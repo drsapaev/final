@@ -18,6 +18,7 @@ import {
     MESSAGING_CONTRACT_VERSION,
     isSupportedMessagingContractVersion,
 } from '../constants/messagingContract';
+import type { AsyncState } from '../types/async-state';
 
 /** AI chat session shape. */
 interface ChatSession {

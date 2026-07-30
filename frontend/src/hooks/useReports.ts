@@ -1,5 +1,6 @@
 import type { ReportConfig } from '../types/domain/clinic';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { AsyncState } from '../types/async-state';
 
 /** Report item shape (used for mock + real reports). */
 interface ReportItem {

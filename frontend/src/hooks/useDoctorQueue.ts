@@ -9,6 +9,7 @@ import type {
   QueueEntry,
   QueueStats,
 } from '../types/domain/queue';
+import type { AsyncState } from '../types/async-state';
 
 // Doctor-queue-specific payload envelope. The backend returns this shape from
 // /queue/{id} with queue entries + stats + can_call_next metadata. The

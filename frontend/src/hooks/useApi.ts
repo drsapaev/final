@@ -8,6 +8,7 @@ import { api, apiRequest } from '../api/client';
 import { toast } from 'react-toastify';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+import type { AsyncState } from '../types/async-state';
 
 // ============================================================================
 // useApiCall
