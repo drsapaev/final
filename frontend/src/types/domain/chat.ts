@@ -23,7 +23,6 @@ export interface ChatReaction {
   id?: number;
   user_id: number;
   user_name?: string | null;
-  [key: string]: unknown;
 }
 
 export interface ChatMessage {
@@ -38,7 +37,6 @@ export interface ChatMessage {
   type?: ChatMessageType;
   attachment_url?: string;
   attachment_name?: string;
-  [key: string]: unknown;
 }
 
 export interface ChatConversation {
@@ -50,7 +48,6 @@ export interface ChatConversation {
   last_message?: string;
   last_message_at?: string;
   unread_count?: number;
-  [key: string]: unknown;
 }
 
 export interface ChatAvailableUser {
@@ -58,7 +55,8 @@ export interface ChatAvailableUser {
   name?: string;
   full_name?: string;
   role?: string;
-  [key: string]: unknown;
+  is_online?: boolean;
+  last_seen?: string;
 }
 
 // Response envelopes — these are DTOs from the REST API. They live in the
@@ -68,23 +66,19 @@ export interface ChatAvailableUser {
 export interface ChatConversationsResponse {
   conversations?: ChatConversation[];
   total_unread?: number;
-  [key: string]: unknown;
 }
 
 export interface ChatConversationResponse {
   messages?: ChatMessage[];
   has_more?: boolean;
-  [key: string]: unknown;
 }
 
 export interface ChatUnreadCountResponse {
   count?: number;
-  [key: string]: unknown;
 }
 
 export interface ChatAvailableUsersResponse {
   users?: ChatAvailableUser[];
-  [key: string]: unknown;
 }
 
 export type ChatOnlineStatus = boolean | 'online' | 'offline' | 'away';

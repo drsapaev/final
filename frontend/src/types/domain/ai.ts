@@ -26,7 +26,6 @@ export interface AIChatMessage {
   timestamp: Date;
   type: AIChatMessageType;
   metadata?: unknown;
-  [key: string]: unknown;
 }
 
 export interface AISuggestion {
@@ -35,14 +34,12 @@ export interface AISuggestion {
   confidence: number;
   category: string;
   timestamp: Date;
-  [key: string]: unknown;
 }
 
 export interface AISuggestionHistoryEntry {
   context: string;
   suggestions: AISuggestion[];
   timestamp: Date;
-  [key: string]: unknown;
 }
 
 export interface AITranslationEntry {
@@ -52,21 +49,18 @@ export interface AITranslationEntry {
   from: string;
   to: string;
   timestamp: Date;
-  [key: string]: unknown;
 }
 
 export interface AIBatchTranslationResult {
   original: string;
   translated: string;
   error?: string;
-  [key: string]: unknown;
 }
 
 export interface AIImageAnalysisFinding {
   label?: string;
   confidence?: number;
   description?: string;
-  [key: string]: unknown;
 }
 
 export interface AIImageAnalysisResult {
@@ -74,5 +68,4 @@ export interface AIImageAnalysisResult {
   findings: AIImageAnalysisFinding[];
   imageType?: string;
   metadata?: { provider?: string; stub?: boolean; [k: string]: unknown };
-  [key: string]: unknown;
 }

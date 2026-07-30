@@ -80,7 +80,7 @@ const formatDateSeparator = (dateStr: string | number | Date | undefined, t: (ke
 
 // Группировка сообщений по датам
 type GroupedMessage = { type: string; id?: string | number; date?: string | number | Date; [k: string]: unknown };
-const groupMessagesByDate = (msgs: Array<{ id?: string | number; created_at?: string | number | Date; [k: string]: unknown }>): GroupedMessage[] => {
+const groupMessagesByDate = (msgs: Array<{ id?: string | number; created_at?: string | number | Date }>): GroupedMessage[] => {
   if (!msgs || msgs.length === 0) return [];
 
   const groups: GroupedMessage[] = [];
@@ -1437,7 +1437,7 @@ const ChatWindow = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
         <MessageContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
-          message={contextMenu.message}
+          message={contextMenu.message as unknown as { id: number; content?: string; sender_id?: number; [key: string]: unknown }}
           isOwn={contextMenu.message.sender_id === user?.id}
           onBlur={() => setContextMenu(null)}
           onAction={(action: string, msg) => { void handleMenuAction(action, msg as unknown as ChatMessage); }} />
