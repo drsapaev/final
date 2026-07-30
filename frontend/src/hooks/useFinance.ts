@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import logger from '../utils/logger';
 import type { Transaction } from '../types/domain/clinic';
 import type { AsyncState } from '../types/async-state';
+import { successState, loadingState, errorState, getData, getError } from '../types/async-state';
 
 const FINANCE_CACHE_KEY = 'admin_finance_transactions_cache';
 // audit/phase-8, BS-36: TTL for deletedIds. Previously deletedIds grew
@@ -182,21 +183,27 @@ const toApiPayload = (transactionData: Record<string, unknown>) => ({
 
 const useFinance = () => {
   const initialCache = readFinanceCache();
-  const [transactions, setTransactions] = useState<unknown[]>(initialCache.transactions);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // AsyncState unifies the (transactions, loading, error) triple. Initialize
+  // from cache so consumers see cached data immediately on mount — the cache
+  // is the source of truth for offline-first behavior.
+  const [transactionsState, setTransactionsState] = useState<AsyncState<unknown[]>>(successState<unknown[]>(initialCache.transactions));
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDateRange, setFilterDateRange] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
-  const transactionsRef = useRef<unknown[]>(initialCache.transactions);
-  const deletedIdsRef = useRef<Set<number>>(new Set(initialCache.deletedIds));
+  // Backward-compatible accessors — preserve the (transactions, loading, error)
+  // shape consumers depend on.
+  const transactions = getData(transactionsState, initialCache.transactions);
+  const loading = transactionsState.status === 'loading';
+  const error = getError(transactionsState);
 
-  useEffect(() => {
-    transactionsRef.current = transactions;
-  }, [transactions]);
+  // Ref mirror of `transactions` so callbacks that transition through 'loading'
+  // (where AsyncState drops the data) can still read the previous data.
+  const transactionsRef = useRef<unknown[]>(transactions);
+  transactionsRef.current = transactions;
+  const deletedIdsRef = useRef<Set<number>>(new Set(initialCache.deletedIds));
 
   const persistTransactions = useCallback((nextTransactions: unknown[], nextDeletedIds: unknown[] | Set<number> = deletedIdsRef.current) => {
     const normalizedTransactions = sortTransactions(nextTransactions.map((tx) => normalizeTransaction(tx as Record<string, unknown>)));
@@ -204,15 +211,14 @@ const useFinance = () => {
 
     transactionsRef.current = normalizedTransactions;
     deletedIdsRef.current = new Set(normalizedDeletedIds);
-    setTransactions(normalizedTransactions);
+    setTransactionsState(successState<unknown[]>(normalizedTransactions));
     writeFinanceCache(normalizedTransactions, normalizedDeletedIds);
 
     return normalizedTransactions;
   }, []);
 
   const loadTransactions = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setTransactionsState(loadingState<unknown[]>());
 
     try {
       const response = await api.get('/admin/finance/transactions', {
@@ -232,10 +238,17 @@ const useFinance = () => {
       return mergedTransactions;
     } catch (err) {
       logger.error('Ошибка загрузки финансовых транзакций:', err);
-      setError(String(err));
 
+      // Cache-fallback behavior (preserve initialCache contract): when we have
+      // data — either live (transactionsRef) or persisted (localStorage) — keep
+      // the data visible via successState. AsyncState is a discriminated union
+      // and cannot represent (data + error) simultaneously, so the error is
+      // logged but not surfaced via the `error` field when cached data is
+      // available. Only when there is no data anywhere do we transition to
+      // errorState so consumers can render an error UI.
       if (transactionsRef.current.length > 0) {
         logger.warn('[FIX:FINANCE] Используем локальный кэш финансовых транзакций после ошибки загрузки');
+        setTransactionsState(successState<unknown[]>(transactionsRef.current));
         return transactionsRef.current;
       }
 
@@ -246,15 +259,13 @@ const useFinance = () => {
         return cachedState.transactions;
       }
 
+      setTransactionsState(errorState<unknown[]>(String(err)));
       return [];
-    } finally {
-      setLoading(false);
     }
   }, [persistTransactions]);
 
   const createTransaction = useCallback(async (transactionData: Partial<Transaction>) => {
-    setLoading(true);
-    setError(null);
+    setTransactionsState(loadingState<unknown[]>());
 
     try {
       const response = await api.post('/admin/finance/transactions', toApiPayload(transactionData));
@@ -275,16 +286,13 @@ const useFinance = () => {
       return createdTransaction;
     } catch (err) {
       logger.error('Ошибка создания финансовой транзакции:', err);
-      setError(String(err));
+      setTransactionsState(errorState<unknown[]>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, [loadTransactions, persistTransactions]);
 
   const updateTransaction = useCallback(async (id: string | number, transactionData: Record<string, unknown>) => {
-    setLoading(true);
-    setError(null);
+    setTransactionsState(loadingState<unknown[]>());
 
     try {
       const response = await api.put(`/admin/finance/transactions/${id}`, toApiPayload(transactionData));
@@ -308,16 +316,13 @@ const useFinance = () => {
       return updatedTransaction;
     } catch (err) {
       logger.error('Ошибка обновления финансовой транзакции:', err);
-      setError(String(err));
+      setTransactionsState(errorState<unknown[]>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, [loadTransactions, persistTransactions]);
 
   const deleteTransaction = useCallback(async (id: string | number) => {
-    setLoading(true);
-    setError(null);
+    setTransactionsState(loadingState<unknown[]>());
 
     try {
       await api.delete(`/admin/finance/transactions/${id}`);
@@ -331,10 +336,8 @@ const useFinance = () => {
       await loadTransactions();
     } catch (err) {
       logger.error('Ошибка удаления финансовой транзакции:', err);
-      setError(String(err));
+      setTransactionsState(errorState<unknown[]>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, [loadTransactions, persistTransactions]);
 

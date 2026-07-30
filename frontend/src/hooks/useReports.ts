@@ -1,6 +1,7 @@
 import type { ReportConfig } from '../types/domain/clinic';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getData, getError } from '../types/async-state';
 
 /** Report item shape (used for mock + real reports). */
 interface ReportItem {
@@ -21,13 +22,20 @@ interface ReportItem {
 }
 
 const useReports = () => {
-  const [reports, setReports] = useState<ReportItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [reportsState, setReportsState] = useState<AsyncState<ReportItem[]>>(idleState<ReportItem[]>());
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterDateRange, setFilterDateRange] = useState('');
+
+  const reports = getData(reportsState, []);
+  const loading = reportsState.status === 'loading';
+  const error = getError(reportsState);
+
+  // Ref mirror of `reports` so callbacks that transition through 'loading'
+  // (where AsyncState drops the data) can still read the previous data.
+  const reportsRef = useRef<ReportItem[]>(reports);
+  reportsRef.current = reports;
 
   // Моковые данные для демонстрации
   const mockReports = useMemo(() => [
@@ -120,29 +128,26 @@ const useReports = () => {
 
   // Загрузка отчетов
   const loadReports = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
+    setReportsState(loadingState<ReportItem[]>());
+
     try {
       // Имитация API запроса
       await new Promise(resolve => setTimeout(resolve, 500));
-      setReports(mockReports);
+      setReportsState(successState<ReportItem[]>(mockReports));
     } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
+      setReportsState(errorState<ReportItem[]>(String(err)));
     }
   }, [mockReports]);
 
   // Генерация отчета
   const generateReport = useCallback(async (reportConfig: ReportConfig) => {
-    setLoading(true);
-    setError(null);
-    
+    const prevReports = reportsRef.current;
+    setReportsState(loadingState<ReportItem[]>());
+
     try {
       // Имитация API запроса
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       const newReport: ReportItem = {
         id: Date.now(),
         name: `${getReportTypeLabel(reportConfig.type)} за ${formatDateRange(reportConfig.dateRange)}`,
@@ -157,29 +162,29 @@ const useReports = () => {
         downloadCount: 0,
         description: getReportTypeDescription(reportConfig.type)
       };
-      
-      setReports(prev => [newReport, ...prev]);
-      
+
+      setReportsState(successState<ReportItem[]>([newReport, ...prevReports]));
+
       // Имитация завершения генерации
       setTimeout(() => {
-        setReports(prev => prev.map(report => 
-          report.id === newReport.id 
-            ? { 
-                ...report, 
-                status: 'completed',
-                generatedAt: new Date().toISOString(),
-                fileSize: `${(Math.random() * 5 + 1).toFixed(1)} MB`
-              }
-            : report
-        ));
+        setReportsState(prev => prev.status === 'success'
+          ? successState<ReportItem[]>(prev.data.map(report =>
+              report.id === newReport.id
+                ? {
+                    ...report,
+                    status: 'completed',
+                    generatedAt: new Date().toISOString(),
+                    fileSize: `${(Math.random() * 5 + 1).toFixed(1)} MB`
+                  }
+                : report
+            ))
+          : prev);
       }, 3000);
-      
+
       return newReport;
     } catch (err) {
-      setError(String(err));
+      setReportsState(errorState<ReportItem[]>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -187,15 +192,17 @@ const useReports = () => {
   const downloadReport = useCallback(async (reportId: string | number) => {
     try {
       // Имитация скачивания
-      const report = reports.find(r => r.id === reportId);
+      const report = reportsRef.current.find(r => r.id === reportId);
       if (report && report.status === 'completed') {
         // Обновляем счетчик скачиваний
-        setReports(prev => prev.map(r => 
-          r.id === reportId 
-            ? { ...r, downloadCount: r.downloadCount + 1 }
-            : r
-        ));
-        
+        setReportsState(prev => prev.status === 'success'
+          ? successState<ReportItem[]>(prev.data.map(r =>
+              r.id === reportId
+                ? { ...r, downloadCount: r.downloadCount + 1 }
+                : r
+            ))
+          : prev);
+
         // Имитация скачивания файла
         const link = document.createElement('a');
         link.href = `#download-${reportId}`;
@@ -205,67 +212,65 @@ const useReports = () => {
         document.body.removeChild(link);
       }
     } catch (err) {
-      setError(String(err));
+      setReportsState(errorState<ReportItem[]>(String(err)));
       throw err;
     }
-  }, [reports]);
+  }, []);
 
   // Удаление отчета
   const deleteReport = useCallback(async (reportId: string | number) => {
-    setLoading(true);
-    setError(null);
-    
+    const prevReports = reportsRef.current;
+    setReportsState(loadingState<ReportItem[]>());
+
     try {
       // Имитация API запроса
       await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setReports(prev => prev.filter(report => report.id !== reportId));
+
+      setReportsState(successState<ReportItem[]>(prevReports.filter(report => report.id !== reportId)));
     } catch (err) {
-      setError(String(err));
+      setReportsState(errorState<ReportItem[]>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   // Повторная генерация отчета
   const regenerateReport = useCallback(async (reportId: string | number) => {
-    setLoading(true);
-    setError(null);
-    
+    const prevReports = reportsRef.current;
+    setReportsState(loadingState<ReportItem[]>());
+
     try {
       // Имитация API запроса
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setReports(prev => prev.map(report => 
-        report.id === reportId 
-          ? { 
-              ...report, 
+
+      setReportsState(successState<ReportItem[]>(prevReports.map(report =>
+        report.id === reportId
+          ? {
+              ...report,
               status: 'generating',
               generatedAt: null,
               error: null
             }
           : report
-      ));
-      
+      )));
+
       // Имитация завершения генерации
       setTimeout(() => {
-        setReports(prev => prev.map(report => 
-          report.id === reportId 
-            ? { 
-                ...report, 
-                status: 'completed',
-                generatedAt: new Date().toISOString(),
-                fileSize: `${(Math.random() * 5 + 1).toFixed(1)} MB`
-              }
-            : report
-        ));
+        setReportsState(prev => prev.status === 'success'
+          ? successState<ReportItem[]>(prev.data.map(report =>
+              report.id === reportId
+                ? {
+                    ...report,
+                    status: 'completed',
+                    generatedAt: new Date().toISOString(),
+                    fileSize: `${(Math.random() * 5 + 1).toFixed(1)} MB`
+                  }
+                : report
+            ))
+          : prev);
       }, 3000);
     } catch (err) {
-      setError(String(err));
+      setReportsState(errorState<ReportItem[]>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
