@@ -614,7 +614,7 @@ const DentistPanelUnified = () => {
                       entry.discount_mode === 'all_free' ? 'All Free' :
                       tI18n('dental.dental_panel_discount_paid'),
                     discount_mode: (entry.discount_mode as string) || 'none',
-                    services: (entry.services as Appointment['services']) || [],
+                    services: (entry.services as unknown as Appointment['services']) || [],
                     service_codes: (entry.service_codes as string[]) || [],
                     payment_type: (entry.payment_type as string) || null,
                     payment_status: (entry.payment_status as string | undefined) ?? null,
@@ -637,7 +637,7 @@ const DentistPanelUnified = () => {
                     ...entryWithTimes,
                     status: (entry.status as string | null | undefined) ?? null,
                     cost: (entry.cost as number) || 0
-                  } as Appointment);
+                  } as unknown as Appointment);
                 });
               }
             });
@@ -984,7 +984,7 @@ const DentistPanelUnified = () => {
             if (visitIdFromUrl && normalizeNumericId(appointment.visit_id) === visitIdFromUrl) {
               return true;
             }
-            return patientIdFromUrl && appointment.patient_id === patientIdFromUrl;
+            return patientIdFromUrl && String(appointment.patient_id) === String(patientIdFromUrl);
           }) || null;
         };
 
@@ -1653,7 +1653,7 @@ const DentistPanelUnified = () => {
         </div>
 
         <EnhancedAppointmentsTable
-        data={appointmentsTableData as unknown as AppointmentRow[]}
+        data={appointmentsTableData as unknown as unknown as AppointmentRow[]}
         loading={appointmentsLoading}
         theme="light"
         language="ru"

@@ -7,6 +7,7 @@
  */
 
 import type { Invoice, Payment } from '../../types/domain/billing';
+import { toInvoiceId, toAppointmentId, toPatientId, toPaymentId } from '../../types/domain/branded';
 
 // Transport shape — the backend returns this loose form. We don't have a
 // strict OpenAPI *Dto for these endpoints (they're not in the generated
@@ -26,9 +27,9 @@ export function mapInvoiceDto(dto: InvoiceDtoLike): Invoice {
   }
 
   return {
-    id,
-    appointment_id: dto.appointment_id as string | number | undefined,
-    patient_id: dto.patient_id as string | number | undefined,
+    id: toInvoiceId(id),
+    appointment_id: dto.appointment_id != null ? toAppointmentId(dto.appointment_id as string | number) : undefined,
+    patient_id: dto.patient_id != null ? toPatientId(dto.patient_id as string | number) : undefined,
     patient_name: dto.patient_name as string | undefined,
     amount: dto.amount != null ? Number(dto.amount) : undefined,
     paid_amount: dto.paid_amount != null ? Number(dto.paid_amount) : undefined,
@@ -64,8 +65,9 @@ export function mapPaymentDto(dto: PaymentDtoLike): Payment {
   }
 
   return {
-    id,
-    invoice_id: dto.invoice_id as string | number | undefined,
+    id: toPaymentId(id),
+    invoice_id: dto.invoice_id != null ? toInvoiceId(dto.invoice_id as string | number) : undefined,
+    patient_id: dto.patient_id != null ? toPatientId(dto.patient_id as string | number) : undefined,
     amount: dto.amount != null ? Number(dto.amount) : undefined,
     method: dto.method as Payment['method'],
     status: dto.status as Payment['status'],

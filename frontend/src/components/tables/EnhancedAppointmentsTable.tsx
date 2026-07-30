@@ -105,14 +105,14 @@ const getEnhancedAppointmentRowKey = (row: Appointment, index: number) => {
 };
 
 export interface AppointmentRow {
-  id?: string | number;
-  patient_id?: string | number;
+  id?: string | number | import('../../types/domain/branded').AppointmentId;
+  patient_id?: string | number | import('../../types/domain/branded').PatientId;
   patient_fio?: string;
   patient_name?: string;
   patient_phone?: string;
   patient_birth_year?: number;
   patient_address?: string;
-  doctor_id?: string | number;
+  doctor_id?: string | number | import('../../types/domain/branded').DoctorId;
   doctor_name?: string;
   department?: string;
   status?: string;
@@ -300,14 +300,14 @@ const EnhancedAppointmentsTable = ({
 
   // Фильтрация данных
   const filteredData = useMemo(() => {
-    return sortedData.filter((row: Appointment) => {
+    return sortedData.filter((row: AppointmentRow) => {
       const searchMatch = !filterConfig.search ||
       Object.values(row).some((val) =>
       String(val).toLowerCase().includes(filterConfig.search.toLowerCase())
       );
 
       const statusMatch = !filterConfig.status || row.status === filterConfig.status;
-      const doctorMatch = !filterConfig.doctor || row.doctor_id === parseInt(filterConfig.doctor);
+      const doctorMatch = !filterConfig.doctor || String(row.doctor_id) === filterConfig.doctor;
       const departmentMatch = !filterConfig.department || row.department === filterConfig.department;
 
       return searchMatch && statusMatch && doctorMatch && departmentMatch;
@@ -360,13 +360,13 @@ const EnhancedAppointmentsTable = ({
   const handleSelectAll = useCallback((checked: boolean) => {
     if (onRowSelect) {
       // Используем внешний обработчик для каждой строки
-      paginatedData.forEach((row: Appointment) => {
+      paginatedData.forEach((row: AppointmentRow) => {
         onRowSelect(row.id, checked);
       });
     } else {
       // Используем внутреннее состояние
       if (checked) {
-        setInternalSelectedRows(new Set(paginatedData.map((row: Appointment) => row.id)));
+        setInternalSelectedRows(new Set(paginatedData.map((row: AppointmentRow) => row.id)));
       } else {
         setInternalSelectedRows(new Set());
       }
@@ -374,7 +374,7 @@ const EnhancedAppointmentsTable = ({
   }, [paginatedData, onRowSelect]);
 
   // ✅ Улучшенный рендер статуса (полный контекстный)
-  const renderStatus = useCallback((status: string) => {
+  const renderStatus = useCallback((status: string): React.ReactNode => {
     const statusConfig = {
       // Статусы записи
       scheduled: {
@@ -1100,7 +1100,7 @@ const EnhancedAppointmentsTable = ({
       const todayAppointments = data.filter((item) =>
       item.date === today || item.appointment_date === today
       );
-      const todayIndex = todayAppointments.findIndex((item: Appointment) => item.id === row.id) + 1;
+      const todayIndex = todayAppointments.findIndex((item: AppointmentRow) => item.id === row.id) + 1;
 
       return (
         <span style={{
@@ -1479,7 +1479,7 @@ const EnhancedAppointmentsTable = ({
                 </td>
               </tr> :
 
-            paginatedData.map((row: Appointment, index: number) => {
+            paginatedData.map((row: AppointmentRow, index: number) => {
               // ⭐ SSOT: Get session color for visual grouping (presentation only)
               const sessionColor = getSessionColor(row.session_id ?? '');
               const rowRecord = row as unknown as Record<string, unknown>;
@@ -1512,7 +1512,7 @@ const EnhancedAppointmentsTable = ({
 
               return (
                 <tr
-                  key={getEnhancedAppointmentRowKey(row, index)}
+                  key={getEnhancedAppointmentRowKey(row as unknown as Appointment, index)}
                   className="enhanced-table-row"
                   style={{
                     backgroundColor: selectedRows.has(row.id) ?
@@ -1564,7 +1564,7 @@ const EnhancedAppointmentsTable = ({
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-base)'
                   }}>
-                      {renderQueueNumbers(row)}
+                      {renderQueueNumbers(row as unknown as Appointment)}
                     </td>
 
                     {/* Пациент */}
@@ -1755,7 +1755,7 @@ const EnhancedAppointmentsTable = ({
                         }
                         const discountMode = row.discount_mode;
                         const paymentStatus = (String(row.payment_status || '')).toLowerCase();
-                        const amount = getDisplayAmount(row);
+                        const amount = getDisplayAmount(row as unknown as Appointment);
                         const isApprovedAllFree = discountMode === 'all_free' && row.approval_status === 'approved';
                         const isPendingAllFree = discountMode === 'all_free' && row.approval_status !== 'approved';
                         const isZeroCostDiscount = ['repeat', 'benefit'].includes(String(discountMode)) && amount <= 0 && paymentStatus !== 'paid';
@@ -1879,7 +1879,7 @@ const EnhancedAppointmentsTable = ({
                       {/* UX Audit R-4.4: показываем visit status + payment status.
                           Раньше: 15 статусов в одной колонке, включая paid_pending/payment_paid.
                           Теперь: visit status (основной) + payment badge (если есть). */}
-                      {renderStatus(row.status ?? '')}
+                      {renderStatus(String(row.status ?? ""))}
                       {row.payment_status && row.payment_status !== 'paid' && (
                         <div style={{
                           display: 'inline-flex',
@@ -1906,7 +1906,7 @@ const EnhancedAppointmentsTable = ({
                     color: (() => {
                       if (row.cost_display === 'free') return 'var(--mac-warning)';
                       const discountMode = row.discount_mode;
-                      const amount = getDisplayAmount(row);
+                      const amount = getDisplayAmount(row as unknown as Appointment);
                       const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(discountMode)) && amount <= 0;
                       if (isZeroCostRegistration) return 'var(--mac-warning)';
 
@@ -1921,7 +1921,7 @@ const EnhancedAppointmentsTable = ({
                         return t('misc.eat_payment_free');
                       }
                       const discountMode = row.discount_mode;
-                      const amount = getDisplayAmount(row);
+                      const amount = getDisplayAmount(row as unknown as Appointment);
                       const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(discountMode)) && amount <= 0;
                       if (isZeroCostRegistration) {
                         return t('misc.eat_payment_free');

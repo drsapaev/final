@@ -35,7 +35,7 @@ export function mapPatientDto(dto: PatientDto): Patient {
   return {
     ...dto,
     name: derivedName,
-  } as Patient;
+  } as unknown as Patient;
 }
 
 /** Convert an array of Patient DTOs. Skips entries that fail the invariant

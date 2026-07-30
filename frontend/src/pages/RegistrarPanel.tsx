@@ -1337,7 +1337,7 @@ const RegistrarPanel = () => {
   const handleContextMenuAction = useCallback(async (action: string, row: Appointment) => {
     switch (action) {
       case 'view':
-        openRecordPreview(row);
+        openRecordPreview(row as unknown as Appointment);
         break;
       case 'edit':
         openRecordEditor(row);
@@ -1380,7 +1380,7 @@ const RegistrarPanel = () => {
         break;
       }
       case 'payment':
-        setPaymentDialog({ open: true, row, paid: false, source: 'context' });
+        setPaymentDialog({ open: true, row: row as unknown as Appointment, paid: false, source: 'context' });
         break;
       case 'print':
         setPrintDialog({ open: true, type: 'ticket', data: row as unknown as Record<string, unknown> });
@@ -1390,7 +1390,7 @@ const RegistrarPanel = () => {
         setShowSlotsModal(true);
         break;
       case 'cancel':
-        setCancelDialog({ open: true, row, reason: '' });
+        setCancelDialog({ open: true, row: row as unknown as Appointment, reason: '' });
         break;
       case 'call_patient':
         if (row.patient_phone) {
@@ -1672,7 +1672,7 @@ const RegistrarPanel = () => {
               showCheckboxes={false} // UX Audit R-4.7: bulk-action UI удалён (QW-01 fix),
                                     // поэтому чекбоксы отключены — они были dead UI
                                     // (видны, но ничего не делают). Nielsen #2 + #4.
-              onRowClick={(row: Appointment) => {
+              onRowClick={(row: unknown) => {
                 logger.info('Открыть детали записи:', row);
                 // Здесь можно открыть модальное окно с деталями записи
               }}
@@ -1680,7 +1680,7 @@ const RegistrarPanel = () => {
                 switch (action) {
                   case 'view':
                     logger.info('Просмотр записи:', row);
-                    openRecordPreview(row);
+                    openRecordPreview(row as unknown as Appointment);
                     break;
                   case 'edit':
                     // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
@@ -1689,7 +1689,7 @@ const RegistrarPanel = () => {
                     break;
                   case 'payment':
                     logger.info('Открытие модального окна оплаты для записи:', row);
-                    setPaymentDialog({ open: true, row, paid: false, source: 'table' });
+                    setPaymentDialog({ open: true, row: row as unknown as Appointment, paid: false, source: 'table' });
                     break;
                   case 'in_cabinet': {
                     // UX Audit Registrar #2: window.confirm() → useConfirm hook.
@@ -1738,7 +1738,7 @@ const RegistrarPanel = () => {
                     setShowSlotsModal(true);
                     break;
                   case 'cancel':
-                    setCancelDialog({ open: true, row, reason: '' });
+                    setCancelDialog({ open: true, row: row as unknown as Appointment, reason: '' });
                     break;
                   case 'more':{
                       // Показать контекстное меню с дополнительными действиями

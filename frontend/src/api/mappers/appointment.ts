@@ -39,7 +39,7 @@ export function mapAppointmentDto(dto: AppointmentDto): Appointment {
     ...rest,
     service_codes: serviceCodes,
     services,
-  } as Appointment;
+  } as unknown as Appointment;
 }
 
 export function mapAppointmentDtos(dtos: AppointmentDto[] | unknown): Appointment[] {
