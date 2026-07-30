@@ -20,7 +20,7 @@ import { useQueueManager } from '../../hooks/useQueueManager';
 // UX Audit Stage 3 (Queue issue 7.1):
 // WebSocket подписка для мгновенных обновлений очереди вместо 30s polling.
 import { useQueueWebSocket } from '../../hooks/useQueueWebSocket';
-import QueueTable from './QueueTable';
+import QueueTable, { type QueueTableData } from './QueueTable';
 import logger from '../../utils/logger';
 import { getErrorMessage } from '../../utils/type-guards';
 import './ModernQueueManager.css';
@@ -650,7 +650,7 @@ const ModernQueueManager = ({
           </div>
 
           <QueueTable
-            queueData={queueData}
+            queueData={queueData as unknown as QueueTableData | null}
             effectiveDoctor={String(effectiveDoctor ?? '')}
             onGenerateQR={generateQR}
             loading={loading}

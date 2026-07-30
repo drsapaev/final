@@ -12,7 +12,6 @@ export interface AppUser {
   full_name?: string;
   email?: string;
   role?: string;
-  [key: string]: unknown;
 }
 
 export interface AppPatient {
@@ -20,7 +19,6 @@ export interface AppPatient {
   name?: string;
   full_name?: string;
   phone?: string;
-  [key: string]: unknown;
 }
 
 export interface AppAppointment {
@@ -28,28 +26,23 @@ export interface AppAppointment {
   patient_id?: string | number;
   doctor_id?: string | number;
   status?: string;
-  [key: string]: unknown;
 }
 
 export interface AppQueueEntry {
   id: string | number;
   status?: string;
-  [key: string]: unknown;
 }
 
 export interface AppQueueData {
   entries: AppQueueEntry[];
   is_open?: boolean;
-  [key: string]: unknown;
 }
 
 export interface AppEMRData {
-  [key: string]: unknown;
 }
 
 export interface AppLabResult {
   id?: string | number;
-  [key: string]: unknown;
 }
 
 export interface AppLoadingState {

@@ -27,11 +27,11 @@ import PhotoArchive from '../components/dental/PhotoArchive';
 import ProtocolTemplates from '../components/dental/ProtocolTemplates';
 import DentalReportsTab from '../components/dental/DentalReportsTab';
 import DentalTemplatesTab from '../components/dental/DentalTemplatesTab';
-import DentalDashboardTab from '../components/dental/DentalDashboardTab';
+import DentalDashboardTab, { type DentalDashboardAppointment } from '../components/dental/DentalDashboardTab';
 import DentalPatientsTab from '../components/dental/DentalPatientsTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import SessionWarningModal from '../components/common/SessionWarningModal';
-import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
+import EnhancedAppointmentsTable, { type AppointmentRow } from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
 
 import {
@@ -768,7 +768,7 @@ const DentistPanelUnified = () => {
       case 'call':
         // Вызвать пациента
         try {
-          const queueEntryId = resolveDoctorQueueEntryId(row);
+          const queueEntryId = resolveDoctorQueueEntryId(row as unknown as Record<string, unknown>);
           if (queueEntryId === null) {
             logger.warn('[Dentist] Cannot start visit without OnlineQueueEntry id', row);
             notify.error(tI18n('dental.no_queue_id_for_visit'));
@@ -1622,7 +1622,7 @@ const DentistPanelUnified = () => {
   // Рендер дашборда
   const renderDashboard = () =>
     <DentalDashboardTab
-      appointments={appointmentsTableData}
+      appointments={appointmentsTableData as unknown as DentalDashboardAppointment[]}
       patients={patients}
       onGoToAppointments={() => handleTabChange('appointments')}
       onGoToPatients={() => handleTabChange('patients')}
@@ -1653,7 +1653,7 @@ const DentistPanelUnified = () => {
         </div>
 
         <EnhancedAppointmentsTable
-        data={appointmentsTableData}
+        data={appointmentsTableData as unknown as AppointmentRow[]}
         loading={appointmentsLoading}
         theme="light"
         language="ru"
@@ -1950,7 +1950,7 @@ const DentistPanelUnified = () => {
             specialty="dentistry"
             onPatientSelect={handlePatientSelect}
             onStartVisit={(appointment: Appointment) => {
-              setSelectedPatient(appointment);
+              setSelectedPatient(appointment as unknown as SelectedPatient);
               handleTabChange('visit');
             }} />);
 

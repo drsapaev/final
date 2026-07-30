@@ -43,6 +43,7 @@ import {
   formatRegistrarDate,
   formatRegistrarTime,
   getLocalDateString,
+  type RegistrarTimestampRecord,
 } from '../../utils/dateUtils';
 
 // ⭐ SSOT: Centralized service code resolver
@@ -51,7 +52,7 @@ import AppointmentPagination from './AppointmentPagination';  // PR-75
 // UX Audit R-3.1: единая CSV-функция с PHI masking.
 import { generateCSV, downloadCSV } from '../../pages/registrar/registrarCsv';
 import { useTranslation } from '../../i18n/useTranslation';
-import type { Appointment } from '../../types/domain/clinic';
+import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
 
 const SESSION_COLORS = [
   'var(--mac-accent-blue)', // blue
@@ -103,7 +104,7 @@ const getEnhancedAppointmentRowKey = (row: Appointment, index: number) => {
   return parts.map((part) => String(part)).join(':');
 };
 
-interface AppointmentRow {
+export interface AppointmentRow {
   id?: string | number;
   patient_id?: string | number;
   patient_fio?: string;
@@ -121,7 +122,7 @@ interface AppointmentRow {
   appointment_time?: string;
   cost?: number;
   payment_amount?: number;
-  queue_numbers?: Array<{ number?: string | number; service_name?: string; specialty?: string; [k: string]: unknown }>;
+  queue_numbers?: QueueNumberInfo[];
   session_id?: string;
   service?: string;
   services?: Array<{ name?: string; [k: string]: unknown }>;
@@ -926,7 +927,7 @@ const EnhancedAppointmentsTable = ({
         let queueStatus: string | undefined = row.queue_number_status;
         if (!queueStatus && row.queue_numbers && Array.isArray(row.queue_numbers)) {
           // Ищем queue_number в queue_numbers и берём его статус
-          const matchingQueue = row.queue_numbers.find((q: Record<string, unknown>) => q.number === row.queue_number);
+          const matchingQueue = row.queue_numbers.find((q: QueueNumberInfo) => q.number === row.queue_number);
           if (matchingQueue) {
             queueStatus = matchingQueue.status as string | undefined;
           } else if (row.queue_numbers.length > 0) {
@@ -1005,7 +1006,7 @@ const EnhancedAppointmentsTable = ({
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
               }}
-              title={row.queue_numbers.map((q: Record<string, unknown>) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
+              title={row.queue_numbers.map((q: QueueNumberInfo) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
             >
               +{row.queue_numbers.length - 1}
             </span>
@@ -1085,7 +1086,7 @@ const EnhancedAppointmentsTable = ({
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
               }}
-              title={row.queue_numbers.map((q: Record<string, unknown>) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
+              title={row.queue_numbers.map((q: QueueNumberInfo) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
             >
               +{row.queue_numbers.length - 1}
             </span>
@@ -1481,12 +1482,13 @@ const EnhancedAppointmentsTable = ({
             paginatedData.map((row: Appointment, index: number) => {
               // ⭐ SSOT: Get session color for visual grouping (presentation only)
               const sessionColor = getSessionColor(row.session_id ?? '');
-              const backendCanPay = getBackendActionAvailability(row, 'payment', 'can_mark_paid');
-              const backendCanCall = getBackendActionAvailability(row, 'call', 'can_start_visit');
-              const backendCanPrint = getBackendActionAvailability(row, 'print', 'can_print_ticket');
-              const backendCanComplete = getBackendActionAvailability(row, 'complete', 'can_complete');
-              const backendCanViewEmr = getBackendActionAvailability(row, 'view_emr', 'can_view_emr');
-              const backendCanScheduleNext = getBackendActionAvailability(row, 'schedule_next', 'can_schedule_next');
+              const rowRecord = row as unknown as Record<string, unknown>;
+              const backendCanPay = getBackendActionAvailability(rowRecord, 'payment', 'can_mark_paid');
+              const backendCanCall = getBackendActionAvailability(rowRecord, 'call', 'can_start_visit');
+              const backendCanPrint = getBackendActionAvailability(rowRecord, 'print', 'can_print_ticket');
+              const backendCanComplete = getBackendActionAvailability(rowRecord, 'complete', 'can_complete');
+              const backendCanViewEmr = getBackendActionAvailability(rowRecord, 'view_emr', 'can_view_emr');
+              const backendCanScheduleNext = getBackendActionAvailability(rowRecord, 'schedule_next', 'can_schedule_next');
               const canPay = !isDoctorView && backendCanPay === true;
               const canCall = isDoctorView && backendCanCall === true;
               const canPrint = backendCanPrint === true;
@@ -1539,7 +1541,7 @@ const EnhancedAppointmentsTable = ({
                       }
                     }
                   }}
-                  onClick={() => onRowClick?.(row)}
+                  onClick={() => onRowClick?.(row as unknown as AppointmentRow)}
                   title={row.session_id ? t('misc.eat_session_label', { sessionId: row.session_id }) : undefined}>
 
                     {/* Чекбокс */}
@@ -1817,7 +1819,7 @@ const EnhancedAppointmentsTable = ({
                         {/* ✅ SSOT FIX: ONLY use queue_time. Compute earliest from all patient entries if needed. */}
                         {(() => {
                         // ⭐ SSOT: Use row.queue_time directly - no aggregation
-                        const timeDisplay = getRegistrarTimestampDisplay(row);
+                        const timeDisplay = getRegistrarTimestampDisplay(row as unknown as RegistrarTimestampRecord);
 
                         if (timeDisplay.primaryDate || timeDisplay.primaryTime) {
                           return (
@@ -1970,7 +1972,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('payment', row, e);
+                          onActionClick?.('payment', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_payment')}>
 
@@ -1989,7 +1991,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('call', row, e);
+                          onActionClick?.('call', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_call_action')}>
 
@@ -2008,7 +2010,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('print', row, e);
+                          onActionClick?.('print', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_print')}
                         aria-label={t('misc.eat_print')}>
@@ -2028,7 +2030,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('complete', row, e);
+                          onActionClick?.('complete', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_complete')}>
 
@@ -2049,12 +2051,12 @@ const EnhancedAppointmentsTable = ({
                             can_notify_diagnostics_return: row.can_notify_diagnostics_return,
                             can_restore_next: row.can_restore_next,
                             can_incomplete: row.can_incomplete,
-                            can_complete: getBackendActionAvailability(row, 'complete', 'can_complete')
+                            can_complete: getBackendActionAvailability(row as unknown as Record<string, unknown>, 'complete', 'can_complete')
                           }}
                           onStatusChange={(action, entry, result) => {
                             logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);
                             // Передаём событие наружу для обновления списка
-                            onActionClick?.(`queue_${action}`, row, null);
+                            onActionClick?.(`queue_${action}`, row as unknown as AppointmentRow, null);
                           }}
                           compact={true} />
 
@@ -2071,7 +2073,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('view', row, e);
+                          onActionClick?.('view', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_view')}
                         aria-label={t('misc.eat_view')}>
@@ -2090,7 +2092,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('edit', row, e);
+                          onActionClick?.('edit', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_edit')}
                         aria-label={t('misc.eat_edit')}>
@@ -2109,7 +2111,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('view_emr', row, e);
+                          onActionClick?.('view_emr', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_view_emr')}
                         aria-label={t('misc.eat_view_emr')}>
@@ -2130,7 +2132,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('reschedule', row, e);
+                          onActionClick?.('reschedule', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_reschedule')}
                         aria-label={t('misc.eat_reschedule_aria')}>
@@ -2148,7 +2150,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('cancel', row, e);
+                          onActionClick?.('cancel', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_cancel')}
                         aria-label={t('misc.eat_cancel_aria')}>
@@ -2166,7 +2168,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('more', row, e);
+                          onActionClick?.('more', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_more')}
                         aria-label={t('misc.eat_more')}>
@@ -2185,7 +2187,7 @@ const EnhancedAppointmentsTable = ({
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
-                          onActionClick?.('schedule_next', row, e);
+                          onActionClick?.('schedule_next', row as unknown as AppointmentRow, e);
                         }}
                         title={t('misc.eat_schedule_next_title')}>
 

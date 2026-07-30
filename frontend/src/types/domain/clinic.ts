@@ -49,7 +49,6 @@ export interface QueueNumberInfo {
   status?: string;
   service_name?: string;
   specialty?: string;
-  [key: string]: unknown;
 }
 
 export interface Appointment {
@@ -100,7 +99,71 @@ export interface Appointment {
   grouped_records?: unknown[];
   grouped_record_refs?: unknown[];
   aggregated_ids?: unknown[];
-  [key: string]: unknown;
+  address?: unknown;
+  all_patient_services?: unknown;
+  birth_year?: unknown;
+  can_create_direct_payment?: unknown;
+  can_create_grouped_payment?: unknown;
+  can_incomplete?: unknown;
+  can_no_show?: unknown;
+  can_notify_diagnostics_return?: unknown;
+  can_restore_next?: unknown;
+  can_send_to_diagnostics?: unknown;
+  canonical_status?: unknown;
+  cost_display?: unknown;
+  doctor?: unknown;
+  doctorCabinet?: unknown;
+  doctorSpecialization?: unknown;
+  doctor_cabinet?: unknown;
+  doctor_specialization?: unknown;
+  effectiveCabinet?: unknown;
+  effective_cabinet?: unknown;
+  entity_type?: unknown;
+  hasIntegrityWarnings?: unknown;
+  has_integrity_warnings?: unknown;
+  has_shared_invoice?: unknown;
+  integrityWarnings?: unknown;
+  integrity_warnings?: unknown;
+  invoice_amount?: unknown;
+  latest_lab_report?: unknown;
+  name?: unknown;
+  notes?: unknown;
+  patient?: unknown;
+  payment_contract?: unknown;
+  payment_visit_id?: unknown;
+  payment_visit_ids?: unknown;
+  phone?: unknown;
+  queueCabinet?: unknown;
+  queue_cabinet?: unknown;
+  queue_id?: unknown;
+  queue_status?: unknown;
+  queue_tag?: unknown;
+  queue_time?: unknown;
+  reason?: unknown;
+  record_type?: unknown;
+  remaining_amount?: unknown;
+  source?: unknown;
+  source_type?: unknown;
+  specialization?: unknown;
+  start_time?: unknown;
+  total_amount?: unknown;
+  appointmentDate?: unknown;
+  appointmentTime?: unknown;
+  appointment_id?: unknown;
+  createdAt?: unknown;
+  department_id?: unknown;
+  doctorId?: unknown;
+  doctorName?: unknown;
+  patientId?: unknown;
+  patientName?: unknown;
+  patient_first_name?: unknown;
+  patient_last_name?: unknown;
+  payment_id?: unknown;
+  service_details?: unknown;
+  services_names?: unknown;
+  updatedAt?: unknown;
+  visit_ids?: unknown;
+  visit_time?: unknown;
 }
 
 export interface Patient {
@@ -119,7 +182,7 @@ export interface Patient {
   doc_number?: string;
   address?: string;
   created_at?: string;
-  [key: string]: unknown;
+  birthDate?: unknown;
 }
 
 export interface DoctorScheduleSlot {
@@ -127,7 +190,6 @@ export interface DoctorScheduleSlot {
   end_time?: string;
   day_of_week?: number;
   is_available?: boolean;
-  [key: string]: unknown;
 }
 
 export interface DoctorAvailability {
@@ -135,7 +197,6 @@ export interface DoctorAvailability {
   is_available?: boolean;
   slots?: DoctorScheduleSlot[];
   reason?: string;
-  [key: string]: unknown;
 }
 
 export interface Doctor {
@@ -156,7 +217,11 @@ export interface Doctor {
   user?: { full_name?: string; [k: string]: unknown };
   schedule?: DoctorScheduleSlot[];
   availability?: DoctorAvailability[];
-  [key: string]: unknown;
+  active?: unknown;
+  experience?: unknown;
+  patientsCount?: unknown;
+  specialization?: unknown;
+  schedules?: unknown;
 }
 
 export interface Transaction {
@@ -167,13 +232,13 @@ export interface Transaction {
   status?: string;
   method?: string;
   date?: string;
-  [key: string]: unknown;
 }
 
 export interface ReportConfig {
   type?: string;
   dateRange?: string;
-  [key: string]: unknown;
+  filters?: unknown;
+  format?: unknown;
 }
 
 export interface DepartmentStats {
@@ -181,7 +246,6 @@ export interface DepartmentStats {
   total_appointments?: number;
   total_patients?: number;
   active_queues?: number;
-  [key: string]: unknown;
 }
 
 export interface Department {
@@ -192,14 +256,12 @@ export interface Department {
   is_active?: boolean;
   doctor_count?: number;
   stats?: DepartmentStats;
-  [key: string]: unknown;
 }
 
 export interface ServiceCategory {
   id?: string | number;
   name?: string;
   code?: string;
-  [key: string]: unknown;
 }
 
 export interface ServiceFilter {
@@ -207,7 +269,6 @@ export interface ServiceFilter {
   specialty?: string;
   department?: string;
   search?: string;
-  [key: string]: unknown;
 }
 
 export interface Service {
@@ -224,5 +285,4 @@ export interface Service {
   is_consultation?: boolean;
   requires_doctor?: boolean;
   description?: string;
-  [key: string]: unknown;
 }

@@ -52,7 +52,7 @@ const hasBackendQueueAction = (
     return availableActions.includes(action);
   }
   if (flagName && Object.prototype.hasOwnProperty.call(entry, flagName)) {
-    return Boolean(entry[flagName]);
+    return Boolean((entry as unknown as Record<string, unknown>)[flagName]);
   }
   return false;
 };

@@ -33,7 +33,7 @@ export interface QueueEntry {
   completed_at?: string;
   people_before?: number;
   estimated_wait_time?: number;
-  [key: string]: unknown;
+  available_actions?: unknown;
 }
 
 export interface QueueState {
@@ -44,7 +44,6 @@ export interface QueueState {
   specialist_id?: string | number;
   specialty?: string;
   date?: string;
-  [key: string]: unknown;
 }
 
 export type QueueAction =
@@ -75,7 +74,6 @@ export interface QueueStats {
   served_count?: number;
   skipped?: number;
   cancelled?: number;
-  [key: string]: unknown;
 }
 
 export interface QueueFilters {
@@ -83,7 +81,6 @@ export interface QueueFilters {
   source?: QueueSource;
   specialty?: string;
   date?: string;
-  [key: string]: unknown;
 }
 
 // === Specialist (was local in useQueueManager.ts) ===========================
@@ -98,7 +95,8 @@ export interface QueueSpecialist {
   specialty_display?: string;
   cabinet?: string | number;
   department?: string;
-  [key: string]: unknown;
+  color?: unknown;
+  icon?: unknown;
 }
 
 // === Queue snapshot (was local in useQueueManager.ts) =======================
@@ -114,12 +112,10 @@ export interface QueueData {
   specialist_id?: number | string;
   specialty?: string;
   queue_id?: number;
-  [key: string]: unknown;
 }
 
 export interface QueuePayload {
   queues?: QueueData[];
-  [key: string]: unknown;
 }
 
 // === QR codes (was local in useQueueManager.ts) =============================
@@ -134,7 +130,6 @@ export interface QrData {
   target_date?: string;
   token?: string;
   expires_at?: string;
-  [key: string]: unknown;
 }
 
 // === Action args / responses (was local in useQueueManager.ts) =============
@@ -170,9 +165,7 @@ export interface QueueActionResponse {
     id?: number;
     name?: string;
     number?: number | string;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
+    };
 }
 
 // === Queue join session (returned by /queue/join/start) =====================
@@ -183,7 +176,6 @@ export interface QueueActionResponse {
 export interface QueueJoinSessionData {
   session_token: string;
   queue_info?: QueueJoinInfo;
-  [key: string]: unknown;
 }
 
 export interface QueueJoinInfo {
@@ -194,7 +186,6 @@ export interface QueueJoinInfo {
   department?: string;
   department_name?: string;
   queue_name?: string;
-  [key: string]: unknown;
 }
 
 // === QR token info (returned by /queue/qr-tokens/{token}/info) ==============
@@ -209,7 +200,6 @@ export interface QrTokenInfo {
   queue_name?: string;
   valid?: boolean;
   expired?: boolean;
-  [key: string]: unknown;
 }
 
 // === Queue profiles (returned by /queues/profiles/public) ===================
@@ -221,10 +211,8 @@ export interface QueueProfile {
   specialty?: string;
   department?: string;
   is_active?: boolean;
-  [key: string]: unknown;
 }
 
 export interface QueueProfilesResponse {
   profiles?: QueueProfile[];
-  [key: string]: unknown;
 }

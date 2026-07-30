@@ -57,7 +57,7 @@ const normalizeAppointment = (appointment: Appointment): NormalizedAppointment =
   hasIntegrityWarnings: (appointment.hasIntegrityWarnings ??
     appointment.has_integrity_warnings ??
     false) as boolean,
-});
+} as NormalizedAppointment);
 
 const buildAppointmentPayload = (appointmentData: Record<string, unknown>, doctors: Doctor[] = []) => {
   const selectedDoctor = doctors.find(

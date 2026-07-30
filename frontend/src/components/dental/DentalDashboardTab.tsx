@@ -7,12 +7,12 @@ import { Card, Button } from '../ui/macos';
 import { Calendar, Users, Activity, FileText } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 
-interface DentalDashboardAppointment {
+export interface DentalDashboardAppointment {
   status?: string;
   [key: string]: unknown;
 }
 
-interface DentalDashboardPatient {
+export interface DentalDashboardPatient {
   [key: string]: unknown;
 }
 

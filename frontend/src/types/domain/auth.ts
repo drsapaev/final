@@ -34,13 +34,18 @@ export interface UserProfile {
   role?: string;
   role_name?: string;
   specialty?: string;
-  [key: string]: unknown;
+  admin?: unknown;
+  clinic_id?: unknown;
+  doctor_id?: unknown;
+  is_admin?: unknown;
+  is_superuser?: unknown;
+  specialist_id?: unknown;
+  roles?: unknown;
 }
 
 export interface AuthState {
   token: string | null;
   profile: UserProfile | null;
-  [key: string]: unknown;
 }
 
 // === Richer auth context state (FUTURE) =====================================
@@ -56,7 +61,6 @@ export interface AuthSessionState {
   status: AuthStatus;
   error: string | null;
   isAuthenticated: boolean;
-  [key: string]: unknown;
 }
 
 export interface AuthUser {
@@ -69,7 +73,6 @@ export interface AuthUser {
   phone?: string;
   avatar?: string | null;
   is_active?: boolean;
-  [key: string]: unknown;
 }
 
 export type AuthAction =
@@ -86,7 +89,6 @@ export interface Permission {
   code?: string;
   name?: string;
   description?: string;
-  [key: string]: unknown;
 }
 
 export interface Role {
@@ -94,7 +96,6 @@ export interface Role {
   name?: string;
   code?: string;
   permissions?: Permission[];
-  [key: string]: unknown;
 }
 
 /**
@@ -113,13 +114,11 @@ export interface RoleRecord {
   level: number;
   is_active: boolean;
   is_system: boolean;
-  [key: string]: unknown;
 }
 
 export interface LoginCredentials {
   email: string;
   password: string;
-  [key: string]: unknown;
 }
 
 // ============================================================================
@@ -205,7 +204,6 @@ export interface TwoFactorVerifyRequest {
   device_fingerprint?: string;
   remember_device?: boolean;
   pending_2fa_token: string;
-  [key: string]: unknown;
 }
 
 // ============================================================================
@@ -214,7 +212,6 @@ export interface TwoFactorVerifyRequest {
 
 export interface RefreshTokenRequest {
   refresh_token: string;
-  [key: string]: unknown;
 }
 
 export interface RefreshTokenResponse {
@@ -222,7 +219,6 @@ export interface RefreshTokenResponse {
   refresh_token: string;
   token_type: string;
   expires_in: number;
-  [key: string]: unknown;
 }
 
 // ============================================================================
@@ -277,7 +273,6 @@ export interface TokenPayload {
   iat?: number;
   role?: string;
   roles?: string[];
-  [key: string]: unknown;
 }
 
 export interface SessionInfo {
@@ -288,5 +283,4 @@ export interface SessionInfo {
   created_at?: string;
   expires_at?: string;
   is_active?: boolean;
-  [key: string]: unknown;
 }

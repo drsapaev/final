@@ -26,7 +26,7 @@ import { useConfirm } from '../components/common/ConfirmDialog';
 // and confirm/notify strings (registrar.*). Replaces the legacy split between
 // getRegistrarTranslator (flat keys) and adapter (namespaced keys).
 import { useTranslation } from '../i18n/useTranslation';
-import type { Appointment, Doctor } from '../types/domain/clinic';
+import type { Appointment, Doctor, QueueNumberInfo } from '../types/domain/clinic';
 import type { QueueEntry } from '../types/domain/queue';
 // Decomp 2: hotkeys extracted to useRegistrarHotkeys hook
 import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
@@ -275,7 +275,7 @@ const RegistrarPanel = () => {
   const {
     resolveRescheduleVisitId,
     removeRescheduledAppointmentFromView,
-  } = useRegistrarReschedule({ setAppointments });
+  } = useRegistrarReschedule({ setAppointments: setAppointments as unknown as (updater: (prev: Record<string, unknown>[]) => Record<string, unknown>[]) => void });
   const [doctors, setDoctors] = useState<Doctor[]>([]);const [services, setServices] = useState<Record<string, unknown>>({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   // Unified i18n hook: single source of truth for all translations.
   // - registrarPanel.* — flat UI keys (tabs, statuses, headings, buttons)
@@ -891,7 +891,7 @@ const RegistrarPanel = () => {
   // Groups entries by patient for visual display (1 patient = 1 row)
   // ✅ ALLOWED by SSOT: This is view-model grouping, NOT business logic
   // ⚠️ Do NOT use for: filtering, routing, department decisions
-  const aggregatePatientsForAllDepartments = useCallback((appointments: Appointment[]) => aggregateRegistrarPatients(appointments), []);
+  const aggregatePatientsForAllDepartments = useCallback((appointments: Appointment[]) => aggregateRegistrarPatients(appointments as unknown as Record<string, unknown>[]), []);
 
   // Мемоизированная фильтрация записей по выбранной вкладке (повторный клик снимает фильтр → activeTab === null)
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
@@ -1002,7 +1002,7 @@ const RegistrarPanel = () => {
         const allCodes: string[] = [];
         const seenCodes = new Set<string>();
 
-        appointment.queue_numbers.forEach((qn: Record<string, unknown>) => {
+        appointment.queue_numbers.forEach((qn: QueueNumberInfo) => {
           // Приоритет 1: service_name
           const serviceNameCode = toServiceCode(qn.service_name);
           if (serviceNameCode && !seenCodes.has(serviceNameCode)) {
@@ -1214,7 +1214,7 @@ const RegistrarPanel = () => {
       });
 
       // Сортируем по queue_time ASC
-      const sorted = sortRegistrarRowsForPresentation(entriesForTab);
+      const sorted = sortRegistrarRowsForPresentation(entriesForTab as unknown as Record<string, unknown>[]);
 
       logger.info('⭐ FIX 16: Вкладка', activeTab, '- найдено', sorted.length, 'записей из',
       appointments.length, 'appointments');
@@ -1247,7 +1247,7 @@ const RegistrarPanel = () => {
         // Фильтр по статусу (если задан)
         if (statusFilter && appointment.status !== statusFilter) return false;
         return true;
-      }));
+      }) as unknown as Record<string, unknown>[]);
 
       // Затем агрегируем пациентов
       logger.info(`📊 Для вкладки "Все отделения": ${filtered.length} записей до агрегации`);
@@ -1300,7 +1300,7 @@ const RegistrarPanel = () => {
     }
 
     // Presentation-only order on a copy; backend remains owner of queue facts.
-    return sortRegistrarRowsForPresentation(appointments);
+    return sortRegistrarRowsForPresentation(appointments as unknown as Record<string, unknown>[]);
   }, [appointments, activeTab, statusFilter, searchQuery, aggregatePatientsForAllDepartments, filterServicesByDepartment, queueProfiles]);
 
   // ✅ Сохраняем filteredAppointments в ref для использования в handleKeyDown
@@ -1318,7 +1318,7 @@ const RegistrarPanel = () => {
 
   const openRecordEditor = useCallback((row: unknown) => {
     const appt = row as Appointment;
-    if (isMultiRecordAggregateRow(appt)) {
+    if (isMultiRecordAggregateRow(appt as unknown as Record<string, unknown>)) {
       logger.info('[RegistrarPanel] Opening edit wizard for aggregate all-departments row', {
         patient: appt?.patient_fio || appt?.patient_name,
         groupedRecords: appt?.grouped_records?.length || 0,
@@ -1357,12 +1357,12 @@ const RegistrarPanel = () => {
           intent: 'primary',
         });
         if (!inCabinetOk) break;
-        await updateAppointmentStatus(row.id, 'in_cabinet', '', row);
+        await updateAppointmentStatus(row.id, 'in_cabinet', '', row as unknown as Record<string, unknown>);
         notify.success(tI18n('registrar.sent_to_cabinet'));
         break;
       }
       case 'call':
-        await handleStartVisit(row);
+        await handleStartVisit(row as unknown as Record<string, unknown>);
         break;
       case 'complete': {
         // UX Audit R-1.2: confirm для завершения приёма в context menu.
@@ -1375,7 +1375,7 @@ const RegistrarPanel = () => {
           intent: 'primary',
         });
         if (!completeOk) break;
-        await updateAppointmentStatus(row.id, 'done', '', row);
+        await updateAppointmentStatus(row.id, 'done', '', row as unknown as Record<string, unknown>);
         notify.success(tI18n('registrar.visit_completed'));
         break;
       }
@@ -1383,10 +1383,10 @@ const RegistrarPanel = () => {
         setPaymentDialog({ open: true, row, paid: false, source: 'context' });
         break;
       case 'print':
-        setPrintDialog({ open: true, type: 'ticket', data: row });
+        setPrintDialog({ open: true, type: 'ticket', data: row as unknown as Record<string, unknown> });
         break;
       case 'reschedule':
-        setRescheduleData(row);
+        setRescheduleData(row as unknown as Record<string, unknown>);
         setShowSlotsModal(true);
         break;
       case 'cancel':
@@ -1508,7 +1508,7 @@ const RegistrarPanel = () => {
             language={legacyLanguage}
             theme={theme}
             textColor={textColor}
-            appointments={appointments}
+            appointments={appointments as unknown as Record<string, unknown>[]}
             departmentStats={departmentStats}
             dataSource={dataSource}
             appointmentsLoading={appointmentsLoading}
@@ -1705,12 +1705,12 @@ const RegistrarPanel = () => {
                     });
                     if (!inCabinetOk) break;
                     logger.info('Отправка пациента в кабинет:', row);
-                    updateAppointmentStatus(row.id, 'in_cabinet', '', row);
+                    updateAppointmentStatus(row.id, 'in_cabinet', '', row as unknown as Record<string, unknown>);
                     break;
                   }
                   case 'call':
                     logger.info('Вызов пациента:', row);
-                    handleStartVisit(row);
+                    handleStartVisit(row as unknown as Record<string, unknown>);
                     break;
                   case 'complete': {
                     // UX Audit Registrar #2: window.confirm() → useConfirm hook.
@@ -1724,17 +1724,17 @@ const RegistrarPanel = () => {
                     });
                     if (!completeOk) break;
                     logger.info('Завершение приёма:', row);
-                    updateAppointmentStatus(row.id, 'done', '', row);
+                    updateAppointmentStatus(row.id, 'done', '', row as unknown as Record<string, unknown>);
                     break;
                   }
                   case 'print':
                     logger.info('Печать талона:', row);
-                    setPrintDialog({ open: true, type: 'ticket', data: row });
+                    setPrintDialog({ open: true, type: 'ticket', data: row as unknown as Record<string, unknown> });
                     break;
                   // UX Audit Registrar #4: cancel и reschedule теперь доступны
                   // как inline кнопки, а не только через context menu.
                   case 'reschedule':
-                    setRescheduleData(row);
+                    setRescheduleData(row as unknown as Record<string, unknown>);
                     setShowSlotsModal(true);
                     break;
                   case 'cancel':
@@ -1825,7 +1825,7 @@ const RegistrarPanel = () => {
               [tI18n('registrarPanel.rp_field_phone'), recordPreviewDialog.row.patient_phone || recordPreviewDialog.row.phone],
               [tI18n('registrarPanel.rp_field_birth_year'), recordPreviewDialog.row.patient_birth_year || recordPreviewDialog.row.birth_year],
               [tI18n('registrarPanel.rp_field_gender'), normalizePatientGender(recordPreviewDialog.row as unknown as Parameters<typeof normalizePatientGender>[0] as Record<string, unknown>)],
-              [tI18n('registrarPanel.rp_field_department'), recordPreviewDialog.row.queue_name || recordPreviewDialog.row.department || recordPreviewDialog.row.specialty],
+              [tI18n('registrarPanel.rp_field_department'), (recordPreviewDialog.row as unknown as Record<string, unknown>).queue_name || recordPreviewDialog.row.department || recordPreviewDialog.row.specialty],
               [tI18n('registrarPanel.rp_field_services'), formatPreviewList(recordPreviewDialog.row.services || recordPreviewDialog.row.service_details)],
               [tI18n('registrarPanel.rp_field_queue'), formatPreviewList(recordPreviewDialog.row.queue_numbers)],
               [tI18n('registrarPanel.rp_field_status'), recordPreviewDialog.row.status || recordPreviewDialog.row.canonical_status],
@@ -1881,7 +1881,7 @@ const RegistrarPanel = () => {
           // ✅ ИСПРАВЛЕНО: используем реальный API вызов через handlePayment
           const appointment = paymentDialog.row;
           if (appointment) {
-            const updated = await handlePayment(appointment, paymentData as { amount?: number | null; method?: string | null } | null);
+            const updated = await handlePayment(appointment as unknown as Record<string, unknown>, paymentData as { amount?: number | null; method?: string | null } | null);
             if (updated) {
               // Canonical state is refreshed by handlePayment via loadAppointments.
               logger.info('PaymentDialog: Оплата успешна, данные обновлены:', updated);

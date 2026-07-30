@@ -47,7 +47,7 @@ const usePatients = () => {
   // which caused clinicians to see empty allergy warnings and made filter-by-
   // blood-type impossible. This was a medical-safety defect.
   const transformPatient = (p: Patient) => {
-    const raw = p as Record<string, unknown>;
+    const raw = p as unknown as Record<string, unknown>;
     return {
       id: p.id,
       firstName: String(raw.first_name ?? ''),
@@ -105,10 +105,10 @@ const usePatients = () => {
       );
 
       const apiData = {
-        last_name: patientData.lastName || (patientData as Record<string, unknown>).last_name,
-        first_name: patientData.firstName || (patientData as Record<string, unknown>).first_name,
-        middle_name: patientData.middleName || (patientData as Record<string, unknown>).middle_name || null,
-        birth_date: patientData.birthDate || (patientData as Record<string, unknown>).birth_date || null,
+        last_name: (patientData as unknown as Record<string, unknown>).lastName || patientData.last_name,
+        first_name: (patientData as unknown as Record<string, unknown>).firstName || patientData.first_name,
+        middle_name: (patientData as unknown as Record<string, unknown>).middleName || patientData.middle_name || null,
+        birth_date: (patientData as unknown as Record<string, unknown>).birthDate || patientData.birth_date || null,
         sex: patientData.gender === 'male' ? 'M' : patientData.gender === 'female' ? 'F' : null,
         phone: (patientData as Record<string, unknown>).phone || null,
         email: (patientData as Record<string, unknown>).email || null,
@@ -141,9 +141,9 @@ const usePatients = () => {
 
     try {
       const apiData = {};
-      if (patientData.lastName !== undefined) (apiData as Record<string, unknown>).last_name = patientData.lastName;
-      if (patientData.firstName !== undefined) (apiData as Record<string, unknown>).first_name = patientData.firstName;
-      if (patientData.middleName !== undefined) (apiData as Record<string, unknown>).middle_name = patientData.middleName;
+      if ((patientData as unknown as Record<string, unknown>).lastName !== undefined) (apiData as Record<string, unknown>).last_name = (patientData as unknown as Record<string, unknown>).lastName;
+      if ((patientData as unknown as Record<string, unknown>).firstName !== undefined) (apiData as Record<string, unknown>).first_name = (patientData as unknown as Record<string, unknown>).firstName;
+      if ((patientData as unknown as Record<string, unknown>).middleName !== undefined) (apiData as Record<string, unknown>).middle_name = (patientData as unknown as Record<string, unknown>).middleName;
       if (patientData.birthDate !== undefined) (apiData as Record<string, unknown>).birth_date = patientData.birthDate;
       if (patientData.gender !== undefined) (apiData as Record<string, unknown>).sex = patientData.gender === 'male' ? 'M' : patientData.gender === 'female' ? 'F' : null;
       if ((patientData as Record<string, unknown>).phone !== undefined) (apiData as Record<string, unknown>).phone = (patientData as Record<string, unknown>).phone;
