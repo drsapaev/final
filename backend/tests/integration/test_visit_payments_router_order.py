@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.v1.endpoints import visit_payments
+from app.api.deps import get_db, get_current_user
 
 
 def test_visit_payments_summary_route_dispatches_before_visit_id(monkeypatch):
@@ -14,14 +15,12 @@ def test_visit_payments_summary_route_dispatches_before_visit_id(monkeypatch):
 
     app = FastAPI()
     app.include_router(visit_payments.router)
-    app.dependency_overrides[visit_payments.get_db] = lambda: object()
-
-    for route in app.routes:
-        if getattr(route, "path", "") == "/visit-payments/summary":
-            for dependency in route.dependant.dependencies:
-                app.dependency_overrides[dependency.call] = lambda: {
-                    "role": "Admin"
-                }
+    app.dependency_overrides[get_db] = lambda: object()
+    app.dependency_overrides[get_current_user] = lambda: {
+        "role": "Admin",
+        "is_superuser": False,
+        "id": 1,
+    }
 
     monkeypatch.setattr(
         visit_payments,
