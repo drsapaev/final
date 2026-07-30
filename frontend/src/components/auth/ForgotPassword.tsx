@@ -13,7 +13,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  *   #9: Real-time confirm password validation on blur
  *   #10: Remove 3s auto-return, keep explicit button
  *   #12: Hardcoded colors → --mac-* tokens
- *   #14: PropTypes cleanup
+ *   #14: TS prop types cleanup
  *   #15: type="button" + state moved to top
  */
 

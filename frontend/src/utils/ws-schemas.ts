@@ -1,7 +1,7 @@
 /**
  * WebSocket message validation schemas (zod).
  *
- * Replaces `JSON.parse(event.data) as WsIncomingMessage` casts with
+ * Replaces `JSON.parse(event.data) as parsed message` casts with
  * runtime-validated parsing. Invalid messages are logged and dropped.
  */
 import { z } from 'zod';

@@ -50,7 +50,6 @@ export interface AppLoadingState {
   patients: boolean;
   appointments: boolean;
   emr: boolean;
-  [key: string]: boolean;
 }
 
 export interface AppErrorsState {
@@ -58,7 +57,6 @@ export interface AppErrorsState {
   patients: string | null;
   appointments: string | null;
   emr: string | null;
-  [key: string]: string | null;
 }
 
 export interface AppDataState {

@@ -1,4 +1,4 @@
-/* eslint-disable react/display-name, react/prop-types */
+/* eslint-disable react/display-name */
 import '@testing-library/jest-dom';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

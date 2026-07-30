@@ -178,7 +178,7 @@ function ContactRow({ icon: Icon, label, value, href }: { icon?: React.Component
 
 // UX Audit Stage 2 (Landing issue 1.5): почищены propTypes-артефакты.
 // Удалён `...(ContactRow.propTypes || {})` (бессмысленный spread из codemod)
-// и удалён несуществующий prop `startsWith: PropTypes.any`.
+// и удалён несуществующий prop `startsWith`.
 
 function toTelegramUrl(handle: unknown) {
   const sanitizedHandle = String(handle || '').trim().replace(/^@/, '');
