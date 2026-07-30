@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 import { api } from '../api/client';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
+import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
 
 const formatPaymentError = (err: unknown, fallbackMessage: string): string =>
   getErrorMessage(err, fallbackMessage);
@@ -73,8 +75,10 @@ export interface UsePaymentsReturn {
 }
 
 export const usePayments = (): UsePaymentsReturn => {
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [requestState, setRequestState] = useState<AsyncState<unknown>>(idleState<unknown>());
+
+  const loading = requestState.status === 'loading';
+  const error = getError(requestState);
 
   const getPendingPayments = useCallback(
     async ({
@@ -84,8 +88,7 @@ export const usePayments = (): UsePaymentsReturn => {
       page = 1,
       size = 20,
     }: PaymentListParams = {}): Promise<PaymentListResult> => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const params: Record<string, unknown> = {
@@ -99,7 +102,7 @@ export const usePayments = (): UsePaymentsReturn => {
         const response = await api.get('/cashier/pending-payments', { params });
         const data = response.data as Record<string, unknown>;
 
-        setLoading(false);
+        setRequestState(successState<unknown>(null));
 
         return {
           success: true,
@@ -117,8 +120,7 @@ export const usePayments = (): UsePaymentsReturn => {
           err,
           'Не удалось загрузить список ожидающих оплат. Проверьте соединение и попробуйте снова.',
         );
-        setError(String(errorMessage));
-        setLoading(false);
+        setRequestState(errorState<unknown>(String(errorMessage)));
 
         return {
           success: false,
@@ -140,8 +142,7 @@ export const usePayments = (): UsePaymentsReturn => {
       search,
       status,
     }: PaymentListParams = {}): Promise<PaymentListResult> => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const params: Record<string, unknown> = {
@@ -156,7 +157,7 @@ export const usePayments = (): UsePaymentsReturn => {
         const response = await api.get('/cashier/payments', { params });
         const data = response.data as Record<string, unknown>;
 
-        setLoading(false);
+        setRequestState(successState<unknown>(null));
 
         return {
           success: true,
@@ -174,8 +175,7 @@ export const usePayments = (): UsePaymentsReturn => {
           err,
           'Не удалось загрузить историю платежей. Проверьте соединение и попробуйте снова.',
         );
-        setError(String(errorMessage));
-        setLoading(false);
+        setRequestState(errorState<unknown>(String(errorMessage)));
 
         return {
           success: false,
@@ -190,12 +190,11 @@ export const usePayments = (): UsePaymentsReturn => {
 
   const createPayment = useCallback(
     async (paymentData: Record<string, unknown>): Promise<PaymentOperationResult> => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const response = await api.post('/cashier/payments', paymentData);
-        setLoading(false);
+        setRequestState(successState<unknown>(null));
 
         return { success: true, data: response.data };
       } catch (err) {
@@ -204,8 +203,7 @@ export const usePayments = (): UsePaymentsReturn => {
           err,
           'Не удалось создать платёж. Проверьте соединение и попробуйте снова.',
         );
-        setError(String(errorMessage));
-        setLoading(false);
+        setRequestState(errorState<unknown>(String(errorMessage)));
 
         return { success: false, error: errorMessage };
       }
@@ -215,12 +213,11 @@ export const usePayments = (): UsePaymentsReturn => {
 
   const markVisitAsPaid = useCallback(
     async (visitId: string | number): Promise<PaymentOperationResult> => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const response = await api.post(`/cashier/visits/${visitId}/mark-paid`, {});
-        setLoading(false);
+        setRequestState(successState<unknown>(null));
 
         return { success: true, data: response.data };
       } catch (err) {
@@ -229,8 +226,7 @@ export const usePayments = (): UsePaymentsReturn => {
           err,
           'Не удалось отметить визит как оплаченный. Проверьте соединение и попробуйте снова.',
         );
-        setError(String(errorMessage));
-        setLoading(false);
+        setRequestState(errorState<unknown>(String(errorMessage)));
 
         return { success: false, error: errorMessage };
       }
@@ -240,12 +236,11 @@ export const usePayments = (): UsePaymentsReturn => {
 
   const getPaymentById = useCallback(
     async (paymentId: string | number): Promise<PaymentOperationResult> => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const response = await api.get(`/cashier/payments/${paymentId}`);
-        setLoading(false);
+        setRequestState(successState<unknown>(null));
 
         return { success: true, data: response.data };
       } catch (err) {
@@ -254,8 +249,7 @@ export const usePayments = (): UsePaymentsReturn => {
           err,
           'Не удалось загрузить платёж. Проверьте соединение и попробуйте снова.',
         );
-        setError(String(errorMessage));
-        setLoading(false);
+        setRequestState(errorState<unknown>(String(errorMessage)));
 
         return { success: false, error: errorMessage, data: null };
       }
@@ -265,12 +259,11 @@ export const usePayments = (): UsePaymentsReturn => {
 
   const cancelPayment = useCallback(
     async (paymentId: string | number, reason: string): Promise<PaymentOperationResult> => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const response = await api.post(`/cashier/payments/${paymentId}/cancel`, { reason });
-        setLoading(false);
+        setRequestState(successState<unknown>(null));
 
         return { success: true, data: response.data };
       } catch (err) {
@@ -279,8 +272,7 @@ export const usePayments = (): UsePaymentsReturn => {
           err,
           'Не удалось отменить платёж. Проверьте соединение и попробуйте снова.',
         );
-        setError(String(errorMessage));
-        setLoading(false);
+        setRequestState(errorState<unknown>(String(errorMessage)));
 
         return { success: false, error: errorMessage };
       }
@@ -290,12 +282,11 @@ export const usePayments = (): UsePaymentsReturn => {
 
   const confirmPayment = useCallback(
     async (paymentId: string | number): Promise<PaymentOperationResult> => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const response = await api.post(`/cashier/payments/${paymentId}/confirm`, {});
-        setLoading(false);
+        setRequestState(successState<unknown>(null));
 
         return { success: true, data: response.data };
       } catch (err) {
@@ -304,8 +295,7 @@ export const usePayments = (): UsePaymentsReturn => {
           err,
           'Не удалось подтвердить платёж. Проверьте соединение и попробуйте снова.',
         );
-        setError(String(errorMessage));
-        setLoading(false);
+        setRequestState(errorState<unknown>(String(errorMessage)));
         throw errorMessage;
       }
     },
@@ -378,15 +368,14 @@ export const usePayments = (): UsePaymentsReturn => {
 
   const refundPayment = useCallback(
     async (paymentId: string | number, { amount, reason }: RefundParams): Promise<PaymentOperationResult> => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const response = await api.post(`/cashier/payments/${paymentId}/refund`, {
           amount,
           reason,
         });
-        setLoading(false);
+        setRequestState(successState<unknown>(null));
 
         return { success: true, data: response.data };
       } catch (err) {
@@ -395,8 +384,7 @@ export const usePayments = (): UsePaymentsReturn => {
           err,
           'Не удалось оформить возврат. Проверьте соединение и попробуйте снова.',
         );
-        setError(String(errorMessage));
-        setLoading(false);
+        setRequestState(errorState<unknown>(String(errorMessage)));
 
         return { success: false, error: errorMessage };
       }

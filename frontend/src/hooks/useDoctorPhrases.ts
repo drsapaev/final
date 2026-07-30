@@ -16,7 +16,7 @@ import logger from '../utils/logger';
 import { formatNetworkErrorMessage } from '../utils/networkErrorMessages';
 import { getErrorMessage } from '../utils/type-guards';
 import type { AsyncState } from '../types/async-state';
-import { idleState, loadingState, successState, errorState, getData, getError } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
 
 // Дефолтные настройки
 const DEFAULT_CONFIG = {
@@ -55,8 +55,10 @@ export const useDoctorPhrases = ({
   config = {}
 }: UseDoctorPhrasesOptions = {}) => {
   const [suggestions, setSuggestions] = useState<unknown[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [requestState, setRequestState] = useState<AsyncState<unknown>>(idleState<unknown>());
+
+  const loading = requestState.status === 'loading';
+  const error = getError(requestState);
 
   // 🔥 READINESS STATE (automatic activation)
   const [readiness, setReadiness] = useState<{
@@ -161,8 +163,7 @@ export const useDoctorPhrases = ({
     }
     abortControllerRef.current = new AbortController();
 
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
 
     try {
       const response = await api.post('/emr/phrase-suggest', {
@@ -181,6 +182,7 @@ export const useDoctorPhrases = ({
       } else {
         setSuggestions([]);
       }
+      setRequestState(successState<unknown>(null));
     } catch (err: unknown) {
       if ((err as Error).name !== 'AbortError' && (err as Error).name !== 'CanceledError') {
         const errorMessage = formatNetworkErrorMessage({
@@ -193,11 +195,12 @@ export const useDoctorPhrases = ({
           error: errorMessage,
           rawMessage: getErrorMessage(err),
         });
-        setError(String(errorMessage));
+        setRequestState(errorState<unknown>(String(errorMessage)));
         setSuggestions([]);
       }
-    } finally {
-      setLoading(false);
+      // For AbortError/CanceledError: leave requestState unchanged. The newer
+      // request that triggered this abort owns the loading state; resetting
+      // here would clobber it (race condition in the original finally block).
     }
   }, [doctorId, field, specialty, maxSuggestions, readiness.ready, paused]);
 

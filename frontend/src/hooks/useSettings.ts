@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import logger from '../utils/logger';
+import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
+
 const useSettings = () => {
   const [settings, setSettings] = useState<Record<string, unknown>>({});
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [requestState, setRequestState] = useState<AsyncState<unknown>>(idleState<unknown>());
   const [activeTab, setActiveTab] = useState<string>('general');
+
+  const loading = requestState.status === 'loading';
+  const error = getError(requestState);
 
   // Моковые данные для настроек
   const mockSettingsRef = useRef({
@@ -83,24 +88,21 @@ const useSettings = () => {
 
   // Загрузка настроек
   const loadSettings = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
     
     try {
       // Имитация API запроса
       await new Promise(resolve => setTimeout(resolve, 500));
       setSettings(mockSettingsRef.current);
+      setRequestState(successState<unknown>(null));
     } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
+      setRequestState(errorState<unknown>(String(err)));
     }
   }, []);
 
   // Сохранение настроек
   const saveSettings = useCallback(async (newSettings: Record<string, unknown>) => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
     
     try {
       // Имитация API запроса
@@ -110,33 +112,30 @@ const useSettings = () => {
       
       // Имитация успешного сохранения
       logger.log('Settings saved:', newSettings);
+      setRequestState(successState<unknown>(null));
       
       return newSettings;
     } catch (err) {
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   // Сброс настроек к значениям по умолчанию
   const resetSettings = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
     
     try {
       // Имитация API запроса
       await new Promise(resolve => setTimeout(resolve, 500));
       
       setSettings(mockSettingsRef.current);
+      setRequestState(successState<unknown>(null));
       
       return mockSettingsRef.current;
     } catch (err) {
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -156,15 +155,14 @@ const useSettings = () => {
       
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       throw err;
     }
   }, [settings]);
 
   // Импорт настроек
   const importSettings = useCallback(async (file: File) => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
     
     try {
       const text = await file.text();
@@ -176,13 +174,12 @@ const useSettings = () => {
       }
       
       setSettings(prev => ({ ...prev, ...importedSettings }));
+      setRequestState(successState<unknown>(null));
       
       return importedSettings;
     } catch (err) {
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 

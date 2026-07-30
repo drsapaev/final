@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { api } from '../api/client';
 import type { Appointment, Doctor } from '../types/domain/clinic';
+import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
 
 /**
  * Normalized appointment shape — extends the domain Appointment with the
@@ -83,12 +85,14 @@ const buildAppointmentPayload = (appointmentData: Record<string, unknown>, docto
 
 const useAppointments = (doctors: Doctor[] = []) => {
   const [appointments, setAppointments] = useState<NormalizedAppointment[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [requestState, setRequestState] = useState<AsyncState<unknown>>(idleState<unknown>());
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterDoctor, setFilterDoctor] = useState('');
+
+  const loading = requestState.status === 'loading';
+  const error = getError(requestState);
 
   // audit/phase-8, BS-22: request-ID guard against overlapping loads.
   // Each create/update/delete calls `await loadAppointments()`; if the user
@@ -99,28 +103,23 @@ const useAppointments = (doctors: Doctor[] = []) => {
 
   const loadAppointments = useCallback(async () => {
     const requestId = ++loadAppointmentsRequestIdRef.current;
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
 
     try {
       const response = await api.get('/admin/appointments');
       if (requestId !== loadAppointmentsRequestIdRef.current) return;
       const items = Array.isArray(response.data) ? response.data : [];
       setAppointments(items.map(normalizeAppointment));
+      setRequestState(successState<unknown>(null));
     } catch (err) {
       if (requestId !== loadAppointmentsRequestIdRef.current) return;
-      setError(String(err));
-    } finally {
-      if (requestId === loadAppointmentsRequestIdRef.current) {
-        setLoading(false);
-      }
+      setRequestState(errorState<unknown>(String(err)));
     }
   }, []);
 
   const createAppointment = useCallback(
     async (appointmentData: Record<string, unknown>) => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const response = await api.post(
@@ -130,10 +129,8 @@ const useAppointments = (doctors: Doctor[] = []) => {
         await loadAppointments();
         return normalizeAppointment(response.data || {});
       } catch (err) {
-        setError(String(err));
+        setRequestState(errorState<unknown>(String(err)));
         throw err;
-      } finally {
-        setLoading(false);
       }
     },
     [doctors, loadAppointments]
@@ -141,8 +138,7 @@ const useAppointments = (doctors: Doctor[] = []) => {
 
   const updateAppointment = useCallback(
     async (id: string | number, appointmentData: Record<string, unknown>) => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const response = await api.put(
@@ -152,10 +148,8 @@ const useAppointments = (doctors: Doctor[] = []) => {
         await loadAppointments();
         return normalizeAppointment(response.data || {});
       } catch (err) {
-        setError(String(err));
+        setRequestState(errorState<unknown>(String(err)));
         throw err;
-      } finally {
-        setLoading(false);
       }
     },
     [doctors, loadAppointments]
@@ -163,17 +157,14 @@ const useAppointments = (doctors: Doctor[] = []) => {
 
   const deleteAppointment = useCallback(
     async (id: string | number) => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         await api.delete(`/appointments/${id}`);
         await loadAppointments();
       } catch (err) {
-        setError(String(err));
+        setRequestState(errorState<unknown>(String(err)));
         throw err;
-      } finally {
-        setLoading(false);
       }
     },
     [loadAppointments]

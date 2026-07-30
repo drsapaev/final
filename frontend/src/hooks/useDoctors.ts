@@ -4,6 +4,8 @@ import { api } from '../api/client';
 import logger from '../utils/logger';
 import type { Doctor } from '../types/domain/clinic';
 import { getErrorMessage } from '../utils/type-guards';
+import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
 
 const normalizeDoctorPayload = (doctorData: Record<string, unknown>) => ({
   user_id: doctorData.userId ? Number(doctorData.userId) : null,
@@ -27,25 +29,25 @@ const normalizeDoctorPayload = (doctorData: Record<string, unknown>) => ({
 const useDoctors = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [availableUsers, setAvailableUsers] = useState<unknown[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [requestState, setRequestState] = useState<AsyncState<unknown>>(idleState<unknown>());
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSpecialization, setFilterSpecialization] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
+  const loading = requestState.status === 'loading';
+  const error = getError(requestState);
+
   const loadDoctors = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
 
     try {
       const response = await api.get('/admin/doctors');
       setDoctors(Array.isArray(response.data) ? response.data as Doctor[] : []);
+      setRequestState(successState<unknown>(null));
     } catch (err) {
       logger.error('Ошибка загрузки врачей:', err);
-      setError(String(err));
-    } finally {
-      setLoading(false);
+      setRequestState(errorState<unknown>(String(err)));
     }
   }, []);
 
@@ -66,8 +68,7 @@ const useDoctors = () => {
 
   const createDoctor = useCallback(
     async (doctorData: Partial<Doctor>) => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const response = await api.post('/admin/doctors', normalizeDoctorPayload(doctorData));
@@ -77,10 +78,8 @@ const useDoctors = () => {
         logger.error('Ошибка создания врача:', err);
         const errorMessage =
           getErrorMessage(err) || 'Ошибка создания врача';
-        setError(String(err));
+        setRequestState(errorState<unknown>(String(err)));
         throw new Error(errorMessage);
-      } finally {
-        setLoading(false);
       }
     },
     [loadDoctors, loadAvailableUsers]
@@ -88,8 +87,7 @@ const useDoctors = () => {
 
   const updateDoctor = useCallback(
     async (id: string | number, doctorData: Partial<Doctor>) => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         const response = await api.put(`/admin/doctors/${id}`, normalizeDoctorPayload(doctorData));
@@ -99,10 +97,8 @@ const useDoctors = () => {
         logger.error('Ошибка обновления врача:', err);
         const errorMessage =
           getErrorMessage(err) || 'Ошибка обновления врача';
-        setError(String(err));
+        setRequestState(errorState<unknown>(String(err)));
         throw new Error(errorMessage);
-      } finally {
-        setLoading(false);
       }
     },
     [loadDoctors, loadAvailableUsers]
@@ -110,8 +106,7 @@ const useDoctors = () => {
 
   const deleteDoctor = useCallback(
     async (id: string | number) => {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       try {
         await api.delete(`/admin/doctors/${id}`);
@@ -120,10 +115,8 @@ const useDoctors = () => {
         logger.error('Ошибка удаления врача:', err);
         const errorMessage =
           getErrorMessage(err) || 'Ошибка удаления врача';
-        setError(String(err));
+        setRequestState(errorState<unknown>(String(err)));
         throw new Error(errorMessage);
-      } finally {
-        setLoading(false);
       }
     },
     [loadDoctors, loadAvailableUsers]

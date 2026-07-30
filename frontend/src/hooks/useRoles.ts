@@ -8,7 +8,7 @@ import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import type { RoleRecord } from '../types/domain/auth';
 import type { AsyncState } from '../types/async-state';
-import { idleState, loadingState, successState, errorState, getData, getError } from '../types/async-state';
+import { loadingState, successState, errorState, getError } from '../types/async-state';
 
 // Re-export for backwards compatibility with any caller that still imports
 // `Role` from this module. New code should import RoleRecord from
@@ -41,25 +41,30 @@ export interface UseRolesReturn {
 export function useRoles({ includeAll = false }: UseRolesOptions = {}): UseRolesReturn {
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [roles, setRoles] = useState<RoleRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  // Initialize to 'loading' to match the original `useState<boolean>(true)` —
+  // fetchRoleOptions() runs on mount via useEffect, so the hook starts in the
+  // loading state until the first fetch resolves.
+  const [requestState, setRequestState] = useState<AsyncState<unknown>>(loadingState<unknown>());
+
+  const loading = requestState.status === 'loading';
+  const error = getError(requestState);
 
   const fetchRoleOptions = useCallback(async (): Promise<void> => {
     try {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       const response = await api.get('/roles/options', {
         params: { include_all: includeAll },
       });
 
       setRoleOptions((response.data as { options?: RoleOption[] }).options || []);
+      setRequestState(successState<unknown>(null));
     } catch (err) {
       const errorMessage = getErrorMessage(
         err,
         'Не удалось загрузить роли. Проверьте соединение и попробуйте снова.',
       );
-      setError(String(errorMessage));
+      setRequestState(errorState<unknown>(String(errorMessage)));
       logger.error('Error fetching role options:', err);
 
       const fallbackRoles: RoleOption[] = [
@@ -78,27 +83,23 @@ export function useRoles({ includeAll = false }: UseRolesOptions = {}): UseRoles
       } else {
         setRoleOptions(fallbackRoles);
       }
-    } finally {
-      setLoading(false);
     }
   }, [includeAll]);
 
   const fetchAllRoles = useCallback(async (): Promise<void> => {
     try {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       const response = await api.get('/roles');
       setRoles((response.data as { roles?: Role[] }).roles || []);
+      setRequestState(successState<unknown>(null));
     } catch (err) {
       const errorMessage = getErrorMessage(
         err,
         'Не удалось загрузить роли. Проверьте соединение и попробуйте снова.',
       );
-      setError(String(errorMessage));
+      setRequestState(errorState<unknown>(String(errorMessage)));
       logger.error('Error fetching roles:', err);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
