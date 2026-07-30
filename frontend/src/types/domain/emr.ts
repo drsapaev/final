@@ -11,7 +11,6 @@ export interface EMRTemplateField {
   name?: string;
   type?: string;
   value?: unknown;
-  [key: string]: unknown;
 }
 
 export interface EMRTemplateSection {
@@ -19,13 +18,11 @@ export interface EMRTemplateSection {
   section_title?: string;
   section_name?: string;
   fields?: EMRTemplateField[];
-  [key: string]: unknown;
 }
 
 export interface EMRTemplateStructure {
   template_name?: string;
   sections?: EMRTemplateSection[];
-  [key: string]: unknown;
 }
 
 export interface EMRTemplate {
@@ -34,14 +31,12 @@ export interface EMRTemplate {
   description?: string;
   specialty?: string;
   template_structure?: EMRTemplateStructure;
-  [key: string]: unknown;
 }
 
 export interface EMRTemplateSuggestion {
   text: string;
   source: string;
   template?: EMRTemplate;
-  [key: string]: unknown;
 }
 
 export interface EMRRecord {
@@ -50,7 +45,6 @@ export interface EMRRecord {
   specialty_data?: Record<string, unknown>;
   row_version?: number;
   is_draft?: boolean;
-  [key: string]: unknown;
 }
 
 // audit/phase-5a, BS-9: renamed from `EMRStatus` to `EMRHttpStatus` to avoid
@@ -70,12 +64,9 @@ export interface EMRApiError {
     data?: {
       detail?: string;
       message?: string;
-      [key: string]: unknown;
+        };
     };
-    [key: string]: unknown;
-  };
   message?: string;
-  [key: string]: unknown;
 }
 
 // === EMR Clinical Content Types ===
@@ -89,7 +80,6 @@ export interface EMRDiagnosis {
   icd10?: string;
   confidence?: number;
   source?: string;
-  [key: string]: unknown;
 }
 
 export interface EMRPrescription {
@@ -102,7 +92,6 @@ export interface EMRPrescription {
   freq?: string;
   duration?: string;
   note?: string;
-  [key: string]: unknown;
 }
 
 export interface EMRSection {
@@ -114,7 +103,6 @@ export interface EMRSection {
   isEditable?: boolean;
   isDraft?: boolean;
   error?: string;
-  [key: string]: unknown;
 }
 
 export interface EMRLabResult {
@@ -126,7 +114,6 @@ export interface EMRLabResult {
   status?: string;
   date?: string;
   abnormal?: boolean;
-  [key: string]: unknown;
 }
 
 export interface EMRAISuggestion {
@@ -135,7 +122,6 @@ export interface EMRAISuggestion {
   text?: string;
   source?: string;
   confidence?: number;
-  [key: string]: unknown;
 }
 
 export type EMRVisitType = 'paid' | 'repeat' | 'benefit';
@@ -150,7 +136,6 @@ export interface EMRVisitData {
   visit_type?: EMRVisitType;
   date?: string;
   status?: string;
-  [key: string]: unknown;
 }
 
 
@@ -163,14 +148,12 @@ export interface EMRConflict {
   client_data?: EMRRecord;
   server_row_version?: number;
   client_row_version?: number;
-  [key: string]: unknown;
 }
 
 export interface EMRAmendRequest {
   reason: string;
   data?: Record<string, unknown>;
   row_version?: number;
-  [key: string]: unknown;
 }
 
 export interface EMRSaveResult {
@@ -178,7 +161,6 @@ export interface EMRSaveResult {
   data?: EMRRecord;
   error?: string;
   conflict?: EMRConflict;
-  [key: string]: unknown;
 }
 
 export interface EMRSectionConfig {
@@ -191,5 +173,4 @@ export interface EMRSectionConfig {
   rows?: number;
   placeholder?: string;
   required?: boolean;
-  [key: string]: unknown;
 }

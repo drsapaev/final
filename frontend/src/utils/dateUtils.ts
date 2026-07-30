@@ -109,7 +109,7 @@ const timestampsDiffer = (
   return Math.abs(first.getTime() - second.getTime()) > thresholdMs;
 };
 
-interface RegistrarTimestampRecord {
+export interface RegistrarTimestampRecord {
   display_time_kind?: string;
   queue_time?: string | null;
   created_at?: string | null;

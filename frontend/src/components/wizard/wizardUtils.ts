@@ -253,7 +253,6 @@ interface PatientGenderRecordLike {
   gender?: unknown;
   sex?: unknown;
   patient?: { gender?: unknown; sex?: unknown } | null;
-  [key: string]: unknown;
 }
 
 export const resolvePatientGenderValue = (record: PatientGenderRecordLike | null | undefined): unknown =>

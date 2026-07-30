@@ -51,7 +51,7 @@ interface PickupLabResult {
 
 // Get user role for role-based UI
 const getUserRole = () => {
-  const st = auth.getState() as { profile?: Record<string, unknown> };
+  const st = auth.getState() as unknown as { profile?: Record<string, unknown> };
   const profile = st.profile || st.profile || {};
   return String(profile?.role || profile?.role_name || '').toLowerCase();
 };

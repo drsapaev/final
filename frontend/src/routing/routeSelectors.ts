@@ -58,7 +58,7 @@ interface RouteRegistryEntry {
   [key: string]: unknown;
 }
 
-interface RouteProfile {
+export interface RouteProfile {
   role?: string;
   role_name?: string;
   roles?: string[];

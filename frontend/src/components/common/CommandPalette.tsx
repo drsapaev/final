@@ -38,7 +38,7 @@ interface CommandItem {
   target?: string;
 }
 
-type CommandProfile = {
+export type CommandProfile = {
   role?: string;
   role_name?: string;
   roles?: string[];

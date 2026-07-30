@@ -30,7 +30,7 @@ export function mapQueueSpecialistDto(dto: QueueDtoLike): QueueSpecialist {
   if (id == null) {
     throw new Error('[mapQueueSpecialistDto] missing required field `id`');
   }
-  return { ...(dto as QueueSpecialist) };
+  return { ...(dto as unknown as QueueSpecialist) };
 }
 
 export function mapQueueSpecialistDtos(dtos: unknown): QueueSpecialist[] {

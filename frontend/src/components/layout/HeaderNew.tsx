@@ -109,7 +109,7 @@ export default function HeaderNew() {
     }
   };
 
-  const stateTyped = state as { profile?: Record<string, unknown>; user?: Record<string, unknown> };
+  const stateTyped = state as unknown as { profile?: Record<string, unknown>; user?: Record<string, unknown> };
   const user = stateTyped.profile || stateTyped.user || null;
   const role = user?.role || user?.role_name || 'Guest';
   const roleLower = String(role).toLowerCase();

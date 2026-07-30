@@ -113,7 +113,7 @@ export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps
 
   // Get user role for navigation
   const getUserRole = () => {
-    const st = auth.getState() as Record<string, unknown>;
+    const st = auth.getState() as unknown as Record<string, unknown>;
     const profile = (st.profile as Record<string, unknown> | undefined) || (st.user as Record<string, unknown> | undefined) || {};
     return String(profile?.role || profile?.role_name || '').toLowerCase();
   };

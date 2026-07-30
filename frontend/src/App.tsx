@@ -19,7 +19,7 @@ import {
 } from './components/ui/macos';
 import HeaderNew from './components/layout/HeaderNew';
 // SW-05 fix: global command palette (Cmd+K)
-import { CommandPalette } from './components/common/CommandPalette';
+import { CommandPalette, type CommandProfile } from './components/common/CommandPalette';
 import GlobalNotificationCenter from './components/notifications/GlobalNotificationCenter';
 import Health from './pages/Health';
 import Landing from './pages/Landing';
@@ -30,7 +30,7 @@ import { useBreakpoint } from './hooks/useEnhancedMediaQuery';
 import auth from './stores/auth';
 import { ROUTE_REGISTRY } from './routing/routeRegistry';
 import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards';
-import { getRouteChromeState } from './routing/routeSelectors';
+import { getRouteChromeState, type RouteProfile } from './routing/routeSelectors';
 import { sanitizeSpeedInsightsEvent } from './utils/speedInsightsPrivacy';
 
 bootstrapStoredColorScheme();
@@ -172,7 +172,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const { theme } = useTheme();
   const { isMobile } = useBreakpoint();
   const [authState, setAuthState] = useState(() => auth.getState());
-  const chrome = getRouteChromeState(location.pathname, location.search, authState.profile) as unknown as Record<string, unknown> & {
+  const chrome = getRouteChromeState(location.pathname, location.search, authState.profile as unknown as RouteProfile) as unknown as Record<string, unknown> & {
     sidebarItems?: unknown[]; sidebarSections?: unknown[]; activeSidebarItem?: string;
     hideHeader?: boolean; hideSidebar?: boolean; route?: { id?: string };
     sidebarPreset?: { navigation?: string; queryParam?: string };
@@ -375,7 +375,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       {/* SW-05 fix: global command palette — Cmd+K / Ctrl+K to open */}
-      <CommandPalette profile={authState.profile} navigate={navigate} />
+      <CommandPalette profile={authState.profile as unknown as CommandProfile} navigate={navigate} />
       {/* Global notification center — controlled by header bell via context */}
       <GlobalNotificationCenter />
     </div>

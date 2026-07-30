@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth';
 import type { AuthState } from '../../types/domain/auth';
-import { getVisibleRoutesForShell, isInternalDemoEnabled } from '../../routing/routeSelectors';
+import { getVisibleRoutesForShell, isInternalDemoEnabled, type RouteProfile } from '../../routing/routeSelectors';
 import { useTranslation } from '../../i18n/useTranslation';
 import type { UserProfile } from '../../types/domain/auth';
 
@@ -34,8 +34,8 @@ export default function Nav() {
 
   useEffect(() => auth.subscribe(setState), []);
 
-  const user = (state.profile || null) as UserProfile | null;
-  const routes = getVisibleRoutesForShell('app-shell', user, {
+  const user = (state.profile || null) as unknown as UserProfile | null;
+  const routes = getVisibleRoutesForShell('app-shell', user as unknown as RouteProfile | null, {
     internalDemoEnabled: isInternalDemoEnabled(),
   }).filter((route: VisibleRoute) => {
     const nav = route.nav;

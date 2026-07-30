@@ -69,12 +69,15 @@ const IntegrationDemo = () => {
             <p>{t('misc.id_zagruzka')}</p>
           ) : (
             <div className="clinic-space-y-sm">
-              {queueManager.specialists.map((specialist: Record<string, unknown>) => (
-                <div key={String(specialist.id)} className="clinic-flex clinic-justify-between">
-                  <span>{String(specialist.name)}</span>
-                  <Badge variant="info">{String(specialist.role)}</Badge>
+              {queueManager.specialists.map((specialist) => {
+                const sp = specialist as unknown as Record<string, unknown>;
+                return (
+                <div key={String(sp.id)} className="clinic-flex clinic-justify-between">
+                  <span>{String(sp.name)}</span>
+                  <Badge variant="info">{String(sp.role)}</Badge>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>

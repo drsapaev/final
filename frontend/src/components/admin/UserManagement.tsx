@@ -121,7 +121,7 @@ const UserManagement = () => {
       try {
         const profile = await getProfile();
         if (isMounted) {
-          setCurrentProfile(profile || null);
+          setCurrentProfile((profile || null) as unknown as { [key: string]: unknown; id?: string | number | null } | null);
         }
       } catch (profileError) {
         logger.warn('Не удалось загрузить текущий профиль пользователя для guardrail удаления', profileError);
