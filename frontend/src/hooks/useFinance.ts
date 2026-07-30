@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '../api/client';
 import logger from '../utils/logger';
 import type { Transaction } from '../types/domain/clinic';
+import type { AsyncState } from '../types/async-state';
 
 const FINANCE_CACHE_KEY = 'admin_finance_transactions_cache';
 // audit/phase-8, BS-36: TTL for deletedIds. Previously deletedIds grew

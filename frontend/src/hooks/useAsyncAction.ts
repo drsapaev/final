@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'react-toastify';
 
 import logger from '../utils/logger';
+import type { AsyncState } from '../types/async-state';
 
 interface AsyncActionOptions {
   loadingMessage?: string | null;

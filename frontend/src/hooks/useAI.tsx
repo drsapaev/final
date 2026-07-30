@@ -19,6 +19,7 @@ import type {
 } from '../types/domain/ai';
 
 import logger from '../utils/logger';
+import type { AsyncState } from '../types/async-state';
 
 // TypeScript doesn't ship SpeechRecognition types in lib.dom. Declare a
 // minimal structural type so consumers of useAIAssistant can compile
