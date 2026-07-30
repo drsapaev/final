@@ -12,6 +12,7 @@ import {
 } from '../ui/macos';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { getErrorMessage } from '../../utils/type-guards';
 
 interface PatientRecord {
   firstName?: string;
@@ -200,8 +201,7 @@ const PatientModal = ({
       onClose();
     } catch (error) {
       logger.error('Ошибка сохранения пациента:', error);
-      const err = error as { response?: { data?: { detail?: string } }; message?: string };
-      setSubmitError(err?.response?.data?.detail || err?.message || t('admin2.pm_err_save'));
+      setSubmitError(getErrorMessage(error) || t('admin2.pm_err_save'));
     } finally {
       setIsSubmitting(false);
     }

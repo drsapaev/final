@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import logger from '../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from './common/ConfirmDialog';
+import { getErrorMessage } from '../utils/type-guards';
 import {
   Shield,
 
@@ -109,7 +110,7 @@ const TwoFactorSettings = () => {
         setError(t('misc.tfs_disable_invalid'));
       }
     } catch (err) {
-      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('misc.tfs_disable_error'));
+      setError(getErrorMessage(err) || t('misc.tfs_disable_error'));
     } finally {
       setLoading(false);
     }
@@ -138,7 +139,7 @@ const TwoFactorSettings = () => {
       setShowBackupCodes(true);
       setSuccess(t('misc.tfs_regenerate_success'));
     } catch (err) {
-      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('misc.tfs_regenerate_error'));
+      setError(getErrorMessage(err) || t('misc.tfs_regenerate_error'));
     } finally {
       setLoading(false);
     }
@@ -163,7 +164,7 @@ const TwoFactorSettings = () => {
       setSuccess(t('misc.tfs_untrust_success'));
       loadDevices();
     } catch (err) {
-      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('misc.tfs_untrust_error'));
+      setError(getErrorMessage(err) || t('misc.tfs_untrust_error'));
     }
   };
 

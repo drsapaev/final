@@ -33,13 +33,13 @@ const conversationPromiseCache = new Map<string, Promise<ChatConversationsRespon
 const unreadCountPromiseCache = new Map<string, Promise<number>>();
 
 function isFreshCacheEntry(entry: { cachedAt: number } | undefined, ttlMs = MESSAGE_QUERY_CACHE_MS): boolean {
-  return Boolean(entry) && Date.now() - entry!.cachedAt < ttlMs;
+  return Boolean(entry) && Date.now() - (entry?.cachedAt ?? 0) < ttlMs;
 }
 
 function getCachedConversationResult(key: string): ChatConversationsResponse | null {
   const entry = conversationCache.get(key);
   if (isFreshCacheEntry(entry)) {
-    return entry!.data;
+    return entry?.data ?? null;
   }
 
   if (entry) {
@@ -52,7 +52,7 @@ function getCachedConversationResult(key: string): ChatConversationsResponse | n
 function getCachedUnreadCountResult(key: string): number | null {
   const entry = unreadCountCache.get(key);
   if (isFreshCacheEntry(entry)) {
-    return entry!.data;
+    return entry?.data ?? null;
   }
 
   if (entry) {

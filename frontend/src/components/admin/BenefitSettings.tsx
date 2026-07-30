@@ -32,6 +32,7 @@ import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettin
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { getErrorMessage } from '../../utils/type-guards';
 /**
  * Компонент для управления настройками льгот в админке
  */
@@ -63,8 +64,7 @@ const BenefitSettings = () => {
       setLastUpdated(new Date(String(data?.updated_at ?? '')));
     } catch (err) {
       logger.error('Error loading benefit settings:', err);
-      const errErr = err as { response?: { data?: { detail?: string } } };
-      setError(errErr.response?.data?.detail || t('admin2.bs_error_load_settings'));
+      setError(getErrorMessage(err) || t('admin2.bs_error_load_settings'));
       toast.error(t('admin2.bs_toast_load_error'));
     } finally {
       setLoading(false);
@@ -85,8 +85,7 @@ const BenefitSettings = () => {
       setLastUpdated(new Date());
     } catch (err) {
       logger.error('Error saving benefit settings:', err);
-      const errErr = err as { response?: { data?: { detail?: string } } };
-      toast.error(errErr.response?.data?.detail || t('admin2.bs_toast_save_error'));
+      toast.error(getErrorMessage(err) || t('admin2.bs_toast_save_error'));
     } finally {
       setSaving(false);
     }

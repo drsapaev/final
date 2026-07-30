@@ -3,6 +3,7 @@
  * Централизованная работа с принтерами и документами
  */
 import { api } from '../api/client';
+import { getErrorMessage } from '../utils/type-guards';
 
 const normalizePrintResponse = (responseData: Record<string, unknown>, fallbackErrorMessage: string) => {
   if (responseData?.success === false) {
@@ -21,7 +22,7 @@ const normalizePrintResponse = (responseData: Record<string, unknown>, fallbackE
 
 const normalizePrintError = (error: unknown, fallbackMessage: string) => ({
   success: false,
-  error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || fallbackMessage
+  error: getErrorMessage(error) || fallbackMessage
 });
 
 export const printService = {

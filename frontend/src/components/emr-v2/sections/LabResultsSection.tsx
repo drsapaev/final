@@ -34,6 +34,7 @@ import { formatLabStatus, getLabStatusVariant } from '../../laboratory/labUiLabe
 import logger from '@/utils/logger';
 import notify from '@/services/notify';
 import { useTranslation } from '@/i18n/useTranslation';
+import { getErrorMessage } from '../../../utils/type-guards';
 
 // UX-AUDIT-FIX10: STATUS_LABELS и STATUS_VARIANTS удалены —
 // используются formatLabStatus() и getLabStatusVariant() из labUiLabels.js.
@@ -175,8 +176,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
       notify.success(`Заказ «${templateName}» создан. Лаборатория увидит его в очереди.`);
       setShowOrderModal(false);
     } catch (err: unknown) {
-      const errShape = err as { response?: { data?: { detail?: unknown } }; message?: string };
-      const msg = errShape?.response?.data?.detail || errShape?.message || 'Не удалось создать заказ.';
+      const msg = getErrorMessage(err) || 'Не удалось создать заказ.';
       notify.error(typeof msg === 'string' ? msg : 'Не удалось создать заказ.');
     } finally {
       setOrdering(false);

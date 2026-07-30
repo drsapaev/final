@@ -38,6 +38,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { getErrorMessage } from '../../utils/type-guards';
 
 // API base URL with fallback for development
 void getApiOrigin();
@@ -378,7 +379,7 @@ const DynamicPricingManager = () => {
       loadData();
     } catch (error: unknown) {
       logger.error('Ошибка создания правила:', error);
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      const detail = getErrorMessage(error);
       toast.error(detail || t('admin2.dp_rule_create_error'));
     }
   };
@@ -401,7 +402,7 @@ const DynamicPricingManager = () => {
       loadData();
     } catch (error: unknown) {
       logger.error('Ошибка создания пакета:', error);
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      const detail = getErrorMessage(error);
       toast.error(detail || t('admin2.dp_package_create_error'));
     }
   };

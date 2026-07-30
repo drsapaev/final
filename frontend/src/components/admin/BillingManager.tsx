@@ -38,6 +38,7 @@ import type { Invoice, Payment } from '../../types/domain/billing';
 import logger from '../../utils/logger';
 import { sanitizePrintableHtml } from '../../utils/printWindow';  // PR-35 / P0-7
 import { useTranslation } from '../../i18n/useTranslation';
+import { getErrorMessage } from '../../utils/type-guards';
 
 type InvoiceForm = {
   patient_id: string | number;
@@ -215,7 +216,7 @@ const BillingManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка создания счета:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.bill_inv_create_error'));
+      toast.error(getErrorMessage(error) || t('admin2.bill_inv_create_error'));
     }
   };
 
@@ -235,7 +236,7 @@ const BillingManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка записи платежа:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.bill_pay_record_error'));
+      toast.error(getErrorMessage(error) || t('admin2.bill_pay_record_error'));
     }
   };
 
@@ -245,7 +246,7 @@ const BillingManager = () => {
       toast.success(t('admin2.bill_inv_sent'));
     } catch (error) {
       logger.error('Ошибка отправки счета:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.bill_inv_send_error'));
+      toast.error(getErrorMessage(error) || t('admin2.bill_inv_send_error'));
     }
   };
 
@@ -266,7 +267,7 @@ const BillingManager = () => {
       newWindow.document.close();
     } catch (error) {
       logger.error('Ошибка получения HTML счета:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.bill_inv_html_error'));
+      toast.error(getErrorMessage(error) || t('admin2.bill_inv_html_error'));
     }
   };
 

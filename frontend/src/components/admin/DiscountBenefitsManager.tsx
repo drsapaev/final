@@ -30,6 +30,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import { getErrorMessage } from '../../utils/type-guards';
 
 // === Domain types ===
 // Shape produced by loadAnalytics(): three optional analytics sections, each
@@ -228,7 +229,7 @@ const DiscountBenefitsManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка создания скидки:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.disc_create_error'));
+      toast.error(getErrorMessage(error) || t('admin2.disc_create_error'));
     }
   };
 
@@ -256,7 +257,7 @@ const DiscountBenefitsManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка создания льготы:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.disc_benefit_create_error'));
+      toast.error(getErrorMessage(error) || t('admin2.disc_benefit_create_error'));
     }
   };
 
@@ -280,7 +281,7 @@ const DiscountBenefitsManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка создания программы лояльности:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.disc_loyalty_create_error'));
+      toast.error(getErrorMessage(error) || t('admin2.disc_loyalty_create_error'));
     }
   };
 

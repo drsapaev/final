@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { Shield, Smartphone, Download, Copy, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { Input } from './ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
+import { getErrorMessage } from '../utils/type-guards';
 
 interface TwoFactorSetupProps {
   onComplete?: () => void;
@@ -48,8 +49,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }: TwoFactorSetupProps) => {
       setBackupCodes((response.data?.backup_codes as string[]) || []);
       setStep(2);
     } catch (err) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      setError(e.response?.data?.detail || t('misc.tfs_oshibka_nastroyki_2fa'));
+      setError(getErrorMessage(err) || t('misc.tfs_oshibka_nastroyki_2fa'));
     } finally {
       setLoading(false);
     }
@@ -76,8 +76,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }: TwoFactorSetupProps) => {
         setError(String(response.data?.message || t('misc.tfs_nevernyy_kod')));
       }
     } catch (err) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      setError(e.response?.data?.detail || t('misc.tfs_oshibka_verifikatsii'));
+      setError(getErrorMessage(err) || t('misc.tfs_oshibka_verifikatsii'));
     } finally {
       setLoading(false);
     }

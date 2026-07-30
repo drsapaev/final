@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api/client';
 import logger from '../utils/logger';
 import { formatNetworkErrorMessage } from '../utils/networkErrorMessages';
+import { getErrorMessage } from '../utils/type-guards';
 
 // Дефолтные настройки
 const DEFAULT_CONFIG = {
@@ -183,12 +184,12 @@ export const useDoctorPhrases = ({
         const errorMessage = formatNetworkErrorMessage({
           responseDetail: (err as Error & { response?: { data?: Record<string, unknown> } })?.response?.data?.detail,
           responseMessage: (err as Error & { response?: { data?: Record<string, unknown> } })?.response?.data?.message,
-          rawMessage: (err as Error)?.message,
+          rawMessage: getErrorMessage(err),
           fallbackMessage: 'Не удалось получить подсказки из истории врача',
         });
         logger.warn('[DoctorPhrases] Не удалось получить подсказки из истории врача', {
           error: errorMessage,
-          rawMessage: (err as Error)?.message,
+          rawMessage: getErrorMessage(err),
         });
         setError(String(errorMessage));
         setSuggestions([]);

@@ -171,9 +171,11 @@ const UserDataTransferManager = () => {
       toast.error(t('admin2.udtm_err_select_users'));
       return false;
     }
+    const srcUser = sourceUser;
+    const tgtUser = targetUser;
 
     try {
-      const response = (await api.post(`/admin/user-data/transfer/validate?source_user_id=${sourceUser!.id}&target_user_id=${targetUser!.id}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
+      const response = (await api.post(`/admin/user-data/transfer/validate?source_user_id=${srcUser.id}&target_user_id=${tgtUser.id}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const validation = (response.data as { valid?: boolean; message?: string; appointments?: unknown; visits?: unknown; queue_entries?: unknown; [k: string]: unknown }) || {};
 
       if (!validation.valid) {
@@ -193,12 +195,13 @@ const UserDataTransferManager = () => {
     if (!(await validateTransfer())) {
       return;
     }
+    if (!sourceUser || !targetUser) return;
 
     setIsTransferring(true);
     try {
       const response = await api.post('/admin/user-data/transfer', {
-        source_user_id: sourceUser!.id,
-        target_user_id: targetUser!.id,
+        source_user_id: sourceUser.id,
+        target_user_id: targetUser.id,
         data_types: selectedDataTypes,
         confirmation_required: false
       }) as import('axios').AxiosResponse<Record<string, unknown>>;

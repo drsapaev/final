@@ -27,6 +27,7 @@ import { Input } from '../ui/macos';
 // useTheme + tokenManager удалены (auth через axios-interceptor, theme через CSS).
 import './ForceMajeureModal.css';
 import { useTranslation } from '../../i18n/useTranslation';
+import { getErrorMessage } from '../../utils/type-guards';
 
 interface ForceMajeureModalProps {
   isOpen: boolean;
@@ -118,7 +119,7 @@ const ForceMajeureModal = ({
       if (onSuccess) onSuccess('transfer', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Transfer error:', err);
-      setError((err as Error)?.message || t('misc.fm_network_error'));
+      setError(getErrorMessage(err) || t('misc.fm_network_error'));
     } finally {
       setLoading(false);
     }
@@ -153,7 +154,7 @@ const ForceMajeureModal = ({
       if (onSuccess) onSuccess('cancel', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Cancel error:', err);
-      setError((err as Error)?.message || t('misc.fm_network_error'));
+      setError(getErrorMessage(err) || t('misc.fm_network_error'));
     } finally {
       setLoading(false);
     }

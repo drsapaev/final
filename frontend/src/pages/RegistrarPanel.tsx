@@ -569,7 +569,7 @@ const RegistrarPanel = () => {
         });
       } else {
         // Other errors (network, 404, 500, etc.)
-        logger.error('❌ Backend недоступен для загрузки записей:', (error as Error)?.message);
+        logger.error('❌ Backend недоступен для загрузки записей:', getErrorMessage(error));
         logger.error('❌ Детали ошибки:', error);
         startTransition(() => {
           if (!silent) setDataSource('error');

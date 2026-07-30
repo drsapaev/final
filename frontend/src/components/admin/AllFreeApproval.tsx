@@ -27,6 +27,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { getErrorMessage } from '../../utils/type-guards';
 
 const ALL_FREE_ACTION_CAN_FIELD: Record<string, string> = {
   approve: 'can_approve',
@@ -108,7 +109,7 @@ const AllFreeApproval = () => {
       setAllFreeRequests(Array.isArray(data) ? data : []);
     } catch (error) {
       logger.error('[AllFreeApproval] Ошибка при загрузке заявок All Free:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.af_err_load'));
+      toast.error(getErrorMessage(error) || t('admin2.af_err_load'));
     } finally {
       setLoading(false);
     }
@@ -141,7 +142,7 @@ const AllFreeApproval = () => {
       setRejectionReason('');
     } catch (error) {
       logger.error('Error processing approval:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.af_err_process'));
+      toast.error(getErrorMessage(error) || t('admin2.af_err_process'));
     } finally {
       setIsProcessing(false);
     }

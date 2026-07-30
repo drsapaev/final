@@ -12,6 +12,7 @@ import './PrintDialog.css';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { getErrorMessage } from '../../utils/type-guards';
 
 interface PrintDocumentData {
   patient_fio?: string;
@@ -151,7 +152,7 @@ const PrintDialog = ({
         onClose();
       } catch (err) {
         logger.error('Print error:', err);
-        toast.error((err as Error)?.message || t('misc.pd_oshibka_pri_pechati_dokument'));
+        toast.error(getErrorMessage(err) || t('misc.pd_oshibka_pri_pechati_dokument'));
       } finally {
         setIsPrinting(false);
       }
@@ -172,7 +173,7 @@ const PrintDialog = ({
       onClose();
     } catch (err) {
       logger.error('Print error:', err);
-      toast.error((err as Error)?.message || t('misc.pd_oshibka_pri_pechati_dokument'));
+      toast.error(getErrorMessage(err) || t('misc.pd_oshibka_pri_pechati_dokument'));
     } finally {
       setIsPrinting(false);
     }

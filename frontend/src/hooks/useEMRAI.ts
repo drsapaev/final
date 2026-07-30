@@ -9,6 +9,7 @@ import {
 } from '../utils/aiValidator';
 
 import logger from '../utils/logger';
+import { getErrorMessage } from '../utils/type-guards';
 /**
  * Кастомный хук для AI функций в EMR системе через MCP
  * Поддерживает все медицинские AI функции
@@ -83,8 +84,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       }
     } catch (err) {
       logger.error('AI error:', err);
-      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
-      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка получения AI подсказок';
+      const errorMessage = getErrorMessage(err) || 'Ошибка получения AI подсказок';
       setError(String(errorMessage));
       return [];
     } finally {
@@ -134,8 +134,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       }
     } catch (err) {
       logger.error('AI analysis error:', err);
-      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
-      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка анализа жалоб';
+      const errorMessage = getErrorMessage(err) || 'Ошибка анализа жалоб';
       setError(String(errorMessage));
       return null;
     } finally {
@@ -153,8 +152,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       return response.data;
     } catch (err) {
       logger.error('AI recommendations error:', err);
-      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
-      const errorMessage = errObj?.response?.data?.detail || 'Ошибка получения рекомендаций';
+      const errorMessage = getErrorMessage(err) || 'Ошибка получения рекомендаций';
       setError(String(errorMessage));
       return null;
     } finally {
@@ -199,8 +197,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       }
     } catch (err) {
       logger.error('AI lab interpretation error:', err);
-      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
-      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка интерпретации анализов';
+      const errorMessage = getErrorMessage(err) || 'Ошибка интерпретации анализов';
       setError(String(errorMessage));
       return null;
     } finally {
@@ -222,8 +219,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       return response.data;
     } catch (err) {
       logger.error('AI lab suggestions error:', err);
-      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
-      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка получения предложений по анализам';
+      const errorMessage = getErrorMessage(err) || 'Ошибка получения предложений по анализам';
       setError(String(errorMessage));
       return [];
     } finally {
@@ -268,8 +264,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       }
     } catch (err) {
       logger.error('AI image analysis error:', err);
-      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
-      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка анализа изображения';
+      const errorMessage = getErrorMessage(err) || 'Ошибка анализа изображения';
       setError(String(errorMessage));
       return null;
     } finally {
@@ -302,8 +297,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       }
     } catch (err) {
       logger.error('AI skin lesion analysis error:', err);
-      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
-      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка анализа кожного образования';
+      const errorMessage = getErrorMessage(err) || 'Ошибка анализа кожного образования';
       setError(String(errorMessage));
       return null;
     } finally {

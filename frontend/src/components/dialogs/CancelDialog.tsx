@@ -9,6 +9,7 @@ import './CancelDialog.css';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import type { Appointment } from '../../types/domain/clinic';
+import { getErrorMessage } from '../../utils/type-guards';
 
 interface CancelDialogProps {
   isOpen: boolean;
@@ -69,7 +70,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
       onClose();
     } catch (error) {
       logger.error('Cancel error:', error);
-      toast.error(t('misc.cd_oshibka_pri_otmene_zapisi') + (error as Error)?.message);
+      toast.error(t('misc.cd_oshibka_pri_otmene_zapisi') + getErrorMessage(error));
     } finally {
       setIsProcessing(false);
     }

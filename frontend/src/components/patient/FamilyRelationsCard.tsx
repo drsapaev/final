@@ -29,6 +29,7 @@ import apiClient from '../../api/client';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { getErrorMessage } from '../../utils/type-guards';
 
 const RELATION_TYPES = {
   parent: { labelKey: 'patient.pat_fam_relation_parent', Icon: Users },
@@ -522,7 +523,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess }:
       onSuccess();
     } catch (err) {
       logger.error('Error creating relation:', err);
-      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('patient.pat_fam_create_error'));
+      setError(getErrorMessage(err) || t('patient.pat_fam_create_error'));
     } finally {
       setLoading(false);
     }

@@ -27,6 +27,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { getErrorMessage } from '../../utils/type-guards';
 
 interface UserExportFile {
   filename: string;
@@ -160,7 +161,7 @@ const UserExportManager = () => {
       }
     } catch (error) {
       logger.error('Ошибка экспорта:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.ue_export_error_fallback'));
+      toast.error(getErrorMessage(error) || t('admin2.ue_export_error_fallback'));
     } finally {
       setLoading(false);
     }

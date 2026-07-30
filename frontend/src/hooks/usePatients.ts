@@ -4,6 +4,7 @@ import { api } from '../api/client';  // PR-38 / High-21: centralized axios clie
 import { buildPatientDocumentFields } from '../utils/patientDocument';
 import logger from '../utils/logger';
 import type { Patient } from '../types/domain/clinic';
+import { getErrorMessage } from '../utils/type-guards';
 
 interface CatchError {
   status?: number;
@@ -85,7 +86,7 @@ const usePatients = () => {
       const transformedPatients = data.map(transformPatient);
       setPatients(transformedPatients);
     } catch (err) {
-      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка загрузки пациентов';
+      const message = getErrorMessage(err) || 'Ошибка загрузки пациентов';
       setError(new Error(message));
       logger.error('Ошибка загрузки пациентов:', err);
     } finally {
@@ -122,7 +123,7 @@ const usePatients = () => {
       setPatients(prev => [transformedPatient, ...prev]);
       return transformedPatient;
     } catch (err) {
-      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка создания пациента';
+      const message = getErrorMessage(err) || 'Ошибка создания пациента';
       const wrapped = new Error(message);
       (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
       (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
@@ -168,7 +169,7 @@ const usePatients = () => {
       ));
       return transformedPatient;
     } catch (err) {
-      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка обновления пациента';
+      const message = getErrorMessage(err) || 'Ошибка обновления пациента';
       const wrapped = new Error(message);
       (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
       (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
@@ -189,7 +190,7 @@ const usePatients = () => {
       await api.delete(`/patients/${id}`);
       setPatients(prev => prev.filter(patient => patient.id !== id));
     } catch (err) {
-      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка удаления пациента';
+      const message = getErrorMessage(err) || 'Ошибка удаления пациента';
       const wrapped = new Error(message);
       (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
       (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
@@ -257,7 +258,7 @@ const usePatients = () => {
           : patient
       ));
     } catch (err) {
-      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка архивирования пациента';
+      const message = getErrorMessage(err) || 'Ошибка архивирования пациента';
       const wrapped = new Error(message);
       (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
       (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
@@ -282,7 +283,7 @@ const usePatients = () => {
           : patient
       ));
     } catch (err) {
-      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка восстановления пациента';
+      const message = getErrorMessage(err) || 'Ошибка восстановления пациента';
       const wrapped = new Error(message);
       (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
       (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;

@@ -31,6 +31,7 @@ import {
 import UserModal from './UserModal';
 import { useRoles } from '../../hooks/useRoles';
 import { getProfile } from '../../stores/auth';
+import { getErrorMessage } from '../../utils/type-guards';
 
 // Local user shape returned by GET /users/users and stored in `users` state.
 // Mirrors UserModal's UserModalUser to allow direct interop.
@@ -191,7 +192,7 @@ const UserManagement = () => {
       setTotalUsers(Number(response.data.total ?? 0));
       setError('');
     } catch (err: unknown) {
-      const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_connection');
+      const errorMessage = getErrorMessage(err) || t('admin2.um_error_connection');
       setError(errorMessage);
       logger.error('Ошибка загрузки пользователей:', err);
     } finally {
@@ -213,7 +214,7 @@ const UserManagement = () => {
       setShowUserModal(false);
       setSelectedUser(null);
     } catch (err: unknown) {
-      const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_save');
+      const errorMessage = getErrorMessage(err) || t('admin2.um_error_save');
       setError(errorMessage);
       logger.error('Ошибка сохранения пользователя:', err);
       throw err; // UserModal catch block will handle specific errors if needed
@@ -241,7 +242,7 @@ const UserManagement = () => {
       setShowDeleteDialog(false);
       setSelectedUser(null);
     } catch (err: unknown) {
-      const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_delete');
+      const errorMessage = getErrorMessage(err) || t('admin2.um_error_delete');
 
       if (errorMessage.includes('связанные данные') || errorMessage.includes('деактивировать')) {
         setDeleteDialogMode('deactivate');
@@ -278,7 +279,7 @@ const UserManagement = () => {
       setDeleteDialogMode('confirm');
       setDeleteDialogMessage('');
     } catch (deactivateErr: unknown) {
-      const deactivateMessage = (deactivateErr as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (deactivateErr as Error)?.message || t('admin2.um_error_deactivate');
+      const deactivateMessage = getErrorMessage(deactivateErr) || t('admin2.um_error_deactivate');
       setError(t('admin2.um_error_deactivate_detailed', { message: deactivateMessage }));
       logger.error('Ошибка деактивации пользователя:', deactivateErr);
     }
@@ -305,7 +306,7 @@ const UserManagement = () => {
       setError('');
       loadUsers(currentPage);
     } catch (err: unknown) {
-      const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_status_change');
+      const errorMessage = getErrorMessage(err) || t('admin2.um_error_status_change');
       setError(errorMessage);
       logger.error('Ошибка изменения статуса пользователя:', err);
     }

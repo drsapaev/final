@@ -48,6 +48,7 @@ import { useLabReportState } from './hooks/useLabReportState';
 import { useLabToast } from './hooks/useLabToast';
 // STRAT#9: t() для i18n — confirm dialogs мигрированы на translation keys.
 import { useTranslation } from '../../i18n/useTranslation';
+import { getErrorMessage } from '../../utils/type-guards';
 
 export default function LabReportWorkbench({
   selectedAppointment = null,
@@ -455,7 +456,7 @@ export default function LabReportWorkbench({
           severity: 'error',
           text: t('workbench.print_pdf_failed')
         });
-        notify?.('error', (downloadError as Error)?.message || t('errors.print_failed'));
+        notify?.('error', getErrorMessage(downloadError) || t('errors.print_failed'));
         return;
       }
       if (!blob || !(blob instanceof Blob)) {
@@ -491,7 +492,7 @@ export default function LabReportWorkbench({
         severity: 'error',
         text: (error instanceof Error ? error.message : String(error))
       });
-      notify?.('error', (error as Error)?.message);
+      notify?.('error', getErrorMessage(error));
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -527,8 +528,7 @@ export default function LabReportWorkbench({
       });
       notify?.('success', t('success.notified'));
     } catch (error) {
-      const err = error as { response?: { data?: { detail?: string } }; message?: string };
-      const msg = err?.response?.data?.detail || err?.message || 'Не удалось отправить результаты пациенту.';
+      const msg = getErrorMessage(error) || 'Не удалось отправить результаты пациенту.';
       notify?.('error', typeof msg === 'string' ? msg : t('errors.notify_failed'));
     } finally {
       setSaving(false);

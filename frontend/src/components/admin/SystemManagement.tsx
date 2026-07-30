@@ -42,6 +42,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { getErrorMessage } from '../../utils/type-guards';
 
 interface BackupItem {
   name: string;
@@ -171,7 +172,7 @@ const SystemManagement = () => {
       }
     } catch (error) {
       logger.error('Ошибка создания бэкапа:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.sm_backup_create_error'));
+      toast.error(getErrorMessage(error) || t('admin2.sm_backup_create_error'));
     } finally {
       setLoading(false);
     }
