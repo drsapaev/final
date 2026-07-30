@@ -4,6 +4,8 @@
  * EnhancedAppointmentsTable, RegistrarPanel, and other consumers.
  */
 
+import type { PatientId, AppointmentId, DoctorId, ServiceId, VisitId, QueueEntryId, UserId } from './branded';
+
 export type AppointmentStatus =
   | 'pending'
   | 'confirmed'
@@ -52,24 +54,24 @@ export interface QueueNumberInfo {
 }
 
 export interface Appointment {
-  id?: string | number;
-  patient_id?: string | number;
+  id?: AppointmentId;
+  patient_id?: PatientId;
   patient_name?: string;
   patient_fio?: string;
-  doctor_id?: string | number;
+  doctor_id?: DoctorId;
   doctor_name?: string;
-  specialist_id?: string | number;
+  specialist_id?: DoctorId;
   status?: AppointmentStatus | (string & {});
   type?: AppointmentType;
   date?: string;
   time?: string;
-  service_id?: string | number;
+  service_id?: ServiceId;
   service_name?: string;
-  queue_entry_id?: string | number;
+  queue_entry_id?: QueueEntryId;
   queue_number?: number | string;
   department?: string;
   specialty?: string;
-  visit_id?: string | number;
+  visit_id?: VisitId;
   payment_status?: string;
   amount?: number;
   created_at?: string;
@@ -167,7 +169,7 @@ export interface Appointment {
 }
 
 export interface Patient {
-  id: string | number;
+  id: PatientId;
   full_name?: string;
   name?: string;
   first_name?: string;
@@ -200,7 +202,7 @@ export interface DoctorAvailability {
 }
 
 export interface Doctor {
-  id: string | number;
+  id: DoctorId;
   full_name?: string;
   name?: string;
   specialty?: string;
@@ -213,7 +215,7 @@ export interface Doctor {
   is_active?: boolean;
   price_default?: number;
   start_number_online?: number;
-  user_id?: string | number;
+  user_id?: UserId;
   user?: { full_name?: string; [k: string]: unknown };
   schedule?: DoctorScheduleSlot[];
   availability?: DoctorAvailability[];
@@ -226,7 +228,7 @@ export interface Doctor {
 
 export interface Transaction {
   id: string | number;
-  patient_id?: string | number;
+  patient_id?: PatientId;
   patient_name?: string;
   amount?: number;
   status?: string;
@@ -249,7 +251,7 @@ export interface DepartmentStats {
 }
 
 export interface Department {
-  id?: string | number;
+  id?: AppointmentId;
   name?: string;
   code?: string;
   description?: string;
@@ -259,7 +261,7 @@ export interface Department {
 }
 
 export interface ServiceCategory {
-  id?: string | number;
+  id?: AppointmentId;
   name?: string;
   code?: string;
 }

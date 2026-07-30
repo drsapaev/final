@@ -4,15 +4,17 @@
  * PaymentWidget, and billing-related components.
  */
 
+import type { PatientId, AppointmentId, DoctorId, ServiceId, InvoiceId, PaymentId } from './branded';
+
 export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'click' | 'payme';
 export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed' | 'partial';
 export type DiscountMode = 'none' | 'repeat' | 'benefit' | 'all_free';
 
 export interface Invoice {
-  id: string | number;
+  id: InvoiceId;
   invoice_number?: string;
-  appointment_id?: string | number;
-  patient_id?: string | number;
+  appointment_id?: AppointmentId;
+  patient_id?: PatientId;
   patient_name?: string;
   invoice_type?: string;
   amount?: number;
@@ -27,28 +29,28 @@ export interface Invoice {
   created_at?: string;
   paid_at?: string;
   items?: InvoiceItem[];
-  invoice_id?: string | number;
+  invoice_id?: InvoiceId;
   provider?: string;
   description?: string;
 }
 
 export interface InvoiceItem {
-  id?: string | number;
-  service_id?: string | number;
+  id?: InvoiceId;
+  service_id?: ServiceId;
   service_name?: string;
   quantity?: number;
   price?: number;
   total?: number;
-  doctor_id?: string | number;
+  doctor_id?: DoctorId;
   doctor_name?: string;
 }
 
 export interface Payment {
-  id: string | number;
+  id: PaymentId;
   payment_number?: string;
   is_confirmed?: boolean;
-  invoice_id?: string | number;
-  patient_id?: string | number;
+  invoice_id?: InvoiceId;
+  patient_id?: PatientId;
   amount?: number;
   method?: PaymentMethod;
   payment_method?: string;
@@ -60,7 +62,7 @@ export interface Payment {
 }
 
 export interface Discount {
-  id: string | number;
+  id: InvoiceId;
   name?: string;
   description?: string;
   discount_type?: 'percentage' | 'fixed';
@@ -88,9 +90,9 @@ export interface BillingSummary {
 export type RefundStatus = 'requested' | 'approved' | 'rejected' | 'processed';
 
 export interface Refund {
-  id: string | number;
-  payment_id?: string | number;
-  invoice_id?: string | number;
+  id: InvoiceId;
+  payment_id?: PaymentId;
+  invoice_id?: InvoiceId;
   amount?: number;
   reason?: string;
   status?: RefundStatus;
@@ -117,12 +119,12 @@ export interface PaymentWebhook {
 }
 
 export interface CartItemBilling {
-  service_id?: string | number;
+  service_id?: ServiceId;
   service_name?: string;
   quantity?: number;
   price?: number;
   total?: number;
-  doctor_id?: string | number;
+  doctor_id?: DoctorId;
   doctor_name?: string;
   discount_amount?: number;
   is_free?: boolean;

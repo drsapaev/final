@@ -39,7 +39,7 @@ export function mapDoctorDto(dto: DoctorDto): Doctor {
     ...dto,
     is_active: dto.active,
     price_default: priceDefault,
-  } as Doctor;
+  } as unknown as Doctor;
 }
 
 export function mapDoctorDtos(dtos: DoctorDto[] | unknown): Doctor[] {

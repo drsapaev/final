@@ -63,7 +63,7 @@ const normalizeAppointment = (appointment: Appointment): NormalizedAppointment =
 
 const buildAppointmentPayload = (appointmentData: Record<string, unknown>, doctors: Doctor[] = []) => {
   const selectedDoctor = doctors.find(
-    (doctor) => doctor.id === Number(appointmentData.doctorId)
+    (doctor) => String(doctor.id) === String(appointmentData.doctorId)
   );
 
   const payload = {
