@@ -27,13 +27,11 @@ import type { AIChatMessage } from './ai';
 export interface McpSuccess<T> {
   status: 'success';
   data: T;
-  [key: string]: unknown;
 }
 
 export interface McpFailure {
   status: 'error';
   error: string;
-  [key: string]: unknown;
 }
 
 export type McpResult<T> = McpSuccess<T> | McpFailure;
@@ -47,7 +45,6 @@ export interface McpChatMessage {
   timestamp?: Date;
   type?: string;
   metadata?: unknown;
-  [key: string]: unknown;
 }
 
 export interface McpChatPayload {
@@ -58,13 +55,11 @@ export interface McpChatPayload {
   maxTokens?: number;
   systemPrompt?: string;
   context?: string;
-  [key: string]: unknown;
 }
 
 export interface McpChatData {
   message: string;
   metadata: { provider: string; model: string; stub: boolean };
-  [key: string]: unknown;
 }
 
 // === Suggestions transport =================================================
@@ -75,20 +70,17 @@ export interface McpSuggestionPayload {
   maxSuggestions?: number;
   provider?: string;
   model?: string;
-  [key: string]: unknown;
 }
 
 export interface McpSuggestionItem {
   text: string;
   confidence: number;
   category: string;
-  [key: string]: unknown;
 }
 
 export interface McpSuggestionData {
   suggestions: McpSuggestionItem[];
   metadata: { type: string; stub: boolean };
-  [key: string]: unknown;
 }
 
 // === Translation transport =================================================
@@ -99,27 +91,23 @@ export interface McpTranslatePayload {
   to?: string;
   provider?: string;
   context?: string;
-  [key: string]: unknown;
 }
 
 export interface McpTranslateData {
   translation: string;
   metadata: { stub: boolean };
-  [key: string]: unknown;
 }
 
 // === Image analysis transport ==============================================
 
 export interface McpAnalyzeImageOptions {
   provider?: string;
-  [key: string]: unknown;
 }
 
 export interface McpAnalyzeImageData {
   summary: string;
   findings: unknown[];
   metadata: { stub: boolean };
-  [key: string]: unknown;
 }
 
 // === Mapper helpers (Wave 4 will move these to src/types/api-mapper/) ======

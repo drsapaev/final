@@ -27,7 +27,9 @@ export interface Invoice {
   created_at?: string;
   paid_at?: string;
   items?: InvoiceItem[];
-  [key: string]: unknown;
+  invoice_id?: string | number;
+  provider?: string;
+  description?: string;
 }
 
 export interface InvoiceItem {
@@ -39,7 +41,6 @@ export interface InvoiceItem {
   total?: number;
   doctor_id?: string | number;
   doctor_name?: string;
-  [key: string]: unknown;
 }
 
 export interface Payment {
@@ -53,9 +54,9 @@ export interface Payment {
   payment_method?: string;
   status?: PaymentStatus;
   transaction_id?: string;
+  reference_number?: string;
   payment_date?: string;
   created_at?: string;
-  [key: string]: unknown;
 }
 
 export interface Discount {
@@ -65,7 +66,6 @@ export interface Discount {
   discount_type?: 'percentage' | 'fixed';
   value?: number;
   active?: boolean;
-  [key: string]: unknown;
 }
 
 export interface DiscountApplication {
@@ -73,7 +73,6 @@ export interface DiscountApplication {
   discount_name?: string;
   amount?: number;
   percentage?: number;
-  [key: string]: unknown;
 }
 
 export interface BillingSummary {
@@ -84,7 +83,6 @@ export interface BillingSummary {
   transaction_count?: number;
   by_method?: Record<string, number>;
   by_status?: Record<string, number>;
-  [key: string]: unknown;
 }
 
 export type RefundStatus = 'requested' | 'approved' | 'rejected' | 'processed';
@@ -98,7 +96,6 @@ export interface Refund {
   status?: RefundStatus;
   requested_at?: string;
   processed_at?: string;
-  [key: string]: unknown;
 }
 
 export interface PaymentProvider {
@@ -107,7 +104,6 @@ export interface PaymentProvider {
   code?: string;
   is_active?: boolean;
   config?: Record<string, unknown>;
-  [key: string]: unknown;
 }
 
 export interface PaymentWebhook {
@@ -118,7 +114,6 @@ export interface PaymentWebhook {
   status?: string;
   payload?: Record<string, unknown>;
   created_at?: string;
-  [key: string]: unknown;
 }
 
 export interface CartItemBilling {
@@ -131,7 +126,6 @@ export interface CartItemBilling {
   doctor_name?: string;
   discount_amount?: number;
   is_free?: boolean;
-  [key: string]: unknown;
 }
 
 export interface PaymentResult {
@@ -139,5 +133,4 @@ export interface PaymentResult {
   transaction_id?: string;
   error?: string;
   redirect_url?: string;
-  [key: string]: unknown;
 }

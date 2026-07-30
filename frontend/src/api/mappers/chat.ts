@@ -51,7 +51,7 @@ export function mapChatConversationDto(dto: ChatDtoLike): ChatConversation {
   if (userId == null) {
     throw new Error('[mapChatConversationDto] missing required field `user_id`');
   }
-  return { ...(dto as ChatConversation) };
+  return { ...(dto as unknown as ChatConversation) };
 }
 
 export function mapChatAvailableUserDto(dto: ChatDtoLike): ChatAvailableUser {
@@ -62,7 +62,7 @@ export function mapChatAvailableUserDto(dto: ChatDtoLike): ChatAvailableUser {
   if (id == null) {
     throw new Error('[mapChatAvailableUserDto] missing required field `id`');
   }
-  return { ...(dto as ChatAvailableUser) };
+  return { ...(dto as unknown as ChatAvailableUser) };
 }
 
 export function mapChatAvailableUserDtos(dtos: unknown): ChatAvailableUser[] {

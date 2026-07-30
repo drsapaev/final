@@ -7,6 +7,7 @@ import type { MouseEvent } from 'react';
 interface MessageData {
   id: number;
   content?: string;
+  sender_id?: number;
   [key: string]: unknown;
 }
 
