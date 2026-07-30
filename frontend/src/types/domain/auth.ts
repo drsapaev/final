@@ -6,6 +6,7 @@
  *   - types/auth-store.ts (store API surface)
  *   - contexts/ChatContext.tsx, contexts/ThemeContext.tsx
  *   - routing/routeGuards.tsx, components/layout/Nav.tsx
+import type { UserId } from './branded';
  *   - LoginForm, UserManagement, RoleGate, security components
  *
  * Consolidation note (Wave 3, Domain Adoption 100%):

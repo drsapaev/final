@@ -4,7 +4,7 @@
  * EnhancedAppointmentsTable, RegistrarPanel, and other consumers.
  */
 
-import type { PatientId, AppointmentId, DoctorId, ServiceId, VisitId, QueueEntryId, UserId } from './branded';
+import type { PatientId, AppointmentId, DoctorId, ServiceId, VisitId, QueueEntryId, UserId, DepartmentId } from './branded';
 
 export type AppointmentStatus =
   | 'pending'
@@ -208,7 +208,7 @@ export interface Doctor {
   specialty?: string;
   specialty_display?: string;
   department?: string;
-  department_id?: string | number;
+  department_id?: DepartmentId;
   email?: string;
   phone?: string;
   cabinet?: string | number;
@@ -274,7 +274,7 @@ export interface ServiceFilter {
 }
 
 export interface Service {
-  id: string | number;
+  id: ServiceId;
   name?: string;
   code?: string;
   category?: string;
