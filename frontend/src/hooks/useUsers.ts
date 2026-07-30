@@ -4,10 +4,11 @@ import { toast } from 'react-toastify';
 
 import logger from '../utils/logger';
 import { getErrorMessage } from '../utils/errorHandler';
+import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getData, getError } from '../types/async-state';
+
 const useUsers = () => {
-  const [users, setUsers] = useState<unknown[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [usersState, setUsersState] = useState<AsyncState<unknown[]>>(idleState<unknown[]>());
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -18,10 +19,13 @@ const useUsers = () => {
     total_pages: 0
   });
 
+  const users = getData(usersState, []);
+  const loading = usersState.status === 'loading';
+  const error = getError(usersState);
+
   // Загрузка пользователей
   const loadUsers = useCallback(async (page = 1) => {
-    setLoading(true);
-    setError(null);
+    setUsersState(loadingState<unknown[]>());
     
     try {
       const params: Record<string, unknown> = {
@@ -36,7 +40,7 @@ const useUsers = () => {
       const response = await api.get('/users/users', { params });
       
       if (response.data) {
-        setUsers(response.data.users || []);
+        setUsersState(successState(response.data.users || []));
         setPagination({
           page: response.data.page || 1,
           per_page: response.data.per_page || 20,
@@ -50,17 +54,14 @@ const useUsers = () => {
         err,
         'Не удалось загрузить пользователей. Проверьте соединение и попробуйте снова.'
       );
-      setError(String(errorMessage));
+      setUsersState(errorState<unknown[]>(String(errorMessage)));
       toast.error(errorMessage);
-    } finally {
-      setLoading(false);
     }
   }, [searchTerm, filterRole, filterStatus, pagination.per_page]);
 
   // Создание пользователя
   const createUser = useCallback(async (userData: Record<string, unknown>) => {
-    setLoading(true);
-    setError(null);
+    setUsersState(loadingState<unknown[]>());
     
     try {
       const response = await api.post('/users/users', userData);
@@ -77,18 +78,15 @@ const useUsers = () => {
         err,
         'Не удалось создать пользователя. Проверьте соединение и попробуйте снова.'
       );
-      setError(String(errorMessage));
+      setUsersState(errorState<unknown[]>(String(errorMessage)));
       toast.error(errorMessage);
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, [loadUsers, pagination.page]);
 
   // Обновление пользователя
   const updateUser = useCallback(async (id: string | number, userData: Record<string, unknown>) => {
-    setLoading(true);
-    setError(null);
+    setUsersState(loadingState<unknown[]>());
     
     try {
       const response = await api.put(`/users/users/${id}`, userData);
@@ -105,18 +103,15 @@ const useUsers = () => {
         err,
         'Не удалось обновить пользователя. Проверьте соединение и попробуйте снова.'
       );
-      setError(String(errorMessage));
+      setUsersState(errorState<unknown[]>(String(errorMessage)));
       toast.error(errorMessage);
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, [loadUsers, pagination.page]);
 
   // Удаление пользователя
   const deleteUser = useCallback(async (id: string | number) => {
-    setLoading(true);
-    setError(null);
+    setUsersState(loadingState<unknown[]>());
     
     try {
       await api.delete(`/users/users/${id}`);
@@ -130,11 +125,9 @@ const useUsers = () => {
         err,
         'Не удалось удалить пользователя. Проверьте соединение и попробуйте снова.'
       );
-      setError(String(errorMessage));
+      setUsersState(errorState<unknown[]>(String(errorMessage)));
       toast.error(errorMessage);
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, [loadUsers, pagination.page]);
 

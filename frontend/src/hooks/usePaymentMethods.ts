@@ -19,6 +19,8 @@ import { useState, useEffect } from 'react';
 import { DEFAULT_PAYMENT_METHODS, mapBackendPaymentMethods } from '../config/paymentMethods';
 import { api } from '../api/client';
 import logger from '../utils/logger';
+import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getData, getError } from '../types/async-state';
 
 export function usePaymentMethods(options: Record<string, unknown> = {}) {
   const { enableBackendFetch = false } = options;
