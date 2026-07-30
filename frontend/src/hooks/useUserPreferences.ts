@@ -10,6 +10,8 @@ import { api } from '../api/client';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
 
 // Дефолтные EMR настройки
 interface EmrPreferences {
@@ -43,9 +45,11 @@ const LOCAL_STORAGE_KEY = 'user_preferences_cache';
  */
 export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = true) => {
     const [preferences, setPreferences] = useState<EmrPreferences | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [requestState, setRequestState] = useState<AsyncState<unknown>>(idleState<unknown>());
     const [isDirty, setIsDirty] = useState(false);
+
+    const loading = requestState.status === 'loading';
+    const error = getError(requestState);
 
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const loadedRef = useRef(false);
@@ -64,8 +68,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
             return defaultPrefs;
         }
 
-        setLoading(true);
-        setError(null);
+        setRequestState(loadingState<unknown>());
 
         try {
             // Попытка загрузить из localStorage (кеш)
@@ -75,7 +78,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
                 if (parsed && Date.now() - parsed._cachedAt < 5 * 60 * 1000) { // 5 минут
                     setPreferences(parsed);
                     loadedRef.current = true;
-                    setLoading(false);
+                    setRequestState(successState<unknown>(null));
                     return parsed;
                 }
             }
@@ -97,9 +100,11 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
                 setPreferences(prefs);
                 localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(prefs));
                 loadedRef.current = true;
+                setRequestState(successState<unknown>(null));
 
                 return prefs;
             }
+            setRequestState(successState<unknown>(null));
         } catch (err) {
             logger.warn('Failed to load preferences:', err);
 
@@ -121,13 +126,11 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
             // Используем defaults если ошибка
             const defaultPrefs = { ...DEFAULT_EMR_PREFERENCES };
             setPreferences(defaultPrefs);
-            setError(
+            setRequestState(errorState<unknown>(
                 getErrorMessage(err, 'Не удалось загрузить настройки пользователя. Проверьте соединение и попробуйте снова.')
-            );
+            ));
 
             return defaultPrefs;
-        } finally {
-            setLoading(false);
         }
     }, [userId, preferences]);
 
@@ -154,9 +157,9 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
             return true;
         } catch (err) {
             logger.error('Failed to save preferences:', err);
-            setError(
+            setRequestState(errorState<unknown>(
                 getErrorMessage(err, 'Не удалось сохранить настройки пользователя. Проверьте соединение и попробуйте снова.')
-            );
+            ));
             return false;
         }
     }, [preferences, userId]);

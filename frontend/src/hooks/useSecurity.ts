@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { AsyncState } from '../types/async-state';
-import { idleState, loadingState, successState, errorState, getData, getError } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
 
 const useSecurity = () => {
   interface SecurityData {
@@ -12,12 +12,14 @@ const useSecurity = () => {
   [key: string]: unknown;
 }
   const [securityData, setSecurityData] = useState<SecurityData>({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [requestState, setRequestState] = useState<AsyncState<unknown>>(idleState<unknown>());
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('');
   const [filterDateRange, setFilterDateRange] = useState('');
+
+  const loading = requestState.status === 'loading';
+  const error = getError(requestState);
 
   // Моковые данные для демонстрации
   const mockSecurityDataRef = useRef({
@@ -224,24 +226,21 @@ const useSecurity = () => {
 
   // Загрузка данных безопасности
   const loadSecurityData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
     
     try {
       // Имитация API запроса
       await new Promise(resolve => setTimeout(resolve, 500));
       setSecurityData(mockSecurityDataRef.current);
+      setRequestState(successState<unknown>(null));
     } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
+      setRequestState(errorState<unknown>(String(err)));
     }
   }, []);
 
   // Блокировка IP адреса
   const blockIP = useCallback(async (ip: string, reason: string, duration = 7) => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
     
     try {
       // Имитация API запроса
@@ -267,20 +266,18 @@ const useSecurity = () => {
           blockedIPs: Number(prev.overview?.blockedIPs) + 1
         }
       }));
+      setRequestState(successState<unknown>(null));
       
       return newBlockedIP;
     } catch (err) {
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   // Разблокировка IP адреса
   const unblockIP = useCallback(async (ipId: number | string) => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
     
     try {
       // Имитация API запроса
@@ -294,18 +291,16 @@ const useSecurity = () => {
           blockedIPs: Math.max(0, Number(prev.overview?.blockedIPs) - 1)
         }
       }));
+      setRequestState(successState<unknown>(null));
     } catch (err) {
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   // Завершение сессии
   const terminateSession = useCallback(async (sessionId: number | string) => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
     
     try {
       // Имитация API запроса
@@ -319,18 +314,16 @@ const useSecurity = () => {
           activeSessions: Math.max(0, Number(prev.overview?.activeSessions) - 1)
         }
       }));
+      setRequestState(successState<unknown>(null));
     } catch (err) {
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   // Завершение всех других сессий
   const terminateAllOtherSessions = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
     
     try {
       // Имитация API запроса
@@ -344,18 +337,16 @@ const useSecurity = () => {
           activeSessions: 1
         }
       }));
+      setRequestState(successState<unknown>(null));
     } catch (err) {
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   // Обновление статуса угрозы
   const updateThreatStatus = useCallback(async (threatId: number | string, newStatus: string) => {
-    setLoading(true);
-    setError(null);
+    setRequestState(loadingState<unknown>());
     
     try {
       // Имитация API запроса
@@ -369,11 +360,10 @@ const useSecurity = () => {
             : threat
         )
       }));
+      setRequestState(successState<unknown>(null));
     } catch (err) {
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       throw err;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -525,7 +515,7 @@ const useSecurity = () => {
       
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       throw err;
     }
   }, [filteredLogs]);

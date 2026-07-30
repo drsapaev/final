@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import axios from 'axios';
+import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
 
 interface UseAdminDataOptions {
   refreshInterval?: number;
@@ -31,11 +33,13 @@ const useAdminData = (
   } = options;
 
   const [data, setData] = useState<unknown>(initialData);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [requestState, setRequestState] = useState<AsyncState<unknown>>(idleState<unknown>());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef<boolean>(true);
+
+  const loading = requestState.status === 'loading';
+  const error = getError(requestState);
 
   const onErrorRef = useRef(onError);
   const onSuccessRef = useRef(onSuccess);
@@ -64,14 +68,14 @@ const useAdminData = (
     abortControllerRef.current = currentAbortController;
 
     try {
-      setLoading(true);
-      setError(null);
+      setRequestState(loadingState<unknown>());
 
       const cleanUrl = url.startsWith('/api/v1') ? url.replace('/api/v1', '') : url;
       const response = await api.get(cleanUrl, { signal: currentAbortController.signal });
 
       if (!mountedRef.current) return;
       setData(response.data);
+      setRequestState(successState<unknown>(null));
       onSuccessRef.current(response.data);
     } catch (err) {
       const errorObj = err as Error & { name: string };
@@ -84,12 +88,8 @@ const useAdminData = (
       }
 
       if (!mountedRef.current) return;
-      setError(String(err));
+      setRequestState(errorState<unknown>(String(err)));
       onErrorRef.current(err);
-    } finally {
-      if (mountedRef.current) {
-        setLoading(false);
-      }
     }
   }, [url, enabled]);
 

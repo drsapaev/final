@@ -25,32 +25,39 @@ import { idleState, loadingState, successState, errorState, getData, getError } 
 export function usePaymentMethods(options: Record<string, unknown> = {}) {
   const { enableBackendFetch = false } = options;
 
-  const [paymentMethods, setPaymentMethods] = useState(DEFAULT_PAYMENT_METHODS);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [paymentMethodsState, setPaymentMethodsState] = useState<AsyncState<typeof DEFAULT_PAYMENT_METHODS>>(idleState<typeof DEFAULT_PAYMENT_METHODS>());
+
+  const paymentMethods = getData(paymentMethodsState, DEFAULT_PAYMENT_METHODS);
+  const loading = paymentMethodsState.status === 'loading';
+  const error = getError(paymentMethodsState);
 
   useEffect(() => {
     if (!enableBackendFetch) return;
 
     let cancelled = false;
     const fetchPaymentMethods = async () => {
-      setLoading(true);
-      setError(null);
+      setPaymentMethodsState(loadingState<typeof DEFAULT_PAYMENT_METHODS>());
       try {
         const response = await api.get('/payment-methods');
-        if (response.data?.methods && !cancelled) {
-          const mapped = mapBackendPaymentMethods(response.data.methods);
-          setPaymentMethods(mapped as typeof DEFAULT_PAYMENT_METHODS);
+        if (!cancelled) {
+          // If backend returns no methods, fall back to defaults — getData
+          // returns the fallback automatically when state is not 'success',
+          // but here we explicitly transition to success with the mapped or
+          // default set so loading=false.
+          const methods = response.data?.methods;
+          const mapped = methods
+            ? (mapBackendPaymentMethods(methods) as typeof DEFAULT_PAYMENT_METHODS)
+            : DEFAULT_PAYMENT_METHODS;
+          setPaymentMethodsState(successState<typeof DEFAULT_PAYMENT_METHODS>(mapped));
         }
       } catch (err) {
         if (!cancelled) {
           logger.warn('[usePaymentMethods] Failed to fetch from backend, using defaults:', err);
-          setError(String(err));
-          // Fallback to defaults on error
-          setPaymentMethods(DEFAULT_PAYMENT_METHODS);
+          // getData returns DEFAULT_PAYMENT_METHODS fallback when state is
+          // 'error', so callers still get the default list while seeing the
+          // error message — preserving the original hook's dual-return shape.
+          setPaymentMethodsState(errorState<typeof DEFAULT_PAYMENT_METHODS>(String(err)));
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
     };
 
