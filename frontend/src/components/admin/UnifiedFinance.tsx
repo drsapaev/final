@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { useSearchParams } from 'react-router-dom';
 import BillingManager from './BillingManager';
 import DynamicPricingManager from './DynamicPricingManager';
@@ -73,8 +72,5 @@ const UnifiedFinance = ({ renderFinance }: { renderFinance?: () => React.ReactNo
 
 };
 
-UnifiedFinance.propTypes = {
-  renderFinance: PropTypes.func
-};
 
 export default UnifiedFinance;

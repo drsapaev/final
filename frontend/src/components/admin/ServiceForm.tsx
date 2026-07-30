@@ -9,7 +9,6 @@ import i18n from '../../i18n';
  * Previously inline in ServiceCatalog.jsx (1208 lines total).
  */
 import { useState, useEffect, useCallback } from 'react';
-import PropTypes from 'prop-types';
 import { AlertCircle, X, Save, Package, Users, Filter } from 'lucide-react';
 import { MacOSTab, MacOSCard, Button, Input, Label, Select, Textarea, Checkbox } from '../ui/macos';
 import ServiceChangesPreview from './ServiceChangesPreview';
@@ -552,13 +551,4 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
 
 };
 
-ServiceForm.propTypes = {
-  service: PropTypes.object,
-  categories: PropTypes.array,
-  doctors: PropTypes.array,
-  queueProfiles: PropTypes.array,
-  setMessage: PropTypes.func,
-  onSave: PropTypes.func,
-  onCancel: PropTypes.func
-};
 

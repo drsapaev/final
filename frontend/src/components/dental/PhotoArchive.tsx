@@ -27,7 +27,6 @@ import {
 
 
 'lucide-react';
-import PropTypes from 'prop-types';
 import notify from '../../services/notify';
 
 /**
@@ -852,12 +851,5 @@ const PhotoArchive = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-PhotoArchive.propTypes = {
-  initialData: PropTypes.any,
-  onClose: PropTypes.any,
-  onSave: PropTypes.any,
-  patientId: PropTypes.any,
-  patientName: PropTypes.any,
-};
 
 export default PhotoArchive;

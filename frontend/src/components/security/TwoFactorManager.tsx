@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ComponentType, ReactNode } from "react";
-import PropTypes from 'prop-types';
 import {
   AlertTriangle,
   CheckCircle,
@@ -97,12 +96,6 @@ function MetricCard({ accent, icon: Icon, label, value }: MetricCardProps) {
   );
 }
 
-MetricCard.propTypes = {
-  accent: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-  label: PropTypes.string.isRequired,
-  value: PropTypes.string.isRequired,
-};
 
 function SectionShell({ title, description, action, children }: { title?: React.ReactNode; description?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode }) {
   return (
@@ -131,12 +124,6 @@ function SectionShell({ title, description, action, children }: { title?: React.
   );
 }
 
-SectionShell.propTypes = {
-  action: PropTypes.node,
-  children: PropTypes.node.isRequired,
-  description: PropTypes.string.isRequired,
-  title: PropTypes.string.isRequired,
-};
 
 function EmptyState({ icon: Icon, title, description, action }: { icon: ComponentType<{ size?: number; className?: string }>; title?: ReactNode; description?: ReactNode; action?: ReactNode }) {
   return (
@@ -173,12 +160,6 @@ function EmptyState({ icon: Icon, title, description, action }: { icon: Componen
   );
 }
 
-EmptyState.propTypes = {
-  action: PropTypes.node,
-  description: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-  title: PropTypes.string.isRequired,
-};
 
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
@@ -272,16 +253,6 @@ function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, on
   );
 }
 
-DeviceCard.propTypes = {
-  badgeLabel: PropTypes.string,
-  details: PropTypes.string.isRequired,
-  lastUsed: PropTypes.string.isRequired,
-  name: PropTypes.string.isRequired,
-  onCancel: PropTypes.func.isRequired,
-  onConfirm: PropTypes.func.isRequired,
-  onToggle: PropTypes.func.isRequired,
-  pending: PropTypes.bool,
-};
 
 export default function TwoFactorManager() {
   const { t: rawT } = useTranslation();

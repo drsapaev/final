@@ -25,7 +25,6 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
@@ -459,12 +458,5 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
 
 
 // audit/strict: removed self-referencing propTypes spread
-EchoForm.propTypes = {
-  initialData: PropTypes.any,
-  onDataUpdate: PropTypes.func,
-  onSave: PropTypes.any,
-  patientId: PropTypes.any,
-  visitId: PropTypes.any,
-};
 
 export default EchoForm;

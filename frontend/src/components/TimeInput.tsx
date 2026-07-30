@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { Input } from './ui/macos';
 import type { CSSProperties, ChangeEvent, FocusEvent } from 'react';
 import React from 'react';
@@ -68,10 +67,3 @@ export default function TimeInput({
 
 
 // audit/strict: removed self-referencing propTypes spread
-TimeInput.propTypes = {
-  disabled: PropTypes.any,
-  ariaLabel: PropTypes.string,
-  onChange: PropTypes.any,
-  style: PropTypes.any,
-  value: PropTypes.any,
-};

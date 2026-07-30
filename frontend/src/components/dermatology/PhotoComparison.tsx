@@ -21,7 +21,6 @@ import {
   Columns,
   Layout } from
 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
@@ -490,10 +489,5 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }
 
 
 // audit/strict: removed self-referencing propTypes spread
-PhotoComparison.propTypes = {
-  afterPhoto: PropTypes.any,
-  beforePhoto: PropTypes.any,
-  metadata: PropTypes.any,
-};
 
 export default PhotoComparison;

@@ -5,7 +5,6 @@
  * Renders the "Осмотр кожи" (skin) and "Косметология" (cosmetic) tabs.
  * Each tab shows a form + history list.
  */
-import PropTypes from 'prop-types';
 import { MacOSCard, Button, Input, Select, Textarea, Badge } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
@@ -261,25 +260,5 @@ export function DermaExamsTab({
   return null;
 }
 
-DermaExamsTab.propTypes = {
-  activeTab: PropTypes.string.isRequired,
-  skinExamination: PropTypes.object,
-  setSkinExamination: PropTypes.func,
-  showSkinForm: PropTypes.bool,
-  skinExaminations: PropTypes.array,
-  onSkinSubmit: PropTypes.func,
-  onOpenSkinForm: PropTypes.func,
-  onCancelSkinForm: PropTypes.func,
-  cosmeticProcedure: PropTypes.object,
-  setCosmeticProcedure: PropTypes.func,
-  showCosmeticForm: PropTypes.bool,
-  cosmeticProcedures: PropTypes.array,
-  onCosmeticSubmit: PropTypes.func,
-  onOpenCosmeticForm: PropTypes.func,
-  onCancelCosmeticForm: PropTypes.func,
-  getColor: PropTypes.func,
-  getFontSize: PropTypes.func,
-  getSpacing: PropTypes.func,
-};
 
 export default DermaExamsTab;

@@ -1,7 +1,6 @@
 import React from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
-import PropTypes from 'prop-types';
 import './ModernCard.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -166,44 +165,11 @@ export const CardDescription = ({
   </p>
 );
 
-ModernCard.propTypes = {
-  children: PropTypes.node,
-  variant: PropTypes.string,
-  padding: PropTypes.string,
-  shadow: PropTypes.string,
-  border: PropTypes.bool,
-  rounded: PropTypes.bool,
-  hoverable: PropTypes.bool,
-  clickable: PropTypes.bool,
-  onClick: PropTypes.func,
-  className: PropTypes.string
-};
 
-CardHeader.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string
-};
 
-CardBody.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string
-};
 
-CardFooter.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string
-};
 
-CardTitle.propTypes = {
-  children: PropTypes.node,
-  level: PropTypes.number,
-  className: PropTypes.string
-};
 
-CardDescription.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string
-};
 
 export default ModernCard;
 

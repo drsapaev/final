@@ -1,6 +1,5 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import PropTypes from 'prop-types';
 import ModernQueueManager, { type ModernQueueManagerDoctor } from './queue/ModernQueueManager';
 import React from 'react';
 import { fetchAvailableSpecialists } from '../api/queue';
@@ -145,13 +144,5 @@ const QueueIntegration = ({
   );
 };
 
-QueueIntegration.propTypes = {
-  specialist: PropTypes.string,
-  department: PropTypes.string,
-  specialty: PropTypes.string,
-  onPatientSelect: PropTypes.func,
-  onStartVisit: PropTypes.func,
-  specialistId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-};
 
 export default QueueIntegration;

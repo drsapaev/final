@@ -2,7 +2,6 @@ import type { CSSProperties, ReactNode } from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernContainer.css';
-import PropTypes from 'prop-types';
 
 type MaxWidth = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
 type PaddingSize = 'none' | 'small' | 'medium' | 'large' | 'xl';
@@ -73,14 +72,5 @@ const ModernContainer = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-ModernContainer.propTypes = {
-  centered: PropTypes.any,
-  children: PropTypes.any,
-  className: PropTypes.any,
-  fluid: PropTypes.any,
-  margin: PropTypes.any,
-  maxWidth: PropTypes.any,
-  padding: PropTypes.any,
-};
 
 export default ModernContainer;

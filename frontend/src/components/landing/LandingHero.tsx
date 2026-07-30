@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 export const LandingHero = ({ onGetStarted }: { onGetStarted: () => void }) => {
   return (
     <section className="landing-hero">
@@ -33,6 +32,3 @@ export const LandingHero = ({ onGetStarted }: { onGetStarted: () => void }) => {
 
 
 // audit/strict: removed self-referencing propTypes spread
-LandingHero.propTypes = {
-  onGetStarted: PropTypes.any,
-};

@@ -12,7 +12,6 @@
  * callbacks via props.
  */
 
-import PropTypes from 'prop-types';
 import { Calendar, Eye, Download, FileText } from 'lucide-react';
 import { Button, Badge, MacOSCard, MacOSEmptyState } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
@@ -258,19 +257,5 @@ export function HistoryTab({
   );
 }
 
-HistoryTab.propTypes = {
-  selectedPatient: PropTypes.object,
-  selectedPatientLabel: PropTypes.string,
-  filteredHistoryEntries: PropTypes.array,
-  historyFilterOptions: PropTypes.array,
-  historyFilter: PropTypes.string.isRequired,
-  setHistoryFilter: PropTypes.func.isRequired,
-  canPreviewAttachment: PropTypes.func.isRequired,
-  downloadPatientFile: PropTypes.func.isRequired,
-  previewPatientFile: PropTypes.func.isRequired,
-  getColor: PropTypes.func.isRequired,
-  getFontSize: PropTypes.func.isRequired,
-  getSpacing: PropTypes.func.isRequired,
-};
 
 export default HistoryTab;

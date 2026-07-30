@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import { Alert, Card } from '../../ui/macos';
 import React from 'react';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -112,8 +111,5 @@ function PreviewTab({ draftVersion }: PreviewTabProps) {
   );
 }
 
-PreviewTab.propTypes = {
-  draftVersion: PropTypes.object.isRequired,
-};
 
 export default PreviewTab;

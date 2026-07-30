@@ -27,7 +27,6 @@ import {
   MacOSCard,
 } from '../ui/macos';
 import type { SelectChangeEvent } from '../ui/macos/Select';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from 'react';
 
@@ -638,8 +637,3 @@ const SecuritySettings = ({
 
 export default SecuritySettings;
 
-SecuritySettings.propTypes = {
-  settings: PropTypes.object,
-  onSave: PropTypes.func,
-  loading: PropTypes.bool,
-};

@@ -85,6 +85,5 @@ const UnifiedUserManagement = () => {
 
 };
 
-UnifiedUserManagement.propTypes = {};
 
 export default UnifiedUserManagement;

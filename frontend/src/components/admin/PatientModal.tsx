@@ -10,7 +10,6 @@ import {
   Modal,
   Alert,
 } from '../ui/macos';
-import PropTypes from 'prop-types';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
@@ -632,12 +631,5 @@ const PatientModal = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-PatientModal.propTypes = {
-  isOpen: PropTypes.any,
-  loading: PropTypes.any,
-  onClose: PropTypes.any,
-  onSave: PropTypes.any,
-  patient: PropTypes.any,
-};
 
 export default PatientModal;

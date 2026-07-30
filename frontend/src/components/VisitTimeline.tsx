@@ -2,7 +2,6 @@
 import React from 'react';
 import { useTranslation } from '../i18n/useTranslation';
 import { CheckCircle, Clock, AlertCircle, CreditCard, User, FileText, Pill } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { Card, Badge } from './ui/macos';
 import { 
   APPOINTMENT_STATUS, 
@@ -216,11 +215,6 @@ const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) =
   );
 };
 
-VisitTimeline.propTypes = {
-  appointment: PropTypes.object,
-  emr: PropTypes.object,
-  prescription: PropTypes.object
-};
 
 export default VisitTimeline;
 

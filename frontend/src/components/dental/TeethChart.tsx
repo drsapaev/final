@@ -30,7 +30,6 @@ import {
   ZoomIn,
   ZoomOut } from
 'lucide-react';
-import PropTypes from 'prop-types';
 import {
   TOOTH_STATUS,
   TOOTH_STATUS_COLORS as STATUS_COLORS,
@@ -396,10 +395,5 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethC
 
 
 // audit/strict: removed self-referencing propTypes spread
-TeethChart.propTypes = {
-  initialData: PropTypes.any,
-  onToothClick: PropTypes.any,
-  readOnly: PropTypes.any,
-};
 
 export default TeethChart;

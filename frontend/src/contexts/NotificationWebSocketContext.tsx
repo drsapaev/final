@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useMemo, type ReactNode, type MutableRefObject } from 'react';
-import PropTypes from 'prop-types';
 import { useLocation } from 'react-router-dom';
 import { buildWsUrl } from '../api/runtime';
 import notify from '../services/notify';
@@ -421,9 +420,6 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
   );
 }
 
-NotificationWebSocketProvider.propTypes = {
-  children: PropTypes.node.isRequired
-};
 
 export function useNotificationWebSocket(): NotificationWebSocketContextValue | null {
   return useContext(NotificationWebSocketContext);

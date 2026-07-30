@@ -2,7 +2,6 @@
 import { useRef, useState } from 'react';
 import { Paperclip } from 'lucide-react';
 import './FileUploader.css';
-import PropTypes from 'prop-types';
 import { validateFile } from '../../utils/fileValidator';  // PR-36 / P0-4
 import { toast } from 'react-toastify';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -83,9 +82,5 @@ const FileUploader = ({ onUpload, disabled }: FileUploaderProps) => {
 
 
 // audit/strict: removed self-referencing propTypes spread
-FileUploader.propTypes = {
-  disabled: PropTypes.any,
-  onUpload: PropTypes.any,
-};
 
 export default FileUploader;

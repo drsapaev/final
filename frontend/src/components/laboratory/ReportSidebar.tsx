@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import React from 'react';
 // STRAT#25: ReportSidebar — extracted from LabReportWorkbench.
 // Объединяет LabReportHistoryPanel и LabReportAIAnalysis в одном
@@ -89,13 +88,3 @@ export default function ReportSidebar({
   );
 }
 
-ReportSidebar.propTypes = {
-  activeInstance: PropTypes.object,
-  notify: PropTypes.func,
-  showRecentReportsBrowser: PropTypes.bool,
-  recentReports: PropTypes.array,
-  reportHistory: PropTypes.array,
-  historySeverityFilter: PropTypes.string,
-  onSeverityFilterChange: PropTypes.func,
-  onOpenInstance: PropTypes.func,
-};

@@ -10,7 +10,6 @@
  * - Рентгенограммы
  */
 
-import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
 import EMRSection from '../EMRSection';
 import React from 'react';
@@ -369,12 +368,3 @@ export function DentistrySection({
 
 export default DentistrySection;
 
-DentistrySection.propTypes = {
-    toothStatus: PropTypes.object,
-    hygieneIndices: PropTypes.object,
-    periodontalPockets: PropTypes.object,
-    measurements: PropTypes.object,
-    radiographs: PropTypes.object,
-    onChange: PropTypes.func,
-    disabled: PropTypes.bool,
-};

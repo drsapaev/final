@@ -7,7 +7,6 @@
  * - No AI logic here (passed via props if needed)
  * - Just a styled input that calls onChange
  */
-import PropTypes from 'prop-types';
 import './EMRTextField.css';
 import { Input } from '../../ui/macos';
 
@@ -108,17 +107,5 @@ export function EMRTextField({
     );
 }
 
-EMRTextField.propTypes = {
-    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    onChange: PropTypes.func,
-    placeholder: PropTypes.string,
-    multiline: PropTypes.bool,
-    rows: PropTypes.number,
-    disabled: PropTypes.bool,
-    label: PropTypes.node,
-    required: PropTypes.bool,
-    className: PropTypes.string,
-    id: PropTypes.string,
-};
 
 export default EMRTextField;

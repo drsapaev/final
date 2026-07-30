@@ -1,7 +1,6 @@
 import { useTranslation } from '../i18n/useTranslation';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode, FormEvent, ChangeEvent } from 'react';
-import PropTypes from 'prop-types';
 import RoleGate from '../components/RoleGate';
 import { api } from '../api/client';
 import { useTheme } from '../contexts/ThemeContext';
@@ -892,45 +891,9 @@ function RoleMapEditor({ items, onSave }: RoleMapEditorProps) {
 
 }
 
-TabButton.propTypes = {
-  active: PropTypes.bool,
-  onClick: PropTypes.func,
-  children: PropTypes.node
-};
 
-Row.propTypes = {
-  k: PropTypes.node,
-  v: PropTypes.any,
-  onSave: PropTypes.func
-};
 
-ProviderCard.propTypes = {
-  provider: PropTypes.object,
-  onEdit: PropTypes.func,
-  onDelete: PropTypes.func
-};
 
-ProviderModal.propTypes = {
-  provider: PropTypes.object,
-  onClose: PropTypes.func,
-  onSave: PropTypes.func,
-  title: PropTypes.node
-};
 
-KVField.propTypes = {
-  label: PropTypes.node,
-  defKey: PropTypes.string,
-  items: PropTypes.array,
-  onSave: PropTypes.func
-};
 
-RoleMapItem.propTypes = {
-  role: PropTypes.string,
-  items: PropTypes.array,
-  onSave: PropTypes.func
-};
 
-RoleMapEditor.propTypes = {
-  items: PropTypes.array,
-  onSave: PropTypes.func
-};

@@ -1,6 +1,5 @@
 
 import React, { useState, useRef } from 'react';
-import PropTypes from 'prop-types';
 import { AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import logger from '../../utils/logger';
@@ -340,39 +339,8 @@ export const FormColumn = ({
 
 };
 
-ModernForm.propTypes = {
-  children: PropTypes.node,
-  onSubmit: PropTypes.func,
-  validation: PropTypes.object,
-  initialValues: PropTypes.object,
-  loading: PropTypes.bool,
-  error: PropTypes.node,
-  success: PropTypes.node,
-  className: PropTypes.string,
-  layout: PropTypes.string,
-  spacing: PropTypes.string
-};
 
-FormGroup.propTypes = {
-  title: PropTypes.node,
-  description: PropTypes.node,
-  children: PropTypes.node,
-  className: PropTypes.string,
-  collapsible: PropTypes.bool,
-  defaultExpanded: PropTypes.bool
-};
 
-FormRow.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  gap: PropTypes.string,
-  align: PropTypes.string
-};
 
-FormColumn.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  width: PropTypes.string
-};
 
 export default ModernForm;

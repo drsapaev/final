@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import { useBreakpoint } from '../../hooks/useEnhancedMediaQuery';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -297,58 +296,10 @@ ResponsiveForm.Select = FormSelect;
 ResponsiveForm.Textarea = FormTextarea;
 ResponsiveForm.Actions = FormActions;
 
-ResponsiveForm.propTypes = {
-  children: PropTypes.node,
-  onSubmit: PropTypes.func,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-FormGroup.propTypes = {
-  children: PropTypes.node,
-  label: PropTypes.node,
-  error: PropTypes.node,
-  required: PropTypes.bool,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-FormInput.propTypes = {
-  type: PropTypes.string,
-  placeholder: PropTypes.string,
-  value: PropTypes.any,
-  onChange: PropTypes.func,
-  disabled: PropTypes.bool,
-  required: PropTypes.bool,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-FormSelect.propTypes = {
-  value: PropTypes.any,
-  onChange: PropTypes.func,
-  children: PropTypes.node,
-  disabled: PropTypes.bool,
-  required: PropTypes.bool,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-FormTextarea.propTypes = {
-  placeholder: PropTypes.string,
-  value: PropTypes.any,
-  onChange: PropTypes.func,
-  disabled: PropTypes.bool,
-  required: PropTypes.bool,
-  rows: PropTypes.number,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-FormActions.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
 export default ResponsiveForm;

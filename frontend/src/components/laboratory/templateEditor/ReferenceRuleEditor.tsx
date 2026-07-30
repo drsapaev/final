@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import { Button, Icon } from '../../ui/macos';
 import { useTranslation } from '@/i18n/useTranslation';
 
@@ -355,11 +354,5 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: R
   );
 }
 
-ReferenceRuleEditor.propTypes = {
-  sectionIndex: PropTypes.number.isRequired,
-  fieldIndex: PropTypes.number.isRequired,
-  field: PropTypes.object.isRequired,
-  updateField: PropTypes.func.isRequired,
-};
 
 export default ReferenceRuleEditor;

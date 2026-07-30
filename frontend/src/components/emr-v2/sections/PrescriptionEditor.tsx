@@ -10,7 +10,6 @@
  */
 
 import { useState } from 'react';
-import PropTypes from 'prop-types';
 import { Plus, Trash2, Pill } from 'lucide-react';
 import './PrescriptionEditor.css';
 import { Input } from '../../ui/macos';
@@ -253,16 +252,3 @@ const PrescriptionEditor = ({
 
 export default PrescriptionEditor;
 
-PrescriptionEditor.propTypes = {
-  prescriptions: PropTypes.arrayOf(PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    name: PropTypes.string,
-    dose: PropTypes.string,
-    frequency: PropTypes.string,
-    duration: PropTypes.string,
-    note: PropTypes.string,
-  })),
-  onChange: PropTypes.func,
-  isEditable: PropTypes.bool,
-  onFieldTouch: PropTypes.func,
-};

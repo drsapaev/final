@@ -12,7 +12,6 @@ import { useTranslation } from '../../i18n/useTranslation';
  * - Bulk operations (delete, activate/deactivate)
  * - CRUD for individual profiles
  */
-import PropTypes from 'prop-types';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CSSProperties } from "react";
 import {
@@ -997,34 +996,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
     );
 };
 
-const queueProfileShape = PropTypes.shape({
-    key: PropTypes.string,
-    title: PropTypes.string,
-    title_ru: PropTypes.string,
-    queue_tags: PropTypes.oneOfType([
-        PropTypes.arrayOf(PropTypes.string),
-        PropTypes.string
-    ]),
-    department_key: PropTypes.string,
-    order: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    display_order: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    is_active: PropTypes.bool,
-    show_on_qr_page: PropTypes.bool,
-    icon: PropTypes.string,
-    color: PropTypes.string
-});
 
-QueueProfilesManager.propTypes = {
-    theme: PropTypes.oneOf(['light', 'dark'])
-};
 
-ProfileForm.propTypes = {
-    profile: queueProfileShape,
-    onSubmit: PropTypes.func,
-    onCancel: PropTypes.func,
-    saving: PropTypes.bool,
-    isDark: PropTypes.bool,
-    isEdit: PropTypes.bool
-};
 
 export default QueueProfilesManager;

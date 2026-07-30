@@ -5,7 +5,6 @@ import { useLocation } from 'react-router-dom';
 import UnifiedSidebar from './UnifiedSidebar';
 import { useTheme } from '../../contexts/ThemeContext';
 import '../../styles/unified-sidebar.css';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**
@@ -120,9 +119,5 @@ const UnifiedLayout = ({ children, showSidebar = true }: { children?: ReactNode;
 
 
 // audit/strict: removed self-referencing propTypes spread
-UnifiedLayout.propTypes = {
-  children: PropTypes.any,
-  showSidebar: PropTypes.any,
-};
 
 export default UnifiedLayout;

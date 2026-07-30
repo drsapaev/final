@@ -19,7 +19,6 @@ import {
 
   Send } from
 'lucide-react';
-import PropTypes from 'prop-types';
 import notify from '../../services/notify';
 
 /**
@@ -835,11 +834,5 @@ const DiagnosisForm = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-DiagnosisForm.propTypes = {
-  initialData: PropTypes.any,
-  onClose: PropTypes.any,
-  onSave: PropTypes.any,
-  patientName: PropTypes.any,
-};
 
 export default DiagnosisForm;

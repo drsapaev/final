@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, Cloud, RefreshCw } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Компактный индикатор подключения с PWA статусом
@@ -141,9 +140,5 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
 
 
 // audit/strict: removed self-referencing propTypes spread
-CompactConnectionStatus.propTypes = {
-  className: PropTypes.any,
-  showTooltip: PropTypes.any,
-};
 
 export default CompactConnectionStatus;

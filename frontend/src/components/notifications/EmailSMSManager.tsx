@@ -2,7 +2,6 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import {
   AlertCircle,
   BarChart3,
@@ -803,10 +802,6 @@ const TabLabel = ({ icon: Icon, text }: TabLabelProps) => (
   </span>
 );
 
-TabLabel.propTypes = {
-  icon: PropTypes.elementType.isRequired,
-  text: PropTypes.string.isRequired
-};
 
 const ActionCard = ({ icon: Icon, title, description, actionLabel, onAction, variant }: ActionCardProps) => (
   <Card padding="default" shadow="small">
@@ -823,14 +818,6 @@ const ActionCard = ({ icon: Icon, title, description, actionLabel, onAction, var
   </Card>
 );
 
-ActionCard.propTypes = {
-  actionLabel: PropTypes.string.isRequired,
-  description: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-  onAction: PropTypes.func.isRequired,
-  title: PropTypes.string.isRequired,
-  variant: PropTypes.string.isRequired
-};
 
 const TemplateColumn = ({ title, icon: Icon, templates, tone }: TemplateColumnProps) => {
   const { t: rawT } = useTranslation();
@@ -896,18 +883,5 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }: TemplateColumnPr
   );
 };
 
-TemplateColumn.propTypes = {
-  icon: PropTypes.elementType.isRequired,
-  templates: PropTypes.arrayOf(
-    PropTypes.shape({
-      description: PropTypes.node,
-      name: PropTypes.string,
-      title: PropTypes.node,
-      variables: PropTypes.arrayOf(PropTypes.string)
-    })
-  ).isRequired,
-  title: PropTypes.string.isRequired,
-  tone: PropTypes.string.isRequired
-};
 
 export default EmailSMSManager;

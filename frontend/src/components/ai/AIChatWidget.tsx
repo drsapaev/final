@@ -9,7 +9,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAIChat } from '../../hooks/useAIChat';
 import './AIChatWidget.css';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**
@@ -245,12 +244,5 @@ const AIChatWidget = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-AIChatWidget.propTypes = {
-  contextType: PropTypes.any,
-  minimized: PropTypes.any,
-  position: PropTypes.any,
-  specialty: PropTypes.any,
-  useWebSocket: PropTypes.any,
-};
 
 export default AIChatWidget;

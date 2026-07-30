@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties, ReactNode } from "react";
-import PropTypes from 'prop-types';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../api/client';
 import KPIMetrics from '../components/analytics/KPIMetrics';
@@ -258,13 +257,6 @@ function AnalyticsSectionCard({ title, subtitle, children, action, compact = fal
     </section>);
 }
 
-AnalyticsSectionCard.propTypes = {
-  title: PropTypes.string,
-  subtitle: PropTypes.string,
-  children: PropTypes.node,
-  action: PropTypes.node,
-  compact: PropTypes.bool,
-};
 
 function AnalyticsStatCard({ icon, label, value, helper, accent = 'var(--mac-accent-blue, #2563eb)', format = 'count', compact = false }: AnalyticsStatCardProps) {
   return (
@@ -332,15 +324,6 @@ function AnalyticsStatCard({ icon, label, value, helper, accent = 'var(--mac-acc
     </article>);
 }
 
-AnalyticsStatCard.propTypes = {
-  icon: PropTypes.node,
-  label: PropTypes.string,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  helper: PropTypes.string,
-  accent: PropTypes.string,
-  format: PropTypes.string,
-  compact: PropTypes.bool,
-};
 
 function AnalyticsComparisonList({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', t }: AnalyticsComparisonListProps) {
   if (!items.length) {
@@ -384,12 +367,6 @@ function AnalyticsComparisonList({ items, format = 'count', accent = 'var(--mac-
     </div>);
 }
 
-AnalyticsComparisonList.propTypes = {
-  items: PropTypes.array,
-  format: PropTypes.string,
-  accent: PropTypes.string,
-  t: PropTypes.func,
-};
 
 function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', compact = false, t }: AnalyticsLineTrendProps) {
   if (!items.length) {
@@ -443,13 +420,6 @@ function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accen
     </div>);
 }
 
-AnalyticsLineTrend.propTypes = {
-  items: PropTypes.array,
-  format: PropTypes.string,
-  accent: PropTypes.string,
-  compact: PropTypes.bool,
-  t: PropTypes.func,
-};
 
 function AnalyticsEmptyState({ title, description }: AnalyticsEmptyStateProps) {
   return (
@@ -466,10 +436,6 @@ function AnalyticsEmptyState({ title, description }: AnalyticsEmptyStateProps) {
     </div>);
 }
 
-AnalyticsEmptyState.propTypes = {
-  title: PropTypes.string,
-  description: PropTypes.string,
-};
 
 export default function AnalyticsPage() {
   const { getColor, getSpacing } = useTheme();

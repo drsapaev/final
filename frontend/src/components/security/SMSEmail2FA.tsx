@@ -17,7 +17,6 @@ import {
   EyeOff } from
 'lucide-react';
 import { tokenManager } from '../../utils/tokenManager';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface SMSEmail2FAProps {
@@ -330,12 +329,5 @@ const SMSEmail2FA = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-SMSEmail2FA.propTypes = {
-  emailAddress: PropTypes.any,
-  method: PropTypes.any,
-  onCancel: PropTypes.any,
-  onSuccess: PropTypes.any,
-  phoneNumber: PropTypes.any,
-};
 
 export default SMSEmail2FA;

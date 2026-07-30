@@ -10,7 +10,6 @@
  * Props передаются из родительского AppointmentWizardV2.
  */
 
-import PropTypes from 'prop-types';
 import { Search, Phone, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
 import { Input,
   Checkbox } from '../ui/macos';
@@ -355,22 +354,5 @@ const PatientStepV2 = ({
 
 };
 
-PatientStepV2.propTypes = {
-  data: PropTypes.object,
-  errors: PropTypes.object,
-  suggestions: PropTypes.array,
-  showSuggestions: PropTypes.bool,
-  onSearch: PropTypes.func,
-  onSelectPatient: PropTypes.func,
-  onUpdate: PropTypes.func,
-  onPhoneChange: PropTypes.func,
-  onBirthDateChange: PropTypes.func,
-  formattedBirthDate: PropTypes.string,
-  fioRef: PropTypes.any,
-  phoneRef: PropTypes.any,
-  cart: PropTypes.object,
-  onUpdateCart: PropTypes.func,
-  phoneError: PropTypes.object
-};
 
 export default PatientStepV2;

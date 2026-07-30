@@ -28,7 +28,6 @@ import {
 import { LANDING_COPY, buildGlassStyle } from './landingContent';
 import { BRAND } from '../config/brand';
 import './Landing.css';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../i18n/useTranslation';
 
 const FEATURE_VISUALS = [
@@ -52,9 +51,6 @@ function SurfaceLabel({ children }: { children: React.ReactNode }) {
 }
 
 
-SurfaceLabel.propTypes = {
-  children: PropTypes.node,
-};
 
 function SectionHeading({ eyebrow, title, description, align = 'left' }: {
   eyebrow?: React.ReactNode;
@@ -72,12 +68,6 @@ function SectionHeading({ eyebrow, title, description, align = 'left' }: {
 }
 
 
-SectionHeading.propTypes = {
-  align: PropTypes.oneOf(['left', 'center']),
-  description: PropTypes.string,
-  eyebrow: PropTypes.string,
-  title: PropTypes.string,
-};
 
 function MetricCard({ value, label, detail, style }: {
   value?: React.ReactNode;
@@ -95,12 +85,6 @@ function MetricCard({ value, label, detail, style }: {
 }
 
 
-MetricCard.propTypes = {
-  detail: PropTypes.string,
-  label: PropTypes.string,
-  style: PropTypes.object,
-  value: PropTypes.node,
-};
 
 function FeatureCard({ accent, icon: Icon, badge, title, description }: {
   accent?: string;
@@ -122,13 +106,6 @@ function FeatureCard({ accent, icon: Icon, badge, title, description }: {
 }
 
 
-FeatureCard.propTypes = {
-  accent: PropTypes.string,
-  badge: PropTypes.string,
-  description: PropTypes.string,
-  icon: PropTypes.elementType,
-  title: PropTypes.string,
-};
 
 function ShowcaseCard({ icon: Icon, label, title, description, style }: {
   icon?: React.ComponentType<{ size?: number }>;
@@ -157,13 +134,6 @@ function ShowcaseCard({ icon: Icon, label, title, description, style }: {
 }
 
 
-ShowcaseCard.propTypes = {
-  description: PropTypes.string,
-  icon: PropTypes.elementType,
-  label: PropTypes.string,
-  style: PropTypes.object,
-  title: PropTypes.string,
-};
 
 function WorkflowStep({ title, description }: {
   title?: React.ReactNode;
@@ -181,10 +151,6 @@ function WorkflowStep({ title, description }: {
 }
 
 
-WorkflowStep.propTypes = {
-  description: PropTypes.string,
-  title: PropTypes.string,
-};
 
 function ContactRow({ icon: Icon, label, value, href }: { icon?: React.ComponentType<{ size?: number }>; label?: string; value?: string; href?: string }) {
   const isExternal = href?.startsWith('http');
@@ -213,12 +179,6 @@ function ContactRow({ icon: Icon, label, value, href }: { icon?: React.Component
 // UX Audit Stage 2 (Landing issue 1.5): почищены propTypes-артефакты.
 // Удалён `...(ContactRow.propTypes || {})` (бессмысленный spread из codemod)
 // и удалён несуществующий prop `startsWith: PropTypes.any`.
-ContactRow.propTypes = {
-  href: PropTypes.string,
-  icon: PropTypes.elementType,
-  label: PropTypes.string,
-  value: PropTypes.string,
-};
 
 function toTelegramUrl(handle: unknown) {
   const sanitizedHandle = String(handle || '').trim().replace(/^@/, '');

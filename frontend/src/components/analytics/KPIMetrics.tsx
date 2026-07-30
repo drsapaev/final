@@ -1,6 +1,5 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import {
@@ -395,13 +394,5 @@ const KPIMetrics = ({
 
 };
 
-KPIMetrics.propTypes = {
-  data: PropTypes.object,
-  loading: PropTypes.bool,
-  onRefresh: PropTypes.func,
-  onExport: PropTypes.func,
-  showTrends: PropTypes.bool,
-  showComparisons: PropTypes.bool
-};
 
 export default KPIMetrics;

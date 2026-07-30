@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ensureMinContrast, getReadableTextColor, mixColors, toRgbaString } from './colorUtils';
 
@@ -174,8 +173,5 @@ export function useMacOSTheme(): MacOSThemeContextValue {
 
 export const ACCENT_OPTIONS = Object.keys(ACCENTS);
 
-MacOSThemeProvider.propTypes = {
-  children: PropTypes.node,
-};
 
 export default MacOSThemeProvider;

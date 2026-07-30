@@ -13,7 +13,6 @@ import { useTranslation } from '../../i18n/useTranslation';
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { useEMR } from '../../hooks/useEMR';
 import { useEMRAutosave } from '../../hooks/useEMRAutosave';
 import { useBeforeUnload } from '../../hooks/useNavigationGuard';
@@ -1003,12 +1002,6 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     );
 }
 
-EMRContainerV2.propTypes = {
-    visitId: PropTypes.number.isRequired,
-    patientId: PropTypes.number,
-    specialty: PropTypes.string.isRequired,
-    ICD10Component: PropTypes.elementType,
-};
 
 
 export default EMRContainerV2;

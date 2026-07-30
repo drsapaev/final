@@ -17,7 +17,6 @@
  */
 
 import React, { useRef } from 'react';
-import PropTypes from 'prop-types';
 import { Loader } from 'lucide-react';
 const unifiedTheme = { colors: { primary: '#007aff', text: '#000', background: '#fff', secondary: '#f5f5f7' }, spacing: { xs: '4px', sm: '8px', md: '16px', lg: '24px' }, borderRadius: { sm: '4px', md: '8px', lg: '12px' }, shadows: { sm: '0 1px 2px rgba(0,0,0,0.05)', md: '0 4px 6px rgba(0,0,0,0.1)' }, typography: { fontSize: { sm: '12px', md: '14px', lg: '16px' } }, transitions: { fast: '0.15s ease', normal: '0.2s ease' } } as Record<string, any>;
 
@@ -284,23 +283,5 @@ const RefactoredButton = ({
   );
 };
 
-RefactoredButton.propTypes = {
-  children: PropTypes.node,
-  variant: PropTypes.oneOf([
-    'primary', 'secondary', 'success', 'warning', 'danger', 'info',
-    'cardiology', 'dermatology', 'dentistry', 'light', 'ghost'
-  ]),
-  size: PropTypes.oneOf(['small', 'medium', 'large']),
-  disabled: PropTypes.bool,
-  loading: PropTypes.bool,
-  icon: PropTypes.node,
-  iconPosition: PropTypes.oneOf(['left', 'right']),
-  fullWidth: PropTypes.bool,
-  rounded: PropTypes.bool,
-  outlined: PropTypes.bool,
-  onClick: PropTypes.func,
-  className: PropTypes.string,
-  type: PropTypes.oneOf(['button', 'submit', 'reset']),
-};
 
 export default RefactoredButton;

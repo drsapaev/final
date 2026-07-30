@@ -7,7 +7,6 @@
  */
 
 import { useState, useCallback } from 'react';
-import PropTypes from 'prop-types';
 import EMRSection from './EMRSection';
 import React from 'react';
 import EMRTextField from './EMRTextField';
@@ -99,9 +98,3 @@ export function NotesSection({
 
 export default NotesSection;
 
-NotesSection.propTypes = {
-    value: PropTypes.string,
-    onChange: PropTypes.func,
-    disabled: PropTypes.bool,
-    defaultOpen: PropTypes.bool,
-};

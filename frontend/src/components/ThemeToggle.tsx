@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import PropTypes from 'prop-types';
 import type { CSSProperties } from 'react';
 
 type ToggleSize = 'sm' | 'md' | 'lg';
@@ -64,10 +63,5 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }: ThemeTogglePro
   );
 };
 
-ThemeToggle.propTypes = {
-  className: PropTypes.string,
-  size: PropTypes.oneOf(['sm', 'md', 'lg']),
-  style: PropTypes.object,
-};
 
 export default ThemeToggle;

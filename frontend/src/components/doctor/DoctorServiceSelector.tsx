@@ -23,7 +23,6 @@ import {
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
@@ -562,12 +561,5 @@ const DoctorServiceSelector = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-DoctorServiceSelector.propTypes = {
-  canEditPrices: PropTypes.bool,
-  className: PropTypes.string,
-  onServicesChange: PropTypes.func,
-  selectedServices: PropTypes.arrayOf(PropTypes.object),
-  specialty: PropTypes.string,
-};
 
 export default DoctorServiceSelector;

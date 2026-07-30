@@ -13,7 +13,6 @@
  * - 1 insert = 1 undo
  */
 
-import PropTypes from 'prop-types';
 import { useState, useCallback, useMemo } from 'react';
 import { History, Pin, Edit2 } from 'lucide-react';
 import EMRSection from './EMRSection';
@@ -535,24 +534,5 @@ export function TreatmentSection({
 
 }
 
-TreatmentSection.propTypes = {
-  value: PropTypes.string,
-  onChange: PropTypes.func,
-  medications: PropTypes.arrayOf(PropTypes.object),
-  onMedicationsChange: PropTypes.func,
-  disabled: PropTypes.bool,
-  defaultOpen: PropTypes.bool,
-  specialty: PropTypes.string,
-  icd10Code: PropTypes.string,
-  complaints: PropTypes.string,
-  suggestions: PropTypes.arrayOf(PropTypes.object),
-  aiLoading: PropTypes.bool,
-  onApplySuggestion: PropTypes.func,
-  onDismissSuggestion: PropTypes.func,
-  onRequestAI: PropTypes.func,
-  doctorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  experimentalGhostMode: PropTypes.bool,
-  onTelemetry: PropTypes.func
-};
 
 export default TreatmentSection;

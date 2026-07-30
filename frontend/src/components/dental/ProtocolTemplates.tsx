@@ -21,7 +21,6 @@ import {
   Star } from
 
 'lucide-react';
-import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -656,9 +655,5 @@ const ProtocolTemplates = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-ProtocolTemplates.propTypes = {
-  onClose: PropTypes.any,
-  onSelectTemplate: PropTypes.any,
-};
 
 export default ProtocolTemplates;

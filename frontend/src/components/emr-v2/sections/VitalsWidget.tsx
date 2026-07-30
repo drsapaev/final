@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import './VitalsWidget.css';
 import { Input } from '../../ui/macos';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -124,20 +123,4 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
 
 export default VitalsWidget;
 
-const vitalsShape = PropTypes.shape({
-    systolic: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    diastolic: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    pulse: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    spo2: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    height: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    weight: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    heightSource: PropTypes.string,
-    weightSource: PropTypes.string,
-});
 
-VitalsWidget.propTypes = {
-    vitals: vitalsShape,
-    onChange: PropTypes.func,
-    onFieldTouch: PropTypes.func,
-    disabled: PropTypes.bool,
-};

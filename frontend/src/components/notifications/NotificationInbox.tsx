@@ -1,6 +1,5 @@
 
 import { useMemo, useState } from 'react';
-import PropTypes from 'prop-types';
 import {
   Archive,
   CheckCheck,
@@ -548,16 +547,3 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
   );
 }
 
-NotificationInbox.propTypes = {
-  userRole: PropTypes.oneOf([
-    'doctor',
-    'registrar',
-    'lab',
-    'patient',
-    'cardiologist',
-    'dermatologist',
-    'dentist',
-    'admin'
-  ]).isRequired,
-  onClose: PropTypes.func.isRequired
-};

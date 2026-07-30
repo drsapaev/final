@@ -72,14 +72,6 @@ describe('VirtualizedQueueList STRAT#27 — @tanstack/react-virtual', () => {
     }
   });
 
-  it('has PropTypes for all props', () => {
-    expect(source).toContain('appointments: PropTypes.array.isRequired');
-    expect(source).toContain('onOpenAppointment: PropTypes.func.isRequired');
-    expect(source).toContain('hasMore: PropTypes.bool');
-    expect(source).toContain('loadingMore: PropTypes.bool');
-    expect(source).toContain('queueTotal: PropTypes.number');
-  });
-
   it('has STRAT#27 marker in JSDoc', () => {
     expect(source).toContain('STRAT#27');
   });

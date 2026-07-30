@@ -44,7 +44,6 @@ import {
 
   X } from
 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**
@@ -587,9 +586,5 @@ const ReportsAndAnalytics = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-ReportsAndAnalytics.propTypes = {
-  initialData: PropTypes.object,
-  onClose: PropTypes.any,
-};
 
 export default ReportsAndAnalytics;

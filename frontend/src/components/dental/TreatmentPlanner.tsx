@@ -34,7 +34,6 @@ import { openPrintableWindow } from '../../utils/printWindow';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import notify from '../../services/notify';
 
 const iconSize = 15;
@@ -568,10 +567,6 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
 
 
 // audit/strict: removed self-referencing propTypes spread
-TreatmentPlanner.propTypes = {
-  onUpdate: PropTypes.any,
-  visitId: PropTypes.any,
-};
 
 export default TreatmentPlanner;
 

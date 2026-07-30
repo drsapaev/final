@@ -15,7 +15,6 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import PropTypes from 'prop-types';
 // UX-AUDIT-FIX6: lucide-react заменён на macos Icon для консистентности со
 // всеми остальными lab-компонентами. Смешивание двух библиотек иконок
 // (lucide + macos SF-Symbol-style) нарушало Nielsen Heuristic #4
@@ -324,10 +323,5 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
   );
 }
 
-LabResultsSection.propTypes = {
-  patientId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  visitId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  disabled: PropTypes.bool,
-};
 
 export default LabResultsSection;

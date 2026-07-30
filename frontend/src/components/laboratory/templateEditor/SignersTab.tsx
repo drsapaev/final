@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { signerFieldLabels } from './config';
 import { useTranslation } from '@/i18n/useTranslation';
 
@@ -38,9 +37,5 @@ function SignersTab({ draftVersion, onUpdateSigner }: SignersTabProps) {
   );
 }
 
-SignersTab.propTypes = {
-  draftVersion: PropTypes.object.isRequired,
-  onUpdateSigner: PropTypes.func.isRequired,
-};
 
 export default SignersTab;

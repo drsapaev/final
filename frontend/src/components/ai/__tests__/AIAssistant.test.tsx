@@ -4,7 +4,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, beforeEach, expect, vi } from 'vitest';
-import PropTypes from 'prop-types';
 
 function SnackbarProviderMock({ children }: { children?: React.ReactNode }) {
   return <div>{children}</div>;
@@ -41,17 +40,6 @@ const mcpAPIMocks = mcpAPI as unknown as {
 };
 
 const MockWrapper = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
-
-
-SnackbarProviderMock.propTypes = {
-  children: PropTypes.node
-};
-
-const mockWrapperPropTypes: Record<string, unknown> = {
-  children: PropTypes.node,
-};
-
-MockWrapper.propTypes = mockWrapperPropTypes;
 
 describe('AIAssistant Component', () => {
   beforeEach(() => {

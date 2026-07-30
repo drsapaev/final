@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import { X, Save, DollarSign, Calendar, AlertCircle, Receipt } from 'lucide-react';
 import { MacOSCard, Button,
   Input } from '../ui/macos';
@@ -663,24 +662,3 @@ const FinanceModal = ({
 
 export default FinanceModal;
 
-FinanceModal.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  transaction: PropTypes.shape({
-    type: PropTypes.string,
-    category: PropTypes.string,
-    amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    description: PropTypes.string,
-    patientId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    doctorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    paymentMethod: PropTypes.string,
-    status: PropTypes.string,
-    transactionDate: PropTypes.string,
-    notes: PropTypes.string,
-    reference: PropTypes.string
-  }),
-  onSave: PropTypes.func.isRequired,
-  loading: PropTypes.bool,
-  patients: PropTypes.arrayOf(PropTypes.object),
-  doctors: PropTypes.arrayOf(PropTypes.object)
-};

@@ -15,7 +15,6 @@ import notify from '../../services/notify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
 
@@ -608,14 +607,5 @@ const PriceOverrideManager = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-PriceOverrideManager.propTypes = {
-  isOpen: PropTypes.any,
-  onClose: PropTypes.any,
-  onPriceOverrideCreated: PropTypes.any,
-  originalPrice: PropTypes.any,
-  serviceId: PropTypes.any,
-  serviceName: PropTypes.any,
-  visitId: PropTypes.any,
-};
 
 export default PriceOverrideManager;

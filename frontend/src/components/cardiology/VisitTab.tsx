@@ -10,7 +10,6 @@
  * When no patient is selected, renders an empty state.
  */
 
-import PropTypes from 'prop-types';
 import { User, FileText, RefreshCw, Save, Calendar, Phone } from 'lucide-react';
 import { Button, MacOSCard, MacOSEmptyState } from '../ui/macos';
 import { EMRContainerV2 } from '../emr-v2/EMRContainerV2';
@@ -163,15 +162,5 @@ export function VisitTab({
   );
 }
 
-VisitTab.propTypes = {
-  selectedPatient: PropTypes.object,
-  emr: PropTypes.object,
-  loading: PropTypes.bool,
-  onCancel: PropTypes.func.isRequired,
-  onComplete: PropTypes.func.isRequired,
-  onGoToAppointments: PropTypes.func.isRequired,
-  getColor: PropTypes.func.isRequired,
-  getFontSize: PropTypes.func.isRequired,
-};
 
 export default VisitTab;

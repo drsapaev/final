@@ -34,7 +34,6 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import {
   Button, Card, Badge, Input, Textarea, Label,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -158,11 +157,6 @@ const PatientHeader = ({ patient, onCompleteVisit, loading }: PatientHeaderProps
   );
 };
 
-PatientHeader.propTypes = {
-  patient: PropTypes.object.isRequired,
-  onCompleteVisit: PropTypes.func.isRequired,
-  loading: PropTypes.bool,
-};
 
 interface AnamnesisSectionProps {
   value: string;
@@ -195,11 +189,6 @@ const AnamnesisSection = ({ value, onChange, disabled }: AnamnesisSectionProps) 
   );
 };
 
-AnamnesisSection.propTypes = {
-  value: PropTypes.string,
-  onChange: PropTypes.func.isRequired,
-  disabled: PropTypes.bool,
-};
 
 interface ToothSummaryProps {
   toothStatus?: Record<string, unknown> | null;
@@ -246,9 +235,6 @@ const ToothSummary = ({ toothStatus }: ToothSummaryProps) => {
   );
 };
 
-ToothSummary.propTypes = {
-  toothStatus: PropTypes.object,
-};
 
 interface DiagnosisSectionProps {
   diagnosis: string;
@@ -315,14 +301,6 @@ const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, 
   );
 };
 
-DiagnosisSection.propTypes = {
-  diagnosis: PropTypes.string,
-  icd10: PropTypes.string,
-  onDiagnosisChange: PropTypes.func.isRequired,
-  onIcd10Change: PropTypes.func.isRequired,
-  onAISuggestion: PropTypes.func,
-  disabled: PropTypes.bool,
-};
 
 interface CollapsibleExtrasProps {
   hygieneIndices: Record<string, unknown>;
@@ -426,11 +404,6 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }: Collap
   );
 };
 
-CollapsibleExtras.propTypes = {
-  hygieneIndices: PropTypes.object,
-  onHygieneChange: PropTypes.func.isRequired,
-  disabled: PropTypes.bool,
-};
 
 interface VisitHistoryProps {
   history: Array<Record<string, unknown>>;
@@ -488,10 +461,6 @@ const VisitHistory = ({ history, loading }: VisitHistoryProps) => {
   );
 };
 
-VisitHistory.propTypes = {
-  history: PropTypes.array,
-  loading: PropTypes.bool,
-};
 
 // =============================================================================
 // AI Suggestion Dialog (исправляет главную проблему: AI suggestions не попадали в EMR)
@@ -547,12 +516,6 @@ const AISuggestionDialog = ({ open, onClose, onApply, anamnesis }: AISuggestionD
   );
 };
 
-AISuggestionDialog.propTypes = {
-  open: PropTypes.bool,
-  onClose: PropTypes.func.isRequired,
-  onApply: PropTypes.func.isRequired,
-  anamnesis: PropTypes.string,
-};
 
 // =============================================================================
 // Main component
@@ -812,10 +775,5 @@ const DentalVisitScreen = ({
   );
 };
 
-DentalVisitScreen.propTypes = {
-  patient: PropTypes.object.isRequired,
-  onCompleteVisit: PropTypes.func.isRequired,
-  loading: PropTypes.bool,
-};
 
 export default DentalVisitScreen;

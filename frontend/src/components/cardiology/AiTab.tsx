@@ -7,7 +7,6 @@
  * All state stays in the parent. This is a presentational wrapper.
  */
 
-import PropTypes from 'prop-types';
 import AIAssistant from '../ai/AIAssistant';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -28,8 +27,5 @@ export function AiTab({ onSuggestionSelect }: AiTabProps): React.JSX.Element | n
   );
 }
 
-AiTab.propTypes = {
-  onSuggestionSelect: PropTypes.func.isRequired,
-};
 
 export default AiTab;

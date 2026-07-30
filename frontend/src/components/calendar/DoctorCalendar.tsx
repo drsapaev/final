@@ -24,7 +24,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getApiOrigin } from '../../api/runtime';
 import tokenManager from '../../utils/tokenManager';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -471,12 +470,5 @@ const DoctorCalendar = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-DoctorCalendar.propTypes = {
-  compact: PropTypes.any,
-  department: PropTypes.any,
-  doctorId: PropTypes.any,
-  onSelectSlot: PropTypes.any,
-  onViewAppointment: PropTypes.any,
-};
 
 export default DoctorCalendar;

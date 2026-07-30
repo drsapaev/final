@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { Bell } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -50,7 +49,3 @@ export default function NotificationBell({ unreadCount = 0, onClick }: { unreadC
   );
 }
 
-NotificationBell.propTypes = {
-  unreadCount: PropTypes.number,
-  onClick: PropTypes.func.isRequired
-};

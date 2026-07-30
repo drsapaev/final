@@ -1,6 +1,5 @@
 
 import { useEffect, useState } from 'react';
-import PropTypes from 'prop-types';
 import {
   Badge, Button, Icon,
 } from '../ui/macos';
@@ -359,8 +358,5 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
   );
 }
 
-PatientCabinetSummary.propTypes = {
-  mode: PropTypes.oneOf(['cabinet', 'payments', 'reports']),
-};
 
 export default PatientCabinetSummary;

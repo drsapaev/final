@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode, ChangeEvent } from "react";
-import PropTypes from 'prop-types';
 import {
   Bell,
   Clock3,
@@ -575,14 +574,6 @@ function NotificationChannelCard({ accent, description, icon: Icon, title, note,
   );
 }
 
-NotificationChannelCard.propTypes = {
-  accent: PropTypes.string.isRequired,
-  children: PropTypes.node.isRequired,
-  description: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-  note: PropTypes.string,
-  title: PropTypes.string.isRequired,
-};
 
 function PreferenceRow({ checked, description, disabled, label, onChange }: PreferenceRowProps) {
   return (
@@ -609,13 +600,6 @@ function PreferenceRow({ checked, description, disabled, label, onChange }: Pref
   );
 }
 
-PreferenceRow.propTypes = {
-  checked: PropTypes.bool,
-  description: PropTypes.string.isRequired,
-  disabled: PropTypes.bool,
-  label: PropTypes.string.isRequired,
-  onChange: PropTypes.func.isRequired,
-};
 
 export function __resetNotificationSettingsCacheForTests() {
   notificationSettingsCache.clear();

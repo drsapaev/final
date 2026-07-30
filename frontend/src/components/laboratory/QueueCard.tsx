@@ -1,6 +1,5 @@
 
 import { memo } from 'react';
-import PropTypes from 'prop-types';
 import { Badge, Icon } from '../ui/macos';
 import {
   formatLabStatus,
@@ -132,7 +131,6 @@ function MaskedPhone({ phone }: MaskedPhoneProps) {
   );
 }
 
-MaskedPhone.propTypes = { phone: PropTypes.string };
 
 function formatServices(appointment: QueueCardAppointment) {
   const serviceDetails = appointment?.service_details || [];
@@ -149,11 +147,6 @@ function formatServices(appointment: QueueCardAppointment) {
   return (i18n.t as unknown as (key: string) => string)('pii.no_services');
 }
 
-QueueCard.propTypes = {
-  appointment: PropTypes.object.isRequired,
-  isSelected: PropTypes.bool,
-  onOpenAppointment: PropTypes.func.isRequired,
-};
 
 // React.memo with default shallow comparison — prevents re-render when
 // appointment object identity, isSelected, and onOpenAppointment are unchanged.

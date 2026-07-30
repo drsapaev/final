@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import {
   createContext,
   useCallback,
@@ -659,6 +658,3 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
 
 };
 
-ThemeProvider.propTypes = {
-  children: PropTypes.node,
-};

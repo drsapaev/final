@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, useId } from 'react';
-import PropTypes from 'prop-types';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
 } from '../ui/macos';
@@ -745,10 +744,3 @@ export default function LabTemplateWorkbench({
   );
 }
 
-LabTemplateWorkbench.propTypes = {
-  templates: PropTypes.array.isRequired,
-  selectedTemplate: PropTypes.object,
-  onSelectTemplate: PropTypes.func.isRequired,
-  onTemplatesChanged: PropTypes.func.isRequired,
-  notify: PropTypes.func.isRequired
-};

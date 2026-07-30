@@ -32,7 +32,6 @@ import {
   X,
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
-import PropTypes from 'prop-types';
 import { api } from '../../api/client';
 // R-11 / P-003 (UX audit): persist parsed ECG parameters to backend so the
 // cardiologist panel's "history" tab can list prior ECGs without re-parsing
@@ -864,11 +863,6 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   );
 };
 
-ECGViewer.propTypes = {
-  visitId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  patientId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  onDataUpdate: PropTypes.func,
-};
 
 export default ECGViewer;
 

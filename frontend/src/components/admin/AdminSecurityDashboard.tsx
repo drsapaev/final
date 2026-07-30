@@ -1,6 +1,5 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import PropTypes from 'prop-types';
 import {
   Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
 } from '../ui/macos';
@@ -331,9 +330,4 @@ function SummaryCard({ label, value, variant }: Record<string, unknown>) {
   );
 }
 
-SummaryCard.propTypes = {
-  label: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  variant: PropTypes.oneOf(['default', 'warning', 'danger']),
-};
 

@@ -7,7 +7,6 @@ import {
 import { Brain, Hospital, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 import { notify } from '../../services/notify';
 import AIClinicalText from './AIClinicalText';
-import PropTypes from 'prop-types';
 import React from "react";
 
 interface ICD10Suggestion {
@@ -87,10 +86,6 @@ const AISuggestions = ({
 
 
   // audit/strict: removed self-referencing propTypes spread
-Pill.propTypes = {
-    children: PropTypes.any,
-    color: PropTypes.any,
-  };
 
   const getRelevanceVariant = (relevance: string | undefined): string => {
     switch ((relevance || '').toLowerCase()) {
@@ -226,15 +221,5 @@ Pill.propTypes = {
 
 
 // audit/strict: removed self-referencing propTypes spread
-AISuggestions.propTypes = {
-  clinicalRecommendations: PropTypes.any,
-  fallbackProvider: PropTypes.any,
-  maxHeight: PropTypes.any,
-  onSelect: PropTypes.any,
-  showConfidence: PropTypes.any,
-  suggestions: PropTypes.any,
-  title: PropTypes.any,
-  type: PropTypes.any,
-};
 
 export default AISuggestions;

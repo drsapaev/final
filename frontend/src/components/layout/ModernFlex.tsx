@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
-import PropTypes from 'prop-types';
 import './ModernFlex.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -89,27 +88,6 @@ export const FlexItem = ({
 
 };
 
-ModernFlex.propTypes = {
-  children: PropTypes.node,
-  direction: PropTypes.string,
-  wrap: PropTypes.string,
-  justify: PropTypes.string,
-  align: PropTypes.string,
-  gap: PropTypes.oneOfType([
-    PropTypes.oneOf(['none', 'small', 'medium', 'large', 'xl']),
-    PropTypes.string,
-    PropTypes.number
-  ]),
-  responsive: PropTypes.bool,
-  className: PropTypes.string
-};
 
-FlexItem.propTypes = {
-  children: PropTypes.node,
-  flex: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  alignSelf: PropTypes.string,
-  order: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  className: PropTypes.string
-};
 
 export default ModernFlex;

@@ -1,7 +1,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';  // STRAT#2: retained for backward-compat;
 // новые callers должны использовать useLabToast.interactive* вместо прямого toast.
 import {
@@ -882,18 +881,3 @@ export default function LabReportWorkbench({
   );
 }
 
-LabReportWorkbench.propTypes = {
-  selectedAppointment: PropTypes.object,
-  templates: PropTypes.array.isRequired,
-  templateResolution: PropTypes.object,
-  templateResolutionLoading: PropTypes.bool,
-  reportHistory: PropTypes.array,
-  recentReports: PropTypes.array,
-  activeInstance: PropTypes.object,
-  onInstanceChange: PropTypes.func.isRequired,
-  onOpenInstance: PropTypes.func.isRequired,
-  onRefreshHistory: PropTypes.func.isRequired,
-  onRefreshRecentReports: PropTypes.func,
-  onQueueChanged: PropTypes.func,
-  notify: PropTypes.func.isRequired
-};

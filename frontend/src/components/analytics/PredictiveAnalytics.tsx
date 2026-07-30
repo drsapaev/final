@@ -1,6 +1,5 @@
 
 import { useState } from 'react';
-import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import {
@@ -404,46 +403,8 @@ const PredictiveAnalytics = ({
 
 };
 
-const recommendationShape = PropTypes.shape({
-  priority: PropTypes.oneOf(['high', 'medium', 'low']),
-  title: PropTypes.string,
-  description: PropTypes.string,
-  impact: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  timeline: PropTypes.string
-});
 
-const trendShape = PropTypes.shape({
-  metric: PropTypes.string,
-  description: PropTypes.string,
-  direction: PropTypes.oneOf(['up', 'down']),
-  change: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  period: PropTypes.string
-});
 
-const forecastShape = PropTypes.shape({
-  period: PropTypes.string,
-  confidence: PropTypes.number,
-  trend: PropTypes.number,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  unit: PropTypes.string,
-  factors: PropTypes.arrayOf(
-    PropTypes.shape({
-      name: PropTypes.string,
-      impact: PropTypes.number
-    })
-  )
-});
 
-PredictiveAnalytics.propTypes = {
-  data: PropTypes.shape({
-    recommendations: PropTypes.arrayOf(recommendationShape),
-    trends: PropTypes.arrayOf(trendShape),
-    forecasts: PropTypes.arrayOf(forecastShape)
-  }),
-  loading: PropTypes.bool,
-  onRefresh: PropTypes.func,
-  onExport: PropTypes.func,
-  showRecommendations: PropTypes.bool
-};
 
 export default PredictiveAnalytics;

@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
-import PropTypes from 'prop-types';
 import { X } from 'lucide-react';
 import './ModernDialog.css';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -206,32 +205,5 @@ const ModernDialog = ({
 
 };
 
-ModernDialog.propTypes = {
-  isOpen: PropTypes.bool,
-  onClose: PropTypes.func,
-  title: PropTypes.node,
-  children: PropTypes.node,
-  customHeader: PropTypes.node,
-  actions: PropTypes.arrayOf(
-    PropTypes.shape({
-      label: PropTypes.node,
-      variant: PropTypes.string,
-      className: PropTypes.string,
-      onClick: PropTypes.func,
-      disabled: PropTypes.bool,
-      icon: PropTypes.node,
-      style: PropTypes.object,
-      props: PropTypes.object
-    })
-  ),
-  maxWidth: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  maxHeight: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  showCloseButton: PropTypes.bool,
-  closeOnBackdrop: PropTypes.bool,
-  closeOnEscape: PropTypes.bool,
-  className: PropTypes.string,
-  dialogClassName: PropTypes.string,
-  dialogStyle: PropTypes.object
-};
 
 export default ModernDialog;

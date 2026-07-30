@@ -5,7 +5,6 @@ import React, { type CSSProperties, type ErrorInfo, type ReactNode } from 'react
 
 import { Button } from '../ui/macos';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -71,11 +70,6 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
 
 // audit/strict: removed self-referencing propTypes spread
-ErrorBoundary.propTypes = {
-  children: PropTypes.any,
-  onError: PropTypes.any,
-  theme: PropTypes.any,
-};
 
 interface ErrorFallbackProps {
   error: Error | null;
@@ -187,17 +181,6 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }: ErrorFallbackProps)
 
 
 // audit/strict: removed self-referencing propTypes spread
-ErrorFallback.propTypes = {
-  componentStack: PropTypes.any,
-  error: PropTypes.any,
-  errorInfo: PropTypes.any,
-  getColor: PropTypes.any,
-  getFontSize: PropTypes.any,
-  getSpacing: PropTypes.any,
-  onRetry: PropTypes.any,
-  theme: PropTypes.any,
-  toString: PropTypes.any,
-};
 
 /**
  * HOC для обертывания компонентов в Error Boundary

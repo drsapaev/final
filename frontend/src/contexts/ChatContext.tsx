@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo, type ReactNode, type Dispatch, type SetStateAction } from 'react';
 import { useLocation } from 'react-router-dom';
-import PropTypes from 'prop-types';
 import { getWsBaseUrl } from '../api/runtime';
 import auth from '../stores/auth';
 import * as messagesApi from '../api/messages';
@@ -777,9 +776,6 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
 
 };
 
-ChatProvider.propTypes = {
-  children: PropTypes.node.isRequired
-};
 
 export const useChat = (): ChatContextValue => {
   const context = useContext(ChatContext);

@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { Smile } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface EmojiPickerProps {
@@ -82,9 +81,5 @@ const EmojiPicker = ({ onEmojiSelect, disabled = false }: EmojiPickerProps) => {
 
 
 // audit/strict: removed self-referencing propTypes spread
-EmojiPicker.propTypes = {
-  disabled: PropTypes.any,
-  onEmojiSelect: PropTypes.any,
-};
 
 export default EmojiPicker;

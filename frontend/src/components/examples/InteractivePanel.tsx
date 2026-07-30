@@ -5,7 +5,6 @@ import { Card, Button, Badge } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
 import { AnimatedTransition } from '../../hooks/useAnimation';
-import PropTypes from 'prop-types';
 
 /**
  * Пример интерактивной панели с эффектами наведения и анимациями
@@ -187,14 +186,6 @@ const InteractivePanel = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-InteractivePanel.propTypes = {
-  actions: PropTypes.any,
-  children: PropTypes.any,
-  className: PropTypes.any,
-  onClick: PropTypes.any,
-  status: PropTypes.any,
-  title: PropTypes.any,
-};
 
 /**
  * Пример интерактивной панели с несколькими состояниями
@@ -327,10 +318,5 @@ export const StateInteractivePanel = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-StateInteractivePanel.propTypes = {
-  initialState: PropTypes.any,
-  states: PropTypes.any,
-  title: PropTypes.any,
-};
 
 export default InteractivePanel;

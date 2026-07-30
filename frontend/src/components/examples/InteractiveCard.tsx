@@ -3,7 +3,6 @@ import type { CSSProperties } from "react";
 import { Card } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
-import PropTypes from 'prop-types';
 
 interface InteractiveCardProps {
   children?: React.ReactNode;
@@ -93,12 +92,6 @@ const InteractiveCard = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-InteractiveCard.propTypes = {
-  children: PropTypes.any,
-  className: PropTypes.any,
-  onClick: PropTypes.any,
-  style: PropTypes.any,
-};
 
 interface InteractiveListItemProps {
   title?: React.ReactNode;
@@ -216,11 +209,5 @@ export const InteractiveListItem = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-InteractiveListItem.propTypes = {
-  icon: PropTypes.any,
-  onClick: PropTypes.any,
-  subtitle: PropTypes.any,
-  title: PropTypes.any,
-};
 
 export default InteractiveCard;

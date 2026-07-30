@@ -2,7 +2,6 @@ import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { servicesService } from '../../api/services';
 import logger from '../../utils/logger';
 import {
@@ -385,9 +384,5 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
   );
 };
 
-ServiceAuditHistory.propTypes = {
-  serviceId: PropTypes.number.isRequired,
-  serviceName: PropTypes.string
-};
 
 export default ServiceAuditHistory;

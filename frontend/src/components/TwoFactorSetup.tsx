@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Download, Copy, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { Input } from './ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 
@@ -557,9 +556,5 @@ const TwoFactorSetup = ({ onComplete, onCancel }: TwoFactorSetupProps) => {
 
 
 // audit/strict: removed self-referencing propTypes spread
-TwoFactorSetup.propTypes = {
-  onCancel: PropTypes.any,
-  onComplete: PropTypes.any,
-};
 
 export default TwoFactorSetup;

@@ -12,7 +12,6 @@ import {
   Modal,
   Alert,
 } from '../ui/macos';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
@@ -519,14 +518,5 @@ const AppointmentModal = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-AppointmentModal.propTypes = {
-  appointment: PropTypes.any,
-  doctors: PropTypes.any,
-  isOpen: PropTypes.any,
-  loading: PropTypes.any,
-  onClose: PropTypes.any,
-  onSave: PropTypes.any,
-  patients: PropTypes.any,
-};
 
 export default AppointmentModal;

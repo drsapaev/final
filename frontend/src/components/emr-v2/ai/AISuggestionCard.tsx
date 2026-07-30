@@ -5,7 +5,6 @@
  * - Clicking "Apply" MUST go through parent's setField
  * - AI only suggests, doctor confirms
  */
-import PropTypes from 'prop-types';
 import './AISuggestionCard.css';
 import { useTranslation } from '@/i18n/useTranslation';
 
@@ -131,15 +130,3 @@ export function AISuggestionCard({
 
 export default AISuggestionCard;
 
-AISuggestionCard.propTypes = {
-  suggestion: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    content: PropTypes.string,
-    confidence: PropTypes.number,
-    explanation: PropTypes.string,
-    source: PropTypes.string,
-  }).isRequired,
-  onApply: PropTypes.func,
-  onDismiss: PropTypes.func,
-  disabled: PropTypes.bool,
-};

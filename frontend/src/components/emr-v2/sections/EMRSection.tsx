@@ -9,7 +9,6 @@
  */
 
 import React from 'react';
-import PropTypes from 'prop-types';
 import './EMRSection.css';
 
 /**
@@ -90,14 +89,3 @@ export function EMRSection({
 
 export default EMRSection;
 
-EMRSection.propTypes = {
-    title: PropTypes.node,
-    icon: PropTypes.node,
-    children: PropTypes.node,
-    defaultOpen: PropTypes.bool,
-    badge: PropTypes.node,
-    headerAction: PropTypes.node,
-    className: PropTypes.string,
-    required: PropTypes.bool,
-    disabled: PropTypes.bool,
-};

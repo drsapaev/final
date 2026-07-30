@@ -1,6 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import PropTypes from 'prop-types';
 import {
   Search,
   Phone,
@@ -3144,16 +3143,6 @@ const AppointmentWizardV2 = ({
 
 export default AppointmentWizardV2;
 
-AppointmentWizardV2.propTypes = {
-  isOpen: PropTypes.bool,
-  onClose: PropTypes.func,
-  onComplete: PropTypes.func,
-  isProcessing: PropTypes.bool,
-  setIsProcessing: PropTypes.func,
-  activeTab: PropTypes.any,
-  editMode: PropTypes.bool,
-  initialData: PropTypes.any
-};
 
 // UX Audit Stage 3 (Wizard issue 5.2):
 // PatientStepV2 и CartStepV2 вынесены в отдельные файлы.

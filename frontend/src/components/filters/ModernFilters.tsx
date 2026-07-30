@@ -15,7 +15,6 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
 import './ModernFilters.css';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
 import {
@@ -309,14 +308,5 @@ const ModernFilters = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-ModernFilters.propTypes = {
-  appointmentsCount: PropTypes.any,
-  autoRefresh: PropTypes.any,
-  className: PropTypes.any,
-  get: PropTypes.any,
-  onAutoRefreshChange: PropTypes.any,
-  onParamsChange: PropTypes.any,
-  searchParams: PropTypes.any,
-};
 
 export default ModernFilters;

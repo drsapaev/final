@@ -1,7 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from "react";
-import PropTypes from 'prop-types';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import ServiceAuditHistory from './ServiceAuditHistory';
@@ -1279,14 +1278,5 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
 };
 
-ServiceForm.propTypes = {
-  service: PropTypes.object,
-  categories: PropTypes.array,
-  doctors: PropTypes.array,
-  queueProfiles: PropTypes.array,
-  setMessage: PropTypes.func,
-  onSave: PropTypes.func,
-  onCancel: PropTypes.func
-};
 
 export default ServiceCatalog;

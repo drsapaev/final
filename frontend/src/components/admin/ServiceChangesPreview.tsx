@@ -1,7 +1,6 @@
 import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
-import PropTypes from 'prop-types';
 import { AlertCircle, ArrowRight, Check, X } from 'lucide-react';
 import {
   MacOSCard, Button, Badge, AppEmpty,
@@ -254,11 +253,5 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }: 
   );
 };
 
-ServiceChangesPreview.propTypes = {
-  oldService: PropTypes.object,
-  newService: PropTypes.object.isRequired,
-  onConfirm: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired
-};
 
 export default ServiceChangesPreview;

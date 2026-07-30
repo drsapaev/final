@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button } from './ui';
-import PropTypes from 'prop-types';
 import { Checkbox } from './ui/macos';
 
 export interface ResponsiveTableColumn {
@@ -465,15 +464,5 @@ const ResponsiveTable = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-ResponsiveTable.propTypes = {
-  actions: PropTypes.any,
-  className: PropTypes.any,
-  columns: PropTypes.any,
-  data: PropTypes.any,
-  onRowClick: PropTypes.any,
-  onRowSelect: PropTypes.any,
-  selectedRows: PropTypes.any,
-  style: PropTypes.any,
-};
 
 export default ResponsiveTable;

@@ -2,7 +2,6 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { MemoryRouter } from 'react-router-dom';
 import { ChatProvider, useChat } from '../ChatContext';
 import { MESSAGE_EVENT_TYPES } from '../../constants/messagingContract';
@@ -230,9 +229,6 @@ function ChatHarness({ openChat = true }: { openChat?: boolean }) {
   );
 }
 
-ChatHarness.propTypes = {
-  openChat: PropTypes.bool,
-};
 
 function renderChat(openChat = true) {
   return render(

@@ -6,7 +6,6 @@
  * - Click to get AI suggestions
  * - Positioned near the field
  */
-import PropTypes from 'prop-types';
 import './SmartAssistButton.css';
 import { useTranslation } from '@/i18n/useTranslation';
 
@@ -57,10 +56,3 @@ export function SmartAssistButton({
 
 export default SmartAssistButton;
 
-SmartAssistButton.propTypes = {
-    onClick: PropTypes.func,
-    isLoading: PropTypes.bool,
-    hasSuggestions: PropTypes.bool,
-    disabled: PropTypes.bool,
-    size: PropTypes.oneOf(['small', 'medium']),
-};

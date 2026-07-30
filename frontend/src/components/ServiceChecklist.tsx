@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { Checkbox } from './ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 import React from 'react';
@@ -87,11 +86,5 @@ const ServiceChecklist = ({ value = [], onChange, department }: ServiceChecklist
 
 
 // audit/strict: removed self-referencing propTypes spread
-ServiceChecklist.propTypes = {
-  department: PropTypes.any,
-  onChange: PropTypes.any,
-  toLowerCase: PropTypes.any,
-  value: PropTypes.any,
-};
 
 export default ServiceChecklist;

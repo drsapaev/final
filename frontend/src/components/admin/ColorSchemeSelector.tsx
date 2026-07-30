@@ -1,6 +1,5 @@
 import type { CSSProperties } from 'react';
 
-import PropTypes from 'prop-types';
 import { useMemo } from 'react';
 import { Layers, Monitor, Moon, Palette, Rainbow, Sparkles, Sun, SwatchBook } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -119,25 +118,6 @@ function ThemePreviewCard({ scheme, isActive, onSelect }: ThemePreviewCardProps)
   );
 }
 
-ThemePreviewCard.propTypes = {
-  scheme: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    name: PropTypes.string.isRequired,
-    mood: PropTypes.string.isRequired,
-    surfaces: PropTypes.string.isRequired,
-    contrast: PropTypes.string.isRequired,
-    preview: PropTypes.shape({
-      background: PropTypes.string.isRequired,
-      surface: PropTypes.string.isRequired,
-      surfaceAlt: PropTypes.string.isRequired,
-      accent: PropTypes.string.isRequired,
-      text: PropTypes.string.isRequired,
-      border: PropTypes.string.isRequired,
-    }).isRequired,
-  }).isRequired,
-  isActive: PropTypes.bool.isRequired,
-  onSelect: PropTypes.func.isRequired,
-};
 
 export default function ColorSchemeSelector() {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;

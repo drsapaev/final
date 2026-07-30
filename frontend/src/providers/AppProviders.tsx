@@ -8,7 +8,6 @@ import ErrorBoundary from '../components/common/ErrorBoundary';
 import { NotificationPrompt } from '../components/chat/NotificationPrompt';
 import { NotificationCenterProvider } from '../contexts/NotificationCenterContext';
 import { NotificationWebSocketProvider } from '../contexts/NotificationWebSocketContext';
-import PropTypes from 'prop-types';
 
 /**
  * Главный провайдер для всех контекстов.
@@ -41,8 +40,5 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
 
 // audit/strict: removed self-referencing propTypes spread
-AppProviders.propTypes = {
-  children: PropTypes.any,
-};
 
 export default AppProviders;

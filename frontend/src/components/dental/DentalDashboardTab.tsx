@@ -3,7 +3,6 @@
  * DentalDashboardTab — R-15: extracted from DentistPanelUnified.
  * Renders the "Обзор" (dashboard) tab: quick stats + recent appointments.
  */
-import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import { Calendar, Users, Activity, FileText } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -90,11 +89,5 @@ export function DentalDashboardTab({
   );
 }
 
-DentalDashboardTab.propTypes = {
-  appointments: PropTypes.array,
-  patients: PropTypes.array,
-  onGoToAppointments: PropTypes.func,
-  onGoToPatients: PropTypes.func,
-};
 
 export default DentalDashboardTab;

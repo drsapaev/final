@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import { Icon } from '../ui/macos';
 import {
   LAB_REPORT_STATUS_CONFIG,
@@ -122,6 +121,3 @@ export default function LabStatusStepper({ status }: { status: string }) {
   );
 }
 
-LabStatusStepper.propTypes = {
-  status: PropTypes.string,
-};

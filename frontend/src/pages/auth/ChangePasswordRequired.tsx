@@ -9,7 +9,6 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**
@@ -310,6 +309,3 @@ export default function ChangePasswordRequired({ currentPassword }: { currentPas
 
 
 // audit/strict: removed self-referencing propTypes spread
-ChangePasswordRequired.propTypes = {
-  currentPassword: PropTypes.any,
-};

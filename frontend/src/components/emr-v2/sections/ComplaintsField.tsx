@@ -16,7 +16,6 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useId } from 'react';
-import PropTypes from 'prop-types';
 import './ComplaintsField.css';
 import logger from '@/utils/logger';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -324,16 +323,3 @@ const ComplaintsField = ({
 
 export default ComplaintsField;
 
-ComplaintsField.propTypes = {
-    value: PropTypes.string,
-    onChange: PropTypes.func,
-    isEditable: PropTypes.bool,
-    aiEnabled: PropTypes.bool,
-    onRequestAI: PropTypes.func,
-    error: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
-    autoFocus: PropTypes.bool,
-    onFieldTouch: PropTypes.func,
-    onBlur: PropTypes.func,
-    label: PropTypes.string,
-    placeholder: PropTypes.string,
-};

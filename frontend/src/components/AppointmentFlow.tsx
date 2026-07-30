@@ -1,6 +1,5 @@
 
 import { useTranslation } from '../i18n/useTranslation';
-import PropTypes from 'prop-types';
 import { CreditCard, User, FileText, Pill, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, Badge } from './ui/macos';
 import {
@@ -217,8 +216,5 @@ const AppointmentFlow = ({ appointment }: AppointmentFlowProps) => {
 
 };
 
-AppointmentFlow.propTypes = {
-  appointment: PropTypes.object
-};
 
 export default AppointmentFlow;

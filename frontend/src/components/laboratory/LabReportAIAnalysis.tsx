@@ -1,6 +1,5 @@
 
 import { useEffect, useMemo, useState } from 'react';
-import PropTypes from 'prop-types';
 import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
   Icon, Typography,
@@ -230,7 +229,3 @@ export default function LabReportAIAnalysis({ activeInstance, notify }: LabRepor
   );
 }
 
-LabReportAIAnalysis.propTypes = {
-  activeInstance: PropTypes.object,
-  notify: PropTypes.func.isRequired,
-};

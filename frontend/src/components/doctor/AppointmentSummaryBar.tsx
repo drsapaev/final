@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { RefreshCw } from 'lucide-react';
 import {
   Badge, Button,
@@ -81,18 +80,3 @@ export default function AppointmentSummaryBar({
   );
 }
 
-AppointmentSummaryBar.propTypes = {
-  ariaLabel: PropTypes.string.isRequired,
-  BadgeComponent: PropTypes.elementType,
-  ButtonComponent: PropTypes.elementType,
-  buttonProps: PropTypes.object,
-  items: PropTypes.arrayOf(PropTypes.shape({
-    key: PropTypes.string.isRequired,
-    label: PropTypes.string.isRequired,
-    value: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
-    variant: PropTypes.string.isRequired
-  })).isRequired,
-  onRefresh: PropTypes.func.isRequired,
-  refreshDisabled: PropTypes.bool,
-  refreshLabel: PropTypes.string
-};

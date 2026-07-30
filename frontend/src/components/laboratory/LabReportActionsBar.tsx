@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import { Button, Icon } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -96,17 +95,3 @@ export default function LabReportActionsBar({
   );
 }
 
-LabReportActionsBar.propTypes = {
-  saving: PropTypes.bool,
-  busyAction: PropTypes.string,
-  canSaveDraft: PropTypes.bool,
-  canFinalize: PropTypes.bool,
-  canRevise: PropTypes.bool,
-  canPrint: PropTypes.bool,
-  canNotify: PropTypes.bool,
-  onSaveDraft: PropTypes.func.isRequired,
-  onFinalize: PropTypes.func.isRequired,
-  onRevise: PropTypes.func.isRequired,
-  onPrint: PropTypes.func.isRequired,
-  onNotify: PropTypes.func,
-};

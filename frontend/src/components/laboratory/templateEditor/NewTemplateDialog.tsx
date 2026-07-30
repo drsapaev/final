@@ -1,6 +1,5 @@
 
 import { useEffect, useMemo, useState } from 'react';
-import PropTypes from 'prop-types';
 import {
   Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
 } from '../../ui/macos';
@@ -150,13 +149,6 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
   );
 }
 
-NewTemplateDialog.propTypes = {
-  open: PropTypes.bool,
-  onClose: PropTypes.func.isRequired,
-  onCreate: PropTypes.func.isRequired,
-  saving: PropTypes.bool,
-  existingTemplates: PropTypes.array,
-};
 
 export default NewTemplateDialog;
 

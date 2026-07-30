@@ -3,7 +3,6 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
-import PropTypes from 'prop-types';
 
 /**
  * Пример интерактивной кнопки с эффектами наведения
@@ -133,12 +132,5 @@ const InteractiveButton = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-InteractiveButton.propTypes = {
-  children: PropTypes.any,
-  onClick: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 export default InteractiveButton;

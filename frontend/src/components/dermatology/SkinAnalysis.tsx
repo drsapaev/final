@@ -5,7 +5,6 @@
  * Согласно MASTER_TODO_LIST строка 268
  */
 import { useState } from 'react';
-import PropTypes from 'prop-types';
 import {
   Box,
   Card,
@@ -500,11 +499,5 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }: SkinAn
 
 };
 
-SkinAnalysis.propTypes = {
-  photos: PropTypes.object,
-  visitId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  patientId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  onAnalysisComplete: PropTypes.func
-};
 
 export default SkinAnalysis;

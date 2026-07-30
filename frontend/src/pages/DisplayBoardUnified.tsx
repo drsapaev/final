@@ -22,7 +22,6 @@ import { openDisplayBoardWS } from '../api/ws';
 import { useTheme } from '../contexts/ThemeContext';
 
 import logger from '../utils/logger';
-import PropTypes from 'prop-types';
 import { formatRegistrarTime } from '../utils/dateUtils';
 import './displayboard.css';
 import { useTranslation } from '../i18n/useTranslation';
@@ -928,18 +927,6 @@ export default function DisplayBoardUnified({
 
 
 // audit/strict: removed self-referencing propTypes spread
-DisplayBoardUnified.propTypes = {
-  announcement: PropTypes.any,
-  boardId: PropTypes.any,
-  contrast: PropTypes.any,
-  dateStr: PropTypes.any,
-  department: PropTypes.any,
-  fontScale: PropTypes.any,
-  kiosk: PropTypes.any,
-  lang: PropTypes.any,
-  refreshMs: PropTypes.any,
-  soundInitial: PropTypes.any,
-};
 
 // Вспомогательные функции (старые)
 function todayStr() {

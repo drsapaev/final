@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Copy, Reply, Trash } from 'lucide-react';
 import './MessageContextMenu.css';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import type { MouseEvent } from 'react';
 
@@ -67,13 +66,5 @@ const MessageContextMenu = ({ x, y, message, onBlur, onAction, isOwn }: MessageC
 };
 
 // audit/strict: removed self-referencing propTypes spread
-MessageContextMenu.propTypes = {
-  isOwn: PropTypes.any,
-  message: PropTypes.any,
-  onAction: PropTypes.any,
-  onBlur: PropTypes.any,
-  x: PropTypes.any,
-  y: PropTypes.any,
-};
 
 export default MessageContextMenu;

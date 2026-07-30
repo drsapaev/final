@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import apiClient from '../../api/client';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
@@ -466,12 +465,6 @@ export default function FamilyRelationsCard({
   );
 }
 
-FamilyRelationsCard.propTypes = {
-  canEdit: PropTypes.bool,
-  onFamilyChange: PropTypes.func,
-  patientId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-  patientName: PropTypes.string
-};
 
 function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess }: AddRelationDialogProps) {
   const { t: rawT } = useTranslation();
@@ -637,10 +630,3 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess }:
   );
 }
 
-AddRelationDialog.propTypes = {
-  onClose: PropTypes.func,
-  onSuccess: PropTypes.func,
-  open: PropTypes.bool,
-  patientId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-  patientName: PropTypes.string
-};

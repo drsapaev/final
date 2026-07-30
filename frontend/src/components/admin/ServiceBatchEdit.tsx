@@ -2,7 +2,6 @@ import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState } from 'react';
-import PropTypes from 'prop-types';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
@@ -316,11 +315,5 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
   );
 };
 
-ServiceBatchEdit.propTypes = {
-  selectedServices: PropTypes.array.isRequired,
-  categories: PropTypes.array.isRequired,
-  onComplete: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired
-};
 
 export default ServiceBatchEdit;

@@ -1,6 +1,5 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import PropTypes from 'prop-types';
 const Chart = null as unknown as { new (ctx: unknown, config: unknown): { destroy: () => void; options: unknown }; registerables: unknown; register: (...args: unknown[]) => void };
 const registerables: unknown[] = [];
 import { Card, Button,
@@ -348,13 +347,5 @@ const AdvancedCharts = ({
 
 };
 
-AdvancedCharts.propTypes = {
-  data: PropTypes.object,
-  loading: PropTypes.bool,
-  onRefresh: PropTypes.func,
-  onExport: PropTypes.func,
-  title: PropTypes.node,
-  showFilters: PropTypes.bool
-};
 
 export default AdvancedCharts;
