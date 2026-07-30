@@ -15,6 +15,8 @@ import { api } from '../api/client';
 import logger from '../utils/logger';
 import { formatNetworkErrorMessage } from '../utils/networkErrorMessages';
 import { getErrorMessage } from '../utils/type-guards';
+import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getData, getError } from '../types/async-state';
 
 // Дефолтные настройки
 const DEFAULT_CONFIG = {

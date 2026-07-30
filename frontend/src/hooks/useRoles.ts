@@ -7,6 +7,8 @@ import { api } from '../api/client';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import type { RoleRecord } from '../types/domain/auth';
+import type { AsyncState } from '../types/async-state';
+import { idleState, loadingState, successState, errorState, getData, getError } from '../types/async-state';
 
 // Re-export for backwards compatibility with any caller that still imports
 // `Role` from this module. New code should import RoleRecord from
