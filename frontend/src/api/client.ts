@@ -362,14 +362,30 @@ function createLocalRateLimitError(config: InternalAxiosRequestConfig): LocalRat
 /**
  * Generic request wrapper that normalizes server error detail.
  * Usage: await apiRequest('get', '/visits/visits', { params: { limit: 10 } })
+ *
+ * Optional zod schema validation: pass a `schema` in the options to
+ * validate the response data at runtime. Invalid responses throw.
+ *
+ * Usage with schema:
+ *   import { z } from 'zod';
+ *   const PatientSchema = z.object({ id: z.number(), name: z.string() });
+ *   const patient = await apiRequest('get', '/patients/1', { schema: PatientSchema });
  */
 async function apiRequest<T = unknown>(
   method: string,
   url: string,
-  { params = {}, data = {} }: { params?: Record<string, unknown>; data?: unknown } = {},
+  { params = {}, data = {}, schema }: { params?: Record<string, unknown>; data?: unknown; schema?: import('zod').ZodType<T> } = {},
 ): Promise<T> {
   try {
     const resp = await api.request({ method, url, params, data });
+    if (schema) {
+      const result = schema.safeParse(resp.data);
+      if (!result.success) {
+        logger.warn('[API] Response validation failed', { url, method, errors: result.error.issues });
+        throw new Error(`Response validation failed for ${method.toUpperCase()} ${url}`);
+      }
+      return result.data;
+    }
     return resp.data as T;
   } catch (err) {
     // Normalize error payloads so callers can handle them uniformly.
