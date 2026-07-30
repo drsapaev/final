@@ -1,10 +1,26 @@
 /**
  * useAIChat - React hook для AI чата
- * 
+ *
  * Функции:
  * - REST API для сессий и сообщений
  * - WebSocket для streaming
  * - Управление состоянием
+ *
+ * Architecture (ADR-0013 §2):
+ * - `sessionState: ChatSessionState` models the WebSocket TRANSPORT layer:
+ *   connectionStatus + streamStatus + structured error. It NEVER carries
+ *   messages (Invariant 1: transport ≠ content).
+ * - `messages`, `currentSession`, `sessions` are separate useState slots —
+ *   they have different update patterns and must not be bundled into the
+ *   transport state.
+ * - `restLoading` / `restError` track REST API operations. They are separate
+ *   from `sessionState` because REST is request/response, not streaming.
+ * - WebSocket callbacks (`onopen`, `onclose`, `onmessage`) call
+ *   `applyConnectionTransition` / `applyStreamTransition` / `setChatError`.
+ *   They never mutate `sessionState` directly (Invariant 3: explicit
+ *   transitions; Invariant 5: no reducer coupling).
+ * - The public return shape is preserved: `loading`, `streaming`, `error`,
+ *   `connected` are derived accessors for backward compatibility.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -18,7 +34,23 @@ import {
     MESSAGING_CONTRACT_VERSION,
     isSupportedMessagingContractVersion,
 } from '../constants/messagingContract';
-import type { AsyncState } from '../types/async-state';
+import type {
+    ChatSessionState,
+    ChatError,
+    ChatErrorCode,
+} from '../types/chat-session-state';
+import {
+    idleChatSessionState,
+    applyConnectionTransition,
+    applyStreamTransition,
+    setChatError,
+    incrementReconnectAttempt,
+    isChatConnecting,
+    isChatConnected,
+    isChatStreaming,
+    getChatErrorMessage,
+    chatError,
+} from '../types/chat-session-state';
 
 /** AI chat session shape. */
 interface ChatSession {
@@ -46,9 +78,12 @@ interface AIAssistantMsg {
 /** WebSocket message handler shape. */
 type WsMessageHandler = ((data: unknown) => void) | null;
 
+/** Maximum WebSocket reconnect attempts before giving up. */
+const MAX_RECONNECT_ATTEMPTS = 5;
+
 /**
  * Хук для AI чата
- * 
+ *
  * @param {Object} options
  * @param {boolean} options.useWebSocket - Использовать WebSocket для streaming
  * @param {string} options.contextType - Тип контекста (emr, lab, general)
@@ -61,23 +96,30 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         specialty = null as unknown
     } = options;
 
+    // ======================================================================
     // State
+    //
+    // Three independent slots per ADR-0013 §2:
+    //   1. sessionState  — WebSocket transport (connection + stream + WS error)
+    //   2. messages      — chat content (separate from transport, Invariant 1)
+    //   3. restLoading / restError — REST API request/response state
+    //
+    // Plus session/bookkeeping UI state that has no async lifecycle.
+    // ======================================================================
+
+    const [sessionState, setSessionState] = useState<ChatSessionState>(idleChatSessionState);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
     const [messages, setMessages] = useState<AIAssistantMsg[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [streaming, setStreaming] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [connected, setConnected] = useState(false);
+    const [restLoading, setRestLoading] = useState(false);
+    const [restError, setRestError] = useState<string | null>(null);
 
-    // Refs
+    // Refs (mirror of state used inside async / WS callbacks)
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const handleWebSocketMessageRef = useRef<WsMessageHandler>(null);
     // audit/phase-final, BS-15: shouldReconnect ref + reconnect attempt counter.
     const shouldReconnectRef = useRef(true);
-    const reconnectAttemptRef = useRef(0);
-    const MAX_RECONNECT_ATTEMPTS = 5;
     const currentSessionRef = useRef<ChatSession | null>(null);
     const loadSessionRequestRef = useRef(0);
     const contractVersionMismatchRef = useRef(false);
@@ -86,25 +128,30 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         currentSessionRef.current = currentSession;
     }, [currentSession]);
 
-    // ==========================================================================
+    // ======================================================================
     // REST API Methods
-    // ==========================================================================
+    //
+    // REST calls update `messages`, `currentSession`, `restLoading`,
+    // `restError`. They DO NOT touch `sessionState` — REST is request/response,
+    // not streaming. (The only exception: a REST load may cancel an in-flight
+    // stream by transitioning streamStatus → idle.)
+    // ======================================================================
 
     /**
      * Загрузить список сессий
      */
     const loadSessions = useCallback(async (limit = 20) => {
         try {
-            setLoading(true);
+            setRestLoading(true);
             const response = await api.get('/ai/chat/sessions', { params: { limit } });
             setSessions(response.data);
             return response.data;
         } catch (err) {
             logger.error('Failed to load chat sessions:', err);
-            setError(getErrorMessage(err) || 'Failed to load sessions');
+            setRestError(getErrorMessage(err) || 'Failed to load sessions');
             return [];
         } finally {
-            setLoading(false);
+            setRestLoading(false);
         }
     }, []);
 
@@ -113,7 +160,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
      */
     const createSession = useCallback(async (customContextType: unknown = null, customSpecialty: unknown = null) => {
         try {
-            setLoading(true);
+            setRestLoading(true);
             const response = await api.post('/ai/chat/sessions', {
                 context_type: customContextType || contextType,
                 specialty: customSpecialty || specialty
@@ -124,16 +171,18 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             setCurrentSession(session);
             currentSessionRef.current = session;
             setMessages([]);
-            setStreaming(false);
-            setError(null);
+            // Cancel any in-flight stream from a previous session.
+            // (completed → idle is allowed; streaming → idle is allowed; idle → idle is idempotent.)
+            setSessionState(prev => applyStreamTransition(prev, 'idle', { clearError: true }));
+            setRestError(null);
 
             return session;
         } catch (err) {
             logger.error('Failed to create chat session:', err);
-            setError(getErrorMessage(err) || 'Failed to create session');
+            setRestError(getErrorMessage(err) || 'Failed to create session');
             return null;
         } finally {
-            setLoading(false);
+            setRestLoading(false);
         }
     }, [contextType, specialty]);
 
@@ -143,9 +192,10 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     const loadSession = useCallback(async (sessionId: string | number) => {
         const requestId = ++loadSessionRequestRef.current;
         try {
-            setLoading(true);
-            setError(null);
-            setStreaming(false);
+            setRestLoading(true);
+            setRestError(null);
+            // Cancel any in-flight stream when loading a different session.
+            setSessionState(prev => applyStreamTransition(prev, 'idle'));
 
             // Загружаем сессию
             const sessionResponse = await api.get(`/ai/chat/sessions/${sessionId}`);
@@ -162,16 +212,16 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             setCurrentSession(sessionResponse.data);
             currentSessionRef.current = sessionResponse.data;
             setMessages(messagesResponse.data);
-            setStreaming(false);
-            setError(null);
+            setSessionState(prev => applyStreamTransition(prev, 'idle'));
+            setRestError(null);
 
             return sessionResponse.data;
         } catch (err) {
             logger.error('Failed to load chat session:', err);
-            setError(getErrorMessage(err) || 'Failed to load session');
+            setRestError(getErrorMessage(err) || 'Failed to load session');
             return null;
         } finally {
-            setLoading(false);
+            setRestLoading(false);
         }
     }, []);
 
@@ -180,13 +230,13 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
      */
     const sendMessage = useCallback(async (content: string, includeHistory: boolean = true) => {
         if (!content?.trim()) {
-            setError('Message cannot be empty');
+            setRestError('Message cannot be empty');
             return null;
         }
 
         // Prompt injection check
         if (detectPromptInjection(content)) {
-            setError('Обнаружена попытка prompt injection. Сообщение отклонено.');
+            setRestError('Обнаружена попытка prompt injection. Сообщение отклонено.');
             logger.warn('AI chat: prompt injection detected and blocked');
             return null;
         }
@@ -200,8 +250,8 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         }
 
         try {
-            setLoading(true);
-            setError(null);
+            setRestLoading(true);
+            setRestError(null);
 
             // Оптимистично добавляем user message
             const userMessage = {
@@ -232,13 +282,13 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             return response.data;
         } catch (err) {
             logger.error('Failed to send message:', err);
-            setError(getErrorMessage(err) || 'Failed to send message');
+            setRestError(getErrorMessage(err) || 'Failed to send message');
 
             // Откатываем оптимистичное обновление
             setMessages(prev => prev.filter(m => !m._pending));
             return null;
         } finally {
-            setLoading(false);
+            setRestLoading(false);
         }
     }, [createSession]);
 
@@ -255,14 +305,14 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 setCurrentSession(null);
                 currentSessionRef.current = null;
                 setMessages([]);
-                setStreaming(false);
-                setError(null);
+                setSessionState(prev => applyStreamTransition(prev, 'idle', { clearError: true }));
+                setRestError(null);
             }
 
             return true;
         } catch (err) {
             logger.error('Failed to delete session:', err);
-            setError(getErrorMessage(err) || 'Failed to delete session');
+            setRestError(getErrorMessage(err) || 'Failed to delete session');
             return false;
         }
     }, []);
@@ -283,9 +333,12 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         }
     }, []);
 
-    // ==========================================================================
+    // ======================================================================
     // WebSocket Methods
-    // ==========================================================================
+    //
+    // WS callbacks update `sessionState` via the transition helpers. They
+    // never assign to `sessionState` directly. (Invariant 3 + Invariant 5.)
+    // ======================================================================
 
     /**
      * Подключиться к WebSocket
@@ -295,13 +348,20 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
 
         const token = tokenManager.getAccessToken();
         if (!token) {
-            setError('Not authenticated');
+            setSessionState(prev =>
+                setChatError(prev, chatError('auth_error', 'Not authenticated', false))
+            );
             return;
         }
 
         // audit/phase-final, BS-15: reset reconnect state on explicit connect.
         shouldReconnectRef.current = true;
-        reconnectAttemptRef.current = 0;
+
+        // Transition idle/disconnected/reconnecting → connecting.
+        // (connected → connecting is also allowed: explicit reconnect.)
+        setSessionState(prev =>
+            applyConnectionTransition(prev, 'connecting', { resetReconnectAttempt: true })
+        );
 
         // P0 security fix: JWT sent via Sec-WebSocket-Protocol subprotocol (bearer.<token>)
         // instead of URL query (?token=...). The URL query form leaked the JWT into nginx
@@ -314,36 +374,76 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
 
             wsRef.current.onopen = () => {
                 logger.info('AI Chat WebSocket connected');
-                setConnected(true);
-                setError(null);
+                // connecting → connected (clears any prior error, resets reconnect attempt).
+                setSessionState(prev =>
+                    applyConnectionTransition(prev, 'connected', {
+                        clearError: true,
+                        resetReconnectAttempt: true,
+                    })
+                );
             };
 
             wsRef.current.onclose = (event) => {
                 logger.info('AI Chat WebSocket closed:', event.code, event.reason);
-                setConnected(false);
 
-                // audit/phase-final, BS-15: exponential backoff + max retries.
-                if (event.code !== 1000 && event.code !== 4001 && shouldReconnectRef.current) {
-                    reconnectAttemptRef.current += 1;
-                    if (reconnectAttemptRef.current <= MAX_RECONNECT_ATTEMPTS) {
-                        const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current - 1), 16000);
-                        const jitter = Math.random() * 500;
-                        const delay = baseDelay + jitter;
-                        logger.info(`Attempting to reconnect WebSocket (${reconnectAttemptRef.current}/${MAX_RECONNECT_ATTEMPTS}) in ${Math.round(delay)}ms...`);
-                        reconnectTimeoutRef.current = setTimeout(() => {
-                            if (shouldReconnectRef.current) {
-                                connectWebSocket();
-                            }
-                        }, delay);
-                    } else {
-                        logger.warn(`WebSocket reconnect giving up after ${MAX_RECONNECT_ATTEMPTS} attempts`);
-                    }
+                // Decide next connection state based on close code + shouldReconnect flag.
+                // Code 1000 (normal) and 4001 (policy) are treated as terminal → disconnected.
+                // Anything else with shouldReconnect=true → reconnecting (will retry).
+                const isNormalClose = event.code === 1000 || event.code === 4001;
+                if (isNormalClose || !shouldReconnectRef.current) {
+                    setSessionState(prev =>
+                        applyConnectionTransition(prev, 'disconnected')
+                    );
+                    return;
                 }
+
+                // Schedule reconnect with exponential backoff + jitter.
+                setSessionState(prev => {
+                    const next = incrementReconnectAttempt(prev);
+                    if (next.reconnectAttempt > MAX_RECONNECT_ATTEMPTS) {
+                        logger.warn(
+                            `WebSocket reconnect giving up after ${MAX_RECONNECT_ATTEMPTS} attempts`
+                        );
+                        return applyConnectionTransition(
+                            setChatError(
+                                prev,
+                                chatError(
+                                    'network_error',
+                                    `Connection lost after ${MAX_RECONNECT_ATTEMPTS} reconnect attempts`,
+                                    false
+                                )
+                            ),
+                            'disconnected'
+                        );
+                    }
+                    const baseDelay = Math.min(
+                        1000 * Math.pow(2, next.reconnectAttempt - 1),
+                        16000
+                    );
+                    const jitter = Math.random() * 500;
+                    const delay = baseDelay + jitter;
+                    logger.info(
+                        `Attempting to reconnect WebSocket (${next.reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS}) in ${Math.round(delay)}ms...`
+                    );
+                    reconnectTimeoutRef.current = setTimeout(() => {
+                        if (shouldReconnectRef.current) {
+                            connectWebSocket();
+                        }
+                    }, delay);
+                    return applyConnectionTransition(next, 'reconnecting');
+                });
             };
 
             wsRef.current.onerror = (error) => {
                 logger.error('AI Chat WebSocket error:', error);
-                setError('WebSocket connection failed');
+                // Note: onerror is usually followed by onclose, which handles
+                // reconnect logic. We only surface the structured error here.
+                setSessionState(prev =>
+                    setChatError(
+                        prev,
+                        chatError('network_error', 'WebSocket connection failed', true)
+                    )
+                );
             };
 
             wsRef.current.onmessage = (event) => {
@@ -368,12 +468,21 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             };
         } catch (err) {
             logger.error('Failed to create WebSocket:', err);
-            setError('Failed to connect to chat');
+            setSessionState(prev =>
+                setChatError(
+                    prev,
+                    chatError('network_error', 'Failed to connect to chat', true)
+                )
+            );
         }
     }, [useWebSocket]);
 
     /**
-     * Обработка WebSocket сообщений
+     * Обработка WebSocket сообщений.
+     *
+     * This callback updates `sessionState.streamStatus` and `messages`.
+     * It does NOT touch `connectionStatus` — that is owned by the WS
+     * connection handlers above. (Invariant 4: two independent dimensions.)
      */
     const handleWebSocketMessage = useCallback((data: Record<string, unknown>) => {
         if (
@@ -385,6 +494,18 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             return;
         }
 
+        // Map backend error `type` field to a structured ChatErrorCode.
+        // The backend currently sends only a free-form `message`; we infer
+        // the code from common substrings. This is intentionally conservative.
+        const inferErrorCode = (raw: unknown): { code: ChatErrorCode; retryable: boolean } => {
+            const msg = String(raw ?? '').toLowerCase();
+            if (msg.includes('rate') && msg.includes('limit')) return { code: 'rate_limit', retryable: true };
+            if (msg.includes('auth') || msg.includes('token')) return { code: 'auth_error', retryable: false };
+            if (msg.includes('cancel')) return { code: 'cancelled', retryable: false };
+            if (msg.includes('quota')) return { code: 'rate_limit', retryable: true };
+            return { code: 'model_error', retryable: true };
+        };
+
         switch (data.type) {
             case 'session':
                 // Новая сессия создана
@@ -393,8 +514,10 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 break;
 
             case 'chunk':
-                // Streaming chunk
-                setStreaming(true);
+                // Streaming chunk — transition streamStatus → streaming (idempotent).
+                setSessionState(prev =>
+                    applyStreamTransition(prev, 'streaming', { clearError: true })
+                );
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
                     if (last?.role === 'assistant' && last._streaming) {
@@ -419,8 +542,8 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 break;
 
             case 'done':
-                // Streaming завершен
-                setStreaming(false);
+                // Streaming завершен — transition streaming → completed.
+                setSessionState(prev => applyStreamTransition(prev, 'completed'));
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
                     if (last?._streaming) {
@@ -444,17 +567,26 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 });
                 break;
 
-            case 'error':
-                setStreaming(false);
-                setError(String(data.message ?? 'Unknown error'));
+            case 'error': {
+                // Backend reported an error during streaming.
+                const message = String(data.message ?? 'Unknown error');
+                const { code, retryable } = inferErrorCode(data.message);
+                const chatErr: ChatError = chatError(code, message, retryable);
+                setSessionState(prev => {
+                    // streaming → idle (cancel any in-flight stream), then attach error.
+                    const transitioned = applyStreamTransition(prev, 'idle');
+                    return setChatError(transitioned, chatErr);
+                });
                 break;
+            }
 
             case 'session_closed':
                 if (currentSessionRef.current?.id === data.session_id) {
                     setCurrentSession(null);
                     currentSessionRef.current = null;
                     setMessages([]);
-                    setStreaming(false);
+                    // completed/streaming → idle is allowed; idle → idle is idempotent.
+                    setSessionState(prev => applyStreamTransition(prev, 'idle'));
                 }
                 break;
 
@@ -476,13 +608,17 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
      */
     const sendMessageWS = useCallback((content: string) => {
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-            setError('WebSocket not connected');
+            setSessionState(prev =>
+                setChatError(prev, chatError('network_error', 'WebSocket not connected', true))
+            );
             return false;
         }
 
         // Prompt injection check
         if (detectPromptInjection(content)) {
-            setError('Обнаружена попытка prompt injection.');
+            setSessionState(prev =>
+                setChatError(prev, chatError('cancelled', 'Обнаружена попытка prompt injection.', false))
+            );
             logger.warn('AI chat WS: prompt injection detected and blocked');
             return false;
         }
@@ -532,12 +668,13 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             wsRef.current = null;
         }
 
-        setConnected(false);
+        // connected/reconnecting/connecting → disconnected (terminal).
+        setSessionState(prev => applyConnectionTransition(prev, 'disconnected'));
     }, []);
 
-    // ==========================================================================
+    // ======================================================================
     // Effects
-    // ==========================================================================
+    // ======================================================================
 
     // Подключаемся к WebSocket при монтировании (если включено)
     useEffect(() => {
@@ -552,7 +689,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
 
     // Ping каждые 30 секунд для keepalive
     useEffect(() => {
-        if (!useWebSocket || !connected) return;
+        if (!useWebSocket || !isChatConnected(sessionState)) return;
 
         const interval = setInterval(() => {
             if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -565,21 +702,36 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         }, 30000);
 
         return () => clearInterval(interval);
-    }, [useWebSocket, connected]);
+    }, [useWebSocket, sessionState]);
 
-    // ==========================================================================
-    // Return
-    // ==========================================================================
+    // ======================================================================
+    // Return — backward-compatible public API
+    //
+    // Legacy boolean fields are derived from `sessionState`:
+    //   loading   ← restLoading (REST API only)
+    //   streaming ← isChatStreaming(sessionState)
+    //   connected ← isChatConnected(sessionState)
+    //   error     ← restError ?? getChatErrorMessage(sessionState)
+    // ======================================================================
+
+    const clearError = useCallback(() => {
+        setRestError(null);
+        setSessionState(prev => setChatError(prev, null));
+    }, []);
 
     return {
-        // State
+        // State (legacy field names preserved for backward compatibility)
         sessions,
         currentSession,
         messages,
-        loading,
-        streaming,
-        error,
-        connected,
+        loading: restLoading,
+        streaming: isChatStreaming(sessionState),
+        error: restError ?? getChatErrorMessage(sessionState),
+        connected: isChatConnected(sessionState),
+
+        // Expose the structured transport state for advanced consumers
+        // (e.g. UI that wants to distinguish 'reconnecting' from 'connecting').
+        sessionState,
 
         // REST methods
         loadSessions,
@@ -595,7 +747,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         sendMessageWS: useWebSocket ? sendMessageWS : sendMessage,
 
         // Utilities
-        clearError: () => setError(null),
+        clearError,
         clearMessages: () => setMessages([]),
         setCurrentSession,
     };
