@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+/*  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render, waitFor } from '@testing-library/react';

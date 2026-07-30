@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tsParser from '@typescript-eslint/parser';
 
-const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx']);
+const SOURCE_EXTENSIONS = new Set(['.tsx']);
 const TEST_FILE_PATTERN = /\.(test|spec)\.[jt]sx?$/;
 const EXCLUDED_DIRS = new Set([
   '__mocks__',

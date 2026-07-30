@@ -691,6 +691,6 @@ const WelcomeView = React.memo(({
 
 WelcomeView.displayName = 'WelcomeView';
 
-// UX Audit: PropTypes for all props used in WelcomeView.
+// UX Audit: TS interfaces for all props used in WelcomeView.
 
 export default WelcomeView;

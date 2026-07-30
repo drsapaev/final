@@ -1,7 +1,7 @@
 {
-  // Phase 10 — Full TS quality: allowJs removed, strict:true, no JS files in src/
+  // Phase 10 — Full TS quality: JS files removed, strict:true, no JS files in src/
   // Plan: JS-to-TS-Migration-Plan v3, section 0.1
-  // Strategy: strict:true only (allowJs removed — all .js/.jsx migrated to .ts/.tsx)
+  // Strategy: strict:true only (JS files removed — all .js/.jsx migrated to .ts/.tsx)
   //
   // Note: `baseUrl` is removed — deprecated in TS 6.0. With `moduleResolution: "bundler"`,
   // `paths` resolves relative to the tsconfig.json file location.

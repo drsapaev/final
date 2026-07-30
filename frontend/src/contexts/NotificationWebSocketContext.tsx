@@ -323,7 +323,9 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
 
     socket.onmessage = (event: MessageEvent) => {
       try {
-        const data = parseWsEvent(event.data as string) as WsPayload | null;
+        const parsed = parseWsEvent(event.data as string);
+        if (!parsed) return;
+        const data = parsed as Record<string, unknown>;
         if (!data) return;
         handleMessageRef.current(data);
       } catch (error) {

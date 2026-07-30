@@ -467,7 +467,9 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
 
       ws.onmessage = (event: MessageEvent) => {
         try {
-          const data = parseWsEvent(event.data as string) as WsIncomingMessage | null;
+          const parsed = parseWsEvent(event.data as string);
+          if (!parsed) return;
+          const data = parsed as unknown as WsIncomingMessage;
           if (!data) return;
           if (
             data.contract_version &&

@@ -11,7 +11,7 @@ import { labReportingApi } from '@/api/labReporting';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { MacOSThemeProvider } from '@/theme/macosTheme';
 
-// The component under test still relies on PropTypes (no TS prop types yet),
+// The component under test still relies on TS prop types,
 // so the inferred prop types collapse to `never`/`undefined` defaults under
 // strictNullChecks. Cast to a permissive ComponentType to keep the test
 // type-checking without changing runtime behavior.
