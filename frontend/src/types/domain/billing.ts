@@ -20,7 +20,7 @@ export interface Invoice {
   paid_amount?: number;
   balance?: number;
   discount_amount?: number;
-  status?: PaymentStatus | string;
+  status?: PaymentStatus;
   method?: PaymentMethod;
   issue_date?: string;
   due_date?: string;
@@ -62,7 +62,7 @@ export interface Discount {
   id: string | number;
   name?: string;
   description?: string;
-  discount_type?: 'percentage' | 'fixed' | string;
+  discount_type?: 'percentage' | 'fixed';
   value?: number;
   active?: boolean;
   [key: string]: unknown;

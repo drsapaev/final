@@ -13,13 +13,33 @@ export type AppointmentStatus =
   | 'cancelled'
   | 'no_show'
   | 'queued'
-  | string;
+  | 'waiting'
+  | 'called'
+  | 'in_progress'
+  | 'served'
+  | 'paid_pending';
+
+export const APPOINTMENT_STATUSES: AppointmentStatus[] = [
+  'pending', 'confirmed', 'paid', 'in_visit', 'completed', 'cancelled', 'no_show',
+  'queued', 'waiting', 'called', 'in_progress', 'served', 'paid_pending'
+];
+
+export function normalizeAppointmentStatus(raw: string): AppointmentStatus {
+  if (APPOINTMENT_STATUSES.includes(raw as AppointmentStatus)) return raw as AppointmentStatus;
+  return 'pending';
+}
 
 export type AppointmentType =
   | 'paid'
   | 'repeat'
-  | 'benefit'
-  | string;
+  | 'benefit';
+
+export const APPOINTMENT_TYPES: AppointmentType[] = ['paid', 'repeat', 'benefit'];
+
+export function normalizeAppointmentType(raw: string): AppointmentType {
+  if (APPOINTMENT_TYPES.includes(raw as AppointmentType)) return raw as AppointmentType;
+  return 'paid';
+}
 
 
 export interface QueueNumberInfo {
@@ -40,7 +60,7 @@ export interface Appointment {
   doctor_id?: string | number;
   doctor_name?: string;
   specialist_id?: string | number;
-  status?: AppointmentStatus;
+  status?: AppointmentStatus | (string & {});
   type?: AppointmentType;
   date?: string;
   time?: string;

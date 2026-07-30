@@ -157,7 +157,7 @@ export interface EMRVisitData {
 // === EMR Conflict & Amendment Types ===
 
 export interface EMRConflict {
-  type?: 'row_version_mismatch' | 'concurrent_edit' | 'deleted' | string;
+  type?: 'row_version_mismatch' | 'concurrent_edit' | 'deleted';
   message?: string;
   server_data?: EMRRecord;
   client_data?: EMRRecord;
