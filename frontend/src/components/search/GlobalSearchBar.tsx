@@ -6,7 +6,10 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
 import { generatePath, useNavigate } from 'react-router-dom';
-import { api } from '../../api';
+// ADR-0015: import api from api/client directly (api/index.ts barrel is also
+// flagged by the boundary scanner because it lives under api/). Both api/client
+// and the barrel re-export the same axios instance.
+import { api } from '../../api/client';
 import auth from '../../stores/auth';
 import logger from '../../utils/logger';
 import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors';

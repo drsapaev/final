@@ -37,20 +37,53 @@ violation inventory.
 | **component** | `components/*.tsx` | hooks, `types/domain`, `utils/*`, UI libraries | `types/api`, `types/generated`, `api/*` (except the `api/index.ts` barrel re-export of `api`), `api/mappers`, `axios` |
 | **page** | `pages/*.tsx` | (same as component) | (same as component) |
 
-## Current violations (audit-2, 2026-07-31)
+## Current violations (audit-2, 2026-07-31, after P1 cleanup)
 
-**23 violations across 21 files.** All at the **runtime** boundary
-(components/pages calling `api/` modules directly). The **type-level**
-boundary is fully clean: 0 violations of "component/hook imports
-`types/api` or `types/generated` directly".
+**3 violations across 3 files.** All at the **runtime** boundary, all
+intentionally exempt:
 
-### Violation breakdown
+| File | Reason | Status |
+|------|--------|--------|
+| `components/ai/__tests__/AIAssistant.test.tsx:32` | Test file mocking `api/mcpClient` | Exempt per ADR-0015 §"Special cases" |
+| `components/laboratory/__tests__/LabReportWorkbench.test.tsx:10` | Test file mocking `api/labReporting` | Exempt per ADR-0015 §"Special cases" |
+| `components/settings/NotificationPreferences.tsx:20` | Module-level utility functions (outside React component lifecycle) need direct access to `notificationsService` | Documented exception — utility functions run before any hook can be called |
 
-| Category | Count | Files |
-|----------|------:|-------|
-| `component imports api/ module directly` | 22 | 20 |
-| `hook imports axios directly` | 1 | 1 (`hooks/useAdminData.ts:3`) |
-| **Total** | **23** | **21** |
+**Before P1 cleanup:** 23 violations across 21 files.
+**After P1 cleanup:** 3 violations across 3 files (−20, −87%).
+
+The **type-level** boundary remains fully clean: 0 violations of
+"component/hook imports `types/api` or `types/generated` directly".
+
+### Hooks introduced in P1 (8 new hooks)
+
+| Hook | Wraps | Components migrated |
+|------|-------|---------------------|
+| `useAdminSettings` | `api/adminSettings` (5 resources via `resource` key) | BenefitSettings, WizardSettings |
+| `usePaymentProviderSettings` | `api/adminSettings` (payment provider + testPayment) | PaymentProviderSettings |
+| `useClinicSettings` | `api/adminSettings` + `api/ticketPrintSettings` | ClinicSettings |
+| `useMcpClient` | `api/mcpClient` (mcpAPI singleton) | AIAssistant, EMRContainerV2 |
+| `useLabReporting` | `api/labReporting` (labReportingApi singleton) | LabResultsSection, LabReportWorkbench, LabTemplateWorkbench |
+| `useRegistrarApi` | `api/registrar` (5 functions + PriceOverrideEntry type) | IntegratedDoctorSelector, IntegratedServiceSelector, PriceOverrideApproval |
+| `useServicesApi` | `api/services` (servicesService + notificationsService + clearCache) | ServiceAuditHistory, NotificationPreferences |
+| `useQueueApi` | `api/queue` (8 functions) | QueueIntegration, AppointmentWizardV2 |
+| `usePatientsApi` | `api/patients` (8 functions) | AppointmentWizardV2 |
+| `usePaymentsApi` | `api/payments` (2 REST + 3 utilities) | PaymentManager |
+
+### useAdminData.ts axios import removed
+
+The only `hook → axios` violation (`hooks/useAdminData.ts:3 import axios from 'axios'`)
+was removed. The `axios.isCancel(err)` runtime check was replaced with
+duck-typing: `err.code === 'ERR_CANCELED' || err.name === 'CanceledError'`.
+This is semantically equivalent (axios sets both fields on cancelled errors)
+and removes the axios runtime dependency from the hook layer.
+
+### Pattern: thin hook wrappers for singleton API objects
+
+For API modules that export a singleton object (`mcpAPI`, `labReportingApi`,
+`servicesService`, `notificationsService`), the hook returns the same
+object reference. This enforces the import boundary without adding
+boilerplate. Tests that `vi.mock('../../../api/mcpClient')` continue to
+work because the hook re-exports the same (mocked) object.
 
 ### Worst offending files
 

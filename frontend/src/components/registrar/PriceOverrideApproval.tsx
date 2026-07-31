@@ -19,11 +19,9 @@ import { toast } from 'react-toastify';
 // Раньше здесь было 2 raw fetch() к /registrar/price-overrides и
 // /registrar/price-override/approve с дублированием URL/headers/error-handling.
 // Теперь все операции идут через api/registrar.js (внутри — axios + interceptors).
-import {
-  fetchPriceOverrides,
-  approvePriceOverride,
-  type PriceOverrideEntry,
-} from '../../api/registrar';
+// ADR-0015: use useRegistrarApi hook instead of importing api/registrar directly.
+import { useRegistrarApi } from '../../hooks/useRegistrarApi';
+import type { PriceOverrideEntry } from '../../hooks/useRegistrarApi';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
@@ -60,6 +58,8 @@ const hasBackendPriceOverrideAction = (override: PriceOverrideEntry | null | und
 const PriceOverrideApproval = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useTheme();
+  // ADR-0015: registrar API accessed via hook.
+  const { fetchPriceOverrides, approvePriceOverride } = useRegistrarApi();
   const [priceOverrides, setPriceOverrides] = useState<PriceOverrideEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending');

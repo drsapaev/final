@@ -37,23 +37,16 @@ import {
   isValidUzbekPhone,
   normalizeUzbekPhoneForApi
 } from '../../utils/phoneUtils';
-import { applyRegistrarEditDelta, createQueueEntriesBatch, updateOnlineQueueEntry } from '../../api/queue';
+// ADR-0015: use useQueueApi + usePatientsApi hooks instead of importing api/queue
+// and api/patients directly.
+import { useQueueApi } from '../../hooks/useQueueApi';
+import { usePatientsApi } from '../../hooks/usePatientsApi';
 import { api } from '../../api/client';
 // UX Audit Stage 3 (Wizard issue 5.1):
 // Все 13 raw fetch() к /patients/* и /registrar/cart заменены на
 // централизованный patients API client. Это убирает дублирование
 // headers/JSON-parsing/error-handling и использует axios-interceptor
 // из api/client.js для auth/CSRF/refresh-token.
-import {
-  getPatient,
-  createPatient,
-  updatePatient,
-  searchPatientsByPhone,
-  searchPatients as searchPatientsApi,
-  checkAuthProbe,
-  createRegistrarCart,
-  findPatientByPhoneVariants,
-} from '../../api/patients';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
@@ -247,6 +240,19 @@ const AppointmentWizardV2 = ({
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+
+  // ADR-0015: queue + patients APIs accessed via hooks.
+  const { applyRegistrarEditDelta, createQueueEntriesBatch, updateOnlineQueueEntry } = useQueueApi();
+  const {
+    getPatient,
+    createPatient,
+    updatePatient,
+    searchPatientsByPhone,
+    searchPatients: searchPatientsApi,
+    checkAuthProbe,
+    createRegistrarCart,
+    findPatientByPhoneVariants,
+  } = usePatientsApi();
 
   // Состояние мастера
   const [currentStep, setCurrentStep] = useState(STEP_PATIENT);

@@ -3,7 +3,8 @@ import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
 } from '../ui/macos';
 import { useConfirm } from '../common/ConfirmDialog';
-import { labReportingApi } from '../../api/labReporting';
+// ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
+import { useLabReporting } from '../../hooks/useLabReporting';
 import './LabTemplateWorkbench.css';
 
 // L-H-6 fix: декомпозиция монолита (1598 → ~600 строк).
@@ -50,6 +51,8 @@ export default function LabTemplateWorkbench({
   // с focus-trap, Esc-to-cancel, явным описанием последствий.
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  // ADR-0015: lab reporting API accessed via hook.
+  const labReportingApi = useLabReporting();
 
   // UX-AUDIT-FIX14: useId() для уникальных ID <datalist>. Ранее ID были
   // захардкожены как 'lab-analyte-catalog' / 'lab-unit-catalog' —

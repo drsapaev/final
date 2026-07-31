@@ -13,7 +13,11 @@ import {
 } from 'lucide-react';
 
 import { api, me } from '../../api/client';
-import { notificationsService } from '../../api/services';
+// ADR-0015: use useServicesApi hook instead of importing api/services directly.
+import { useServicesApi } from '../../hooks/useServicesApi';
+// Module-level access to notificationsService for utility functions
+// (requestNotificationSettings, etc.) that run outside React component lifecycle.
+import { notificationsService as notificationsServiceModule } from '../../api/services';
 import {
   Alert,
   Card,
@@ -444,7 +448,7 @@ function shouldFallbackToDirectApi(error: unknown): boolean {
 
 async function requestNotificationSettings(userId: string | number): Promise<Record<string, unknown>> {
   try {
-    return (await notificationsService.getSettings(userId)) as Record<string, unknown>;
+    return (await notificationsServiceModule.getSettings(userId)) as Record<string, unknown>;
   } catch (error) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
@@ -456,7 +460,7 @@ async function requestNotificationSettings(userId: string | number): Promise<Rec
 
 async function persistNotificationSettings(userId: string | number, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
-    return (await notificationsService.updateSettings(userId, payload)) as Record<string, unknown>;
+    return (await notificationsServiceModule.updateSettings(userId, payload)) as Record<string, unknown>;
   } catch (error) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
@@ -468,7 +472,7 @@ async function persistNotificationSettings(userId: string | number, payload: Rec
 
 async function requestNotificationPolicy(userId: string | number) {
   try {
-    const payload = (await notificationsService.getPolicy(userId)) as Record<string, unknown>;
+    const payload = (await notificationsServiceModule.getPolicy(userId)) as Record<string, unknown>;
     return payload?.policy || {};
   } catch (error) {
     if (!shouldFallbackToDirectApi(error)) {
@@ -481,7 +485,7 @@ async function requestNotificationPolicy(userId: string | number) {
 
 async function persistNotificationPolicy(userId: string | number, payload: Record<string, unknown>) {
   try {
-    const response = (await notificationsService.updatePolicy(userId, payload)) as Record<string, unknown>;
+    const response = (await notificationsServiceModule.updatePolicy(userId, payload)) as Record<string, unknown>;
     return response?.policy || payload;
   } catch (error) {
     if (!shouldFallbackToDirectApi(error)) {
@@ -610,6 +614,8 @@ export function __resetNotificationSettingsCacheForTests() {
 export default function NotificationPreferences() {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  // ADR-0015: services API accessed via hook.
+  const { notificationsService } = useServicesApi();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');

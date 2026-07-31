@@ -27,7 +27,8 @@ import EMRDiffViewer from './EMRDiffViewer';
 import EMRConflictDialog from './EMRConflictDialog';
 import EMRHelpDialog from './EMRHelpDialog';
 import { useAppData } from '../../contexts/AppDataContext';
-import { mcpAPI } from '../../api/mcpClient';
+// ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
+import { useMcpClient } from '../../hooks/useMcpClient';
 import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
 // Analytics is handled via handleTelemetry callback
 
@@ -156,6 +157,8 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     const [confirm, confirmDialog] = useConfirm();
     const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+    // ADR-0015: MCP API accessed via hook, not direct import.
+    const mcpAPI = useMcpClient();
     const canonicalSpecialty = normalizeSpecialty(specialty);
     const {
         data,

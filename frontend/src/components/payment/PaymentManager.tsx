@@ -4,13 +4,8 @@ import { toast } from 'react-toastify';
 import { CreditCard, DollarSign, Receipt, Clock, CheckCircle, X } from 'lucide-react';
 import PaymentClick from './PaymentClick';
 import PaymentPayMe from './PaymentPayMe';
-import {
-  getPendingInvoices,
-  createPaymentInvoice,
-  formatUZS,
-  normalizePaymentAmount,
-  isValidPaymentAmount,
-} from '../../api/payments';
+// ADR-0015: use usePaymentsApi hook instead of importing api/payments directly.
+import { usePaymentsApi } from '../../hooks/usePaymentsApi';
 import type { Invoice } from '../../types/domain/billing';
 import logger from '../../utils/logger';
 import './PaymentManager.css';
@@ -65,6 +60,14 @@ const PaymentManager = ({
   patientInfo = null
 }: PaymentManagerProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  // ADR-0015: payments API accessed via hook.
+  const {
+    getPendingInvoices,
+    createPaymentInvoice,
+    formatUZS,
+    normalizePaymentAmount,
+    isValidPaymentAmount,
+  } = usePaymentsApi();
   // Состояние компонента
   const [selectedProvider, setSelectedProvider] = useState('click');
   const [paymentAmount, setPaymentAmount] = useState(initialAmount || 0);

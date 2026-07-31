@@ -14,48 +14,54 @@ import {
 } from '../ui/macos';
 import { Settings, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { fetchWizardSettings, saveWizardSettings } from '../../api/adminSettings';
+// ADR-0015: use useAdminSettings hook instead of importing api/adminSettings directly.
+import { useAdminSettings } from '../../hooks/useAdminSettings';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const WizardSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  // ADR-0015: settings lifecycle owned by useAdminSettings hook.
+  const {
+    settings: fetchedSettings,
+    loading,
+    saving,
+    error,
+    reload: fetchSettings,
+    save: saveSettingsViaHook,
+    resetError,
+  } = useAdminSettings<{ use_new_wizard: boolean; updated_at: string | null }>({
+    resource: 'wizard',
+    errorMessage: t('admin2.ws_load_error_desc'),
+    loadErrorToast: t('admin2.ws_load_error_toast'),
+    saveErrorToast: t('admin2.ws_save_error_toast'),
+  });
   const [settings, setSettings] = useState<{ use_new_wizard: boolean; updated_at: string | null }>({
     use_new_wizard: false,
     updated_at: null
   });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Загрузка настроек
+  // Sync local editable settings when fetch completes.
   useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
-    try {
-      setLoading(true);
-      const data = await fetchWizardSettings();
-      setSettings(data);
+    if (fetchedSettings) {
+      setSettings(fetchedSettings);
       setHasChanges(false);
-    } catch (error) {
-      logger.error('Error fetching wizard settings:', error);
-      setError(t('admin2.ws_load_error_desc'));
-      // Fallback данные при ошибке
+    }
+  }, [fetchedSettings]);
+
+  // Fallback on error: keep UI usable with default settings.
+  useEffect(() => {
+    if (error && !fetchedSettings) {
       setSettings({
         use_new_wizard: false,
         updated_at: new Date().toISOString()
       });
       setHasChanges(false);
-      toast.error(t('admin2.ws_load_error_toast'));
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [error, fetchedSettings]);
 
   const handleToggleWizard = () => {
     setSettings((prev) => ({
@@ -70,25 +76,17 @@ const WizardSettings = () => {
   };
 
   const confirmSave = async () => {
-    try {
-      setSaving(true);
-      setShowConfirmModal(false);
-      const response = await saveWizardSettings({
-        use_new_wizard: settings.use_new_wizard
-      });
-
-      if (response.success) {
-        toast.success(response.message);
-        setSettings(response.settings);
-        setHasChanges(false);
-      } else {
-        throw new Error(response.message || t('admin2.ws_save_error_short'));
-      }
-    } catch (error) {
-      logger.error('Error saving wizard settings:', error);
-      toast.error(t('admin2.ws_save_error_toast'));
-    } finally {
-      setSaving(false);
+    setShowConfirmModal(false);
+    // WizardSettings backend returns { success, message, settings } — but useAdminSettings.save
+    // only signals success/failure. We use the toast from the hook (if saveSuccessToast were set)
+    // and update local state on success. The success toast is omitted here because the backend
+    // provides its own message in the response — we cannot surface it via the hook's static toast.
+    const ok = await saveSettingsViaHook({
+      use_new_wizard: settings.use_new_wizard,
+      updated_at: settings.updated_at,
+    });
+    if (ok) {
+      setHasChanges(false);
     }
   };
 
@@ -146,7 +144,7 @@ const WizardSettings = () => {
             type="error"
             title={t('admin2.ws_load_alert_title')}
             message={error}
-            onClose={() => setError(null)} />
+            onClose={resetError} />
 
           }
 
