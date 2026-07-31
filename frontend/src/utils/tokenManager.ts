@@ -10,6 +10,7 @@
  * sessionStorage is cleared when the tab closes, limiting the exposure window.
  */
 import logger from './logger';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
@@ -82,8 +83,8 @@ export const tokenManager = {
     try {
       const data = sessionStorage.getItem(USER_KEY);
       if (!data) return null;
-      // JSON.parse result is unknown — narrow to object or null.
-      const parsed: unknown = JSON.parse(data);
+      // safeJsonParse result is unknown — narrow to object or null.
+      const parsed: unknown = safeJsonParse(data);
       return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
     } catch (error) {
       logger.error('Error reading user data:', error);
@@ -135,8 +136,8 @@ export const tokenManager = {
 
     try {
       // Проверка срока действия (если это JWT)
-      // atob returns string; JSON.parse returns unknown.
-      const payload: JwtPayload = JSON.parse(atob(parts[1])) as JwtPayload;
+      // atob returns string; safeJsonParse returns unknown.
+      const payload: JwtPayload = safeJsonParse(atob(parts[1])) as JwtPayload;
       if (payload.exp) {
         const expirationTime = payload.exp * 1000;
         return Date.now() < expirationTime;

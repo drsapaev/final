@@ -33,6 +33,7 @@ import logger from '../../utils/logger';
 import api from '../../api/client';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { safeJsonParse } from '../../utils/safeJsonParse';
 
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
@@ -99,7 +100,7 @@ const parseMeta = (meta: unknown): Record<string, unknown> => {
   if (!meta) return {};
   if (typeof meta === 'object') return meta as Record<string, unknown>;
   try {
-    return JSON.parse(String(meta)) as Record<string, unknown>;
+    return safeJsonParse(String(meta)) as Record<string, unknown>;
   } catch {
     return {};
   }

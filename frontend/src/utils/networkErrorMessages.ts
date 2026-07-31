@@ -2,7 +2,7 @@
 // Phase 1 — migrated from .js. Pure functions; types added.
 // No behavioral changes.
 
-import type { AxiosLikeError } from '../types/errors';
+import type { HttpApiError } from '../types/errors';
 
 const NETWORK_ERROR_PATTERNS: readonly RegExp[] = [
   /failed to fetch/i,
@@ -76,7 +76,7 @@ export function formatNetworkErrorMessage({
   return message || fallbackMessage;
 }
 
-// Canonical AxiosLikeError type is now in types/errors.ts (ADR-0016).
+// Canonical HttpApiError type is now in types/errors.ts (ADR-0016).
 
 export function formatApiErrorMessage(
   error: unknown,
@@ -93,7 +93,7 @@ export function formatApiErrorMessage(
     return fallbackMessage;
   }
 
-  const err = error as AxiosLikeError;
+  const err = error as HttpApiError;
   const responseDetail = err.response?.data?.detail ?? err.data?.detail ?? err.detail;
   const responseMessage =
     err.response?.data?.message ??

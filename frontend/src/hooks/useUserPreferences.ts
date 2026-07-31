@@ -12,6 +12,7 @@ import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import type { AsyncState } from '../types/async-state';
 import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 // Дефолтные EMR настройки
 interface EmrPreferences {
@@ -74,7 +75,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
             // Попытка загрузить из localStorage (кеш)
             const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (cached && !forceReload) {
-                const parsed = JSON.parse(cached);
+                const parsed = safeJsonParse(cached);
                 if (parsed && Date.now() - parsed._cachedAt < 5 * 60 * 1000) { // 5 минут
                     setPreferences(parsed);
                     loadedRef.current = true;

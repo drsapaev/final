@@ -1,11 +1,11 @@
-// ADR-0016: WrappedApiError replaced by canonical AxiosLikeError from types/errors.ts.
-import type { AxiosLikeError } from '../types/errors';
+// ADR-0016: WrappedApiError replaced by canonical HttpApiError from types/errors.ts.
+import type { HttpApiError } from '../types/errors';
 
-function createWrappedError(message: string, extras: { status?: number; detail?: string; response?: unknown }): AxiosLikeError & Error {
-  const err = new Error(message) as AxiosLikeError & Error;
+function createWrappedError(message: string, extras: { status?: number; detail?: string; response?: unknown }): HttpApiError & Error {
+  const err = new Error(message) as HttpApiError & Error;
   err.status = extras.status;
   err.detail = extras.detail;
-  err.response = extras.response as AxiosLikeError['response'];
+  err.response = extras.response as HttpApiError['response'];
   return err;
 }
 
@@ -59,13 +59,13 @@ export async function createPatient(patientData: Record<string, unknown>): Promi
     return mapPatientDto(response.data);
   } catch (error) {
     // 400 — типичная ошибка «пациент уже существует»
-    if ((error as AxiosLikeError)?.response?.status === 400) {
-      const detail = (error as AxiosLikeError)?.response?.data?.detail || 'Пациент с таким номером телефона уже существует';
-      throw createWrappedError(String(detail), { status: 400, detail: String(detail), response: (error as AxiosLikeError)?.response });
+    if ((error as HttpApiError)?.response?.status === 400) {
+      const detail = (error as HttpApiError)?.response?.data?.detail || 'Пациент с таким номером телефона уже существует';
+      throw createWrappedError(String(detail), { status: 400, detail: String(detail), response: (error as HttpApiError)?.response });
     }
     // Другие ошибки — пробрасываем с нормализованным сообщением
-    const message = (error as AxiosLikeError)?.response?.data?.detail || (error as { message?: string })?.message || 'Ошибка создания пациента';
-    throw createWrappedError(String(message), { status: (error as AxiosLikeError)?.response?.status as number | undefined, response: (error as AxiosLikeError)?.response });
+    const message = (error as HttpApiError)?.response?.data?.detail || (error as { message?: string })?.message || 'Ошибка создания пациента';
+    throw createWrappedError(String(message), { status: (error as HttpApiError)?.response?.status as number | undefined, response: (error as HttpApiError)?.response });
   }
 }
 
@@ -78,10 +78,10 @@ export async function updatePatient(patientId: string | number, updateData: Reco
     const response = await api.put<PatientDto>(`/patients/${patientId}`, updateData);
     return mapPatientDto(response.data);
   } catch (error) {
-    const status = (error as AxiosLikeError)?.response?.status;
-    const detail = (error as AxiosLikeError)?.response?.data?.detail;
+    const status = (error as HttpApiError)?.response?.status;
+    const detail = (error as HttpApiError)?.response?.data?.detail;
     logger.error('[patients API] updatePatient failed', { patientId, status, detail });
-    throw createWrappedError(String(detail || `Ошибка обновления пациента (${status || 'network'})`), { status: status as number | undefined, response: (error as AxiosLikeError)?.response });
+    throw createWrappedError(String(detail || `Ошибка обновления пациента (${status || 'network'})`), { status: status as number | undefined, response: (error as HttpApiError)?.response });
   }
 }
 
@@ -124,7 +124,7 @@ export async function checkAuthProbe(): Promise<boolean> {
     await api.get('/patients/', { params: { _limit: 1 } });
     return true;
   } catch (error) {
-    const status = (error as AxiosLikeError)?.response?.status;
+    const status = (error as HttpApiError)?.response?.status;
     if (status === 401 || status === 403) {
       return false;
     }
@@ -154,10 +154,10 @@ export async function createRegistrarCart(cartData: Record<string, unknown>): Pr
     const response = await api.post('/registrar/cart', cartData);
     return response.data;
   } catch (error) {
-    const status = (error as AxiosLikeError)?.response?.status;
-    const detail = (error as AxiosLikeError)?.response?.data?.detail;
+    const status = (error as HttpApiError)?.response?.status;
+    const detail = (error as HttpApiError)?.response?.data?.detail;
     logger.error('[patients API] createRegistrarCart failed', { status, detail });
-    throw createWrappedError(String(detail || `Ошибка создания записи (${status || 'network'})`), { status: status as number | undefined, response: (error as AxiosLikeError)?.response });
+    throw createWrappedError(String(detail || `Ошибка создания записи (${status || 'network'})`), { status: status as number | undefined, response: (error as HttpApiError)?.response });
   }
 }
 

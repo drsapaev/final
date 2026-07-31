@@ -35,6 +35,7 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import notify from '../../services/notify';
+import { safeJsonParse } from '../../utils/safeJsonParse';
 
 const iconSize = 15;
 
@@ -47,7 +48,7 @@ function clonePlainObject(value: unknown) {
     return structuredClone(value);
   }
 
-  return JSON.parse(JSON.stringify(value));
+  return safeJsonParse(JSON.stringify(value));
 }
 
 async function loadExistingEmrDraft(visitId: string | number) {

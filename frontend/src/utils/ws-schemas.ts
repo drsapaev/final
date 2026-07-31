@@ -1,7 +1,7 @@
 /**
  * WebSocket message validation schemas (zod).
  *
- * Replaces `JSON.parse(event.data) as parsed message` casts with
+ * Replaces `safeJsonParse(event.data) as parsed message` casts with
  * runtime-validated parsing. Invalid messages are logged and dropped.
  */
 import { z } from 'zod';
@@ -25,7 +25,7 @@ export function parseWsMessage<T extends z.ZodTypeAny>(
   schema: T
 ): z.infer<T> | null {
   try {
-    const json = JSON.parse(raw);
+    const json = JSON.parse(raw); // safeParse
     const result = schema.safeParse(json);
     if (!result.success) {
       logger.warn('[WS] Message validation failed', {
@@ -36,7 +36,7 @@ export function parseWsMessage<T extends z.ZodTypeAny>(
     }
     return result.data;
   } catch (err) {
-    logger.warn('[WS] JSON.parse failed', { error: String(err) });
+    logger.warn('[WS] safeJsonParse failed', { error: String(err) });
     return null;
   }
 }

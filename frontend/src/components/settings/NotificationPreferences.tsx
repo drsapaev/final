@@ -32,6 +32,7 @@ import { getState as getAuthState } from '../../stores/auth';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
 import { getErrorMessage } from '../../utils/type-guards';
+import { safeJsonParse } from '../../utils/safeJsonParse';
 
 interface PolicyControl {
   desktop: boolean;
@@ -251,7 +252,7 @@ function cloneValue<T>(value: T): T {
   if (typeof structuredClone === 'function') {
     return structuredClone(value);
   }
-  return JSON.parse(JSON.stringify(value)) as T;
+  return safeJsonParse(JSON.stringify(value)) as T;
 }
 
 function toDateTimeLocalValue(value: string | Date | null | undefined): string {

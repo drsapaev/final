@@ -21,6 +21,7 @@ import { me, setToken as setClientToken } from '../api/client';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 import type { AuthState, UserProfile } from '../types/domain/auth';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 // Wave G6: removed `export type { AuthState, UserProfile } from '../types/domain/auth'`
 // re-export shim. Consumers should import AuthState directly from
@@ -87,7 +88,7 @@ export function getToken(): string | null {
 export function getProfileFromStorage(): UserProfile | null {
   try {
     const raw = sessionStorage.getItem(PROFILE_KEY);
-    return raw ? (JSON.parse(raw) as UserProfile) : null;
+    return raw ? (safeJsonParse(raw) as UserProfile) : null;
   } catch {
     return null;
   }

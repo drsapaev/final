@@ -14,6 +14,7 @@ import { useNotificationCenter } from '../../contexts/NotificationCenterContext'
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { safeJsonParse } from '../../utils/safeJsonParse';
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: '\u0412\u0441\u0435' },
@@ -54,7 +55,7 @@ function extractMetadata(item: { payloadSnapshot?: unknown; raw?: Record<string,
   let snapshotData: unknown = payloadSnapshot;
   if (typeof snapshotData === 'string') {
     try {
-      snapshotData = JSON.parse(snapshotData);
+      snapshotData = safeJsonParse(snapshotData);
     } catch {
       snapshotData = null;
     }

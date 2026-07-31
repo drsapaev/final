@@ -1,6 +1,7 @@
 import logger from '../utils/logger';
 import { buildWsUrl } from '../api/runtime';
 import { tokenManager } from '../utils/tokenManager';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 interface WebSocketAuthOptions {
   requireAuth?: boolean;
@@ -83,7 +84,7 @@ export function createAuthenticatedWebSocket(baseUrl: string, params: Record<str
 
   ws.onmessage = (event: MessageEvent) => {
     try {
-      const data = JSON.parse(event.data);
+      const data = safeJsonParse(event.data);
       logger.log('📨 Получено сообщение WebSocket:', data);
 
       // Обрабатываем ошибки аутентификации в сообщениях
@@ -238,7 +239,7 @@ export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<
         onMessage: (event: MessageEvent) => {
           // ✅ SECURITY: Handle heartbeat pong messages
           try {
-            const data = JSON.parse(event.data as string);
+            const data = safeJsonParse(event.data as string);
             if (data.type === 'ping') {
               // Respond to ping with pong
               if (ws && ws.readyState === WebSocket.OPEN) {

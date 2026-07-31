@@ -51,6 +51,7 @@ import {
     getChatErrorMessage,
     chatError,
 } from '../types/chat-session-state';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 /** AI chat session shape. */
 interface ChatSession {
@@ -448,7 +449,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
 
             wsRef.current.onmessage = (event) => {
                 try {
-                    const data = JSON.parse(event.data);
+                    const data = safeJsonParse(event.data);
                     if (
                         data.contract_version &&
                         !isSupportedMessagingContractVersion(data.contract_version) &&

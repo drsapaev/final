@@ -46,7 +46,9 @@ export type ChatErrorCode =
   | 'contract_mismatch'    // protocol version mismatch with backend
   | 'unknown';
 
-export interface ChatError {
+import type { BaseApiError } from './errors';
+
+export interface ChatError extends BaseApiError {
   code: ChatErrorCode;
   message: string;
   /** When false, the UI should not show a "Retry" button. */

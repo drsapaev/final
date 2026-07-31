@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 import logger from '../utils/logger';
+import { safeJsonParse } from '../utils/safeJsonParse';
 // Хук для дебаунса
 export const useDebounce = <T,>(value: T, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -86,7 +87,7 @@ export const useLocalStorage = <T,>(key: string, initialValue: T) => {
   const [storedValue, setStoredValue] = useState(() => {
     try {
       const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
+      return item ? safeJsonParse(item) : initialValue;
     } catch (error) {
       logger.error(`Error reading localStorage key "${key}":`, error);
       return initialValue;
@@ -111,7 +112,7 @@ export const useSessionStorage = <T,>(key: string, initialValue: T) => {
   const [storedValue, setStoredValue] = useState(() => {
     try {
       const item = window.sessionStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
+      return item ? safeJsonParse(item) : initialValue;
     } catch (error) {
       logger.error(`Error reading sessionStorage key "${key}":`, error);
       return initialValue;

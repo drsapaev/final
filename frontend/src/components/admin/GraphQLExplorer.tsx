@@ -25,6 +25,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import { safeJsonParse } from '../../utils/safeJsonParse';
 
 interface GraphQLSchemaField {
   name: string;
@@ -344,7 +345,7 @@ const GraphQLExplorer = () => {
       let parsedVariables = {};
       if (variables.trim()) {
         try {
-          parsedVariables = JSON.parse(variables);
+          parsedVariables = safeJsonParse(variables);
         } catch {
           setError(t('admin2.gql_error_invalid_json'));
           setLoading(false);

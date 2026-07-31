@@ -1,3 +1,4 @@
+import { safeJsonParse } from '../utils/safeJsonParse';
 function cloneValue(value: unknown): Record<string, unknown> {
   if (value == null || typeof value !== 'object') {
     if (value == null) return {};
@@ -8,7 +9,7 @@ function cloneValue(value: unknown): Record<string, unknown> {
     return structuredClone(value) as Record<string, unknown>;
   }
 
-  return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  return safeJsonParse(JSON.stringify(value)) as Record<string, unknown>;
 }
 
 function resolvePatientId(patient: Record<string, unknown> | null | undefined): string | number | null {

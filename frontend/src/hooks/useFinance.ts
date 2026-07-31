@@ -5,6 +5,7 @@ import logger from '../utils/logger';
 import type { Transaction } from '../types/domain/clinic';
 import type { AsyncState } from '../types/async-state';
 import { successState, loadingState, errorState, getData, getError } from '../types/async-state';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 const FINANCE_CACHE_KEY = 'admin_finance_transactions_cache';
 // audit/phase-8, BS-36: TTL for deletedIds. Previously deletedIds grew
@@ -91,7 +92,7 @@ const readFinanceCache = () => {
       return { transactions: [], deletedIds: [] };
     }
 
-    const parsed = JSON.parse(raw);
+    const parsed = safeJsonParse(raw);
     const cachedTransactions = Array.isArray(parsed)
       ? parsed
       : Array.isArray(parsed?.transactions)

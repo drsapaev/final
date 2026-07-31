@@ -1,6 +1,7 @@
 import logger from '../utils/logger';
 // UX Audit: миграция 5 raw fetch() → api/client.js.
 import { api } from '../api/client';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 /**
  * Утилиты для тестирования мастера регистрации
@@ -119,7 +120,7 @@ class WizardTester {
 
     // Проверяем восстановление
     const stored = localStorage.getItem('wizard_draft');
-    const restored = stored ? JSON.parse(stored) : null;
+    const restored = stored ? safeJsonParse(stored) : null;
 
     if (JSON.stringify(restored) === JSON.stringify(testData)) {
       logger.log('✅ Автосохранение работает корректно');

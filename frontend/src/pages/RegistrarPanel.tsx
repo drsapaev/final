@@ -102,7 +102,7 @@ import DataSourceIndicator from './registrar/DataSourceIndicator';
 import { generateCSV, downloadCSV } from './registrar/registrarCsv';
 
 // ADR-0016: canonical error types from types/errors.ts.
-import type { AxiosLikeError } from '../types/errors';
+import type { HttpApiError } from '../types/errors';
 
 interface QueueProfileItem {
   key?: string;
@@ -201,7 +201,7 @@ const RegistrarPanel = () => {
         logger.info('[Registrar] Загружен пациент из URL (patientId matched)');
       } catch (error: unknown) {
         // 404 — пациент не найден, не логируем как error.
-        const status = (error as AxiosLikeError)?.response?.status;
+        const status = (error as HttpApiError)?.response?.status;
         if (status !== 404) {
           logger.error('[Registrar] Не удалось загрузить пациента:', error);
         }
@@ -545,7 +545,7 @@ const RegistrarPanel = () => {
         });
       }
     } catch (error: unknown) {
-      if ((error as AxiosLikeError)?.response?.status === 429) {
+      if ((error as HttpApiError)?.response?.status === 429) {
         autoRefreshCooldownUntilRef.current = Date.now() + 60_000;
         autoRefreshCooldownLoggedRef.current = false;
         logger.warn('⏳ Регистраторская очередь ограничена по частоте, включаем cooldown на 60с', {
@@ -556,7 +556,7 @@ const RegistrarPanel = () => {
       }
 
       // Handle axios errors
-      if ((error as AxiosLikeError)?.response?.status === 401) {
+      if ((error as HttpApiError)?.response?.status === 401) {
         // Токен недействителен
         logger.warn('Токен недействителен (401), очищаем и показываем ошибку');
         sessionStorage.removeItem('auth_token');  // PR-39 / P0-2;

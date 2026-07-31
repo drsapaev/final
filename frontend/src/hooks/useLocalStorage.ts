@@ -21,6 +21,7 @@
 
 import { useCallback, useState } from 'react';
 import logger from '../utils/logger';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 /** Updater function shape — same as React's setState updater. */
 type SetValueAction<T> = T | ((prev: T) => T);
@@ -31,9 +32,9 @@ const safeGet = <T,>(key: string, fallback: T): T => {
     if (raw === null) {
       return fallback;
     }
-    // JSON.parse возвращает unknown — приводим к T. Это безопасно на уровне
+    // safeJsonParse возвращает unknown — приводим к T. Это безопасно на уровне
     // вызова: caller контролирует тип T и fallback.
-    return JSON.parse(raw) as T;
+    return safeJsonParse(raw) as T;
   } catch (err) {
     logger.warn(`useLocalStorage: failed to read key "${key}"`, err);
     return fallback;

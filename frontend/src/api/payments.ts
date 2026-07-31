@@ -1,11 +1,11 @@
-// ADR-0016: WrappedApiError replaced by canonical AxiosLikeError from types/errors.ts.
-import type { AxiosLikeError } from '../types/errors';
+// ADR-0016: WrappedApiError replaced by canonical HttpApiError from types/errors.ts.
+import type { HttpApiError } from '../types/errors';
 
-function createWrappedError(message: string, extras: { status?: number; detail?: string; response?: unknown }): AxiosLikeError & Error {
-  const err = new Error(message) as AxiosLikeError & Error;
+function createWrappedError(message: string, extras: { status?: number; detail?: string; response?: unknown }): HttpApiError & Error {
+  const err = new Error(message) as HttpApiError & Error;
   err.status = extras.status;
   err.detail = extras.detail;
-  err.response = extras.response as AxiosLikeError['response'];
+  err.response = extras.response as HttpApiError['response'];
   return err;
 }
 
@@ -40,10 +40,10 @@ export async function getPendingInvoices(): Promise<Invoice[]> {
     return mapInvoiceDtos(response.data);
   } catch (error) {
     logger.error('[payments API] getPendingInvoices failed', {
-      status: (error as AxiosLikeError)?.response?.status,
-      detail: (error as AxiosLikeError)?.response?.data?.detail,
+      status: (error as HttpApiError)?.response?.status,
+      detail: (error as HttpApiError)?.response?.data?.detail,
     });
-    throw createWrappedError(String((error as AxiosLikeError)?.response?.data?.detail || 'Ошибка загрузки счетов'), { status: (error as AxiosLikeError)?.response?.status as number | undefined, response: (error as AxiosLikeError)?.response });
+    throw createWrappedError(String((error as HttpApiError)?.response?.data?.detail || 'Ошибка загрузки счетов'), { status: (error as HttpApiError)?.response?.status as number | undefined, response: (error as HttpApiError)?.response });
   }
 }
 
@@ -58,10 +58,10 @@ export async function createPaymentInvoice(invoiceData: Record<string, unknown>)
     return mapInvoiceDto(response.data as Record<string, unknown>);
   } catch (error) {
     logger.error('[payments API] createPaymentInvoice failed', {
-      status: (error as AxiosLikeError)?.response?.status,
-      detail: (error as AxiosLikeError)?.response?.data?.detail,
+      status: (error as HttpApiError)?.response?.status,
+      detail: (error as HttpApiError)?.response?.data?.detail,
     });
-    throw createWrappedError(String((error as AxiosLikeError)?.response?.data?.detail || 'Ошибка создания счёта'), { status: (error as AxiosLikeError)?.response?.status as number | undefined, response: (error as AxiosLikeError)?.response });
+    throw createWrappedError(String((error as HttpApiError)?.response?.data?.detail || 'Ошибка создания счёта'), { status: (error as HttpApiError)?.response?.status as number | undefined, response: (error as HttpApiError)?.response });
   }
 }
 

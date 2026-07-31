@@ -1,6 +1,7 @@
 
 import { Button, Icon } from '../../ui/macos';
 import { useTranslation } from '@/i18n/useTranslation';
+import { safeJsonParse } from '../../../utils/safeJsonParse';
 
 /**
  * L-H-6 fix: ReferenceRuleEditor выделен в отдельный файл (~290 строк).
@@ -95,7 +96,7 @@ export interface ReferenceRuleEditorProps {
 function parseRuleText(text: string | null | undefined): ReferenceRule | null {
   if (!text?.trim()) return null;
   try {
-    return JSON.parse(text) as ReferenceRule;
+    return safeJsonParse(text) as ReferenceRule;
   } catch {
     return null;
   }

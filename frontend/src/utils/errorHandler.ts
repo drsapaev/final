@@ -5,10 +5,10 @@
 import { toast } from 'react-toastify';
 
 import logger from '../utils/logger';
-import type { AxiosLikeError } from '../types/errors';
+import type { HttpApiError } from '../types/errors';
 import {
   getErrorMessage,
-  isAxiosLikeError,
+  isHttpApiError,
 } from './error-utils';
 
 // Re-export getErrorMessage for backward compatibility — existing imports
@@ -16,8 +16,8 @@ import {
 export { getErrorMessage };
 
 // Backward-compat alias: ErrorWithResponse was a local interface here before
-// ADR-0016 consolidation. It is now AxiosLikeError in types/errors.ts.
-type ErrorWithResponse = AxiosLikeError;
+// ADR-0016 consolidation. It is now HttpApiError in types/errors.ts.
+type ErrorWithResponse = HttpApiError;
 /**
  * Типы ошибок
  */
@@ -48,7 +48,7 @@ export const HTTP_STATUS = {
  * Определяет тип ошибки по HTTP статусу и содержимому
  */
 export function getErrorType(error: unknown): string {
-  if (!isAxiosLikeError(error) || !error.response) {
+  if (!isHttpApiError(error) || !error.response) {
     return ERROR_TYPES.NETWORK;
   }
 
@@ -120,7 +120,7 @@ export function handleError(
 
   // Логирование
   if (logError) {
-    const errAxios = isAxiosLikeError(error) ? error : null;
+    const errAxios = isHttpApiError(error) ? error : null;
     logger.error(`[${context}] ${errorType.toUpperCase()} Error:`, {
       message: errorMessage,
       status: errAxios?.response?.status,
@@ -154,7 +154,7 @@ export function handleError(
   return {
     type: errorType,
     message: errorMessage,
-    status: isAxiosLikeError(error) ? error.response?.status : undefined,
+    status: isHttpApiError(error) ? error.response?.status : undefined,
     originalError: error
   };
 }

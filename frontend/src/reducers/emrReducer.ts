@@ -11,6 +11,7 @@
  * - UNDO/REDO: Navigate history
  */
 import type { EmrAction, EmrRecord, EmrState } from '../types/features/emr';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 // Action types — exported as a const object for runtime use.
 // The EmrAction discriminated union (in types/features/emr.ts) is the
@@ -61,7 +62,7 @@ function pushHistory(
     // EMR history entries that contain timestamps), and is faster.
     const snapshot: Record<string, unknown> = typeof structuredClone === 'function'
         ? structuredClone(data)
-        : JSON.parse(JSON.stringify(data)) as Record<string, unknown>;
+        : safeJsonParse(JSON.stringify(data)) as Record<string, unknown>;
     const newHistory = [...history, snapshot];
     if (newHistory.length > MAX_HISTORY_SIZE) {
         return newHistory.slice(-MAX_HISTORY_SIZE);

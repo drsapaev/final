@@ -25,6 +25,7 @@ import { getCanonicalRoutes, isRouteAccessibleToProfile } from '../../routing/ro
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { safeJsonParse } from '../../utils/safeJsonParse';
 
 interface CommandItem {
   id: string;
@@ -91,7 +92,7 @@ const getQuickActions = (t: (key: string, options?: Record<string, unknown>) => 
 function loadRecent() {
   try {
     const raw = localStorage.getItem(RECENT_KEY);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? safeJsonParse(raw) : [];
   } catch {
     return [];
   }

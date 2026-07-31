@@ -7,7 +7,7 @@ import { tokenManager } from '../utils/tokenManager';
 import { clearToken as clearAuthState } from '../stores/auth';
 import logger from '../utils/logger';
 import { handleError } from '../utils/errorHandler';
-import type { AxiosLikeError } from '../types/errors';
+import type { HttpApiError } from '../types/errors';
 
 
 export function isExpectedApiErrorStatus(originalRequest: { expectedErrorStatuses?: number[] } | null | undefined, status: unknown): boolean {
@@ -20,12 +20,12 @@ export function isExpectedApiErrorStatus(originalRequest: { expectedErrorStatuse
 }
 
 export function isCanceledApiError(error: unknown): boolean {
-  return (error as AxiosLikeError)?.code === 'ERR_CANCELED' || (error as AxiosLikeError)?.name === 'CanceledError';
+  return (error as HttpApiError)?.code === 'ERR_CANCELED' || (error as HttpApiError)?.name === 'CanceledError';
 }
 
 export function shouldSuppressApiError(error: unknown): boolean {
-  const originalRequest = (error as AxiosLikeError)?.config;
-  const status = (error as AxiosLikeError)?.response?.status;
+  const originalRequest = (error as HttpApiError)?.config;
+  const status = (error as HttpApiError)?.response?.status;
 
   if (isCanceledApiError(error)) {
     return true;
@@ -39,11 +39,11 @@ export function shouldSuppressApiError(error: unknown): boolean {
 }
 
 export function shouldClearAuthOnUnauthorized(error: unknown, hasToken: boolean = tokenManager.hasToken()): boolean {
-  if (!hasToken || (error as AxiosLikeError)?.response?.status !== 401) {
+  if (!hasToken || (error as HttpApiError)?.response?.status !== 401) {
     return false;
   }
 
-  const requestUrl = String((error as AxiosLikeError)?.config?.url || '');
+  const requestUrl = String((error as HttpApiError)?.config?.url || '');
   if (
     requestUrl.includes('/auth/login') ||
     requestUrl.includes('/auth/csrf-token') ||

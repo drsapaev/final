@@ -1,3 +1,4 @@
+import { safeJsonParse } from '../utils/safeJsonParse';
 export const DENTIST_DOCUMENTS_STORAGE_KEY = 'dentist_panel_documents_v1';
 
 export function getDefaultDentistDocuments() {
@@ -12,7 +13,7 @@ export function parseDentistDocuments(rawValue: string | null) {
   }
 
   try {
-    const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+    const parsed = typeof rawValue === 'string' ? safeJsonParse(rawValue) : rawValue;
     return {
       visitProtocols: Array.isArray(parsed?.visitProtocols) ? parsed.visitProtocols : [],
     };

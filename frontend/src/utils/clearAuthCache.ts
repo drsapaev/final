@@ -1,5 +1,6 @@
 import logger from '../utils/logger';
 import tokenManager from './tokenManager';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 /**
  * Утилита для очистки кэша аутентификации
@@ -38,7 +39,7 @@ export function hasStaleAuthCache() {
     const profile = sessionStorage.getItem('auth_profile');
     if (!profile) return false;
 
-    const profileData = JSON.parse(profile);
+    const profileData = safeJsonParse(profile);
     const role = profileData?.role;
 
     // Проверяем на устаревшие роли или неправильные маршруты
