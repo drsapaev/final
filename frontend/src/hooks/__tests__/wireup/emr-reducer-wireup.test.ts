@@ -15,7 +15,7 @@ import type { EmrState } from '../../../types/features/emr';
 describe('EMR reducer wire-up — state machine transitions', () => {
   it('SAVE_START transitions idle → saving', () => {
     const state: EmrState = { ...initialState, status: 'idle' };
-    const next = emrReducer(state, { type: EMR_ACTIONS.SAVE_START, payload: {} });
+    const next = emrReducer(state, { type: EMR_ACTIONS.SAVE_START });
     expect(next.status).toBe('saving');
   });
 
