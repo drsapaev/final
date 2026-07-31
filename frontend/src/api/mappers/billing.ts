@@ -1,45 +1,34 @@
 /**
  * Mappers: billing DTOs → domain Invoice / Payment.
  *
- * The backend payment endpoints (/payments/invoices/*, /payments/*) return
- * dynamic Pydantic shapes. These mappers normalize the canonical fields
- * the UI reads and let extras ride along via the domain index signature.
+ * Per ADR-0018, zod schemas validate the DTO shape before transformation.
  */
 
 import type { Invoice, Payment } from '../../types/domain/billing';
 import { toInvoiceId, toAppointmentId, toPatientId, toPaymentId } from '../../types/domain/branded';
+import { InvoiceDtoSchema, PaymentDtoSchema } from './schemas/billingSchema';
 
-// Transport shape — the backend returns this loose form. We don't have a
-// strict OpenAPI *Dto for these endpoints (they're not in the generated
-// schema), so we accept `unknown` and assert the minimal invariant at runtime.
-type InvoiceDtoLike = Record<string, unknown>;
-type PaymentDtoLike = Record<string, unknown>;
-
-export function mapInvoiceDto(dto: InvoiceDtoLike): Invoice {
-  if (dto == null || typeof dto !== 'object') {
-    throw new Error('[mapInvoiceDto] expected object, got ' + typeof dto);
-  }
-  // Invariant: an invoice must have either an `id` or an `invoice_id`.
-  // Some endpoints return `invoice_id` instead of `id`; normalize.
-  const id = (dto.id ?? dto.invoice_id) as string | number | undefined;
+export function mapInvoiceDto(dto: Record<string, unknown> | unknown): Invoice {
+  const parsed = InvoiceDtoSchema.parse(dto);
+  const id = parsed.id ?? parsed.invoice_id;
   if (id == null) {
     throw new Error('[mapInvoiceDto] missing required field `id` or `invoice_id`');
   }
 
   return {
     id: toInvoiceId(id),
-    appointment_id: dto.appointment_id != null ? toAppointmentId(dto.appointment_id as string | number) : undefined,
-    patient_id: dto.patient_id != null ? toPatientId(dto.patient_id as string | number) : undefined,
-    patient_name: dto.patient_name as string | undefined,
-    amount: dto.amount != null ? Number(dto.amount) : undefined,
-    paid_amount: dto.paid_amount != null ? Number(dto.paid_amount) : undefined,
-    discount_amount: dto.discount_amount != null ? Number(dto.discount_amount) : undefined,
-    status: dto.status as Invoice['status'],
-    method: dto.method as Invoice['method'],
-    created_at: dto.created_at as string | undefined,
-    paid_at: dto.paid_at as string | undefined,
-    ...dto,
-  };
+    appointment_id: parsed.appointment_id != null ? toAppointmentId(parsed.appointment_id) : undefined,
+    patient_id: parsed.patient_id != null ? toPatientId(parsed.patient_id) : undefined,
+    patient_name: parsed.patient_name,
+    amount: parsed.amount != null ? Number(parsed.amount) : undefined,
+    paid_amount: parsed.paid_amount != null ? Number(parsed.paid_amount) : undefined,
+    discount_amount: parsed.discount_amount != null ? Number(parsed.discount_amount) : undefined,
+    status: parsed.status as Invoice['status'],
+    method: parsed.method as Invoice['method'],
+    created_at: parsed.created_at,
+    paid_at: parsed.paid_at,
+    ...parsed,
+  } as unknown as Invoice;
 }
 
 export function mapInvoiceDtos(dtos: unknown): Invoice[] {
@@ -47,7 +36,7 @@ export function mapInvoiceDtos(dtos: unknown): Invoice[] {
   const out: Invoice[] = [];
   for (const dto of dtos) {
     try {
-      out.push(mapInvoiceDto(dto as InvoiceDtoLike));
+      out.push(mapInvoiceDto(dto));
     } catch {
       // skip malformed
     }
@@ -55,24 +44,22 @@ export function mapInvoiceDtos(dtos: unknown): Invoice[] {
   return out;
 }
 
-export function mapPaymentDto(dto: PaymentDtoLike): Payment {
-  if (dto == null || typeof dto !== 'object') {
-    throw new Error('[mapPaymentDto] expected object, got ' + typeof dto);
-  }
-  const id = (dto.id ?? dto.payment_id) as string | number | undefined;
+export function mapPaymentDto(dto: Record<string, unknown> | unknown): Payment {
+  const parsed = PaymentDtoSchema.parse(dto);
+  const id = parsed.id ?? parsed.payment_id;
   if (id == null) {
     throw new Error('[mapPaymentDto] missing required field `id` or `payment_id`');
   }
 
   return {
     id: toPaymentId(id),
-    invoice_id: dto.invoice_id != null ? toInvoiceId(dto.invoice_id as string | number) : undefined,
-    patient_id: dto.patient_id != null ? toPatientId(dto.patient_id as string | number) : undefined,
-    amount: dto.amount != null ? Number(dto.amount) : undefined,
-    method: dto.method as Payment['method'],
-    status: dto.status as Payment['status'],
-    transaction_id: dto.transaction_id as string | undefined,
-    created_at: dto.created_at as string | undefined,
-    ...dto,
-  };
+    invoice_id: parsed.invoice_id != null ? toInvoiceId(parsed.invoice_id) : undefined,
+    patient_id: parsed.patient_id != null ? toPatientId(parsed.patient_id) : undefined,
+    amount: parsed.amount != null ? Number(parsed.amount) : undefined,
+    method: parsed.method as Payment['method'],
+    status: parsed.status as Payment['status'],
+    transaction_id: parsed.transaction_id,
+    created_at: parsed.created_at,
+    ...parsed,
+  } as unknown as Payment;
 }

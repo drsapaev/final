@@ -1,40 +1,24 @@
 /**
  * Mapper: AppointmentDto (OpenAPI transport) → Appointment (domain).
  *
- * The domain Appointment is intentionally permissive (most fields optional,
- * index signature for backend extras) because the frontend consumes multiple
- * appointment-like shapes (queue entries, grouped records, etc.) through the
- * same component code paths. The mapper therefore normalizes the canonical
- * backend Appointment DTO into the domain shape and lets extras ride along.
- *
- * Note on `null` vs `undefined`: OpenAPI marks optional backend fields as
- * `T | null`. The domain type uses `T | undefined` (idiomatic TS). The
- * spread `...rest` carries these `null` values through unchanged; the
- * domain index signature `[key: string]: unknown` accepts both. Consumers
- * that need to disambiguate should check `== null` (covers both).
+ * Per ADR-0018 (Runtime Validation Strategy), this mapper is the single
+ * validation boundary for Appointment data. The zod schema validates the
+ * DTO shape before transformation.
  */
 
 import type { AppointmentDto } from '../../types/api';
 import type { Appointment } from '../../types/domain/clinic';
+import { AppointmentDtoSchema } from './schemas/appointmentSchema';
 
-export function mapAppointmentDto(dto: AppointmentDto): Appointment {
-  if (dto == null || typeof dto !== 'object') {
-    throw new Error('[mapAppointmentDto] expected object, got ' + typeof dto);
-  }
-  if (dto.id == null) {
-    throw new Error('[mapAppointmentDto] missing required field `id`');
-  }
+export function mapAppointmentDto(dto: AppointmentDto | unknown): Appointment {
+  // Validate the DTO shape. parse() throws ZodError on mismatch.
+  const parsed = AppointmentDtoSchema.parse(dto);
 
   // Normalize `services: string[]` (DTO) → `services: Array<{code}>` (domain).
-  // Keep service_codes as a separate convenience field the domain allows.
-  // We strip `services` from the rest spread so the normalized array wins.
-  const { services: _services, ...rest } = dto;
+  const { services: _services, ...rest } = parsed;
   const serviceCodes = _services ?? [];
   const services = serviceCodes.map((code) => ({ code, name: code }));
 
-  // Spread rest first, then add normalized fields on top. This avoids
-  // TS2783 ("specified more than once") and lets the domain index signature
-  // absorb the `null`-typed DTO fields without complaint.
   return {
     ...rest,
     service_codes: serviceCodes,
@@ -47,7 +31,7 @@ export function mapAppointmentDtos(dtos: AppointmentDto[] | unknown): Appointmen
   const out: Appointment[] = [];
   for (const dto of dtos) {
     try {
-      out.push(mapAppointmentDto(dto as AppointmentDto));
+      out.push(mapAppointmentDto(dto));
     } catch {
       // skip malformed
     }
