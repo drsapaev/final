@@ -70,9 +70,9 @@ def test_payment_integration():
             )
 
             if success2:
-                print("✅ Платёж для записи обработан")
+                print(f"✅ Платёж для записи {appointment_id} обработан: {message2}")
             else:
-                print("❌ Ошибка обработки платежа")
+                print(f"❌ Ошибка обработки платежа: {message2}")
 
         # Тест 3: Получение информации о платеже
         if success and appointment_id:

@@ -49,7 +49,7 @@ def test_auth_logic():
 
         print(f"🔍 Проверка пароля...")
         password_valid = verify_password(password, hashed_password)
-        print("✅ Результат проверки пароля")
+        print(f"✅ Результат проверки пароля: {password_valid}")
 
         if not password_valid:
             print(f"❌ Неверный пароль")

@@ -167,14 +167,14 @@ def test_frontend_logic_fixed():
     print("-" * 40)
 
     for appointment in test_appointments:
-        print("\n📋 Запись: ")
-        print("  Услуги (ID) logged")
+        print(f"\n📋 {appointment['name']}:")
+        print(f"  Услуги (ID): {appointment['services']}")
 
         # Преобразуем ID в коды
         serviceCodesFromIds = convertServiceIdsToCodes(appointment['services'], services_by_group)
         allServiceCodes = appointment['service_codes'] + serviceCodesFromIds
 
-        print("  Коды услуг logged")
+        print(f"  Коды услуг: {allServiceCodes}")
 
         # Проверяем распределение по вкладкам
         for dept, categories in departmentCategoryMapping.items():

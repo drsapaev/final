@@ -182,9 +182,9 @@ def test_frontend_logic_with_names():
     print("-" * 50)
 
     for appointment in test_appointments:
-        print("\n📋 Запись: ")
-        print("  Услуги (названия) logged")
-        print("  Коды услуг (старые) logged")
+        print(f"\n📋 {appointment['name']}:")
+        print(f"  Услуги (названия): {appointment['services']}")
+        print(f"  Коды услуг (старые): {appointment['service_codes']}")
 
         # Преобразуем услуги в коды
         allServiceCodes = convertServicesToCodes(
@@ -193,7 +193,7 @@ def test_frontend_logic_with_names():
             services_by_group
         )
 
-        print("  Все коды услуг logged")
+        print(f"  Все коды услуг: {allServiceCodes}")
 
         # Проверяем распределение по вкладкам
         for dept, categories in departmentCategoryMapping.items():
