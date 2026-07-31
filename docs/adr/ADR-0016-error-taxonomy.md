@@ -172,36 +172,49 @@ either:
 
 ## Concrete actions for this sprint
 
-These are documented as decisions; the actual code changes are
-scheduled for follow-up sprints:
+These actions have been executed in the P0 error-model consolidation sprint
+(PR #2623). Status below:
 
-1. **Extract a shared `AxiosLikeError` interface** to a new
-   `types/errors.ts`. Replace the 14 duplicate declarations in Bucket B.
-   This is the single biggest cleanup.
+1. ✅ **Extract a shared `AxiosLikeError` interface** to `types/errors.ts`.
+   All 17 duplicate declarations in Bucket B replaced:
+   - `WrappedApiError` (api/patients.ts, api/payments.ts) → `AxiosLikeError & Error`
+   - `ApiErrorResponse` (components/admin/WebhookManager.tsx, components/security/TwoFactorManager.tsx) → `AxiosLikeError`
+   - `AxiosLikeError` (api/interceptors.ts, utils/type-guards.ts, utils/networkErrorMessages.ts) → import from `types/errors.ts`
+   - `ErrorWithExtras` (components/TelegramManager.tsx, pages/RegistrarPanel.tsx) → `AxiosLikeError`
+   - `ErrorWithResponse` (utils/errorHandler.ts) → `AxiosLikeError`
+   - `EMRApiError` (types/domain/emr.ts) → re-export `AxiosLikeError as EMRApiError` for backward compat
+   - `CatchError` (hooks/useApi.ts, hooks/useDoctorQueue.ts, hooks/usePatients.ts) → `AxiosLikeError`
+   - `WebAuthnErrorResponse` (hooks/useWebAuthn.tsx) → `AxiosLikeError`
+   - `LocalRateLimitError` (api/client.ts) — intentionally kept (factory type, not catch type)
 
-2. **Delete the dead `AsyncState` interface in `types/ui.ts:62`.**
-   Verified zero importers.
+2. ✅ **Delete the dead `AsyncState` interface in `types/ui.ts:62`.**
+   Verified zero importers via `rg "types/ui" src/`. Removed.
 
-3. **Consolidate the two `getErrorMessage()` exports** into one. Suggest
-   `utils/errorMessage.ts` as the canonical location.
+3. ✅ **Consolidate the two `getErrorMessage()` exports** into one in
+   `utils/error-utils.ts`. The old files (`type-guards.ts`, `errorHandler.ts`)
+   are now backward-compat re-export shims. The canonical implementation
+   uses the RICHER behavior (2-arg with `fallbackMessage` + HTTP-status
+   messages + validation array handling).
 
-4. **Rename one of the two `useErrorHandler` exports.** Suggested:
-   rename the utils version to `withErrorBoundaryHandler`.
+4. ✅ **Rename one of the two `useErrorHandler` exports.**
+   `components/common/ErrorBoundary.tsx:useErrorHandler` → `useErrorBoundaryState`.
+   The barrel export (`components/common/index.ts`) keeps `useErrorHandler` as
+   a deprecated alias for `useErrorBoundaryState` so existing imports work.
 
-5. **Tighten `EmrState.error: unknown` → `string | null`** by having the
-   EMR reducer call `getErrorMessage(err)` before dispatching
-   `saveError(...)`. Low-risk change.
+5. ⏳ **Tighten `EmrState.error: unknown` → `string | null`** — deferred to
+   a follow-up sprint. The EMR reducer currently stores `unknown`; changing
+   it requires auditing every `dispatch({ type: 'saveError', error: ... })`
+   call site to ensure `error` is coerced to `string` before dispatch.
 
-6. **Add `chatError: ChatError | null` field to `useAIChat`'s public
-   return** so consumers that need `code`-branching can access the
-   structured ChatError (currently flattened to `string | null` via
-   `getChatErrorMessage`).
+6. ⏳ **Add `chatError: ChatError | null` field to `useAIChat`'s public
+   return** — deferred. Currently `useAIChat` flattens `ChatError` to
+   `string | null` via `getChatErrorMessage`. Adding the structured field
+   is additive and low-risk, but no consumer currently needs it.
 
-7. **Add ESLint rule** banning `try { ... } catch` in `components/` and
-   `pages/`. 608 violations exist today; the rule can be added with
-   auto-fix suggestions ("move this catch into the hook that owns the
-   state"). Existing violations get `// eslint-disable-next-line` +
-   TECH-DEBT marker.
+7. ⏳ **Add ESLint rule banning `try { ... } catch` in `components/` and
+   `pages/`** — deferred. 608 violations exist; the rule would need to be
+   added with `// eslint-disable-next-line` + TECH-DEBT markers for all
+   existing violations, which is a large mechanical change.
 
 8. **Document policy on silent-swallow catch blocks.** ~502 catch
    blocks only `logger.error` / `logger.warn` and swallow. ADR-0016

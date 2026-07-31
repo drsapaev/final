@@ -59,13 +59,10 @@ export interface ToastState {
 
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
-export interface AsyncState<T> {
-  data: T | null;
-  loading: boolean;
-  error: unknown;
-  /** Timestamp of last successful fetch (ms since epoch). */
-  lastFetchedAt: number | null;
-}
+// ADR-0016: the duplicate `AsyncState<T>` interface that was here has been
+// removed. The canonical `AsyncState<T>` discriminated union lives in
+// `types/async-state.ts` (per ADR-0013). This file had zero importers for
+// the old interface — verified via `rg "types/ui" src/` before removal.
 
 // ============================================================================
 // Form

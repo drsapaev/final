@@ -2,6 +2,8 @@
 // Phase 1 — migrated from .js. Pure functions; types added.
 // No behavioral changes.
 
+import type { AxiosLikeError } from '../types/errors';
+
 const NETWORK_ERROR_PATTERNS: readonly RegExp[] = [
   /failed to fetch/i,
   /network error/i,
@@ -74,25 +76,7 @@ export function formatNetworkErrorMessage({
   return message || fallbackMessage;
 }
 
-// Shape of axios-like errors we inspect. Kept permissive because callers
-// may pass arbitrary thrown values.
-interface AxiosLikeError {
-  response?: {
-    data?: {
-      detail?: unknown;
-      message?: unknown;
-      error?: unknown;
-    };
-  };
-  data?: {
-    detail?: unknown;
-    message?: unknown;
-  };
-  detail?: unknown;
-  error?: unknown;
-  normalizedMessage?: string;
-  message?: string;
-}
+// Canonical AxiosLikeError type is now in types/errors.ts (ADR-0016).
 
 export function formatApiErrorMessage(
   error: unknown,

@@ -9,6 +9,8 @@ import { toast } from 'react-toastify';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 import type { AsyncState } from '../types/async-state';
+// ADR-0016: canonical error types from types/errors.ts.
+import type { AxiosLikeError } from '../types/errors';
 
 // ============================================================================
 // useApiCall
@@ -27,10 +29,7 @@ interface UseApiCallReturn {
   error: string | null;
 }
 
-interface CatchError {
-  response?: { data?: { detail?: string } };
-  message?: string;
-}
+// ADR-0016: CatchError replaced by canonical AxiosLikeError.
 
 export function useApiCall(): UseApiCallReturn {
   const [loading, setLoading] = useState<boolean>(false);
@@ -60,8 +59,9 @@ export function useApiCall(): UseApiCallReturn {
 
         return result;
       } catch (err) {
-        const e = err as CatchError;
-        const errorMsg = e?.response?.data?.detail || e?.message || errorMessage;
+        const e = err as AxiosLikeError;
+        const detail = e?.response?.data?.detail;
+        const errorMsg = (typeof detail === 'string' && detail) || e?.message || errorMessage;
         setError(String(errorMsg));
 
         if (showError) {
@@ -130,8 +130,9 @@ export function useApiData(
         setData(result);
         return result;
       } catch (err) {
-        const e = err as CatchError;
-        const errorMsg = e?.response?.data?.detail || e?.message || 'Ошибка загрузки данных';
+        const e = err as AxiosLikeError;
+        const detail = e?.response?.data?.detail;
+        const errorMsg = (typeof detail === 'string' && detail) || e?.message || 'Ошибка загрузки данных';
         setError(String(errorMsg));
 
         if (fallbackData) {

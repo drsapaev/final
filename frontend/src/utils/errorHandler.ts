@@ -5,22 +5,19 @@
 import { toast } from 'react-toastify';
 
 import logger from '../utils/logger';
+import type { AxiosLikeError } from '../types/errors';
 import {
-  DEFAULT_USER_FACING_NETWORK_ERROR,
-  formatApiErrorMessage,
-} from './networkErrorMessages';
+  getErrorMessage,
+  isAxiosLikeError,
+} from './error-utils';
 
-// Phase 1 — typed accessor for error objects with axios-like shape.
-interface ErrorWithResponse {
-  response?: {
-    status?: number;
-    data?: { detail?: unknown; message?: string };
-    statusText?: string;
-  };
-  message?: string;
-  code?: string;
-  name?: string;
-}
+// Re-export getErrorMessage for backward compatibility — existing imports
+// `from '../utils/errorHandler'` continue to work.
+export { getErrorMessage };
+
+// Backward-compat alias: ErrorWithResponse was a local interface here before
+// ADR-0016 consolidation. It is now AxiosLikeError in types/errors.ts.
+type ErrorWithResponse = AxiosLikeError;
 /**
  * Типы ошибок
  */
@@ -51,11 +48,11 @@ export const HTTP_STATUS = {
  * Определяет тип ошибки по HTTP статусу и содержимому
  */
 export function getErrorType(error: unknown): string {
-  if (!(error as ErrorWithResponse).response) {
+  if (!isAxiosLikeError(error) || !error.response) {
     return ERROR_TYPES.NETWORK;
   }
 
-  const status = (error as ErrorWithResponse).response?.status;
+  const status = error.response?.status;
   
   switch (status) {
     case HTTP_STATUS.UNAUTHORIZED:
@@ -74,69 +71,9 @@ export function getErrorType(error: unknown): string {
   }
 }
 
-/**
- * Извлекает сообщение об ошибке из ответа сервера
- */
-export function getErrorMessage(error: unknown, fallbackMessage: string = DEFAULT_USER_FACING_NETWORK_ERROR): string {
-  const formatted = formatApiErrorMessage(error, fallbackMessage);
-  if (formatted) {
-    return formatted;
-  }
-
-  if (!(error as ErrorWithResponse)?.response) {
-    return fallbackMessage;
-  }
-
-  const { status, data } = (error as ErrorWithResponse).response ?? {};
-
-  // Сообщение от сервера
-  if (data?.detail) {
-    if (typeof data.detail === 'string') {
-      return data.detail;
-    }
-    
-    // Обработка массива ошибок валидации
-    if (Array.isArray(data.detail)) {
-      return (data.detail as Array<{ msg?: string; loc?: unknown[] }>).map(err => {
-        if (err.msg && err.loc) {
-          const field = err.loc[err.loc.length - 1];
-          return `${field}: ${err.msg}`;
-        }
-        return err.msg || 'Ошибка валидации';
-      }).join(', ');
-    }
-  }
-
-  if (data?.message) {
-    return data.message;
-  }
-
-  if ((data as { error?: string })?.error) {
-    return (data as { error?: string }).error as string;
-  }
-
-  // Стандартные сообщения по HTTP статусам
-  switch (status) {
-    case HTTP_STATUS.BAD_REQUEST:
-      return 'Некорректный запрос';
-    case HTTP_STATUS.UNAUTHORIZED:
-      return 'Необходима авторизация';
-    case HTTP_STATUS.FORBIDDEN:
-      return 'Недостаточно прав для выполнения операции';
-    case HTTP_STATUS.NOT_FOUND:
-      return 'Запрашиваемый ресурс не найден';
-    case HTTP_STATUS.UNPROCESSABLE_ENTITY:
-      return 'Ошибка валидации данных';
-    case HTTP_STATUS.INTERNAL_SERVER_ERROR:
-      return 'Внутренняя ошибка сервера';
-    case HTTP_STATUS.BAD_GATEWAY:
-      return 'Ошибка шлюза';
-    case HTTP_STATUS.SERVICE_UNAVAILABLE:
-      return 'Сервис временно недоступен';
-    default:
-      return `Ошибка сервера (${status})`;
-  }
-}
+// getErrorMessage is now imported from utils/error-utils.ts (canonical).
+// The old implementation was consolidated per ADR-0016.
+// See utils/error-utils.ts for the unified implementation.
 
 /**
  * Определяет, нужно ли показывать уведомление пользователю
@@ -183,10 +120,11 @@ export function handleError(
 
   // Логирование
   if (logError) {
+    const errAxios = isAxiosLikeError(error) ? error : null;
     logger.error(`[${context}] ${errorType.toUpperCase()} Error:`, {
       message: errorMessage,
-      status: (error as { response?: { status?: number } })?.response?.status,
-      data: (error as ErrorWithResponse).response?.data,
+      status: errAxios?.response?.status,
+      data: errAxios?.response?.data,
       originalError: error
     });
   }
@@ -216,7 +154,7 @@ export function handleError(
   return {
     type: errorType,
     message: errorMessage,
-    status: (error as ErrorWithResponse).response?.status,
+    status: isAxiosLikeError(error) ? error.response?.status : undefined,
     originalError: error
   };
 }

@@ -59,16 +59,10 @@ export type EMRHttpStatus = number | string;
 /** @deprecated Use `EMRHttpStatus` instead. */
 export type EMRStatus = EMRHttpStatus;
 
-export interface EMRApiError {
-  response?: {
-    status?: number;
-    data?: {
-      detail?: string;
-      message?: string;
-        };
-    };
-  message?: string;
-}
+// ADR-0016: EMRApiError replaced by canonical AxiosLikeError from types/errors.ts.
+// Re-exported here for backward compatibility with existing imports
+// `from '../types/domain/emr'`. New code should import AxiosLikeError directly.
+export type { AxiosLikeError as EMRApiError } from '../errors';
 
 // === EMR Clinical Content Types ===
 // Used by EMR sections (complaints, anamnesis, examination, diagnosis,

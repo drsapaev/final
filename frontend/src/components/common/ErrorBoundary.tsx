@@ -199,9 +199,13 @@ export function withErrorBoundary<P extends Record<string, unknown>>(
 }
 
 /**
- * Хук для обработки ошибок в функциональных компонентах
+ * Хук для управления состоянием error boundary в функциональных компонентах.
+ *
+ * Renamed from `useErrorHandler` to `useErrorBoundaryState` per ADR-0016,
+ * to avoid collision with `utils/errorHandler.ts:useErrorHandler` (which
+ * returns a function, not an error-state triple).
  */
-export function useErrorHandler() {
+export function useErrorBoundaryState() {
   const [error, setError] = React.useState<Error | null>(null);
 
   const resetError = React.useCallback(() => {
@@ -209,7 +213,7 @@ export function useErrorHandler() {
   }, []);
 
   const handleError = React.useCallback((error: Error) => {
-    logger.error('Error caught by useErrorHandler:', error);
+    logger.error('Error caught by useErrorBoundaryState:', error);
     setError(error);
   }, []);
 
