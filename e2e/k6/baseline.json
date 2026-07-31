@@ -1,0 +1,16 @@
+{
+  "queue": {
+    "p95_ms": 310,
+    "description": "Baseline p95 for GET /queue/today. Fail if measured p95 > 310 * 1.15 = 356ms",
+    "last_updated": "2026-07-31",
+    "last_measured": null
+  },
+  "emr": {
+    "p95_ms": 1000,
+    "description": "Baseline p95 for GET /emr/{patient_id}. Fail if measured p95 > 1000 * 1.15 = 1150ms",
+    "last_updated": "2026-07-31",
+    "last_measured": null
+  },
+  "threshold_multiplier": 1.15,
+  "notes": "Baseline values are initial estimates. Update after first weekly run with real measurements. Fail threshold = baseline * 1.15 (15% degradation allowed)."
+}

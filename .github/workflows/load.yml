@@ -1,0 +1,100 @@
+name: Load Testing (Weekly)
+
+on:
+  schedule:
+    # Every Sunday at 3:00 UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  load-test:
+    # Use self-hosted runner for consistent performance metrics.
+    # Fallback to ubuntu-latest if no self-hosted runner available.
+    runs-on: ${{ vars.LOAD_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A36442D5730B2B1A0669E2A2A
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Check runner type
+        id: runner
+        run: |
+          if [ "${{ runner.name }}" = "GitHub Actions" ] && [ "${{ runner.os }}" = "Linux" ]; then
+            echo "is_reference=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Running on GitHub-hosted runner — results are reference only, not for baseline comparison"
+          else
+            echo "is_reference=false" >> $GITHUB_OUTPUT
+            echo "✅ Running on self-hosted runner — results are production-grade"
+          fi
+
+      - name: Run k6 — Queue load test
+        working-directory: tests/load
+        run: |
+          k6 run k6-queue-load.js \
+            --out json=queue-results.json \
+            --env BASE_URL=http://localhost:8000 \
+            --env TEST_JWT=${{ secrets.TEST_JWT || 'test-token' }}
+        continue-on-error: true
+
+      - name: Run k6 — EMR load test
+        working-directory: tests/load
+        run: |
+          k6 run k6-emr-load.js \
+            --out json=emr-results.json \
+            --env BASE_URL=http://localhost:8000 \
+            --env TEST_JWT=${{ secrets.TEST_JWT || 'test-token' }}
+        continue-on-error: true
+
+      - name: Parse k6 results
+        run: |
+          node -e "
+          const fs = require('fs');
+          const queue = JSON.parse(fs.readFileSync('tests/load/queue-results.json', 'utf-8'));
+          const emr = JSON.parse(fs.readFileSync('tests/load/emr-results.json', 'utf-8'));
+
+          // Extract p95 from k6 JSON output
+          function extractP95(data) {
+            const durations = data
+              .filter(d => d.metric === 'http_req_duration')
+              .map(d => d.data.value);
+            durations.sort((a, b) => a - b);
+            const idx = Math.ceil(durations.length * 0.95) - 1;
+            return durations[idx] || 0;
+          }
+
+          const results = {
+            queue: { p95_ms: Math.round(extractP95(queue)) },
+            emr: { p95_ms: Math.round(extractP95(emr)) },
+          };
+          fs.writeFileSync('tests/load/k6-parsed-results.json', JSON.stringify(results, null, 2));
+          console.log(JSON.stringify(results, null, 2));
+          "
+
+      - name: Baseline check (fail on >15% degradation)
+        if: steps.runner.outputs.is_reference != 'true'
+        run: |
+          node scripts/load-baseline-check.mjs \
+            --results tests/load/k6-parsed-results.json \
+            --baseline e2e/k6/baseline.json
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: tests/load/*-results.json
