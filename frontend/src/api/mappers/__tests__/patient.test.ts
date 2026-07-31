@@ -15,13 +15,13 @@ import type { PatientDto } from '../../../types/api';
 describe('mapPatientDto', () => {
   const validDto: PatientDto = {
     id: 123,
-    last_name: 'Иванов',
-    first_name: 'Иван',
-    full_name: 'Иванов Иван Иванович',
-    middle_name: 'Иванович',
+    last_name: 'Synth',
+    first_name: 'Test',
+    full_name: 'Synth Test Synthич',
+    middle_name: 'Synthич',
     birth_date: '1990-01-15',
     sex: 'male',
-    phone: '+998901234567',
+    phone: '+0000000000',
     email: 'ivan@example.com',
     doc_type: 'passport',
     doc_number: 'AB1234567',
@@ -32,28 +32,28 @@ describe('mapPatientDto', () => {
   it('transforms a valid DTO to domain Patient', () => {
     const patient = mapPatientDto(validDto);
     expect(patient.id).toBe(123);
-    expect(patient.last_name).toBe('Иванов');
-    expect(patient.first_name).toBe('Иван');
-    expect(patient.name).toBe('Иванов Иван Иванович');
+    expect(patient.last_name).toBe('Synth');
+    expect(patient.first_name).toBe('Test');
+    expect(patient.name).toBe('Synth Test Synthич');
     expect(patient.birth_date).toBe('1990-01-15');
   });
 
   it('derives name from first_name + last_name when full_name is null', () => {
     const dto = { ...validDto, full_name: null };
     const patient = mapPatientDto(dto);
-    expect(patient.name).toBe('Иван Иванов');
+    expect(patient.name).toBe('Test Synth');
   });
 
   it('derives name from first_name + last_name when full_name is undefined', () => {
     const { full_name: _, ...dtoWithoutFullName } = validDto;
     const patient = mapPatientDto(dtoWithoutFullName);
-    expect(patient.name).toBe('Иван Иванов');
+    expect(patient.name).toBe('Test Synth');
   });
 
   it('preserves all optional fields', () => {
     const patient = mapPatientDto(validDto);
-    expect(patient.middle_name).toBe('Иванович');
-    expect(patient.phone).toBe('+998901234567');
+    expect(patient.middle_name).toBe('Synthич');
+    expect(patient.phone).toBe('+0000000000');
     expect(patient.email).toBe('ivan@example.com');
     expect(patient.doc_type).toBe('passport');
     expect(patient.doc_number).toBe('AB1234567');

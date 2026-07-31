@@ -22,7 +22,7 @@ test.describe('Business: Appointment Cancellation', () => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ id: 1, status, patient_name: 'Test Patient' }),
+          body: JSON.stringify({ id: 1, status, patient_name: 'Synth Patient' }),
         });
       } else {
         await route.continue();

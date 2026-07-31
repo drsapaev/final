@@ -800,6 +800,18 @@ jobs:
         retention-days: 14
         if-no-files-found: ignore
 
+    - name: 🧪 Business + Security + Concurrency E2E (Chromium)
+      run: |
+        cd frontend
+        npx playwright test e2e/business/ e2e/concurrency/ e2e/integration/ e2e/security/ --project=chromium
+      continue-on-error: true  # Non-blocking — these suites use route mocking, not live backend
+
+    - name: 🧪 Load + Chaos E2E (Chromium)
+      run: |
+        cd frontend
+        npx playwright test e2e/load/ e2e/chaos/ --project=chromium
+      continue-on-error: true  # Non-blocking — load/chaos tests are informational in CI
+
   # --- Backend тесты ---
   backend-tests:
     name: 🐍 Backend тесты

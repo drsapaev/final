@@ -18,7 +18,7 @@ test.describe('Business: Payment Processing', () => {
         body: JSON.stringify({
           id: 1,
           status: appointmentStatus,
-          patient_name: 'Test Patient',
+          patient_name: 'Synth Patient',
           payment_amount: 150000,
           payment_currency: 'UZS',
         }),
@@ -60,8 +60,8 @@ test.describe('Business: Payment Processing', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([
-          { id: 1, amount: 150000, status: 'paid', patient_name: 'Patient A' },
-          { id: 2, amount: 50000, status: 'pending', patient_name: 'Patient B' },
+          { id: 1, amount: 150000, status: 'paid', patient_name: 'Synth A' },
+          { id: 2, amount: 50000, status: 'pending', patient_name: 'Synth B' },
         ]),
       });
     });

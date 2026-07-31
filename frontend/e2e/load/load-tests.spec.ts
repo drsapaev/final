@@ -41,7 +41,7 @@ test.describe('Load: Queue — 50 parallel users', () => {
       try {
         const latency = await measureLatency(async () => {
           // Simulate API call (mocked — no actual network)
-          await new Promise(resolve => setTimeout(resolve, 10 + Math.random() * 50));
+          await new Promise(resolve => setTimeout(resolve, 10 + crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296 * 50));
         });
         latencies.push(latency);
       } catch {
@@ -89,7 +89,7 @@ test.describe('Load: EMR — 20 parallel doctors', () => {
     for (let i = 0; i < totalRequests; i++) {
       const latency = await measureLatency(async () => {
         // Simulate EMR load (mocked)
-        await new Promise(resolve => setTimeout(resolve, 20 + Math.random() * 100));
+        await new Promise(resolve => setTimeout(resolve, 20 + crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296 * 100));
       });
       latencies.push(latency);
     }

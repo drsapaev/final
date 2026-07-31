@@ -121,6 +121,9 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     const handleWebSocketMessageRef = useRef<WsMessageHandler>(null);
     // audit/phase-final, BS-15: shouldReconnect ref + reconnect attempt counter.
     const shouldReconnectRef = useRef(true);
+    // F7 fix: Track reconnect attempt count in a ref (not inside state updater)
+    // to avoid double-increment in React Strict Mode.
+    const reconnectAttemptRef = useRef(0);
     const currentSessionRef = useRef<ChatSession | null>(null);
     const loadSessionRequestRef = useRef(0);
     const contractVersionMismatchRef = useRef(false);
@@ -357,6 +360,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
 
         // audit/phase-final, BS-15: reset reconnect state on explicit connect.
         shouldReconnectRef.current = true;
+        reconnectAttemptRef.current = 0;
 
         // Transition idle/disconnected/reconnecting → connecting.
         // (connected → connecting is also allowed: explicit reconnect.)
@@ -375,6 +379,8 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
 
             wsRef.current.onopen = () => {
                 logger.info('AI Chat WebSocket connected');
+                // F7 fix: Reset reconnect attempt ref on successful connect.
+                reconnectAttemptRef.current = 0;
                 // connecting → connected (clears any prior error, resets reconnect attempt).
                 setSessionState(prev =>
                     applyConnectionTransition(prev, 'connected', {
@@ -398,14 +404,19 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                     return;
                 }
 
-                // Schedule reconnect with exponential backoff + jitter.
-                setSessionState(prev => {
-                    const next = incrementReconnectAttempt(prev);
-                    if (next.reconnectAttempt > MAX_RECONNECT_ATTEMPTS) {
-                        logger.warn(
-                            `WebSocket reconnect giving up after ${MAX_RECONNECT_ATTEMPTS} attempts`
-                        );
-                        return applyConnectionTransition(
+                // F7 fix: Schedule reconnect OUTSIDE the state updater.
+                // The previous version called setTimeout inside setSessionState updater,
+                // which could double-schedule in React Strict Mode (updater runs twice).
+                const currentAttempt = reconnectAttemptRef.current;
+                const nextAttempt = currentAttempt + 1;
+                reconnectAttemptRef.current = nextAttempt;
+
+                if (nextAttempt > MAX_RECONNECT_ATTEMPTS) {
+                    logger.warn(
+                        `WebSocket reconnect giving up after ${MAX_RECONNECT_ATTEMPTS} attempts`
+                    );
+                    setSessionState(prev =>
+                        applyConnectionTransition(
                             setChatError(
                                 prev,
                                 chatError(
@@ -415,24 +426,28 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                                 )
                             ),
                             'disconnected'
-                        );
+                        )
+                    );
+                    return;
+                }
+
+                const baseDelay = Math.min(
+                    1000 * Math.pow(2, nextAttempt - 1),
+                    16000
+                );
+                const jitter = Math.random() * 500;
+                const delay = baseDelay + jitter;
+                logger.info(
+                    `Attempting to reconnect WebSocket (${nextAttempt}/${MAX_RECONNECT_ATTEMPTS}) in ${Math.round(delay)}ms...`
+                );
+                reconnectTimeoutRef.current = setTimeout(() => {
+                    if (shouldReconnectRef.current) {
+                        connectWebSocket();
                     }
-                    const baseDelay = Math.min(
-                        1000 * Math.pow(2, next.reconnectAttempt - 1),
-                        16000
-                    );
-                    const jitter = Math.random() * 500;
-                    const delay = baseDelay + jitter;
-                    logger.info(
-                        `Attempting to reconnect WebSocket (${next.reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS}) in ${Math.round(delay)}ms...`
-                    );
-                    reconnectTimeoutRef.current = setTimeout(() => {
-                        if (shouldReconnectRef.current) {
-                            connectWebSocket();
-                        }
-                    }, delay);
-                    return applyConnectionTransition(next, 'reconnecting');
-                });
+                }, delay);
+                setSessionState(prev =>
+                    applyConnectionTransition(prev, 'reconnecting')
+                );
             };
 
             wsRef.current.onerror = (error) => {
@@ -469,12 +484,15 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             };
         } catch (err) {
             logger.error('Failed to create WebSocket:', err);
-            setSessionState(prev =>
-                setChatError(
+            // F6 fix: Clear connecting state on construction throw.
+            // Without this, state stays in 'connecting' forever if new WebSocket() throws.
+            setSessionState(prev => {
+                const withError = setChatError(
                     prev,
                     chatError('network_error', 'Failed to connect to chat', true)
-                )
-            );
+                );
+                return applyConnectionTransition(withError, 'disconnected');
+            });
         }
     }, [useWebSocket]);
 
