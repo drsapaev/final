@@ -1,71 +1,26 @@
 /**
- * Type guards and error utilities — replaces inline `as { response?: ... }` casts.
+ * Type guards and error utilities — backward-compat shim.
  *
- * Usage:
- *   import { getErrorMessage, isAxiosError } from '../utils/type-guards';
- *   catch (err) {
- *     toast.error(getErrorMessage(err));
- *   }
- */
-
-export interface AxiosLikeError {
-  isAxiosError?: boolean;
-  response?: {
-    status?: number;
-    data?: { detail?: string; message?: string; [key: string]: unknown };
-  };
-  message?: string;
-}
-
-/**
- * Type guard: checks if an unknown error is an Axios error.
- */
-export function isAxiosError(
-  err: unknown
-): err is AxiosLikeError {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    'isAxiosError' in err &&
-    (err as { isAxiosError?: unknown }).isAxiosError === true
-  );
-}
-
-/**
- * Extracts a human-readable error message from any caught error.
+ * Per ADR-0016 (Error Taxonomy), the canonical implementations now live in:
+ *   - types/errors.ts           (AxiosLikeError, ApiErrorPayload, etc.)
+ *   - utils/error-utils.ts      (getErrorMessage, isAxiosLikeError, etc.)
  *
- * Priority:
- * 1. Axios error: response.data.detail || response.data.message || err.message
- * 2. Error instance: err.message
- * 3. Fallback: String(err)
+ * This file re-exports the canonical symbols so existing imports
+ * (`from '../utils/type-guards'`) continue to work. New code should import
+ * from `utils/error-utils.ts` directly.
+ *
+ * The deprecated `AxiosLikeError` interface that used to live here is
+ * replaced by the canonical one in `types/errors.ts`. It is re-exported
+ * below for backward compatibility.
  */
-export function getErrorMessage(err: unknown): string {
-  if (isAxiosError(err)) {
-    const detail = err.response?.data?.detail;
-    if (detail) return String(detail);
-    const message = err.response?.data?.message;
-    if (message) return String(message);
-    if (err.message) return err.message;
-  }
 
-  if (err instanceof Error) {
-    return err.message;
-  }
-
-  if (typeof err === 'string') {
-    return err;
-  }
-
-  return String(err);
-}
-
-/**
- * Extracts the HTTP status code from an error, if available.
- * Returns null for non-HTTP errors.
- */
-export function getErrorStatus(err: unknown): number | null {
-  if (isAxiosError(err)) {
-    return err.response?.status ?? null;
-  }
-  return null;
-}
+export type { AxiosLikeError } from '../types/errors';
+export {
+  isAxiosLikeError,
+  isAxiosError,
+  getErrorMessage,
+  getErrorStatus,
+  extractApiPayload,
+  extractApiMessage,
+  extractNetworkInfo,
+} from './error-utils';

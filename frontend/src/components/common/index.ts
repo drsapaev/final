@@ -1,5 +1,7 @@
 // Централизованный экспорт всех UI компонентов
-export { default as ErrorBoundary, withErrorBoundary, useErrorHandler } from './ErrorBoundary';
+// ADR-0016: useErrorHandler renamed to useErrorBoundaryState.
+export { default as ErrorBoundary, withErrorBoundary, useErrorBoundaryState } from './ErrorBoundary';
+export { useErrorBoundaryState as useErrorHandler } from './ErrorBoundary';
 export { ToastProvider, useToast, toast } from './Toast';
 export { Loading, ButtonLoading, TableLoading, CardLoading, ListLoading, useLoading } from './Loading';
 export { ModalProvider, useModal, Modal, modal } from './Modal';

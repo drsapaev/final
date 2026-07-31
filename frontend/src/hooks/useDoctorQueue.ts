@@ -10,6 +10,8 @@ import type {
   QueueStats,
 } from '../types/domain/queue';
 import type { AsyncState } from '../types/async-state';
+// ADR-0016: canonical error types from types/errors.ts.
+import type { AxiosLikeError } from '../types/errors';
 
 // Doctor-queue-specific payload envelope. The backend returns this shape from
 // /queue/{id} with queue entries + stats + can_call_next metadata. The
@@ -30,10 +32,7 @@ interface QueueControls {
   nextCallEntryId: string | number | null;
 }
 
-interface CatchError {
-  response?: { data?: { detail?: string }; status?: number };
-  message?: string;
-}
+// ADR-0016: CatchError replaced by canonical AxiosLikeError.
 
 const ZERO_STATS: QueueStats = {
   waiting: 0,
@@ -139,12 +138,13 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
       });
     } catch (err) {
       if (requestId !== loadQueueRequestIdRef.current) return;
-      const e = err as CatchError;
+      const e = err as AxiosLikeError;
       logger.error('[useDoctorQueue] Error loading queue:', err);
       setQueue([]);
       setStats(ZERO_STATS);
       setQueueControls({ canCallNext: false, nextCallEntryId: null });
-      setError(e?.response?.data?.detail || e?.message || 'Ошибка загрузки очереди');
+      const detail = e?.response?.data?.detail;
+      setError((typeof detail === 'string' && detail) || e?.message || 'Ошибка загрузки очереди');
     } finally {
       if (requestId === loadQueueRequestIdRef.current) {
         setLoading(false);

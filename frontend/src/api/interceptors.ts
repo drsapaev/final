@@ -7,13 +7,7 @@ import { tokenManager } from '../utils/tokenManager';
 import { clearToken as clearAuthState } from '../stores/auth';
 import logger from '../utils/logger';
 import { handleError } from '../utils/errorHandler';
-// Phase 1 — typed accessor for axios-like errors in interceptors.
-interface AxiosLikeError {
-  config?: { url?: string; expectedErrorStatuses?: number[]; silent?: boolean };
-  response?: { status?: number };
-  code?: string;
-  name?: string;
-}
+import type { AxiosLikeError } from '../types/errors';
 
 
 export function isExpectedApiErrorStatus(originalRequest: { expectedErrorStatuses?: number[] } | null | undefined, status: unknown): boolean {

@@ -170,14 +170,15 @@ function formatDate(dateString: string | undefined | null, t: TranslationFn): st
   return parsed.toLocaleString('ru-RU');
 }
 
-interface ApiErrorResponse {
-  response?: { data?: { detail?: string } };
-}
+// ADR-0016: canonical error types from types/errors.ts.
+import type { AxiosLikeError } from '../../types/errors';
 
 function resolveApiError(error: unknown, fallbackMessage: string): string {
   if (error && typeof error === 'object' && 'response' in error) {
-    const errResp = (error as ApiErrorResponse).response;
-    return errResp?.data?.detail || fallbackMessage;
+    const errResp = (error as AxiosLikeError).response;
+    const detail = errResp?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    return fallbackMessage;
   }
   return fallbackMessage;
 }

@@ -41,12 +41,14 @@ const generateSessionId = () => {
 const emrCache = new Map();
 const isAccessDeniedStatus = (status: EMRHttpStatus | undefined) => status === 401 || status === 403;
 
-const getAccessDeniedMessage = (error?: EMRApiError): string => (
-    error?.response?.data?.detail ||
-    error?.response?.data?.message ||
-    error?.message ||
-    'Нет доступа к EMR для текущей учётной записи'
-);
+const getAccessDeniedMessage = (error?: EMRApiError): string => {
+    const detail = error?.response?.data?.detail;
+    if (typeof detail === 'string' && detail) return detail;
+    if (typeof detail === 'object' && detail?.message) return detail.message;
+    return error?.response?.data?.message ||
+        error?.message ||
+        'Нет доступа к EMR для текущей учётной записи';
+};
 
 /** Coerce a caught value (typed `unknown` in strict mode) to EMRApiError. */
 const toEMRApiError = (err: unknown): EMRApiError => {
@@ -261,10 +263,12 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
             }
 
             // Check for signed EMR error (400)
-            if (apiError.response?.status === 400 &&
-                apiError.response.data?.detail?.includes('signed')) {
-                dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
-                return { signed: true };
+            if (apiError.response?.status === 400) {
+                const detail = apiError.response.data?.detail;
+                if (typeof detail === 'string' && detail.includes('signed')) {
+                    dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
+                    return { signed: true };
+                }
             }
 
             dispatch(emrActions.saveError(apiError.message || 'Ошибка сохранения'));

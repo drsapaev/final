@@ -45,15 +45,8 @@ interface AuthResponseData {
   [key: string]: unknown;
 }
 
-interface WebAuthnErrorResponse {
-  response?: {
-    data?: {
-      detail?: {
-        reason?: string;
-      };
-    };
-  };
-}
+// ADR-0016: WebAuthnErrorResponse replaced by canonical AxiosLikeError from types/errors.ts.
+import type { AxiosLikeError } from '../types/errors';
 
 export interface UseWebAuthnReturn {
   isSupported: boolean;
@@ -154,8 +147,10 @@ export function useWebAuthn(): UseWebAuthnReturn {
 
         return true;
       } catch (err) {
-        const e = err as WebAuthnErrorResponse;
-        setError(e?.response?.data?.detail?.reason || 'registration_failed');
+        const e = err as AxiosLikeError;
+        const detail = e?.response?.data?.detail;
+        const reason = typeof detail === 'object' && detail ? detail.reason : undefined;
+        setError(reason || 'registration_failed');
         return false;
       } finally {
         setIsRegistering(false);
@@ -238,8 +233,10 @@ export function useWebAuthn(): UseWebAuthnReturn {
 
         return data ?? null;
       } catch (err) {
-        const e = err as WebAuthnErrorResponse;
-        setError(e?.response?.data?.detail?.reason || 'authentication_failed');
+        const e = err as AxiosLikeError;
+        const detail = e?.response?.data?.detail;
+        const reason = typeof detail === 'object' && detail ? detail.reason : undefined;
+        setError(reason || 'authentication_failed');
         return null;
       } finally {
         setIsAuthenticating(false);

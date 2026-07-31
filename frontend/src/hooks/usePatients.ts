@@ -5,12 +5,8 @@ import { buildPatientDocumentFields } from '../utils/patientDocument';
 import logger from '../utils/logger';
 import type { Patient } from '../types/domain/clinic';
 import { getErrorMessage } from '../utils/type-guards';
-
-interface CatchError {
-  status?: number;
-  response?: { status?: number; data?: unknown };
-  message?: string;
-}
+// ADR-0016: canonical error types from types/errors.ts.
+import type { AxiosLikeError } from '../types/errors';
 
 /**
  * usePatients hook — patient CRUD operations.
@@ -125,8 +121,8 @@ const usePatients = () => {
     } catch (err) {
       const message = getErrorMessage(err) || 'Ошибка создания пациента';
       const wrapped = new Error(message);
-      (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
-      (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
+      (wrapped as AxiosLikeError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as AxiosLikeError).response = (err as AxiosLikeError)?.response;
       setError(new Error(String(wrapped)));
       throw wrapped;
     } finally {
@@ -171,8 +167,8 @@ const usePatients = () => {
     } catch (err) {
       const message = getErrorMessage(err) || 'Ошибка обновления пациента';
       const wrapped = new Error(message);
-      (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
-      (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
+      (wrapped as AxiosLikeError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as AxiosLikeError).response = (err as AxiosLikeError)?.response;
       setError(new Error(String(wrapped)));
       throw wrapped;
     } finally {
@@ -192,8 +188,8 @@ const usePatients = () => {
     } catch (err) {
       const message = getErrorMessage(err) || 'Ошибка удаления пациента';
       const wrapped = new Error(message);
-      (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
-      (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
+      (wrapped as AxiosLikeError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as AxiosLikeError).response = (err as AxiosLikeError)?.response;
       setError(new Error(String(wrapped)));
       throw wrapped;
     } finally {
@@ -260,8 +256,8 @@ const usePatients = () => {
     } catch (err) {
       const message = getErrorMessage(err) || 'Ошибка архивирования пациента';
       const wrapped = new Error(message);
-      (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
-      (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
+      (wrapped as AxiosLikeError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as AxiosLikeError).response = (err as AxiosLikeError)?.response;
       setError(new Error(String(wrapped)));
       throw wrapped;
     } finally {
@@ -285,8 +281,8 @@ const usePatients = () => {
     } catch (err) {
       const message = getErrorMessage(err) || 'Ошибка восстановления пациента';
       const wrapped = new Error(message);
-      (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
-      (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
+      (wrapped as AxiosLikeError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as AxiosLikeError).response = (err as AxiosLikeError)?.response;
       setError(new Error(String(wrapped)));
       throw wrapped;
     } finally {

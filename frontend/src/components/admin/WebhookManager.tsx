@@ -45,15 +45,15 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
-
-interface ApiErrorResponse {
-  response?: { data?: { detail?: string } };
-}
+// ADR-0016: canonical error types from types/errors.ts.
+import type { AxiosLikeError } from '../../types/errors';
 
 function resolveApiError(error: unknown, fallbackMessage: string): string {
   if (error && typeof error === 'object' && 'response' in error) {
-    const errResp = (error as ApiErrorResponse).response;
-    return errResp?.data?.detail || fallbackMessage;
+    const errResp = (error as AxiosLikeError).response;
+    const detail = errResp?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    return fallbackMessage;
   }
   return fallbackMessage;
 }
