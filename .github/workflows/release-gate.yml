@@ -57,7 +57,7 @@ jobs:
         run: |
           npx stryker run --configFile stryker.config.mjs \
             --mutate "src/types/state-machines/*.ts,src/api/mappers/patient.ts,src/api/mappers/appointment.ts,src/api/mappers/billing.ts"
-        
+
 
       - name: Parse Stryker score
         run: |

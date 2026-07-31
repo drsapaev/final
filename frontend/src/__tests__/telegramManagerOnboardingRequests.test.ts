@@ -37,7 +37,7 @@ describe('Telegram manager onboarding request review', () => {
   it('limits review actions to staff review endpoints', () => {
     const actionHandler = sourceBetween(
       managerSource,
-      'const handleOnboardingReviewAction = async (requestId, action, options = {}) => {',
+      'const handleOnboardingReviewAction = async (requestId: string, action: string, options: Record<string, unknown> = {}) => {',
       'const handleCreateTemplate = async () => {'
     );
 
