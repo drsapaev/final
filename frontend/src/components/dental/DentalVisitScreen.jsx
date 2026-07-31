@@ -256,12 +256,18 @@ const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, 
       <Button
         variant="outline"
         size="small"
-        onClick={onAISuggestion}
+        onClick={() => document.getElementById('dental-ai-suggest-icd10')?.click()}
         disabled={disabled}
         aria-label="AI-подбор кода МКБ-10 по жалобе">
         <Brain size={14} style={{ marginRight: 6 }} aria-hidden="true" />
         AI: подобрать МКБ-10
       </Button>
+      <button
+        id="dental-ai-suggest-icd10"
+        style={{ display: 'none' }}
+        onClick={onAISuggestion}
+        aria-hidden="true"
+      />
     </div>
   </div>
 );
@@ -646,10 +652,10 @@ const DentalVisitScreen = ({
         />
 
         {isLoading ? (
-          <div style={{ padding: 20 }} role="status" aria-live="polite" aria-busy="true">
-            <Skeleton style={{ height: 60, marginBottom: 12 }} aria-hidden="true" />
-            <Skeleton style={{ height: 200, marginBottom: 12 }} aria-hidden="true" />
-            <Skeleton style={{ height: 80 }} aria-hidden="true" />
+          <div style={{ padding: 20 }}>
+            <Skeleton style={{ height: 60, marginBottom: 12 }} />
+            <Skeleton style={{ height: 200, marginBottom: 12 }} />
+            <Skeleton style={{ height: 80 }} />
           </div>
         ) : (
           <div style={{ padding: 20 }}>
