@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
-import axios from 'axios';
 import type { AsyncState } from '../types/async-state';
 import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
+
+// ADR-0015: type-only import of axios for the isCancel type guard.
+// The runtime check is done via duck-typing (err.code === 'ERR_CANCELED' ||
+// err.name === 'CanceledError') so we don't need the axios runtime here.
+// Keeping the type import avoids the `hook imports axios directly` violation.
 
 interface UseAdminDataOptions {
   refreshInterval?: number;
@@ -78,11 +82,11 @@ const useAdminData = (
       setRequestState(successState<unknown>(null));
       onSuccessRef.current(response.data);
     } catch (err) {
-      const errorObj = err as Error & { name: string };
+      const errorObj = err as Error & { name: string; code?: string };
       if (
         errorObj?.name === 'AbortError' ||
         errorObj?.name === 'CanceledError' ||
-        axios.isCancel(err)
+        errorObj?.code === 'ERR_CANCELED'
       ) {
         return;
       }

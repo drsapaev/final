@@ -14,7 +14,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 import logger from '../utils/logger';
-import type { AsyncState } from '../types/async-state';
 
 /**
  * TreatmentTemplate — shape of items returned by /emr/doctor-templates/treatment.

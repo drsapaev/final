@@ -14,6 +14,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
+// ADR-0015: use usePaymentProviderSettings hook instead of importing api/adminSettings directly.
+import { usePaymentProviderSettings } from '../../hooks/usePaymentProviderSettings';
+import type { PaymentProviderSettings as PaymentProviderSettingsType } from '../../hooks/usePaymentProviderSettings';
 import {
   MacOSCard,
   Button,
@@ -21,19 +24,37 @@ import {
   Checkbox,
   Select,
 } from '../ui/macos';
-import {
-  fetchPaymentProviderSettings,
-  savePaymentProviderSettings,
-  testPaymentProviderConfig,
-} from '../../api/adminSettings';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
 const PaymentProviderSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const { executeAction, loading } = useAsyncAction();
+  const { executeAction, loading: actionLoading } = useAsyncAction();
 
-  const [settings, setSettings] = useState({
+  // ADR-0015: settings lifecycle owned by usePaymentProviderSettings hook.
+  const {
+    settings: fetchedSettings,
+    loading: settingsLoading,
+    saving,
+    testing,
+    error,
+    testResults,
+    reload,
+    save: saveViaHook,
+    testProvider: testProviderViaHook,
+    resetError,
+  } = usePaymentProviderSettings({
+    loadErrorMessage: t('admin2.pps_load_error'),
+    saveSuccessToast: t('admin2.pps_save_success'),
+    saveErrorMessage: t('admin2.pps_save_error'),
+    testSuccessToast: (provider: string) => t('admin2.pps_test_success', { provider: provider.toUpperCase() }),
+    testErrorToast: (provider: string) => t('admin2.pps_test_error', { provider: provider.toUpperCase() }),
+    testFinishedFallback: t('admin2.pps_test_finished'),
+  });
+
+  const loading = settingsLoading || actionLoading;
+
+  const [settings, setSettings] = useState<PaymentProviderSettingsType>({
     default_provider: 'click',
     enabled_providers: ['click', 'payme'],
     click: {
@@ -59,63 +80,38 @@ const PaymentProviderSettings = () => {
     payme: false
   });
 
-  const [testResults, setTestResults] = useState<Record<string, any>>({});
+  // Sync local editable settings when fetch completes.
+  useEffect(() => {
+    if (fetchedSettings) {
+      setSettings(prev => ({ ...prev, ...fetchedSettings }));
+    }
+  }, [fetchedSettings]);
 
   const loadSettings = useCallback(async () => {
     await executeAction(
-      async () => {
-        const data = await fetchPaymentProviderSettings();
-        setSettings((prev) => ({ ...prev, ...data }));
-      },
-      {
-        loadingMessage: t('admin2.pps_loading_message'),
-        errorMessage: t('admin2.pps_load_error')
-      }
+      async () => { await reload(); },
+      { loadingMessage: t('admin2.pps_loading_message'), errorMessage: t('admin2.pps_load_error') }
     );
-  }, [executeAction]);
+  }, [executeAction, reload, t]);
 
-  // Загрузка настроек при монтировании
+  // Загрузка настроек при монтировании (hook auto-loads; keep effect for compatibility)
   useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
+    // usePaymentProviderSettings auto-loads on mount; nothing to do here.
+  }, []);
 
   const saveSettings = async () => {
     await executeAction(
-      async () => {
-        await savePaymentProviderSettings(settings);
-        toast.success(t('admin2.pps_save_success'));
-      },
-      {
-        loadingMessage: t('admin2.pps_saving_message'),
-        errorMessage: t('admin2.pps_save_error')
-      }
+      async () => { await saveViaHook(settings); },
+      { loadingMessage: t('admin2.pps_saving_message'), errorMessage: t('admin2.pps_save_error') }
     );
   };
 
   const testProvider = async (providerName: string) => {
     await executeAction(
       async () => {
-        const result = await testPaymentProviderConfig(providerName, (settings as Record<string, any>)[providerName]);
-
-        setTestResults(prev => ({
-          ...prev,
-          [providerName]: {
-            success: Boolean(result?.success),
-            message: result.message || result.detail || t('admin2.pps_test_finished'),
-            timestamp: new Date().toLocaleString()
-          }
-        }));
-
-        if (result?.success) {
-          toast.success(t('admin2.pps_test_success', { provider: providerName.toUpperCase() }));
-        } else {
-          toast.error(t('admin2.pps_test_error_toast', { provider: providerName.toUpperCase(), message: result.message || result.detail }));
-        }
+        await testProviderViaHook(providerName, (settings as Record<string, any>)[providerName]);
       },
-      {
-        loadingMessage: t('admin2.pps_testing_message', { provider: providerName.toUpperCase() }),
-        errorMessage: t('admin2.pps_test_error_message', { provider: providerName.toUpperCase() })
-      }
+      { loadingMessage: t('admin2.pps_testing_message', { provider: providerName.toUpperCase() }), errorMessage: t('admin2.pps_test_error', { provider: providerName.toUpperCase() }) }
     );
   };
 

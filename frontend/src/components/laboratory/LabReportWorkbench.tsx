@@ -6,7 +6,8 @@ import { toast } from 'react-toastify';  // STRAT#2: retained for backward-compa
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
   Input } from '../ui/macos';
-import { labReportingApi } from '../../api/labReporting';
+// ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
+import { useLabReporting } from '../../hooks/useLabReporting';
 import { api } from '../../api/client';
 import { printService } from '../../services/print';
 import logger from '../../utils/logger';
@@ -87,6 +88,8 @@ export default function LabReportWorkbench({
   // новый instance. Оба действия необратимы без объяснения последствий.
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  // ADR-0015: lab reporting API accessed via hook.
+  const labReportingApi = useLabReporting();
 
   // STRAT#2: единый канал нотификаций.
   const labToast = useLabToast(notify as (type: string, message: string) => void);

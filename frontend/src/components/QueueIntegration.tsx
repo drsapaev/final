@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ModernQueueManager, { type ModernQueueManagerDoctor } from './queue/ModernQueueManager';
 import React from 'react';
-import { fetchAvailableSpecialists } from '../api/queue';
+// ADR-0015: use useQueueApi hook instead of importing api/queue directly.
+import { useQueueApi } from '../hooks/useQueueApi';
 import auth from '../stores/auth';
 import logger from '../utils/logger';
 import type { QueueSpecialist } from '../types/domain/queue';
@@ -47,6 +48,8 @@ const QueueIntegration = ({
   onPatientSelect,
   onStartVisit,
 }: QueueIntegrationProps): React.JSX.Element | null => {
+  // ADR-0015: queue API accessed via hook.
+  const { fetchAvailableSpecialists } = useQueueApi();
   const [availableSpecialists, setAvailableSpecialists] = useState<QueueSpecialist[]>([]);
   const [authProfile, setAuthProfile] = useState(auth.getState().profile);
 

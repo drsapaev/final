@@ -7,7 +7,8 @@ import {
 import { ChevronDown, ChevronUp, Brain, CheckCircle, Copy, RefreshCw } from 'lucide-react';
 import { notify } from '../../services/notify';
 import { apiClient } from '../../api/client';
-import { mcpAPI } from '../../api/mcpClient';
+// ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
+import { useMcpClient } from '../../hooks/useMcpClient';
 import { sanitizeAIContent } from '../../utils/sanitizer';
 import logger from '../../utils/logger';
 
@@ -161,6 +162,8 @@ const AIAssistant = ({
 }: AIAssistantProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  // ADR-0015: MCP API accessed via hook, not direct import.
+  const mcpAPI = useMcpClient();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AIResult | null>(null);
   const [error, setError] = useState<string | null>(null);

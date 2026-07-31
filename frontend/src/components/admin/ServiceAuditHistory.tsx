@@ -2,7 +2,8 @@ import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
-import { servicesService } from '../../api/services';
+// ADR-0015: use useServicesApi hook instead of importing api/services directly.
+import { useServicesApi } from '../../hooks/useServicesApi';
 import logger from '../../utils/logger';
 import { getErrorMessage } from '../../utils/type-guards';
 import {
@@ -49,6 +50,8 @@ interface ServiceAuditHistoryProps {
 }
 
 const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProps) => {
+  // ADR-0015: services API accessed via hook.
+  const { servicesService } = useServicesApi();
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<ServiceAuditHistoryItem[]>([]);

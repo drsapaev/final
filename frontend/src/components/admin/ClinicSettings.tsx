@@ -1,14 +1,13 @@
 import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
-import { api } from '../../api/client';
-import { fetchClinicSettings, saveClinicSettings } from '../../api/adminSettings';
+// ADR-0015: use useClinicSettings hook instead of importing api/adminSettings
+// and api/ticketPrintSettings directly.
 import {
-  fetchTicketPrintSettings,
-  saveTicketPrintSettings,
+  useClinicSettings,
   TICKET_PRINT_SETTINGS_DEFINITIONS,
   TICKET_PRINT_SETTINGS_DEFAULTS,
-} from '../../api/ticketPrintSettings';
+} from '../../hooks/useClinicSettings';
 import logger from '../../utils/logger';
 import {
   Building2,
@@ -38,6 +37,14 @@ import React from "react";
 
 const ClinicSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  // ADR-0015: API access via hook.
+  const {
+    fetchClinicSettings,
+    saveClinicSettings: saveClinicSettingsApi,
+    fetchTicketPrintSettings,
+    saveTicketPrintSettings: saveTicketPrintSettingsApi,
+    uploadLogo: uploadLogoApi,
+  } = useClinicSettings();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
@@ -76,11 +83,9 @@ const ClinicSettings = () => {
       const data = await fetchClinicSettings('clinic');
       const settingsObj: Record<string, string> = {};
 
-      if (Array.isArray(data)) {
-        data.forEach((setting: { key: string; value: string }) => {
+      data.forEach((setting: { key: string; value: string }) => {
           settingsObj[setting.key] = setting.value;
         });
-      }
 
       setSettings(prev => ({ ...prev, ...settingsObj }));
     } catch (error) {
@@ -141,20 +146,10 @@ const ClinicSettings = () => {
     }
   };
 
-  const uploadLogo = async () => {
-    if (!logoFile) return null;
-
+  const uploadLogo = async (): Promise<string> => {
+    if (!logoFile) return settings.logo_url;
     try {
-      const formData = new FormData();
-      formData.append('file', logoFile);
-
-      const response = await api.post('/admin/clinic/logo', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-
-      return response.data.logo_url;
+      return await uploadLogoApi(logoFile);
     } catch (error) {
       logger.error('Ошибка загрузки логотипа:', error);
       throw error;
@@ -178,7 +173,7 @@ const ClinicSettings = () => {
         logo_url: logoUrl
       };
 
-      await saveClinicSettings({
+      await saveClinicSettingsApi({
         settings: settingsToSave
       });
 
@@ -202,8 +197,8 @@ const ClinicSettings = () => {
     try {
       setTicketPrintSaving(true);
       setTicketPrintMessage({ type: '', text: '' });
-      const savedSettings = await saveTicketPrintSettings(ticketPrintSettings);
-      setTicketPrintSettings({ ...TICKET_PRINT_SETTINGS_DEFAULTS, ...savedSettings });
+      const savedSettings = await saveTicketPrintSettingsApi(ticketPrintSettings);
+      setTicketPrintSettings({ ...TICKET_PRINT_SETTINGS_DEFAULTS, ...(savedSettings as Record<string, unknown>) });
       setTicketPrintMessage({ type: 'success', text: t('admin2.cset_success_save_print') });
     } catch (error) {
       logger.error('Ошибка сохранения настроек печати талонов:', error);

@@ -27,7 +27,8 @@ import {
   MacOSStatCard,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
-import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettings';
+// ADR-0015: use useAdminSettings hook instead of importing api/adminSettings directly.
+import { useAdminSettings } from '../../hooks/useAdminSettings';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -38,61 +39,54 @@ import { getErrorMessage } from '../../utils/type-guards';
  */
 const BenefitSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  // ADR-0015: settings lifecycle owned by useAdminSettings hook.
+  const {
+    settings: fetchedSettings,
+    originalSettings,
+    loading,
+    saving,
+    error,
+    lastUpdated,
+    reload: loadSettings,
+    save: saveSettingsViaHook,
+    resetError,
+  } = useAdminSettings<Record<string, unknown>>({
+    resource: 'benefit',
+    errorMessage: t('admin2.bs_error_load_settings'),
+    loadErrorToast: t('admin2.bs_toast_load_error'),
+    saveSuccessToast: t('admin2.bs_toast_saved'),
+    saveErrorToast: t('admin2.bs_toast_save_error'),
+  });
+
+  // Local editable copy — initialized from fetched settings, updated by user.
   const [settings, setSettings] = useState<Record<string, any>>({
     repeat_visit_days: 21,
     repeat_visit_discount: 0,
     benefit_consultation_free: true,
     all_free_auto_approve: false
   });
-  const [originalSettings, setOriginalSettings] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // Sync local editable settings when fetch completes.
   useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchBenefitSettings();
-      setSettings(data);
-      setOriginalSettings(data);
-      setLastUpdated(new Date(String(data?.updated_at ?? '')));
-    } catch (err) {
-      logger.error('Error loading benefit settings:', err);
-      setError(getErrorMessage(err) || t('admin2.bs_error_load_settings'));
-      toast.error(t('admin2.bs_toast_load_error'));
-    } finally {
-      setLoading(false);
+    if (fetchedSettings) {
+      setSettings(fetchedSettings);
     }
-  };
+  }, [fetchedSettings]);
 
   const saveSettings = async () => {
     setShowConfirmModal(true);
   };
 
   const confirmSave = async () => {
-    setSaving(true);
     setShowConfirmModal(false);
-    try {
-      const response = await saveBenefitSettings(settings);
-      toast.success(response?.message || t('admin2.bs_toast_saved'));
-      setOriginalSettings(settings);
-      setLastUpdated(new Date());
-    } catch (err) {
-      logger.error('Error saving benefit settings:', err);
-      toast.error(getErrorMessage(err) || t('admin2.bs_toast_save_error'));
-    } finally {
-      setSaving(false);
-    }
+    await saveSettingsViaHook(settings);
   };
 
   const resetSettings = () => {
-    setSettings(originalSettings);
+    if (originalSettings) {
+      setSettings(originalSettings);
+    }
   };
 
   const hasChanges = () => {
@@ -159,7 +153,7 @@ const BenefitSettings = () => {
               type="error"
               title={t('admin2.bs_alert_load_error_title')}
               message={error}
-              onClose={() => setError(null)}
+              onClose={resetError}
             />
           )}
 

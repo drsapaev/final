@@ -21,7 +21,8 @@ import { useEffect, useState, useCallback } from 'react';
 // (Consistency & Standards) — разные stroke-width, optical size, padding.
 import EMRSection from './EMRSection';
 import React from 'react';
-import { labReportingApi } from '@/api/labReporting';
+// ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
+import { useLabReporting } from '@/hooks/useLabReporting';
 import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions, Icon } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
 // UX-AUDIT-FIX10: ранее STATUS_LABELS / STATUS_VARIANTS дублировались локально.
@@ -78,6 +79,8 @@ function formatDate(dateStr: unknown): string {
 
 export function LabResultsSection({ patientId, visitId, disabled = false }: LabResultsSectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  // ADR-0015: lab reporting API accessed via hook.
+  const labReportingApi = useLabReporting();
   const [instances, setInstances] = useState<LabReportInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

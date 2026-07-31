@@ -18,7 +18,8 @@ import { Card } from '../ui/macos';
 // Раньше здесь был 1 raw fetch() к /registrar/services с ручным
 // Authorization-хедером и токеном.
 // Теперь auth/CSRF/refresh обрабатываются axios-interceptor'ом в api/client.js.
-import { fetchRegistrarServices } from '../../api/registrar';
+// ADR-0015: use useRegistrarApi hook instead of importing api/registrar directly.
+import { useRegistrarApi } from '../../hooks/useRegistrarApi';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
@@ -42,6 +43,8 @@ const IntegratedServiceSelector = ({
   onNext
 }: IntegratedServiceSelectorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  // ADR-0015: registrar API accessed via hook.
+  const { fetchRegistrarServices } = useRegistrarApi();
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<Record<string, any>>({});
   const [, setCategories] = useState<unknown[]>([]);

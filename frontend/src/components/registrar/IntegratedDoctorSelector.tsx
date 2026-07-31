@@ -18,10 +18,8 @@ import { Card, Badge } from '../ui/macos';
 // Раньше здесь было 2 raw fetch() к /registrar/doctors и /registrar/queue-settings
 // с ручным формированием Authorization-хедера и токена.
 // Теперь auth/CSRF/refresh обрабатываются axios-interceptor'ом в api/client.js.
-import {
-  fetchRegistrarDoctors,
-  fetchRegistrarQueueSettings,
-} from '../../api/registrar';
+// ADR-0015: use useRegistrarApi hook instead of importing api/registrar directly.
+import { useRegistrarApi } from '../../hooks/useRegistrarApi';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 /**
@@ -44,6 +42,8 @@ const IntegratedDoctorSelector = ({
   className = ''
 }: IntegratedDoctorSelectorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  // ADR-0015: registrar API accessed via hook.
+  const { fetchRegistrarDoctors, fetchRegistrarQueueSettings } = useRegistrarApi();
   const [loading, setLoading] = useState(true);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [queueSettings, setQueueSettings] = useState<Record<string, any>>({});
