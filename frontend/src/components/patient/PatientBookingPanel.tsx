@@ -1,4 +1,6 @@
 
+import type { HttpApiError } from '../../types/errors';
+import { extractDetailReason } from '../../utils/error-utils';
 import { useState } from 'react';
 import {
   Badge, Button, Icon, Input, Textarea,
@@ -95,8 +97,8 @@ function PatientBookingPanel() {
       setBookingPreview(response.data as { appointment?: BookingAppointment; preview?: { appointment?: BookingAppointment } });
       setBookingStatus('preview-ready');
     } catch (err) {
-      const errObj = err as { response?: { data?: { detail?: { reason?: string } } } };
-      const reason = errObj?.response?.data?.detail?.reason || 'booking_preview_failed';
+      const errObj = err as HttpApiError;
+      const reason = extractDetailReason(errObj) || 'booking_preview_failed';
       setBookingError(describePatientError('booking', reason));
       setBookingStatus('error');
     }
@@ -112,8 +114,8 @@ function PatientBookingPanel() {
       setBookingPreview((response.data as BookingCreatedResponse)?.preview || null);
       setBookingStatus('created');
     } catch (err) {
-      const errObj = err as { response?: { data?: { detail?: { reason?: string } } } };
-      const reason = errObj?.response?.data?.detail?.reason || 'booking_create_failed';
+      const errObj = err as HttpApiError;
+      const reason = extractDetailReason(errObj) || 'booking_create_failed';
       setBookingError(describePatientError('booking', reason));
       setBookingStatus('error');
     }
@@ -194,13 +196,13 @@ function PatientBookingPanel() {
 
           {createdBooking && (
             <div className="pp-grid-span-2 pp-message pp-message--success" role="status">
-              <Icon name="checkmark.circle" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <Icon name="checkmark.circle" size={16} />
               {t('patient.pat_book_created', { id: createdBooking.appointment_id })}
             </div>
           )}
           {bookingError && (
             <div className="pp-grid-span-2 pp-message pp-message--error" role="alert">
-              <Icon name="exclamationmark.triangle" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <Icon name="exclamationmark.triangle" size={16} />
               {bookingError}
             </div>
           )}
@@ -213,7 +215,7 @@ function PatientBookingPanel() {
               loading={bookingStatus === 'previewing'}
               onClick={previewBooking}
             >
-              <Icon name="doc.text" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <Icon name="doc.text" size={16} />
               {t('patient.pat_book_preview_button')}
             </Button>
             <Button
@@ -223,7 +225,7 @@ function PatientBookingPanel() {
               loading={bookingStatus === 'creating'}
               onClick={createBooking}
             >
-              <Icon name="calendar" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <Icon name="calendar" size={16} />
               {t('patient.pat_book_book_button')}
             </Button>
           </div>

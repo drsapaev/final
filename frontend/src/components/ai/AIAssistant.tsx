@@ -11,6 +11,7 @@ import { apiClient } from '../../api/client';
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { sanitizeAIContent } from '../../utils/sanitizer';
 import logger from '../../utils/logger';
+import type { HttpApiError } from '../../types/errors';
 
 /**
  * Рекурсивная санитизация AI-generated контента
@@ -130,7 +131,7 @@ function isFallbackProvider(providerName: unknown): boolean {
  */
 function getErrResponseData(err: unknown): { detail?: string; error?: string } | undefined {
   if (!err || typeof err !== 'object') return undefined;
-  const maybeResponse = (err as { response?: unknown }).response;
+  const maybeResponse = (err as HttpApiError).response;
   if (!maybeResponse || typeof maybeResponse !== 'object') return undefined;
   const data = (maybeResponse as { data?: unknown }).data;
   if (!data || typeof data !== 'object') return undefined;

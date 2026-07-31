@@ -107,7 +107,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     const availableIcons = getAvailableIcons(t);
     // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
     const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
     const [profiles, setProfiles] = useState<QueueProfileDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -752,7 +752,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                     />
                 )}
                 {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-                {confirmDialog as unknown as React.ReactNode}
+                {confirmDialog}
             </div>
         </div>
     );

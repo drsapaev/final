@@ -193,13 +193,13 @@ const PWAInstallPrompt = ({ onClose }: { onClose?: () => void }) => {
   return (
     <div
       className="pwa-install-prompt"
-      style={styles.shell as unknown as CSSProperties}
+      style={styles.shell as CSSProperties}
       role="dialog"
       aria-modal="false"
       aria-labelledby="pwa-install-prompt-title"
     >
-      <Card variant="elevated" padding="default" style={styles.card as unknown as CSSProperties}>
-        <CardHeader style={styles.header as unknown as CSSProperties}>
+      <Card variant="elevated" padding="default" style={styles.card as CSSProperties}>
+        <CardHeader style={styles.header as CSSProperties}>
           <div style={styles.titleRow}>
             <Smartphone size={22} aria-hidden="true" style={styles.titleIcon} />
             <div>
@@ -232,7 +232,7 @@ const PWAInstallPrompt = ({ onClose }: { onClose?: () => void }) => {
             </Button>
           ) : isInstallable ? (
             <>
-              <div style={styles.chipGrid as unknown as CSSProperties} aria-label={t18('misc.pip_statusy_pwa')}>
+              <div style={styles.chipGrid as CSSProperties} aria-label={t18('misc.pip_statusy_pwa')}>
                 <CapabilityChip
                   icon={isOnline ? CheckCircle2 : WifiOff}
                   variant={isOnline ? 'success' : 'warning'}
@@ -284,8 +284,8 @@ const PWAInstallPrompt = ({ onClose }: { onClose?: () => void }) => {
           )}
 
           <div>
-            <p style={styles.capabilityLabel as unknown as CSSProperties}>{t18('misc.pip_vozmozhnosti_prilozheniya_2')}</p>
-            <div style={styles.chipGrid as unknown as CSSProperties} aria-label={t18('misc.pip_vozmozhnosti_prilozheniya')}>
+            <p style={styles.capabilityLabel as CSSProperties}>{t18('misc.pip_vozmozhnosti_prilozheniya_2')}</p>
+            <div style={styles.chipGrid as CSSProperties} aria-label={t18('misc.pip_vozmozhnosti_prilozheniya')}>
               {(capabilities as Record<string, unknown>).serviceWorker ? (
                 <CapabilityChip variant="outline">{t18('misc.pip_oflayn_rabota')}</CapabilityChip>
               ) : null}

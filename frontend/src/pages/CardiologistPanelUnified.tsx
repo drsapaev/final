@@ -139,7 +139,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   // QW-10 (UX audit): confirm hook used before completing a visit (prevents
   // accidental completion with empty diagnosis/treatment).
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   // STRAT#32: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null }>({ open: false, patient: null });
@@ -1763,8 +1763,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
               appointmentsLoading={appointmentsLoading}
               appointmentSummaryItems={appointmentSummaryItems}
               onRefresh={loadMacOSCardiologyAppointments}
-              onRowClick={(row) => { void handleAppointmentRowClick(row as unknown as Record<string, unknown>); }}
-              onActionClick={(action, row) => { void handleAppointmentActionClick(action, row as unknown as Record<string, unknown>); }}
+              onRowClick={(row) => { void handleAppointmentRowClick(row as Record<string, unknown>); }}
+              onActionClick={(action, row) => { void handleAppointmentActionClick(action, row as Record<string, unknown>); }}
               services={services}
               isDark={isDark}
             />
@@ -1956,7 +1956,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         }
 
         {/* QW-10 (UX audit): portal-mounted ConfirmDialog used before completing a visit */}
-        {confirmDialog as unknown as React.ReactNode}
+        {confirmDialog}
 
         {/* P-021 (UX audit): session timeout warning dialog */}
         {sessionWarning && (

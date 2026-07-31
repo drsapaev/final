@@ -44,7 +44,7 @@ const TwoFactorSettings = () => {
   const t = rawT;
   // P-013 fix: shared ConfirmDialog hook (replaces 2 native confirm() calls).
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -607,7 +607,7 @@ const TwoFactorSettings = () => {
         </div>
       </div>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </div>);
 
 };

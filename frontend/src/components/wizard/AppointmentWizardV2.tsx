@@ -239,7 +239,7 @@ const AppointmentWizardV2 = ({
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
 
   // ADR-0015: queue + patients APIs accessed via hooks.
   const { applyRegistrarEditDelta, createQueueEntriesBatch, updateOnlineQueueEntry } = useQueueApi();

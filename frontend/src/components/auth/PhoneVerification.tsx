@@ -16,6 +16,7 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import { useSafeInput } from '../../hooks/useSafeInput';  // PR-39 / P0-5: sanitizer wired to form
 import { useTranslation } from '../../i18n/useTranslation';
+import type { HttpApiError } from '../../types/errors';
 
 // === Domain types ===
 export type PhoneVerificationPurpose = 'verification' | 'login' | 'reset' | string;
@@ -157,7 +158,7 @@ const PhoneVerification = ({
     } catch (error) {
       logger.error('Error sending verification code:', error);
       
-      const sendErrResponse = (error as { response?: { status?: number } })?.response;
+      const sendErrResponse = (error as HttpApiError)?.response;
       if (sendErrResponse?.status === 429) {
         toast.error(t('misc.pv_slishkom_chastye_zaprosy_pop'));
       } else if (sendErrResponse?.status === 502) {
@@ -196,7 +197,7 @@ const PhoneVerification = ({
     } catch (error) {
       logger.error('Error verifying code:', error);
       
-      const errorResponse = (error as { response?: { status?: number; data?: { detail?: { attempts_left?: number } } } })?.response;
+      const errorResponse = (error as HttpApiError & { response?: { data?: { detail?: { attempts_left?: number } } } })?.response;
       const errorData = errorResponse?.data?.detail;
       
       if (errorResponse?.status === 404) {

@@ -237,3 +237,22 @@ export function getErrorMessage(
   // 6. Fallback
   return fallbackMessage;
 }
+
+// ===========================================================================
+// Detail reason extractor — for patterns like err.response.data.detail.reason
+// ===========================================================================
+
+/**
+ * Extract the `reason` field from an error's response.data.detail.
+ *
+ * `detail` can be a string or an object with { message, error, reason }.
+ * This helper narrows to the object form and returns `reason`, or undefined.
+ */
+export function extractDetailReason(err: unknown): string | undefined {
+  if (!isHttpApiError(err)) return undefined;
+  const detail = err.response?.data?.detail ?? err.detail;
+  if (typeof detail === 'object' && detail !== null) {
+    return detail.reason;
+  }
+  return undefined;
+}

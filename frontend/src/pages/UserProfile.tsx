@@ -395,8 +395,8 @@ export default function UserProfile() {
       if (axiosErr?.response?.status === 429) {
         const fallbackProfile = getFallbackAuthProfile();
         if (fallbackProfile) {
-          setProfile(fallbackProfile as unknown as Record<string, unknown>);
-          setDraft(normalizeProfileForDraft(fallbackProfile as unknown as Record<string, unknown> | null));
+          setProfile(fallbackProfile as Record<string, unknown>);
+          setDraft(normalizeProfileForDraft(fallbackProfile as Record<string, unknown> | null));
           setError(t('misc.up_err_rate_limited'));
           logger.warn('[FIX:PROFILE] Self profile request hit rate limit, using cached auth profile fallback');
           return;

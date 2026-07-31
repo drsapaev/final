@@ -237,7 +237,7 @@ const VisitProtocol = ({
         description: ''
       };
 
-      handleArrayAdd(`photos.${category}`, photoData as unknown as Record<string, unknown>);
+      handleArrayAdd(`photos.${category}`, photoData as Record<string, unknown>);
     };
     reader.readAsDataURL(file);
   };

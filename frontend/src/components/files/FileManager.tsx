@@ -180,7 +180,7 @@ const FileManager = () => {
   const t = rawT;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [, setFolders] = useState<unknown[]>([]);
@@ -924,7 +924,7 @@ const FileManager = () => {
         </DialogActions>
       </Dialog>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </div>
   );
 };

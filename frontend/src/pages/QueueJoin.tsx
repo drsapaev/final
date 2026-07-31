@@ -25,6 +25,7 @@ import {
 import { useTranslation } from '../i18n/useTranslation';
 import type { QueueSpecialist } from '../types/domain/queue';
 import { safeJsonParse } from '../utils/safeJsonParse';
+import type { HttpApiError } from '../types/errors';
 
 interface QueueJoinPageInfo {
   is_clinic_wide?: boolean;
@@ -134,7 +135,7 @@ const QueueJoin = () => {
   const [countdown, setCountdown] = useState<number | null>(null);
 
   const getApiErrorMessage = useCallback((err: unknown, fallbackMessage: string): string => {
-    const responseData = (err as { response?: { data?: { detail?: unknown; message?: unknown } } })?.response?.data;
+    const responseData = (err as HttpApiError)?.response?.data;
     if (typeof responseData?.detail === 'string') {
       return responseData.detail;
     }

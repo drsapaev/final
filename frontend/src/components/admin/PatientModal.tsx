@@ -53,7 +53,7 @@ const PatientModal = ({
   const t = rawT;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   const [formData, setFormData] = useState<Record<string, unknown>>({
     firstName: '',
     lastName: '',
@@ -624,7 +624,7 @@ const PatientModal = ({
         </div>
       </form>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </Modal>);
 
 };

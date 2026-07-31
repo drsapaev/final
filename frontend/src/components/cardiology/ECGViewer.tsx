@@ -363,7 +363,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   const parseECGFileData = async (originalFile: File, uploadedFile: EcgFile) => {
     try {
       // Сначала пробуем локальный парсинг
-      const parseResult = await parseECGFile(originalFile) as unknown as Record<string, unknown>;
+      const parseResult = await parseECGFile(originalFile) as Record<string, unknown>;
       
       if (parseResult.success && parseResult.parameters) {
         const analysis = analyzeECGParameters(parseResult.parameters as Record<string, unknown>);

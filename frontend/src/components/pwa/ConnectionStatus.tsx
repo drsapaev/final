@@ -150,7 +150,7 @@ function ConnectionToast({ open, position, tone, icon: Icon, title, description,
   const config = toneConfig[tone as keyof typeof toneConfig] || toneConfig.primary;
 
   return (
-    <div style={toastPositionStyle(position) as unknown as CSSProperties}>
+    <div style={toastPositionStyle(position) as CSSProperties}>
       <Alert
         severity={config.alert}
         role={tone === 'danger' || tone === 'warning' ? 'alert' : 'status'}
@@ -268,7 +268,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }: { showO
   return (
     <>
       {/* Индикатор статуса */}
-      <div style={styles.statusRow as unknown as CSSProperties}>
+      <div style={styles.statusRow as CSSProperties}>
         <Badge
           variant={toneStyle.badge as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}
           size="small"
@@ -322,8 +322,8 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }: { showO
 
       {/* Постоянный индикатор офлайн режима */}
       {!isOnline && (
-        <div style={styles.offlineBanner as unknown as CSSProperties} role="status" aria-live="polite">
-          <span style={styles.offlineBannerInner as unknown as CSSProperties}>
+        <div style={styles.offlineBanner as CSSProperties} role="status" aria-live="polite">
+          <span style={styles.offlineBannerInner as CSSProperties}>
             <WifiOff size={14} aria-hidden="true" />
             Офлайн режим - данные будут синхронизированы при подключении
           </span>

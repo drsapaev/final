@@ -59,12 +59,12 @@ const InteractiveCard = ({
       style={{
         padding: getSpacing('lg'),
         borderRadius: getBorderRadius('lg'),
-        ...cardStyle as unknown as CSSProperties
+        ...cardStyle as CSSProperties
       }}
       {...props}
     >
       {/* Overlay эффект */}
-      <div style={overlayStyle as unknown as CSSProperties} />
+      <div style={overlayStyle as CSSProperties} />
 
       {/* Основное содержимое */}
       <div style={{ position: 'relative', zIndex: 1 }}>

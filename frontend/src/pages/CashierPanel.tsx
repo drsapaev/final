@@ -416,7 +416,7 @@ const CashierPanel = () => {
   // The hook returns [confirm, dialogNode]; dialogNode must be rendered once
   // in the component tree (we render it at the end of the JSX below).
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   // STRAT#31: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   const location = useLocation();
@@ -2117,7 +2117,7 @@ const CashierPanel = () => {
         </div>
       )}
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </div>);
 
 };

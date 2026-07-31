@@ -50,7 +50,7 @@ export default function LabTemplateWorkbench({
   // Согласованность с LabReportWorkbench — единый стилизованный portal-dialog
   // с focus-trap, Esc-to-cancel, явным описанием последствий.
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   // ADR-0015: lab reporting API accessed via hook.
   const labReportingApi = useLabReporting();
 
@@ -533,7 +533,7 @@ export default function LabTemplateWorkbench({
           </div>
 
           <div className="ltw-grid-8">
-            {((templates as unknown as Record<string, unknown>[]) || [])
+            {((templates as Record<string, unknown>[]) || [])
               .filter((t: Record<string, unknown>) => {
                 if (!templateSearch.trim()) return true;
                 const q = templateSearch.trim().toLowerCase();
@@ -743,7 +743,7 @@ export default function LabTemplateWorkbench({
       </datalist>
 
       {/* L-H-1 fix: portal-mounted ConfirmDialog для destructive actions */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </div>
   );
 }

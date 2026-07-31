@@ -181,8 +181,8 @@ class MockWebSocket {
 }
 
 // Cast the mocks through unknown to expose vitest mock methods.
-const messagesApiMockTyped = messagesApiMock as unknown as Record<string, ReturnType<typeof vi.fn>>;
-const loggerMockTyped = loggerMock as unknown as Record<string, ReturnType<typeof vi.fn>>;
+const messagesApiMockTyped = messagesApiMock as Record<string, ReturnType<typeof vi.fn>>;
+const loggerMockTyped = loggerMock as Record<string, ReturnType<typeof vi.fn>>;
 
 interface ChatMessage {
   is_read?: boolean;

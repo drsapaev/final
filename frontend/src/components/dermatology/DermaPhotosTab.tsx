@@ -76,7 +76,7 @@ export function DermaPhotosTab({
           {t('derma.derma_photos_ai_title')}
         </h3>
         <SkinAnalysis
-          photos={photoData as unknown as Record<string, unknown>}
+          photos={photoData as Record<string, unknown>}
           visitId={currentAppointment?.visit_id}
           patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
           onAnalysisComplete={(result: unknown) => {

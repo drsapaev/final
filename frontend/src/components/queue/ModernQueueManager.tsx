@@ -98,7 +98,7 @@ const ModernQueueManager = ({
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
 
   // i18next translation function.
   const { t: rawT } = useTranslation();
@@ -774,7 +774,7 @@ const ModernQueueManager = ({
       </ModernDialog>
 
       {/* UX Audit Registrar #2: ConfirmDialog (useConfirm hook). */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </div>);
 
 };
