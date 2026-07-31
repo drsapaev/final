@@ -347,7 +347,7 @@ export function setProfile(profile: UserProfile | null): void {
       tokenManager.setUserData(null);
     } else {
       sessionStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-      tokenManager.setUserData(profile as unknown as Record<string, unknown>);
+      tokenManager.setUserData(profile as Record<string, unknown>);
     }
   } catch (e) {
     logger.warn('setProfile localStorage failed:', e);

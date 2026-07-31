@@ -206,7 +206,7 @@ const RefactoredCard = ({
   return (
     <article
       className={className}
-      style={cardStyles as unknown as CSSProperties}
+      style={cardStyles as CSSProperties}
       onMouseEnter={() => hoverable && setIsHovered(true)}
       onMouseLeave={() => hoverable && setIsHovered(false)}
       onClick={clickable ? (onClick as React.MouseEventHandler<HTMLDivElement>) : undefined}
@@ -217,23 +217,23 @@ const RefactoredCard = ({
     >
       {/* Header section */}
       {(header || title) && (
-        <div style={headerStyles as unknown as CSSProperties}>
-          {title && <h2 style={titleStyles as unknown as CSSProperties}>{title}</h2>}
-          {description && <p style={descriptionStyles as unknown as CSSProperties}>{description}</p>}
+        <div style={headerStyles as CSSProperties}>
+          {title && <h2 style={titleStyles as CSSProperties}>{title}</h2>}
+          {description && <p style={descriptionStyles as CSSProperties}>{description}</p>}
           {header && header}
         </div>
       )}
 
       {/* Main content */}
       {children && (
-        <div style={bodyStyles as unknown as CSSProperties}>
+        <div style={bodyStyles as CSSProperties}>
           {children}
         </div>
       )}
 
       {/* Footer section */}
       {footer && (
-        <div style={footerStyles as unknown as CSSProperties}>
+        <div style={footerStyles as CSSProperties}>
           {footer}
         </div>
       )}

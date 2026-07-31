@@ -71,7 +71,7 @@ const InteractivePanel = ({
         {...props}
       >
         {/* Градиентный overlay эффект */}
-        <div style={gradientOverlay as unknown as CSSProperties} />
+        <div style={gradientOverlay as CSSProperties} />
 
         {/* Основное содержимое */}
         <div style={{ position: 'relative', zIndex: 1 } as React.CSSProperties}>

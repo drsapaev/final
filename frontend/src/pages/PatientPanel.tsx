@@ -1,3 +1,5 @@
+import type { HttpApiError } from '../types/errors';
+import { extractDetailReason } from '../utils/error-utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import {
@@ -109,7 +111,7 @@ const PatientPanel = () => {
         } catch (error) {
           logger.error(`[PatientPanel] Failed to load ${label}:`, error);
           // Не показываем error если это просто 401 (пользователь не авторизован)
-          if ((error as { response?: { status?: number } })?.response?.status !== 401) {
+          if ((error as HttpApiError)?.response?.status !== 401) {
             setPatientDataError(t('misc.pp_ne_udalos_zagruzit_label_obn', { label: label }));
           }
         }
@@ -165,7 +167,7 @@ const PatientPanel = () => {
       })
       .catch((err) => {
         if (cancelled) return;
-        const reason = (err as { response?: { data?: { detail?: { reason?: string } } } })?.response?.data?.detail?.reason || 'forms_preview_failed';
+        const reason = extractDetailReason(err) || 'forms_preview_failed';
         setFormsError(describePatientError('forms', reason));
         setFormsStatus('error');
       });

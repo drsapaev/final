@@ -305,7 +305,7 @@ export function DoctorTemplatesPanel({
                 </div>
             </div>
             {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-            {confirmDialog as unknown as React.ReactNode}
+            {confirmDialog}
         </div>
     );
 }

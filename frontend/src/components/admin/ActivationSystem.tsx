@@ -111,7 +111,7 @@ const ActivationSystem = () => {
   const t = rawT as TranslationFn;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   const [loading, setLoading] = useState(true);
 
 const [activations, setActivations] = useState<Activation[]>([]);
@@ -586,7 +586,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
         </div>
       </MacOSCard>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
 
       {/* UX Audit: Extend activation dialog (replaces window.prompt). */}
       <ModernDialog

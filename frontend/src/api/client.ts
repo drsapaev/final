@@ -17,6 +17,7 @@ import type { LoginResult } from '../types/domain/auth';
 import { parseLoginResponse, AuthInvariantViolationError } from '../types/auth-mapper';
 import type { LoginResponseRaw, UserDto } from '../types/api';
 import { safeJsonParse } from '../utils/safeJsonParse';
+import type { HttpApiError } from '../types/errors';
 
 const API_BASE = getApiBaseUrl();
 // PR-39 / Medium-11: CSRF bootstrap defaults to ON. Set VITE_CSRF_BOOTSTRAP=0
@@ -176,7 +177,7 @@ async function ensureCSRFToken(): Promise<string | null> {
       });
       return response.data?.csrf_token || getCookie('csrf_token');
     } catch (err) {
-      const axiosErr = err as { response?: { status?: number } };
+      const axiosErr = err as HttpApiError;
       if (axiosErr?.response?.status === 404) {
         csrfEndpointUnavailable = true;
         logger.info('[FIX:CSRF] Backend does not expose /auth/csrf-token; skipping CSRF header bootstrap');
@@ -390,7 +391,7 @@ async function apiRequest<T = unknown>(
     return resp.data as T;
   } catch (err) {
     // Normalize error payloads so callers can handle them uniformly.
-    const axiosErr = err as { response?: { data?: { detail?: unknown } } };
+    const axiosErr = err as HttpApiError;
     if (axiosErr?.response?.data) {
       const d = axiosErr.response.data;
       // common FastAPI shapes: { "detail": "msg" } or { "detail": [ ... ] }

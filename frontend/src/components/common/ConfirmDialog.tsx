@@ -257,7 +257,10 @@ export function ConfirmDialog({
  *     if (ok) await api.delete(`/patients/${id}`);
  *   }
  */
-export function useConfirm() {
+export type ConfirmFn = (options: Record<string, unknown>) => Promise<boolean>;
+export type UseConfirmReturn = [ConfirmFn, React.ReactNode];
+
+export function useConfirm(): UseConfirmReturn {
   const [state, setState] = useState({
     isOpen: false,
     options: {},

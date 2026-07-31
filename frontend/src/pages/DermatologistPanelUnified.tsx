@@ -318,7 +318,7 @@ const DermatologistPanelUnified = () => {
   const { isDark, getColor, getSpacing, getFontSize } = useTheme();
   // QW-5 (UX audit): confirm hook for visit completion
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   // STRAT#33: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   const t = tI18n as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -1085,7 +1085,7 @@ const DermatologistPanelUnified = () => {
         });
 
         const applyAppointmentSelection = (appointment: DermatologyAppointment) => {
-          const patientObj = buildDermatologyPatientFromAppointment(appointment as unknown as Record<string, unknown>, i18n.t.bind(null));
+          const patientObj = buildDermatologyPatientFromAppointment(appointment as Record<string, unknown>, i18n.t.bind(null));
           if (!patientObj) {
             return false;
           }
@@ -1320,7 +1320,7 @@ const DermatologistPanelUnified = () => {
     }
 
     // Определяем ID записи: приоритет selectedPatient, потом currentAppointment
-    const entryId = resolveDoctorQueueEntryId(selectedPatient as unknown as Record<string, unknown>) ?? resolveDoctorQueueEntryId(currentAppointment as unknown as Record<string, unknown>);
+    const entryId = resolveDoctorQueueEntryId(selectedPatient as Record<string, unknown>) ?? resolveDoctorQueueEntryId(currentAppointment as Record<string, unknown>);
     if (!entryId) {
       logger.error('[Dermатology] handleSaveVisit: нет entryId');
       notify.error(t('derma.no_patient_for_complete'));
@@ -1942,7 +1942,7 @@ const DermatologistPanelUnified = () => {
 
         {/* AI Chat Widget */}
         {/* QW-5/QW-6 (UX audit): confirm dialog + session timeout warning */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
       {sessionWarning && (
         <SessionWarningModal
           visible={!!sessionWarning}

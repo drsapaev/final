@@ -164,7 +164,7 @@ const ServiceCatalog = () => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -817,7 +817,7 @@ const ServiceCatalog = () => {
         </div>
       )}
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </div>);
 
 };

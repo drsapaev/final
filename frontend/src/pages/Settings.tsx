@@ -128,7 +128,7 @@ export default function Settings() {void
   const t = rawT;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   const [tab, setTab] = useState<'license' | 'printer' | 'online_queue' | 'display_board' | 'payment_providers' | 'notifications' | 'appearance' | 'security'>('license');
 
   // license tab
@@ -511,7 +511,7 @@ export default function Settings() {void
         </div>
       </RoleGate>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </div>);
 
 }

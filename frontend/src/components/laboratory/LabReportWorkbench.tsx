@@ -87,7 +87,7 @@ export default function LabReportWorkbench({
   // Finalize делает бланк immutable (можно только revise). Revise создаёт
   // новый instance. Оба действия необратимы без объяснения последствий.
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   // ADR-0015: lab reporting API accessed via hook.
   const labReportingApi = useLabReporting();
 
@@ -879,7 +879,7 @@ export default function LabReportWorkbench({
         onOpenInstance={onOpenInstance as unknown as (instanceId: string | number) => void}
       />
       {/* WF-08 fix: portal-mounted ConfirmDialog для irreversible actions */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </div>
   );
 }

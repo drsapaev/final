@@ -33,6 +33,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
 import { getErrorMessage } from '../../utils/type-guards';
 import { safeJsonParse } from '../../utils/safeJsonParse';
+import type { HttpApiError } from '../../types/errors';
 
 interface PolicyControl {
   desktop: boolean;
@@ -443,7 +444,7 @@ function getFreshNotificationSettings(userId: string | number): Record<string, u
 }
 
 function shouldFallbackToDirectApi(error: unknown): boolean {
-  const err = error as { response?: unknown };
+  const err = error as HttpApiError;
   return !err?.response;
 }
 

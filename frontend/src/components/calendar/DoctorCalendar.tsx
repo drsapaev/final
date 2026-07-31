@@ -372,10 +372,10 @@ const DoctorCalendar = ({
   };
 
   return (
-    <div style={styles.container as unknown as CSSProperties}>
+    <div style={styles.container as CSSProperties}>
             {/* Header */}
-            <div style={styles.header as unknown as CSSProperties}>
-                <div style={styles.title as unknown as CSSProperties}>
+            <div style={styles.header as CSSProperties}>
+                <div style={styles.title as CSSProperties}>
                     <Calendar size={20} />
                     <span>
                         {weekDays.length > 0 &&
@@ -388,7 +388,7 @@ const DoctorCalendar = ({
 
                 <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' } as CSSProperties}>
                     <button
-            style={styles.navButton as unknown as CSSProperties}
+            style={styles.navButton as CSSProperties}
             onClick={goToPrevWeek}
             title={t18('misc.dc_predyduschaya_nedelya')}
             aria-label={t18('misc.dc_predyduschaya_nedelya')}>
@@ -397,14 +397,14 @@ const DoctorCalendar = ({
                     </button>
 
                     <button
-            style={styles.todayButton as unknown as CSSProperties}
+            style={styles.todayButton as CSSProperties}
             onClick={goToToday}>
 
                         Сегодня
                     </button>
 
                     <button
-            style={styles.navButton as unknown as CSSProperties}
+            style={styles.navButton as CSSProperties}
             onClick={goToNextWeek}
             title={t18('misc.dc_sleduyuschaya_nedelya')}
             aria-label={t18('misc.dc_sleduyuschaya_nedelya')}>
@@ -413,7 +413,7 @@ const DoctorCalendar = ({
                     </button>
 
                     <button
-            style={styles.navButton as unknown as CSSProperties}
+            style={styles.navButton as CSSProperties}
             onClick={loadSchedule}
             title={t18('misc.dc_obnovit')}
             aria-label={t18('misc.dc_obnovit')}>
@@ -425,7 +425,7 @@ const DoctorCalendar = ({
 
             {/* Error */}
             {error &&
-      <div style={styles.error as unknown as CSSProperties}>
+      <div style={styles.error as CSSProperties}>
                     <AlertCircle size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} />
                     {error}
                 </div>
@@ -433,17 +433,17 @@ const DoctorCalendar = ({
 
             {/* Loading */}
             {loading ?
-      <div style={styles.loading as unknown as CSSProperties}>
+      <div style={styles.loading as CSSProperties}>
                     <RefreshCw size={24} className="spinning" style={{ marginRight: 'var(--mac-spacing-2)' }} />
                     Загрузка расписания...
                 </div> :
 
       <>
                     {/* Week Grid */}
-                    <div style={styles.weekGrid as unknown as CSSProperties}>
+                    <div style={styles.weekGrid as CSSProperties}>
                         {/* Day Headers */}
                         {WEEKDAY_NAMES.map((name, idx) =>
-          <div key={idx} style={styles.dayHeader as unknown as CSSProperties}>
+          <div key={idx} style={styles.dayHeader as CSSProperties}>
                                 {name}
                             </div>
           )}

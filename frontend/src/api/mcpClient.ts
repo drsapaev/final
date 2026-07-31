@@ -19,6 +19,7 @@
 import { api } from './client';
 import { hardRedirectToLogin } from '../utils/navigation';
 import logger from '../utils/logger';
+import type { HttpApiError } from '../types/errors';
 
 // Префикс для всех MCP-эндпоинтов. Подставляется к baseURL из api/client.js.
 const MCP_PREFIX = '/mcp';
@@ -62,7 +63,7 @@ async function mcpRequest(method: string, path: string, config: Record<string, u
 
     return response.data;
   } catch (error) {
-    const axiosErr = error as { response?: { status?: number; data?: { detail?: string; message?: string } } };
+    const axiosErr = error as HttpApiError;
     const status = axiosErr?.response?.status;
     const detail = axiosErr?.response?.data?.detail || axiosErr?.response?.data?.message;
 

@@ -9,7 +9,7 @@ import { mcpAPI as _mcpAPI } from '../api/mcpClient';
 // Cast to a permissive type to avoid breaking type-check; do NOT use this
 // pattern in production code.
 const mcpAPI: Record<string, (...args: unknown[]) => Promise<Record<string, unknown>>> =
-  _mcpAPI as unknown as Record<string, (...args: unknown[]) => Promise<Record<string, unknown>>>;
+  _mcpAPI as Record<string, (...args: unknown[]) => Promise<Record<string, unknown>>>;
 
 import logger from '../utils/logger';
 export const testMCPIntegration = async () => {

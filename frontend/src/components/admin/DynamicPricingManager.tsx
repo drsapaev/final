@@ -257,7 +257,7 @@ const DynamicPricingManager = () => {
   const t = rawT;
   // P-013 fix: shared ConfirmDialog hook (replaces 2 native confirm() calls).
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   const [activeTab, setActiveTab] = useState<'rules' | 'packages' | 'analytics'>('rules');
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
   const [servicePackages, setServicePackages] = useState<ServicePackage[]>([]);
@@ -1133,7 +1133,7 @@ const DynamicPricingManager = () => {
         </>
       }
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </div>);
 
 };

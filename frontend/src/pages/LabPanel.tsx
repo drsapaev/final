@@ -685,7 +685,7 @@ export default function LabPanel() {
           loadingMore={loadingMore}
           queueTotal={queueTotal}
           onOpenAppointment={(appointment) => {
-            setSelectedAppointment(appointment as unknown as Record<string, unknown>);
+            setSelectedAppointment(appointment as Record<string, unknown>);
             setTemplateResolution(null);
             // WF-03 fix: если у пациента уже есть report_instance_id —
             // сразу открываем существующий отчёт, а не сбрасываем в режим
@@ -698,7 +698,7 @@ export default function LabPanel() {
             }
             switchTab('reports');
           }}
-          selectedAppointment={selectedAppointment as unknown as Record<string, unknown> & { id?: string | number; patient_fio?: string; patient_phone?: string; patient_id?: string | number; visit_id?: string | number; appointment_time?: string; status?: string }}
+          selectedAppointment={selectedAppointment as Record<string, unknown> & { id?: string | number; patient_fio?: string; patient_phone?: string; patient_id?: string | number; visit_id?: string | number; appointment_time?: string; status?: string }}
           reportHistory={reportHistory as unknown as Array<Record<string, unknown> & { id: string | number; created_at: string; status: string; flagged_findings_count: number; critical_findings_count: number; max_flag_severity?: number }>}
         />
       </section>

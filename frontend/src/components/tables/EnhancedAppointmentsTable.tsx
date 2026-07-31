@@ -1483,7 +1483,7 @@ const EnhancedAppointmentsTable = ({
               // ⭐ SSOT: Get session color for visual grouping (presentation only)
               const sessionColor = getSessionColor(row.session_id ?? '');
               const statusBadge: React.ReactNode = renderStatus(String(row.status ?? ""));
-              const rowRecord = row as unknown as Record<string, unknown>;
+              const rowRecord = row as Record<string, unknown>;
               const backendCanPay = getBackendActionAvailability(rowRecord, 'payment', 'can_mark_paid');
               const backendCanCall = getBackendActionAvailability(rowRecord, 'call', 'can_start_visit');
               const backendCanPrint = getBackendActionAvailability(rowRecord, 'print', 'can_print_ticket');
@@ -2051,7 +2051,7 @@ const EnhancedAppointmentsTable = ({
                             can_notify_diagnostics_return: row.can_notify_diagnostics_return,
                             can_restore_next: row.can_restore_next,
                             can_incomplete: row.can_incomplete,
-                            can_complete: getBackendActionAvailability(row as unknown as Record<string, unknown>, 'complete', 'can_complete')
+                            can_complete: getBackendActionAvailability(row as Record<string, unknown>, 'complete', 'can_complete')
                           }}
                           onStatusChange={(action, entry, result) => {
                             logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);

@@ -319,7 +319,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }: { isCollapsed?: boole
                 ...navItemStyle(active),
                 ...(isActive && !active ? hoverStyle : {}),
                 ...inlineStyle
-              }) as unknown as CSSProperties}
+              }) as CSSProperties}
               title={isCollapsed ? item.label : ''}>
 
               <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
@@ -362,7 +362,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }: { isCollapsed?: boole
                   ...navItemStyle(active),
                   ...(isActive && !active ? hoverStyle : {}),
                   ...inlineStyle
-                }) as unknown as CSSProperties}
+                }) as CSSProperties}
               title={isCollapsed ? item.label : ''}>
 
                 <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />

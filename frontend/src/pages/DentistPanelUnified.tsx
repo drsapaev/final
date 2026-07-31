@@ -485,7 +485,7 @@ const DentistPanelUnified = () => {
 
   // C-1 (UX audit): confirm hook for visit completion
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   // STRAT#34: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   // C-2 (UX audit): session timeout warning
@@ -749,7 +749,7 @@ const DentistPanelUnified = () => {
         patient_name: row.patient_fio,
         phone: row.patient_phone || (row.phone as string) || '',
         number: row.id,
-        doctor_queue_entry_id: resolveDoctorQueueEntryId(row as unknown as Record<string, unknown>),
+        doctor_queue_entry_id: resolveDoctorQueueEntryId(row as Record<string, unknown>),
         source: 'appointments'
       };
       setSelectedPatient(patientData);
@@ -768,7 +768,7 @@ const DentistPanelUnified = () => {
       case 'call':
         // Вызвать пациента
         try {
-          const queueEntryId = resolveDoctorQueueEntryId(row as unknown as Record<string, unknown>);
+          const queueEntryId = resolveDoctorQueueEntryId(row as Record<string, unknown>);
           if (queueEntryId === null) {
             logger.warn('[Dentist] Cannot start visit without OnlineQueueEntry id', row);
             notify.error(tI18n('dental.no_queue_id_for_visit'));
@@ -792,7 +792,7 @@ const DentistPanelUnified = () => {
       case 'print':
         logger.info('[Dentist] Печать талона для:', row.patient_fio);
         try {
-          const printResult = await printPanelTicket(row as unknown as Record<string, unknown>, {
+          const printResult = await printPanelTicket(row as Record<string, unknown>, {
             specialtyName: tI18n('dental.dental_panel_specialty_name')
           }) as { message?: string } | undefined;
           notify.success(printResult?.message || tI18n('dental.dental_panel_ticket_printed', { name: row.patient_fio }));
@@ -817,7 +817,7 @@ const DentistPanelUnified = () => {
             patient_name: row.patient_fio,
             phone: row.patient_phone || (row.phone as string) || '',
             number: row.id,
-            doctor_queue_entry_id: resolveDoctorQueueEntryId(row as unknown as Record<string, unknown>),
+            doctor_queue_entry_id: resolveDoctorQueueEntryId(row as Record<string, unknown>),
             source: 'appointments',
             status: 'in_cabinet'
           };
@@ -1763,7 +1763,7 @@ const DentistPanelUnified = () => {
     if (selectedPatient) {
       return (
         <DentalVisitScreen
-          patient={selectedPatient as unknown as Record<string, unknown>}
+          patient={selectedPatient as Record<string, unknown>}
           onCompleteVisit={handleCompleteVisit}
           onBackToQueue={() => {
             setSelectedPatient(null);
@@ -2402,7 +2402,7 @@ const DentistPanelUnified = () => {
 
 
       {/* C-1 (UX audit): portal-mounted ConfirmDialog */}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
 
       {/* C-2 (UX audit): session timeout warning dialog */}
       {sessionWarning && (

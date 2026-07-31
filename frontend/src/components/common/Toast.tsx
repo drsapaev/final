@@ -227,10 +227,10 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
   };
 
   return (
-    <div style={getToastStyles(toast.type as string) as unknown as CSSProperties}>
+    <div style={getToastStyles(toast.type as string) as CSSProperties}>
       {getIcon(toast.type as string)}
-      <div style={contentStyle as unknown as CSSProperties}>
-        {Boolean(toast.title) && <div style={titleStyle as unknown as CSSProperties}>{toast.title as string}</div>}
+      <div style={contentStyle as CSSProperties}>
+        {Boolean(toast.title) && <div style={titleStyle as CSSProperties}>{toast.title as string}</div>}
         {Boolean(toast.message) && <div style={messageStyle}>{toast.message as string}</div>}
       </div>
       <button
@@ -242,7 +242,7 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
         ×
       </button>
       {(toast.duration as number) > 0 &&
-      <div style={progressBarStyle as unknown as CSSProperties} />
+      <div style={progressBarStyle as CSSProperties} />
       }
     </div>);
 

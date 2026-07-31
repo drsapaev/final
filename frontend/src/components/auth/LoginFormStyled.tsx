@@ -19,6 +19,7 @@ import {
 } from '../ui/macos';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import type { HttpApiError } from '../../types/errors';
 
 const landingRoute = getCanonicalRouteById('landing')?.path || '/';
 const loginRoute = getCanonicalRouteById('login')?.path || '/login';
@@ -141,10 +142,10 @@ const LoginFormStyled = () => {
         data = response.data;
       } catch (apiErr: unknown) {
         // Нормализуем ошибку axios и пробрасываем дальше.
-        const apiErrExtra = apiErr as { response?: { status?: number; data?: { detail?: string; message?: string } }; message?: string };
+        const apiErrExtra = apiErr as HttpApiError;
         const normalizedError = new Error(formatLoginErrorMessage({
           responseStatus: apiErrExtra?.response?.status,
-          responseDetail: apiErrExtra?.response?.data?.detail,
+          responseDetail: typeof apiErrExtra?.response?.data?.detail === 'string' ? apiErrExtra?.response?.data?.detail : null,
           responseMessage: apiErrExtra?.response?.data?.message,
           rawMessage: apiErrExtra?.message,
           fallbackMessage: t('misc.lfs_oshibka_avtorizatsii'),
@@ -233,7 +234,7 @@ const LoginFormStyled = () => {
       const rawMessage = typeof errObj?.message === 'string' ? errObj.message : '';
       const errorMessage = formatLoginErrorMessage({
         responseStatus: errObj?.response?.status,
-        responseDetail: errObj?.response?.data?.detail,
+        responseDetail: typeof errObj?.response?.data?.detail === 'string' ? errObj?.response?.data?.detail : null,
         responseMessage: errObj?.response?.data?.message,
         rawMessage: errObj?.normalizedMessage || rawMessage,
         fallbackMessage: t('misc.lfs_oshibka_vhoda'),

@@ -104,7 +104,7 @@ const groupMessagesByDate = (msgs: Array<{ id?: string | number; created_at?: st
 const ChatWindow = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
   const [authState, setAuthState] = useState(auth.getState());
   const user = authState.profile;
   const { addToast } = useToast() as { addToast: (toast: unknown) => void };
@@ -1458,7 +1458,7 @@ const ChatWindow = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
   return (
     <>
       {chatWindowElement}
-      {confirmDialog as unknown as React.ReactNode}
+      {confirmDialog}
     </>
   );
 };

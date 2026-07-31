@@ -136,11 +136,11 @@ function ModalContainer({ modals, onClose, theme }: ModalContainerProps) {
   return (
     <>
       {modals.map((modal) =>
-      <div key={modal.id} style={overlayStyle as unknown as CSSProperties}>
+      <div key={modal.id} style={overlayStyle as CSSProperties}>
           {modal.closable &&
         <button
           type="button"
-          style={backdropButtonStyle as unknown as CSSProperties}
+          style={backdropButtonStyle as CSSProperties}
           onClick={() => onClose(modal.id)}
           tabIndex={-1}
           aria-label="Close modal" />
@@ -258,14 +258,14 @@ function ModalItem({ modal, onClose }: ModalItemProps) {
 
   return (
     <div
-      style={modalStyle as unknown as CSSProperties}>
+      style={modalStyle as CSSProperties}>
 
       {modal.title &&
-      <div style={headerStyle as unknown as CSSProperties}>
-          <h2 style={titleStyle as unknown as CSSProperties}>{modal.title}</h2>
+      <div style={headerStyle as CSSProperties}>
+          <h2 style={titleStyle as CSSProperties}>{modal.title}</h2>
           {modal.closable &&
         <button
-          style={closeButtonStyle as unknown as CSSProperties}
+          style={closeButtonStyle as CSSProperties}
           onClick={() => onClose(modal.id)}
           onMouseOver={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.backgroundColor = 'var(--color-background-tertiary)';
@@ -280,12 +280,12 @@ function ModalItem({ modal, onClose }: ModalItemProps) {
         </div>
       }
       
-      <div style={contentStyle as unknown as CSSProperties}>
+      <div style={contentStyle as CSSProperties}>
         {modal.content}
       </div>
       
       {modal.footer &&
-      <div style={footerStyle as unknown as CSSProperties}>
+      <div style={footerStyle as CSSProperties}>
           {modal.footer}
         </div>
       }
@@ -426,24 +426,24 @@ export function Modal({
   if (!isOpen) return null;
 
   return (
-    <div style={overlayStyle as unknown as CSSProperties}>
+    <div style={overlayStyle as CSSProperties}>
       {closable &&
       <button
         type="button"
-        style={backdropButtonStyle as unknown as CSSProperties}
+        style={backdropButtonStyle as CSSProperties}
         onClick={onClose}
         tabIndex={-1}
         aria-label="Close modal" />
 
       }
 
-      <div style={modalStyle as unknown as CSSProperties}>
+      <div style={modalStyle as CSSProperties}>
         {title &&
-        <div style={headerStyle as unknown as CSSProperties}>
-            <h2 style={titleStyle as unknown as CSSProperties}>{title}</h2>
+        <div style={headerStyle as CSSProperties}>
+            <h2 style={titleStyle as CSSProperties}>{title}</h2>
             {closable &&
           <button
-            style={closeButtonStyle as unknown as CSSProperties}
+            style={closeButtonStyle as CSSProperties}
             onClick={onClose}
             onMouseOver={(e: React.MouseEvent<HTMLElement>) => {
               e.currentTarget.style.backgroundColor = 'var(--color-background-tertiary)';
@@ -458,12 +458,12 @@ export function Modal({
           </div>
         }
         
-        <div style={contentStyle as unknown as CSSProperties}>
+        <div style={contentStyle as CSSProperties}>
           {children}
         </div>
         
         {footer &&
-        <div style={footerStyle as unknown as CSSProperties}>
+        <div style={footerStyle as CSSProperties}>
             {footer}
           </div>
         }

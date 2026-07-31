@@ -130,7 +130,7 @@ const DepartmentManagement = () => {
   const t = rawT;
   // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
   const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const confirm = confirmRaw;
 
   // Reactive label option arrays (depend on current language via t).
   const categoryOptions = getCategoryOptions(t);
@@ -1430,7 +1430,7 @@ const DepartmentManagement = () => {
                 </div>
             </Modal>
             {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-            {confirmDialog as unknown as React.ReactNode}
+            {confirmDialog}
         </div>
       );
 
