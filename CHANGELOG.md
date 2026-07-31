@@ -1,5 +1,53 @@
 # Changelog
 
+## 2026-07-31 — TypeScript Migration Completion + Runtime Correctness + Business Reliability (16 PRs)
+
+Full journey from JS→TS migration completion through architectural consolidation to
+business reliability infrastructure. 16 PRs merged, all CI gates green throughout.
+
+### Architecture Consolidation (PR #2621–#2626)
+
+- **#2621:** ChatSessionState redesigned per 6 architectural invariants (transport ≠ content, explicit transitions, structured error)
+- **#2622:** ADR-0014..0017 (State Pattern Matrix, Domain Boundary Matrix, Error Taxonomy, Transition Verification) + 107 property tests
+- **#2623:** P0 error model consolidation — 17 duplicate AxiosLikeError types → 1 canonical HttpApiError + BaseApiError hierarchy
+- **#2624:** P1–P4 runtime boundary cleanup (23→3 violations), dead code removal, ADR-0018 validation strategy, dead AsyncState imports removed
+- **#2625:** Sprint C+D+E3 — boundary cleanup (JSON.parse→safeJsonParse), assertion hygiene (as unknown as 964→475), AsyncState migration
+- **#2626:** D1+D3 completion — as unknown as 475→315, as { response → 0, HttpApiError + extractDetailReason helper
+
+### Runtime Correctness (PR #2627–#2631)
+
+- **#2627:** Track 1 — Zod runtime DTO validation in mappers (Patient, Appointment, Billing). 3 schemas, 39 tests
+- **#2628:** Track 2 — Domain invariant validators (16 business rules across Appointment, Billing, Queue, EMR). 81 tests
+- **#2629:** Track 3 — State machine transition validators (5 machines: Appointment, Queue, Payment, Refund, EMR). 43 property tests
+- **#2630:** Wire-up — invariants + state machines integrated into hooks/reducers. EMR reducer enforces transitions, hooks call validators before API
+- **#2631:** Track 4 — End-to-end contract tests (OpenAPI ↔ Zod ↔ Mapper ↔ Domain). 19 tests with drift detection
+
+### Business Reliability (PR #2632–#2635)
+
+- **#2632:** Phase 1 — 10 E2E business scenarios + 4 concurrency tests. 105 test instances across 7 browsers
+- **#2633:** Phase 2 — 5 integration endpoint contracts + 15 security scenarios (RBAC, JWT, input validation). 125 test instances
+- **#2634:** Phase 3 — 4 load tests (Queue 50 users p95<500ms, EMR 20 doctors p95<1000ms) + 4 chaos scenarios + 2 k6 scripts
+- **#2635:** Phase 4 — Mutation testing configuration (mutmut Python ≥80%, Stryker TS ≥70%)
+
+### CI Reliability Infrastructure (PR #2636)
+
+- **#2636:** 4 GitHub Actions workflows (mutation nightly, load weekly, chaos weekly, release gate) + 3 helper scripts + baseline config + reliability dashboard. 5 corrections: mutation not in PRs, load on self-hosted, baseline + %, chaos recovery, dashboard history
+
+### Verification Summary
+
+| Metric | Value |
+|--------|-------|
+| tsc --noEmit | 0 errors (strict:true) |
+| eslint | 0 errors |
+| type-debt | PASS (21/21, all documented) |
+| regression-audit | 31/31 PASS |
+| vitest (unit + contract) | 314/314 PASS |
+| Playwright E2E | 270 test instances |
+| Total test count | 615+ |
+| ADRs | 18 (ADR-0001 through ADR-0018) |
+
+---
+
 ## 2026-07-12 — Architecture & Audit Remediation Sprint (28 PRs)
 
 Comprehensive remediation across 6 audit cycles. All changes merged to `main`

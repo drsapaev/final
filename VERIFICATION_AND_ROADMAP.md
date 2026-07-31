@@ -1015,3 +1015,53 @@ The Invalidation Criteria table above is designed to be CI-automatable.
 A `scripts/regression-audit-check.mjs` script should be created that
 runs all checks and fails CI if any invariant is violated. This turns
 the audit from a document into an engineering process.
+
+---
+
+## Post-Verification Milestones (2026-07-31)
+
+After the verification pass (73 findings, all resolved), the project
+proceeded through 4 major phases:
+
+### Phase 1: TypeScript Migration Completion
+- strict:true achieved (0 tsc errors)
+- All `@ts-nocheck` removed
+- All `.js/.jsx` files migrated to `.ts/.tsx`
+- Type debt baseline locked at 20 `any` casts (all documented)
+
+### Phase 2: Architectural Consolidation (ADR-0013–0018)
+- State Management Boundaries defined (AsyncState / ChatSessionState / useReducer / useState)
+- Domain Boundary Matrix enforced (23→3 runtime violations)
+- Error Taxonomy consolidated (17 duplicate types → 1 canonical HttpApiError)
+- Transition Verification (107 property tests for ChatSessionState)
+- Runtime Validation Strategy (Zod at mapper layer)
+
+### Phase 3: Runtime Correctness (Tracks 1–4 + Wire-up)
+- Track 1: Zod schemas in mappers (3 schemas, 39 tests)
+- Track 2: Domain invariant validators (16 rules, 81 tests)
+- Track 3: State machine transition validators (5 machines, 43 tests)
+- Track 4: Contract tests (OpenAPI ↔ Zod ↔ Mapper ↔ Domain, 19 tests)
+- Wire-up: invariants + state machines integrated into hooks/reducers
+
+### Phase 4: Business Reliability (Phases 1–4 + CI Infrastructure)
+- E2E business scenarios (10 scenarios, 105 test instances)
+- Concurrency/race-condition tests (4 scenarios)
+- Integration + Security tests (5 endpoints + 15 security scenarios)
+- Load + Chaos tests (k6 scripts + chaos engineering with recovery)
+- Mutation testing configuration (mutmut + Stryker)
+- CI infrastructure: 4 workflows (nightly mutation, weekly load, weekly chaos, release gate)
+- Reliability dashboard: docs/RELIABILITY.md with historical trends
+
+### Final State
+
+| Metric | Value |
+|--------|-------|
+| tsc errors | 0 (strict:true) |
+| eslint errors | 0 |
+| type-debt | 21/21 (all documented) |
+| regression-audit | 31/31 PASS |
+| vitest | 314/314 PASS |
+| Playwright E2E | 270 test instances |
+| Total tests | 615+ |
+| ADRs | 18 |
+| CI workflows | 4 (mutation, load, chaos, release-gate) |

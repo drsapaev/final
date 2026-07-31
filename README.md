@@ -38,11 +38,13 @@
 - **Аутентификация**: JWT токены с системой ролей
 - **WebSocket**: Реальное время для очередей и уведомлений
 
-### Frontend (React + Vite)
+### Frontend (React + Vite + TypeScript)
+- **TypeScript**: strict:true, 0 tsc ошибок, 0 `@ts-nocheck`, полная JS→TS миграция
 - **UI**: Современный интерфейс с темной/светлой темой
 - **Роутинг**: React Router с защищенными маршрутами, динамическая маршрутизация по `Doctor.specialty`
-- **Состояние**: Контекст API для управления состоянием
-- **Тестирование**: Playwright для E2E тестов, Vitest для unit тестов
+- **Состояние**: AsyncState<T> для async ресурсов, ChatSessionState для WebSocket, useReducer для workflow state machines
+- **Type Safety**: Branded IDs (PatientId, AppointmentId, etc.), Zod schemas на границе DTO→Domain, domain invariants
+- **Тестирование**: Playwright для E2E тестов, Vitest для unit/contract тестов
 
 ## 🛠️ Технологический стек
 
@@ -184,6 +186,37 @@ Require these GitHub-native checks:
 - `🔗 Интеграционные тесты` — тяжелая проверка для `push` в `main` и ручных запусков
 
 ## 📚 Документация
+
+### Архитектурные решения (ADR)
+
+| ADR | Тема | Статус |
+|-----|------|--------|
+| [ADR-0013](docs/adr/ADR-0013-state-management-boundaries.md) | State Management Boundaries (AsyncState vs useReducer vs useState vs ChatSessionState) | ✅ Accepted |
+| [ADR-0014](docs/adr/ADR-0014-state-pattern-matrix.md) | State Pattern Matrix — decision flowchart for choosing the right state pattern | ✅ Accepted |
+| [ADR-0015](docs/adr/ADR-0015-domain-boundary-matrix.md) | Domain Boundary Matrix — import rules for DTO↔Domain↔Hook↔Component layers | ✅ Accepted |
+| [ADR-0016](docs/adr/ADR-0016-error-taxonomy.md) | Error Taxonomy — HttpApiError / ChatError / WorkflowError hierarchy | ✅ Accepted |
+| [ADR-0017](docs/adr/ADR-0017-transition-verification.md) | Transition Verification — finite state machine property tests for ChatSessionState | ✅ Accepted |
+| [ADR-0018](docs/adr/ADR-0018-runtime-validation-strategy.md) | Runtime Validation Strategy — Zod at the mapper layer as single validation boundary | ✅ Accepted |
+
+### Reliability infrastructure
+
+- [Reliability Dashboard](docs/RELIABILITY.md) — исторические тренды: mutation scores, load p95, chaos, security
+- [Mutation Testing Guide](docs/mutation-testing.md) — mutmut (Python ≥80%) + Stryker (TS ≥70%)
+- [Runtime Correctness Roadmap](docs/architecture/ROADMAP-runtime-correctness.md) — 3-track plan: boundary/domain/workflow correctness
+
+### CI/CD архитектура
+
+```
+PR CI → lint + tsc + unit (314) + integration + contracts + type-debt + regression (31) + [critical: incremental Stryker]
+  ↓
+Nightly → mutmut (Python ≥80%) + Stryker (TS ≥70%) — artifacts: mutation-reports/
+  ↓
+Weekly → k6 load (baseline × 1.15 gate) + chaos (failure → recovery → verification)
+  ↓
+Release → k6 baseline + incremental mutation + regression 31/31
+  ↓
+Dashboard → docs/RELIABILITY.md (исторические тренды)
+```
 
 ### Основные документы
 - [ADR-001: Queue Ownership & Specialty Architecture](docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md) — архитектурное решение: очередь принадлежит врачу, специальность определяется по `Doctor.specialty`
