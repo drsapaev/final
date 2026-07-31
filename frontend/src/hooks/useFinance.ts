@@ -6,6 +6,8 @@ import type { Transaction } from '../types/domain/clinic';
 import type { AsyncState } from '../types/async-state';
 import { successState, loadingState, errorState, getData, getError } from '../types/async-state';
 import { safeJsonParse } from '../utils/safeJsonParse';
+// Wire-up: payment invariant validator (Track 2 + Wire-up).
+import { checkPaymentAmount } from '../types/domain/invariants/billing';
 
 const FINANCE_CACHE_KEY = 'admin_finance_transactions_cache';
 // audit/phase-8, BS-36: TTL for deletedIds. Previously deletedIds grew
@@ -266,6 +268,15 @@ const useFinance = () => {
   }, [persistTransactions]);
 
   const createTransaction = useCallback(async (transactionData: Partial<Transaction>) => {
+    // Wire-up: validate payment invariant before API call.
+    const amountCheck = checkPaymentAmount({
+      amount: transactionData.amount as number | undefined,
+    });
+    if (!amountCheck.ok) {
+      setTransactionsState(errorState<unknown[]>(amountCheck.message));
+      throw new Error(amountCheck.message);
+    }
+
     setTransactionsState(loadingState<unknown[]>());
 
     try {

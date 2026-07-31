@@ -11,6 +11,8 @@ import type {
 } from '../types/domain/queue';
 // ADR-0016: canonical error types from types/errors.ts.
 import type { HttpApiError } from '../types/errors';
+// Wire-up: queue invariant validator (Track 2 + Wire-up).
+import { checkQueueEntryCanBeCalled } from '../types/domain/invariants/queue';
 
 // Doctor-queue-specific payload envelope. The backend returns this shape from
 // /queue/{id} with queue entries + stats + can_call_next metadata. The
@@ -154,9 +156,21 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
   const callNext = useCallback(async (): Promise<unknown> => {
     try {
       const currentQueue = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
-      const nextCallEntryId = selectNextCallEntryId(currentQueue.data as DoctorQueuePayload);
+      const queueData = currentQueue.data as DoctorQueuePayload;
+      const nextCallEntryId = selectNextCallEntryId(queueData);
       if (!nextCallEntryId) {
         return { success: false, message: 'Нет ожидающих пациентов' };
+      }
+
+      // Wire-up: validate queue invariant before calling.
+      // Find the entry to check its status — don't call a terminal entry.
+      const entry = (queueData?.entries ?? []).find((e) => e.id === nextCallEntryId);
+      if (entry) {
+        const canCallCheck = checkQueueEntryCanBeCalled(entry);
+        if (!canCallCheck.ok) {
+          logger.warn('[useDoctorQueue] Invariant violation in callNext:', canCallCheck);
+          return { success: false, message: canCallCheck.message };
+        }
       }
 
       const response = await api.post(`/doctor/queue/${nextCallEntryId}/call`, {});

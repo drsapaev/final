@@ -12,6 +12,8 @@
  */
 import type { EmrAction, EmrRecord, EmrState } from '../types/features/emr';
 import { safeJsonParse } from '../utils/safeJsonParse';
+// Wire-up: EMR state machine transition validator (Track 3 + Wire-up).
+import { applyEmrTransition } from '../types/state-machines/emr';
 
 // Action types — exported as a const object for runtime use.
 // The EmrAction discriminated union (in types/features/emr.ts) is the
@@ -158,55 +160,51 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
         // SAVE_START - Begin save
         // =========================================================================
         case EMR_ACTIONS.SAVE_START:
-            return {
+            return applyEmrTransition({
                 ...state,
-                status: 'saving',
                 error: null,
-            };
+            }, 'saving');
 
         // =========================================================================
         // SAVE_SUCCESS - Save completed
         // =========================================================================
         case EMR_ACTIONS.SAVE_SUCCESS: {
             const emr: EmrRecord = action.payload.emr;
-            return {
+            return applyEmrTransition({
                 ...state,
                 emr,
                 version: emr.version ?? state.version,
                 rowVersion: emr.row_version ?? state.rowVersion,
-                status: 'idle',
                 isDirty: false,
                 lastSaved: new Date().toISOString(),
                 error: null,
                 conflict: null,
-            };
+            }, 'idle');
         }
 
         // =========================================================================
         // SAVE_ERROR - Save failed
         // =========================================================================
         case EMR_ACTIONS.SAVE_ERROR:
-            return {
+            return applyEmrTransition({
                 ...state,
-                status: 'error',
                 error: action.payload.error,
-            };
+            }, 'error');
 
         // =========================================================================
         // CONFLICT_DETECTED - Optimistic lock failed
         // =========================================================================
         case EMR_ACTIONS.CONFLICT_DETECTED: {
             const p = action.payload;
-            return {
+            return applyEmrTransition({
                 ...state,
-                status: 'conflict',
                 conflict: {
                     serverVersion: p.current_version,
                     yourVersion: p.your_version,
                     lastEditedBy: p.last_edited_by,
                     lastEditedAt: p.last_edited_at,
                 },
-            };
+            }, 'conflict');
         }
 
         // =========================================================================
@@ -228,9 +226,8 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
         // pre-conflict version), and clears `error`.
         case EMR_ACTIONS.CONFLICT_RESOLVED: {
             const payload = action.payload;
-            return {
+            return applyEmrTransition({
                 ...state,
-                status: 'idle',
                 conflict: null,
                 ...(payload?.data ? { data: payload.data } : {}),
                 ...(payload?.rowVersion ? { rowVersion: payload.rowVersion } : {}),
@@ -238,7 +235,7 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
                 future: [],
                 isDirty: true,
                 error: null,
-            };
+            }, 'idle');
         }
 
         // =========================================================================
