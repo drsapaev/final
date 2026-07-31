@@ -36,7 +36,7 @@ export const testPatient: TestPatient = {
   id: 1,
   first_name: 'Test',
   last_name: 'Patient',
-  phone: '+998901234567',
+  phone: '+0000000000',
   birth_date: '1990-01-15',
 };
 

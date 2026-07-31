@@ -1,5 +1,5 @@
 /**
- * E2E Business Scenario 1: Patient Appointment Booking
+ * E2E Business Scenario 1: Synth Appointment Booking
  *
  * Tests: appointment creation → pending status → confirmation → confirmed status
  *
@@ -12,7 +12,7 @@
 
 import { test, expect } from './fixtures';
 
-test.describe('Business: Patient Appointment Booking', () => {
+test.describe('Business: Synth Appointment Booking', () => {
   test('create appointment → pending → confirm → confirmed', async ({ mockAuthPage: page }) => {
     // Mock the appointments API
     let appointmentStatus = 'pending';
@@ -24,7 +24,7 @@ test.describe('Business: Patient Appointment Booking', () => {
           body: JSON.stringify([{
             id: 1,
             patient_id: 1,
-            patient_name: 'Test Patient',
+            patient_name: 'Synth Patient',
             doctor_id: 1,
             doctor_name: 'Dr. Test',
             status: appointmentStatus,
@@ -81,9 +81,9 @@ test.describe('Business: Patient Appointment Booking', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([
-          { id: 1, patient_name: 'Patient A', status: 'pending', appointment_date: '2024-12-01' },
-          { id: 2, patient_name: 'Patient B', status: 'confirmed', appointment_date: '2024-12-02' },
-          { id: 3, patient_name: 'Patient C', status: 'completed', appointment_date: '2024-12-03' },
+          { id: 1, patient_name: 'Synth A', status: 'pending', appointment_date: '2024-12-01' },
+          { id: 2, patient_name: 'Synth B', status: 'confirmed', appointment_date: '2024-12-02' },
+          { id: 3, patient_name: 'Synth C', status: 'completed', appointment_date: '2024-12-03' },
         ]),
       });
     });

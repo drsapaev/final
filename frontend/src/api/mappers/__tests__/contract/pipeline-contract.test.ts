@@ -51,13 +51,13 @@ describe('Patient contract: OpenAPI → zod → mapper → domain', () => {
   // and the zod schema must be updated together.
   const patientFixture: PatientDto = {
     id: 1,
-    last_name: 'Иванов',
-    first_name: 'Иван',
-    full_name: 'Иванов Иван Иванович',
-    middle_name: 'Иванович',
+    last_name: 'Synth',
+    first_name: 'Test',
+    full_name: 'Synth Test Synthич',
+    middle_name: 'Synthич',
     birth_date: '1990-01-15',
     sex: 'male',
-    phone: '+998901234567',
+    phone: '+0000000000',
     email: 'ivan@example.com',
     doc_type: 'passport',
     doc_number: 'AB1234567',
@@ -68,14 +68,14 @@ describe('Patient contract: OpenAPI → zod → mapper → domain', () => {
   it('fixture passes zod schema validation', () => {
     const parsed = PatientDtoSchema.parse(patientFixture);
     expect(parsed.id).toBe(1);
-    expect(parsed.last_name).toBe('Иванов');
+    expect(parsed.last_name).toBe('Synth');
   });
 
   it('mapper transforms fixture to domain Patient', () => {
     const patient = mapPatientDto(patientFixture);
     expect(patient.id).toBe(1);
-    expect(patient.last_name).toBe('Иванов');
-    expect(patient.name).toBe('Иванов Иван Иванович');
+    expect(patient.last_name).toBe('Synth');
+    expect(patient.name).toBe('Synth Test Synthич');
   });
 
   it('mapper output satisfies domain Patient type', () => {

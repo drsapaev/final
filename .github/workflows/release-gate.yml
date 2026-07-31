@@ -57,7 +57,7 @@ jobs:
         run: |
           npx stryker run --configFile stryker.config.mjs \
             --mutate "src/types/state-machines/*.ts,src/api/mappers/patient.ts,src/api/mappers/appointment.ts,src/api/mappers/billing.ts"
-        continue-on-error: true
+        
 
       - name: Parse Stryker score
         run: |
@@ -86,13 +86,17 @@ jobs:
         run: |
           node -e "
           const fs = require('fs');
+          function parseK6NDJSON(filepath) {
+            const lines = fs.readFileSync(filepath, 'utf-8').trim().split('\n');
+            return lines.map(line => JSON.parse(line));
+          }
           function extractP95(data) {
             const durations = data.filter(d => d.metric === 'http_req_duration').map(d => d.data.value);
             durations.sort((a, b) => a - b);
             return durations[Math.ceil(durations.length * 0.95) - 1] || 0;
           }
-          const queue = JSON.parse(fs.readFileSync('tests/load/queue-results.json', 'utf-8'));
-          const emr = JSON.parse(fs.readFileSync('tests/load/emr-results.json', 'utf-8'));
+          const queue = parseK6NDJSON('tests/load/queue-results.json');
+          const emr = parseK6NDJSON('tests/load/emr-results.json');
           const results = {
             queue: { p95_ms: Math.round(extractP95(queue)) },
             emr: { p95_ms: Math.round(extractP95(emr)) },

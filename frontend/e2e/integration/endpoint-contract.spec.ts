@@ -32,13 +32,13 @@ test.describe('Integration: GET /patients/{id} → zod parse', () => {
     // real HTTP request goes through.
     const mockResponse = {
       id: 1,
-      last_name: 'Иванов',
-      first_name: 'Иван',
-      full_name: 'Иванов Иван Иванович',
-      middle_name: 'Иванович',
+      last_name: 'Synth',
+      first_name: 'Test',
+      full_name: 'Synth Test Synthич',
+      middle_name: 'Synthич',
       birth_date: '1990-01-15',
       sex: 'male',
-      phone: '+998901234567',
+      phone: '+0000000000',
       email: 'ivan@example.com',
       doc_type: 'passport',
       doc_number: 'AB1234567',
@@ -49,13 +49,13 @@ test.describe('Integration: GET /patients/{id} → zod parse', () => {
     // Verify zod schema accepts the response shape
     const parsed = PatientDtoSchema.parse(mockResponse);
     expect(parsed.id).toBe(1);
-    expect(parsed.last_name).toBe('Иванов');
+    expect(parsed.last_name).toBe('Synth');
   });
 
   test('rejects response missing required field id', async () => {
     const invalidResponse = {
-      last_name: 'Иванов',
-      first_name: 'Иван',
+      last_name: 'Synth',
+      first_name: 'Test',
       created_at: '2024-01-01T00:00:00Z',
       // missing id
     };
@@ -109,7 +109,7 @@ test.describe('Integration: POST /payments → zod parse', () => {
       id: 123,
       appointment_id: 456,
       patient_id: 789,
-      patient_name: 'Test Patient',
+      patient_name: 'Synth Patient',
       amount: 150000,
       paid_amount: 150000,
       status: 'paid',

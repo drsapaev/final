@@ -22,7 +22,7 @@ test.describe('Business: Visit Completion', () => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ id: 1, status: visitStatus, patient_name: 'Test Patient' }),
+          body: JSON.stringify({ id: 1, status: visitStatus, patient_name: 'Synth Patient' }),
         });
       }
     });

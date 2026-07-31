@@ -31,7 +31,7 @@ jobs:
         working-directory: backend
         run: |
           mutmut run \
-            --paths-to-mutate app/services/appointments.py,app/services/payments.py,app/services/queue.py,app/services/emr.py \
+            --paths-to-mutate app/crud/appointment.py,app/crud/payment.py,app/crud/queue.py,app/crud/emr.py \
             2>&1 | tee mutmut-output.txt
 
       - name: Parse mutation score
@@ -78,7 +78,7 @@ jobs:
         run: |
           node scripts/parse-stryker-score.js \
             --output frontend/reports/mutation/mutation.json \
-            --threshold 70 || true
+            --threshold 70
 
       - name: Upload mutation report
         if: always()

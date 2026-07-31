@@ -15,10 +15,10 @@ Already in `backend/pyproject.toml` (add this section):
 ```toml
 [tool.mutmut]
 paths_to_mutate = [
-  "app/services/appointments.py",
-  "app/services/payments.py",
-  "app/services/queue.py",
-  "app/services/emr.py",
+  "app/crud/appointment.py",
+  "app/crud/payment.py",
+  "app/crud/queue.py",
+  "app/crud/emr.py",
 ]
 tests_dir = "tests/"
 ```
@@ -85,7 +85,7 @@ Add to CI pipeline:
   run: |
     cd backend
     pip install mutmut
-    mutmut run --paths-to-mutate app/services/appointments.py,app/services/payments.py
+    mutmut run --paths-to-mutate app/crud/appointment.py,app/crud/payment.py
     mutmut results | grep -q "survived: 0" || exit 1
 
 # Frontend mutation (weekly — slow)

@@ -8,7 +8,7 @@ Per Phase 4 requirements:
 
 Usage:
   cd backend
-  mutmut run --paths-to-mutate app/services/appointments.py,app/services/payments.py,app/services/queue.py,app/services/emr.py
+  mutmut run --paths-to-mutate app/crud/appointment.py,app/crud/payment.py,app/crud/queue.py,app/crud/emr.py
   mutmut results
   mutmut html
 
@@ -23,19 +23,19 @@ require mutmut installed and a running test suite.
 #
 # Tool: mutmut (Python)
 # Target modules (critical business logic):
-#   - backend/app/services/appointments.py
-#   - backend/app/services/payments.py
-#   - backend/app/services/queue.py
-#   - backend/app/services/emr.py
+#   - backend/app/crud/appointment.py
+#   - backend/app/crud/payment.py
+#   - backend/app/crud/queue.py
+#   - backend/app/crud/emr.py
 #
 # Configuration (in backend/setup.cfg or backend/pyproject.toml):
 #
 #   [tool.mutmut]
 #   paths_to_mutate = [
-#     "app/services/appointments.py",
-#     "app/services/payments.py",
-#     "app/services/queue.py",
-#     "app/services/emr.py",
+#     "app/crud/appointment.py",
+#     "app/crud/payment.py",
+#     "app/crud/queue.py",
+#     "app/crud/emr.py",
 #   ]
 #   tests_dir = "tests/"
 #   do_not_mutate = [
@@ -55,10 +55,10 @@ require mutmut installed and a running test suite.
 #   Need >= 80% — add tests to kill surviving mutants.
 
 MUTATION_TARGETS = {
-    "appointments": "app/services/appointments.py",
-    "payments": "app/services/payments.py",
-    "queue": "app/services/queue.py",
-    "emr": "app/services/emr.py",
+    "appointments": "app/crud/appointment.py",
+    "payments": "app/crud/payment.py",
+    "queue": "app/crud/queue.py",
+    "emr": "app/crud/emr.py",
 }
 
 MUTATION_SCORE_THRESHOLD = 80  # percent

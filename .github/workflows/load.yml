@@ -64,10 +64,15 @@ jobs:
         run: |
           node -e "
           const fs = require('fs');
-          const queue = JSON.parse(fs.readFileSync('tests/load/queue-results.json', 'utf-8'));
-          const emr = JSON.parse(fs.readFileSync('tests/load/emr-results.json', 'utf-8'));
+          // k6 outputs NDJSON (one JSON object per line), not a JSON array.
+          // Parse line-by-line to handle this correctly.
+          function parseK6NDJSON(filepath) {
+            const lines = fs.readFileSync(filepath, 'utf-8').trim().split('\n');
+            return lines.map(line => JSON.parse(line));
+          }
+          const queue = parseK6NDJSON('tests/load/queue-results.json');
+          const emr = parseK6NDJSON('tests/load/emr-results.json');
 
-          // Extract p95 from k6 JSON output
           function extractP95(data) {
             const durations = data
               .filter(d => d.metric === 'http_req_duration')
