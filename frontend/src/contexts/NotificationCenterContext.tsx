@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { notificationsService } from '../api/services';
 import logger from '../utils/logger';
+import type { HttpApiError } from '../types/errors';
 
 // ---- Domain types ----
 // The notification protocol is dynamic JSON from both WS push and REST
@@ -644,7 +645,7 @@ export function NotificationCenterProvider({ children }: NotificationCenterProvi
           unreadCooldownUntilRef.current = 0;
           return snapshot;
         } catch (error) {
-          const err = error as { response?: { status?: number } };
+          const err = error as HttpApiError;
           const status = err?.response?.status;
           if (status === 429) {
             unreadCooldownUntilRef.current = Date.now() + 60_000;
@@ -693,7 +694,7 @@ export function NotificationCenterProvider({ children }: NotificationCenterProvi
         const unreadPayload = unreadResult.status === 'fulfilled' ? (unreadResult.value as UnreadSnapshot) : null;
 
         if (inboxResult.status === 'rejected') {
-          const inboxError = inboxResult.reason as { response?: { status?: number } };
+          const inboxError = inboxResult.reason as HttpApiError;
           if (inboxError?.response?.status === 429) {
             inboxCooldownUntilRef.current = Date.now() + 60_000;
             unreadCooldownUntilRef.current = Date.now() + 60_000;
@@ -733,7 +734,7 @@ export function NotificationCenterProvider({ children }: NotificationCenterProvi
           }));
         }
 
-        if (unreadResult.status === 'rejected' && ((unreadResult.reason as { response?: { status?: number } })?.response?.status === 429)) {
+        if (unreadResult.status === 'rejected' && ((unreadResult.reason as HttpApiError)?.response?.status === 429)) {
           unreadCooldownUntilRef.current = Date.now() + 60_000;
           logger.warn('[NotificationCenter] unread snapshot refresh rate limited, cooling down', {
             cooldownMs: 60_000,
@@ -744,7 +745,7 @@ export function NotificationCenterProvider({ children }: NotificationCenterProvi
         setLastSyncAt(new Date().toISOString());
         return normalized;
       } catch (error) {
-        const err = error as { response?: { status?: number } };
+        const err = error as HttpApiError;
         const status = err?.response?.status;
         if (status === 429) {
           inboxCooldownUntilRef.current = Date.now() + 60_000;

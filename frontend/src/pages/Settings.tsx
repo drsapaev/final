@@ -103,7 +103,7 @@ function TabButton({ active, onClick, children }: TabButtonProps) {
 
 function Row({ k, v, onSave }: RowProps) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [val, setVal] = useState(String(v ?? ''));
   useEffect(() => setVal(String(v ?? '')), [v]);
   return (
@@ -125,7 +125,7 @@ export default function Settings() {void
   useTheme();
   useState('Settings');
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
@@ -519,7 +519,7 @@ export default function Settings() {void
 // Компонент карточки провайдера
 function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   return (
     <div style={{
       border: '1px solid var(--border-color)',
@@ -573,7 +573,7 @@ function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
 // Модальное окно для добавления/редактирования провайдера
 function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown) => void; title?: string }) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [formData, setFormData] = useState<Record<string, unknown>>({
     name: provider?.name || '',
     code: provider?.code || '',
@@ -837,7 +837,7 @@ const errBox = {
 
 function KVField({ label, defKey, items, onSave }: KVFieldProps) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const found = (items || []).find((x) => x.key === defKey);
   const [val, setVal] = useState(String(found?.value ?? ''));
   useEffect(() => setVal(String(found?.value ?? '')), [found?.value]);
@@ -853,7 +853,7 @@ function KVField({ label, defKey, items, onSave }: KVFieldProps) {
 // Отдельный компонент для роли чтобы избежать hooks в map
 function RoleMapItem({ role, items, onSave }: RoleMapItemProps) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const found = (items || []).find((x) => x.key === role);
   const [val, setVal] = useState(String(found?.value ?? ''));
   useEffect(() => setVal(String(found?.value ?? '')), [found?.value]);

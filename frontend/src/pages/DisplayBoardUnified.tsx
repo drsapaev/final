@@ -25,6 +25,7 @@ import logger from '../utils/logger';
 import { formatRegistrarTime } from '../utils/dateUtils';
 import './displayboard.css';
 import { useTranslation } from '../i18n/useTranslation';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 const DEFAULT_BOARD_STATS = { last_ticket: 0, waiting: 0, serving: 0, done: 0 };
 
@@ -157,7 +158,7 @@ export default function DisplayBoardUnified({
 }: DisplayBoardUnifiedProps) {void
   useTheme();
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   // Параметры из URL или пропсов
   // PR #1910 bugfix: department destructured as departmentProp, но использовался
@@ -258,7 +259,7 @@ export default function DisplayBoardUnified({
 
           // Игнорируем ошибки localStorage
         }}} catch (e: unknown) {setErr((e as { message?: string })?.message || t('misc.dbu_err_load')); // fallback из кэша
-      try {const raw = localStorage.getItem('board.state');if (raw) {const cached = JSON.parse(raw) as Record<string, unknown>;if (cached && typeof cached === 'object') {
+      try {const raw = localStorage.getItem('board.state');if (raw) {const cached = safeJsonParse(raw) as Record<string, unknown>;if (cached && typeof cached === 'object') {
             setStats(extractBoardStats(cached));
             setBoard({
               brand: String(cached.brand ?? cached.title ?? 'Clinic'),

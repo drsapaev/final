@@ -20,7 +20,7 @@
  */
 
 import type {
-  AxiosLikeError,
+  HttpApiError,
   ApiErrorPayload,
   NetworkErrorInfo,
 } from '../types/errors';
@@ -46,7 +46,7 @@ import {
  * `getErrorMessage` can extract the server-provided message instead of
  * falling through to `err.message` or `String(err)`.
  */
-export function isAxiosLikeError(err: unknown): err is AxiosLikeError {
+export function isHttpApiError(err: unknown): err is HttpApiError {
   if (typeof err !== 'object' || err === null) return false;
   return (
     'isAxiosError' in err ||
@@ -56,13 +56,14 @@ export function isAxiosLikeError(err: unknown): err is AxiosLikeError {
 }
 
 /**
- * Backward-compat alias for `isAxiosLikeError`.
+ * Backward-compat alias for `isHttpApiError`.
  *
  * The old name `isAxiosError` is kept because 30+ files import it from
- * `utils/type-guards.ts`. New code should use `isAxiosLikeError` for clarity
- * (the canonical type is `AxiosLikeError`, not `AxiosError`).
+ * `utils/type-guards.ts`. New code should use `isHttpApiError` for clarity
+ * (the canonical type is `HttpApiError`, not `AxiosError`).
  */
-export const isAxiosError = isAxiosLikeError;
+export const isAxiosLikeError = isHttpApiError;
+export const isAxiosError = isHttpApiError;
 
 // ===========================================================================
 // Extractors
@@ -75,7 +76,7 @@ export const isAxiosError = isAxiosLikeError;
  * alias used by some code paths).
  */
 export function extractApiPayload(err: unknown): ApiErrorPayload | null {
-  if (!isAxiosLikeError(err)) return null;
+  if (!isHttpApiError(err)) return null;
   return err.response?.data ?? err.data ?? null;
 }
 
@@ -124,7 +125,7 @@ export function extractApiMessage(err: unknown): string | null {
  * Useful for logging and for deciding retry / cooldown / re-auth behavior.
  */
 export function extractNetworkInfo(err: unknown): NetworkErrorInfo {
-  if (!isAxiosLikeError(err)) {
+  if (!isHttpApiError(err)) {
     return {
       status: null,
       statusText: null,
@@ -157,7 +158,7 @@ export function extractNetworkInfo(err: unknown): NetworkErrorInfo {
  * (Migrated from utils/type-guards.ts:getErrorStatus)
  */
 export function getErrorStatus(err: unknown): number | null {
-  if (!isAxiosLikeError(err)) return null;
+  if (!isHttpApiError(err)) return null;
   return err.response?.status ?? err.status ?? null;
 }
 

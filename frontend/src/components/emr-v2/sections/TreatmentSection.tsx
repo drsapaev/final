@@ -80,7 +80,7 @@ export function TreatmentSection({
   experimentalGhostMode = false,
   onTelemetry
 }: TreatmentSectionProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [showTemplates, setShowTemplates] = useState(false);
   const [showMyExperience, setShowMyExperience] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TreatmentTemplate | null>(null);
@@ -193,7 +193,7 @@ export function TreatmentSection({
             transition: 'all 0.15s ease'
           }}>
           
-                        <History size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                        <History size={14} />
                         Мой опыт {hasMyExperience && `(${myExperienceTemplates.length})`}
                     </button>
                     {/* 📋 Generic Templates */}
@@ -312,7 +312,7 @@ export function TreatmentSection({
                   color: tmpl.is_pinned ? 'var(--accent-warning, #f59e0b)' : 'var(--text-muted, #6b7280)'
                 }}>
                 
-                                            <Pin size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                                            <Pin size={16} />
                                         </button>
 
                                         {/* Edit button */}
@@ -334,7 +334,7 @@ export function TreatmentSection({
                   color: 'var(--text-muted, #6b7280)'
                 }}>
                 
-                                            <Edit2 size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                                            <Edit2 size={14} />
                                         </button>
 
                                         {/* Template content - clickable */}

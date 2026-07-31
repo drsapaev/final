@@ -82,7 +82,7 @@ interface ErrorFallbackProps {
  * Fallback UI компонент
  */
 function ErrorFallback({ error, errorInfo, onRetry, theme }: ErrorFallbackProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // Проверяем, что theme существует и имеет необходимые методы
   type ThemeFn = (...args: unknown[]) => string;
   const themeObj = theme as Record<string, unknown> | null | undefined;

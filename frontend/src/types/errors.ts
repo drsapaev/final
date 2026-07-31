@@ -7,7 +7,7 @@
  *
  * The three types here form a small hierarchy:
  *
- *   AxiosLikeError        — the full error shape (what catch blocks cast to)
+ *   HttpApiError        — the full error shape (what catch blocks cast to)
  *     └── response?: ApiErrorResponse   — the HTTP response (if the error reached the server)
  *           └── data?: ApiErrorPayload  — the response body (detail / message / error)
  *
@@ -17,7 +17,7 @@
  *
  * These types are deliberately PERMISSIVE (every field optional). They
  * model the shape of arbitrary thrown values, not a strict contract.
- * Use `isAxiosLikeError()` (in `utils/error-utils.ts`) to narrow before
+ * Use `isHttpApiError()` (in `utils/error-utils.ts`) to narrow before
  * accessing fields.
  *
  * See ADR-0016 for the full rationale and the "do NOT unify into AppError"
@@ -61,7 +61,7 @@ export interface ApiErrorPayload {
 // ===========================================================================
 
 /**
- * Canonical shape of the `response` field of an AxiosLikeError.
+ * Canonical shape of the `response` field of an HttpApiError.
  */
 export interface ApiErrorResponse {
   status?: number;
@@ -71,7 +71,7 @@ export interface ApiErrorResponse {
 }
 
 // ===========================================================================
-// AxiosLikeError — the canonical catch-block type
+// HttpApiError — the canonical catch-block type
 // ===========================================================================
 
 /**
@@ -82,7 +82,7 @@ export interface ApiErrorResponse {
  *
  *   WrappedApiError (api/patients.ts, api/payments.ts)
  *   ApiErrorResponse (components/admin/WebhookManager.tsx, components/security/TwoFactorManager.tsx)
- *   AxiosLikeError (api/interceptors.ts, utils/type-guards.ts, utils/networkErrorMessages.ts)
+ *   HttpApiError (api/interceptors.ts, utils/type-guards.ts, utils/networkErrorMessages.ts)
  *   ErrorWithExtras (components/TelegramManager.tsx, pages/RegistrarPanel.tsx)
  *   ErrorWithResponse (utils/errorHandler.ts)
  *   EMRApiError (types/domain/emr.ts)
@@ -92,9 +92,15 @@ export interface ApiErrorResponse {
  * All of those are replaced by this single type.
  *
  * Every field is optional because callers may pass arbitrary thrown values.
- * Use `isAxiosLikeError()` to narrow before accessing fields.
+ * Use `isHttpApiError()` to narrow before accessing fields.
  */
-export interface AxiosLikeError {
+// Sprint C1: BaseApiError — root of the error type hierarchy.
+export interface BaseApiError {
+  message?: string;
+  code?: string;
+}
+
+export interface HttpApiError extends BaseApiError {
   // Axios markers
   isAxiosError?: boolean;
   name?: string;
@@ -117,7 +123,7 @@ export interface AxiosLikeError {
 
   // Flat aliases — some code paths flatten response.status / response.data.detail
   // onto the error itself (e.g. WrappedApiError in api/patients.ts, the
-  // permissive AxiosLikeError in utils/networkErrorMessages.ts).
+  // permissive HttpApiError in utils/networkErrorMessages.ts).
   // Kept for compatibility with existing cast-and-access patterns.
   status?: number;
   detail?: string | { message?: string; error?: string; reason?: string };
@@ -150,4 +156,16 @@ export interface NetworkErrorInfo {
   isRateLimited: boolean;
   /** True if status === 401 or 403. */
   isAuthError: boolean;
+}
+
+// ===========================================================================
+// Backward-compat alias + WorkflowError
+// ===========================================================================
+
+/** @deprecated Use HttpApiError. Kept for backward compat during Sprint C1. */
+export type AxiosLikeError = HttpApiError;
+
+/** Error for workflow state machines (EMR draft→dirty→saving→conflict). */
+export interface WorkflowError extends BaseApiError {
+  step?: string;
 }

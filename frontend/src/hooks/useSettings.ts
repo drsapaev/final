@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import logger from '../utils/logger';
 import type { AsyncState } from '../types/async-state';
 import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 const useSettings = () => {
   const [settings, setSettings] = useState<Record<string, unknown>>({});
@@ -166,7 +167,7 @@ const useSettings = () => {
     
     try {
       const text = await file.text();
-      const importedSettings = JSON.parse(text);
+      const importedSettings = safeJsonParse(text);
       
       // Валидация импортированных настроек
       if (typeof importedSettings !== 'object' || importedSettings === null) {

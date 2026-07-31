@@ -14,6 +14,7 @@ import { useNotificationCenter } from '../../contexts/NotificationCenterContext'
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { safeJsonParse } from '../../utils/safeJsonParse';
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: '\u0412\u0441\u0435' },
@@ -54,7 +55,7 @@ function extractMetadata(item: { payloadSnapshot?: unknown; raw?: Record<string,
   let snapshotData: unknown = payloadSnapshot;
   if (typeof snapshotData === 'string') {
     try {
-      snapshotData = JSON.parse(snapshotData);
+      snapshotData = safeJsonParse(snapshotData);
     } catch {
       snapshotData = null;
     }
@@ -155,7 +156,7 @@ type NormalizedNotificationLike = {
 };
 
 export default function NotificationInbox({ userRole, onClose }: NotificationInboxProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const {
     getNotificationsByRole,
     markAsRead,
@@ -317,7 +318,7 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
             background: 'var(--mac-bg-secondary)'
           }}
         >
-          <Search size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <Search size={16} />
           <Input
             type="search"
             aria-label={t('misc.ni_poisk_po_uvedomleniyam')}
@@ -431,7 +432,7 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
                           flexShrink: 0
                         }}
                       >
-                        <Icon size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                        <Icon size={16} />
                       </span>
                       <div style={{ minWidth: 0 }}>
                         <strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -533,7 +534,7 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
                         gap: 6
                       }}
                     >
-                      <Archive size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                      <Archive size={14} />
                       Архив
                     </button>
                   ) : null}

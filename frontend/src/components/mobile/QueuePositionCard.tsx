@@ -33,7 +33,7 @@ export interface QueuePositionCardProps {
 }
 
 const QueuePositionCard = ({ queueEntry }: QueuePositionCardProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   if (!queueEntry) return null;
 
   const {

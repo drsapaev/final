@@ -49,7 +49,7 @@ interface CashPaymentModalProps {
 }
 
 const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymentModalProps) => {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+    const { t: rawT } = useTranslation(); const t = rawT;
     // Auto-fill amount from appointment data
     const defaultAmount = appointment?.total_amount ||
         appointment?.remaining_amount ||

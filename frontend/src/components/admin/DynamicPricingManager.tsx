@@ -185,7 +185,7 @@ const toggleServiceId = (selectedIds: unknown, serviceId: unknown): number[] => 
 
 const ServiceChecklist = ({ services = [], value = [], onChange }: ServiceChecklistProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const selectedIds = getSelectedServiceIds(value);
 
   if (!services.length) {
@@ -254,7 +254,7 @@ const buildPricingRulePayload = (form: RuleForm): Record<string, unknown> =>
 
 const DynamicPricingManager = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   // P-013 fix: shared ConfirmDialog hook (replaces 2 native confirm() calls).
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;

@@ -45,8 +45,8 @@ interface AuthResponseData {
   [key: string]: unknown;
 }
 
-// ADR-0016: WebAuthnErrorResponse replaced by canonical AxiosLikeError from types/errors.ts.
-import type { AxiosLikeError } from '../types/errors';
+// ADR-0016: WebAuthnErrorResponse replaced by canonical HttpApiError from types/errors.ts.
+import type { HttpApiError } from '../types/errors';
 
 export interface UseWebAuthnReturn {
   isSupported: boolean;
@@ -147,7 +147,7 @@ export function useWebAuthn(): UseWebAuthnReturn {
 
         return true;
       } catch (err) {
-        const e = err as AxiosLikeError;
+        const e = err as HttpApiError;
         const detail = e?.response?.data?.detail;
         const reason = typeof detail === 'object' && detail ? detail.reason : undefined;
         setError(reason || 'registration_failed');
@@ -233,7 +233,7 @@ export function useWebAuthn(): UseWebAuthnReturn {
 
         return data ?? null;
       } catch (err) {
-        const e = err as AxiosLikeError;
+        const e = err as HttpApiError;
         const detail = e?.response?.data?.detail;
         const reason = typeof detail === 'object' && detail ? detail.reason : undefined;
         setError(reason || 'authentication_failed');

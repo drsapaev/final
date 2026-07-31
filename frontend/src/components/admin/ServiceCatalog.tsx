@@ -162,7 +162,7 @@ const getAllowedPrefixesForGroup = (groupKey: string | null | undefined): string
 const ServiceCatalog = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces native confirm()).
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [loading, setLoading] = useState(true);
@@ -826,7 +826,7 @@ const ServiceCatalog = () => {
 // ⭐ SSOT: Redesigned with tabs for better UX, removed duplicate fields
 const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel, departments }: { service?: Record<string, unknown> | null; categories: CategoryItem[]; doctors: DoctorItem[]; queueProfiles: QueueProfileItem[]; setMessage: (msg: { type: string; text: string }) => void; onSave: (serviceData: Record<string, unknown>) => Promise<void> | void; onCancel: () => void; departments: DepartmentItem[] }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
   const [showPreview, setShowPreview] = useState(false); // ✅ PREVIEW: Show changes preview
   const [formData, setFormData] = useState<Record<string, unknown>>({

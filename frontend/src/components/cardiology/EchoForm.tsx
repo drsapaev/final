@@ -27,6 +27,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import type { HttpApiError } from '../../types/errors';
 
 // === Domain types ===
 // EchoForm tracks echocardiography measurements grouped by anatomical
@@ -176,7 +177,7 @@ async function loadExistingEmrDraft(visitId: string | number | null | undefined)
     const response = await api.get(`/v2/emr/${visitId}`);
     return response.data || null;
   } catch (err) {
-    if ((err as { response?: { status?: number } })?.response?.status === 404) {
+    if ((err as HttpApiError)?.response?.status === 404) {
       return null;
     }
     throw err;
@@ -200,7 +201,7 @@ function buildEchoEmrPayload(existingEmr: Record<string, unknown> | null, echoDa
 }
 
 const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFormProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [echoData, setEchoData] = useState<EchoData>(DEFAULT_ECHO_DATA as EchoData);
 
   const [loading, setLoading] = useState(false);

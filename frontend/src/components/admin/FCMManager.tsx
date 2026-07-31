@@ -58,7 +58,7 @@ const formatFcmTokenStatus = (user: FcmUser, t: (key: string, options?: Record<s
 };
 
 const FCMManager = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [loading, setLoading] = useState(false);
   const [fcmStatus, setFcmStatus] = useState<FcmStatus | null>(null);
   const [usersWithTokens, setUsersWithTokens] = useState<FcmUser[]>([]);

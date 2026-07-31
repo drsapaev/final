@@ -67,7 +67,7 @@ const DiagnosisForm = ({
   onClose
 }: { patientId?: string | number; patientName?: string; initialData?: Record<string, unknown> | null; onSave?: (data: unknown) => void; onClose?: () => void }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [formData, setFormData] = useState<DiagnosisFormState>({
     // Основные данные
     diagnosisDate: new Date().toISOString().split('T')[0],

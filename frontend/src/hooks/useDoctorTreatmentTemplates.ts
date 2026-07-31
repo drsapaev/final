@@ -14,6 +14,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 import logger from '../utils/logger';
+import { idleState, loadingState, successState, errorState, getData, getError } from '../types/async-state';
+import type { AsyncState } from '../types/async-state';
 
 /**
  * TreatmentTemplate — shape of items returned by /emr/doctor-templates/treatment.
@@ -60,18 +62,19 @@ export function useDoctorTreatmentTemplates({
     enabled?: boolean;
     limit?: number;
 } = {}) {
-    const [templates, setTemplates] = useState<TreatmentTemplate[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    // Sprint E3: migrated to AsyncState<TreatmentTemplate[]> (loading + error + data lifecycle).
+    const [templatesState, setTemplatesState] = useState<AsyncState<TreatmentTemplate[]>>(idleState());
+    const templates = getData(templatesState, []);
+    const loading = templatesState.status === 'loading';
+    const error = getError(templatesState);
 
     const fetchTemplates = useCallback(async () => {
         if (!enabled || !icd10Code) {
-            setTemplates([]);
+            setTemplatesState(successState<TreatmentTemplate[]>([]));
             return;
         }
 
-        setLoading(true);
-        setError(null);
+        setTemplatesState(loadingState());
 
         try {
             const response = await api.get('/emr/doctor-templates/treatment', {
@@ -79,13 +82,10 @@ export function useDoctorTreatmentTemplates({
             });
 
             const data = response.data as Record<string, unknown>;
-            setTemplates((data.templates as TreatmentTemplate[]) || []);
+            setTemplatesState(successState<TreatmentTemplate[]>((data.templates as TreatmentTemplate[]) || []));
         } catch (err: unknown) {
             logger.error('[DoctorTemplates] Error fetching:', err);
-            setError((err as Error).message || 'Ошибка загрузки шаблонов');
-            setTemplates([]);
-        } finally {
-            setLoading(false);
+            setTemplatesState(errorState<TreatmentTemplate[]>((err as Error).message || 'Ошибка загрузки шаблонов'));
         }
     }, [icd10Code, enabled, limit]);
 

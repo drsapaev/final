@@ -25,6 +25,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import { safeJsonParse } from '../../utils/safeJsonParse';
 
 interface GraphQLSchemaField {
   name: string;
@@ -51,7 +52,7 @@ interface GraphQLResult {
 
 const GraphQLExplorer = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [activeTab, setActiveTab] = useState('explorer');
   const [query, setQuery] = useState('');
   const [variables, setVariables] = useState('{}');
@@ -344,7 +345,7 @@ const GraphQLExplorer = () => {
       let parsedVariables = {};
       if (variables.trim()) {
         try {
-          parsedVariables = JSON.parse(variables);
+          parsedVariables = safeJsonParse(variables);
         } catch {
           setError(t('admin2.gql_error_invalid_json'));
           setLoading(false);

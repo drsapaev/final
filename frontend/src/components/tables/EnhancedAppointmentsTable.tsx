@@ -266,7 +266,7 @@ const EnhancedAppointmentsTable = ({
 
   // Переводы — i18next unified.
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   void language; // legacy prop, kept for backward compat; translations come from i18next.
 
   // Сортировка данных

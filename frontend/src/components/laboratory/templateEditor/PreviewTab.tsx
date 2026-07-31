@@ -36,7 +36,7 @@ interface PreviewTabProps {
  * Shows branding + sections + fields as they'll appear in the PDF.
  */
 function PreviewTab({ draftVersion }: PreviewTabProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const branding = draftVersion.branding_overrides || {};
   const signers = draftVersion.signer_defaults || {};
 

@@ -103,7 +103,7 @@ export function BloodTestsTab({
   getFontSize,
   getSpacing,
 }: BloodTestsTabProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // Helper: compute average of a field across all blood tests
   const avg = (key: string) => {
     const nums = bloodTests

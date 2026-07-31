@@ -106,7 +106,7 @@ const normalizeStatistics = (payload: unknown): TransferStatistics => {
 
 const UserDataTransferManager = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [activeTab, setActiveTab] = useState<'transfer' | 'history' | 'statistics'>('transfer');
   const [sourceUser, setSourceUser] = useState<TransferUser | null>(null);
   const [targetUser, setTargetUser] = useState<TransferUser | null>(null);

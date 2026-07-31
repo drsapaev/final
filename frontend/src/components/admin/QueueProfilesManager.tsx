@@ -102,7 +102,7 @@ const PRESET_COLORS = [
 
 const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' }) => {
     const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
     const statusFilterOptions = getStatusFilterOptions(t);
     const availableIcons = getAvailableIcons(t);
     // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
@@ -760,7 +760,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
 // Profile form component with show_on_qr_page support
 const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }: { profile?: Record<string, unknown>; onSubmit?: (data: Record<string, unknown>) => void | Promise<void>; onCancel?: () => void; saving?: boolean; isDark?: boolean; isEdit?: boolean; departments?: DepartmentDto[] }) => {
     const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
     const availableIcons = getAvailableIcons(t);
     const [formData, setFormData] = useState<Record<string, unknown>>({
         key: profile?.key || '',

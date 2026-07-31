@@ -14,7 +14,7 @@ import React from "react";
  * Also shows: compliance report, secrets rotation status, backup status.
  */
 export default function AdminSecurityDashboard() {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [dashboard, setDashboard] = useState<Record<string, unknown> | null>(null);
   const [compliance, setCompliance] = useState<Record<string, unknown> | null>(null);
   const [secrets, setSecrets] = useState<Record<string, unknown> | null>(null);
@@ -69,7 +69,7 @@ export default function AdminSecurityDashboard() {
         <CardContent>
           <Alert severity="error">{error}</Alert>
           <Button variant="outline" onClick={loadData} style={{ marginTop: 12 }}>
-            <Icon name="arrow.clockwise" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Icon name="arrow.clockwise" size={16} />
             {t('admin2.asd_retry')}
           </Button>
         </CardContent>
@@ -96,7 +96,7 @@ export default function AdminSecurityDashboard() {
               fontWeight: activeTab === tab.id ? 600 : 400,
             }}
           >
-            <Icon name={tab.icon} size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Icon name={tab.icon} size={14} />
             {tab.label}
           </button>
         ))}
@@ -119,7 +119,7 @@ export default function AdminSecurityDashboard() {
 }
 
 function DashboardTab({ data }: { data: Record<string, unknown> }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const summary = (data.summary ?? null) as Record<string, unknown> | null;
   const recent_logins = (data.recent_logins ?? []) as Array<Record<string, unknown>>;
   const failed_logins = (data.failed_logins ?? []) as Array<Record<string, unknown>>;
@@ -142,7 +142,7 @@ function DashboardTab({ data }: { data: Record<string, unknown> }) {
         <Card variant="filled" padding="none">
           <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '12px 16px' }}>
             <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon name="exclamationmark.triangle" size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <Icon name="exclamationmark.triangle" size={18} />
               {t('admin2.asd_failed_logins', { count: failed_logins.length })}
             </CardTitle>
           </CardHeader>
@@ -199,7 +199,7 @@ function DashboardTab({ data }: { data: Record<string, unknown> }) {
 }
 
 function ComplianceTab({ data }: { data: Record<string, unknown> }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const summary = (data.summary ?? null) as Record<string, unknown> | null;
   const checks = (data.checks ?? []) as Array<Record<string, unknown>>;
   return (
@@ -218,7 +218,7 @@ function ComplianceTab({ data }: { data: Record<string, unknown> }) {
         </div>
         {checks.map((check) => (
           <div key={String(check.name)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
-            <Icon name={check.passed ? 'checkmark.circle.fill' : 'exclamationmark.triangle'} size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Icon name={check.passed ? 'checkmark.circle.fill' : 'exclamationmark.triangle'} size={16} />
             <div>
               <div style={{ fontWeight: 500, color: 'var(--mac-text-primary)' }}>{String(check.label)}</div>
               <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{String(check.details)}</div>
@@ -231,7 +231,7 @@ function ComplianceTab({ data }: { data: Record<string, unknown> }) {
 }
 
 function SecretsTab({ data }: { data: Record<string, unknown> }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const rotation_interval_days = data.rotation_interval_days as number | undefined;
   const secrets = (data.secrets ?? {}) as Record<string, Record<string, unknown>>;
   return (
@@ -260,7 +260,7 @@ function SecretsTab({ data }: { data: Record<string, unknown> }) {
 }
 
 function BackupTab({ data, onVerify }: { data: Record<string, unknown>; onVerify: () => void }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [verifying, setVerifying] = useState(false);
   const handleVerify = async () => {
     setVerifying(true);
@@ -301,7 +301,7 @@ function BackupTab({ data, onVerify }: { data: Record<string, unknown>; onVerify
           </Badge>
         </div>
         <Button variant="outline" onClick={handleVerify} loading={verifying}>
-          <Icon name="checkmark.circle" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <Icon name="checkmark.circle" size={16} />
           {t('admin2.asd_backup_mark_verified')}
         </Button>
       </CardContent>

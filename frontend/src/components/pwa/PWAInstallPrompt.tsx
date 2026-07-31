@@ -108,7 +108,7 @@ const styles = {
 const hasNotificationApi = () => typeof window !== 'undefined' && 'Notification' in window;
 
 function CapabilityChip({ children, icon: Icon, variant = 'outline', onClick, ariaLabel }: { children?: React.ReactNode; icon?: React.ComponentType<any>; variant?: string; onClick?: () => void; ariaLabel?: string }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const content = (
     <span style={styles.chipContent}>
       {Icon && React.createElement(Icon, { size: 13, "aria-hidden": "true" })}

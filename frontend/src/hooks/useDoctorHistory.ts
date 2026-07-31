@@ -15,6 +15,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../api/client';
 import logger from '../utils/logger';
+import { idleState, loadingState, successState, errorState, getData, getError } from '../types/async-state';
+import type { AsyncState } from '../types/async-state';
 
 interface DoctorHistoryEntry {
     content?: string;
@@ -51,9 +53,11 @@ export function useDoctorHistory({
     limit = 10,
     enabled = true,
 }: UseDoctorHistoryOptions) {
-    const [history, setHistory] = useState<DoctorHistoryEntry[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    // Sprint E3: migrated to AsyncState<DoctorHistoryEntry[]>.
+    const [historyState, setHistoryState] = useState<AsyncState<DoctorHistoryEntry[]>>(idleState());
+    const history = getData(historyState, []);
+    const isLoading = historyState.status === 'loading';
+    const error = getError(historyState);
     const abortControllerRef = useRef<AbortController | null>(null);
 
     /**
@@ -69,8 +73,7 @@ export function useDoctorHistory({
         const controller = new AbortController();
         abortControllerRef.current = controller;
 
-        setIsLoading(true);
-        setError(null);
+        setHistoryState(loadingState());
 
         try {
             const response = await apiClient.get('/v2/emr/doctor-history', {
@@ -84,17 +87,13 @@ export function useDoctorHistory({
                 signal: controller.signal,
             });
 
-            setHistory(((response.data as Record<string, unknown>).entries as DoctorHistoryEntry[]) || []);
+            setHistoryState(successState<DoctorHistoryEntry[]>(((response.data as Record<string, unknown>).entries as DoctorHistoryEntry[]) || []));
         } catch (err) {
             const errObj = err as { name?: string; code?: string; message?: string };
             if (errObj?.name !== 'AbortError' && errObj?.code !== 'ERR_CANCELED') {
                 logger.error('[useDoctorHistory] Error:', err);
-                setError(errObj?.message || 'Unknown error');
-                // Return empty on error - not critical
-                setHistory([]);
+                setHistoryState(errorState<DoctorHistoryEntry[]>(errObj?.message || 'Unknown error'));
             }
-        } finally {
-            setIsLoading(false);
         }
     }, [enabled, doctorId, specialty, fieldName, currentText, limit]);
 

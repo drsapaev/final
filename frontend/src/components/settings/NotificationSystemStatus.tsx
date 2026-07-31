@@ -31,7 +31,7 @@ interface StatusCardProps {
 }
 
 export default function NotificationSystemStatus() {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
     const [status, setStatus] = useState<NotificationStatus | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -83,7 +83,7 @@ export default function NotificationSystemStatus() {
 }
 
 function StatusCard({ title, configured, details }: StatusCardProps) {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+    const { t: rawT } = useTranslation(); const t = rawT;
     return (
         <div style={{
             border: '1px solid var(--border-color)',

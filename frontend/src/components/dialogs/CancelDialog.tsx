@@ -19,7 +19,7 @@ interface CancelDialogProps {
 }
 
 const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [reason, setReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');

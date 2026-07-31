@@ -24,6 +24,7 @@ import {
   Checkbox } from '../components/ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 import type { QueueSpecialist } from '../types/domain/queue';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 interface QueueJoinPageInfo {
   is_clinic_wide?: boolean;
@@ -157,7 +158,7 @@ const QueueJoin = () => {
       return;
     }
     try {
-      const parsed = JSON.parse(saved);
+      const parsed = safeJsonParse(saved);
       if (parsed && typeof parsed === 'object') {
         setFormData({
           patientName: parsed.patientName || '',

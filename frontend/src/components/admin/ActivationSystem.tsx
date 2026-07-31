@@ -33,6 +33,7 @@ import logger from '../../utils/logger';
 import api from '../../api/client';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { safeJsonParse } from '../../utils/safeJsonParse';
 
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
@@ -99,7 +100,7 @@ const parseMeta = (meta: unknown): Record<string, unknown> => {
   if (!meta) return {};
   if (typeof meta === 'object') return meta as Record<string, unknown>;
   try {
-    return JSON.parse(String(meta)) as Record<string, unknown>;
+    return safeJsonParse(String(meta)) as Record<string, unknown>;
   } catch {
     return {};
   }
@@ -107,7 +108,7 @@ const parseMeta = (meta: unknown): Record<string, unknown> => {
 
 const ActivationSystem = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as TranslationFn;
+  const t = rawT as TranslationFn;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
@@ -623,7 +624,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
 // Компонент формы создания ключа
 const ActivationKeyForm = ({ onSave, onCancel }: ActivationKeyFormProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as TranslationFn;
+  const t = rawT as TranslationFn;
   const [formData, setFormData] = useState<KeyFormData>({
     key_type: 'full',
     duration_days: 365,

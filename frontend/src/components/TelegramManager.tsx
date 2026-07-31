@@ -63,7 +63,7 @@ import {
 import { api } from '../api/client';
 import { getErrorMessage } from '../utils/type-guards';
 // ADR-0016: canonical error types from types/errors.ts.
-import type { AxiosLikeError } from '../types/errors';
+import type { HttpApiError } from '../types/errors';
 
 const ONBOARDING_STATUS_FILTER_OPTIONS = [
 { value: 'all', label: 'All statuses' },
@@ -210,7 +210,7 @@ interface TelegramTemplate {
 
 const TelegramManager = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
   const [templates, setTemplates] = useState<TelegramTemplate[]>([]);
   const [onboardingRequests, setOnboardingRequests] = useState<OnboardingRequest[]>([]);
@@ -354,7 +354,7 @@ const TelegramManager = () => {
       await loadOnboardingRequests();
       await loadOnboardingAnalytics();
     } catch (e: unknown) {
-      const detail = (e as AxiosLikeError)?.response?.data?.detail;
+      const detail = (e as HttpApiError)?.response?.data?.detail;
       const detailStr = typeof detail === 'string' ? detail : (detail?.message ?? '');
       setError(detailStr || getErrorMessage(e) || t('misc.tg_err_load'));
     } finally {
@@ -566,7 +566,7 @@ const TelegramManager = () => {
       setSuccess(t('misc.tg_success_patient_commands', { languages }));
       await loadTelegramData();
     } catch (e: unknown) {
-      const detail = (e as AxiosLikeError)?.response?.data?.detail;
+      const detail = (e as HttpApiError)?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : (detail?.message ?? detail?.error);
       setError(message || getErrorMessage(e) || t('misc.tg_err_register_commands'));
     } finally {
@@ -586,7 +586,7 @@ const TelegramManager = () => {
       setSuccess(t('misc.tg_success_staff_commands', { commands }));
       await loadTelegramData();
     } catch (e: unknown) {
-      const detail = (e as AxiosLikeError)?.response?.data?.detail;
+      const detail = (e as HttpApiError)?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
       setError(message || getErrorMessage(e) || t('misc.tg_err_register_staff_commands'));
     } finally {

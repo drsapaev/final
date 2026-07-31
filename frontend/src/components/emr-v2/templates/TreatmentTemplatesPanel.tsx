@@ -80,7 +80,7 @@ export function TreatmentTemplatesPanel({
     onClose?: () => void;
     isOpen?: boolean;
 }) {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+    const { t: rawT } = useTranslation(); const t = rawT;
     const [activeCategory, setActiveCategory] = useState('medications');
     const [searchQuery, setSearchQuery] = useState('');
     const [previewTemplate, setPreviewTemplate] = useState<{ id: string; title: string; body: string; tags?: string[] } | null>(null);

@@ -24,7 +24,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
   onClose: () => void;
   onAllPrinted?: () => void;
 }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const [printedTickets, setPrintedTickets] = useState<Set<string | number>>(new Set());
   const [currentPrinting, setCurrentPrinting] = useState<string | number | null>(null);
   const [countdown, setCountdown] = useState(0);

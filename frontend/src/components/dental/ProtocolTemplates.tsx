@@ -38,7 +38,7 @@ const ProtocolTemplates = ({
   onClose
 }: ProtocolTemplatesProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [templates, setTemplates] = useState([
   // Шаблоны процедур
   {

@@ -23,6 +23,7 @@ import { useRegistrarApi } from '../../hooks/useRegistrarApi';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
+import type { HttpApiError } from '../../types/errors';
 /**
  * Интегрированный селектор услуг для регистратуры
  * Использует справочник из админ панели согласно detail.md стр. 112
@@ -42,7 +43,7 @@ const IntegratedServiceSelector = ({
   simple = false,
   onNext
 }: IntegratedServiceSelectorProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // ADR-0015: registrar API accessed via hook.
   const { fetchRegistrarServices } = useRegistrarApi();
   const [loading, setLoading] = useState(true);
@@ -172,7 +173,7 @@ const IntegratedServiceSelector = ({
       } catch (apiError) {
         // 401/403 — пользователь не авторизован, axios-interceptor сам решит,
         // что делать (показать login или refresh-token). Здесь просто лог.
-        const axiosApiError = apiError as { response?: { status?: number } };
+        const axiosApiError = apiError as HttpApiError;
         const status = axiosApiError?.response?.status;
         if (status === 401 || status === 403) {
           logger.warn('IntegratedServiceSelector: not authenticated, keeping fallback data');

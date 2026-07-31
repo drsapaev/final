@@ -7,7 +7,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * ИСПРАВЛЕНО: Убран избыточный импорт React
  */
 const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [isOnline, setIsOnline] = useState(() => (
     typeof navigator === 'undefined' ? true : navigator.onLine
   ));

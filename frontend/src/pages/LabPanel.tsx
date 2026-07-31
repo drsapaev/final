@@ -79,7 +79,7 @@ function buildTemplateResolutionPayload(appointment: Record<string, unknown> | n
 
 export default function LabPanel() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const tabs = [
     { id: 'queue', label: t('misc.lp_ochered'), icon: 'testtube.2' },
     { id: 'templates', label: t('misc.lp_shablony'), icon: 'rectangle.stack.badge.plus' },

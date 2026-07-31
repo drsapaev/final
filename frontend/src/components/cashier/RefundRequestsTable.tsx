@@ -95,7 +95,7 @@ const hasBackendRefundAction = (request: RefundRequest | null | undefined, actio
 };
 
 const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as RefundTranslationFn;
+  const { t: rawT } = useTranslation(); const t = rawT as RefundTranslationFn;
   const [requests, setRequests] = useState<RefundRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -209,7 +209,7 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
 
     return (
       <Badge variant={config.variant} className="refund-status-icon">
-        <IconComponent size={12 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+        <IconComponent size={12} aria-hidden="true" />
         {config.label}
       </Badge>
     );
@@ -241,7 +241,7 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
     if (processingId === request.id) {
       return (
         <span role="status" aria-live="polite" className="refund-inline-cluster">
-          <Loader2 size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="animate-spin" aria-hidden="true" />
+          <Loader2 size={16} className="animate-spin" aria-hidden="true" />
           <span className="refund-cell-muted">{t('misc.rrt_obrabotka')}</span>
         </span>
       );
@@ -262,7 +262,7 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
               title={t('misc.rrt_odobrit')}
               aria-label={t('misc.rrt_odobrit_zayavku_na_vozvrat_r', { id: request.id })}
             >
-              <Check size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+              <Check size={14} aria-hidden="true" />
             </Button>
           )}
           {canReject && (
@@ -273,7 +273,7 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
               title={t('misc.rrt_otklonit')}
               aria-label={t('misc.rrt_otklonit_zayavku_na_vozvrat_', { id: request.id })}
             >
-              <X size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+              <X size={14} aria-hidden="true" />
             </Button>
           )}
           {canComplete && (
@@ -283,7 +283,7 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
               onClick={() => handleComplete(request.id)}
               aria-label={t('misc.rrt_otmetit_zayavku_na_vozvrat_r', { id: request.id })}
             >
-              <CreditCard size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+              <CreditCard size={14} aria-hidden="true" />
               Выплатить
             </Button>
           )}
@@ -305,7 +305,7 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
       title: t('payment.col_patient'),
       render: (_value: unknown, request: RefundRequest) => (
         <span className="refund-inline-cluster">
-          <User size={16 as unknown as "small" | "default" | "large" | "xlarge"} color="var(--mac-text-secondary)" aria-hidden="true" />
+          <User size={16} color="var(--mac-text-secondary)" aria-hidden="true" />
           <span>{request.patient_name || t('misc.rrt_patsient_request_patient_id', { patient_id: request.patient_id })}</span>
         </span>
       )
@@ -350,7 +350,7 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
     <section aria-labelledby="refund-requests-title">
       <div className="refund-header">
         <div className="refund-inline-cluster">
-          <DollarSign size={20 as unknown as "small" | "default" | "large" | "xlarge"} color="var(--mac-success)" aria-hidden="true" />
+          <DollarSign size={20} color="var(--mac-success)" aria-hidden="true" />
           <h3
             id="refund-requests-title"
             style={{

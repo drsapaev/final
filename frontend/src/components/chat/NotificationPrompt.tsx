@@ -11,7 +11,7 @@ import logger from '../../utils/logger';
  * Shows a non-intrusive banner that can be dismissed
  */
 export function NotificationPrompt() {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [isVisible, setIsVisible] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);

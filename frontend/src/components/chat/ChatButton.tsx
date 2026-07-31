@@ -13,7 +13,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Кнопка открытия чата с бейджем непрочитанных сообщений
  */
 const ChatButton = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
     const [isOpen, setIsOpen] = useState(false);
     const { unreadCount, isConnected, loadMessages } = useChat();
     // PR-68 / P0-1: listen for 'openChat' CustomEvent from desktop notifications

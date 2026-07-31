@@ -75,7 +75,7 @@ interface LabReportAIAnalysisProps {
 }
 
 export default function LabReportAIAnalysis({ activeInstance, notify }: LabReportAIAnalysisProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   void t;
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
 
@@ -168,7 +168,7 @@ export default function LabReportAIAnalysis({ activeInstance, notify }: LabRepor
               >
                 {/* L-M-8 fix: emoji ✕ заменён на lucide-icon X для консистентности
                     с остальными UI-кнопками (cashier/registrar/admin/doctor panels). */}
-                <Icon name="xmark" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                <Icon name="xmark" size={14} />
               </Button>
             </Box>
           </DialogTitle>

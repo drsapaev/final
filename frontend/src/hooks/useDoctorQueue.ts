@@ -10,7 +10,7 @@ import type {
   QueueStats,
 } from '../types/domain/queue';
 // ADR-0016: canonical error types from types/errors.ts.
-import type { AxiosLikeError } from '../types/errors';
+import type { HttpApiError } from '../types/errors';
 
 // Doctor-queue-specific payload envelope. The backend returns this shape from
 // /queue/{id} with queue entries + stats + can_call_next metadata. The
@@ -31,7 +31,7 @@ interface QueueControls {
   nextCallEntryId: string | number | null;
 }
 
-// ADR-0016: CatchError replaced by canonical AxiosLikeError.
+// ADR-0016: CatchError replaced by canonical HttpApiError.
 
 const ZERO_STATS: QueueStats = {
   waiting: 0,
@@ -137,7 +137,7 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
       });
     } catch (err) {
       if (requestId !== loadQueueRequestIdRef.current) return;
-      const e = err as AxiosLikeError;
+      const e = err as HttpApiError;
       logger.error('[useDoctorQueue] Error loading queue:', err);
       setQueue([]);
       setStats(ZERO_STATS);

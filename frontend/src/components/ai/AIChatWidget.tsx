@@ -34,7 +34,7 @@ const AIChatWidget = ({
   minimized?: boolean;
   position?: string;
 }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [minimized, setMinimized] = useState(initialMinimized);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);

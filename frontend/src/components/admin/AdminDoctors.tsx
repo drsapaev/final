@@ -65,7 +65,7 @@ const getDepartmentLabel = (department: string | undefined, deptList: Department
 };
 
 const AdminDoctors = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const {
@@ -186,7 +186,7 @@ const AdminDoctors = () => {
               {t('admin2.ad_subtitle')}
             </p>
           </div>
-          <Button onClick={handleCreateDoctor} startIcon={<Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
+          <Button onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
             {t('admin2.ad_add_doctor')}
           </Button>
         </div>
@@ -250,7 +250,7 @@ const AdminDoctors = () => {
               title={t('admin2.ad_error_load_title')}
               description={t('admin2.ad_error_load_description')}
               action={
-                <Button onClick={refresh} startIcon={<RefreshCw size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
+                <Button onClick={refresh} startIcon={<RefreshCw size={16} />}>
                   {t('admin2.ad_refresh')}
                 </Button>
               }
@@ -265,7 +265,7 @@ const AdminDoctors = () => {
                   : t('admin2.ad_empty_no_doctors')
               }
               action={
-                <Button onClick={handleCreateDoctor} startIcon={<Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
+                <Button onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
                   {t('admin2.ad_add_first_doctor')}
                 </Button>
               }
@@ -357,14 +357,14 @@ const AdminDoctors = () => {
                     >
                       <div className="flex items-center justify-center gap-2">
                         <IconButton label={t('admin2.ad_edit_doctor')} onClick={() => handleEditDoctor(doctor)}>
-                          <Edit size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                          <Edit size={16} />
                         </IconButton>
                         <IconButton
                           label={t('admin2.ad_deactivate_doctor_aria')}
                           tone="danger"
                           onClick={() => handleDeleteDoctor(doctor)}
                         >
-                          <Trash2 size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                          <Trash2 size={16} />
                         </IconButton>
                       </div>
                     </td>

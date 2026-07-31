@@ -142,7 +142,7 @@ const FinanceModal = ({
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as TranslationFn;
+  const t = rawT as TranslationFn;
 
   // Инициализация формы при открытии
   useEffect(() => {

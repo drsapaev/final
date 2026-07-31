@@ -75,7 +75,7 @@ const PredictiveAnalytics = ({
   onExport,
   showRecommendations = true
 }: PredictiveAnalyticsProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [selectedMetric, setSelectedMetric] = useState('revenue');
   const [forecastPeriod, setForecastPeriod] = useState('30d');
   const [showDetails, setShowDetails] = useState(false);

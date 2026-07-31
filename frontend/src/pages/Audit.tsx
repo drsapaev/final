@@ -29,7 +29,7 @@ interface AuditRow {
  */
 export default function Audit() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [limit, setLimit] = useState(100);
   const [q, setQ] = useState('');

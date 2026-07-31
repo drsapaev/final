@@ -60,7 +60,7 @@ interface ThemePreviewCardProps {
 }
 
 function ThemePreviewCard({ scheme, isActive, onSelect }: ThemePreviewCardProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const Icon = ICONS[scheme.id as keyof typeof ICONS] || Sun;
   const preview = scheme.preview;
   const buttonLabel = isActive
@@ -120,7 +120,7 @@ function ThemePreviewCard({ scheme, isActive, onSelect }: ThemePreviewCardProps)
 
 
 export default function ColorSchemeSelector() {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const { colorScheme, setColorScheme } = useTheme();
   const { accent } = useMacOSTheme();
 

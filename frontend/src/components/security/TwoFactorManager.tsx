@@ -67,7 +67,7 @@ interface MetricCardProps {
 
 function MetricCard({ accent, icon: Icon, label, value }: MetricCardProps) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   return (
     <div
       className="theme-soft-surface"
@@ -171,11 +171,11 @@ function formatDate(dateString: string | undefined | null, t: TranslationFn): st
 }
 
 // ADR-0016: canonical error types from types/errors.ts.
-import type { AxiosLikeError } from '../../types/errors';
+import type { HttpApiError } from '../../types/errors';
 
 function resolveApiError(error: unknown, fallbackMessage: string): string {
   if (error && typeof error === 'object' && 'response' in error) {
-    const errResp = (error as AxiosLikeError).response;
+    const errResp = (error as HttpApiError).response;
     const detail = errResp?.data?.detail;
     if (typeof detail === 'string') return detail;
     return fallbackMessage;
@@ -196,7 +196,7 @@ interface DeviceCardProps {
 
 function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, onConfirm, onToggle }: DeviceCardProps) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   return (
     <Card shadow="none" style={{ borderStyle: 'solid' }}>
       <CardContent style={{ display: 'grid', gap: 12 }}>
@@ -257,7 +257,7 @@ function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, on
 
 export default function TwoFactorManager() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as TranslationFn;
+  const t = rawT as TranslationFn;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');

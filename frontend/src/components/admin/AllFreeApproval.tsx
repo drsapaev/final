@@ -77,7 +77,7 @@ const hasBackendAllFreeAction = (request: AllFreeRequest | null | undefined, act
  */
 const AllFreeApproval = () => {
   useTheme();
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [allFreeRequests, setAllFreeRequests] = useState<AllFreeRequest[]>([]);
   const [allRequestsForStats, setAllRequestsForStats] = useState<AllFreeRequest[]>([]); // ✅ Для статистики - все заявки
   const [loading, setLoading] = useState(true);
@@ -163,10 +163,10 @@ const AllFreeApproval = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending':return <Clock size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
-      case 'approved':return <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
-      case 'rejected':return <XCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
-      default:return <AlertCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
+      case 'pending':return <Clock size={16} />;
+      case 'approved':return <CheckCircle size={16} />;
+      case 'rejected':return <XCircle size={16} />;
+      default:return <AlertCircle size={16} />;
     }
   };
 
@@ -208,7 +208,7 @@ const AllFreeApproval = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="admin-fs-24-fw-700-primary-d-flex-ai-center-gap-8-m-0">
-              <Bell size={24 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-warning" />
+              <Bell size={24} className="admin-warning" />
               {t('admin2.af_title')}
               {pendingCount > 0 &&
               <Badge variant="warning" className="admin-ml-8">
@@ -224,7 +224,7 @@ const AllFreeApproval = () => {
           <div className="admin-flex-center-12">
             {/* Фильтр по статусу */}
             <div className="flex items-center justify-center gap-2">
-              <Filter size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-tertiary" />
+              <Filter size={16} className="admin-tertiary" />
               <Select
                 aria-label={t('admin2.af_filter_aria')}
                 value={statusFilter}
@@ -245,7 +245,7 @@ const AllFreeApproval = () => {
               disabled={loading}
               variant="outline">
               
-              <RefreshCw size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-mr-8-anim-dyn" style={{ '--admin-anim0': loading ? 'spin 1s linear infinite' : 'none' } as CSSProperties} />
+              <RefreshCw size={16} className="admin-mr-8-anim-dyn" style={{ '--admin-anim0': loading ? 'spin 1s linear infinite' : 'none' } as CSSProperties} />
               {t('admin2.af_btn_refresh')}
             </Button>
           </div>
@@ -259,7 +259,7 @@ const AllFreeApproval = () => {
             
             <div className="admin-flex-center-12">
               <div className="admin-p-8-bgc-var-mac-warning-bg-radius-var-mac-radius-md">
-                <Clock size={20 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-warning" />
+                <Clock size={20} className="admin-warning" />
               </div>
               <div>
                 <p className="admin-fs-14-secondary-m-0">
@@ -278,7 +278,7 @@ const AllFreeApproval = () => {
             
             <div className="admin-flex-center-12">
               <div className="admin-p-8-bgc-var-mac-success-bg-radius-var-mac-radius-md">
-                <CheckCircle size={20 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-success" />
+                <CheckCircle size={20} className="admin-success" />
               </div>
               <div>
                 <p className="admin-fs-14-secondary-m-0">
@@ -297,7 +297,7 @@ const AllFreeApproval = () => {
             
             <div className="admin-flex-center-12">
               <div className="admin-p-8-bgc-var-mac-error-bg-radius-var-mac-radius-md">
-                <XCircle size={20 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-error" />
+                <XCircle size={20} className="admin-error" />
               </div>
               <div>
                 <p className="admin-fs-14-secondary-m-0">
@@ -316,7 +316,7 @@ const AllFreeApproval = () => {
             
             <div className="admin-flex-center-12">
               <div className="admin-p-8-bgc-var-mac-info-bg-radius-var-mac-radius-md">
-                <DollarSign size={20 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-info" />
+                <DollarSign size={20} className="admin-info" />
               </div>
               <div>
                 <p className="admin-fs-14-secondary-m-0">
@@ -362,7 +362,7 @@ const AllFreeApproval = () => {
                   </div>
                   
                   <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                    <Calendar size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                    <Calendar size={14} />
                     {new Date(request.created_at || '').toLocaleDateString('ru-RU')}
                   </div>
                 </div>
@@ -374,12 +374,12 @@ const AllFreeApproval = () => {
                       {t('admin2.af_label_patient')}
                     </label>
                     <div className="flex items-center gap-2">
-                      <User size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-gray-400" />
+                      <User size={16} className="text-gray-400" />
                       <div>
                         <div className="text-sm">{request.patient_name || t('admin2.af_not_specified_patient')}</div>
                         {request.patient_phone &&
                     <div className="text-xs text-gray-500 flex items-center gap-1">
-                            <Phone size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
+                            <Phone size={12} />
                             {request.patient_phone}
                           </div>
                     }
@@ -393,7 +393,7 @@ const AllFreeApproval = () => {
                         {t('admin2.af_label_doctor')}
                       </label>
                       <div className="flex items-center gap-2">
-                        <Stethoscope size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-gray-400" />
+                        <Stethoscope size={16} className="text-gray-400" />
                         <div>
                           <div className="text-sm">{request.doctor_name}</div>
                           <div className="text-xs text-gray-500">
@@ -421,7 +421,7 @@ const AllFreeApproval = () => {
                     {t('admin2.af_label_services')}
                   </label>
                   <div className="flex items-center gap-2 mb-2">
-                    <Package size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-gray-400" />
+                    <Package size={16} className="text-gray-400" />
                     <div className="flex flex-wrap gap-2">
                       {(request.services || []).map((service, index) =>
                   <Badge key={index} variant="secondary" className="text-xs">
@@ -432,7 +432,7 @@ const AllFreeApproval = () => {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <DollarSign size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-orange-600" />
+                    <DollarSign size={16} className="text-orange-600" />
                     <span className="text-lg font-semibold text-orange-600">
                       {formatPrice(request.total_original_amount || 0)}
                     </span>
@@ -461,7 +461,7 @@ const AllFreeApproval = () => {
                 disabled={isProcessing}
                 className="flex items-center gap-2 bg-green-600 hover:bg-green-700">
                 
-                      <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                      <CheckCircle size={16} />
                       {t('admin2.af_btn_approve')}
                     </Button>
               }
@@ -476,7 +476,7 @@ const AllFreeApproval = () => {
                 variant="outline"
                 className="flex items-center gap-2 text-red-600 border-red-600 hover:bg-red-50">
                 
-                      <XCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                      <XCircle size={16} />
                       {t('admin2.af_btn_reject')}
                     </Button>
               }
@@ -529,7 +529,7 @@ const AllFreeApproval = () => {
                     {isProcessing ?
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> :
 
-                  <XCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                  <XCircle size={16} />
                   }
                     {t('admin2.af_btn_reject')}
                   </Button>

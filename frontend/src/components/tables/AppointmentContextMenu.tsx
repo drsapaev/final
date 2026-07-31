@@ -61,7 +61,7 @@ const AppointmentContextMenu = ({
   theme = 'light',
   isDoctorView = false
 }: AppointmentContextMenuProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const menuRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
 

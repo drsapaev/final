@@ -23,6 +23,7 @@
 
 import { useEffect, useRef } from 'react';
 import logger from '../utils/logger';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 const DEFAULT_WARNING_THRESHOLD = 5 * 60 * 1000; // 5 minutes
 const DEFAULT_POLL_INTERVAL = 30 * 1000; // 30 seconds
@@ -37,7 +38,7 @@ function getTokenExpiryMs(token: string) {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1]));
+    const payload = safeJsonParse(atob(parts[1]));
     if (!payload.exp) return null;
     return payload.exp * 1000;
   } catch {

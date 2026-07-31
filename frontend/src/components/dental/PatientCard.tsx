@@ -81,7 +81,7 @@ const PatientCard = ({
   isEditMode?: boolean;
 }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [formData, setFormData] = useState<PatientFormData>({
     // Основные данные
     id: '',

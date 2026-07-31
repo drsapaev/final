@@ -37,7 +37,7 @@ import { getErrorMessage } from '../../utils/type-guards';
 
 const MedicalEquipmentManager = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [activeTab, setActiveTab] = useState('devices');
   const [devices, setDevices] = useState<Array<Record<string, any>>>([]);
   const [measurements, setMeasurements] = useState<Array<Record<string, any>>>([]);

@@ -87,7 +87,7 @@ const sanitizePayload = (form: Record<string, unknown>) =>
 
 const DiscountBenefitsManager = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [activeTab, setActiveTab] = useState('discounts');
   const [discounts, setDiscounts] = useState<Record<string, any>[]>([]);
   const [benefits, setBenefits] = useState<Record<string, any>[]>([]);

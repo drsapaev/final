@@ -60,7 +60,7 @@ interface ForgotPasswordProps {
 
 const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   // All state at the top (UX Audit #15 — was scattered)
   const [step, setStep] = useState('method');
   const [method, setMethod] = useState('phone');

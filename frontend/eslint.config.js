@@ -156,6 +156,11 @@ export default [
         },
       ],
 
+      // Sprint C4: ban DTO-shaped interfaces (Response/Request/DTO suffix) in types/domain/.
+      // Domain types should not mirror backend DTO shapes — they should represent
+      // domain concepts. DTOs belong in types/api.ts or types/generated/api.ts.
+      // Applied via a separate config block below (files: types/domain/**).
+
       // 10.2 + 10.4: Запрет прямого localStorage.setItem и window.location.href.
       'no-restricted-properties': [
         'warn',
@@ -278,6 +283,40 @@ export default [
       'no-restricted-properties': 'off',
       'no-restricted-syntax': 'off',
       'no-console': 'off',
+    },
+  },
+  {
+    // Sprint C4: ban DTO-shaped interfaces (Response/Request/DTO suffix) in types/domain/.
+    // Domain types should not mirror backend DTO shapes — they should represent
+    // domain concepts. DTOs belong in types/api.ts or types/generated/api.ts.
+    files: ['src/types/domain/**/*.{ts,tsx}'],
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    languageOptions: {
+      parser: tsParser,
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      parserOptions: {
+        project: './tsconfig.json',
+      },
+    },
+    rules: {
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector: "TSInterfaceDeclaration[id.name=/Response$/]",
+          message: 'DTO-shaped interfaces (suffix Response) are not allowed in types/domain/. Use types/api.ts for DTOs.',
+        },
+        {
+          selector: "TSInterfaceDeclaration[id.name=/Request$/]",
+          message: 'DTO-shaped interfaces (suffix Request) are not allowed in types/domain/. Use types/api.ts for DTOs.',
+        },
+        {
+          selector: "TSInterfaceDeclaration[id.name=/DTO$/]",
+          message: 'DTO-shaped interfaces (suffix DTO) are not allowed in types/domain/. Use types/api.ts for DTOs.',
+        },
+      ],
     },
   },
   {

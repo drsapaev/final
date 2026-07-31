@@ -119,7 +119,7 @@ const DoctorPanel = () => {
   const navigate = useNavigate();
   const { isMobile, isTablet } = useBreakpoint();
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const isTouchDevice = useTouchDevice();
   // UX Audit Doctor L-43: isTouchDevice used for disabling hover on touch.
   void isTouchDevice;

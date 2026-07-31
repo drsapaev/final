@@ -27,6 +27,7 @@ import { mixColors, toRgbaString } from '../theme/colorUtils';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { isPublicRoutePath } from '../routing/routeSelectors';
+import type { HttpApiError } from '../types/errors';
 
 type ThemeMode = 'light' | 'dark';
 type ColorScheme = string;
@@ -492,7 +493,7 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
           });
         })
         .catch((error: unknown) => {
-          const err = error as { response?: { status?: number } };
+          const err = error as HttpApiError;
           if (err?.response?.status === 401 || err?.response?.status === 403) {
             clearCachedThemePreference(authToken);
             logger.info('[FIX:THEME] Skipping theme preference reuse due to auth state', {
@@ -544,7 +545,7 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
           });
         }
       } catch (error) {
-        const err = error as { response?: { status?: number } };
+        const err = error as HttpApiError;
         if (err?.response?.status === 401 || err?.response?.status === 403) {
           clearCachedThemePreference(authToken);
           logger.info('[FIX:THEME] Skipping theme preference load due to auth state', {
@@ -599,7 +600,7 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
             colorScheme: capturedColorScheme,
           });
         } catch (error) {
-          const err = error as { response?: { status?: number } };
+          const err = error as HttpApiError;
           if (err?.response?.status === 401 || err?.response?.status === 403) {
             clearCachedThemePreference(capturedAuthToken);
             logger.info('[FIX:THEME] Skipping theme preference save due to auth state', {

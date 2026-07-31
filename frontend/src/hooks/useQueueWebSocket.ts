@@ -33,6 +33,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { buildWsUrl } from '../api/runtime';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 const RECONNECT_DELAYS = [3000, 6000, 12000, 24000, 30000]; // exponential backoff
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -104,7 +105,7 @@ export function useQueueWebSocket({ specialistId, date, enabled = true, onUpdate
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
+          const data = safeJsonParse(event.data);
 
           // Ignore heartbeat pings
           if (data.type === 'ping' || data.type === 'pong') {

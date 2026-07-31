@@ -79,7 +79,7 @@ export default function ReportEditor({
   reportHistory = [],
   notify,
 }: ReportEditorProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // STRAT#2: labToast for interactive numeric validation toasts.
   // Fallback no-op preserves runtime behavior: ReportEditor only uses the
   // interactive* methods (which call toast directly, not the notify callback).
@@ -106,7 +106,7 @@ export default function ReportEditor({
             >
               {section.title || section.key}
               {/* L-M-11 fix: заменены ▶/▼ (CJK punctuation) на lucide chevron icons */}
-              <Icon name={isCollapsed ? 'chevron.right' : 'chevron.down'} size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <Icon name={isCollapsed ? 'chevron.right' : 'chevron.down'} size={14} />
             </div>
             {!isCollapsed && (
             <div style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', display: 'grid', gap: '10px' }}>

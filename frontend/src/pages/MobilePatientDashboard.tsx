@@ -54,7 +54,7 @@ interface PatientAppointment {
 
 const MobilePatientDashboard = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [patientData, setPatientData] = useState<PatientData | null>(null);
   const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
   const [loading, setLoading] = useState(true);

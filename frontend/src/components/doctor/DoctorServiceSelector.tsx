@@ -66,7 +66,7 @@ const DoctorServiceSelector = ({
   canEditPrices = true,
   className = ''
 }: DoctorServiceSelectorProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // Проверяем демо-режим в самом начале
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
@@ -225,7 +225,7 @@ const DoctorServiceSelector = ({
   if (error) {
     return (
       <MacOSCard style={{ padding: 'var(--mac-spacing-6)', display: 'flex', alignItems: 'center', color: 'var(--mac-red-600)' }}>
-        <AlertCircle size={20 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-2)' }} />
+        <AlertCircle size={20} style={{ marginRight: 'var(--mac-spacing-2)' }} />
         <span>{error}</span>
       </MacOSCard>);
 
@@ -309,7 +309,7 @@ const DoctorServiceSelector = ({
             }}>
             
                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-success)' }} />
+                  <CheckCircle size={16} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-success)' }} />
                   <div>
                     <div style={{
                   fontWeight: 'var(--mac-font-weight-medium)',
@@ -344,7 +344,7 @@ const DoctorServiceSelector = ({
                   onClick={() => handleQuantityChange(service.id || '', (service.quantity ?? 1) - 1)}
                   disabled={(service.quantity ?? 1) <= 1}>
 
-                      <Minus aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                      <Minus aria-hidden="true" size={14} />
                     </Button>
                     <span style={{
                   width: '32px',
@@ -360,7 +360,7 @@ const DoctorServiceSelector = ({
                   aria-label={`Increase quantity for ${service.name}`}
                   onClick={() => handleQuantityChange(service.id || '', (service.quantity ?? 1) + 1)}>
 
-                      <Plus aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                      <Plus aria-hidden="true" size={14} />
                     </Button>
                   </div>
 
@@ -415,7 +415,7 @@ const DoctorServiceSelector = ({
                 aria-label={`Remove service ${service.name}`}
                 onClick={() => handleServiceToggle(service)}>
 
-                    <Minus aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                    <Minus aria-hidden="true" size={14} />
                   </Button>
                 </div>
               </div>
@@ -440,7 +440,7 @@ const DoctorServiceSelector = ({
                 alignItems: 'center',
                 color: 'var(--mac-text-primary)'
               }}>
-                <CategoryIcon size={20 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-2)', color: 'var(--mac-info)' }} />
+                <CategoryIcon size={20} style={{ marginRight: 'var(--mac-spacing-2)', color: 'var(--mac-info)' }} />
                 {categoryName}
               </h3>
 
@@ -483,9 +483,9 @@ const DoctorServiceSelector = ({
                       
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         {isSelected ?
-                        <CheckCircle size={20 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-info)' }} /> :
+                        <CheckCircle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-info)' }} /> :
 
-                        <Circle size={20 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-text-tertiary)' }} />
+                        <Circle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-text-tertiary)' }} />
                         }
                         <div>
                           <div style={{
@@ -521,7 +521,7 @@ const DoctorServiceSelector = ({
                           justifyContent: 'flex-end',
                           gap: 'var(--mac-spacing-1)'
                         }}>
-                          <Clock size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
+                          <Clock size={12} />
                           {service.duration_minutes} мин
                         </div>
                       </div>

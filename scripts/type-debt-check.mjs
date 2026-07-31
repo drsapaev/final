@@ -58,8 +58,9 @@ const BASELINE = {
   //   - PatientStepV2.tsx onUpdate value: any (TECH-DEBT(patient-step-update-any))
   //   - PatientStepV2.tsx onUpdateCart value: any (TECH-DEBT(patient-step-cart-any))
   //   - PatientStepV2.tsx phoneError patient: any (TECH-DEBT(patient-step-phone-any))
+  //   - safeJsonParse.ts fallback: any + return any (TECH-DEBT(c3-safejsonparse-any))
   // Note: .d.ts files are excluded from the scan entirely (see findUndocumentedCasts).
-  anyCasts: 20,
+  anyCasts: 21,
   tsIgnore: 0,
   tsNoCheck: 0,
   indexSignatureAny: 1,

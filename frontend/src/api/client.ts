@@ -16,6 +16,7 @@ import logger from '../utils/logger';
 import type { LoginResult } from '../types/domain/auth';
 import { parseLoginResponse, AuthInvariantViolationError } from '../types/auth-mapper';
 import type { LoginResponseRaw, UserDto } from '../types/api';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 const API_BASE = getApiBaseUrl();
 // PR-39 / Medium-11: CSRF bootstrap defaults to ON. Set VITE_CSRF_BOOTSTRAP=0
@@ -64,7 +65,7 @@ function isTokenExpiringSoon(token: string | null | undefined): boolean {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return false;
-    const payload: { exp?: number } = JSON.parse(atob(parts[1])) as { exp?: number };
+    const payload: { exp?: number } = safeJsonParse(atob(parts[1])) as { exp?: number };
     if (!payload.exp) return false;
     const expiresAt = payload.exp * 1000;
     const fiveMinutes = 5 * 60 * 1000;

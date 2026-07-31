@@ -27,7 +27,7 @@ export function DentalTemplatesTab({
   templates?: DentalTemplate[];
   onApplyTemplate?: (template: DentalTemplate) => void;
 }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const typedTemplates: DentalTemplate[] = templates;
   return (
     <div className="dental-flex-col dental-gap-24">

@@ -10,7 +10,7 @@ import React from 'react';
  * Тестовый компонент для проверки работы селектора языка
  */
 const LanguageTest = () => {
-  const { language, setLanguage, t: rawT, availableLanguages } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { language, setLanguage, t: rawT, availableLanguages } = useTranslation(); const t = rawT;
   const { isDark, toggleTheme } = useTheme();
 
   return (

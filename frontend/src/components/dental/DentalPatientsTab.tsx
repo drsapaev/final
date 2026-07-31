@@ -43,7 +43,7 @@ export function DentalPatientsTab({
   onTreatment,
   onProsthetic,
 }: DentalPatientsTabProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   if (patients.length === 0) {
     return (
       <Card padding="large">

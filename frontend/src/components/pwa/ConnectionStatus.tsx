@@ -141,7 +141,7 @@ interface ConnectionToastProps {
 }
 
 function ConnectionToast({ open, position, tone, icon: Icon, title, description, onClose }: ConnectionToastProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   void t;
   if (!open) {
     return null;
@@ -158,7 +158,7 @@ function ConnectionToast({ open, position, tone, icon: Icon, title, description,
         style={styles.toastAlert}
       >
         <div style={styles.toastContent}>
-          <Icon size={18 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" style={{ color: config.color, marginTop: 1 }} />
+          <Icon size={18} aria-hidden="true" style={{ color: config.color, marginTop: 1 }} />
           <div>
             <p style={styles.toastTitle}>{title}</p>
             <p style={styles.toastDescription}>{description}</p>
@@ -171,7 +171,7 @@ function ConnectionToast({ open, position, tone, icon: Icon, title, description,
             onClick={onClose}
             style={styles.closeButton}
           >
-            <X size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+            <X size={14} aria-hidden="true" />
           </Button>
         </div>
       </Alert>
@@ -275,7 +275,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }: { showO
           aria-label={t18('misc.cs_status_podklyucheniya_label', { label: label })}
         >
           <span style={styles.badgeContent}>
-            <Icon size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+            <Icon size={14} aria-hidden="true" />
             {label}
           </span>
         </Badge>
@@ -324,7 +324,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }: { showO
       {!isOnline && (
         <div style={styles.offlineBanner as unknown as CSSProperties} role="status" aria-live="polite">
           <span style={styles.offlineBannerInner as unknown as CSSProperties}>
-            <WifiOff size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+            <WifiOff size={14} aria-hidden="true" />
             Офлайн режим - данные будут синхронизированы при подключении
           </span>
         </div>

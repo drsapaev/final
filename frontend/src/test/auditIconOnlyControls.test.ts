@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const scriptPath = path.join(frontendRoot, 'scripts', 'audit-icon-only-controls.mjs');
@@ -35,7 +36,7 @@ function runAudit(source: string, extraArgs: string[] = [], extraFiles: Record<s
     return {
       status: result.status,
       stderr: result.stderr,
-      report: JSON.parse(result.stdout),
+      report: safeJsonParse(result.stdout),
       root,
     };
   } finally {
@@ -60,7 +61,7 @@ function runAuditRoot(root: string, extraArgs: string[] = []) {
   return {
     status: result.status,
     stderr: result.stderr,
-    report: JSON.parse(result.stdout),
+    report: safeJsonParse(result.stdout),
   };
 }
 

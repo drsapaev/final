@@ -6,6 +6,7 @@
  */
 
 import type { VisitId, PatientId, DoctorId } from './branded';
+import type { HttpApiError } from '../../types/errors';
 export interface EMRTemplateField {
   id?: string;
   label?: string;
@@ -59,10 +60,10 @@ export type EMRHttpStatus = number | string;
 /** @deprecated Use `EMRHttpStatus` instead. */
 export type EMRStatus = EMRHttpStatus;
 
-// ADR-0016: EMRApiError replaced by canonical AxiosLikeError from types/errors.ts.
+// ADR-0016: EMRApiError replaced by canonical HttpApiError from types/errors.ts.
 // Re-exported here for backward compatibility with existing imports
-// `from '../types/domain/emr'`. New code should import AxiosLikeError directly.
-export type { AxiosLikeError as EMRApiError } from '../errors';
+// `from '../types/domain/emr'`. New code should import HttpApiError directly.
+export type { HttpApiError as EMRApiError } from '../errors';
 
 // === EMR Clinical Content Types ===
 // Used by EMR sections (complaints, anamnesis, examination, diagnosis,

@@ -95,7 +95,7 @@ export function EMRStatusIndicator({
     version?: number;
     autosaveConfig?: { debounceMs: number; enabled: boolean };
 }) {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+    const { t: rawT } = useTranslation(); const t = rawT as TFunc;
     // Update relative time every 10 seconds
     const [, setTick] = useState(0);
 

@@ -42,7 +42,7 @@ interface AIClinicalTextProps {
 }
 
 const AIClinicalText = ({ content, variant = 'info' }: AIClinicalTextProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   if (!content) return null;
 
   // Разбираем контент на секции

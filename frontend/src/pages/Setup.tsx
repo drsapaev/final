@@ -225,7 +225,7 @@ export default function Setup() {
   const navigate = useNavigate();
   const loginRoute = getCanonicalRouteById('login')?.path || '/login';
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   const requiredFieldRefs = useRef<Record<string, HTMLElement | null>>({});
   // UX Audit Stage 2 (Setup issue 2.2): track touched fields для real-time валидации.

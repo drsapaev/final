@@ -9,7 +9,8 @@ import { toast } from 'react-toastify';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 // ADR-0016: canonical error types from types/errors.ts.
-import type { AxiosLikeError } from '../types/errors';
+import type { HttpApiError } from '../types/errors';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 // ============================================================================
 // useApiCall
@@ -28,7 +29,7 @@ interface UseApiCallReturn {
   error: string | null;
 }
 
-// ADR-0016: CatchError replaced by canonical AxiosLikeError.
+// ADR-0016: CatchError replaced by canonical HttpApiError.
 
 export function useApiCall(): UseApiCallReturn {
   const [loading, setLoading] = useState<boolean>(false);
@@ -58,7 +59,7 @@ export function useApiCall(): UseApiCallReturn {
 
         return result;
       } catch (err) {
-        const e = err as AxiosLikeError;
+        const e = err as HttpApiError;
         const detail = e?.response?.data?.detail;
         const errorMsg = (typeof detail === 'string' && detail) || e?.message || errorMessage;
         setError(String(errorMsg));
@@ -129,7 +130,7 @@ export function useApiData(
         setData(result);
         return result;
       } catch (err) {
-        const e = err as AxiosLikeError;
+        const e = err as HttpApiError;
         const detail = e?.response?.data?.detail;
         const errorMsg = (typeof detail === 'string' && detail) || e?.message || 'Ошибка загрузки данных';
         setError(String(errorMsg));
@@ -381,7 +382,7 @@ export function useWebSocket(
     };
 
     ws.onmessage = (event: MessageEvent): void => {
-      const message: unknown = JSON.parse(event.data);
+      const message: unknown = safeJsonParse(event.data);
       setLastMessage(message);
       onMessageRef.current?.(message);
     };
@@ -456,7 +457,7 @@ export function useCachedData(
       try {
         const cached = localStorage.getItem(`cache_${key}`);
         if (cached) {
-          const parsed = JSON.parse(cached) as { data: unknown; timestamp: number };
+          const parsed = safeJsonParse(cached) as { data: unknown; timestamp: number };
           if (Date.now() - parsed.timestamp < ttl) {
             setData(parsed.data);
             setLoading(false);

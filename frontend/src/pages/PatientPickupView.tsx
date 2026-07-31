@@ -58,7 +58,7 @@ const getUserRole = () => {
 
 export default function PatientPickupView() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const { patientId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();

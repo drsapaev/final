@@ -13,7 +13,7 @@ interface TwoFactorSetupProps {
 
 const TwoFactorSetup = ({ onComplete, onCancel }: TwoFactorSetupProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [step, setStep] = useState(1); // 1: Setup, 2: Verify, 3: Complete
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

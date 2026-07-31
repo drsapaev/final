@@ -10,7 +10,7 @@ interface EMRHelpDialogProps {
 }
 
 const EMRHelpDialog = ({ isOpen, onClose }: EMRHelpDialogProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
     if (!isOpen) return null;
     const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, action: () => void) => {
         if (event.key === 'Enter' || event.key === ' ') {

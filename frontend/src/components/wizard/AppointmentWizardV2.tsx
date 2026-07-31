@@ -234,7 +234,7 @@ const AppointmentWizardV2 = ({
 
   // i18n: unified translation hook — required for all t('misc.aw_*') calls below.
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.

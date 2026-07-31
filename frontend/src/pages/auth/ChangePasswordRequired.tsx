@@ -17,7 +17,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  */
 export default function ChangePasswordRequired({ currentPassword }: { currentPassword: string }) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
     const navigate = useNavigate();
     const { theme, getColor } = useTheme();
 

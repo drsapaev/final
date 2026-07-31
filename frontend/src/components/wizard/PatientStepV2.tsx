@@ -61,7 +61,7 @@ const PatientStepV2 = ({
   onUpdateCart,
   phoneError
 }: PatientStepV2Props) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const safeData = (data || {}) as Record<string, any>;
   const selectedGender = normalizeGenderForForm(safeData.gender);
 
@@ -108,7 +108,7 @@ const PatientStepV2 = ({
 
           {errors.fio &&
           <span className="patient-step-v2__error-inline">
-              <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <AlertCircle size={14} />
               {errors.fio}
             </span>
           }
@@ -116,7 +116,7 @@ const PatientStepV2 = ({
           {/* UX Audit Registrar #11: loading indicator во время поиска пациентов. */}
           {isSearching &&
           <div className="patient-step-v2__search-loading">
-            <RefreshCw size={14 as unknown as "small" | "default" | "large" | "xlarge"} className="patient-step-v2__search-spinner" />
+            <RefreshCw size={14} className="patient-step-v2__search-spinner" />
             Поиск пациентов...
           </div>
           }
@@ -142,8 +142,8 @@ const PatientStepV2 = ({
                     {patient.fio || `${patient.last_name} ${patient.first_name}`}
                   </div>
                   <div className="patient-step-v2__suggestion-details">
-                    <span className="patient-step-v2__suggestion-detail"><Phone size={12 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />{patient.phone}</span>
-                    <span className="patient-step-v2__suggestion-detail"><Calendar size={12 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />{formatDateDisplay(patient.birth_date)}</span>
+                    <span className="patient-step-v2__suggestion-detail"><Phone size={12} aria-hidden="true" />{patient.phone}</span>
+                    <span className="patient-step-v2__suggestion-detail"><Calendar size={12} aria-hidden="true" />{formatDateDisplay(patient.birth_date)}</span>
                   </div>
                 </button>
             )}
@@ -186,7 +186,7 @@ const PatientStepV2 = ({
           </div>
           {errors.gender &&
           <span className="patient-step-v2__error-inline">
-              <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <AlertCircle size={14} />
               {errors.gender}
             </span>
           }
@@ -215,14 +215,14 @@ const PatientStepV2 = ({
           }
           {errors.phone &&
           <span className="patient-step-v2__error-inline">
-              <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <AlertCircle size={14} />
               {errors.phone}
             </span>
           }
           {phoneError &&
           <div className="patient-step-v2__phone-error-block">
               <span className="patient-step-v2__phone-error-text">
-                <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                <AlertCircle size={14} />
                 {phoneError.message}
               </span>
               <button
@@ -255,7 +255,7 @@ const PatientStepV2 = ({
 
           {errors.birth_date &&
           <span className="patient-step-v2__error-inline">
-              <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <AlertCircle size={14} />
               {errors.birth_date}
             </span>
           }
@@ -344,7 +344,7 @@ const PatientStepV2 = ({
           </label>
           {cart?.all_free &&
           <div className="patient-step-v2__all-free-warning">
-              <AlertCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <AlertCircle size={16} />
               Заявка будет отправлена на одобрение администратору
             </div>
           }

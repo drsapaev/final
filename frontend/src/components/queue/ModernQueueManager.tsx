@@ -102,7 +102,7 @@ const ModernQueueManager = ({
 
   // i18next translation function.
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   // Compatibility object passed to <QueueTable t={...} /> — QueueTable still
   // expects an object with named keys (selectDoctor, patient, phone, etc.),

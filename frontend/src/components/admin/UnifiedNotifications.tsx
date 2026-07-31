@@ -10,7 +10,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 type NotificationSection = 'fcm' | 'registrar';
 
 const UnifiedNotifications = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'fcm';
 

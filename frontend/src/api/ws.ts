@@ -1,6 +1,7 @@
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 import { buildWsUrl } from './runtime';
+import { safeJsonParse } from '../utils/safeJsonParse';
 
 // Helper для WS с прокси. Управление — VITE_ENABLE_WS=0/1
 function wsEnabled() {
@@ -22,7 +23,7 @@ export function openQueueWS(department: string, dateStr: string, onMessage: (dat
     ws = new WebSocket(url);
     ws.onmessage = (ev) => {
       try {
-        const obj = JSON.parse(ev.data);
+        const obj = safeJsonParse(ev.data);
         onMessage && onMessage(obj);
       } catch {
         // ignore
@@ -108,7 +109,7 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
 
       ws.onmessage = (ev) => {
         try {
-          const obj = JSON.parse(ev.data);
+          const obj = safeJsonParse(ev.data);
           logger.log('📨 Получено WebSocket сообщение:', obj);
           onMessage && onMessage(obj);
         } catch (e) {

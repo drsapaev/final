@@ -46,7 +46,7 @@ const INTEGRATION_VISUALS = [MessageSquare, CreditCard, CreditCard, CreditCard, 
 
 function SurfaceLabel({ children }: { children: React.ReactNode }) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   return <span className="landing-surface-label">{children}</span>;
 }
 
@@ -194,7 +194,7 @@ export default function Landing() {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
   const { availableLanguages, language, setLanguage, t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   // Map unified language codes to legacy LANDING_COPY keys ('uz-Latn' → 'uz')
   const landingCopyKey = language?.startsWith('uz') ? 'uz' : language?.split('-')[0];
   const copy = (LANDING_COPY[landingCopyKey as keyof typeof LANDING_COPY] || LANDING_COPY.ru) as typeof LANDING_COPY.ru;

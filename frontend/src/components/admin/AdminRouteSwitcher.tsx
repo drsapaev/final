@@ -119,7 +119,7 @@ interface AdminRouteSwitcherProps {
 }
 
 export default function AdminRouteSwitcher({ current }: AdminRouteSwitcherProps = {}) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const navigate = useNavigate();
   const location = useLocation();
 

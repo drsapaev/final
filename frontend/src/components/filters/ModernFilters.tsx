@@ -41,7 +41,7 @@ const ModernFilters = ({
   className?: string;
   [key: string]: unknown;
 }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   void t;
   const { getColor } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);

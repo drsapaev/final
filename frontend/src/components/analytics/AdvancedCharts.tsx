@@ -47,7 +47,7 @@ const AdvancedCharts = ({
   title = t18('misc.ac_prodvinutaya_analitika'),
   showFilters = true
 }: AdvancedChartsProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   void title;
   const chartRefs = useRef<Record<string, { destroy: () => void }>>({});
   const [activeTab, setActiveTab] = useState('overview');

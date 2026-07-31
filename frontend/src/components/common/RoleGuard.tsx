@@ -5,6 +5,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getProfileRoles, hasRouteAccess as hasRouteAccessByRole, normalizeRole } from '../../routing/routeSelectors';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+import { safeJsonParse } from '../../utils/safeJsonParse';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 interface RoleGuardProps {
@@ -27,13 +28,13 @@ export function RoleGuard({
   profile = null,
   route = null
 }: RoleGuardProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const theme = useTheme();
   theme;
 
   // Получаем профиль из контекста или пропсов
   const userProfile = profile || (typeof window !== 'undefined' ?
-  JSON.parse(sessionStorage.getItem('auth_profile') || 'null') : null);
+  safeJsonParse(sessionStorage.getItem('auth_profile') || 'null') : null);
 
   if (!userProfile) {
     return fallback || <AccessDenied message={t18('misc.rg_neobhodima_avtorizatsiya')} theme={theme} />;
@@ -93,7 +94,7 @@ export function withRoleGuard(WrappedComponent: ComponentType<any>, guardProps: 
  */
 export function useRoleAccess(profile: Record<string, unknown> | null = null) {
   const userProfile = profile || (typeof window !== 'undefined' ?
-  JSON.parse(sessionStorage.getItem('auth_profile') || 'null') : null);
+  safeJsonParse(sessionStorage.getItem('auth_profile') || 'null') : null);
 
   const hasRole = (roles: string[]) => {
   if (!userProfile || !Array.isArray(roles)) return false;

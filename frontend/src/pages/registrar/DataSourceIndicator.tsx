@@ -19,7 +19,7 @@ interface DataSourceIndicatorProps {
 
 const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }: DataSourceIndicatorProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   // QW-03 fix: 'demo' state replaced with 'error' state — no more fake data.
   // DS-3: inline styles replaced with .registrar-ds-* CSS classes
   // i18n-unification: hardcoded Russian strings migrated to registrarPanel.* namespace

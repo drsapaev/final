@@ -78,7 +78,7 @@ function formatDate(dateStr: unknown): string {
 }
 
 export function LabResultsSection({ patientId, visitId, disabled = false }: LabResultsSectionProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // ADR-0015: lab reporting API accessed via hook.
   const labReportingApi = useLabReporting();
   const [instances, setInstances] = useState<LabReportInstance[]>([]);
@@ -219,7 +219,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
               background: 'var(--mac-bg-secondary)',
             }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-              <Icon name="testtube.2" size={16 as unknown as "small" | "default" | "large" | "xlarge"} color="secondary" aria-hidden="true" />
+              <Icon name="testtube.2" size={16} color="secondary" aria-hidden="true" />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 500, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
                   {instance.template_name || instance.template_code || 'Лабораторный отчёт'}
@@ -244,7 +244,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
                   size="small"
                   onClick={() => handleDownload(instance.id)}
                   aria-label={`Скачать PDF: ${instance.template_name || 'лабораторный отчёт'}`}>
-                  <Icon name="square.and.arrow.down" size={14 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 4 }} aria-hidden="true" />
+                  <Icon name="square.and.arrow.down" size={14} style={{ marginRight: 4 }} aria-hidden="true" />
                   PDF
                 </Button>
               )}
@@ -259,12 +259,12 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
     <>
       <EMRSection
         title="Результаты анализов"
-        icon={<Icon name="doc.text" size={16 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />}
+        icon={<Icon name="doc.text" size={16} aria-hidden="true" />}
         disabled={disabled}
         defaultOpen={instances.length > 0}
         headerAction={!disabled && patientId ? (
           <Button variant="outline" size="small" onClick={handleOpenOrderModal}>
-            <Icon name="plus" size={14 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 4 }} aria-hidden="true" />
+            <Icon name="plus" size={14} style={{ marginRight: 4 }} aria-hidden="true" />
             Заказать анализы
           </Button>
         ) : null}
@@ -311,7 +311,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
                         {template.code} • {template.family}
                       </div>
                     </div>
-                    <Icon name="testtube.2" size={20 as unknown as "small" | "default" | "large" | "xlarge"} color="secondary" aria-hidden="true" />
+                    <Icon name="testtube.2" size={20} color="secondary" aria-hidden="true" />
                   </button>
                 ))
               )}

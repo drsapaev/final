@@ -76,7 +76,7 @@ const DoctorModal = ({
   availableUsers = [],
   departments = [],
 }: DoctorModalProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [formData, setFormData] = useState<DoctorFormState>({
     userId: '',
     specialty: '',

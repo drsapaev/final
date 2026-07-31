@@ -47,7 +47,7 @@ interface PhoneVerificationStatistics {
 }
 
 const PhoneVerificationManager = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [loading, setLoading] = useState(false);
   const [statistics, setStatistics] = useState<PhoneVerificationStatistics | null>(null);
   const [activeTab, setActiveTab] = useState('overview');

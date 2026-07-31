@@ -48,7 +48,7 @@ interface MaskedPhoneProps {
  * вызывает re-render только отфильтрованных карточек, а не всех.
  */
 function QueueCard({ appointment, isSelected = false, onOpenAppointment }: QueueCardProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   return (
     <div
       role="button"
@@ -103,7 +103,7 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }: Queue
           </details>
         </div>
         <Badge variant={appointment.report_instance_id ? 'success' : 'info'}>
-          <Icon name="doc.text" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <Icon name="doc.text" size={12} />
           {appointment.report_instance_id ? t('queue.report_exists') : t('queue.report_new')}
         </Badge>
       </div>

@@ -1,3 +1,4 @@
+import { safeJsonParse } from '../../../utils/safeJsonParse';
 /**
  * L-H-6 fix: shared helpers для templateEditor.
  * Раньше жили в LabTemplateWorkbench.jsx как module-level functions.
@@ -80,7 +81,7 @@ export function parseJsonInput(value: string | null | undefined) {
     return null;
   }
   try {
-    return JSON.parse(value);
+    return safeJsonParse(value);
   } catch {
     return Symbol.for('invalid-json');
   }

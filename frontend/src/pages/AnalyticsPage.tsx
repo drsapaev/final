@@ -440,7 +440,7 @@ function AnalyticsEmptyState({ title, description }: AnalyticsEmptyStateProps) {
 export default function AnalyticsPage() {
   const { getColor, getSpacing } = useTheme();
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState(buildRelativeDateRange(30));
   const [department, setDepartment] = useState('');

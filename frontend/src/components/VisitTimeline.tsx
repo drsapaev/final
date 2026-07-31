@@ -38,7 +38,7 @@ interface TimelineStep {
 }
 
 const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const timelineSteps = [
     {
       id: 'appointment',

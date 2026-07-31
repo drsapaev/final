@@ -114,7 +114,7 @@ interface PatientHeaderProps {
 
 const PatientHeader = ({ patient, onCompleteVisit, loading }: PatientHeaderProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const patientName =
     patient?.patient_name ||
     patient?.name ||
@@ -166,7 +166,7 @@ interface AnamnesisSectionProps {
 
 const AnamnesisSection = ({ value, onChange, disabled }: AnamnesisSectionProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   return (
     <div style={{ marginBottom: 16 }}>
       <Label htmlFor="dental-anamnesis" style={{ display: 'block', marginBottom: 6 }}>
@@ -196,7 +196,7 @@ interface ToothSummaryProps {
 
 const ToothSummary = ({ toothStatus }: ToothSummaryProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const teeth = Object.entries(toothStatus || {});
   if (teeth.length === 0) {
     return (
@@ -247,7 +247,7 @@ interface DiagnosisSectionProps {
 
 const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, onAISuggestion, disabled }: DiagnosisSectionProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 12, marginBottom: 16 }}>
       <div>
@@ -310,7 +310,7 @@ interface CollapsibleExtrasProps {
 
 const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }: CollapsibleExtrasProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [open, setOpen] = useState(false);
 
   return (
@@ -412,7 +412,7 @@ interface VisitHistoryProps {
 
 const VisitHistory = ({ history, loading }: VisitHistoryProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   if (loading) {
     return <Skeleton style={{ height: 80, borderRadius: 8 }} />;
   }
@@ -475,7 +475,7 @@ interface AISuggestionDialogProps {
 
 const AISuggestionDialog = ({ open, onClose, onApply, anamnesis }: AISuggestionDialogProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
@@ -532,7 +532,7 @@ const DentalVisitScreen = ({
   [k: string]: unknown;
 }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [emrData, setEmrData] = useState(EMPTY_EMR_DATA);
   const [rowVersion, setRowVersion] = useState(0);
   const [loading, setLoading] = useState(true);

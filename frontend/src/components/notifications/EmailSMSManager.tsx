@@ -140,7 +140,7 @@ const parseRecipients = (value: string) =>
 const EmailSMSManager = () => {
   useTheme();
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [statistics, setStatistics] = useState<EmailSMSStatistics | null>(null);
@@ -821,7 +821,7 @@ const ActionCard = ({ icon: Icon, title, description, actionLabel, onAction, var
 
 const TemplateColumn = ({ title, icon: Icon, templates, tone }: TemplateColumnProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as TranslationFn;
+  const t = rawT as TranslationFn;
   const columns = [
     {
       key: 'title',

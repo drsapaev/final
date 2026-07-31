@@ -98,7 +98,7 @@ interface SkinAnalysisProps {
 }
 
 const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }: SkinAnalysisProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<SkinAnalysisResult | null>(null);
   const [compareMode, setCompareMode] = useState(false);
@@ -307,7 +307,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }: SkinAn
                     <CircularProgressAny
                   variant="determinate"
                   value={analysisResult.overall_score}
-                  size={80 as unknown as "small" | "default" | "large" | "xlarge"}
+                  size={80}
                   thickness={"thick" as unknown as "thin" | "medium" | "thick"}
                   color={getScoreColor(analysisResult.overall_score)} />
                 

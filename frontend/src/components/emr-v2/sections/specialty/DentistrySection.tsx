@@ -52,7 +52,7 @@ export function DentistrySection({
     onChange,
     disabled = false,
 }: DentistrySectionProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
     const hygieneIndices = hygieneIndicesRaw as Record<string, any>;
   const toothStatus = toothStatusRaw as Record<string, any>;
   const periodontalPockets = periodontalPocketsRaw as Record<string, any>;

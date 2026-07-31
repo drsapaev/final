@@ -36,7 +36,7 @@ export function AppointmentsTab({
   services?: Record<string, unknown>;
   isDark?: boolean;
 }): React.JSX.Element | null {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   return (
     <div style={{ width: '100%', maxWidth: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard className="cardio-card-fullwidth">

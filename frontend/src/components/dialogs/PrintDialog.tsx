@@ -82,7 +82,7 @@ const PrintDialog = ({
   documentData,
   onPrint,
 }: PrintDialogComponentProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -202,7 +202,7 @@ const PrintDialog = ({
     {
       label: isPrinting ? t('misc.pd_pechat') : t('misc.pd_pechat_2'),
       variant: 'primary',
-      icon: <Printer size={16 as unknown as "small" | "default" | "large" | "xlarge"} />,
+      icon: <Printer size={16} />,
       onClick: handlePrint,
       disabled: isPrinting || (!usesBrowserPrint && !selectedPrinter),
     },
@@ -255,7 +255,7 @@ const PrintDialog = ({
                 if (ticketCount > 1) {
                   return (
                     <p className="print-doc-ticket-count">
-                      <PrinterIcon size={16 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+                      <PrinterIcon size={16} aria-hidden="true" />
                       <span>Будет напечатано талонов: {ticketCount}</span>
                     </p>
                   );
@@ -269,7 +269,7 @@ const PrintDialog = ({
         {usesBrowserPrint ? (
           <div className="print-browser-notice">
             <div className="print-browser-notice-header">
-              <Printer size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <Printer size={20} />
               <strong>{t('misc.pd_pechat_cherez_brauzer')}</strong>
             </div>
             <p className="print-browser-notice-text">
@@ -294,7 +294,7 @@ const PrintDialog = ({
                 </div>
               ) : error ? (
                 <div className="print-error-box">
-                  <AlertCircle size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
+                  <AlertCircle size={20} />
                   <div>
                     <p className="print-error-title">
                       Ошибка загрузки принтеров
@@ -335,7 +335,7 @@ const PrintDialog = ({
                       </div>
 
                       {/* Иконка принтера */}
-                      <Printer size={20 as unknown as "small" | "default" | "large" | "xlarge"} className="print-printer-icon" />
+                      <Printer size={20} className="print-printer-icon" />
 
                       {/* Информация о принтере */}
                       <div className="print-printer-info">
@@ -358,17 +358,17 @@ const PrintDialog = ({
                       <div className={`print-status-badge ${printer.status === 'online' ? 'print-status-badge--online' : printer.status ? 'print-status-badge--error' : ''}`}>
                         {printer.status === 'online' ? (
                           <>
-                            <Wifi size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                            <Wifi size={14} />
                             Онлайн
                           </>
                         ) : printer.status ? (
                           <>
-                            <WifiOff size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                            <WifiOff size={14} />
                             Офлайн
                           </>
                         ) : (
                           <>
-                            <WifiOff size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                            <WifiOff size={14} />
                             Статус неизвестен
                           </>
                         )}

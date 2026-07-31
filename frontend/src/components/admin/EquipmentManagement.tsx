@@ -107,7 +107,7 @@ const getTypeOptions = (t: TranslationFn) => EQUIPMENT_TYPE_KEYS.map((option) =>
 
 const EquipmentManagement = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [equipment, setEquipment] = useState<Equipment[]>([]);

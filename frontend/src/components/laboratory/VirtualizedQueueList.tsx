@@ -54,7 +54,7 @@ export default function VirtualizedQueueList({
   loadingMore = false,
   queueTotal = 0,
 }: VirtualizedQueueListProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const rowVirtualizer = useVirtualizer({
@@ -139,7 +139,7 @@ export default function VirtualizedQueueList({
             disabled={loadingMore}
             aria-label={t('queue.load_more_aria')}
           >
-            <Icon name={loadingMore ? 'arrow.clockwise' : 'arrow.down'} size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Icon name={loadingMore ? 'arrow.clockwise' : 'arrow.down'} size={14} />
             {loadingMore
               ? t('queue.loading')
               : `${t('queue.show_more')} (${queueTotal - appointments.length} ${t('queue.remaining')})`}

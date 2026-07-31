@@ -67,7 +67,7 @@ export interface TeethChartProps {
 }
 
 const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethChartProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [teethData, setTeethData] = useState<TeethChartMap>(initialData);
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>(TOOTH_STATUS.CARIES);

@@ -200,7 +200,7 @@ function exportActivityToCsv(chartData: AdminActivityChartData | null | undefine
 }
 
 const AdminDashboard = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as AdminTranslationFn;
+  const { t: rawT } = useTranslation(); const t = rawT as AdminTranslationFn;
   const {
     data: statsDataRaw,
     loading: statsLoading,
@@ -326,7 +326,7 @@ const AdminDashboard = () => {
             description={t('admin2.adm_error_load_stats_desc')}
             action={(
               <Button onClick={refreshStats} variant="primary">
-                <RefreshCw size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                <RefreshCw size={16} />
                 {t('admin2.adm_retry')}
               </Button>
             )}

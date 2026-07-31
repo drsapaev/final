@@ -54,7 +54,7 @@ export function CardiologySection({
   onChange,
   disabled = false,
 }: CardiologySectionProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const ecgData = ecgDataRaw as Record<string, any>;
   const echoData = echoDataRaw as Record<string, any>;
   const labResults = labResultsRaw as Record<string, any>;
@@ -71,7 +71,7 @@ export function CardiologySection({
   return (
     <EMRSection
       title={t('misc.cs_title')}
-      icon={<Heart size={16 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />}
+      icon={<Heart size={16} aria-hidden="true" />}
       disabled={disabled}
       defaultOpen={true}>
       
@@ -111,7 +111,7 @@ export function CardiologySection({
             {activeTab === 'ecg' &&
       <div className="cardiology-tab-content">
                     <div className="cardiology-info-panel" role="status">
-                            <div className="cardiology-info-icon"><FileText size={20 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" /></div>
+                            <div className="cardiology-info-icon"><FileText size={20} aria-hidden="true" /></div>
                             <div className="cardiology-info-text">
                                 <h4>{t('misc.cs_ecg_separate_tab')}</h4>
                                 <p>
@@ -161,7 +161,7 @@ export function CardiologySection({
             {activeTab === 'echo' &&
       <div className="cardiology-tab-content">
                     <div className="cardiology-info-panel" role="status">
-                            <div className="cardiology-info-icon"><FileText size={20 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" /></div>
+                            <div className="cardiology-info-icon"><FileText size={20} aria-hidden="true" /></div>
                             <div className="cardiology-info-text">
                                 <h4>{t('misc.cs_echo_separate_tab')}</h4>
                                 <p>
@@ -209,7 +209,7 @@ export function CardiologySection({
             {activeTab === 'labs' &&
       <div className="cardiology-tab-content">
                     <div className="cardiology-info-panel" role="status">
-                            <div className="cardiology-info-icon"><FileText size={20 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" /></div>
+                            <div className="cardiology-info-icon"><FileText size={20} aria-hidden="true" /></div>
                             <div className="cardiology-info-text">
                                 <h4>{t('misc.cs_labs_full_form_tab')}</h4>
                                 <p>

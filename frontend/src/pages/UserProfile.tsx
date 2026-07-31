@@ -35,6 +35,7 @@ import { getState as getAuthState, setProfile as setAuthProfile } from '../store
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import { useTranslation } from '../i18n/useTranslation';
+import type { HttpApiError } from '../types/errors';
 
 const SELF_PROFILE_CACHE_MS = 30_000;
 let selfProfileCache: Record<string, unknown> | null = null;
@@ -295,7 +296,7 @@ function ProfileField({ label, children }: ProfileFieldProps) {
 
 export default function UserProfile() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   const genderOptions = [
     { value: '', label: t('misc.up_gender_none') },
@@ -390,7 +391,7 @@ export default function UserProfile() {
       setProfile(nextProfile);
       setDraft(normalizeProfileForDraft(nextProfile));
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number } };
+      const axiosErr = err as HttpApiError;
       if (axiosErr?.response?.status === 429) {
         const fallbackProfile = getFallbackAuthProfile();
         if (fallbackProfile) {

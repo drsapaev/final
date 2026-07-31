@@ -110,7 +110,7 @@ const formatAge = (patient: Record<string, unknown>, calculateAge: (birthDate: s
 };
 
 const AdminPatients = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const genderOptions = getGenderOptions(t);
@@ -214,7 +214,7 @@ const AdminPatients = () => {
               {t('admin2.ap_page_subtitle')}
             </p>
           </div>
-          <Button onClick={handleCreatePatient} startIcon={<Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
+          <Button onClick={handleCreatePatient} startIcon={<Plus size={16} />}>
             {t('admin2.ap_add_patient_btn')}
           </Button>
         </div>
@@ -283,7 +283,7 @@ const AdminPatients = () => {
               title={t('admin2.ap_load_error_title')}
               description={t('admin2.ap_load_error_desc')}
               action={
-                <Button onClick={refresh} startIcon={<RefreshCw size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
+                <Button onClick={refresh} startIcon={<RefreshCw size={16} />}>
                   {t('admin2.ap_refresh_btn')}
                 </Button>
               }
@@ -298,7 +298,7 @@ const AdminPatients = () => {
                   : t('admin2.ap_empty_desc_initial')
               }
               action={
-                <Button onClick={handleCreatePatient} startIcon={<Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
+                <Button onClick={handleCreatePatient} startIcon={<Plus size={16} />}>
                   {t('admin2.ap_add_first_patient_btn')}
                 </Button>
               }
@@ -393,14 +393,14 @@ const AdminPatients = () => {
                     >
                       <div className="flex items-center justify-center gap-2">
                         <IconButton label={t('admin2.ap_edit_aria')} onClick={() => handleEditPatient(patient)}>
-                          <Edit size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                          <Edit size={16} />
                         </IconButton>
                         <IconButton
                           label={t('admin2.ap_delete_aria')}
                           tone="danger"
                           onClick={() => handleDeletePatient(patient)}
                         >
-                          <Trash2 size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                          <Trash2 size={16} />
                         </IconButton>
                       </div>
                     </td>

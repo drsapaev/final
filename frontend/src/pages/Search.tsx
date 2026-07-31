@@ -28,7 +28,7 @@ interface Visit {
 // Modern Search Page with Full Functionality
 export default function Search() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [patients, setPatients] = useState<Patient[]>([]);

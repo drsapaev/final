@@ -121,7 +121,7 @@ const BillingManager = () => {
   const [showRecordPayment, setShowRecordPayment] = useState(false);
 
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const invoiceTypeOptions = getInvoiceTypeOptions(t);
   const paymentMethodOptions = getPaymentMethodOptions(t);
   const invoiceTypeLabels = Object.fromEntries(
