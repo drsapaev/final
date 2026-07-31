@@ -4,6 +4,8 @@ import { api } from '../api/client';
 import type { Appointment, Doctor } from '../types/domain/clinic';
 import type { AsyncState } from '../types/async-state';
 import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
+// Wire-up: domain invariant validators (Track 2 + Wire-up).
+import { checkAppointmentHasPatient, checkAppointmentPaymentAmount } from '../types/domain/invariants/appointment';
 
 /**
  * Normalized appointment shape — extends the domain Appointment with the
@@ -119,6 +121,22 @@ const useAppointments = (doctors: Doctor[] = []) => {
 
   const createAppointment = useCallback(
     async (appointmentData: Record<string, unknown>) => {
+      // Wire-up: validate business invariants before API call.
+      const patientCheck = checkAppointmentHasPatient({
+        patient_id: appointmentData.patient_id as string | number | null,
+      });
+      if (!patientCheck.ok) {
+        setRequestState(errorState<unknown>(patientCheck.message));
+        throw new Error(patientCheck.message);
+      }
+      const amountCheck = checkAppointmentPaymentAmount({
+        payment_amount: appointmentData.payment_amount as number | undefined,
+      });
+      if (!amountCheck.ok) {
+        setRequestState(errorState<unknown>(amountCheck.message));
+        throw new Error(amountCheck.message);
+      }
+
       setRequestState(loadingState<unknown>());
 
       try {
