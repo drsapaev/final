@@ -122,7 +122,10 @@ export * from './route';
 // ============================================================================
 // Manual — frontend-only UI types
 // ============================================================================
-export * from './ui';
+// ADR-0016: types/ui.ts was deleted (zero importers — all UI types like
+// FormState/ThemeState/ModalState were declared locally in components).
+// If new cross-cutting UI types are needed, create a new file under types/
+// and add the re-export here.
 
 // ============================================================================
 // Manual — i18next type augmentation

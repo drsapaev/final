@@ -15,7 +15,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../api/client';
 import logger from '../utils/logger';
-import type { AsyncState } from '../types/async-state';
 
 interface DoctorHistoryEntry {
     content?: string;

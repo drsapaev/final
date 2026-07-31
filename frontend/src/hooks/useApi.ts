@@ -8,7 +8,6 @@ import { api, apiRequest } from '../api/client';
 import { toast } from 'react-toastify';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
-import type { AsyncState } from '../types/async-state';
 // ADR-0016: canonical error types from types/errors.ts.
 import type { AxiosLikeError } from '../types/errors';
 

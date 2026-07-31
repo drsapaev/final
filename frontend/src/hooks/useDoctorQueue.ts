@@ -9,7 +9,6 @@ import type {
   QueueEntry,
   QueueStats,
 } from '../types/domain/queue';
-import type { AsyncState } from '../types/async-state';
 // ADR-0016: canonical error types from types/errors.ts.
 import type { AxiosLikeError } from '../types/errors';
 
