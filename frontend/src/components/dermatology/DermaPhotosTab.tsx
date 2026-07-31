@@ -46,7 +46,7 @@ export function DermaPhotosTab({
   onPhotoUpdate?: (data: unknown) => void;
   onGoToAppointments?: () => void;
 }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   if (!hasPatient) {
     return (
       <MacOSEmptyState

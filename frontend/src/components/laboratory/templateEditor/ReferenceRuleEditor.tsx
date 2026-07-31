@@ -108,7 +108,7 @@ function serializeRule(rule: ReferenceRule | null | undefined): string {
 }
 
 function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: ReferenceRuleEditorProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as ReferenceRuleTranslationFn;
+  const { t: rawT } = useTranslation(); const t = rawT as ReferenceRuleTranslationFn;
   const rule = parseRuleText(field.reference_rule_text);
   const isStructured = rule === null || (rule && Array.isArray(rule.cases));
 
@@ -173,7 +173,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: R
       <div className="ltw-flex-between">
         <span className="ltw-fw-600 ltw-text-14">{t('misc.rre_norm_rules')}</span>
         <Button variant="outline" size="small" onClick={addCase}>
-          <Icon name="plus" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <Icon name="plus" size={12} />
           {t('misc.rre_add_condition')}
         </Button>
       </div>
@@ -191,7 +191,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: R
             <div className="ltw-flex-between">
               <span className="ltw-text-13 ltw-fw-500">{t('misc.rre_condition_n', { n: caseIndex + 1 })}</span>
               <Button variant="ghost" size="small" onClick={() => removeCase(caseIndex)} aria-label={t('misc.rre_remove_condition')}>
-                <Icon name="trash" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
+                <Icon name="trash" size={12} />
               </Button>
             </div>
 

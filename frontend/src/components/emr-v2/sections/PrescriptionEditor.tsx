@@ -66,7 +66,7 @@ const PrescriptionEditor = ({
   isEditable = true,
   onFieldTouch
 }: PrescriptionEditorProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({
     name: '',

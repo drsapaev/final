@@ -5,7 +5,7 @@ import { t as rawT, tInterpolate as rawTInterpolate, i18n } from '../useTranslat
 // or a defaultValue. The adapter re-exports it directly, so we cast to
 // a permissive signature for the test's call sites (which pass only a
 // key). The runtime behavior is unchanged.
-const t = rawT as unknown as (key: string) => string;
+const t = rawT;
 const tInterpolate = rawTInterpolate as unknown as (key: string, params: Record<string, unknown>) => string;
 const i18nT = i18n.t as unknown as (key: string) => string;
 

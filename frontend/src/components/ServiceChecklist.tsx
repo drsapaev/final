@@ -17,7 +17,7 @@ interface ServiceChecklistProps {
 
 const ServiceChecklist = ({ value = [], onChange, department }: ServiceChecklistProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const services: Record<string, ChecklistService[]> = {
     cardio: [
       { id: 'cardio_consultation', name: t('misc.sc_konsultatsiya_kardiologa'), price: 60000, group: t('misc.sc_kardiologiya') },

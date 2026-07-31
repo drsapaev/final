@@ -27,7 +27,7 @@ import i18n from '../../i18n';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 // ❌ СТАРЫЙ ПОДХОД - НЕ ИСПОЛЬЗУЙТЕ
 function OldPatientComponent() {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [, setPatients] = useState<unknown[]>([]);
   const [, setLoading] = useState(false);
   const [, setError] = useState<string | null>(null);

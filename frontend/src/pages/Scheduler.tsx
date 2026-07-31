@@ -31,7 +31,7 @@ function todayStr() {
  */
 export default function Scheduler() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState<ScheduleRow[]>([]);
   const [q, setQ] = useState('');

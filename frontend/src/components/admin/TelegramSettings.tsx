@@ -54,7 +54,7 @@ const getLanguageOptions = (t: (key: string, options?: Record<string, unknown>) 
 ];
 
 const TelegramSettings = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({

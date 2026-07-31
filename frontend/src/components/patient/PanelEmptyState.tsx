@@ -20,7 +20,7 @@ function PanelEmptyState({ icon, title, description, variant = 'empty' }: PanelE
       aria-live={variant === 'loading' ? 'polite' : undefined}
       aria-busy={variant === 'loading' ? 'true' : undefined}
     >
-      <Icon name={icon} size={iconSize as unknown as "small" | "default" | "large" | "xlarge"} className="pp-empty-state-icon" />
+      <Icon name={icon} size={iconSize} className="pp-empty-state-icon" />
       <div className="pp-empty-state-title">{title}</div>
       {description && <p className="pp-empty-state-description">{description}</p>}
       {variant === 'loading' && (

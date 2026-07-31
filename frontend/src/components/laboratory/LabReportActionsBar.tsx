@@ -48,7 +48,7 @@ export default function LabReportActionsBar({
   onPrint,
   onNotify,
 }: LabReportActionsBarProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const showPrimaryGroup = canSaveDraft || canFinalize;
   const showSecondaryGroup = canRevise || canPrint || canNotify;
 
@@ -61,11 +61,11 @@ export default function LabReportActionsBar({
       {showPrimaryGroup && (
         <>
           <Button variant="outline" onClick={onSaveDraft} disabled={saving || !canSaveDraft}>
-            <Icon name="square.and.arrow.down" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Icon name="square.and.arrow.down" size={16} />
             {busyAction === 'save' ? t('actions.saving') : t('actions.save_draft')}
           </Button>
           <Button variant="primary" onClick={onFinalize} disabled={saving || !canFinalize}>
-            <Icon name="lock.circle" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Icon name="lock.circle" size={16} />
             {busyAction === 'finalize' ? t('actions.finalizing') : t('actions.finalize')}
           </Button>
         </>
@@ -73,19 +73,19 @@ export default function LabReportActionsBar({
       {showSecondaryGroup && (
         <>
           <Button variant="outline" onClick={onRevise} disabled={saving || !canRevise} title={t('actions.revise_title')}>
-            <Icon name="arrow.triangle.branch" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Icon name="arrow.triangle.branch" size={16} />
             {/* L-L-2 fix: сокращён текст кнопки для tablet-friendly layout.
                 Полное название доступно в title-атрибуте. */}
             {busyAction === 'revise' ? t('actions.revising') : t('actions.revise')}
           </Button>
           <Button variant="outline" onClick={onPrint} disabled={saving || !canPrint}>
-            <Icon name="printer" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Icon name="printer" size={16} />
             {busyAction === 'print' ? t('actions.printing') : t('actions.print')}
           </Button>
           {/* P1 fix: Notify patient via Telegram — only for finalized/printed reports */}
           {canNotify && (
             <Button variant="success" onClick={onNotify} disabled={saving || busyAction === 'notify'}>
-              <Icon name="paperplane" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <Icon name="paperplane" size={16} />
               {busyAction === 'notify' ? t('actions.notifying') : t('actions.notify_patient')}
             </Button>
           )}

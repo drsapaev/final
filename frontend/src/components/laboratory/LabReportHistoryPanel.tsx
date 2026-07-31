@@ -73,7 +73,7 @@ export default function LabReportHistoryPanel({
   activeInstanceId = null,
   onOpenInstance,
 }: LabReportHistoryPanelProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const sourceItems = showRecentReportsBrowser ? recentReports : reportHistory;
   const filteredItems = sortHistoryItems(
     sourceItems.filter((item) => matchesHistoryFilter(item, historySeverityFilter))
@@ -112,7 +112,7 @@ export default function LabReportHistoryPanel({
     <Card variant="filled" padding="none">
       <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
         <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-          <Icon name="clock.arrow.circlepath" size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <Icon name="clock.arrow.circlepath" size={20} />
           {title}
         </CardTitle>
       </CardHeader>

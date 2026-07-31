@@ -15,7 +15,7 @@ interface TwoFactorVerifyProps {
 }
 
 const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }: TwoFactorVerifyProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');

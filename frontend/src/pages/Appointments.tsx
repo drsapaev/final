@@ -40,7 +40,7 @@ function todayStr() {
  */
 export default function Appointments() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState<AppointmentRow[]>([]);
   const [q, setQ] = useState('');

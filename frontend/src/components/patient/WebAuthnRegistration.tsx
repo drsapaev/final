@@ -21,7 +21,7 @@ interface WebAuthnCredential {
 }
 
 export default function WebAuthnRegistration({ patientId }: { patientId?: string | number | null }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   void patientId;
   const { isSupported, isRegistering, error, register, listCredentials, deactivateCredential } = useWebAuthn();
   const [credentials, setCredentials] = useState<WebAuthnCredential[]>([]);
@@ -72,7 +72,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
     <Card variant="filled" padding="none">
       <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '12px 16px' }}>
         <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Icon name="lock.shield" size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <Icon name="lock.shield" size={20} />
           {t('patient.pat_web_title')}
         </CardTitle>
       </CardHeader>
@@ -94,7 +94,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
             loading={isRegistering}
             disabled={isRegistering}
           >
-            <Icon name="plus" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Icon name="plus" size={16} />
             {isRegistering ? t('patient.pat_web_registering') : t('patient.pat_web_add_passkey')}
           </Button>
         </div>
@@ -145,7 +145,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
                   size="small"
                   onClick={() => handleDeactivate(cred.id)}
                 >
-                  <Icon name="trash" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                  <Icon name="trash" size={14} />
                   {t('patient.pat_web_delete')}
                 </Button>
               </div>

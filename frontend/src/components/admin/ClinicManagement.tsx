@@ -62,7 +62,7 @@ interface ClinicStats {
 }
 
 const ClinicManagement = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [activeTab, setActiveTab] = useState('overview');
   const [systemHealth, setSystemHealth] = useState<SystemHealthData | null>(null);
   const [stats, setStats] = useState<ClinicStats | null>(null);
@@ -390,7 +390,7 @@ const ClinicManagement = () => {
                 value: tab.id,
                 label: (
                   <span className="admin-d-inline-flex-ai-center-gap-8">
-                    {IconComponent && <IconComponent size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />}
+                    {IconComponent && <IconComponent size={14} aria-hidden="true" />}
                     {tab.label}
                   </span>
                 )

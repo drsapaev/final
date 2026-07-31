@@ -24,7 +24,7 @@ interface IntegrationDemoQueueManager extends UseQueueManagerReturn {
  * Показывает работу всех созданных хуков и контекстов
  */
 const IntegrationDemo = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [activeDemo, setActiveDemo] = useState('queue');
 
   // Используем созданные хуки

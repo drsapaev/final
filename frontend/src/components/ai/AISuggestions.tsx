@@ -46,7 +46,7 @@ const AISuggestions = ({
   clinicalRecommendations = null,
   fallbackProvider = null
 }: AISuggestionsProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   title = title || t('misc.as_ai_podskazki');
   const [expanded, setExpanded] = useState(true);
   const [copiedId, setCopiedId] = useState<number | null>(null);

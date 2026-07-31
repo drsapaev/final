@@ -50,7 +50,7 @@ const ForceMajeureModal = ({
   specialistName,
   onSuccess
 }: ForceMajeureModalProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [activeTab, setActiveTab] = useState('transfer'); // 'transfer' | 'cancel'
   const [reason, setReason] = useState('');
   const [refundType, setRefundType] = useState('deposit'); // 'deposit' | 'bank_transfer'
@@ -165,7 +165,7 @@ const ForceMajeureModal = ({
   const isConfirmValid = confirmText === 'ПОДТВЕРЖДАЮ';
   const isReasonValid = reason.trim().length >= 5;
   const primaryActionLabel = loading ? t('misc.fm_processing') : activeTab === 'transfer' ? t('misc.fm_transfer_button') : t('misc.fm_cancel_button');
-  const primaryActionIcon = loading ? <Loader2 size={18 as unknown as "small" | "default" | "large" | "xlarge"} className="animate-spin" /> : activeTab === 'transfer' ? <ArrowRight size={18 as unknown as "small" | "default" | "large" | "xlarge"} /> : <XCircle size={18 as unknown as "small" | "default" | "large" | "xlarge"} />;
+  const primaryActionIcon = loading ? <Loader2 size={18} className="animate-spin" /> : activeTab === 'transfer' ? <ArrowRight size={18} /> : <XCircle size={18} />;
   const dialogSurfaceStyle = {
     backgroundColor: 'var(--mac-bg-primary)'
   };
@@ -174,7 +174,7 @@ const ForceMajeureModal = ({
     <div className="fmm-header">
       <div className="fmm-header-info">
         <div className="fmm-header-icon">
-          <AlertTriangle size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <AlertTriangle size={20} />
         </div>
         <div className="fmm-header-text">
           <h2 className="fmm-header-title">
@@ -189,7 +189,7 @@ const ForceMajeureModal = ({
         onClick={onClose}
         className="fmm-close-btn"
         aria-label={t('misc.fm_aria_close')}>
-        <XCircle size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
+        <XCircle size={18} />
       </button>
     </div>
   );
@@ -229,21 +229,21 @@ const ForceMajeureModal = ({
             type="button"
             onClick={() => setActiveTab('transfer')}
             className={`fmm-tab-btn fmm-tab-btn--transfer ${activeTab === 'transfer' ? 'fmm-tab-btn--active' : ''}`}>
-            <Calendar size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Calendar size={18} />
             {t('misc.fm_tab_transfer')}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('cancel')}
             className={`fmm-tab-btn fmm-tab-btn--cancel ${activeTab === 'cancel' ? 'fmm-tab-btn--active' : ''}`}>
-            <DollarSign size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <DollarSign size={18} />
             {t('misc.fm_tab_cancel')}
           </button>
         </div>
 
         {dryRunResult &&
         <div className="fmm-dry-run-card">
-          <Users size={32 as unknown as "small" | "default" | "large" | "xlarge"} className="fmm-dry-run-icon" />
+          <Users size={32} className="fmm-dry-run-icon" />
           <div className="fmm-dry-run-info">
             <p className="fmm-dry-run-count">
               {t('misc.fm_entries_count', { count: dryRunResult.count })}
@@ -258,7 +258,7 @@ const ForceMajeureModal = ({
             onClick={loadPendingEntries}
             className="fmm-refresh-btn"
             aria-label={t('misc.fm_aria_refresh')}>
-            <RefreshCw size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <RefreshCw size={18} />
           </button>
         </div>
         }

@@ -296,7 +296,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
                 '--admin-tab-weight': isActive ? '600' : '500'
               } as CSSProperties}>
 
-              <TabIcon size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <TabIcon size={16} />
               {tab.label}
             </button>);
 
@@ -337,7 +337,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
             }
               {codeWarning &&
             <div className="admin-hint-12-error-mt-4-flex">
-                  <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                  <AlertCircle size={14} />
                   {codeWarning}
                 </div>
             }
@@ -358,7 +358,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
             }
               {codePrefixMismatch &&
             <div className="admin-hint-12-warning-mt-4-flex">
-                  <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                  <AlertCircle size={14} />
                   {selectedGroupLabel
                     ? t18('admin2.sf_warn_code_mismatch_group', { code: normalizedCode, group: selectedGroupLabel })
                     : t18('admin2.sf_warn_code_mismatch_no_group', { code: normalizedCode })}
@@ -523,11 +523,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
               имитируя wizard с последовательным продвижением. */}
           <div className="admin-form-row-gap-12">
             <Button type="button" variant="outline" onClick={onCancel}>
-              <X size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
+              <X size={16} className="mr-2" />
               {t18('admin2.sf_btn_cancel')}
             </Button>
             <Button type="submit">
-              <Save size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
+              <Save size={16} className="mr-2" />
               {t18('admin2.sf_btn_save')}
             </Button>
           </div>

@@ -158,7 +158,7 @@ export default function DisplayBoardUnified({
 }: DisplayBoardUnifiedProps) {void
   useTheme();
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   // Параметры из URL или пропсов
   // PR #1910 bugfix: department destructured as departmentProp, но использовался

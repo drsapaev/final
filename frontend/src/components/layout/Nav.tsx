@@ -26,7 +26,7 @@ interface VisibleRoute {
 
 export default function Nav() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string) => string;
+  const t = rawT;
   void t;
   const [state, setState] = useState<AuthState>(auth.getState());
   const navigate = useNavigate();

@@ -252,7 +252,7 @@ const ToothModal = ({
   visitId
 }: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown) => void; toothNumber?: string | number; visitId?: string | number; open?: boolean; [k: string]: unknown }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [formData, setFormData] = useState<ToothFormData>({
     status: '',
     procedures: [],

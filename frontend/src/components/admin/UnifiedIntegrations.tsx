@@ -27,7 +27,7 @@ const INTEGRATION_TABS = (t: (key: string) => string) => [
 ];
 
 const UnifiedIntegrations = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [searchParams, setSearchParams] = useSearchParams();
   const section = searchParams.get('tab') || 'webhooks';
   const [activeTab, setActiveTab] = useState<string>(section);

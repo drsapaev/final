@@ -57,7 +57,7 @@ function MaskedPhone({ phone, canReveal = true }: { phone: string; canReveal?: b
   if (!canReveal) {
     return (
       <span className="lqw-masked-phone-readonly" title={t18('pii.phone_restricted')}>
-        <Icon name="eye.slash" size={12 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+        <Icon name="eye.slash" size={12} aria-hidden="true" />
         <span className="lqw-masked-phone-text">{maskPhone(phone)}</span>
       </span>
     );
@@ -74,7 +74,7 @@ function MaskedPhone({ phone, canReveal = true }: { phone: string; canReveal?: b
       aria-pressed={revealed}
       className={`lqw-masked-phone ${revealed ? 'lqw-masked-phone-revealed' : ''}`}
     >
-      <Icon name={revealed ? 'eye.slash' : 'eye'} size={12 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+      <Icon name={revealed ? 'eye.slash' : 'eye'} size={12} aria-hidden="true" />
       <span className="lqw-masked-phone-text">{revealed ? phone : maskPhone(phone)}</span>
     </button>
   );
@@ -172,7 +172,7 @@ export default function LabQueueWorkbench({
   loadingMore = false,
   queueTotal = 0,
 }: LabQueueWorkbenchProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // QW-8 fix: локальный state поиска и фильтра статусов.
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -230,7 +230,7 @@ export default function LabQueueWorkbench({
       <Card variant="filled" padding="none">
         <CardHeader className="lqw-card-header">
           <CardTitle className="lqw-card-title">
-            <Icon name="testtube.2" size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <Icon name="testtube.2" size={20} />
             {t18('queue.title')}
           </CardTitle>
           <div className="lqw-meta-row">
@@ -239,7 +239,7 @@ export default function LabQueueWorkbench({
               {t18('queue.in_progress')}: {appointments.filter((item) => activeQueueStatuses.has(item.status || '')).length}
             </Badge>
             <Button variant="outline" onClick={onRefresh} disabled={loading}>
-              <Icon name="arrow.clockwise" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <Icon name="arrow.clockwise" size={16} />
               {t18('common.refresh')}
             </Button>
           </div>
@@ -248,7 +248,7 @@ export default function LabQueueWorkbench({
             <div className="lqw-search-wrapper">
               <Icon
                 name="magnifyingglass"
-                size={14 as unknown as "small" | "default" | "large" | "xlarge"}
+                size={14}
                 className="lqw-search-icon"
               />
               <Input
@@ -368,7 +368,7 @@ export default function LabQueueWorkbench({
         <Card variant="filled" padding="none">
           <CardHeader className="lqw-card-header">
             <CardTitle className="lqw-card-title">
-              <Icon name="clock.arrow.circlepath" size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <Icon name="clock.arrow.circlepath" size={20} />
               {t18('queue.history_title')}
             </CardTitle>
           </CardHeader>

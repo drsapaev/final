@@ -14,7 +14,7 @@ const ReportsAndAnalytics = ({ patients, diagnoses, prosthetics }: {
   diagnoses?: unknown[];
   prosthetics?: unknown[];
 }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   return (
     <Card padding="large">
       <div className="dental-flex-between-16">
@@ -63,7 +63,7 @@ export function DentalReportsTab({
   diagnoses?: unknown[];
   prosthetics?: unknown[];
 }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const protocols: SavedVisitProtocol[] = savedVisitProtocols;
   return (
     <div className="dental-flex-col dental-gap-24">

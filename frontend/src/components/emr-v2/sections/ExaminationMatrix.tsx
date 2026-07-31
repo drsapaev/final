@@ -113,7 +113,7 @@ const ExaminationMatrix = ({
   onGenerateText,
   isEditable = true
 }: ExaminationMatrixProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [activeCategory, setActiveCategory] = useState(Object.keys(MATRICES[specialty as keyof typeof MATRICES] || MATRICES.general)[0]);
   const [status, setStatus] = useState<Record<string, string>>({}); // { 'em_item_tones': 'norm' | 'path' }
 

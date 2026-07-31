@@ -112,7 +112,7 @@ export function EMRHistoryPanel({
     isOpen = true,
     onClose,
 }: EMRHistoryPanelProps): React.ReactElement | null {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as TranslateFn;
+    const { t: rawT } = useTranslation(); const t = rawT as TranslateFn;
     const [history, setHistory] = useState<HistoryRevision[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

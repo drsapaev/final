@@ -22,6 +22,7 @@ import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 import type { AuthState, UserProfile } from '../types/domain/auth';
 import { safeJsonParse } from '../utils/safeJsonParse';
+import type { HttpApiError } from '../types/errors';
 
 // Wave G6: removed `export type { AuthState, UserProfile } from '../types/domain/auth'`
 // re-export shim. Consumers should import AuthState directly from
@@ -246,7 +247,7 @@ export async function getProfile(force = false): Promise<UserProfile | null> {
         }
       }
     } catch (err) {
-      const e = err as { response?: { status?: number } };
+      const e = err as HttpApiError;
       const status = e?.response?.status;
       if (status === 401 || status === 403) {
         logger.warn('[FIX:AUTH] Backend rejected current session, clearing auth state', {

@@ -125,7 +125,7 @@ interface SystemSettingsFormProps {
 
 const AISettings = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [loading, setLoading] = useState(true);
   const [providers, setProviders] = useState<AIProviderRecord[]>([]);
   const [systemSettings, setSystemSettings] = useState<AISystemSettings>({});
@@ -548,7 +548,7 @@ const AISettings = () => {
 // Компонент формы провайдера
 const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }: ProviderFormProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [formData, setFormData] = useState<AIProviderFormData>({
     name: provider?.name || '',
     display_name: provider?.display_name || '',
@@ -738,7 +738,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }: ProviderF
 // Компонент системных настроек
 const SystemSettingsForm = ({ settings, onSave }: SystemSettingsFormProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [formData, setFormData] = useState<AISystemSettings>(settings);
 
   useEffect(() => {

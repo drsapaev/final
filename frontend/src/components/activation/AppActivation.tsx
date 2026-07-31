@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 const AppActivation = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [activationKey, setActivationKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

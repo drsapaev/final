@@ -52,7 +52,7 @@ interface ServiceAuditHistoryProps {
 const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProps) => {
   // ADR-0015: services API accessed via hook.
   const { servicesService } = useServicesApi();
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<ServiceAuditHistoryItem[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
@@ -217,7 +217,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
               aria-label={t('admin2.sah_retry_aria', { label: refreshHistoryLabel })}
               onClick={loadHistory}
             >
-              <RefreshCw size={14 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-mr-6" />
+              <RefreshCw size={14} className="admin-mr-6" />
               {t('admin2.sah_retry')}
             </Button>
           }
@@ -252,7 +252,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
     >
       <div className="admin-p-20px-24px-bd-b-1px-solid-var-mac-bo-d-flex-ai-center-jc-between">
         <div className="admin-flex-center-12">
-          <History size={20 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-accent" />
+          <History size={20} className="admin-accent" />
           <div>
             <h3 id={historyTitleId} className="admin-fs-16-fw-600-primary-m-0">
               {t('admin2.sah_title')}
@@ -270,7 +270,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
           aria-label={refreshHistoryLabel}
           onClick={loadHistory}
         >
-          <RefreshCw size={14 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-mr-6" />
+          <RefreshCw size={14} className="admin-mr-6" />
           {t('admin2.sah_refresh_btn')}
         </Button>
       </div>
@@ -301,7 +301,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
                 <div
                   className="admin-w-32-h-32-radius-8-d-flex-ai-center-jc-center-fsk-0-bgc-dyn" style={{ '--admin-bgc0': `${getActionColor(item.action)}15` } as CSSProperties}
                 >
-                  <ActionIcon size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-col-dyn" style={{ '--admin-col0': getActionColor(item.action) } as CSSProperties} />
+                  <ActionIcon size={16} className="admin-col-dyn" style={{ '--admin-col0': getActionColor(item.action) } as CSSProperties} />
                 </div>
 
                 <div className="admin-flex-1-minw-0">
@@ -316,11 +316,11 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
 
                   <div className="admin-d-flex-ai-center-gap-12-fs-13-secondary-mb-dyn" style={{ '--admin-mb0': hasChanges ? '8px' : '0' } as CSSProperties}>
                     <div className="admin-flex-center admin-gap-4">
-                      <User size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
+                      <User size={12} />
                       <span>{item.user_name || t('admin2.sah_system')}</span>
                     </div>
                     <div className="admin-flex-center admin-gap-4">
-                      <Clock size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
+                      <Clock size={12} />
                       <span>{formatDate(item.created_at ?? Date.now())}</span>
                     </div>
                   </div>
@@ -341,7 +341,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
                         aria-label={changesToggleLabel}
                         className="admin-bg-none-bd-none-p-4px-0-cur-pointer-d-flex-ai-center-gap-4-fs-13-accent-fw-500"
                       >
-                        {isExpanded ? <ChevronUp size={14 as unknown as "small" | "default" | "large" | "xlarge"} /> : <ChevronDown size={14 as unknown as "small" | "default" | "large" | "xlarge"} />}
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         {isExpanded ? t('admin2.sah_hide_changes') : t('admin2.sah_show_changes', { count: changesCount })}
                       </button>
 

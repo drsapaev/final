@@ -29,7 +29,7 @@ function ComponentTestInner() {
   const { openModal } = useModal() as { openModal: (...args: unknown[]) => void };
   const { form, setValue, setError, validateForm } = useForm('test-form', { name: '', email: '' });
   const { profile, hasRole, isAdmin } = useRoleAccess();
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
 
   const [loading, setLoading] = useState(false);
   const [tableData, setTableData] = useState([

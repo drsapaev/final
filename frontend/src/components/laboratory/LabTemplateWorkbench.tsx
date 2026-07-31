@@ -45,7 +45,7 @@ export default function LabTemplateWorkbench({
   [k: string]: unknown;
 }) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   // L-H-1 fix: useConfirm() для всех destructive actions (вместо native confirm()).
   // Согласованность с LabReportWorkbench — единый стилизованный portal-dialog
   // с focus-trap, Esc-to-cancel, явным описанием последствий.

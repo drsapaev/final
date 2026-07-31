@@ -90,7 +90,7 @@ const DoctorCalendar = ({
   onViewAppointment?: (slot: Record<string, unknown>) => void;
   compact?: boolean;
 }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -376,7 +376,7 @@ const DoctorCalendar = ({
             {/* Header */}
             <div style={styles.header as unknown as CSSProperties}>
                 <div style={styles.title as unknown as CSSProperties}>
-                    <Calendar size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
+                    <Calendar size={20} />
                     <span>
                         {weekDays.length > 0 &&
             <>
@@ -393,7 +393,7 @@ const DoctorCalendar = ({
             title={t18('misc.dc_predyduschaya_nedelya')}
             aria-label={t18('misc.dc_predyduschaya_nedelya')}>
 
-                        <ChevronLeft size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
+                        <ChevronLeft size={18} />
                     </button>
 
                     <button
@@ -409,7 +409,7 @@ const DoctorCalendar = ({
             title={t18('misc.dc_sleduyuschaya_nedelya')}
             aria-label={t18('misc.dc_sleduyuschaya_nedelya')}>
 
-                        <ChevronRight size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
+                        <ChevronRight size={18} />
                     </button>
 
                     <button
@@ -418,7 +418,7 @@ const DoctorCalendar = ({
             title={t18('misc.dc_obnovit')}
             aria-label={t18('misc.dc_obnovit')}>
 
-                        <RefreshCw size={16 as unknown as "small" | "default" | "large" | "xlarge"} className={loading ? 'spinning' : ''} />
+                        <RefreshCw size={16} className={loading ? 'spinning' : ''} />
                     </button>
                 </div>
             </div>
@@ -426,7 +426,7 @@ const DoctorCalendar = ({
             {/* Error */}
             {error &&
       <div style={styles.error as unknown as CSSProperties}>
-                    <AlertCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-2)' }} />
+                    <AlertCircle size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} />
                     {error}
                 </div>
       }
@@ -434,7 +434,7 @@ const DoctorCalendar = ({
             {/* Loading */}
             {loading ?
       <div style={styles.loading as unknown as CSSProperties}>
-                    <RefreshCw size={24 as unknown as "small" | "default" | "large" | "xlarge"} className="spinning" style={{ marginRight: 'var(--mac-spacing-2)' }} />
+                    <RefreshCw size={24} className="spinning" style={{ marginRight: 'var(--mac-spacing-2)' }} />
                     Загрузка расписания...
                 </div> :
 

@@ -47,7 +47,7 @@ const KPIMetrics = ({
   showTrends = true,
   showComparisons = true
 }: KPIMetricsProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [animatedValues, setAnimatedValues] = useState<Record<string, { current: number; target: number; trend: number }>>({});
   const [selectedPeriod, setSelectedPeriod] = useState('30d');
 

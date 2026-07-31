@@ -156,7 +156,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
     const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
     // ADR-0015: MCP API accessed via hook, not direct import.
     const mcpAPI = useMcpClient();
     const canonicalSpecialty = normalizeSpecialty(specialty);

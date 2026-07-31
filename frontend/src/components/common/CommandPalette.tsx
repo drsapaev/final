@@ -155,7 +155,7 @@ function scoreResult(query: string, item: CommandItem) {
 }
 
 export function CommandPalette({ profile, navigate }: { profile: CommandProfile; navigate: (path: string) => void }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -346,7 +346,7 @@ export function CommandPalette({ profile, navigate }: { profile: CommandProfile;
           padding: '14px 16px',
           borderBottom: '1px solid var(--mac-border, rgba(0,0,0,0.08))',
         }}>
-          <Search size={18 as unknown as "small" | "default" | "large" | "xlarge"} style={{ color: 'var(--mac-text-secondary, #6b7280)', flexShrink: 0 }} />
+          <Search size={18} style={{ color: 'var(--mac-text-secondary, #6b7280)', flexShrink: 0 }} />
           <Input
             ref={inputRef}
             type="text"
@@ -423,7 +423,7 @@ export function CommandPalette({ profile, navigate }: { profile: CommandProfile;
                 }}
               >
                 {isRecent && (
-                  <Clock size={14 as unknown as "small" | "default" | "large" | "xlarge"} style={{
+                  <Clock size={14} style={{
                     color: isSelected ? 'color-mix(in srgb, white, transparent 30%)' : 'var(--mac-text-secondary, #6b7280)',
                     flexShrink: 0,
                   }} />
@@ -451,7 +451,7 @@ export function CommandPalette({ profile, navigate }: { profile: CommandProfile;
                   )}
                 </div>
                 {isSelected && (
-                  <ArrowRight size={14 as unknown as "small" | "default" | "large" | "xlarge"} style={{ color: 'color-mix(in srgb, white, transparent 30%)', flexShrink: 0 }} />
+                  <ArrowRight size={14} style={{ color: 'color-mix(in srgb, white, transparent 30%)', flexShrink: 0 }} />
                 )}
               </div>
             );

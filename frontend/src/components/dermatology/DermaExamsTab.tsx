@@ -99,7 +99,7 @@ export function DermaExamsTab({
   getFontSize,
   getSpacing,
 }: DermaExamsTabProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   if (activeTab === 'skin') {
     return (
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: getSpacing?.('xl') }}>

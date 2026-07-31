@@ -28,7 +28,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
 const PaymentProviderSettings = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const { executeAction, loading: actionLoading } = useAsyncAction();
 
   // ADR-0015: settings lifecycle owned by usePaymentProviderSettings hook.

@@ -46,7 +46,7 @@ export function DoctorTemplatesPanel({
     onClose?: () => void;
     isOpen?: boolean;
 }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
     const {
         templates,
         loading,
@@ -140,7 +140,7 @@ export function DoctorTemplatesPanel({
                 {/* Header */}
                 <div className="doctor-templates-header">
                     <div className="doctor-templates-title">
-                        <History size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
+                        <History size={18} />
                         <span>Мой опыт: {sectionLabel}</span>
                         {icd10Code && (
                             <span className="doctor-templates-icd">{icd10Code}</span>
@@ -152,7 +152,7 @@ export function DoctorTemplatesPanel({
                         aria-label={t18('misc.dtp_zakryt_panel_shablonov_secti', { sectionLabel: sectionLabel })}
                         title={t18('misc.dtp_zakryt')}
                     >
-                        <X size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
+                        <X size={18} />
                     </button>
                 </div>
 
@@ -164,7 +164,7 @@ export function DoctorTemplatesPanel({
                         </div>
                     ) : !hasTemplates ? (
                         <div className="doctor-templates-empty">
-                            <History size={32 as unknown as "small" | "default" | "large" | "xlarge"} opacity={0.3} />
+                            <History size={32} opacity={0.3} />
                             <p>{t18('misc.dtp_net_sohranyonnyh_shablonov')}</p>
                             <small>
                                 {icd10Code
@@ -193,7 +193,7 @@ export function DoctorTemplatesPanel({
                                             aria-label={t18('misc.dtp_template_is_pinned_otkrepit_', { is_pinned: tmpl.is_pinned ? 'Открепить' : 'Закрепить' })}
                                             title={tmpl.is_pinned ? t18('misc.dtp_otkrepit') : t18('misc.dtp_zakrepit')}
                                         >
-                                            <Pin size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                                            <Pin size={14} />
                                         </button>
                                         <button
                                             type="button"
@@ -202,7 +202,7 @@ export function DoctorTemplatesPanel({
                                             aria-label={t18('misc.dtp_redaktirovat_shablon_vracha')}
                                             title={t18('misc.dtp_redaktirovat')}
                                         >
-                                            <Edit2 size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                                            <Edit2 size={14} />
                                         </button>
                                         <button
                                             type="button"
@@ -211,7 +211,7 @@ export function DoctorTemplatesPanel({
                                             aria-label={t18('misc.dtp_udalit_shablon_vracha')}
                                             title={t18('misc.dtp_udalit')}
                                         >
-                                            <Trash2 size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                                            <Trash2 size={14} />
                                         </button>
                                     </div>
 
@@ -257,7 +257,7 @@ export function DoctorTemplatesPanel({
                     <div className="doctor-templates-edit-overlay">
                         <div className="doctor-templates-edit-panel">
                             <div className="doctor-templates-edit-header">
-                                <Edit2 size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                                <Edit2 size={16} />
                                 <span>{t18('misc.dtp_redaktirovat_shablon')}</span>
                             </div>
                             <textarea
@@ -282,7 +282,7 @@ export function DoctorTemplatesPanel({
                                     onClick={() => handleEditSave('replace')}
                                     title={t18('misc.dtp_obnovit_suschestvuyuschiy_sh')}
                                 >
-                                    <Save size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                                    <Save size={14} />
                                     Заменить старый
                                 </button>
                                 <button
@@ -291,7 +291,7 @@ export function DoctorTemplatesPanel({
                                     onClick={() => handleEditSave('save_as_new')}
                                     title={t18('misc.dtp_sozdat_novyy_shablon_s_izmen')}
                                 >
-                                    <Plus size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                                    <Plus size={14} />
                                     Сохранить как новый
                                 </button>
                             </div>
@@ -338,7 +338,7 @@ export function DoctorTemplatesButton({
             disabled={disabled}
             title={hasTemplates ? t18('misc.dtp_moy_opyt_count_shablonov', { count: count }) : t18('misc.dtp_moy_opyt')}
         >
-            <History size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <History size={14} />
             <span>{t18('misc.dtp_moy_opyt_2')}</span>
             {hasTemplates && count > 0 && (
                 <span className="doctor-templates-btn-count">{count}</span>

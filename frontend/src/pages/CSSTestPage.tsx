@@ -9,7 +9,7 @@ import logger from '../utils/logger';
 import { useTranslation } from '../i18n/useTranslation';
 const CSSTestPage = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [activeTab, setActiveTab] = useState('cardio');
   const [testResults, setTestResults] = useState<Array<{ test: string; passed: boolean; message: string }>>([]);
 

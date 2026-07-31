@@ -136,7 +136,7 @@ const CartStepV2 = ({
   onApplyRepeatSuggestion,
   repeatSuggestionSummary
 }: CartStepV2Props) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // Local state removed - lifted to AppointmentWizardV2
 
   // Categories are now defined globally at the top of the file
@@ -536,7 +536,7 @@ const CartStepV2 = ({
                       display: 'flex'
                     }}>
 
-                      <X size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                      <X size={14} />
                     </button>
                   </div>
                   {requiresDoctor &&
@@ -596,7 +596,7 @@ const CartStepV2 = ({
           alignItems: 'center',
           gap: 'var(--mac-spacing-2)'
         }}>
-            <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <AlertCircle size={14} />
             {String(errors?.cart ?? errors?.doctors ?? errors?.repeat ?? '')}
           </div>
         }

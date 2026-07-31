@@ -21,7 +21,7 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const WizardSettings = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // ADR-0015: settings lifecycle owned by useAdminSettings hook.
   const {
     settings: fetchedSettings,

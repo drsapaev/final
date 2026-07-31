@@ -69,7 +69,7 @@ export function AISuggestionPanel({
     isOpen = true,
     onClose,
 }: AISuggestionPanelProps) {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+    const { t: rawT } = useTranslation(); const t = rawT;
     if (!isOpen) return null;
 
     // Group suggestions by field

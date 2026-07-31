@@ -93,7 +93,7 @@ const BackupManagement = () => {
   const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
   const [stats, setStats] = useState<BackupStats | null>(null);
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   // Форма резервной копии
   const [formData, setFormData] = useState(defaultBackupForm);

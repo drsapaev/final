@@ -118,7 +118,7 @@ const buildStatsSummary = (
 };
 
 const QueueCabinetManagement = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS);
   const [queues, setQueues] = useState<QueueRow[]>([]);

@@ -156,7 +156,7 @@ type NormalizedNotificationLike = {
 };
 
 export default function NotificationInbox({ userRole, onClose }: NotificationInboxProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const {
     getNotificationsByRole,
     markAsRead,
@@ -318,7 +318,7 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
             background: 'var(--mac-bg-secondary)'
           }}
         >
-          <Search size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <Search size={16} />
           <Input
             type="search"
             aria-label={t('misc.ni_poisk_po_uvedomleniyam')}
@@ -432,7 +432,7 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
                           flexShrink: 0
                         }}
                       >
-                        <Icon size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                        <Icon size={16} />
                       </span>
                       <div style={{ minWidth: 0 }}>
                         <strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -534,7 +534,7 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
                         gap: 6
                       }}
                     >
-                      <Archive size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+                      <Archive size={14} />
                       Архив
                     </button>
                   ) : null}

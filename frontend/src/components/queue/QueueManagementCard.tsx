@@ -120,7 +120,7 @@ export const QueueActionButtons = ({
   compact?: boolean;
 }) => {
   const styles = stylesRaw as Record<string, unknown>;
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [loading, setLoading] = useState(false);
 
   const {
@@ -365,14 +365,14 @@ export const QueueActionButtons = ({
       case 'done':
         return (
           <span className="qm-status-text qm-status-text--success">
-            <CheckCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} /> {t('misc.qmc_status_completed')}
+            <CheckCircle size={14} /> {t('misc.qmc_status_completed')}
           </span>
         );
 
       case 'incomplete':
         return (
           <span className="qm-status-text qm-status-text--danger">
-            <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} /> {t('misc.qmc_status_incomplete')}
+            <AlertCircle size={14} /> {t('misc.qmc_status_incomplete')}
           </span>
         );
 
@@ -401,7 +401,7 @@ export const QueueActionButtons = ({
  */
 export const QueueStatsBar = ({ stats, getColor }: { stats: Record<string, unknown>; getColor?: (category: string, variant: string | number) => string }) => {
   const styles: Record<string, unknown> = {};
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // UX Audit Registrar #3: если getColor не передан — используем CSS-классы.
   // Backward compat: если getColor передан — используем inline-стили.
   if (getColor) {

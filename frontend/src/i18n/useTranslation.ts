@@ -41,7 +41,23 @@ export const AVAILABLE_LANGUAGES = [
  * the hook also exposes `language` normalized to legacy form. BUT new code
  * should use 'uz-Latn' directly.
  */
-export function useTranslation() {
+/**
+ * Translation function signature — accepts flat string keys + optional
+ * interpolation options, returns a string. Components use this type
+ * directly instead of casting `rawT as unknown as (...) => string`.
+ */
+export type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+export interface UseTranslationReturn {
+  t: TranslationFn;
+  i18n: typeof i18n;
+  language: string;
+  setLanguage: (code: string) => void;
+  availableLanguages: typeof AVAILABLE_LANGUAGES;
+  ready: boolean;
+}
+
+export function useTranslation(): UseTranslationReturn {
   const reactI18n = useReactI18NextTranslation();
 
   // i18n.language is the current language code (e.g. 'ru', 'uz-Latn').

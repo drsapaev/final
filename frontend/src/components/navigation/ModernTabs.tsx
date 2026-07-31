@@ -80,7 +80,7 @@ const ModernTabs = ({
   theme,
   dynamicDepartments
 }: ModernTabsProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [indicatorStyle, setIndicatorStyle] = useState<Record<string, any>>({});
   const [tabs, setTabs] = useState<TabItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -333,7 +333,7 @@ const ModernTabs = ({
           }}>
 
           <div className="tab-icon">
-            <TrendingUp size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+            <TrendingUp size={16} />
           </div>
           <span className="tab-label">{t('queue.all')}</span>
         </button>
@@ -375,7 +375,7 @@ const ModernTabs = ({
 
                 <div className="tab-content">
                   <div className="tab-icon">
-                    <Icon size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+                    <Icon size={16} />
                   </div>
                   <span className="tab-label">{tab.label}</span>
 

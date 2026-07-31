@@ -243,7 +243,7 @@ interface TreatmentPlanState {
 
 const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId?: string | number; onUpdate?: () => void; patientId?: string | number; teethData?: Record<string, unknown> }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [treatmentPlan, setTreatmentPlan] = useState<TreatmentPlanState>({
     name: '',
     stages: [],

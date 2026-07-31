@@ -67,7 +67,7 @@ const ModernStatistics = ({
   onRefresh,
   ...props
 }: ModernStatisticsProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const { theme } = useTheme();
   const [animatedValues, setAnimatedValues] = useState<Record<string, any>>({});
   const [period, setPeriod] = useState('today');

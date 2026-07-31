@@ -121,7 +121,7 @@ const usePatients = () => {
     } catch (err) {
       const message = getErrorMessage(err) || 'Ошибка создания пациента';
       const wrapped = new Error(message);
-      (wrapped as HttpApiError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as HttpApiError).status = (err as HttpApiError)?.response?.status;
       (wrapped as HttpApiError).response = (err as HttpApiError)?.response;
       setError(new Error(String(wrapped)));
       throw wrapped;
@@ -167,7 +167,7 @@ const usePatients = () => {
     } catch (err) {
       const message = getErrorMessage(err) || 'Ошибка обновления пациента';
       const wrapped = new Error(message);
-      (wrapped as HttpApiError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as HttpApiError).status = (err as HttpApiError)?.response?.status;
       (wrapped as HttpApiError).response = (err as HttpApiError)?.response;
       setError(new Error(String(wrapped)));
       throw wrapped;
@@ -188,7 +188,7 @@ const usePatients = () => {
     } catch (err) {
       const message = getErrorMessage(err) || 'Ошибка удаления пациента';
       const wrapped = new Error(message);
-      (wrapped as HttpApiError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as HttpApiError).status = (err as HttpApiError)?.response?.status;
       (wrapped as HttpApiError).response = (err as HttpApiError)?.response;
       setError(new Error(String(wrapped)));
       throw wrapped;
@@ -256,7 +256,7 @@ const usePatients = () => {
     } catch (err) {
       const message = getErrorMessage(err) || 'Ошибка архивирования пациента';
       const wrapped = new Error(message);
-      (wrapped as HttpApiError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as HttpApiError).status = (err as HttpApiError)?.response?.status;
       (wrapped as HttpApiError).response = (err as HttpApiError)?.response;
       setError(new Error(String(wrapped)));
       throw wrapped;
@@ -281,7 +281,7 @@ const usePatients = () => {
     } catch (err) {
       const message = getErrorMessage(err) || 'Ошибка восстановления пациента';
       const wrapped = new Error(message);
-      (wrapped as HttpApiError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as HttpApiError).status = (err as HttpApiError)?.response?.status;
       (wrapped as HttpApiError).response = (err as HttpApiError)?.response;
       setError(new Error(String(wrapped)));
       throw wrapped;

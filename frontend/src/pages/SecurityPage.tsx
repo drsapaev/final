@@ -22,7 +22,7 @@ import {
  */
 const SecurityPage = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   useTheme();
   const [activeTab, setActiveTab] = useState('overview');
   const [showSetupWizard, setShowSetupWizard] = useState(false);

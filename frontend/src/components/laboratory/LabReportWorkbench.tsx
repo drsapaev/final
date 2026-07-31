@@ -82,7 +82,7 @@ export default function LabReportWorkbench({
   [k: string]: unknown;
 }) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   // WF-08 fix: confirmation dialog для irreversible actions.
   // Finalize делает бланк immutable (можно только revise). Revise создаёт
   // новый instance. Оба действия необратимы без объяснения последствий.

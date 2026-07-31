@@ -41,7 +41,7 @@ const IntegratedDoctorSelector = ({
   showSchedule = true,
   className = ''
 }: IntegratedDoctorSelectorProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // ADR-0015: registrar API accessed via hook.
   const { fetchRegistrarDoctors, fetchRegistrarQueueSettings } = useRegistrarApi();
   const [loading, setLoading] = useState(true);

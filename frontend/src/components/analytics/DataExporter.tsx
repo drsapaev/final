@@ -47,7 +47,7 @@ const DataExporter = ({
   const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(showAdvanced);
 
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
 
   const formatOptions = [
   {

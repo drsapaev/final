@@ -20,7 +20,7 @@ interface ActivationRow {
 
 export default function Activation() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   useTheme();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<unknown>(null);

@@ -52,7 +52,7 @@ interface NotificationStats {
 }
 
 const RegistrarNotificationManager = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [activeTab, setActiveTab] = useState('send');
   const [loading, setLoading] = useState(false);
   const [registrars, setRegistrars] = useState<Registrar[]>([]);

@@ -108,7 +108,7 @@ const VisitProtocol = ({
   onComplete
 }: { patientName?: string; patientId?: string | number; visitId?: string | number; initialData?: Record<string, unknown> | null; onSave?: (data: unknown) => void; onClose?: () => void; onComplete?: () => void }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [formData, setFormData] = useState<VisitProtocolFormData>({
     // Основные данные визита
     visitDate: new Date().toISOString().split('T')[0],

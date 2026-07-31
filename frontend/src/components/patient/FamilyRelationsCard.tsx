@@ -300,7 +300,7 @@ export default function FamilyRelationsCard({
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [family, setFamily] = useState<FamilyRelation[]>([]);
@@ -469,7 +469,7 @@ export default function FamilyRelationsCard({
 
 function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess }: AddRelationDialogProps) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchedPatient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<SearchedPatient | null>(null);

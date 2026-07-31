@@ -109,7 +109,7 @@ const ChatWindow = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
   const user = authState.profile;
   const { addToast } = useToast() as { addToast: (toast: unknown) => void };
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;  // PR-72
+  const t = rawT;  // PR-72
   const {
     conversations,
     messages,

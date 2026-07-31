@@ -29,7 +29,7 @@ export function DentalDashboardTab({
   onGoToAppointments,
   onGoToPatients,
 }: DentalDashboardTabProps = {}) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const totalAppointments = appointments.length;
   const waitingCount = appointments.filter(a => ['waiting', 'confirmed', 'pending'].includes(a.status || '')).length;
   const calledCount = appointments.filter(a => ['called', 'in_progress'].includes(a.status || '')).length;

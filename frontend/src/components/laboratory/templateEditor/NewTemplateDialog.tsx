@@ -31,7 +31,7 @@ interface NewTemplateDialogProps {
 }
 
 function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates = [] }: NewTemplateDialogProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [form, setForm] = useState({
     code: '',
     name: '',
@@ -141,7 +141,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
           form="new-template-form"
           disabled={saving || Boolean(codeConflict)}
         >
-          <Icon name="plus" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <Icon name="plus" size={16} />
           Создать
         </Button>
       </DialogActions>

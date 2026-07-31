@@ -68,7 +68,7 @@ interface DisplayBanner {
 
 const DisplayBoardSettings = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [boards, setBoards] = useState<DisplayBoard[]>([]); // P2 fix: restored value (was const [, setX]; used in loadDisplayData L75)

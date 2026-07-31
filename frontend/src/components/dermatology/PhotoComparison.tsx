@@ -30,7 +30,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }
   metadata?: Record<string, unknown>;
 }) => {
   const metadata = metadataRaw as Record<string, unknown>;
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [sliderPosition, setSliderPosition] = useState(50);
   const [viewMode, setViewMode] = useState('slider'); // slider, side-by-side, overlay
   const [zoom, setZoom] = useState(1);

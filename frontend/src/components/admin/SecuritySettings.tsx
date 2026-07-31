@@ -64,7 +64,7 @@ const SecuritySettings = ({
   loading = false
 }: SecuritySettingsProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [formData, setFormData] = useState<Record<string, unknown>>({
     // Пароль
     currentPassword: '',

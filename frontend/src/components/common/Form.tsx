@@ -127,7 +127,7 @@ export interface FormProviderProps {
 
 export function FormProvider({ children }: FormProviderProps) {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [forms, setForms] = useState<Record<string, FormState>>({});
 
   const registerForm = useCallback((formId: string, initialValues: Record<string, unknown> = {}) => {

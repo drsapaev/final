@@ -22,7 +22,7 @@ interface NotificationItem {
  * Компонент для управления мобильными уведомлениями
  */
 const MobileNotifications = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [permission, setPermission] = useState('default');
   const [loading, setLoading] = useState(false);

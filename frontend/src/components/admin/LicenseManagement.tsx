@@ -88,7 +88,7 @@ const LicenseManagement = () => {
   const [stats, setStats] = useState<LicenseStats | null>(null);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   // Форма лицензии
   const [formData, setFormData] = useState({

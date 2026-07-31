@@ -132,7 +132,7 @@ const ReportsAndAnalytics = ({
   ...props
 }: ReportsAndAnalyticsProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('30d');
   const analyticsData: AnalyticsData = initialData ?? EMPTY_ANALYTICS_DATA;

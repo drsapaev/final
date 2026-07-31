@@ -10,7 +10,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * consistent styling and dark mode support.
  */
 const SessionWarningModal = ({ visible, onDismiss, onExtend }: { visible: boolean; onDismiss: () => void; onExtend?: () => void }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   if (!visible) return null;
 
   return (

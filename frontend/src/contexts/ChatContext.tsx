@@ -24,6 +24,7 @@ import type {
   ChatAvailableUsersResponse,
 } from '../types/domain/chat';
 import type { AuthState } from '../types/domain/auth';
+import type { HttpApiError } from '../types/errors';
 
 // WS protocol envelope. Transport concern — stays local until the WS layer
 // gets its own domain file (planned for Wave 4 alongside API mapper).
@@ -181,7 +182,7 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
         setUnreadCount(data.total_unread || 0);
       }
     } catch (error) {
-      const err = error as { response?: { status?: number } };
+      const err = error as HttpApiError;
       const status = err?.response?.status;
       if (status === 401 || status === 403) {
         logger.info('[FIX:CHAT] Skipping conversations load due to auth state', {
@@ -218,7 +219,7 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
       const count = (await messagesApi.getUnreadCount()) as number | ChatUnreadCountResponse;
       setUnreadCount(typeof count === 'number' ? count : (count?.count ?? 0));
     } catch (error) {
-      const err = error as { response?: { status?: number } };
+      const err = error as HttpApiError;
       const status = err?.response?.status;
       if (status === 401 || status === 403) {
         logger.info('[FIX:CHAT] Skipping unread count refresh due to auth state', {

@@ -89,7 +89,7 @@ export function DiagnosisSection({
     experimentalGhostMode = false,
     onTelemetry,
 }: DiagnosisSectionProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
     const diagnosisText = normalizeTextValue(diagnosis);
     const icd10Text = normalizeTextValue(icd10Code);
 

@@ -23,7 +23,7 @@ const TAB_ICONS = {
 
 
 const UnifiedUserManagement = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'users';
 

@@ -118,7 +118,7 @@ const DoctorQueuePanel = ({
   className = ''
 }: DoctorQueuePanelProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   // Проверяем демо-режим в самом начале (в демо не скрываем компонент, а показываем моковые данные)
   const isDemoMode = import.meta.env.MODE === 'development' && window.location.hostname === 'localhost';
 

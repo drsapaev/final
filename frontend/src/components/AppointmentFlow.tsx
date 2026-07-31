@@ -45,7 +45,7 @@ export interface AppointmentFlowProps {
 }
 
 const AppointmentFlow = ({ appointment }: AppointmentFlowProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const getStepIcon = (step: string, status?: string) => {
     switch (step) {
       case 'payment':

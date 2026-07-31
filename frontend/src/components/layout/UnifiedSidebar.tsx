@@ -23,7 +23,7 @@ interface NavItem {
 }
 
 const UnifiedSidebar = ({ isCollapsed = false, onToggle }: { isCollapsed?: boolean; onToggle?: () => void }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   void t;
   const asideRef = useRef<HTMLElement | null>(null);
   const location = useLocation();

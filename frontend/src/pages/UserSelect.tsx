@@ -18,7 +18,7 @@ interface UserSelectItem {
 
 export default function UserSelect() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [items, setItems] = useState<UserSelectItem[]>([]);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);

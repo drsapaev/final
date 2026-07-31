@@ -91,7 +91,7 @@ const createEmptyForm = (): TemplateForm => ({
 
 const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?: (procedure: unknown) => void; visitId?: string | number }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [templates, setTemplates] = useState<ProcedureTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<ProcedureTemplate | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);

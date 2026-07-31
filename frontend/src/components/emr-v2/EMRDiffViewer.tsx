@@ -126,7 +126,7 @@ export function EMRDiffViewer({
     versionTo,
     onClose,
 }: EMRDiffViewerProps) {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+    const { t: rawT } = useTranslation(); const t = rawT;
     const [diff, setDiff] = useState<EMRDiffData | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

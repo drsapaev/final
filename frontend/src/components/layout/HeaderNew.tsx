@@ -43,7 +43,7 @@ export default function HeaderNew() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t: rawT, language, setLanguage } = useTranslation();  // PR-50: i18n wired
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   const [state, setState] = useState(auth.getState());
   const { inboxOpen, setInboxOpen, getUnreadCount } = useNotificationCenter();

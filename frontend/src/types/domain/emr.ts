@@ -6,6 +6,7 @@
  */
 
 import type { VisitId, PatientId, DoctorId } from './branded';
+import type { HttpApiError } from '../../types/errors';
 export interface EMRTemplateField {
   id?: string;
   label?: string;

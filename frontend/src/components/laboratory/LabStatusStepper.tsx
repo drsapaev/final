@@ -92,7 +92,7 @@ export default function LabStatusStepper({ status }: { status: string }) {
               title={`${step.label} — ${titleSuffix}`}
             >
               {isCompleted && (
-                <Icon name="checkmark.circle.fill" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
+                <Icon name="checkmark.circle.fill" size={12} />
               )}
               {isCurrent && (
                 <span

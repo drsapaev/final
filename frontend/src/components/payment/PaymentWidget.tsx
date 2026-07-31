@@ -74,7 +74,7 @@ const PaymentWidget = ({
   onCancel?: () => void;
 }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   // UX Audit #4 regression fix: useTheme() удалён — больше не нужен.
   // i18n: fallback description is resolved at render time so t() is available.
   const effectiveDescription = description ?? t('payment.pay_widg_default_description');

@@ -64,7 +64,7 @@ interface ServiceBatchEditProps {
 }
 
 const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }: ServiceBatchEditProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [updates, setUpdates] = useState<Record<string, unknown>>({});
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);

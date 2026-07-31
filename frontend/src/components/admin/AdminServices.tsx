@@ -26,7 +26,7 @@ const AdminServices = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isDark } = useTheme();
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [servicesTab, setServicesTab] = useState(() => getInitialServicesTab(location.search));
   const serviceTabs = getServiceTabs(t);
 

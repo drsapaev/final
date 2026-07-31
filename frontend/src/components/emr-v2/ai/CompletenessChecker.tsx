@@ -79,7 +79,7 @@ export function CompletenessChecker({
   specialty = 'general',
   onFieldClick
 }: CompletenessCheckerProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<CompletenessResults | null>(null);

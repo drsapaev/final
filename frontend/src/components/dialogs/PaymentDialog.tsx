@@ -27,7 +27,7 @@ const PaymentDialog = ({
   onPaymentSuccess,
   onPrintTicket,
 }: PaymentDialogProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(t('misc.pd_karta'));
   const [isProcessing, setIsProcessing] = useState(false);

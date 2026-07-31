@@ -59,7 +59,7 @@ const PaymentManager = ({
   initialAmount = null,
   patientInfo = null
 }: PaymentManagerProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   // ADR-0015: payments API accessed via hook.
   const {
     getPendingInvoices,
@@ -240,7 +240,7 @@ const PaymentManager = ({
         >
           <div className="payment-manager-header">
             <h2 id="payment-manager-title">
-              <CreditCard size={24 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+              <CreditCard size={24} aria-hidden="true" />
               {t('payment.pay_mgr_module_title')}
             </h2>
             <button
@@ -250,7 +250,7 @@ const PaymentManager = ({
               title={t('payment.pay_mgr_close_title')}
               type="button"
             >
-              <X size={20 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+              <X size={20} aria-hidden="true" />
             </button>
           </div>
 
@@ -258,7 +258,7 @@ const PaymentManager = ({
             {/* Создание новой оплаты */}
             <div className="payment-section">
               <h3>
-                <DollarSign size={20 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+                <DollarSign size={20} aria-hidden="true" />
                 {t('payment.pay_mgr_new_payment')}
               </h3>
 
@@ -335,18 +335,18 @@ const PaymentManager = ({
             {/* Список неоплаченных счетов */}
             <div className="invoices-section">
               <h3>
-                <Receipt size={20 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+                <Receipt size={20} aria-hidden="true" />
                 {t('payment.pay_mgr_unpaid_invoices')}
               </h3>
 
               {loading ? (
                 <div className="loading-state">
-                  <Clock size={20 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+                  <Clock size={20} aria-hidden="true" />
                   {t('payment.pay_mgr_loading')}
                 </div>
               ) : invoices.length === 0 ? (
                 <div className="empty-state">
-                  <CheckCircle size={24 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
+                  <CheckCircle size={24} aria-hidden="true" />
                   {t('payment.pay_mgr_no_unpaid')}
                 </div>
               ) : (

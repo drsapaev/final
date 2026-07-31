@@ -99,7 +99,7 @@ function useDebounce(value: string, delay: number) {
 }
 
 export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);

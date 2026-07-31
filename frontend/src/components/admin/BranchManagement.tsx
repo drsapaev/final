@@ -103,7 +103,7 @@ const BranchManagement = () => {
   });
 
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   const statusOptions = [
   { value: 'active', label: t('admin2.br_status_active'), color: 'success' },

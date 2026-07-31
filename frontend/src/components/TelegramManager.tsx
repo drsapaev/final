@@ -210,7 +210,7 @@ interface TelegramTemplate {
 
 const TelegramManager = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
   const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
   const [templates, setTemplates] = useState<TelegramTemplate[]>([]);
   const [onboardingRequests, setOnboardingRequests] = useState<OnboardingRequest[]>([]);

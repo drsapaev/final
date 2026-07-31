@@ -14,7 +14,7 @@ let addToastExternal: ((toast: Record<string, unknown>) => string | number | nul
  * Провайдер контекста уведомлений
  */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [toasts, setToasts] = useState<Record<string, unknown>[]>([]);
   const theme = useTheme();
 

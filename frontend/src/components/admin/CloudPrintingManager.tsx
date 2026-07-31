@@ -168,7 +168,7 @@ const normalizeLocalPrinter = (printer: Record<string, unknown>, t: TranslationF
 
 const CloudPrintingManager = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as TranslationFn;
+  const t = rawT as TranslationFn;
   const [activeTab, setActiveTab] = useState('printers');
   const [printers, setPrinters] = useState<PrinterRecord[]>([]);
   const [localPrinters, setLocalPrinters] = useState<PrinterRecord[]>([]);

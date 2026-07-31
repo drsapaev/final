@@ -1,7 +1,7 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
 export const ControlCenter = ({ onActivate, onLogin }: { onActivate: () => void; onLogin: () => void }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   return (
     <div className="control-center spotlight-card">
       <h2>{t('misc.cc_panel_upravleniya')}</h2>

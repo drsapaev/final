@@ -138,7 +138,7 @@ export function PhraseSuggestions({
     disabled?: boolean;
     isOpen?: boolean;
 }) {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+    const { t: rawT } = useTranslation(); const t = rawT as TFunc;
     const [selectedPhrases, setSelectedPhrases] = useState<Set<string>>(new Set());
 
     // Find matching phrases

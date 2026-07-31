@@ -17,7 +17,7 @@ interface ServiceChangesPreviewProps {
 }
 
 const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }: ServiceChangesPreviewProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const formatFieldName = (field: string) => {
     const fieldNames: Record<string, string> = {
       name: t('admin2.scp_field_name'),

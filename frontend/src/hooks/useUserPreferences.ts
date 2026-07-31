@@ -13,6 +13,7 @@ import tokenManager from '../utils/tokenManager';
 import type { AsyncState } from '../types/async-state';
 import { idleState, loadingState, successState, errorState, getError } from '../types/async-state';
 import { safeJsonParse } from '../utils/safeJsonParse';
+import type { HttpApiError } from '../types/errors';
 
 // Дефолтные EMR настройки
 interface EmrPreferences {
@@ -117,7 +118,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
             // interceptors.ts (no auth-state notification fired). Use the
             // SSOT method instead — it clears the full auth tuple and any
             // future storage additions are picked up automatically.
-            if ((err as { response?: { status?: number } })?.response?.status === 401) {
+            if ((err as HttpApiError)?.response?.status === 401) {
                 tokenManager.clearAll();
             }
 

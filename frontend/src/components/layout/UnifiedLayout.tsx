@@ -12,7 +12,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Используется во всех панелях для единообразия
  */
 const UnifiedLayout = ({ children, showSidebar = true }: { children?: ReactNode; showSidebar?: boolean }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   useLocation();

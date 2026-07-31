@@ -10,7 +10,7 @@ import {
 } from './ui/macos';
 
 const LanguageSwitcher = ({ compact = false }) => {
-    const { language, setLanguage, availableLanguages, t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+    const { language, setLanguage, availableLanguages, t: rawT } = useTranslation(); const t = rawT;
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 

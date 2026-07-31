@@ -45,7 +45,7 @@ const ADMIN_SETTINGS_ROUTE_SECTION_MAP = {
 };
 
 const UnifiedSettings = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const routeSection = ADMIN_SETTINGS_ROUTE_SECTION_MAP[location.pathname.replace(/\/$/, '') as keyof typeof ADMIN_SETTINGS_ROUTE_SECTION_MAP];

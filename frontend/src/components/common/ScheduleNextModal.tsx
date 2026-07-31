@@ -58,7 +58,7 @@ const ScheduleNextModal = ({
 }: ScheduleNextModalProps) => {
   const { getColor, getSpacing, getFontSize } = theme ?? { getColor: () => '', getSpacing: () => '', getFontSize: () => '' };
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT;
 
   // Состояния формы
   const [formData, setFormData] = useState({

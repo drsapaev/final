@@ -72,7 +72,7 @@ const ModernSelect = ({
   className = '',
   ...props
 }: ModernSelectProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT;
   const selectListboxId = useId();
   const accessibleLabel = typeof label === 'string' && label.trim() ? label : placeholder;
   const { getColor } = useTheme();
@@ -295,7 +295,7 @@ const ModernSelect = ({
                   aria-label={t18('misc.ms_udalit')}
                   title={t18('misc.ms_udalit')}>
                   
-                  <X size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
+                  <X size={12} />
                 </button>
               </span>);
 
@@ -320,7 +320,7 @@ const ModernSelect = ({
     return (
       <>
         <span className="option-label">{label}</span>
-        {isSelected && <Check size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="option-check" />}
+        {isSelected && <Check size={16} className="option-check" />}
       </>);
 
   };
@@ -398,26 +398,26 @@ const ModernSelect = ({
             aria-label={t18('misc.ms_ochistit_vybor')}
             title={t18('misc.ms_ochistit_vybor')}>
             
-              <X size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <X size={16} />
             </button>
           }
 
           {/* Индикатор состояния */}
           {hasError &&
           <div className="select-status error">
-              <AlertCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <AlertCircle size={16} />
             </div>
           }
           
           {hasSuccess &&
           <div className="select-status success">
-              <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              <CheckCircle size={16} />
             </div>
           }
 
           {/* Стрелка */}
           <div className={`select-arrow ${isOpen ? 'open' : ''}`}>
-            {isOpen ? <ChevronUp size={16 as unknown as "small" | "default" | "large" | "xlarge"} /> : <ChevronDown size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}
+            {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </div>
         </div>
       </div>
@@ -435,7 +435,7 @@ const ModernSelect = ({
           {/* Поиск */}
           {searchable &&
         <div className="select-search">
-              <Search size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="search-icon" />
+              <Search size={16} className="search-icon" />
               <Input
             ref={searchInputRef}
             type="text"
@@ -525,7 +525,7 @@ const ModernSelect = ({
         className="select-message error"
         style={{ color: getColor('danger') }}>
         
-          <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <AlertCircle size={14} />
           <span>{error}</span>
         </div>
       }
@@ -536,7 +536,7 @@ const ModernSelect = ({
         className="select-message success"
         style={{ color: getColor('success') }}>
         
-          <CheckCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
+          <CheckCircle size={14} />
           <span>{success}</span>
         </div>
       }
