@@ -4,14 +4,18 @@ on:
   pull_request:
     paths:
       - 'frontend/src/i18n/**'
-      - 'frontend/src/**/*.jsx'
-      - 'frontend/src/**/*.js'
+      - 'frontend/src/**/*.tsx'
+      - 'frontend/src/**/*.ts'
       - 'scripts/i18n/**'
   push:
     branches: [main]
     paths:
       - 'frontend/src/i18n/**'
       - 'scripts/i18n/**'
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
   locale-parity:
@@ -38,6 +42,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Detect hardcoded Russian text in JSX/JS
+      - name: Detect hardcoded Russian text in TSX/TS
         run: |
           python3 scripts/i18n/detect_hardcoded_russian.py --max-violations 7000 --verbose
