@@ -8,8 +8,7 @@ import { setProfile } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors';
 import { useSetupStatus } from '../../hooks/useSetupStatus';
-import * as _tokens from '../../theme/tokens';
-const colors = ((_tokens as Record<string, unknown>).colors || {}) as Record<string, unknown>;
+import { colorsLight as colors } from '../../theme/tokens';
 import { BRAND } from '../../config/brand';
 import TwoFactorVerify from '../TwoFactorVerify';
 import ForgotPassword from './ForgotPassword';
@@ -361,7 +360,7 @@ const LoginFormStyled = () => {
     return (
       <div style={{
         minHeight: '100vh',
-        background: `linear-gradient(135deg, ${(colors.primary as Record<number, string>)[500]} 0%, ${(colors.primary as Record<number, string>)[700]} 100%)`,
+        background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -383,7 +382,7 @@ const LoginFormStyled = () => {
             <div style={{
               width: '60px',
               height: '60px',
-              background: `linear-gradient(135deg, ${(colors.primary as Record<number, string>)[500]} 0%, ${(colors.primary as Record<number, string>)[700]} 100%)`,
+              background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
@@ -404,13 +403,13 @@ const LoginFormStyled = () => {
             <h1 style={{
               fontSize: 'var(--mac-font-size-3xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
-              color: (colors.semantic as { text?: { primary?: string } })?.text?.primary,
+              color: colors.primary[700],
               margin: '0 0 8px 0'
             }}>
               Двухфакторная аутентификация
             </h1>
             <p style={{
-              color: (colors.semantic as { text?: { secondary?: string } })?.text?.secondary,
+              color: colors.secondary[500],
               margin: '0',
               fontSize: 'var(--mac-font-size-base)'
             }}>
@@ -445,14 +444,14 @@ const LoginFormStyled = () => {
                     style={{
                       flex: 1,
                       padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
-                      background: isActive ? (colors.primary as Record<number, string>)[500] : 'transparent',
-                      color: isActive ? 'white' : (colors.semantic as { text?: { secondary?: string } })?.text?.secondary,
+                      background: isActive ? colors.primary[500] : 'transparent',
+                      color: isActive ? 'white' : colors.secondary[500],
                       border: '1px solid var(--mac-border)',
                       borderRadius: 'var(--mac-radius-sm)',
                       fontSize: 'var(--mac-font-size-xs)',
                       cursor: 'pointer',
                       font: 'inherit',
-                      outline: isActive ? `2px solid ${(colors.primary as Record<number, string>)[500]}` : 'none',
+                      outline: isActive ? `2px solid ${colors.primary[500]}` : 'none',
                       outlineOffset: '2px',
                     }}
                   >
