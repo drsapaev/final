@@ -65,13 +65,25 @@ class PaymentSettingsService:
                 return self._test_click_provider(config)
             if provider_name == "payme":
                 return self._test_payme_provider(config)
+            # Business message: provider_name is the user's own input, not a
+            # credential. Safe to echo back so the admin UI can show which
+            # provider was rejected.
             return {
                 "success": False,
                 "message": f"Неподдерживаемый провайдер: {provider_name}",
             }
         except Exception as exc:
-            logger.error("Ошибка тестирования провайдера %s: %s", provider_name, exc)
-            return {"success": False, "message": f"Внутренняя ошибка: {exc}"}
+            # Never embed str(exc) in the HTTP response — exception text is
+            # internal diagnostics. The full traceback goes to logs (scrubbed
+            # by JsonLogFormatter.formatException per Issue #1); the client
+            # receives only a generic localized message.
+            logger.error(
+                "Payment provider test failed provider=%s error_type=%s",
+                provider_name,
+                type(exc).__name__,
+                exc_info=exc,
+            )
+            return {"success": False, "message": "Внутренняя ошибка тестирования провайдера"}
 
     @staticmethod
     def get_payment_providers_info() -> dict[str, Any]:
@@ -160,6 +172,7 @@ class PaymentSettingsService:
         required_fields = ["service_id", "merchant_id", "secret_key"]
         missing_fields = [field for field in required_fields if not config.get(field)]
         if missing_fields:
+            # Business message: field NAMES (not values) are safe to echo.
             return {
                 "success": False,
                 "message": f"Не заполнены обязательные поля: {', '.join(missing_fields)}",
@@ -194,20 +207,34 @@ class PaymentSettingsService:
                     },
                 }
 
+            # result.error_message is a provider-library passthrough — its
+            # content is not controlled by this service. Log it for devops,
+            # but do NOT embed it in the HTTP response.
+            logger.warning(
+                "Click test payment failed provider_error_message=%s",
+                result.error_message,
+            )
             return {
                 "success": False,
-                "message": f"Ошибка создания тестового платежа: {result.error_message}",
+                "message": "Ошибка создания тестового платежа",
             }
         except Exception as exc:
+            # Never embed str(exc) in the HTTP response.
+            logger.error(
+                "Click provider init failed error_type=%s",
+                type(exc).__name__,
+                exc_info=exc,
+            )
             return {
                 "success": False,
-                "message": f"Ошибка инициализации провайдера: {exc}",
+                "message": "Ошибка инициализации провайдера",
             }
 
     def _test_payme_provider(self, config: dict[str, Any]) -> dict[str, Any]:
         required_fields = ["merchant_id", "secret_key"]
         missing_fields = [field for field in required_fields if not config.get(field)]
         if missing_fields:
+            # Business message: field NAMES (not values) are safe to echo.
             return {
                 "success": False,
                 "message": f"Не заполнены обязательные поля: {', '.join(missing_fields)}",
@@ -242,12 +269,25 @@ class PaymentSettingsService:
                     },
                 }
 
+            # result.error_message is a provider-library passthrough — its
+            # content is not controlled by this service. Log it for devops,
+            # but do NOT embed it in the HTTP response.
+            logger.warning(
+                "PayMe test payment failed provider_error_message=%s",
+                result.error_message,
+            )
             return {
                 "success": False,
-                "message": f"Ошибка создания тестового платежа: {result.error_message}",
+                "message": "Ошибка создания тестового платежа",
             }
         except Exception as exc:
+            # Never embed str(exc) in the HTTP response.
+            logger.error(
+                "PayMe provider init failed error_type=%s",
+                type(exc).__name__,
+                exc_info=exc,
+            )
             return {
                 "success": False,
-                "message": f"Ошибка инициализации провайдера: {exc}",
+                "message": "Ошибка инициализации провайдера",
             }
