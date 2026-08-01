@@ -311,7 +311,7 @@ const WaitTimeAnalytics = () => {
             
                     <AlertTriangle style={{ width: '16px', height: '16px', color: 'var(--mac-warning)' }} />
                     <span className="wta-recommendation-text">
-                      {String(recommendation.title ?? recommendation.description ?? '')}
+                      {recommendation.title ?? recommendation.description ?? ''}
                     </span>
                   </div>
           )}
@@ -497,7 +497,7 @@ const WaitTimeAnalytics = () => {
             
                     <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-info)' }} />
                     <span className="wta-recommendation-text-default">
-                      {String(recommendation.title ?? recommendation.description ?? '')}
+                      {recommendation.title ?? recommendation.description ?? ''}
                     </span>
                   </div>
           )}

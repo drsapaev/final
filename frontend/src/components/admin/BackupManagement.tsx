@@ -545,7 +545,7 @@ const BackupManagement = () => {
                 </div>
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-10">
                   <Calendar aria-hidden="true" className="w-4 h-4" />
-                  <span>{new Date(backup.created_at ?? Date.now()).toLocaleString()}</span>
+                  <span>{backup.created_at ? new Date(backup.created_at).toLocaleString() : '—'}</span>
                 </div>
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-9">
                   <Clock aria-hidden="true" className="w-4 h-4" />
