@@ -106,10 +106,13 @@ jobs:
 
       - name: Baseline gate (fail on >15% degradation)
         run: |
+          if [ ! -f tests/load/k6-parsed-results.json ]; then
+            echo "⚠️ No k6 results found — skipping baseline check (no live backend)"
+            exit 0
+          fi
           node scripts/load-baseline-check.mjs \
             --results tests/load/k6-parsed-results.json \
-            --baseline e2e/k6/baseline.json || \
-          echo "⚠️ Load baseline check skipped (no live backend or no results)"
+            --baseline e2e/k6/baseline.json
 
       # === Summary ===
       - name: Release gate summary

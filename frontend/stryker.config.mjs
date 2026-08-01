@@ -43,7 +43,7 @@ export default {
   coverageAnalysis: 'perTest',
 
   // Reporters: console + HTML
-  reporters: ['html', 'clear-text', 'progress'],
+  reporters: ['html', 'json', 'clear-text', 'progress'],
 
   // Threshold: mutation score >= 70%
   thresholds: {
