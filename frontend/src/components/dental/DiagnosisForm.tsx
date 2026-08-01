@@ -281,7 +281,7 @@ const DiagnosisForm = ({
       
       <div className="space-y-4">
         {formData.generalDiagnoses.map((diagnosis, index) =>
-      <div key={`dx-${index}-${diagnosis || ''}`} className="flex items-center gap-3 p-3 border rounded-lg">
+      <div key={`dx-${index}`} className="flex items-center gap-3 p-3 border rounded-lg">
             <input
           type="text"
           aria-label={t('dental.dental_df_aria_general_diagnosis', { index: index + 1 })}
