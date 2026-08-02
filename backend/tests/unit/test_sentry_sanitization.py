@@ -743,3 +743,85 @@ class TestSanitizeEventPiiInStandardContext:
         assert d["phone"] != "+998901234567"
         assert d["iin"] != "12345678901234"
         assert d["version"] == "1.0.0"
+
+
+class TestSanitizeEventPiiInDiagnosticNameField:
+    """PHI inside the diagnostic ``name`` field of standard contexts must
+    be scrubbed via regex, while non-PII diagnostic names are preserved.
+
+    The ``name`` key is in ``PII_FIELD_PATTERNS``, but for standard
+    contexts it contains diagnostic metadata (e.g. "CPython", "Linux").
+    We apply ``mask_pii(value)`` to the raw value — for strings this
+    calls ``_mask_string_inplace()`` (regex only), NOT ``mask_name()``
+    (which would corrupt "CPython" to "C.").
+
+    Criteria (per maintainer review):
+    - device.name = "CPython" → stays "CPython"
+    - device.name = "+998901234567" → phone masked
+    - device.name = "john@example.com" → email masked
+    - device.name = "AA1234567" → passport masked
+    - device.name = "NVIDIA T4" → stays unchanged
+    """
+
+    def test_diagnostic_name_cpython_preserved(self):
+        """runtime.name = 'CPython' → unchanged (non-PII diagnostic)."""
+        event = {"contexts": {"runtime": {"name": "CPython"}}}
+        sanitize_event(event)
+        assert event["contexts"]["runtime"]["name"] == "CPython"
+
+    def test_diagnostic_name_nvidia_t4_preserved(self):
+        """gpu.name = 'NVIDIA T4' → unchanged (non-PII diagnostic)."""
+        event = {"contexts": {"gpu": {"name": "NVIDIA T4"}}}
+        sanitize_event(event)
+        assert event["contexts"]["gpu"]["name"] == "NVIDIA T4"
+
+    def test_diagnostic_name_linux_preserved(self):
+        """os.name = 'Linux' → unchanged."""
+        event = {"contexts": {"os": {"name": "Linux"}}}
+        sanitize_event(event)
+        assert event["contexts"]["os"]["name"] == "Linux"
+
+    def test_phone_in_diagnostic_name_scrubbed(self):
+        """device.name = '+998901234567' → phone masked via regex."""
+        event = {"contexts": {"device": {"name": "+998901234567"}}}
+        sanitize_event(event)
+        assert "+998901234567" not in event["contexts"]["device"]["name"]
+        assert "+998901•••567" in event["contexts"]["device"]["name"]
+
+    def test_email_in_diagnostic_name_scrubbed(self):
+        """response.name = 'john@example.com' → email masked via regex."""
+        event = {"contexts": {"response": {"name": "john@example.com"}}}
+        sanitize_event(event)
+        assert "john@example.com" not in event["contexts"]["response"]["name"]
+        assert "j•••@example.com" in event["contexts"]["response"]["name"]
+
+    def test_passport_in_diagnostic_name_scrubbed(self):
+        """device.name = 'AA1234567' → passport masked via regex."""
+        event = {"contexts": {"device": {"name": "AA1234567"}}}
+        sanitize_event(event)
+        assert "AA1234567" not in event["contexts"]["device"]["name"]
+
+    def test_iin_in_diagnostic_name_scrubbed(self):
+        """device.name = '12345678901234' → IIN masked via regex."""
+        event = {"contexts": {"device": {"name": "12345678901234"}}}
+        sanitize_event(event)
+        assert "12345678901234" not in event["contexts"]["device"]["name"]
+        assert "1234••••••1234" in event["contexts"]["device"]["name"]
+
+    def test_diagnostic_name_with_pii_and_non_pii_mixed_in_context(self):
+        """A standard context with both a diagnostic name (non-PII) and
+        PII in other fields — name preserved, PII scrubbed."""
+        event = {
+            "contexts": {
+                "device": {
+                    "name": "server-1",           # non-PII → preserved
+                    "phone": "+998901234567",     # PII → scrubbed
+                    "model": "PowerEdge R750",    # non-PII → preserved
+                }
+            }
+        }
+        sanitize_event(event)
+        d = event["contexts"]["device"]
+        assert d["name"] == "server-1"
+        assert d["model"] == "PowerEdge R750"
+        assert d["phone"] != "+998901234567"

@@ -87,11 +87,17 @@ def _scrub_context(context_name: str, context_value: Any) -> Any:
     """Scrub a single Sentry context, preserving known diagnostic fields.
 
     For standard contexts (runtime, os, device, etc.), known diagnostic
-    keys (e.g. ``name``) are preserved because they collide with PII field
-    patterns but contain runtime metadata, not patient data. All other
-    keys are scrubbed via ``mask_pii()`` — passed as a single-key dict so
-    that ``mask_pii`` can apply key-based redaction (e.g. ``diagnosis``
-    key → ``[REDACTED]``).
+    keys (e.g. ``name``) are passed through ``mask_pii()`` as raw values
+    (not wrapped in a dict). This applies regex-based scrubbing (phone,
+    email, passport, IIN) to the value without triggering key-based
+    ``mask_name()`` — which would corrupt diagnostic names like
+    ``"CPython"`` to ``"C."``. The result: ``device.name = "CPython"``
+    is preserved, but ``device.name = "+998901234567"`` is scrubbed.
+
+    All other keys within standard contexts are scrubbed via
+    ``mask_pii({k: v})`` — wrapped in a single-key dict so ``mask_pii``
+    can apply key-based redaction (e.g. ``diagnosis`` key →
+    ``[REDACTED]``).
 
     For custom contexts, ``mask_pii()`` is applied to the entire value.
     """
@@ -101,7 +107,10 @@ def _scrub_context(context_name: str, context_value: Any) -> Any:
         result = {}
         for k, v in context_value.items():
             if k in _STANDARD_CONTEXT_DIAGNOSTIC_KEYS:
-                result[k] = v
+                # Apply mask_pii to the raw value — for strings this calls
+                # _mask_string_inplace (regex only, no key-based masking).
+                # Preserves "CPython" but scrubs "+998901234567".
+                result[k] = mask_pii(v)
             else:
                 # Wrap in single-key dict so mask_pii applies key-based
                 # redaction (e.g. {"diagnosis": "Crohn"} → {"diagnosis": "[REDACTED]"})
