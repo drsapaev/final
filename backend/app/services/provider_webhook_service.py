@@ -519,6 +519,45 @@ class ProviderWebhookService:
                 "id": request_id,
             }
 
+    # Mirrors business rules from billing_service_pkg/_payments.py:423-446.
+    # See FOLLOWUP-6 for shared state-machine extraction.
+    # Terminal payment states: no outgoing transitions allowed. A duplicate
+    # webhook must not reopen a refunded/cancelled/void payment. The
+    # failed → paid direct transition is also blocked — per project
+    # state-machine, failed must return to pending before a new paid attempt.
+    _TERMINAL_PAYMENT_STATUSES = frozenset({"refunded", "cancelled", "void"})
+    _TERMINAL_TRANSACTION_STATUSES = frozenset({"cancelled", "refunded"})
+
+    @classmethod
+    def _can_transition_payment_status(
+        cls, current_status: str, target_status: str
+    ) -> bool:
+        """Check if a payment status transition is allowed.
+
+        Same-status duplicates (e.g. ``paid → paid`` from a retry webhook)
+        are allowed as idempotent no-ops — ``payment.status`` is not
+        mutated, but ``provider_data`` is still updated to preserve the
+        audit trail.
+        """
+        if current_status == target_status:
+            return True
+        if current_status in cls._TERMINAL_PAYMENT_STATUSES:
+            return False
+        if current_status == "failed" and target_status == "paid":
+            return False
+        return True
+
+    @classmethod
+    def _can_transition_transaction_status(
+        cls, current_status: str, target_status: str
+    ) -> bool:
+        """Check if a PaymentTransaction status transition is allowed."""
+        if current_status == target_status:
+            return True
+        if current_status in cls._TERMINAL_TRANSACTION_STATUSES:
+            return False
+        return True
+
     def _apply_existing_payme_transaction_state(
         self,
         transaction: Any,
@@ -545,7 +584,23 @@ class ProviderWebhookService:
                 ):
                     return "amount_mismatch"
 
-        transaction.status = provider_status
+        # Guard transaction.status: do not overwrite terminal states.
+        # provider_data is ALWAYS updated to preserve the audit trail of
+        # the last webhook payload, even when status is not mutated.
+        current_tx_status = getattr(transaction, "status", None)
+        if current_tx_status and not self._can_transition_transaction_status(
+            current_tx_status, provider_status
+        ):
+            logger.warning(
+                "Payme webhook: ignored invalid transaction transition "
+                "current=%s target=%s transaction_id=%s method=%s",
+                current_tx_status,
+                provider_status,
+                getattr(transaction, "id", None),
+                method,
+            )
+        else:
+            transaction.status = provider_status
         transaction.provider_data = {
             **(transaction.provider_data or {}),
             "method": method,
@@ -553,17 +608,39 @@ class ProviderWebhookService:
             "params": params,
         }
 
+        # effective_payment_status tracks the ACTUAL state of payment.status
+        # after the guard decision — distinct from the desired payment_status
+        # derived from the webhook method. The response field
+        # "payment_status" reflects the actual DB state so admin/monitoring
+        # sees the truth, not what the webhook tried to set.
+        effective_payment_status = payment_status
         if payment_id:
             payment = self.repository.get_payment_by_id(payment_id)
             if payment:
-                payment.status = payment_status
-                if payment_status == "paid" and not payment.paid_at:
-                    payment.paid_at = datetime.now(UTC)
+                current_payment_status = getattr(payment, "status", None)
+                if current_payment_status and not self._can_transition_payment_status(
+                    current_payment_status, payment_status
+                ):
+                    logger.warning(
+                        "Payme webhook: ignored invalid payment transition "
+                        "current=%s target=%s payment_id=%s method=%s",
+                        current_payment_status,
+                        payment_status,
+                        payment_id,
+                        method,
+                    )
+                    effective_payment_status = current_payment_status
+                else:
+                    payment.status = payment_status
+                    if payment_status == "paid" and not payment.paid_at:
+                        payment.paid_at = datetime.now(UTC)
+                # provider_data is ALWAYS updated — preserves audit trail
+                # of last webhook payload regardless of status transition.
                 payment.provider_data = {
                     **(payment.provider_data or {}),
                     **(transaction.provider_data or {}),
                 }
-        return payment_status
+        return effective_payment_status
 
     def process_kaspi_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
         """Webhook для Kaspi Pay платежной системы.
