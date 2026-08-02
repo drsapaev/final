@@ -8,6 +8,8 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
+from app.core.pii_masker import _mask_string_inplace, mask_pii
+
 _STRUCTURED_FIELDS = (
     "request_id",
     "trace_id",
@@ -21,7 +23,14 @@ _STRUCTURED_FIELDS = (
 
 
 class JsonLogFormatter(logging.Formatter):
-    """Render log records as one JSON object per line."""
+    """Render log records as one JSON object per line.
+
+    ``formatException`` is overridden to scrub PII patterns (phone numbers,
+    emails, passports, IINs) from the rendered traceback string. The
+    ``record.exc_info`` tuple itself is left untouched, so Sentry SDK,
+    OpenTelemetry, and other handlers that consume ``record.exc_info``
+    continue to receive the original exception object.
+    """
 
     def format(self, record: logging.LogRecord) -> str:  # noqa: A003
         payload: dict[str, Any] = {
@@ -41,6 +50,16 @@ class JsonLogFormatter(logging.Formatter):
 
         return json.dumps(payload, ensure_ascii=False, default=str)
 
+    def formatException(self, exc_info):  # noqa: A003 - logging API
+        """Render the traceback and scrub PII patterns from the result.
+
+        - ``record.exc_info`` is NOT modified; only the serialized string is.
+        - When the traceback contains no PII patterns, the output is identical
+          to ``super().formatException()`` — masking is a no-op.
+        """
+        tb = super().formatException(exc_info)
+        return _mask_string_inplace(tb)
+
 
 class PIIMaskingFilter(logging.Filter):
     """Logging filter that masks PII in record args + message.
@@ -58,8 +77,6 @@ class PIIMaskingFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
         try:
-            from app.core.pii_masker import mask_pii
-
             # Mask args (dict/list only — strings handled via message regex)
             if record.args:
                 if isinstance(record.args, (dict, list, tuple)):
@@ -74,7 +91,6 @@ class PIIMaskingFilter(logging.Filter):
             if isinstance(record.msg, str):
                 # Only scrub if there's likely PII — quick check via presence of digits/+998
                 if "+998" in record.msg or "@" in record.msg or "patient" in record.msg.lower():
-                    from app.core.pii_masker import _mask_string_inplace
                     record.msg = _mask_string_inplace(record.msg)
         except Exception:
             # Never let masking break logging
