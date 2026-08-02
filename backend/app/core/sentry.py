@@ -56,6 +56,25 @@ def _scrub_pii(data: Any) -> Any:
     return data
 
 
+# Standard Sentry contexts as documented by Sentry:
+# https://docs.sentry.io/platforms/python/enriching-events/contexts/
+# These contain runtime/OS/device metadata rather than application
+# payloads — scrubbing them corrupts diagnostic value (e.g. "name"
+# key in {"runtime": {"name": "CPython"}} is masked to "C.").
+_STANDARD_SENTRY_CONTEXTS = frozenset({
+    "app",             # app version, build type
+    "browser",         # browser name, version
+    "device",          # device model, family, arch
+    "os",              # os name, version, build
+    "runtime",         # runtime name, version (CPython, etc.)
+    "gpu",             # GPU name, vendor
+    "trace",           # distributed tracing (trace_id, span_id)
+    "response",        # HTTP response context
+    "culture",         # user culture (locale, timezone)
+    "cloud_resource",  # cloud provider info
+})
+
+
 def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
     """Scrub PII from a Sentry event before it is sent.
 
@@ -69,7 +88,9 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
     - ``event["request"]`` — request body, headers, query string
     - ``event["breadcrumbs"][*]["data"]`` — breadcrumb payloads
     - ``event["extra"]`` — extra context
-    - ``event["contexts"]`` — custom contexts
+    - ``event["contexts"]`` — custom (non-standard) contexts only;
+      standard Sentry contexts (runtime, os, device, etc.) are preserved
+      because they contain diagnostic metadata, not patient data
     - ``event["exception"]["values"][*]["value"]`` — ``str(exc)``, may
       contain phone/email/IIN/passport from bound SQL params
     - ``event["exception"]["values"][*]["stacktrace"]["frames"][*]["vars"]``
@@ -91,7 +112,25 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
         event["extra"] = mask_pii(event["extra"])
 
     if "contexts" in event:
-        event["contexts"] = mask_pii(event["contexts"])
+        contexts = event["contexts"]
+        if isinstance(contexts, dict):
+            # Scrub only custom (non-standard) contexts. Standard Sentry
+            # contexts (runtime, os, device, app, browser, gpu, trace,
+            # response, culture, cloud_resource) contain runtime/OS/device
+            # metadata rather than application payloads — scrubbing them
+            # corrupts diagnostic value (e.g. "name" key in
+            # {"runtime": {"name": "CPython"}} is masked to "C.").
+            #
+            # If the application intentionally uses a standard key (runtime,
+            # os, etc.) for its own data, that data will no longer pass
+            # through mask_pii(). This is considered an acceptable
+            # trade-off since such keys are reserved by the Sentry spec.
+            event["contexts"] = {
+                k: (v if k in _STANDARD_SENTRY_CONTEXTS else mask_pii(v))
+                for k, v in contexts.items()
+            }
+        else:
+            event["contexts"] = mask_pii(contexts)
 
     exception = event.get("exception")
     if isinstance(exception, dict):
@@ -161,18 +200,26 @@ def init_sentry() -> None:
         ``PIIMaskingFilter`` for stdout logs.
 
         If ``sanitize_event`` raises, the event is still returned (unscrubbed)
-        so error tracking is not lost. The exception is logged for devops.
+        so error tracking is not lost. The failure is logged via
+        ``logger.warning`` (NOT ``logger.exception``) to avoid Sentry
+        recursion: ``LoggingIntegration`` auto-registers with
+        ``DEFAULT_EVENT_LEVEL=ERROR``, so ``logger.exception`` (level=ERROR)
+        would trigger a new Sentry event → re-enter ``before_send`` →
+        infinite recursion until ``RecursionError``. ``logger.warning``
+        (level=WARNING < ERROR) does not trigger event capture, breaking
+        the cycle while still recording the failure in stdout logs.
         """
         try:
             sanitize_event(event)
         except Exception:
-            # Never let scrubbing itself fail the send — return the event
-            # (potentially with PII) rather than dropping it. Log the error
-            # so devops can detect and fix the sanitizer.
-            logger.exception(
+            # logger.warning (NOT logger.exception) — see docstring above
+            # for the Sentry recursion risk that logger.exception creates.
+            logger.warning(
                 "Sentry before_send sanitizer failed — "
-                "event sent unscrubbed (event_id=%s)",
+                "event sent unscrubbed (event_id=%s error_type=%s)",
                 event.get("event_id", "unknown"),
+                type(hint.get("exception") or hint.get("exc_info") or Exception()).__name__
+                if hint else "unknown",
             )
         return event
 
