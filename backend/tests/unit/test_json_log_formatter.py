@@ -160,9 +160,13 @@ class TestJsonLogFormatterFormatException:
         Guards against regex side effects on multibyte content (the project's
         primary language is Russian; patient messages frequently contain
         Cyrillic + Latin + digits in one string).
+
+        Fixture uses an explicitly synthetic marker (``PHI_TEST_MARKER``) and
+        a zero-suffixed phone number (``+998900000001``) so it cannot be
+        mistaken for real patient data per AGENTS.md synthetic-data rule.
         """
         try:
-            raise ValueError("Пациент Иванов +998901234567 обратился")
+            raise ValueError("PHI_TEST_MARKER +998900000001 обратился")
         except ValueError as exc:
             record = _build_record(exc)
 
@@ -170,10 +174,10 @@ class TestJsonLogFormatterFormatException:
         tb = payload["exception"]
 
         # PII scrubbed.
-        assert "+998901234567" not in tb
-        assert "+998901•••567" in tb
-        # Cyrillic + Uzbek word preserved verbatim (no mojibake, no truncation).
-        assert "Пациент Иванов" in tb
+        assert "+998900000001" not in tb
+        assert "+998900•••001" in tb
+        # Cyrillic word preserved verbatim (no mojibake, no truncation).
+        assert "PHI_TEST_MARKER" in tb
         assert "обратился" in tb
         # Exception type preserved.
         assert "ValueError" in tb
