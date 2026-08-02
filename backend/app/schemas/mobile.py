@@ -27,6 +27,9 @@ class MobileLoginResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     access_token: str = Field(..., description="JWT токен")
+    refresh_token: str | None = Field(
+        None, description="Refresh token для продления сессии (использовать с /mobile/auth/refresh)"
+    )
     token_type: str = Field(default="bearer", description="Тип токена")
     expires_in: int = Field(..., description="Время жизни токена в секундах")
     user: dict[str, Any] = Field(..., description="Информация о пользователе")
