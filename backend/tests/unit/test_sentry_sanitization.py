@@ -618,8 +618,8 @@ class TestSanitizeEventCustomContextsScrubbed:
         assert event["contexts"]["patient"]["phone"] != "+998901234567"
 
     def test_preserves_mixed_standard_and_custom_contexts(self):
-        """When standard and custom contexts coexist, standard preserved,
-        custom scrubbed."""
+        """When standard and custom contexts coexist, standard diagnostic
+        fields preserved, custom scrubbed."""
         event = {
             "contexts": {
                 "runtime": {"name": "CPython", "version": "3.11.10"},
@@ -627,9 +627,119 @@ class TestSanitizeEventCustomContextsScrubbed:
             }
         }
         sanitize_event(event)
-        # Standard preserved
+        # Standard diagnostic field preserved
         assert event["contexts"]["runtime"]["name"] == "CPython"
         assert event["contexts"]["runtime"]["version"] == "3.11.10"
         # Custom scrubbed
         assert event["contexts"]["user"]["phone"] != "+998901234567"
         assert event["contexts"]["user"]["id"] == 42  # non-PII preserved
+
+
+class TestSanitizeEventPiiInStandardContext:
+    """PHI that accidentally lands inside a standard Sentry context must
+    still be scrubbed — only known diagnostic fields (e.g. ``name``) are
+    preserved, all other keys are scrubbed via mask_pii().
+    """
+
+    def test_scrubs_phone_in_device_context(self):
+        """device.phone must be scrubbed even though device is a standard
+        context — only device.name is preserved."""
+        event = {
+            "contexts": {
+                "device": {
+                    "name": "server-1",
+                    "phone": "+998901234567",
+                    "arch": "x86_64",
+                }
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["device"]["name"] == "server-1"  # preserved
+        assert event["contexts"]["device"]["arch"] == "x86_64"  # non-PII preserved
+        assert event["contexts"]["device"]["phone"] != "+998901234567"  # scrubbed
+
+    def test_scrubs_diagnosis_in_device_context(self):
+        """device.diagnosis must be scrubbed — diagnosis is not a diagnostic
+        field, it's medical PII."""
+        event = {
+            "contexts": {
+                "device": {
+                    "name": "server-1",
+                    "diagnosis": "Crohn disease",
+                }
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["device"]["name"] == "server-1"  # preserved
+        assert event["contexts"]["device"]["diagnosis"] == "[REDACTED]"
+
+    def test_scrubs_email_in_trace_context(self):
+        """trace.email must be scrubbed even though trace is standard."""
+        event = {
+            "contexts": {
+                "trace": {
+                    "trace_id": "abc123",
+                    "email": "patient@example.com",
+                }
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["trace"]["trace_id"] == "abc123"  # non-PII
+        assert event["contexts"]["trace"]["email"] != "patient@example.com"
+
+    def test_scrubs_phone_in_response_context(self):
+        """response.phone must be scrubbed even though response is standard."""
+        event = {
+            "contexts": {
+                "response": {
+                    "status_code": 200,
+                    "phone": "+998901234567",
+                }
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["response"]["status_code"] == 200
+        assert event["contexts"]["response"]["phone"] != "+998901234567"
+
+    def test_preserves_name_in_all_standard_contexts(self):
+        """The 'name' diagnostic field must be preserved in ALL standard
+        contexts where it appears — not just runtime/os/device."""
+        event = {
+            "contexts": {
+                "app": {"name": "clinic-backend"},
+                "browser": {"name": "Chrome"},
+                "device": {"name": "server-1"},
+                "os": {"name": "Linux"},
+                "runtime": {"name": "CPython"},
+                "gpu": {"name": "Tesla T4"},
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["app"]["name"] == "clinic-backend"
+        assert event["contexts"]["browser"]["name"] == "Chrome"
+        assert event["contexts"]["device"]["name"] == "server-1"
+        assert event["contexts"]["os"]["name"] == "Linux"
+        assert event["contexts"]["runtime"]["name"] == "CPython"
+        assert event["contexts"]["gpu"]["name"] == "Tesla T4"
+
+    def test_standard_context_with_pii_and_diagnostic_fields_together(self):
+        """A standard context can have both diagnostic fields (preserved)
+        and PII fields (scrubbed) simultaneously."""
+        event = {
+            "contexts": {
+                "device": {
+                    "name": "server-1",           # diagnostic → preserved
+                    "arch": "x86_64",             # non-PII → preserved
+                    "phone": "+998901234567",     # PII → scrubbed
+                    "iin": "12345678901234",      # PII → scrubbed
+                    "version": "1.0.0",           # non-PII → preserved
+                }
+            }
+        }
+        sanitize_event(event)
+        d = event["contexts"]["device"]
+        assert d["name"] == "server-1"
+        assert d["arch"] == "x86_64"
+        assert d["phone"] != "+998901234567"
+        assert d["iin"] != "12345678901234"
+        assert d["version"] == "1.0.0"

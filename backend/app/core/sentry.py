@@ -58,9 +58,6 @@ def _scrub_pii(data: Any) -> Any:
 
 # Standard Sentry contexts as documented by Sentry:
 # https://docs.sentry.io/platforms/python/enriching-events/contexts/
-# These contain runtime/OS/device metadata rather than application
-# payloads — scrubbing them corrupts diagnostic value (e.g. "name"
-# key in {"runtime": {"name": "CPython"}} is masked to "C.").
 _STANDARD_SENTRY_CONTEXTS = frozenset({
     "app",             # app version, build type
     "browser",         # browser name, version
@@ -73,6 +70,45 @@ _STANDARD_SENTRY_CONTEXTS = frozenset({
     "culture",         # user culture (locale, timezone)
     "cloud_resource",  # cloud provider info
 })
+
+# Diagnostic field keys within standard Sentry contexts whose names collide
+# with PII field patterns (e.g. "name" is in PII_FIELD_PATTERNS). These are
+# preserved as-is when they appear inside a standard context, because they
+# contain runtime/OS/device metadata (e.g. {"runtime": {"name": "CPython"}}),
+# not patient data.
+#
+# All OTHER keys within standard contexts are still scrubbed via mask_pii(),
+# so PII that accidentally lands inside a standard context (e.g.
+# {"device": {"name": "server-1", "phone": "+998..."}}) is still redacted.
+_STANDARD_CONTEXT_DIAGNOSTIC_KEYS = frozenset({"name"})
+
+
+def _scrub_context(context_name: str, context_value: Any) -> Any:
+    """Scrub a single Sentry context, preserving known diagnostic fields.
+
+    For standard contexts (runtime, os, device, etc.), known diagnostic
+    keys (e.g. ``name``) are preserved because they collide with PII field
+    patterns but contain runtime metadata, not patient data. All other
+    keys are scrubbed via ``mask_pii()`` — passed as a single-key dict so
+    that ``mask_pii`` can apply key-based redaction (e.g. ``diagnosis``
+    key → ``[REDACTED]``).
+
+    For custom contexts, ``mask_pii()`` is applied to the entire value.
+    """
+    if not isinstance(context_value, dict):
+        return mask_pii(context_value)
+    if context_name in _STANDARD_SENTRY_CONTEXTS:
+        result = {}
+        for k, v in context_value.items():
+            if k in _STANDARD_CONTEXT_DIAGNOSTIC_KEYS:
+                result[k] = v
+            else:
+                # Wrap in single-key dict so mask_pii applies key-based
+                # redaction (e.g. {"diagnosis": "Crohn"} → {"diagnosis": "[REDACTED]"})
+                scrubbed = mask_pii({k: v})
+                result[k] = scrubbed[k]
+        return result
+    return mask_pii(context_value)
 
 
 def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
@@ -88,9 +124,10 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
     - ``event["request"]`` — request body, headers, query string
     - ``event["breadcrumbs"][*]["data"]`` — breadcrumb payloads
     - ``event["extra"]`` — extra context
-    - ``event["contexts"]`` — custom (non-standard) contexts only;
-      standard Sentry contexts (runtime, os, device, etc.) are preserved
-      because they contain diagnostic metadata, not patient data
+    - ``event["contexts"]`` — ALL contexts are scrubbed; for standard
+      Sentry contexts (runtime, os, device, etc.), known diagnostic
+      fields (e.g. ``name``) are preserved while sensitive keys and
+      free-text PII are still redacted
     - ``event["exception"]["values"][*]["value"]`` — ``str(exc)``, may
       contain phone/email/IIN/passport from bound SQL params
     - ``event["exception"]["values"][*]["stacktrace"]["frames"][*]["vars"]``
@@ -114,20 +151,13 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
     if "contexts" in event:
         contexts = event["contexts"]
         if isinstance(contexts, dict):
-            # Scrub only custom (non-standard) contexts. Standard Sentry
-            # contexts (runtime, os, device, app, browser, gpu, trace,
-            # response, culture, cloud_resource) contain runtime/OS/device
-            # metadata rather than application payloads — scrubbing them
-            # corrupts diagnostic value (e.g. "name" key in
-            # {"runtime": {"name": "CPython"}} is masked to "C.").
-            #
-            # If the application intentionally uses a standard key (runtime,
-            # os, etc.) for its own data, that data will no longer pass
-            # through mask_pii(). This is considered an acceptable
-            # trade-off since such keys are reserved by the Sentry spec.
+            # Scrub ALL contexts — standard and custom. For standard
+            # contexts, known diagnostic fields (e.g. "name") are
+            # preserved via _scrub_context(); all other keys are scrubbed.
+            # This ensures PII that accidentally lands inside a standard
+            # context (e.g. device.phone) is still redacted.
             event["contexts"] = {
-                k: (v if k in _STANDARD_SENTRY_CONTEXTS else mask_pii(v))
-                for k, v in contexts.items()
+                k: _scrub_context(k, v) for k, v in contexts.items()
             }
         else:
             event["contexts"] = mask_pii(contexts)
