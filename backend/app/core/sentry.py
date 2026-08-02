@@ -15,6 +15,8 @@ import logging
 import os
 from typing import Any
 
+from app.core.pii_masker import mask_pii
+
 logger = logging.getLogger(__name__)
 
 # Same field-name list as frontend/src/services/sentry.js + backend/app/core/pii_masker.py.
@@ -36,7 +38,15 @@ MEDICAL_PII_KEYS = [
 
 
 def _scrub_pii(data: Any) -> Any:
-    """Recursively redact PII keys from a dict/list structure."""
+    """Recursively redact PII keys from a dict/list structure.
+
+    .. note::
+        ``before_send`` now uses ``mask_pii()`` from ``pii_masker.py`` which
+        combines key-based redaction with regex-based string scrubbing.
+        ``_scrub_pii`` is retained for backward compatibility and any
+        callers outside ``before_send``. Removal is deferred to a separate
+        cleanup PR after this security fix is verified in production.
+    """
     if data is None:
         return None
     if isinstance(data, dict):
@@ -44,6 +54,68 @@ def _scrub_pii(data: Any) -> Any:
     if isinstance(data, list):
         return [_scrub_pii(item) for item in data]
     return data
+
+
+def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
+    """Scrub PII from a Sentry event before it is sent.
+
+    This function is intentionally "dumb" — it does not know anything about
+    regex patterns or PII field names. It delegates all masking logic to
+    ``mask_pii()`` from ``pii_masker.py``, which is the single source of
+    truth for PII scrubbing (also used by ``JsonLogFormatter`` and
+    ``PIIMaskingFilter`` for stdout logs).
+
+    Fields scrubbed:
+    - ``event["request"]`` — request body, headers, query string
+    - ``event["breadcrumbs"][*]["data"]`` — breadcrumb payloads
+    - ``event["extra"]`` — extra context
+    - ``event["contexts"]`` — custom contexts
+    - ``event["exception"]["values"][*]["value"]`` — ``str(exc)``, may
+      contain phone/email/IIN/passport from bound SQL params
+    - ``event["exception"]["values"][*]["stacktrace"]["frames"][*]["vars"]``
+      — frame local variables, may contain patient objects
+
+    Missing fields are skipped silently — this function must not raise on
+    events with partial structure (e.g. ``{}`` or ``{"exception": {}}``).
+    """
+    if "request" in event:
+        event["request"] = mask_pii(event["request"])
+
+    if "breadcrumbs" in event:
+        event["breadcrumbs"] = [
+            {**b, "data": mask_pii(b.get("data", {}))}
+            for b in event["breadcrumbs"]
+        ]
+
+    if "extra" in event:
+        event["extra"] = mask_pii(event["extra"])
+
+    if "contexts" in event:
+        event["contexts"] = mask_pii(event["contexts"])
+
+    exception = event.get("exception")
+    if isinstance(exception, dict):
+        values = exception.get("values")
+        if isinstance(values, list):
+            for value_entry in values:
+                if not isinstance(value_entry, dict):
+                    continue
+                # value = str(exc) — apply mask_pii (handles string via regex)
+                exc_value = value_entry.get("value")
+                if exc_value is not None:
+                    value_entry["value"] = mask_pii(exc_value)
+                # stacktrace.frames[*].vars — frame local variables
+                stacktrace = value_entry.get("stacktrace")
+                if isinstance(stacktrace, dict):
+                    frames = stacktrace.get("frames")
+                    if isinstance(frames, list):
+                        for frame in frames:
+                            if not isinstance(frame, dict):
+                                continue
+                            if "vars" in frame:
+                                frame["vars"] = mask_pii(frame["vars"])
+
+    return event
 
 
 def init_sentry() -> None:
@@ -81,20 +153,27 @@ def init_sentry() -> None:
         integrations.append(AsyncPGIntegration())
 
     def before_send(event: dict, hint: dict) -> dict | None:
-        """Scrub PII from request bodies, breadcrumbs, extra context before sending."""
+        """Scrub PII from Sentry event before sending.
+
+        Delegates all masking logic to ``sanitize_event()`` which uses
+        ``mask_pii()`` from ``pii_masker.py`` — the single source of truth
+        for PII scrubbing, shared with ``JsonLogFormatter`` and
+        ``PIIMaskingFilter`` for stdout logs.
+
+        If ``sanitize_event`` raises, the event is still returned (unscrubbed)
+        so error tracking is not lost. The exception is logged for devops.
+        """
         try:
-            if "request" in event:
-                event["request"] = _scrub_pii(event["request"])
-            if "breadcrumbs" in event:
-                event["breadcrumbs"] = [
-                    {**b, "data": _scrub_pii(b.get("data", {}))}
-                    for b in event["breadcrumbs"]
-                ]
-            if "extra" in event:
-                event["extra"] = _scrub_pii(event["extra"])
+            sanitize_event(event)
         except Exception:
-            # Never let scrubbing itself fail the send
-            pass
+            # Never let scrubbing itself fail the send — return the event
+            # (potentially with PII) rather than dropping it. Log the error
+            # so devops can detect and fix the sanitizer.
+            logger.exception(
+                "Sentry before_send sanitizer failed — "
+                "event sent unscrubbed (event_id=%s)",
+                event.get("event_id", "unknown"),
+            )
         return event
 
     sentry_sdk.init(
