@@ -58,6 +58,25 @@ class ProviderWebhookRepository:
     def get_payment_by_id(self, payment_id: int) -> Payment | None:
         return self.db.query(Payment).filter(Payment.id == payment_id).first()
 
+    def get_payment_by_id_for_update(self, payment_id: int) -> Payment | None:
+        """Lock the payment row for update (SELECT ... FOR UPDATE).
+
+        Used in webhook duplicate-processing to prevent TOCTOU races:
+        a cashier cancellation (via PaymentCancelService →
+        billing_service.update_payment_status which uses
+        with_for_update) can commit a terminal status between our
+        read and write. This method acquires the row lock so that
+        the status we read is the status we mutate.
+
+        Must be called inside a transaction_ctx block.
+        """
+        return (
+            self.db.query(Payment)
+            .filter(Payment.id == payment_id)
+            .with_for_update()
+            .first()
+        )
+
     def get_payment_by_provider_payment_id(
         self, provider_payment_id: str
     ) -> Payment | None:

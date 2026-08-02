@@ -574,6 +574,8 @@ class ProviderWebhookService:
 
         payment_status = self._map_provider_status_to_payment_status(provider_status)
         payment_id = getattr(transaction, "payment_id", None)
+
+        # Phase 1: amount-mismatch check (unlocked read — no status mutation).
         if payment_id:
             payment = self.repository.get_payment_by_id(payment_id)
             if payment:
@@ -584,38 +586,16 @@ class ProviderWebhookService:
                 ):
                     return "amount_mismatch"
 
-        # Guard transaction.status: do not overwrite terminal states.
-        # provider_data is ALWAYS updated to preserve the audit trail of
-        # the last webhook payload, even when status is not mutated.
-        current_tx_status = getattr(transaction, "status", None)
-        if current_tx_status and not self._can_transition_transaction_status(
-            current_tx_status, provider_status
-        ):
-            logger.warning(
-                "Payme webhook: ignored invalid transaction transition "
-                "current=%s target=%s transaction_id=%s method=%s",
-                current_tx_status,
-                provider_status,
-                getattr(transaction, "id", None),
-                method,
-            )
-        else:
-            transaction.status = provider_status
-        transaction.provider_data = {
-            **(transaction.provider_data or {}),
-            "method": method,
-            "transaction_id": params.get("id"),
-            "params": params,
-        }
-
-        # effective_payment_status tracks the ACTUAL state of payment.status
-        # after the guard decision — distinct from the desired payment_status
-        # derived from the webhook method. The response field
-        # "payment_status" reflects the actual DB state so admin/monitoring
-        # sees the truth, not what the webhook tried to set.
+        # Phase 2: lock the payment row for the status-mutation phase.
+        # This prevents TOCTOU: a cashier cancellation can commit a
+        # terminal status between our unlocked read above and the write
+        # below. By acquiring FOR UPDATE here, we serialize with any
+        # concurrent billing_service.update_payment_status() call (which
+        # also uses with_for_update per PAY-REAUDIT-28 P0-7).
         effective_payment_status = payment_status
+        payment_terminal = False
         if payment_id:
-            payment = self.repository.get_payment_by_id(payment_id)
+            payment = self.repository.get_payment_by_id_for_update(payment_id)
             if payment:
                 current_payment_status = getattr(payment, "status", None)
                 if current_payment_status and not self._can_transition_payment_status(
@@ -630,6 +610,7 @@ class ProviderWebhookService:
                         method,
                     )
                     effective_payment_status = current_payment_status
+                    payment_terminal = True
                 else:
                     payment.status = payment_status
                     if payment_status == "paid" and not payment.paid_at:
@@ -638,8 +619,86 @@ class ProviderWebhookService:
                 # of last webhook payload regardless of status transition.
                 payment.provider_data = {
                     **(payment.provider_data or {}),
-                    **(transaction.provider_data or {}),
+                    "method": method,
+                    "transaction_id": params.get("id"),
+                    "params": params,
                 }
+
+        # Phase 3: guard transaction.status.
+        # provider_data is ALWAYS updated to preserve the audit trail.
+        #
+        # DEFENSIVE CONSISTENCY CHECK: if the linked payment is in a
+        # terminal state (refunded/cancelled/void), block the transaction
+        # transition too — even if the transaction's own state-machine
+        # would allow it (e.g. processing → completed).
+        #
+        # Root cause: PaymentCancelService.cancel_payment() updates only
+        # payment.status via billing_service, NOT transaction.status. This
+        # leaves the transaction in a non-terminal state while the payment
+        # is terminal. A duplicate PerformTransaction could then mark the
+        # transaction "completed" while the payment stays "cancelled",
+        # producing an inconsistent pair for reconciliation.
+        #
+        # This guard is DEFENSIVE — the proper fix is for
+        # PaymentCancelService to update PaymentTransaction atomically
+        # (FOLLOWUP-8). Once that is implemented, this guard becomes a
+        # no-op (payment will not be terminal while transaction is not).
+        # DO NOT REMOVE this guard until FOLLOWUP-8 is verified in
+        # production.
+        current_tx_status = getattr(transaction, "status", None)
+        tx_blocked_by_payment = (
+            payment_terminal
+            and current_tx_status
+            and current_tx_status != provider_status
+        )
+        if current_tx_status and (
+            not self._can_transition_transaction_status(
+                current_tx_status, provider_status
+            )
+            or tx_blocked_by_payment
+        ):
+            if tx_blocked_by_payment:
+                logger.warning(
+                    "Payme webhook: blocked transaction transition because "
+                    "linked payment is terminal "
+                    "tx_current=%s tx_target=%s payment_status=%s "
+                    "transaction_id=%s method=%s "
+                    "(defensive guard — see FOLLOWUP-8)",
+                    current_tx_status,
+                    provider_status,
+                    effective_payment_status,
+                    getattr(transaction, "id", None),
+                    method,
+                )
+            else:
+                logger.warning(
+                    "Payme webhook: ignored invalid transaction transition "
+                    "current=%s target=%s transaction_id=%s method=%s",
+                    current_tx_status,
+                    provider_status,
+                    getattr(transaction, "id", None),
+                    method,
+                )
+        else:
+            transaction.status = provider_status
+
+        transaction.provider_data = {
+            **(transaction.provider_data or {}),
+            "method": method,
+            "transaction_id": params.get("id"),
+            "params": params,
+        }
+
+        # Update payment.provider_data with the final transaction
+        # provider_data (merge). This is done here (after transaction
+        # provider_data is finalized) rather than in Phase 2 so the
+        # payment always gets the complete payload.
+        if payment_id and payment:
+            payment.provider_data = {
+                **(payment.provider_data or {}),
+                **(transaction.provider_data or {}),
+            }
+
         return effective_payment_status
 
     def process_kaspi_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
