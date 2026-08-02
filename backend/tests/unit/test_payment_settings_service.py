@@ -233,8 +233,9 @@ class TestPaymentSettingsServiceCredentialLeakPrevention:
     ):
         """When provider.create_payment() returns PaymentResult(success=False,
         error_message=<text>), the error_message must NOT be embedded in the
-        HTTP response — it's a provider-library passthrough, not controlled
-        by this service. Log it; return generic message."""
+        HTTP response AND must NOT be logged verbatim — it's a provider-library
+        passthrough that may contain credential fragments. Only safe metadata
+        (provider name, operation) is logged for devops correlation."""
         service = PaymentSettingsService(db_session)
         dangerous_error_message = "Auth failed: signature=md5(secret_key+timestamp)"
 
@@ -262,11 +263,15 @@ class TestPaymentSettingsServiceCredentialLeakPrevention:
         assert dangerous_error_message not in result["message"]
         assert "signature=md5" not in result["message"]
         assert "Ошибка создания тестового платежа" in result["message"]
-        # error_message must be logged for devops.
+        # Safe metadata must be logged for devops correlation.
         assert any(
             "Click test payment failed" in rec.message
-            and dangerous_error_message in rec.message
+            and "provider=click" in rec.message
             for rec in caplog.records
+        )
+        # The dangerous error_message must NOT appear in logs verbatim.
+        assert all(
+            dangerous_error_message not in rec.message for rec in caplog.records
         )
 
     def test_test_payment_provider_provider_error_message_not_passthrough_payme(
@@ -296,10 +301,15 @@ class TestPaymentSettingsServiceCredentialLeakPrevention:
         assert dangerous_error_message not in result["message"]
         assert "base64(Paycom" not in result["message"]
         assert "Ошибка создания тестового платежа" in result["message"]
+        # Safe metadata must be logged for devops correlation.
         assert any(
             "PayMe test payment failed" in rec.message
-            and dangerous_error_message in rec.message
+            and "provider=payme" in rec.message
             for rec in caplog.records
+        )
+        # The dangerous error_message must NOT appear in logs verbatim.
+        assert all(
+            dangerous_error_message not in rec.message for rec in caplog.records
         )
 
     def test_test_payment_provider_outer_exception_does_not_leak_str_exc(

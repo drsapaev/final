@@ -207,12 +207,14 @@ class PaymentSettingsService:
                     },
                 }
 
-            # result.error_message is a provider-library passthrough — its
-            # content is not controlled by this service. Log it for devops,
-            # but do NOT embed it in the HTTP response.
+            # result.error_message is a provider-library passthrough whose
+            # content is not controlled by this service. Do NOT log its value
+            # verbatim — it may contain credential fragments (signature hashes,
+            # auth headers, etc.) and there is no sanitizer for provider
+            # diagnostics today. Log only safe metadata so devops can correlate
+            # without leaking secrets.
             logger.warning(
-                "Click test payment failed provider_error_message=%s",
-                result.error_message,
+                "Click test payment failed provider=click operation=create_payment"
             )
             return {
                 "success": False,
@@ -269,12 +271,14 @@ class PaymentSettingsService:
                     },
                 }
 
-            # result.error_message is a provider-library passthrough — its
-            # content is not controlled by this service. Log it for devops,
-            # but do NOT embed it in the HTTP response.
+            # result.error_message is a provider-library passthrough whose
+            # content is not controlled by this service. Do NOT log its value
+            # verbatim — it may contain credential fragments (signature hashes,
+            # auth headers, etc.) and there is no sanitizer for provider
+            # diagnostics today. Log only safe metadata so devops can correlate
+            # without leaking secrets.
             logger.warning(
-                "PayMe test payment failed provider_error_message=%s",
-                result.error_message,
+                "PayMe test payment failed provider=payme operation=create_payment"
             )
             return {
                 "success": False,
