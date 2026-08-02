@@ -28,7 +28,7 @@ def _make_before_send():
     # For the "sanitizer fails" test, we patch sanitize_event to raise.
     # This is sufficient because before_send is a thin wrapper:
     #   try: sanitize_event(event)
-    #   except Exception: log
+    #   except Exception: logger.warning(...)
     #   return event
     #
     # For direct before_send tests, we construct an equivalent closure.
@@ -40,10 +40,15 @@ def _make_before_send():
         try:
             sanitize_event(event)
         except Exception:
-            sentinel_logger.exception(
+            # logger.warning (NOT logger.exception) — avoids Sentry recursion
+            # because LoggingIntegration DEFAULT_EVENT_LEVEL=ERROR and
+            # WARNING < ERROR, so no new Sentry event is created.
+            sentinel_logger.warning(
                 "Sentry before_send sanitizer failed — "
-                "event sent unscrubbed (event_id=%s)",
+                "event sent unscrubbed (event_id=%s error_type=%s)",
                 event.get("event_id", "unknown"),
+                type(hint.get("exception") or hint.get("exc_info") or Exception()).__name__
+                if hint else "unknown",
             )
         return event
 
@@ -437,3 +442,304 @@ class TestBeforeSendSanitizerFailure:
         before_send = _make_before_send()
         result = before_send({"event_id": "x"}, hint=None)
         assert result["event_id"] == "x"
+
+    def test_before_send_uses_warning_not_exception_on_failure(self, caplog):
+        """When sanitize_event raises, before_send must log via
+        ``logger.warning`` (NOT ``logger.exception``) to avoid Sentry
+        recursion.
+
+        ``LoggingIntegration`` auto-registers with
+        ``DEFAULT_EVENT_LEVEL=ERROR``. ``logger.exception`` (level=ERROR)
+        would trigger a new Sentry event → re-enter ``before_send`` →
+        infinite recursion until ``RecursionError``. ``logger.warning``
+        (level=WARNING < ERROR) does not trigger event capture.
+
+        This test verifies that the log record has level=WARNING and
+        ``exc_info is None`` (no traceback attached — if it were,
+        LoggingIntegration might still capture it).
+        """
+        import logging
+
+        before_send = _make_before_send()
+        event = {"event_id": "recursion-test", "request": {"data": "x"}}
+
+        with patch(
+            "app.core.sentry.mask_pii",
+            side_effect=RuntimeError("sanitizer crashed"),
+        ):
+            with caplog.at_level(
+                logging.WARNING, logger="app.core.sentry"
+            ):
+                before_send(event, hint={"exception": RuntimeError("x")})
+
+        # Find the warning record
+        warning_records = [
+            r for r in caplog.records
+            if r.levelno == logging.WARNING
+            and "sanitizer failed" in r.message
+        ]
+        assert len(warning_records) == 1, (
+            f"Expected exactly 1 WARNING record, got {len(warning_records)}"
+        )
+        rec = warning_records[0]
+        # Critical: exc_info must NOT be set — logger.exception() sets it,
+        # logger.warning() does not. If exc_info is set, LoggingIntegration
+        # may still capture the record as a Sentry event.
+        assert rec.exc_info is None, (
+            "exc_info must be None — logger.exception() would set it and "
+            "trigger Sentry recursion. Use logger.warning() without exc_info."
+        )
+        assert rec.levelno == logging.WARNING, (
+            f"Expected WARNING (30), got {rec.levelno} — "
+            "logger.exception() uses ERROR (40) which triggers Sentry capture."
+        )
+
+
+class TestSanitizeEventStandardContextsPreserved:
+    """Standard Sentry contexts (runtime, os, device, etc.) must NOT be
+    scrubbed — they contain diagnostic metadata, not patient data.
+
+    See: https://docs.sentry.io/platforms/python/enriching-events/contexts/
+    """
+
+    def test_preserves_standard_context_runtime(self):
+        """``{"runtime": {"name": "CPython"}}`` → unchanged.
+
+        Without the whitelist, ``mask_pii`` treats ``name`` as a patient
+        name (it's in ``PII_FIELD_PATTERNS``) and masks it to ``"C."``.
+        """
+        event = {"contexts": {"runtime": {"name": "CPython", "version": "3.11.10"}}}
+        sanitize_event(event)
+        assert event["contexts"]["runtime"]["name"] == "CPython"
+        assert event["contexts"]["runtime"]["version"] == "3.11.10"
+
+    def test_preserves_standard_context_os(self):
+        event = {"contexts": {"os": {"name": "Linux", "version": "5.15.0"}}}
+        sanitize_event(event)
+        assert event["contexts"]["os"]["name"] == "Linux"
+        assert event["contexts"]["os"]["version"] == "5.15.0"
+
+    def test_preserves_standard_context_device(self):
+        event = {"contexts": {"device": {"name": "server-1", "arch": "x86_64"}}}
+        sanitize_event(event)
+        assert event["contexts"]["device"]["name"] == "server-1"
+        assert event["contexts"]["device"]["arch"] == "x86_64"
+
+    def test_preserves_standard_context_app(self):
+        event = {"contexts": {"app": {"name": "clinic-backend", "version": "0.9.0"}}}
+        sanitize_event(event)
+        assert event["contexts"]["app"]["name"] == "clinic-backend"
+
+    def test_preserves_standard_context_browser(self):
+        event = {"contexts": {"browser": {"name": "Chrome", "version": "120.0"}}}
+        sanitize_event(event)
+        assert event["contexts"]["browser"]["name"] == "Chrome"
+
+    def test_preserves_standard_context_gpu(self):
+        event = {"contexts": {"gpu": {"name": "Tesla T4", "vendor": "NVIDIA"}}}
+        sanitize_event(event)
+        assert event["contexts"]["gpu"]["name"] == "Tesla T4"
+        assert event["contexts"]["gpu"]["vendor"] == "NVIDIA"
+
+    def test_preserves_entire_nested_standard_context(self):
+        """The ENTIRE standard context object must be preserved — not just
+        the ``name`` field. All nested keys (version, build, arch, etc.)
+        must remain untouched."""
+        event = {
+            "contexts": {
+                "runtime": {
+                    "name": "CPython",
+                    "version": "3.13.0",
+                    "build": "default",
+                    "compiler": "GCC 11.4.0",
+                }
+            }
+        }
+        sanitize_event(event)
+        runtime = event["contexts"]["runtime"]
+        assert runtime["name"] == "CPython"
+        assert runtime["version"] == "3.13.0"
+        assert runtime["build"] == "default"
+        assert runtime["compiler"] == "GCC 11.4.0"
+
+    def test_preserves_all_standard_contexts_simultaneously(self):
+        """Multiple standard contexts in one event — all preserved."""
+        event = {
+            "contexts": {
+                "runtime": {"name": "CPython", "version": "3.11.10"},
+                "os": {"name": "Linux", "version": "5.15.0"},
+                "device": {"name": "server-1", "arch": "x86_64"},
+                "app": {"name": "clinic-backend", "version": "0.9.0"},
+                "browser": {"name": "Chrome", "version": "120.0"},
+                "gpu": {"name": "Tesla T4", "vendor": "NVIDIA"},
+                "trace": {"trace_id": "abc123", "span_id": "def456"},
+            }
+        }
+        sanitize_event(event)
+        for ctx_key in ("runtime", "os", "device", "app", "browser", "gpu", "trace"):
+            assert event["contexts"][ctx_key] == event["contexts"][ctx_key], (
+                f"{ctx_key} context was modified"
+            )
+
+
+class TestSanitizeEventCustomContextsScrubbed:
+    """Custom (non-standard) contexts must still be scrubbed."""
+
+    def test_scrubs_unknown_custom_context_with_pii(self):
+        """Unknown custom context with PII must be fully scrubbed.
+
+        ``{"customer": {"name": "John", "phone": "+998901234567"}}``
+        → ``name`` masked, ``phone`` redacted.
+        """
+        event = {
+            "contexts": {
+                "customer": {
+                    "name": "PHI_TEST_MARKER",
+                    "phone": "+998901234567",
+                }
+            }
+        }
+        sanitize_event(event)
+        customer = event["contexts"]["customer"]
+        assert customer["phone"] != "+998901234567"
+        assert customer["name"] != "PHI_TEST_MARKER"  # masked
+
+    def test_scrubs_custom_context_with_patient_data(self):
+        """Custom ``patient`` context must be scrubbed."""
+        event = {
+            "contexts": {
+                "patient": {
+                    "phone": "+998901234567",
+                    "diagnosis": "[REDACTED]",  # already redacted in test
+                }
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["patient"]["phone"] != "+998901234567"
+
+    def test_preserves_mixed_standard_and_custom_contexts(self):
+        """When standard and custom contexts coexist, standard diagnostic
+        fields preserved, custom scrubbed."""
+        event = {
+            "contexts": {
+                "runtime": {"name": "CPython", "version": "3.11.10"},
+                "user": {"phone": "+998901234567", "id": 42},
+            }
+        }
+        sanitize_event(event)
+        # Standard diagnostic field preserved
+        assert event["contexts"]["runtime"]["name"] == "CPython"
+        assert event["contexts"]["runtime"]["version"] == "3.11.10"
+        # Custom scrubbed
+        assert event["contexts"]["user"]["phone"] != "+998901234567"
+        assert event["contexts"]["user"]["id"] == 42  # non-PII preserved
+
+
+class TestSanitizeEventPiiInStandardContext:
+    """PHI that accidentally lands inside a standard Sentry context must
+    still be scrubbed — only known diagnostic fields (e.g. ``name``) are
+    preserved, all other keys are scrubbed via mask_pii().
+    """
+
+    def test_scrubs_phone_in_device_context(self):
+        """device.phone must be scrubbed even though device is a standard
+        context — only device.name is preserved."""
+        event = {
+            "contexts": {
+                "device": {
+                    "name": "server-1",
+                    "phone": "+998901234567",
+                    "arch": "x86_64",
+                }
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["device"]["name"] == "server-1"  # preserved
+        assert event["contexts"]["device"]["arch"] == "x86_64"  # non-PII preserved
+        assert event["contexts"]["device"]["phone"] != "+998901234567"  # scrubbed
+
+    def test_scrubs_diagnosis_in_device_context(self):
+        """device.diagnosis must be scrubbed — diagnosis is not a diagnostic
+        field, it's medical PII."""
+        event = {
+            "contexts": {
+                "device": {
+                    "name": "server-1",
+                    "diagnosis": "Crohn disease",
+                }
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["device"]["name"] == "server-1"  # preserved
+        assert event["contexts"]["device"]["diagnosis"] == "[REDACTED]"
+
+    def test_scrubs_email_in_trace_context(self):
+        """trace.email must be scrubbed even though trace is standard."""
+        event = {
+            "contexts": {
+                "trace": {
+                    "trace_id": "abc123",
+                    "email": "patient@example.com",
+                }
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["trace"]["trace_id"] == "abc123"  # non-PII
+        assert event["contexts"]["trace"]["email"] != "patient@example.com"
+
+    def test_scrubs_phone_in_response_context(self):
+        """response.phone must be scrubbed even though response is standard."""
+        event = {
+            "contexts": {
+                "response": {
+                    "status_code": 200,
+                    "phone": "+998901234567",
+                }
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["response"]["status_code"] == 200
+        assert event["contexts"]["response"]["phone"] != "+998901234567"
+
+    def test_preserves_name_in_all_standard_contexts(self):
+        """The 'name' diagnostic field must be preserved in ALL standard
+        contexts where it appears — not just runtime/os/device."""
+        event = {
+            "contexts": {
+                "app": {"name": "clinic-backend"},
+                "browser": {"name": "Chrome"},
+                "device": {"name": "server-1"},
+                "os": {"name": "Linux"},
+                "runtime": {"name": "CPython"},
+                "gpu": {"name": "Tesla T4"},
+            }
+        }
+        sanitize_event(event)
+        assert event["contexts"]["app"]["name"] == "clinic-backend"
+        assert event["contexts"]["browser"]["name"] == "Chrome"
+        assert event["contexts"]["device"]["name"] == "server-1"
+        assert event["contexts"]["os"]["name"] == "Linux"
+        assert event["contexts"]["runtime"]["name"] == "CPython"
+        assert event["contexts"]["gpu"]["name"] == "Tesla T4"
+
+    def test_standard_context_with_pii_and_diagnostic_fields_together(self):
+        """A standard context can have both diagnostic fields (preserved)
+        and PII fields (scrubbed) simultaneously."""
+        event = {
+            "contexts": {
+                "device": {
+                    "name": "server-1",           # diagnostic → preserved
+                    "arch": "x86_64",             # non-PII → preserved
+                    "phone": "+998901234567",     # PII → scrubbed
+                    "iin": "12345678901234",      # PII → scrubbed
+                    "version": "1.0.0",           # non-PII → preserved
+                }
+            }
+        }
+        sanitize_event(event)
+        d = event["contexts"]["device"]
+        assert d["name"] == "server-1"
+        assert d["arch"] == "x86_64"
+        assert d["phone"] != "+998901234567"
+        assert d["iin"] != "12345678901234"
+        assert d["version"] == "1.0.0"

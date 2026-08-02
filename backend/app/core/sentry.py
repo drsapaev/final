@@ -56,6 +56,61 @@ def _scrub_pii(data: Any) -> Any:
     return data
 
 
+# Standard Sentry contexts as documented by Sentry:
+# https://docs.sentry.io/platforms/python/enriching-events/contexts/
+_STANDARD_SENTRY_CONTEXTS = frozenset({
+    "app",             # app version, build type
+    "browser",         # browser name, version
+    "device",          # device model, family, arch
+    "os",              # os name, version, build
+    "runtime",         # runtime name, version (CPython, etc.)
+    "gpu",             # GPU name, vendor
+    "trace",           # distributed tracing (trace_id, span_id)
+    "response",        # HTTP response context
+    "culture",         # user culture (locale, timezone)
+    "cloud_resource",  # cloud provider info
+})
+
+# Diagnostic field keys within standard Sentry contexts whose names collide
+# with PII field patterns (e.g. "name" is in PII_FIELD_PATTERNS). These are
+# preserved as-is when they appear inside a standard context, because they
+# contain runtime/OS/device metadata (e.g. {"runtime": {"name": "CPython"}}),
+# not patient data.
+#
+# All OTHER keys within standard contexts are still scrubbed via mask_pii(),
+# so PII that accidentally lands inside a standard context (e.g.
+# {"device": {"name": "server-1", "phone": "+998..."}}) is still redacted.
+_STANDARD_CONTEXT_DIAGNOSTIC_KEYS = frozenset({"name"})
+
+
+def _scrub_context(context_name: str, context_value: Any) -> Any:
+    """Scrub a single Sentry context, preserving known diagnostic fields.
+
+    For standard contexts (runtime, os, device, etc.), known diagnostic
+    keys (e.g. ``name``) are preserved because they collide with PII field
+    patterns but contain runtime metadata, not patient data. All other
+    keys are scrubbed via ``mask_pii()`` — passed as a single-key dict so
+    that ``mask_pii`` can apply key-based redaction (e.g. ``diagnosis``
+    key → ``[REDACTED]``).
+
+    For custom contexts, ``mask_pii()`` is applied to the entire value.
+    """
+    if not isinstance(context_value, dict):
+        return mask_pii(context_value)
+    if context_name in _STANDARD_SENTRY_CONTEXTS:
+        result = {}
+        for k, v in context_value.items():
+            if k in _STANDARD_CONTEXT_DIAGNOSTIC_KEYS:
+                result[k] = v
+            else:
+                # Wrap in single-key dict so mask_pii applies key-based
+                # redaction (e.g. {"diagnosis": "Crohn"} → {"diagnosis": "[REDACTED]"})
+                scrubbed = mask_pii({k: v})
+                result[k] = scrubbed[k]
+        return result
+    return mask_pii(context_value)
+
+
 def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
     """Scrub PII from a Sentry event before it is sent.
 
@@ -69,7 +124,10 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
     - ``event["request"]`` — request body, headers, query string
     - ``event["breadcrumbs"][*]["data"]`` — breadcrumb payloads
     - ``event["extra"]`` — extra context
-    - ``event["contexts"]`` — custom contexts
+    - ``event["contexts"]`` — ALL contexts are scrubbed; for standard
+      Sentry contexts (runtime, os, device, etc.), known diagnostic
+      fields (e.g. ``name``) are preserved while sensitive keys and
+      free-text PII are still redacted
     - ``event["exception"]["values"][*]["value"]`` — ``str(exc)``, may
       contain phone/email/IIN/passport from bound SQL params
     - ``event["exception"]["values"][*]["stacktrace"]["frames"][*]["vars"]``
@@ -91,7 +149,18 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
         event["extra"] = mask_pii(event["extra"])
 
     if "contexts" in event:
-        event["contexts"] = mask_pii(event["contexts"])
+        contexts = event["contexts"]
+        if isinstance(contexts, dict):
+            # Scrub ALL contexts — standard and custom. For standard
+            # contexts, known diagnostic fields (e.g. "name") are
+            # preserved via _scrub_context(); all other keys are scrubbed.
+            # This ensures PII that accidentally lands inside a standard
+            # context (e.g. device.phone) is still redacted.
+            event["contexts"] = {
+                k: _scrub_context(k, v) for k, v in contexts.items()
+            }
+        else:
+            event["contexts"] = mask_pii(contexts)
 
     exception = event.get("exception")
     if isinstance(exception, dict):
@@ -161,18 +230,26 @@ def init_sentry() -> None:
         ``PIIMaskingFilter`` for stdout logs.
 
         If ``sanitize_event`` raises, the event is still returned (unscrubbed)
-        so error tracking is not lost. The exception is logged for devops.
+        so error tracking is not lost. The failure is logged via
+        ``logger.warning`` (NOT ``logger.exception``) to avoid Sentry
+        recursion: ``LoggingIntegration`` auto-registers with
+        ``DEFAULT_EVENT_LEVEL=ERROR``, so ``logger.exception`` (level=ERROR)
+        would trigger a new Sentry event → re-enter ``before_send`` →
+        infinite recursion until ``RecursionError``. ``logger.warning``
+        (level=WARNING < ERROR) does not trigger event capture, breaking
+        the cycle while still recording the failure in stdout logs.
         """
         try:
             sanitize_event(event)
         except Exception:
-            # Never let scrubbing itself fail the send — return the event
-            # (potentially with PII) rather than dropping it. Log the error
-            # so devops can detect and fix the sanitizer.
-            logger.exception(
+            # logger.warning (NOT logger.exception) — see docstring above
+            # for the Sentry recursion risk that logger.exception creates.
+            logger.warning(
                 "Sentry before_send sanitizer failed — "
-                "event sent unscrubbed (event_id=%s)",
+                "event sent unscrubbed (event_id=%s error_type=%s)",
                 event.get("event_id", "unknown"),
+                type(hint.get("exception") or hint.get("exc_info") or Exception()).__name__
+                if hint else "unknown",
             )
         return event
 
