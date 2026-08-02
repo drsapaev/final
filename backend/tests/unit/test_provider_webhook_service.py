@@ -46,6 +46,7 @@ class TestProviderWebhookService:
         repository = SimpleNamespace(
             get_existing_transaction=Mock(return_value=transaction),
             get_payment_by_id=Mock(return_value=payment),
+            get_payment_by_id_for_update=Mock(return_value=payment),
         )
         manager = SimpleNamespace(
             get_provider=Mock(
@@ -99,6 +100,7 @@ class TestProviderWebhookService:
         repository = SimpleNamespace(
             get_existing_transaction=Mock(return_value=transaction),
             get_payment_by_id=Mock(return_value=payment),
+            get_payment_by_id_for_update=Mock(return_value=payment),
         )
         manager = SimpleNamespace(
             get_provider=Mock(
@@ -147,6 +149,7 @@ class TestProviderWebhookService:
             get_existing_transaction=Mock(return_value=None),
             create_webhook=Mock(return_value=webhook),
             get_payment_by_id=Mock(return_value=payment),
+            get_payment_by_id_for_update=Mock(return_value=payment),
             create_transaction=Mock(),
         )
         manager = SimpleNamespace(
@@ -220,6 +223,7 @@ class TestPaymeTerminalStatePreservation:
         payment_status="processing",
         transaction_provider_data=None,
         payment_provider_data=None,
+        locked_payment_status=None,
     ):
         transaction = SimpleNamespace(
             id=77,
@@ -237,9 +241,22 @@ class TestPaymeTerminalStatePreservation:
             provider_data=payment_provider_data
             or {"order_id": "clinic_44_1700000000"},
         )
+        # locked_payment simulates a TOCTOU race: the unlocked read sees
+        # the original status, but the FOR UPDATE read sees a different
+        # status (e.g. another transaction committed "cancelled" between
+        # the two reads).
+        locked_payment = SimpleNamespace(
+            id=44,
+            amount=Decimal("1000"),
+            status=locked_payment_status or payment_status,
+            paid_at=None,
+            provider_data=payment_provider_data
+            or {"order_id": "clinic_44_1700000000"},
+        )
         repository = SimpleNamespace(
             get_existing_transaction=Mock(return_value=transaction),
             get_payment_by_id=Mock(return_value=payment),
+            get_payment_by_id_for_update=Mock(return_value=locked_payment),
         )
         manager = SimpleNamespace(
             get_provider=Mock(
@@ -249,7 +266,7 @@ class TestPaymeTerminalStatePreservation:
             )
         )
         service = ProviderWebhookService(db_session, repository=repository)
-        return service, transaction, payment
+        return service, transaction, payment, locked_payment
 
     def _call_perform(self, service, auth_header="Basic valid"):
         with patch(
@@ -298,7 +315,7 @@ class TestPaymeTerminalStatePreservation:
     # --- Terminal payment states: PerformTransaction must NOT overwrite ---
 
     def test_perform_does_not_overwrite_refunded_payment(self, db_session):
-        service, tx, payment = self._make_service(
+        service, tx, payment, _locked = self._make_service(
             db_session, payment_status="refunded"
         )
         result = self._call_perform(service)
@@ -307,7 +324,7 @@ class TestPaymeTerminalStatePreservation:
         assert result["payment_status"] == "refunded"  # response shows truth
 
     def test_perform_does_not_overwrite_cancelled_payment(self, db_session):
-        service, tx, payment = self._make_service(
+        service, tx, payment, _locked = self._make_service(
             db_session, payment_status="cancelled"
         )
         result = self._call_perform(service)
@@ -316,7 +333,7 @@ class TestPaymeTerminalStatePreservation:
         assert result["payment_status"] == "cancelled"
 
     def test_perform_does_not_overwrite_void_payment(self, db_session):
-        service, tx, payment = self._make_service(
+        service, tx, payment, _locked = self._make_service(
             db_session, payment_status="void"
         )
         result = self._call_perform(service)
@@ -327,7 +344,7 @@ class TestPaymeTerminalStatePreservation:
     # --- failed → paid blocked (not a valid direct transition) ---
 
     def test_perform_does_not_overwrite_failed_payment_to_paid(self, db_session):
-        service, tx, payment = self._make_service(
+        service, tx, payment, _locked = self._make_service(
             db_session, payment_status="failed"
         )
         result = self._call_perform(service)
@@ -341,7 +358,7 @@ class TestPaymeTerminalStatePreservation:
         from datetime import UTC, datetime
 
         original_paid_at = datetime(2025, 1, 1, tzinfo=UTC)
-        service, tx, payment = self._make_service(
+        service, tx, payment, _locked = self._make_service(
             db_session,
             payment_status="paid",
             payment_provider_data={"order_id": "clinic_44_1700000000"},
@@ -353,7 +370,7 @@ class TestPaymeTerminalStatePreservation:
         assert payment.paid_at == original_paid_at  # NOT re-set
 
     def test_perform_on_completed_transaction_is_idempotent(self, db_session):
-        service, tx, payment = self._make_service(
+        service, tx, payment, _locked = self._make_service(
             db_session,
             transaction_status="completed",
             payment_status="paid",
@@ -365,28 +382,28 @@ class TestPaymeTerminalStatePreservation:
     # --- Regression: non-terminal forward transitions still allowed ---
 
     def test_perform_on_processing_payment_allowed(self, db_session):
-        service, tx, payment = self._make_service(
+        service, tx, payment, locked = self._make_service(
             db_session, payment_status="processing"
         )
         result = self._call_perform(service)
         assert result["result"]["state"] == 2
-        assert payment.status == "paid"  # transition allowed
+        assert locked.status == "paid"  # transition allowed (on locked object)
         assert tx.status == "completed"
-        assert payment.paid_at is not None
+        assert locked.paid_at is not None
 
     def test_perform_on_pending_payment_allowed(self, db_session):
-        service, tx, payment = self._make_service(
+        service, tx, payment, locked = self._make_service(
             db_session, payment_status="pending"
         )
         result = self._call_perform(service)
         assert result["result"]["state"] == 2
-        assert payment.status == "paid"
+        assert locked.status == "paid"
 
     # --- CancelTransaction: terminal states preserved ---
 
     def test_cancel_on_refunded_payment_blocked(self, db_session):
         """refunded → cancelled is not allowed (refunded is terminal)."""
-        service, tx, payment = self._make_service(
+        service, tx, payment, _locked = self._make_service(
             db_session, payment_status="refunded"
         )
         result = self._call_cancel(service, reason=1)
@@ -396,7 +413,7 @@ class TestPaymeTerminalStatePreservation:
 
     def test_cancel_on_cancelled_payment_idempotent(self, db_session):
         """cancelled → cancelled is idempotent (same-status)."""
-        service, tx, payment = self._make_service(
+        service, tx, payment, _locked = self._make_service(
             db_session, payment_status="cancelled"
         )
         result = self._call_cancel(service, reason=1)
@@ -409,26 +426,26 @@ class TestPaymeTerminalStatePreservation:
         """When status overwrite is blocked, provider_data must still receive
         the new webhook payload — preserving the audit trail."""
         original_provider_data = {"order_id": "clinic_44_1700000000"}
-        service, tx, payment = self._make_service(
+        service, tx, payment, locked = self._make_service(
             db_session,
             payment_status="refunded",
             payment_provider_data=dict(original_provider_data),
         )
         self._call_perform(service)
-        # payment.status is NOT mutated (refunded is terminal)
-        assert payment.status == "refunded"
+        # locked payment status is NOT mutated (refunded is terminal)
+        assert locked.status == "refunded"
         # BUT provider_data IS updated with the new webhook info
-        assert payment.provider_data["method"] == "PerformTransaction"
-        assert payment.provider_data["transaction_id"] == "payme-tx-1"
-        assert "params" in payment.provider_data
+        assert locked.provider_data["method"] == "PerformTransaction"
+        assert locked.provider_data["transaction_id"] == "payme-tx-1"
+        assert "params" in locked.provider_data
         # Original data is preserved (merge, not replace)
-        assert payment.provider_data["order_id"] == "clinic_44_1700000000"
+        assert locked.provider_data["order_id"] == "clinic_44_1700000000"
 
     def test_blocked_transaction_transition_still_updates_tx_provider_data(
         self, db_session
     ):
         """Same audit-trail preservation for transaction.provider_data."""
-        service, tx, payment = self._make_service(
+        service, tx, payment, _locked = self._make_service(
             db_session,
             transaction_status="refunded",
             payment_status="refunded",
@@ -443,7 +460,7 @@ class TestPaymeTerminalStatePreservation:
     def test_blocked_payment_transition_logs_warning(self, db_session, caplog):
         import logging
 
-        service, tx, payment = self._make_service(
+        service, tx, payment, _locked = self._make_service(
             db_session, payment_status="refunded"
         )
         with caplog.at_level(logging.WARNING, logger="app.services.provider_webhook_service"):
@@ -454,3 +471,115 @@ class TestPaymeTerminalStatePreservation:
             and "paid" in rec.message
             for rec in caplog.records
         )
+
+    # === TOCTOU race condition tests ===
+
+    def test_toctou_cancelled_during_unlocked_read(self, db_session):
+        """Unlocked read sees 'processing', locked read sees 'cancelled'.
+
+        The webhook must NOT overwrite the cancelled payment to 'paid'
+        — it must see the post-cancellation state via FOR UPDATE.
+        """
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="completed",
+            payment_status="processing",        # what unlocked read sees
+            locked_payment_status="cancelled",  # what FOR UPDATE sees (TOCTOU)
+        )
+        result = self._call_perform(service)
+        assert result["payment_status"] == "cancelled"
+
+    def test_toctou_refunded_during_unlocked_read(self, db_session):
+        """Unlocked read sees 'processing', locked read sees 'refunded'."""
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="completed",
+            payment_status="processing",
+            locked_payment_status="refunded",
+        )
+        result = self._call_perform(service)
+        assert result["payment_status"] == "refunded"
+
+    def test_toctou_no_race_normal_path(self, db_session):
+        """When there's no race (locked == unlocked), normal forward
+        transition proceeds as expected."""
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="processing",
+            payment_status="processing",
+            locked_payment_status="processing",  # no race — same status
+        )
+        result = self._call_perform(service)
+        assert result["payment_status"] == "paid"
+
+    # === Payment ↔ Transaction consistency tests ===
+
+    def test_payment_cancelled_blocks_transaction_completed(self, db_session):
+        """Payment is cancelled (terminal), transaction is processing.
+        Duplicate PerformTransaction must NOT mark transaction completed
+        — it would create an inconsistent (cancelled, completed) pair.
+        """
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="processing",   # transaction NOT terminal
+            payment_status="cancelled",         # payment IS terminal
+        )
+        self._call_perform(service)
+        assert tx.status == "processing"
+
+    def test_payment_refunded_blocks_transaction_completed(self, db_session):
+        """Payment is refunded (terminal), transaction is processing."""
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="processing",
+            payment_status="refunded",
+        )
+        self._call_perform(service)
+        assert tx.status == "processing"
+
+    def test_payment_not_terminal_allows_transaction_transition(self, db_session):
+        """When payment is NOT terminal (e.g. processing), transaction
+        transition proceeds normally — no defensive block."""
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="processing",
+            payment_status="processing",  # not terminal
+        )
+        self._call_perform(service)
+        assert tx.status == "completed"
+
+    def test_defensive_guard_logs_warning(self, db_session, caplog):
+        """When defensive guard blocks transaction transition, it must
+        log a warning mentioning FOLLOWUP-8 for traceability."""
+        import logging
+
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="processing",
+            payment_status="cancelled",
+        )
+        with caplog.at_level(
+            logging.WARNING, logger="app.services.provider_webhook_service"
+        ):
+            self._call_perform(service)
+        assert any(
+            "blocked transaction transition because linked payment is terminal"
+            in rec.message
+            and "FOLLOWUP-8" in rec.message
+            for rec in caplog.records
+        )
+
+    def test_provider_data_still_updated_when_defensive_guard_blocks(
+        self, db_session
+    ):
+        """Even when the defensive guard blocks transaction.status,
+        provider_data must still be updated (audit trail preserved)."""
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="processing",
+            payment_status="cancelled",
+        )
+        self._call_perform(service)
+        assert tx.status == "processing"  # NOT changed
+        assert tx.provider_data["method"] == "PerformTransaction"
+        assert tx.provider_data["transaction_id"] == "payme-tx-1"
