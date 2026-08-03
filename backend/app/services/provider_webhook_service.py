@@ -624,18 +624,21 @@ class ProviderWebhookService:
         # transition too — even if the transaction's own state-machine
         # would allow it (e.g. processing → completed).
         #
-        # Root cause: PaymentCancelService.cancel_payment() updates only
-        # payment.status via billing_service, NOT transaction.status. This
-        # leaves the transaction in a non-terminal state while the payment
-        # is terminal. A duplicate PerformTransaction could then mark the
-        # transaction "completed" while the payment stays "cancelled",
-        # producing an inconsistent pair for reconciliation.
+        # Historical context: this guard was introduced in PR #2657 to
+        # compensate for PaymentCancelService.cancel_payment() updating
+        # only Payment.status, leaving PaymentTransaction in a non-
+        # terminal state. FOLLOWUP-8 (PR #2670, merged) fixed the
+        # cancel path: Payment and PaymentTransaction are now updated
+        # atomically inside transaction_ctx with FOR UPDATE locks.
         #
-        # This guard is DEFENSIVE — the proper fix is for
-        # PaymentCancelService to update PaymentTransaction atomically
-        # (FOLLOWUP-8). Once that is implemented, this guard becomes a
-        # no-op (payment will not be terminal while transaction is not).
-        # DO NOT REMOVE this guard until FOLLOWUP-8 is verified in
+        # However, this guard is STILL required because of FOLLOWUP-10
+        # (not yet implemented): the webhook insert-path (Click/Kaspi)
+        # can create a new PaymentTransaction row without locking the
+        # Payment first, leaving a Tx in non-terminal state while the
+        # Payment is terminal. Until FOLLOWUP-10 lands, this guard
+        # catches that race.
+        #
+        # DO NOT REMOVE this guard until FOLLOWUP-10 is verified in
         # production.
         current_tx_status = getattr(transaction, "status", None)
         tx_blocked_by_payment = (
@@ -655,7 +658,7 @@ class ProviderWebhookService:
                     "linked payment is terminal "
                     "tx_current=%s tx_target=%s payment_status=%s "
                     "transaction_id=%s method=%s "
-                    "(defensive guard — see FOLLOWUP-8)",
+                    "(defensive guard — see FOLLOWUP-10)",
                     current_tx_status,
                     provider_status,
                     effective_payment_status,

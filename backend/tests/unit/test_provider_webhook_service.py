@@ -550,7 +550,7 @@ class TestPaymeTerminalStatePreservation:
 
     def test_defensive_guard_logs_warning(self, db_session, caplog):
         """When defensive guard blocks transaction transition, it must
-        log a warning mentioning FOLLOWUP-8 for traceability."""
+        log a warning mentioning FOLLOWUP-10 for traceability."""
         import logging
 
         service, tx, payment, _locked = self._make_service(
@@ -565,7 +565,7 @@ class TestPaymeTerminalStatePreservation:
         assert any(
             "blocked transaction transition because linked payment is terminal"
             in rec.message
-            and "FOLLOWUP-8" in rec.message
+            and "FOLLOWUP-10" in rec.message
             for rec in caplog.records
         )
 
