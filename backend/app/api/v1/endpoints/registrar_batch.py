@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -39,6 +39,17 @@ class PatientEntriesResponse(BaseModel):
     online_queue_entries: list[dict[str, Any]]
     visits: list[dict[str, Any]]
     aggregated: dict[str, Any]
+
+
+class StructuredErrorResponse(BaseModel):
+    """Structured error response for batch operations.
+
+    Returned as HTTP 400 detail when error_code is present (e.g.
+    ambiguous_entry_id, entry_not_found). When error_code is None,
+    the detail is a plain string for backward compatibility.
+    """
+    code: str = Field(..., description="Machine-readable error code")
+    message: str = Field(..., description="Human-readable error message")
 
 
 # ============================================================================
@@ -114,7 +125,13 @@ async def get_patient_entries(
 @router.patch(
     "/patients/{patient_id}/entries/{date}",
     response_model=BatchUpdateResponse,
-    summary="Batch-обновление записей пациента"
+    summary="Batch-обновление записей пациента",
+    responses={
+        400: {
+            "description": "Batch operation failed — structured error with code and message",
+            "model": StructuredErrorResponse,
+        },
+    },
 )
 async def batch_update_patient_entries(
     patient_id: int = Path(..., description="ID пациента"),
@@ -168,9 +185,12 @@ async def batch_update_patient_entries(
     result = service.batch_update(patient_id, target_date, request)
 
     if not result.success:
+        error_detail = result.error or "Batch update failed"
+        if result.error_code:
+            error_detail = {"code": result.error_code, "message": error_detail}
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.error or "Batch update failed"
+            detail=error_detail
         )
 
     return result

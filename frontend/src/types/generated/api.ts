@@ -22936,6 +22936,16 @@ export type components = {
             common_updates?: components["schemas"]["CommonUpdates"] | null;
         };
         /**
+         * StructuredErrorResponse
+         * @description Structured error response for batch operations.
+         */
+        StructuredErrorResponse: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /**
          * BatchUpdateResponse
          * @description Ответ на batch-обновление
          */
@@ -22954,6 +22964,11 @@ export type components = {
             } | null;
             /** Error */
             error?: string | null;
+            /**
+             * Error Code
+             * @description Machine-readable error code from the first failed entry
+             */
+            error_code?: string | null;
         };
         /** BenefitCreate */
         BenefitCreate: {
@@ -26488,6 +26503,11 @@ export type components = {
             status: "updated" | "cancelled" | "created" | "error";
             /** Error */
             error?: string | null;
+            /**
+             * Error Code
+             * @description Machine-readable error code (e.g. ambiguous_entry_id, entry_not_found)
+             */
+            error_code?: string | null;
         };
         /** EquipmentCreate */
         EquipmentCreate: {

@@ -40,7 +40,6 @@ import { getApiOrigin } from '../../api/runtime';
 // import IconSelector, { iconMap } from './IconSelector';
 
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import { getErrorMessage } from '../../utils/type-guards';
@@ -568,21 +567,13 @@ const DepartmentManagement = () => {
       }
 
       // Импорт данных
-      const token = tokenManager.getAccessToken();
-      const response = await fetch('admin/departments/bulk', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ departments: importedDepartments })
-      });
+      const response = await api.post('/admin/departments/bulk', { departments: importedDepartments });
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         toast.success(t('admin2.dept_import_success', { count: importedDepartments.length }));
         loadDepartments();
       } else {
-        const errorData = await response.json();
+        const errorData = response.data as { detail?: string };
         toast.error(errorData.detail || t('admin2.dept_import_failed'));
       }
 
@@ -633,24 +624,16 @@ const DepartmentManagement = () => {
     if (!confirmed) return;
 
     try {
-      const token = tokenManager.getAccessToken();
-      const response = await fetch('admin/departments/bulk-delete', {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ids: selectedDepartments })
-      });
+      const response = await api.delete('/admin/departments/bulk-delete', { data: { ids: selectedDepartments } });
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         toast.success(t('admin2.dept_bulk_deleted', { count: selectedDepartments.length }));
         setSelectedDepartments([]);
         setSelectAll(false);
         loadDepartments();
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        const errorData = response.data as { detail?: string; message?: string };
+        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}`;
         toast.error(t('admin2.dept_bulk_delete_error', { error: errorMessage }));
       }
     } catch (error: unknown) {
@@ -666,27 +649,19 @@ const DepartmentManagement = () => {
     }
 
     try {
-      const token = tokenManager.getAccessToken();
-      const response = await fetch('admin/departments/bulk-activate', {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ids: selectedDepartments,
-          active: activate
-        })
+      const response = await api.patch('/admin/departments/bulk-activate', {
+        ids: selectedDepartments,
+        active: activate
       });
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         toast.success(activate ? t('admin2.dept_bulk_activated', { count: selectedDepartments.length }) : t('admin2.dept_bulk_deactivated', { count: selectedDepartments.length }));
         setSelectedDepartments([]);
         setSelectAll(false);
         loadDepartments();
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        const errorData = response.data as { detail?: string; message?: string };
+        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}`;
         toast.error(activate ? t('admin2.dept_bulk_activate_error_on', { error: errorMessage }) : t('admin2.dept_bulk_activate_error_off', { error: errorMessage }));
       }
     } catch (error: unknown) {

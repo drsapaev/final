@@ -88,6 +88,7 @@ class EntryResult(BaseModel):
     id: int
     status: Literal["updated", "cancelled", "created", "error"]
     error: str | None = None
+    error_code: str | None = None
 
 
 class BatchUpdateResponse(BaseModel):
@@ -98,6 +99,7 @@ class BatchUpdateResponse(BaseModel):
     updated_entries: list[EntryResult]
     aggregated_row: dict[str, Any] | None = None
     error: str | None = None
+    error_code: str | None = None
 
 
 # ============================================================================
@@ -226,12 +228,17 @@ class BatchPatientService:
             if has_errors:
                 # Откатываем транзакцию
                 self.db.rollback()
+                # Find the first error code for the top-level response
+                first_error_code = next(
+                    (r.error_code for r in results if r.error_code), None
+                )
                 return BatchUpdateResponse(
                     success=False,
                     patient_id=patient_id,
                     date=str(target_date),
                     updated_entries=results,
-                    error="One or more operations failed"
+                    error="One or more operations failed",
+                    error_code=first_error_code
                 )
 
             # Коммитим транзакцию
@@ -276,6 +283,11 @@ class BatchPatientService:
             action=action,
         )
         if error:
+            if isinstance(error, dict):
+                return EntryResult(
+                    id=action.id, status="error",
+                    error=error["message"], error_code=error.get("code")
+                )
             return EntryResult(id=action.id, status="error", error=error)
 
         if entry_type == "online_queue":
@@ -312,6 +324,11 @@ class BatchPatientService:
             action=action,
         )
         if error:
+            if isinstance(error, dict):
+                return EntryResult(
+                    id=action.id, status="error",
+                    error=error["message"], error_code=error.get("code")
+                )
             return EntryResult(id=action.id, status="error", error=error)
 
         if entry_type == "online_queue":
@@ -366,12 +383,12 @@ class BatchPatientService:
             return None, None, "Entry not found"
 
         if entry and visit:
-            return None, None, "Ambiguous entry id; include entry_type"
+            return None, None, {"code": "ambiguous_entry_id", "message": "Ambiguous entry id; include entry_type"}
         if entry:
             return "online_queue", entry, None
         if visit:
             return "visit", visit, None
-        return None, None, "Entry not found"
+        return None, None, {"code": "entry_not_found", "message": "Entry not found"}
 
     def _find_online_queue_entry_for_action(
         self,
