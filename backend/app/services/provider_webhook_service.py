@@ -13,6 +13,10 @@ from sqlalchemy.orm import Session
 from app.db.transactions import transaction as transaction_ctx
 from app.repositories.provider_webhook_repository import ProviderWebhookRepository
 from app.services.payment_provider_manager_factory import get_payment_manager
+from app.services.payment_state_checks import (
+    can_transition_payment_status,
+    can_transition_transaction_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -519,12 +523,10 @@ class ProviderWebhookService:
                 "id": request_id,
             }
 
-    # Mirrors business rules from billing_service_pkg/_payments.py:423-446.
-    # See FOLLOWUP-6 for shared state-machine extraction.
-    # Terminal payment states: no outgoing transitions allowed. A duplicate
-    # webhook must not reopen a refunded/cancelled/void payment. The
-    # failed → paid direct transition is also blocked — per project
-    # state-machine, failed must return to pending before a new paid attempt.
+    # State-machine rules are now in app.services.payment_state_checks
+    # (shared with PaymentCancelService). These class attributes and
+    # classmethods are retained as thin delegates for backward
+    # compatibility with existing tests and any external callers.
     _TERMINAL_PAYMENT_STATUSES = frozenset({"refunded", "cancelled", "void"})
     _TERMINAL_TRANSACTION_STATUSES = frozenset({"cancelled", "refunded"})
 
@@ -532,31 +534,21 @@ class ProviderWebhookService:
     def _can_transition_payment_status(
         cls, current_status: str, target_status: str
     ) -> bool:
-        """Check if a payment status transition is allowed.
+        """Delegate to shared payment_state_checks module.
 
         Same-status duplicates (e.g. ``paid → paid`` from a retry webhook)
         are allowed as idempotent no-ops — ``payment.status`` is not
         mutated, but ``provider_data`` is still updated to preserve the
         audit trail.
         """
-        if current_status == target_status:
-            return True
-        if current_status in cls._TERMINAL_PAYMENT_STATUSES:
-            return False
-        if current_status == "failed" and target_status == "paid":
-            return False
-        return True
+        return can_transition_payment_status(current_status, target_status)
 
     @classmethod
     def _can_transition_transaction_status(
         cls, current_status: str, target_status: str
     ) -> bool:
-        """Check if a PaymentTransaction status transition is allowed."""
-        if current_status == target_status:
-            return True
-        if current_status in cls._TERMINAL_TRANSACTION_STATUSES:
-            return False
-        return True
+        """Delegate to shared payment_state_checks module."""
+        return can_transition_transaction_status(current_status, target_status)
 
     def _apply_existing_payme_transaction_state(
         self,
