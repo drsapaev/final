@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -16,11 +18,17 @@ def test_visit_payments_summary_route_dispatches_before_visit_id(monkeypatch):
     app = FastAPI()
     app.include_router(visit_payments.router)
     app.dependency_overrides[get_db] = lambda: object()
-    app.dependency_overrides[get_current_user] = lambda: {
-        "role": "Admin",
-        "is_superuser": False,
-        "id": 1,
-    }
+    # Use SimpleNamespace (not a dict) so attribute access in
+    # app.core.security.require_roles (current_user.role,
+    # current_user.is_superuser, current_user.id) works correctly.
+    # This matches the production contract of get_current_user -> User
+    # and the established override pattern in
+    # tests/unit/test_messages_router_service_wiring.py.
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id=1,
+        role="Admin",
+        is_superuser=False,
+    )
 
     monkeypatch.setattr(
         visit_payments,
