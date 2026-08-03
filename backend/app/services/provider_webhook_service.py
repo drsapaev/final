@@ -307,6 +307,19 @@ class ProviderWebhookService:
                     return {"result": {"allow": True}, "id": request_id}
                 payment_id = getattr(existing_transaction, "payment_id", None)
                 payment_status = None
+                # FOLLOWUP-9: capture previous Tx status BEFORE any mutation.
+                # Payme spec (developer.help.paycom.uz/metody-merchant-api/
+                # tipy-dannykh): state -1 = "отменена (начальное состояние 1)",
+                # state -2 = "отменена после завершения (начальное состояние 2)".
+                # The CancelTransaction response state must reflect the
+                # transition that occurred: -1 if Tx was in state 1
+                # (processing), -2 if Tx was in state 2 (completed).
+                # Capturing before _apply_existing_payme_transaction_state
+                # ensures the value is the true "previous state", not the
+                # post-mutation state.
+                was_completed = (
+                    getattr(existing_transaction, "status", None) == "completed"
+                )
                 if method in {"PerformTransaction", "CancelTransaction"}:
                     with transaction_ctx(self.db):
                         payment_status = self._apply_existing_payme_transaction_state(
@@ -355,7 +368,7 @@ class ProviderWebhookService:
                         "result": {
                             "cancel_time": int(datetime.now(UTC).timestamp() * 1000),
                             "transaction": existing_transaction.id,
-                            "state": -1,
+                            "state": -2 if was_completed else -1,
                         },
                         "id": request_id,
                         "payment_id": payment_id,

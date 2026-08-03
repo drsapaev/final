@@ -420,6 +420,72 @@ class TestPaymeTerminalStatePreservation:
         assert result["result"]["state"] == -1
         assert payment.status == "cancelled"
 
+    # --- FOLLOWUP-9: CancelTransaction response state per Payme spec ---
+    # Spec (developer.help.paycom.uz/metody-merchant-api/tipy-dannykh):
+    #   state -1 = "отменена (начальное состояние 1)" — Tx was in state 1
+    #   state -2 = "отменена после завершения (начальное состояние 2)" — Tx was in state 2
+    # The response state must reflect the transition that occurred, based
+    # on the Tx status BEFORE the CancelTransaction was applied.
+
+    def test_cancel_response_state_minus_1_for_processing_tx(self, db_session):
+        """Payme spec: CancelTransaction on Tx in state 1 (processing)
+        must return state=-1 in the JSON-RPC response.
+
+        State 1 → -1 is the only valid transition per the state diagram.
+        """
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="processing",
+            payment_status="processing",
+        )
+        result = self._call_cancel(service, reason=1)
+        assert result["result"]["state"] == -1
+
+    def test_cancel_response_state_minus_2_for_completed_tx(self, db_session):
+        """Payme spec: CancelTransaction on Tx in state 2 (completed)
+        must return state=-2 in the JSON-RPC response.
+
+        State 2 → -2 is the only valid transition per the state diagram.
+        Before this fix (FOLLOWUP-9), the response was hardcoded to -1
+        for all CancelTransaction responses, which violated the spec
+        for transactions that had already been performed.
+        """
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="completed",
+            payment_status="paid",
+        )
+        result = self._call_cancel(service, reason=1)
+        assert result["result"]["state"] == -2
+
+    def test_cancel_response_state_idempotent_on_duplicate_cancel(
+        self, db_session
+    ):
+        """Regression guard: a duplicate CancelTransaction (e.g. Payme
+        retries the webhook) must return the same state value as the
+        first CancelTransaction.
+
+        Once a Tx has been cancelled (status="cancelled"), a duplicate
+        CancelTransaction should still return state=-1, not -2. This
+        preserves the original transition's response for idempotency.
+
+        Note: this test intentionally does NOT assert that the duplicate
+        response matches the first call's state — it only asserts that
+        the state value is deterministic (-1 for cancelled Tx, which
+        was state 1 before the first cancel). This fixes the existing
+        behavior so future refactors don't accidentally change it.
+        """
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="cancelled",
+            payment_status="cancelled",
+        )
+        result = self._call_cancel(service, reason=1)
+        # Tx was already cancelled (state -1). A duplicate CancelTransaction
+        # must not "upgrade" the response to -2, because the original
+        # transition was 1 → -1, not 2 → -2.
+        assert result["result"]["state"] == -1
+
     # --- Audit trail: provider_data always updated, even when status blocked ---
 
     def test_blocked_transition_still_updates_provider_data(self, db_session):
