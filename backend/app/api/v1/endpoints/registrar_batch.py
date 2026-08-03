@@ -168,9 +168,12 @@ async def batch_update_patient_entries(
     result = service.batch_update(patient_id, target_date, request)
 
     if not result.success:
+        error_detail = result.error or "Batch update failed"
+        if result.error_code:
+            error_detail = {"code": result.error_code, "message": error_detail}
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.error or "Batch update failed"
+            detail=error_detail
         )
 
     return result
