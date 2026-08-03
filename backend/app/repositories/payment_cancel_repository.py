@@ -17,6 +17,41 @@ class PaymentCancelRepository:
     def get_payment(self, payment_id: int) -> Payment | None:
         return self.db.query(Payment).filter(Payment.id == payment_id).first()
 
+    def count_transactions_by_payment_id(self, payment_id: int) -> int:
+        """Unlocked ``SELECT COUNT(*)`` of PaymentTransaction rows.
+
+        Used as a **soft pre-check** before the external provider cancel
+        call. If this returns ``> 1``, the 1:1 contract invariant is
+        already violated and we raise ``PaymentCancelDomainError(500)``
+        BEFORE calling ``payment_manager.cancel_payment()`` — so we
+        don't leave the provider cancelled while the local Payment
+        stays unchanged.
+
+        This is intentionally an unlocked count: we don't want to hold
+        row locks across the external HTTP call to the provider. The
+        definitive cardinality check (with ``FOR UPDATE`` locks) still
+        runs inside ``_cancel_payment_and_transaction`` via
+        ``get_transactions_by_payment_id_for_update()``. If the count
+        changes between this pre-check and the locked check (e.g. a
+        webhook inserts a second Tx during the cancel call — itself a
+        producer bug), the locked check catches it and raises 500.
+
+        Known limitation (FOLLOWUP-10): if the count is 0 at pre-check
+        time and a webhook inserts a Tx between the pre-check and the
+        locked check, the cancel path will see 1 Tx and update it to
+        'cancelled'. This is correct behavior — the webhook's insert
+        is serialized by the Payment row lock that
+        ``billing_service.update_payment_status`` acquires. The
+        remaining race (webhook reads Payment unlocked, inserts Tx,
+        then cancel overwrites) is a webhook-side issue tracked as
+        FOLLOWUP-10.
+        """
+        return (
+            self.db.query(PaymentTransaction)
+            .filter(PaymentTransaction.payment_id == payment_id)
+            .count()
+        )
+
     def get_transactions_by_payment_id_for_update(
         self, payment_id: int
     ) -> list[PaymentTransaction]:

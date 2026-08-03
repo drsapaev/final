@@ -257,6 +257,70 @@ class TestPaymentCancelTransactionAtomicity:
         db_session.refresh(payment)
         assert payment.status == "processing"
 
+    def test_cancel_multiple_transactions_raises_before_provider_call(
+        self, db_session, test_visit
+    ):
+        """Codex P1 #1 regression guard: the cardinality pre-check must
+        fire BEFORE the external provider cancel is called.
+
+        Without the pre-check, the provider cancel would succeed first,
+        then the locked cardinality check inside
+        _cancel_payment_and_transaction would raise 500 — leaving the
+        provider cancelled while the local Payment stays unchanged.
+
+        With the pre-check, payment_manager.cancel_payment() is NEVER
+        called when the invariant is already violated.
+        """
+        payment, _ = self._create_payment_with_transaction(
+            db_session, test_visit, payment_status="processing", tx_status="processing"
+        )
+
+        duplicate_tx = PaymentTransaction(
+            transaction_id="tx-DUPLICATE",
+            provider="click",
+            amount=1_000_000,
+            currency="UZS",
+            status="processing",
+            payment_id=payment.id,
+            webhook_id=None,
+            visit_id=test_visit.id,
+            provider_data={"method": "CreateTransaction"},
+        )
+        db_session.add(duplicate_tx)
+        db_session.commit()
+        db_session.refresh(payment)
+
+        # Use a fake manager that would FAIL the cancel call — if the
+        # pre-check works, the manager is never called at all, so the
+        # failure never happens. If the pre-check is missing, the
+        # manager is called, returns failure, and we'd see a 502
+        # instead of the expected 500.
+        fake_manager = _FakePaymentManager(
+            PaymentResult(success=False, error_message="SHOULD_NOT_BE_CALLED")
+        )
+        service = PaymentCancelService(db_session, fake_manager)
+
+        # Track whether cancel_payment was invoked on the manager.
+        original_cancel = fake_manager.cancel_payment
+        call_count = {"n": 0}
+
+        def tracking_cancel(provider_name, provider_payment_id):
+            call_count["n"] += 1
+            return original_cancel(provider_name, provider_payment_id)
+
+        fake_manager.cancel_payment = tracking_cancel
+
+        with pytest.raises(PaymentCancelDomainError) as exc_info:
+            service.cancel_payment(payment_id=payment.id)
+
+        assert exc_info.value.status_code == 500
+        assert "expected exactly 1" in exc_info.value.detail
+        assert call_count["n"] == 0, (
+            "payment_manager.cancel_payment() must NOT be called when "
+            "the cardinality pre-check detects >1 PaymentTransaction. "
+            f"Was called {call_count['n']} time(s)."
+        )
+
 
 @pytest.mark.unit
 class TestPaymentCancelRepositoryLocking:

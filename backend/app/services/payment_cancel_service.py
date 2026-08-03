@@ -44,6 +44,33 @@ class PaymentCancelService:
                 detail=f"Платеж со статусом {payment.status} нельзя отменить",
             )
 
+        # PRE-CHECK: validate PaymentTransaction cardinality BEFORE
+        # calling the external provider cancel. If >1 row exists, the
+        # 1:1 contract invariant is already violated — raise now so we
+        # don't leave the provider cancelled while the local Payment
+        # stays unchanged (which would happen if we raised 500 only
+        # after the provider call succeeded).
+        #
+        # This is a soft (unlocked) count. The definitive check with
+        # FOR UPDATE locks still runs inside
+        # _cancel_payment_and_transaction. If the count changes between
+        # this pre-check and the locked check (e.g. a webhook inserts
+        # a second Tx during the cancel call — itself a producer bug),
+        # the locked check catches it and raises 500. At that point the
+        # provider cancel has already succeeded, but the 500 response
+        # signals the invariant violation to the operator.
+        tx_count = self.repository.count_transactions_by_payment_id(payment_id)
+        if tx_count > 1:
+            raise PaymentCancelDomainError(
+                status_code=500,
+                detail=(
+                    f"Payment {payment_id} has {tx_count} "
+                    "PaymentTransaction rows — expected exactly 1 "
+                    "(1:1 contract). Manual data reconciliation required "
+                    "before cancellation can proceed safely."
+                ),
+            )
+
         if payment.provider and payment.provider_payment_id:
             result = self.payment_manager.cancel_payment(
                 payment.provider, payment.provider_payment_id
