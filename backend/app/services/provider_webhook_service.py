@@ -619,24 +619,34 @@ class ProviderWebhookService:
         # Phase 3: guard transaction.status.
         # provider_data is ALWAYS updated to preserve the audit trail.
         #
-        # DEFENSIVE CONSISTENCY CHECK: if the linked payment is in a
-        # terminal state (refunded/cancelled/void), block the transaction
-        # transition too — even if the transaction's own state-machine
-        # would allow it (e.g. processing → completed).
+        # DEFENSIVE CONSISTENCY CHECK (Payme only): if the linked payment
+        # is in a terminal state (refunded/cancelled/void), block the
+        # transaction transition too — even if the transaction's own
+        # state-machine would allow it (e.g. processing → completed).
         #
-        # Root cause: PaymentCancelService.cancel_payment() updates only
-        # payment.status via billing_service, NOT transaction.status. This
-        # leaves the transaction in a non-terminal state while the payment
-        # is terminal. A duplicate PerformTransaction could then mark the
-        # transaction "completed" while the payment stays "cancelled",
-        # producing an inconsistent pair for reconciliation.
+        # Historical context: this guard was introduced in PR #2657 to
+        # compensate for PaymentCancelService.cancel_payment() updating
+        # only Payment.status, leaving PaymentTransaction in a non-
+        # terminal state. FOLLOWUP-8 (PR #2670, merged) fixed the
+        # cancel path: Payment and PaymentTransaction are now updated
+        # atomically inside transaction_ctx with FOR UPDATE locks.
         #
-        # This guard is DEFENSIVE — the proper fix is for
-        # PaymentCancelService to update PaymentTransaction atomically
-        # (FOLLOWUP-8). Once that is implemented, this guard becomes a
-        # no-op (payment will not be terminal while transaction is not).
-        # DO NOT REMOVE this guard until FOLLOWUP-8 is verified in
-        # production.
+        # Scope: this method (_apply_existing_payme_transaction_state)
+        # is invoked ONLY from process_payme_webhook(). Click and Kaspi
+        # webhook handlers (process_click_webhook / process_kaspi_webhook)
+        # do NOT route through this guard. The remaining Payme-specific
+        # invariant this guard protects: a duplicate PerformTransaction
+        # webhook arriving on an already-cancelled Payme Tx must not
+        # reopen it.
+        #
+        # FOLLOWUP-10 (not yet implemented) tracks a separate race in
+        # Click/Kaspi webhook insert paths — that race is NOT caught by
+        # this guard and must be fixed in the Click/Kaspi handlers
+        # directly. Do not rely on this guard for Click/Kaspi coverage.
+        #
+        # DO NOT REMOVE this guard until FOLLOWUP-10 lands AND a separate
+        # audit confirms no Payme duplicate-PerformTransaction scenario
+        # remains.
         current_tx_status = getattr(transaction, "status", None)
         tx_blocked_by_payment = (
             payment_terminal
@@ -655,7 +665,7 @@ class ProviderWebhookService:
                     "linked payment is terminal "
                     "tx_current=%s tx_target=%s payment_status=%s "
                     "transaction_id=%s method=%s "
-                    "(defensive guard — see FOLLOWUP-8)",
+                    "(defensive guard — Payme duplicate-webhook protector)",
                     current_tx_status,
                     provider_status,
                     effective_payment_status,
