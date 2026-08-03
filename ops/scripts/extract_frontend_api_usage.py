@@ -15,8 +15,14 @@ from pathlib import Path
 LOGGER = logging.getLogger("frontend_api_inventory")
 
 API_REQUEST_CALL_PATTERN = re.compile(r"\bapiRequest\s*\(", re.IGNORECASE)
+# Optional TypeScript generic type argument after the method name, e.g.
+# `api.get<UserDto>(...)`. Without this group, typed calls are silently
+# skipped because the regex requires `(` immediately after the method.
+# `(?:<[^>]*>)?` matches one optional `<...>` clause; nested generics
+# like `api.get<Page<T>>(...)` are not currently present in the codebase
+# (verified) and would require a non-regex parser to balance correctly.
 AXIOS_METHOD_CALL_PATTERN = re.compile(
-    r"\bapi\.(?P<method>get|post|put|patch|delete|options|head)\s*\(",
+    r"\bapi\.(?P<method>get|post|put|patch|delete|options|head)\s*(?:<[^>]*>)?\s*\(",
     re.IGNORECASE,
 )
 SINGLE_QUOTE_LITERAL = re.compile(r"^'([^'\\]|\\.)*'$")
