@@ -131,7 +131,7 @@ dependencies = [
   "strawberry-graphql>=0.315.5",
 
   # Background tasks
-  "arq>=0.26.0,<0.27",
+  "arq>=0.26.0,<0.29",
 
   # Security: rate limiting & file validation
   "slowapi==0.1.10",
