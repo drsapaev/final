@@ -138,6 +138,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   return (
     <textarea
       ref={internalRef}
+      aria-invalid={!!error}
       className={className}
       style={textareaStyles}
       disabled={disabled}

@@ -171,6 +171,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
       )}
       <input
         ref={ref}
+        aria-invalid={!!error}
         className={className}
         style={inputStyle}
         disabled={disabled}
