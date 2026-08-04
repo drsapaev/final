@@ -419,47 +419,31 @@ class PaymentsMixin(BillingServiceMixinBase):
         current_status = payment.status.lower() if payment.status else ""
         new_status_lower = new_status.lower()
 
-        # Разрешённые переходы (используем enum для валидации)
-        allowed_transitions = {
-            PaymentStatus.PENDING.value: [
-                PaymentStatus.PROCESSING.value,
-                PaymentStatus.PAID.value,
-                PaymentStatus.FAILED.value,
-                PaymentStatus.CANCELLED.value,
-            ],
-            PaymentStatus.PROCESSING.value: [
-                PaymentStatus.PAID.value,
-                PaymentStatus.FAILED.value,
-                PaymentStatus.CANCELLED.value,
-            ],
-            PaymentStatus.PAID.value: [
-                PaymentStatus.REFUNDED.value,
-                PaymentStatus.VOID.value,
-            ],
-            PaymentStatus.FAILED.value: [
-                PaymentStatus.PENDING.value,
-                PaymentStatus.CANCELLED.value,
-            ],
-            PaymentStatus.CANCELLED.value: [],
-            PaymentStatus.REFUNDED.value: [],
-            PaymentStatus.VOID.value: [],
-        }
+        # FOLLOWUP-6: authoritative state machine table extracted to
+        # app.services.payment_state_checks (single source of truth).
+        # Previously this was an inline dict duplicated only here.
+        # The shared ALLOWED_PAYMENT_TRANSITIONS constant and
+        # is_valid_payment_transition() function are now the SSOT.
+        from app.services.payment_state_checks import (
+            ALLOWED_PAYMENT_TRANSITIONS,
+            is_valid_payment_transition,
+        )
 
         # PAY-REAUDIT-28 P1-1: неизвестный current_status отклоняется явно.
         # Раньше если current_status не входил в allowed_transitions (None,
         # "", "voided", опечатка), валидация молча пропускалась и принимала
         # любой new_status (включая "" → "refunded").
-        if current_status and current_status not in allowed_transitions:
+        if current_status and current_status not in ALLOWED_PAYMENT_TRANSITIONS:
             raise ValueError(
                 f"Неизвестный текущий статус '{current_status}' у платежа {payment_id}"
             )
 
-        if current_status in allowed_transitions:
+        if current_status in ALLOWED_PAYMENT_TRANSITIONS:
             # Allow same-status transitions (idempotent updates)
             if new_status_lower == current_status:
                 # No status change - just update metadata if provided
                 pass
-            elif new_status_lower not in allowed_transitions[current_status]:
+            elif not is_valid_payment_transition(current_status, new_status_lower):
                 raise ValueError(
                     f"Переход статуса с '{current_status}' на '{new_status}' недопустим"
                 )
