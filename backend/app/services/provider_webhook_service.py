@@ -155,7 +155,12 @@ class ProviderWebhookService:
                             result.payment_id
                         )
                         if payment_id_from_order:
-                            payment = self.repository.get_payment_by_id(
+                            # FOLLOWUP-10: lock Payment row before mutation.
+                            # Prevents TOCTOU race against concurrent
+                            # PaymentCancelService.cancel_payment() (which
+                            # acquires SELECT Payment ... FOR UPDATE via
+                            # billing_service.update_payment_status).
+                            payment = self.repository.get_payment_by_id_for_update(
                                 payment_id_from_order
                             )
 
@@ -394,7 +399,12 @@ class ProviderWebhookService:
                             result.payment_id
                         )
                         if payment_id_from_order:
-                            payment = self.repository.get_payment_by_id(
+                            # FOLLOWUP-10: lock Payment row before mutation.
+                            # Prevents TOCTOU race against concurrent
+                            # PaymentCancelService.cancel_payment() (which
+                            # acquires SELECT Payment ... FOR UPDATE via
+                            # billing_service.update_payment_status).
+                            payment = self.repository.get_payment_by_id_for_update(
                                 payment_id_from_order
                             )
 
@@ -779,7 +789,12 @@ class ProviderWebhookService:
                     payment = None
                     mapped_status = None
                     if result.payment_id:
-                        payment = self.repository.get_payment_by_provider_payment_id(
+                        # FOLLOWUP-10: lock Payment row before mutation.
+                        # Prevents TOCTOU race against concurrent
+                        # PaymentCancelService.cancel_payment() (which
+                        # acquires SELECT Payment ... FOR UPDATE via
+                        # billing_service.update_payment_status).
+                        payment = self.repository.get_payment_by_provider_payment_id_for_update(
                             result.payment_id
                         )
 

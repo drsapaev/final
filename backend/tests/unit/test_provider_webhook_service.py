@@ -192,6 +192,125 @@ class TestProviderWebhookService:
         assert payment.paid_at is None
         repository.create_transaction.assert_not_called()
 
+    # --- FOLLOWUP-10: Click/Kaspi/Payme must lock Payment before mutation ---
+
+    def test_click_webhook_locks_payment_before_mutation(self, db_session):
+        """FOLLOWUP-10 regression guard: Click handler must call
+        get_payment_by_id_for_update (not get_payment_by_id) before
+        mutating payment.status. Without the lock, a concurrent cashier
+        cancel could commit a terminal status between our read and
+        write, leaving Payment and PaymentTransaction inconsistent.
+        """
+        webhook = SimpleNamespace(id=33, status="pending", processed_at=None)
+        payment = SimpleNamespace(
+            id=44,
+            amount=Decimal("1000"),
+            status="pending",
+            paid_at=None,
+            provider_data={},
+            visit_id=55,
+        )
+        repository = SimpleNamespace(
+            get_existing_transaction=Mock(return_value=None),
+            create_webhook=Mock(return_value=webhook),
+            get_payment_by_id=Mock(return_value=payment),
+            get_payment_by_id_for_update=Mock(return_value=payment),
+            create_transaction=Mock(),
+        )
+        manager = SimpleNamespace(
+            get_provider=Mock(
+                return_value=SimpleNamespace(
+                    validate_webhook_signature=Mock(return_value=True)
+                )
+            ),
+            process_webhook=Mock(
+                return_value=SimpleNamespace(
+                    success=True,
+                    payment_id="clinic_44_1700000000",
+                    status="completed",
+                    provider_data={"amount": Decimal("1000")},
+                )
+            ),
+        )
+        service = ProviderWebhookService(db_session, repository=repository)
+
+        with patch(
+            "app.services.provider_webhook_service.get_payment_manager",
+            return_value=manager,
+        ):
+            service.process_click_webhook(
+                {
+                    "click_trans_id": "click-1",
+                    "merchant_trans_id": "clinic_44_1700000000",
+                    "amount": 100000,
+                    "sign_string": "valid",
+                }
+            )
+
+        # The locked variant must be called; the unlocked one must NOT.
+        repository.get_payment_by_id_for_update.assert_called_once_with(44)
+        repository.get_payment_by_id.assert_not_called()
+
+    def test_kaspi_webhook_locks_payment_before_mutation(self, db_session):
+        """FOLLOWUP-10 regression guard: Kaspi handler must call
+        get_payment_by_provider_payment_id_for_update (not
+        get_payment_by_provider_payment_id) before mutating payment.status.
+        """
+        webhook = SimpleNamespace(id=33, status="pending", processed_at=None)
+        payment = SimpleNamespace(
+            id=44,
+            amount=Decimal("1000"),
+            status="pending",
+            paid_at=None,
+            provider_data={},
+            visit_id=55,
+        )
+        repository = SimpleNamespace(
+            get_existing_transaction=Mock(return_value=None),
+            create_webhook=Mock(return_value=webhook),
+            get_payment_by_provider_payment_id=Mock(return_value=payment),
+            get_payment_by_provider_payment_id_for_update=Mock(
+                return_value=payment
+            ),
+            create_transaction=Mock(),
+        )
+        manager = SimpleNamespace(
+            get_provider=Mock(
+                return_value=SimpleNamespace(
+                    validate_webhook_signature=Mock(return_value=True)
+                )
+            ),
+            process_webhook=Mock(
+                return_value=SimpleNamespace(
+                    success=True,
+                    payment_id="kaspi-pay-123",
+                    status="completed",
+                    provider_data={"amount": Decimal("1000")},
+                )
+            ),
+        )
+        service = ProviderWebhookService(db_session, repository=repository)
+
+        with patch(
+            "app.services.provider_webhook_service.get_payment_manager",
+            return_value=manager,
+        ):
+            service.process_kaspi_webhook(
+                {
+                    "transaction_id": "kaspi-1",
+                    "merchant_id": "m1",
+                    "amount": 100000,
+                    "currency": "KZT",
+                    "signature": "valid",
+                }
+            )
+
+        # The locked variant must be called; the unlocked one must NOT.
+        repository.get_payment_by_provider_payment_id_for_update.assert_called_once_with(
+            "kaspi-pay-123"
+        )
+        repository.get_payment_by_provider_payment_id.assert_not_called()
+
     def test_extract_payment_id_from_order(self, db_session):
         service = ProviderWebhookService(db_session)
 
