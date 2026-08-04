@@ -86,6 +86,36 @@ class ProviderWebhookRepository:
             .first()
         )
 
+    def get_payment_by_provider_payment_id_for_update(
+        self, provider_payment_id: str
+    ) -> Payment | None:
+        """Lock the payment row for update (SELECT ... FOR UPDATE).
+
+        Symmetric counterpart of ``get_payment_by_id_for_update``. Used
+        by Kaspi webhook handler (which looks up Payment by
+        ``provider_payment_id`` instead of by ``id``) to prevent TOCTOU
+        races against concurrent cashier cancellations.
+
+        FOLLOWUP-10: before this method existed, the Kaspi handler read
+        Payment without a lock, then mutated ``payment.status`` and
+        inserted a new ``PaymentTransaction`` row. A concurrent
+        ``PaymentCancelService.cancel_payment()`` call (which acquires
+        ``SELECT Payment ... FOR UPDATE`` via
+        ``billing_service.update_payment_status``) could commit a
+        terminal status between the Kaspi handler's unlocked read and
+        its write, leaving Payment and PaymentTransaction in
+        inconsistent states.
+
+        Must be called inside a ``transaction_ctx`` block so the lock
+        is released on commit/rollback.
+        """
+        return (
+            self.db.query(Payment)
+            .filter(Payment.provider_payment_id == provider_payment_id)
+            .with_for_update()
+            .first()
+        )
+
     def create_transaction(
         self,
         *,
