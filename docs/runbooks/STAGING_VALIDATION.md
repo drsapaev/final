@@ -432,9 +432,11 @@ Masked patient: {'first_name': 'A.', 'last_name': 'K.', 'phone': '+998901••�
 ### If it fails
 
 - **"AssertionError"**: a field is not being scrubbed — add it to
-  `MEDICAL_PII_KEYS` in `backend/app/core/pii_masker.py` +
-  `backend/app/core/sentry.py` + `frontend/src/services/sentry.js`
-  (all three lists MUST stay in sync)
+  `PII_FIELD_PATTERNS` in `backend/app/core/pii_masker.py` (single source
+  of truth for backend layers). If the field is also relevant to the
+  browser surface, add it to `MEDICAL_PII_KEYS` in
+  `frontend/src/services/sentry.ts`. The two lists are intentionally
+  separate (frontend covers auth tokens + payment fields per BS-57).
 
 ---
 
