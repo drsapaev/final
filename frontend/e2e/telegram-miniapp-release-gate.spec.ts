@@ -507,6 +507,27 @@ async function installAdminMocks(page) {
     });
   });
 
+  // FOLLOWUP-12 investigation: NotificationCenter / GlobalNotificationCenter
+  // (added in PR #2439 "make header bell functional across ALL panels") call
+  // these endpoints on mount. Without mocks, Vite proxy returns ECONNREFUSED
+  // (backend not running in CI), which produces console errors caught by
+  // monitorRuntimeErrors(page), failing expect(errors).toEqual([]).
+  await page.route('**/api/v1/notifications/inbox**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], total: 0, unread_count: 0 }),
+    });
+  });
+
+  await page.route('**/api/v1/notifications/unread-count**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ unread_count: 0 }),
+    });
+  });
+
   await page.route('**/api/v1/users/me/preferences', async (route) => {
     if (route.request().method() === 'PUT') {
       await route.fulfill({
