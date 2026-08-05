@@ -22,8 +22,12 @@ import re
 from typing import Any
 
 # ---------------------------------------------------------------------------
-# Field-name list — same set as frontend/src/services/sentry.js
-# Keep these in sync. If you add a field here, add it there too.
+# Field-name list — backend source of truth.
+# Frontend has its own MEDICAL_PII_KEYS list in frontend/src/services/sentry.ts
+# (separate concern — frontend covers auth tokens + payment fields per BS-57,
+# backend focuses on medical PHI). The two lists are intentionally separate
+# and do not need to mirror each other. See docs/runbooks/SENTRY_SETUP.md
+# section "Maintenance → Adding new PII fields".
 # ---------------------------------------------------------------------------
 
 PII_FIELD_PATTERNS = [
