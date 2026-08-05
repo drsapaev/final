@@ -388,9 +388,14 @@ These fields are PII and must NEVER appear in plaintext in:
 | `first_name`, `last_name` | initials only (`I.I.`) | `patients.*` |
 
 The frontend Sentry integration already enforces this in
-`frontend/src/services/sentry.js` (`beforeSend` scrubs 15+ medical field
-keys). Backend Python logging must apply the same masking — see
-`backend/app/core/pii_masker.py` (TODO: P1.x — backfill backend masking).
+`frontend/src/services/sentry.ts` (`beforeSend` scrubs 50+ medical field
+keys including auth tokens, BS-57). Backend Python logging applies
+masking via `backend/app/core/pii_masker.py` — the single source of
+truth for backend PII patterns (`PII_FIELD_PATTERNS`), used by both
+`PIIMaskingFilter` (log layer) and `sanitize_event` (Sentry layer).
+Frontend and backend PII lists are intentionally separate concerns;
+frontend scrubs more aggressively (auth tokens, payment fields) because
+the browser surface is wider.
 
 ### Threat model — who can attack, what's at risk, what protects it
 
@@ -478,9 +483,15 @@ PII is scrubbed before any event leaves your infrastructure:
 3. **Sentry layer** — `beforeSend` callback scrubs request bodies, breadcrumbs,
    extras before sending to sentry.io
 
-All three layers use the same field list (`MEDICAL_PII_KEYS`) — keep them in
-sync when adding new PII fields. See `docs/runbooks/SENTRY_SETUP.md` section
-"Maintenance → Adding new PII fields".
+Backend layers (Code + Log + Sentry) all delegate to `mask_pii()` from
+`pii_masker.py` — the single source of truth for backend PII patterns
+(`PII_FIELD_PATTERNS`). Frontend has its own `MEDICAL_PII_KEYS` list in
+`frontend/src/services/sentry.ts` (separate concern, more aggressive —
+includes auth tokens and payment fields per BS-57). When adding a new
+PII field, update `PII_FIELD_PATTERNS` in `pii_masker.py` (backend) and
+optionally `MEDICAL_PII_KEYS` in `sentry.ts` (frontend) if the field is
+relevant to the browser surface. See `docs/runbooks/SENTRY_SETUP.md`
+section "Maintenance → Adding new PII fields".
 
 ### Smoke testing Sentry
 

@@ -1,8 +1,15 @@
 """
 Backend Sentry initialization.
 
-Mirrors frontend/src/services/sentry.js PII scrubbing. Initializes Sentry
-for FastAPI + SQLAlchemy + asyncPG. No-op if SENTRY_DSN env var is unset.
+Initializes Sentry for FastAPI + SQLAlchemy + asyncPG. No-op if
+SENTRY_DSN env var is unset.
+
+PII scrubbing for Sentry events is handled by ``sanitize_event()``, which
+delegates to ``mask_pii()`` from ``pii_masker.py`` — the single source of
+truth for backend PII patterns (``PII_FIELD_PATTERNS``). Frontend has its
+own ``MEDICAL_PII_KEYS`` list in ``frontend/src/services/sentry.ts``
+(separate concern, more aggressive — covers auth tokens and payment
+fields per BS-57).
 
 Usage (called from app/main.py):
     from app.core.sentry import init_sentry
@@ -18,43 +25,6 @@ from typing import Any
 from app.core.pii_masker import mask_pii
 
 logger = logging.getLogger(__name__)
-
-# Same field-name list as frontend/src/services/sentry.js + backend/app/core/pii_masker.py.
-# Keep all three in sync.
-MEDICAL_PII_KEYS = [
-    "iin", "passport_number", "passport_series", "ssn", "national_id",
-    "doc_number", "doc_series",
-    "phone", "phone_number", "mobile", "email",
-    "diagnosis", "diagnoses", "icd10", "icd10_code", "icd10_codes",
-    "complaints", "complaint", "examination",
-    "prescription", "prescriptions", "medications", "medication",
-    "allergies", "allergy",
-    "visit_reason", "patient_name", "patient_full_name", "doctor_notes",
-    "notes", "anamnesis", "anamnesis_morbida",
-    "first_name", "last_name", "middle_name", "full_name", "name",
-    "birth_date", "date_of_birth", "dob",
-    "address", "street_address", "home_address",
-]
-
-
-def _scrub_pii(data: Any) -> Any:
-    """Recursively redact PII keys from a dict/list structure.
-
-    .. note::
-        ``before_send`` now uses ``mask_pii()`` from ``pii_masker.py`` which
-        combines key-based redaction with regex-based string scrubbing.
-        ``_scrub_pii`` is retained for backward compatibility and any
-        callers outside ``before_send``. Removal is deferred to a separate
-        cleanup PR after this security fix is verified in production.
-    """
-    if data is None:
-        return None
-    if isinstance(data, dict):
-        return {k: ("[REDACTED]" if k.lower() in MEDICAL_PII_KEYS else _scrub_pii(v)) for k, v in data.items()}
-    if isinstance(data, list):
-        return [_scrub_pii(item) for item in data]
-    return data
-
 
 # Standard Sentry contexts as documented by Sentry:
 # https://docs.sentry.io/platforms/python/enriching-events/contexts/
