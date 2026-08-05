@@ -32,10 +32,12 @@ describe('Telegram Mini App appointment create guardrails', () => {
   });
 
   it('posts creates through the existing appointment endpoint with the preview request body shape', () => {
+    // After TypeScript migration (PR #2433), function signatures include type
+    // annotations. Match by function name prefix to stay type-agnostic.
     const createHandler = sourceBetween(
       appSource,
-      'const handleAppointmentCreateSubmit = () => {',
-      'const handlePatientFormFieldChange = (formId, field) => (event) => {'
+      'const handleAppointmentCreateSubmit = ',
+      'const handlePatientFormFieldChange = '
     );
 
     expect(createHandler).toContain('getTelegramMiniAppAuthPayload(location.search, \'appointments\')');
@@ -50,15 +52,17 @@ describe('Telegram Mini App appointment create guardrails', () => {
   });
 
   it('clears stale create state when the appointment draft or preview submission changes', () => {
+    // After TypeScript migration (PR #2433), function signatures include type
+    // annotations. Match by function name prefix to stay type-agnostic.
     const fieldChangeHandler = sourceBetween(
       appSource,
-      'const handleAppointmentPreviewFieldChange = (field) => (event) => {',
-      'const handleAppointmentPreviewSubmit = (event) => {'
+      'const handleAppointmentPreviewFieldChange = ',
+      'const handleAppointmentPreviewSubmit = '
     );
     const previewSubmitHandler = sourceBetween(
       appSource,
-      'const handleAppointmentPreviewSubmit = (event) => {',
-      'const handleAppointmentCreateSubmit = () => {'
+      'const handleAppointmentPreviewSubmit = ',
+      'const handleAppointmentCreateSubmit = '
     );
 
     expect(fieldChangeHandler).toContain('setAppointmentCreate({');
