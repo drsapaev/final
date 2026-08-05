@@ -26,6 +26,13 @@ logger = logging.getLogger(__name__)
 # (CancelTransaction response state must be idempotent per ADR-0019).
 PAYME_TX_PRE_CANCEL_STATE_ACTION = "PAYME_TX_PRE_CANCEL_STATE"
 
+# FOLLOWUP-12: terminal PaymentTransaction statuses. If current_tx_status
+# is in this set AND no AuditLog pre_cancel_status record exists, the first
+# cancel already committed but its AuditLog INSERT failed — we cannot
+# recover the true pre-cancel state and must not persist the terminal
+# status (Codex P2 review on PR #2684).
+_TERMINAL_TX_STATUSES = frozenset({"refunded", "cancelled", "void"})
+
 
 class ProviderWebhookService:
     """Handles provider webhook processing formerly implemented in controller."""
@@ -803,6 +810,18 @@ class ProviderWebhookService:
         structured warning.
 
         Constraint: at most 1 SELECT + 1 INSERT per call.
+
+        Terminal-status guard (Codex P2 review on PR #2684): if
+        `current_tx_status` is already terminal (refunded/cancelled/void)
+        AND no AuditLog record exists, this means the first cancel
+        already committed but its AuditLog INSERT failed. In this case
+        we CANNOT recover the true pre-cancel state — it is lost. We
+        return False (conservative — response state=-1) and DO NOT
+        persist the terminal status, because doing so would record an
+        immutable-but-wrong `pre_cancel_status` that blocks all future
+        recovery. This is the unavoidable degradation of Strategy 2:
+        when the first AuditLog write fails, idempotency for that Tx
+        is lost, but we do not make it worse by persisting wrong data.
         """
         tx_id = getattr(transaction, "id", None)
 
@@ -812,17 +831,38 @@ class ProviderWebhookService:
             # Retry: AuditLog record exists from a prior CancelTransaction.
             return recovered_pre_cancel == "completed"
 
-        # Step 2: first call (or prior AuditLog write failed). Derive from
-        # current mutable state and persist for future retries.
+        # Step 2: first call (or prior AuditLog write failed).
+        #
+        # Terminal-status guard: if current_tx_status is already terminal,
+        # the first cancel already committed but its AuditLog INSERT
+        # failed. We cannot recover the true pre-cancel state — persist
+        # the terminal status would record wrong data that blocks future
+        # recovery. Return False (conservative) and do not persist.
+        if current_tx_status in _TERMINAL_TX_STATUSES:
+            logger.warning(
+                "Payme webhook: Tx is already in terminal state %s but no "
+                "AuditLog pre_cancel_status record exists — first cancel's "
+                "AuditLog INSERT must have failed. Cannot recover true "
+                "pre-cancel state; returning was_completed=False (state=-1). "
+                "Idempotency for this Tx is degraded (Strategy 2). "
+                "transaction_id=%s",
+                current_tx_status,
+                tx_id,
+            )
+            return False
+
+        # Step 3: genuine first call — current_tx_status is a non-terminal
+        # state (processing/completed). Derive was_completed and persist
+        # for future retries.
         was_completed = current_tx_status == "completed"
 
         # Persist pre_cancel_status. On failure, fall back to mutable-state
         # derivation (Strategy 2). The webhook response is still sent;
         # idempotency degrades silently for this Tx if a retry arrives.
         # The try/except here is a safety net: _persist_pre_cancel_state
-        # already catches exceptions internally (via SAVEPOINT), but this
-        # outer catch ensures that any unexpected error from the helper
-        # does not abort the webhook.
+        # already catches exceptions internally, but this outer catch
+        # ensures that any unexpected error from the helper does not
+        # abort the webhook.
         try:
             self._persist_pre_cancel_state(tx_id, current_tx_status)
         except Exception as exc:
