@@ -854,13 +854,18 @@ class TestPaymeTerminalStatePreservation:
         mutable-state derivation. Idempotency degrades silently.
 
         This test patches _persist_pre_cancel_state to raise, simulating
-        AuditLog INSERT failure. The implementation uses SAVEPOINT
-        (db.begin_nested) to isolate the failure so the outer
-        transaction_ctx can still commit the Tx.status mutation.
+        AuditLog INSERT failure. The implementation does a full db.rollback()
+        inside _persist_pre_cancel_state to clear the failed INSERT, but
+        this rollback MUST NOT discard the Phase 2 payment.status /
+        payment.provider_data mutation (Codex P2 review on PR #2684).
+        _resolve_was_completed is called BEFORE Phase 2 to ensure this.
+
         Verifies:
           1. webhook response is still sent (state computed from Tx.status)
           2. logger.warning is emitted (NOT logger.exception — Sentry recursion)
           3. warning contains transaction_id for traceability
+          4. payment.status is still mutated to refunded (Phase 2 not rolled back)
+          5. payment.provider_data is still updated (Phase 2 not rolled back)
         """
         import logging
 
@@ -890,4 +895,18 @@ class TestPaymeTerminalStatePreservation:
         ]
         assert any("transaction_id=77" in msg for msg in warning_messages), (
             f"Expected warning with transaction_id=77, got: {warning_messages}"
+        )
+
+        # Codex P2: payment.status and payment.provider_data must still be
+        # mutated (Phase 2 must not be rolled back by AuditLog failure).
+        # reason=2 → provider_status='refunded' → payment_status='refunded'.
+        assert payment.status == "refunded", (
+            f"Expected payment.status='refunded' (Phase 2 mutation preserved), "
+            f"got '{payment.status}'. AuditLog rollback incorrectly discarded "
+            "Phase 2 payment mutation."
+        )
+        assert payment.provider_data.get("method") == "CancelTransaction", (
+            f"Expected payment.provider_data['method']='CancelTransaction', "
+            f"got {payment.provider_data.get('method')!r}. Phase 2 provider_data "
+            "mutation was lost."
         )

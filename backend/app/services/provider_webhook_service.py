@@ -610,6 +610,50 @@ class ProviderWebhookService:
                 ):
                     return "amount_mismatch"
 
+        # FOLLOWUP-12: persist pre-cancel state for idempotent CancelTransaction
+        # response. Per ADR-0019, the response `state` (-1 vs -2) must reflect
+        # the Tx status BEFORE the first cancel was applied. On retry, the
+        # current `transaction.status` has already mutated (e.g. completed →
+        # refunded), so we cannot derive `was_completed` from it. We persist
+        # `pre_cancel_status` in AuditLog (immutable via DB trigger, migration
+        # 0044) on the first call and recover it on retry.
+        #
+        # IMPORTANT: this call MUST happen BEFORE Phase 2 (Payment mutation)
+        # so that if _persist_pre_cancel_state does a full db.rollback() on
+        # AuditLog INSERT failure (Strategy 2), it does NOT discard the
+        # Phase 2 payment.status / payment.provider_data mutation. At this
+        # point, nothing has been mutated in this transaction_ctx yet (the
+        # Phase 1 amount check is a SELECT, not a mutation).
+        #
+        # Scope: Payme CancelTransaction only. PerformTransaction does not
+        # need this (response state is always 2). Click/Kaspi are not touched.
+        #
+        # Atomicity: AuditLog INSERT is inside the same transaction_ctx as
+        # the Tx.status mutation (caller's `with transaction_ctx(self.db):`
+        # at process_payme_webhook line 322). If the mutation rolls back,
+        # the AuditLog INSERT rolls back too — no phantom audit records.
+        # Verified via backend/app/db/transactions.py:32-39 (commit/rollback
+        # on context exit) and session.py:153-155 (autocommit=False).
+        #
+        # Failure mode (Strategy 2 per ADR-0019 lines 152-154): if AuditLog
+        # INSERT or SELECT fails, fall back to mutable-state derivation.
+        # Idempotency degrades silently for that Tx, but webhook availability
+        # is preserved. logger.warning (NOT logger.exception) to avoid
+        # Sentry recursion (see backend/app/core/sentry.py:243-249).
+        #
+        # Constraint: at most 1 SELECT + 1 INSERT per webhook call. The
+        # SELECT runs before the mutation to recover prior pre_cancel_status;
+        # the INSERT runs only if no prior record exists (first call).
+        current_tx_status = getattr(transaction, "status", None)
+        if method == "CancelTransaction":
+            self._last_cancel_was_completed = self._resolve_was_completed(
+                transaction, current_tx_status
+            )
+        else:
+            # PerformTransaction: response state is always 2, no pre-cancel
+            # state needed. Flag stays None (caller ignores it).
+            self._last_cancel_was_completed = None
+
         # Phase 2: lock the payment row for the status-mutation phase.
         # This prevents TOCTOU: a cashier cancellation can commit a
         # terminal status between our unlocked read above and the write
@@ -686,41 +730,10 @@ class ProviderWebhookService:
             and current_tx_status != provider_status
         )
 
-        # FOLLOWUP-12: persist pre-cancel state for idempotent CancelTransaction
-        # response. Per ADR-0019, the response `state` (-1 vs -2) must reflect
-        # the Tx status BEFORE the first cancel was applied. On retry, the
-        # current `transaction.status` has already mutated (e.g. completed →
-        # refunded), so we cannot derive `was_completed` from it. We persist
-        # `pre_cancel_status` in AuditLog (immutable via DB trigger, migration
-        # 0044) on the first call and recover it on retry.
-        #
-        # Scope: Payme CancelTransaction only. PerformTransaction does not
-        # need this (response state is always 2). Click/Kaspi are not touched.
-        #
-        # Atomicity: AuditLog INSERT is inside the same transaction_ctx as
-        # the Tx.status mutation (caller's `with transaction_ctx(self.db):`
-        # at process_payme_webhook line 322). If the mutation rolls back,
-        # the AuditLog INSERT rolls back too — no phantom audit records.
-        # Verified via backend/app/db/transactions.py:32-39 (commit/rollback
-        # on context exit) and session.py:153-155 (autocommit=False).
-        #
-        # Failure mode (Strategy 2 per ADR-0019 lines 152-154): if AuditLog
-        # INSERT or SELECT fails, fall back to mutable-state derivation.
-        # Idempotency degrades silently for that Tx, but webhook availability
-        # is preserved. logger.warning (NOT logger.exception) to avoid
-        # Sentry recursion (see backend/app/core/sentry.py:243-249).
-        #
-        # Constraint: at most 1 SELECT + 1 INSERT per webhook call. The
-        # SELECT runs before the mutation to recover prior pre_cancel_status;
-        # the INSERT runs only if no prior record exists (first call).
-        if method == "CancelTransaction":
-            self._last_cancel_was_completed = self._resolve_was_completed(
-                transaction, current_tx_status
-            )
-        else:
-            # PerformTransaction: response state is always 2, no pre-cancel
-            # state needed. Flag stays None (caller ignores it).
-            self._last_cancel_was_completed = None
+        # NOTE: _resolve_was_completed (FOLLOWUP-12 AuditLog persist) was
+        # already called above, BEFORE Phase 2, to avoid rolling back
+        # payment.status / payment.provider_data mutations on AuditLog
+        # failure. Do not re-call it here.
 
         if current_tx_status and (
             not self._can_transition_transaction_status(
