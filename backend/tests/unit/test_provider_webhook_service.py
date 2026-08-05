@@ -900,13 +900,15 @@ class TestPaymeTerminalStatePreservation:
         # Codex P2: payment.status and payment.provider_data must still be
         # mutated (Phase 2 must not be rolled back by AuditLog failure).
         # reason=2 → provider_status='refunded' → payment_status='refunded'.
-        assert payment.status == "refunded", (
-            f"Expected payment.status='refunded' (Phase 2 mutation preserved), "
-            f"got '{payment.status}'. AuditLog rollback incorrectly discarded "
-            "Phase 2 payment mutation."
+        # Note: Phase 2 mutates locked_payment (returned by
+        # get_payment_by_id_for_update), not the unlocked payment object.
+        assert _locked.status == "refunded", (
+            f"Expected locked_payment.status='refunded' (Phase 2 mutation "
+            f"preserved), got '{_locked.status}'. AuditLog rollback incorrectly "
+            "discarded Phase 2 payment mutation."
         )
-        assert payment.provider_data.get("method") == "CancelTransaction", (
-            f"Expected payment.provider_data['method']='CancelTransaction', "
-            f"got {payment.provider_data.get('method')!r}. Phase 2 provider_data "
+        assert _locked.provider_data.get("method") == "CancelTransaction", (
+            f"Expected locked_payment.provider_data['method']='CancelTransaction', "
+            f"got {_locked.provider_data.get('method')!r}. Phase 2 provider_data "
             "mutation was lost."
         )
