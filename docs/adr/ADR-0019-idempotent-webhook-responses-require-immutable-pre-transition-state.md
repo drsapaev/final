@@ -155,10 +155,90 @@ infrastructure and doesn't extend the storage model.
 - Add a regression test that reproduces the original Codex P1 scenario
   (two CancelTransaction calls, assert same `state` in both responses).
 
+### Confirmed limitation of Strategy 2 (documented post-implementation)
+
+Strategy 2 (fall back to mutable-state derivation on AuditLog failure)
+was implemented in FOLLOWUP-12 (PR #2684) and refined in PR #2685
+(terminal-status guard). **This is a mitigation, not a complete fix.**
+When the first CancelTransaction's AuditLog INSERT fails, idempotency
+for that specific Tx is **lost** — the system cannot recover the true
+pre-cancel state, and all subsequent retries will return the wrong
+`state` value (`-1` instead of `-2` for a completed-then-cancelled Tx).
+
+**Scenario where idempotency is lost:**
+
+```
+1. CancelTransaction on Tx(status='completed')
+   → AuditLog INSERT FAILS (DB error, connection drop, etc.)
+   → Strategy 2: fall back to was_completed=(status=='completed')=True
+   → response state=-2 (correct for this call)
+   → Tx.status mutates to 'refunded', commits in a fresh transaction
+   → AuditLog record is NOT persisted (INSERT failed)
+
+2. Retry CancelTransaction on Tx(status='refunded')
+   → AuditLog SELECT returns None (no record from step 1)
+   → current_tx_status='refunded' (terminal)
+   → terminal-status guard (PR #2685): return was_completed=False
+     WITHOUT persisting (avoids recording wrong immutable data)
+   → response state=-1 (WRONG — should be -2)
+
+3. All future retries: same as step 2 — permanently state=-1
+```
+
+**Why this is acceptable (per architectural decision in Issue #2679):**
+
+1. **Availability over perfect idempotency.** Strategy 1 (abort webhook
+   on AuditLog failure) would make the webhook unavailable whenever
+   AuditLog has a transient failure. Payme may interpret this as a
+   merchant outage. Strategy 2 preserves availability at the cost of
+   idempotency for the affected Tx.
+
+2. **Terminal-status guard prevents making it worse.** PR #2685 added
+   a guard that refuses to persist a terminal status as `pre_cancel_status`.
+   Without this guard, step 2 above would persist `pre_cancel_status='refunded'`
+   in an immutable AuditLog record, which would make the wrong answer
+   permanent AND block any future recovery. The guard ensures that if
+   AuditLog recovers later, a future retry could still (in theory) get
+   the right answer — though in practice the pre-cancel state is already
+   lost by step 1.
+
+3. **AuditLog failure is rare.** AuditLog uses the same DB connection as
+   the Tx.status mutation. If AuditLog INSERT fails, the Tx.status
+   mutation is likely to fail too (same transaction). The scenario
+   above requires AuditLog to fail WHILE Tx.status mutation succeeds —
+   which only happens because Strategy 2 does a full `db.rollback()`
+   on AuditLog failure, then re-applies the Tx.status mutation in a
+   fresh transaction. This is a narrow window.
+
+**When to revisit:** if production logs show that the "AuditLog INSERT
+failed" warning appears with any frequency, or if Payme reports
+idempotency violations in production, the project should reconsider
+Strategy 1 (abort webhook) or Option C (dedicated immutable column
+with trigger — see RFC #2679). The current implementation is a
+conscious trade-off, not a complete solution.
+
+**Do not treat this as fully solved.** Future developers reading this
+ADR should understand: FOLLOWUP-12 + PR #2685 make the Payme
+CancelTransaction response idempotent **in the common case** (AuditLog
+INSERT succeeds). In the failure case (AuditLog INSERT fails),
+idempotency degrades to Strategy 2's mutable-state derivation, which
+is wrong on retry. This is the accepted limitation of the chosen
+architecture.
+
 ## References
 
-- PR #2675 (blocked) — discovery artifact with full analysis
-- FOLLOWUP-9 — Payme `result.state` spec compliance (blocked on this ADR)
-- FOLLOWUP-12 — implementation task to persist pre-cancel state
+- PR #2675 (blocked, superseded) — discovery artifact with full analysis.
+  Superseded by FOLLOWUP-12 (PR #2684) which implemented the same
+  spec compliance fix with AuditLog-based pre-cancel state recovery,
+  addressing the idempotency defect that PR #2675 could not solve.
+- FOLLOWUP-9 — Payme `result.state` spec compliance (resolved by
+  FOLLOWUP-12).
+- FOLLOWUP-12 (PR #2684, merged) — implementation: AuditLog-based
+  pre-cancel state persistence with Strategy 2 fallback.
+- PR #2685 (merged) — terminal-status guard refinement: prevents
+  persisting wrong immutable data when Strategy 2 fallback is triggered
+  on a retry after AuditLog failure.
+- RFC #2679 (Issue #2679) — architecture decision: Option A (AuditLog),
+  inline `db.add()+db.flush()`, Strategy 2, no migrations, Payme-only.
 - Payme spec: https://developer.help.paycom.uz/metody-merchant-api/tipy-dannykh
 - Codex P1 review on PR #2675: "Preserve the original cancel state across retries"
