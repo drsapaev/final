@@ -812,6 +812,15 @@ jobs:
         npx playwright test e2e/load/ e2e/chaos/ --project=chromium
       continue-on-error: true  # Non-blocking — load/chaos tests are informational in CI
 
+    - name: рџ“¤ Upload Playwright failure artifacts
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: playwright-failure-artifacts
+        path: frontend/test-results/
+        retention-days: 14
+        if-no-files-found: ignore
+
   # --- Backend тесты ---
   backend-tests:
     name: 🐍 Backend тесты
@@ -2112,6 +2121,7 @@ jobs:
         path: |
           docs/release_gates/telegram_mini_app_release_gate_score.json
           output/playwright/telegram-miniapp-release-gate/
+          frontend/test-results/
         retention-days: 14
         if-no-files-found: warn
 
