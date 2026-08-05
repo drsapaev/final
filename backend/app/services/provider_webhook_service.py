@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.db.transactions import transaction as transaction_ctx
+from app.models.audit import AuditLog
 from app.repositories.provider_webhook_repository import ProviderWebhookRepository
 from app.services.payment_provider_manager_factory import get_payment_manager
 from app.services.payment_state_checks import (
@@ -19,6 +20,11 @@ from app.services.payment_state_checks import (
 )
 
 logger = logging.getLogger(__name__)
+
+# FOLLOWUP-12: AuditLog action constant for persisting the pre-cancel state
+# of a Payme PaymentTransaction. Used to recover `was_completed` on retry
+# (CancelTransaction response state must be idempotent per ADR-0019).
+PAYME_TX_PRE_CANCEL_STATE_ACTION = "PAYME_TX_PRE_CANCEL_STATE"
 
 
 class ProviderWebhookService:
@@ -31,6 +37,11 @@ class ProviderWebhookService:
     ):
         self.db = db
         self.repository = repository or ProviderWebhookRepository(db)
+        # FOLLOWUP-12: per-request flag set by _apply_existing_payme_
+        # transaction_state during CancelTransaction. Read by the caller
+        # (process_payme_webhook) to compute the JSON-RPC response `state`.
+        # Reset to None at the start of each webhook invocation.
+        self._last_cancel_was_completed: bool | None = None
 
     @staticmethod
     def _decimal_amount(value: Any) -> Decimal | None:
@@ -252,6 +263,11 @@ class ProviderWebhookService:
         self, webhook_data: dict[str, Any], auth_header: str | None
     ) -> dict[str, Any]:
         """Webhook для Payme платежной системы (JSON-RPC)."""
+        # FOLLOWUP-12: reset per-request flag. Set by _apply_existing_payme_
+        # transaction_state during CancelTransaction; read below to compute
+        # the JSON-RPC response `state` (-2 if Tx was completed before
+        # cancel, -1 otherwise). Idempotent across retries via AuditLog.
+        self._last_cancel_was_completed = None
         request_id = webhook_data.get("id")
         try:
             # PAY-REAUDIT-28 P1-2: PII-safe logging
@@ -356,11 +372,17 @@ class ProviderWebhookService:
                         "payment_provider": "payme",
                     }
                 if method == "CancelTransaction":
+                    # FOLLOWUP-12: response state must reflect the Tx status
+                    # BEFORE the first cancel was applied (per Payme spec:
+                    # state -1 = cancelled from state 1, state -2 = cancelled
+                    # from state 2). Recovered from AuditLog on retry, derived
+                    # from current_tx_status on first call. See ADR-0019.
+                    was_completed = self._last_cancel_was_completed or False
                     return {
                         "result": {
                             "cancel_time": int(datetime.now(UTC).timestamp() * 1000),
                             "transaction": existing_transaction.id,
-                            "state": -1,
+                            "state": -2 if was_completed else -1,
                         },
                         "id": request_id,
                         "payment_id": payment_id,
@@ -663,6 +685,43 @@ class ProviderWebhookService:
             and current_tx_status
             and current_tx_status != provider_status
         )
+
+        # FOLLOWUP-12: persist pre-cancel state for idempotent CancelTransaction
+        # response. Per ADR-0019, the response `state` (-1 vs -2) must reflect
+        # the Tx status BEFORE the first cancel was applied. On retry, the
+        # current `transaction.status` has already mutated (e.g. completed →
+        # refunded), so we cannot derive `was_completed` from it. We persist
+        # `pre_cancel_status` in AuditLog (immutable via DB trigger, migration
+        # 0044) on the first call and recover it on retry.
+        #
+        # Scope: Payme CancelTransaction only. PerformTransaction does not
+        # need this (response state is always 2). Click/Kaspi are not touched.
+        #
+        # Atomicity: AuditLog INSERT is inside the same transaction_ctx as
+        # the Tx.status mutation (caller's `with transaction_ctx(self.db):`
+        # at process_payme_webhook line 322). If the mutation rolls back,
+        # the AuditLog INSERT rolls back too — no phantom audit records.
+        # Verified via backend/app/db/transactions.py:32-39 (commit/rollback
+        # on context exit) and session.py:153-155 (autocommit=False).
+        #
+        # Failure mode (Strategy 2 per ADR-0019 lines 152-154): if AuditLog
+        # INSERT or SELECT fails, fall back to mutable-state derivation.
+        # Idempotency degrades silently for that Tx, but webhook availability
+        # is preserved. logger.warning (NOT logger.exception) to avoid
+        # Sentry recursion (see backend/app/core/sentry.py:243-249).
+        #
+        # Constraint: at most 1 SELECT + 1 INSERT per webhook call. The
+        # SELECT runs before the mutation to recover prior pre_cancel_status;
+        # the INSERT runs only if no prior record exists (first call).
+        if method == "CancelTransaction":
+            self._last_cancel_was_completed = self._resolve_was_completed(
+                transaction, current_tx_status
+            )
+        else:
+            # PerformTransaction: response state is always 2, no pre-cancel
+            # state needed. Flag stays None (caller ignores it).
+            self._last_cancel_was_completed = None
+
         if current_tx_status and (
             not self._can_transition_transaction_status(
                 current_tx_status, provider_status
@@ -712,6 +771,145 @@ class ProviderWebhookService:
             }
 
         return effective_payment_status
+
+    def _resolve_was_completed(
+        self, transaction: Any, current_tx_status: str | None
+    ) -> bool:
+        """FOLLOWUP-12: determine whether the Tx was in 'completed' state
+        before the first CancelTransaction was applied.
+
+        On the first CancelTransaction call, `current_tx_status` is the
+        true pre-cancel state (e.g. 'completed' or 'processing'). We
+        persist it in AuditLog so that on retry — when `current_tx_status`
+        has already mutated to 'refunded' or 'cancelled' — we can recover
+        the original value and return the correct JSON-RPC `state`.
+
+        Returns True if the Tx was in 'completed' state before cancel,
+        False otherwise. On AuditLog failure (Strategy 2 per ADR-0019),
+        falls back to deriving from `current_tx_status` and logs a
+        structured warning.
+
+        Constraint: at most 1 SELECT + 1 INSERT per call.
+        """
+        tx_id = getattr(transaction, "id", None)
+
+        # Step 1: try to recover pre_cancel_status from AuditLog (retry case).
+        recovered_pre_cancel = self._get_pre_cancel_state_from_audit_log(tx_id)
+        if recovered_pre_cancel is not None:
+            # Retry: AuditLog record exists from a prior CancelTransaction.
+            return recovered_pre_cancel == "completed"
+
+        # Step 2: first call (or prior AuditLog write failed). Derive from
+        # current mutable state and persist for future retries.
+        was_completed = current_tx_status == "completed"
+
+        # Persist pre_cancel_status. On failure, fall back to mutable-state
+        # derivation (Strategy 2). The webhook response is still sent;
+        # idempotency degrades silently for this Tx if a retry arrives.
+        # The try/except here is a safety net: _persist_pre_cancel_state
+        # already catches exceptions internally (via SAVEPOINT), but this
+        # outer catch ensures that any unexpected error from the helper
+        # does not abort the webhook.
+        try:
+            self._persist_pre_cancel_state(tx_id, current_tx_status)
+        except Exception as exc:
+            logger.warning(
+                "Payme webhook: AuditLog persist failed — falling back to "
+                "mutable-state derivation. Idempotency may degrade on retry. "
+                "transaction_id=%s pre_cancel_status=%s error_type=%s",
+                tx_id,
+                current_tx_status,
+                type(exc).__name__,
+            )
+
+        return was_completed
+
+    def _get_pre_cancel_state_from_audit_log(
+        self, tx_id: int | None
+    ) -> str | None:
+        """Recover the latest pre_cancel_status from AuditLog for the given Tx.
+
+        Returns None if no record exists (first call) or on query failure
+        (Strategy 2 fallback). At most 1 SELECT per call.
+        """
+        if tx_id is None:
+            return None
+        try:
+            row = (
+                self.db.query(AuditLog)
+                .filter(
+                    AuditLog.action == PAYME_TX_PRE_CANCEL_STATE_ACTION,
+                    AuditLog.entity_type == "payment_transaction",
+                    AuditLog.entity_id == tx_id,
+                )
+                .order_by(AuditLog.created_at.desc())
+                .first()
+            )
+            if row is None or not row.payload:
+                return None
+            return row.payload.get("pre_cancel_status")
+        except Exception as exc:
+            # Strategy 2: do not abort the webhook. Fall back to mutable-state
+            # derivation. logger.warning (NOT logger.exception) to avoid
+            # Sentry recursion (see sentry.py:243-249).
+            logger.warning(
+                "Payme webhook: AuditLog SELECT failed — falling back to "
+                "mutable-state derivation. Idempotency may degrade on retry. "
+                "transaction_id=%s error_type=%s",
+                tx_id,
+                type(exc).__name__,
+            )
+            return None
+
+    def _persist_pre_cancel_state(
+        self, tx_id: int | None, pre_cancel_status: str | None
+    ) -> None:
+        """Persist pre_cancel_status in AuditLog for future retry recovery.
+
+        Uses inline `db.add(AuditLog(...)); db.flush()` (NOT
+        `audit_service.log_audit_event()`, which does its own `db.commit()`
+        and would break atomicity — see Finding 5 in RFC #2679).
+
+        On failure, logs a structured warning and returns (Strategy 2).
+        Uses SAVEPOINT (db.begin_nested()) to isolate the AuditLog INSERT
+        so that a failure does not poison the outer transaction_ctx —
+        the Tx.status mutation can still commit successfully.
+        """
+        if tx_id is None:
+            return
+        try:
+            # SAVEPOINT: if the AuditLog INSERT fails, roll back only the
+            # savepoint (not the outer transaction). This allows the Tx.status
+            # mutation to commit independently — Strategy 2 (availability
+            # preserved, idempotency degrades silently for this Tx).
+            nested = self.db.begin_nested()
+            try:
+                entry = AuditLog(
+                    action=PAYME_TX_PRE_CANCEL_STATE_ACTION,
+                    entity_type="payment_transaction",
+                    entity_id=tx_id,
+                    payload={"pre_cancel_status": pre_cancel_status},
+                    actor_type="system",
+                    outcome="success",
+                )
+                self.db.add(entry)
+                self.db.flush()  # NOT commit — caller controls transaction_ctx
+                nested.commit()
+            except Exception:
+                nested.rollback()
+                raise
+        except Exception as exc:
+            # Strategy 2: do not abort the webhook. The SAVEPOINT rollback
+            # above restored the session to a clean state; the outer
+            # transaction_ctx can still commit the Tx.status mutation.
+            logger.warning(
+                "Payme webhook: AuditLog INSERT failed — falling back to "
+                "mutable-state derivation. Idempotency may degrade on retry. "
+                "transaction_id=%s pre_cancel_status=%s error_type=%s",
+                tx_id,
+                pre_cancel_status,
+                type(exc).__name__,
+            )
 
     def process_kaspi_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
         """Webhook для Kaspi Pay платежной системы.

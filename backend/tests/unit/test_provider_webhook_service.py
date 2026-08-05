@@ -703,3 +703,191 @@ class TestPaymeTerminalStatePreservation:
         assert tx.status == "processing"  # NOT changed
         assert tx.provider_data["method"] == "PerformTransaction"
         assert tx.provider_data["transaction_id"] == "payme-tx-1"
+
+    # --- FOLLOWUP-12: pre-cancel state idempotency (ADR-0019) ---
+    #
+    # Payme spec (developer.help.paycom.uz/metody-merchant-api/tipy-dannykh):
+    #   state -1 = "отменена (начальное состояние 1)" — Tx was in state 1
+    #   state -2 = "отменена после завершения (начальное состояние 2)" — Tx was in state 2
+    #
+    # The CancelTransaction response state must reflect the transition that
+    # occurred, based on the Tx status BEFORE the first CancelTransaction.
+    # On retry (commit succeeded, response lost), Tx.status has already
+    # mutated to 'refunded', so we cannot derive was_completed from it.
+    # We persist pre_cancel_status in AuditLog on the first call and recover
+    # it on retry (Option A per RFC #2679, ADR-0019 compliance).
+
+    def test_cancel_first_call_on_completed_tx_returns_state_minus_2(
+        self, db_session
+    ):
+        """First CancelTransaction on a completed Tx must return state=-2.
+
+        Scenario: Tx.status='completed' (Payme state 2).
+        Expected: response state=-2 (state 2 → -2 per spec).
+        AuditLog INSERT persists pre_cancel_status='completed'.
+        """
+        from app.models.audit import AuditLog
+        from app.services.provider_webhook_service import (
+            PAYME_TX_PRE_CANCEL_STATE_ACTION,
+        )
+
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="completed",
+            payment_status="paid",
+        )
+        result = self._call_cancel(service, reason=2)  # reason != 1 → refunded
+
+        assert result["result"]["state"] == -2
+
+        # Verify AuditLog record was persisted with pre_cancel_status
+        audit_entry = (
+            db_session.query(AuditLog)
+            .filter(
+                AuditLog.action == PAYME_TX_PRE_CANCEL_STATE_ACTION,
+                AuditLog.entity_type == "payment_transaction",
+                AuditLog.entity_id == tx.id,
+            )
+            .first()
+        )
+        assert audit_entry is not None
+        assert audit_entry.payload["pre_cancel_status"] == "completed"
+
+    def test_cancel_first_call_on_processing_tx_returns_state_minus_1(
+        self, db_session
+    ):
+        """First CancelTransaction on a processing Tx must return state=-1.
+
+        Scenario: Tx.status='processing' (Payme state 1).
+        Expected: response state=-1 (state 1 → -1 per spec).
+        """
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="processing",
+            payment_status="processing",
+        )
+        result = self._call_cancel(service, reason=1)
+        assert result["result"]["state"] == -1
+
+    def test_cancel_retry_after_refunded_returns_state_minus_2(
+        self, db_session
+    ):
+        """REGRESSION TEST for ADR-0019 idempotency defect.
+
+        Scenario (the real failing case from PR #2675 / FOLLOWUP-9):
+          Step 1: Tx.status='completed' (Payme state 2)
+            → first CancelTransaction (reason=2, refunded)
+            → response state=-2 ✅
+            → Tx.status mutates to 'refunded'
+            → AuditLog INSERT persists pre_cancel_status='completed'
+
+          Step 2: simulate response lost (network drop, gateway timeout)
+            → no DB change; Payme will retry
+
+          Step 3: same CancelTransaction retried
+            → Tx.status is now 'refunded' (mutated by step 1)
+            → AuditLog recovery returns pre_cancel_status='completed'
+            → was_completed=True → response state=-2 ✅ (NOT -1)
+
+        Without AuditLog recovery, step 3 would compute:
+          was_completed = (Tx.status == 'completed') = False
+          → response state=-1 ❌ (wrong, breaks idempotency)
+
+        This is the test that PR #2675's
+        test_cancel_response_state_idempotent_on_duplicate_cancel FAILED
+        to cover (it tested cancelled → retry, missing the refunded case).
+        """
+        from app.models.audit import AuditLog
+        from app.services.provider_webhook_service import (
+            PAYME_TX_PRE_CANCEL_STATE_ACTION,
+        )
+
+        # Step 1: first CancelTransaction on a completed Tx
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="completed",
+            payment_status="paid",
+        )
+        result_step1 = self._call_cancel(service, reason=2)
+        assert result_step1["result"]["state"] == -2
+
+        # Verify AuditLog record exists (persisted in step 1)
+        audit_entry = (
+            db_session.query(AuditLog)
+            .filter(
+                AuditLog.action == PAYME_TX_PRE_CANCEL_STATE_ACTION,
+                AuditLog.entity_type == "payment_transaction",
+                AuditLog.entity_id == tx.id,
+            )
+            .first()
+        )
+        assert audit_entry is not None
+        assert audit_entry.payload["pre_cancel_status"] == "completed"
+
+        # Step 2: simulate Tx.status mutation (already done by step 1 in
+        # production; in this test, _make_service used SimpleNamespace so
+        # we manually update to simulate the post-step-1 state for retry).
+        tx.status = "refunded"
+
+        # Step 3: retry the same CancelTransaction
+        # Re-create service with the mutated tx status to simulate retry
+        service_retry, tx_retry, payment_retry, _locked_retry = self._make_service(
+            db_session,
+            transaction_status="refunded",  # mutated by step 1
+            payment_status="refunded",
+        )
+        # Ensure same tx.id so AuditLog recovery finds the record
+        tx_retry.id = tx.id
+        result_step3 = self._call_cancel(service_retry, reason=2)
+
+        # KEY ASSERTION: step 3 must return -2, NOT -1, even though
+        # tx_retry.status is 'refunded' (not 'completed'). The AuditLog
+        # record from step 1 provides the correct pre_cancel_status.
+        assert result_step3["result"]["state"] == -2
+        assert result_step1["result"]["state"] == result_step3["result"]["state"]
+
+    def test_cancel_audit_log_failure_falls_back_to_mutable_state(
+        self, db_session, caplog
+    ):
+        """Strategy 2 (ADR-0019): if AuditLog INSERT fails, the webhook
+        must still respond (availability preserved), falling back to
+        mutable-state derivation. Idempotency degrades silently.
+
+        This test patches _persist_pre_cancel_state to raise, simulating
+        AuditLog INSERT failure. The implementation uses SAVEPOINT
+        (db.begin_nested) to isolate the failure so the outer
+        transaction_ctx can still commit the Tx.status mutation.
+        Verifies:
+          1. webhook response is still sent (state computed from Tx.status)
+          2. logger.warning is emitted (NOT logger.exception — Sentry recursion)
+          3. warning contains transaction_id for traceability
+        """
+        import logging
+
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="completed",
+            payment_status="paid",
+        )
+
+        with caplog.at_level(logging.WARNING):
+            with patch.object(
+                service,
+                "_persist_pre_cancel_state",
+                side_effect=RuntimeError("simulated AuditLog INSERT failure"),
+            ):
+                result = self._call_cancel(service, reason=2)
+
+        # Webhook still responds (availability preserved)
+        assert result["result"]["state"] == -2  # derived from Tx.status='completed'
+
+        # Structured warning was emitted
+        warning_messages = [
+            rec.getMessage()
+            for rec in caplog.records
+            if rec.levelno == logging.WARNING
+            and "AuditLog" in rec.getMessage()
+        ]
+        assert any("transaction_id=77" in msg for msg in warning_messages), (
+            f"Expected warning with transaction_id=77, got: {warning_messages}"
+        )
