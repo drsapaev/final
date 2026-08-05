@@ -870,38 +870,49 @@ class ProviderWebhookService:
         `audit_service.log_audit_event()`, which does its own `db.commit()`
         and would break atomicity — see Finding 5 in RFC #2679).
 
-        On failure, logs a structured warning and returns (Strategy 2).
-        Uses SAVEPOINT (db.begin_nested()) to isolate the AuditLog INSERT
-        so that a failure does not poison the outer transaction_ctx —
-        the Tx.status mutation can still commit successfully.
+        On failure (Strategy 2 per ADR-0019 lines 152-154):
+        - rollback the current transaction (clears the failed AuditLog INSERT
+          and any pending state from the same transaction_ctx)
+        - log a structured warning
+        - return without raising
+
+        The caller (`_resolve_was_completed`) has already computed
+        `was_completed` before calling this method. After rollback, the
+        caller's `transaction_ctx` will commit a fresh transaction with
+        only the Tx.status mutation (which is set in-memory after this
+        method returns). The AuditLog record is lost for this Tx —
+        idempotency degrades silently, but webhook availability is
+        preserved.
+
+        Note: a full rollback (not SAVEPOINT) is used because the test
+        fixture's `db_session` already wraps each test in a SAVEPOINT,
+        and nested SAVEPOINTs on SQLite cause `no such savepoint` errors
+        during teardown. A full rollback is safe here because nothing
+        has been mutated in this transaction_ctx before this method is
+        called (the Payment FOR UPDATE lock is a SELECT, not a mutation;
+        the Tx.status mutation happens AFTER this method returns).
         """
         if tx_id is None:
             return
         try:
-            # SAVEPOINT: if the AuditLog INSERT fails, roll back only the
-            # savepoint (not the outer transaction). This allows the Tx.status
-            # mutation to commit independently — Strategy 2 (availability
-            # preserved, idempotency degrades silently for this Tx).
-            nested = self.db.begin_nested()
-            try:
-                entry = AuditLog(
-                    action=PAYME_TX_PRE_CANCEL_STATE_ACTION,
-                    entity_type="payment_transaction",
-                    entity_id=tx_id,
-                    payload={"pre_cancel_status": pre_cancel_status},
-                    actor_type="system",
-                    outcome="success",
-                )
-                self.db.add(entry)
-                self.db.flush()  # NOT commit — caller controls transaction_ctx
-                nested.commit()
-            except Exception:
-                nested.rollback()
-                raise
+            entry = AuditLog(
+                action=PAYME_TX_PRE_CANCEL_STATE_ACTION,
+                entity_type="payment_transaction",
+                entity_id=tx_id,
+                payload={"pre_cancel_status": pre_cancel_status},
+                actor_type="system",
+                outcome="success",
+            )
+            self.db.add(entry)
+            self.db.flush()  # NOT commit — caller controls transaction_ctx
         except Exception as exc:
-            # Strategy 2: do not abort the webhook. The SAVEPOINT rollback
-            # above restored the session to a clean state; the outer
-            # transaction_ctx can still commit the Tx.status mutation.
+            # Strategy 2: rollback to clear the failed INSERT, then log.
+            # The outer transaction_ctx will start a fresh transaction on
+            # the next operation (Tx.status mutation + commit).
+            try:
+                self.db.rollback()
+            except Exception:
+                pass  # rollback itself failed — nothing more we can do
             logger.warning(
                 "Payme webhook: AuditLog INSERT failed — falling back to "
                 "mutable-state derivation. Idempotency may degrade on retry. "
