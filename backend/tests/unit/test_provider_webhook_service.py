@@ -912,3 +912,97 @@ class TestPaymeTerminalStatePreservation:
             f"got {_locked.provider_data.get('method')!r}. Phase 2 provider_data "
             "mutation was lost."
         )
+
+    def test_cancel_retry_after_failed_audit_log_does_not_persist_terminal_status(
+        self, db_session, caplog
+    ):
+        """REGRESSION TEST for Codex P2 review on PR #2684.
+
+        Scenario (the terminal-status guard):
+          Step 1: Tx.status='completed' (Payme state 2)
+            → first CancelTransaction
+            → _persist_pre_cancel_state called with pre_cancel_status='completed'
+            → AuditLog INSERT succeeds
+            → response state=-2 ✅
+            → Tx.status mutates to 'refunded'
+
+          Step 2: simulate AuditLog INSERT failed on step 1 (rollback
+            removed the AuditLog row, but Tx.status mutation committed
+            in a fresh transaction). Now Tx.status='refunded' and no
+            AuditLog record exists.
+
+          Step 3: retry CancelTransaction
+            → _get_pre_cancel_state_from_audit_log returns None (no record)
+            → current_tx_status='refunded' (terminal)
+            → terminal-status guard kicks in: return was_completed=False
+              WITHOUT persisting 'refunded' as pre_cancel_status
+            → response state=-1 (degraded, but not worse)
+
+          Step 4: another retry
+            → same as step 3 — no AuditLog record, terminal guard,
+              state=-1
+
+        Without the terminal-status guard, step 3 would persist
+        pre_cancel_status='refunded' (wrong), and step 4 would recover
+        it and return state=-1 (also wrong, but now permanently wrong
+        because the AuditLog record is immutable). The guard prevents
+        persisting wrong data.
+
+        This test verifies:
+          1. No AuditLog record is created when current_tx_status is terminal
+          2. Response state=-1 (conservative, degraded idempotency)
+          3. Structured warning is emitted
+        """
+        import logging
+        from app.models.audit import AuditLog
+        from app.services.provider_webhook_service import (
+            PAYME_TX_PRE_CANCEL_STATE_ACTION,
+        )
+
+        # Setup: Tx is already in 'refunded' (terminal) state, no AuditLog
+        # record exists (simulating failed INSERT on first cancel).
+        service, tx, payment, _locked = self._make_service(
+            db_session,
+            transaction_status="refunded",  # terminal — first cancel already happened
+            payment_status="refunded",
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = self._call_cancel(service, reason=2)
+
+        # Response: state=-1 (degraded, but not persisting wrong data)
+        assert result["result"]["state"] == -1, (
+            f"Expected -1 (terminal-status guard, degraded), "
+            f"got {result['result']['state']}"
+        )
+
+        # KEY ASSERTION: no AuditLog record was created.
+        # The terminal-status guard must NOT persist 'refunded' as
+        # pre_cancel_status — that would be immutable-but-wrong data.
+        audit_entry = (
+            db_session.query(AuditLog)
+            .filter(
+                AuditLog.action == PAYME_TX_PRE_CANCEL_STATE_ACTION,
+                AuditLog.entity_type == "payment_transaction",
+                AuditLog.entity_id == tx.id,
+            )
+            .first()
+        )
+        assert audit_entry is None, (
+            f"Terminal-status guard failed: AuditLog record was created with "
+            f"pre_cancel_status={audit_entry.payload.get('pre_cancel_status')!r}. "
+            "Persisting a terminal status as pre_cancel_status would block "
+            "future recovery — the guard should have skipped the INSERT."
+        )
+
+        # Structured warning was emitted
+        warning_messages = [
+            rec.getMessage()
+            for rec in caplog.records
+            if rec.levelno == logging.WARNING
+            and "terminal state" in rec.getMessage()
+        ]
+        assert any("transaction_id=77" in msg for msg in warning_messages), (
+            f"Expected warning about terminal state with transaction_id=77, "
+            f"got: {warning_messages}"
+        )
