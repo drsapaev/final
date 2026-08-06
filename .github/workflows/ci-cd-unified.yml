@@ -700,90 +700,160 @@ jobs:
         cd frontend
         npm ci --legacy-peer-deps
     
-    - name: 🧪 Тесты frontend (with hang diagnostics v2)
+    - name: 🧪 Тесты frontend (with hang diagnostics v3 — active handles)
       run: |
         cd frontend
-        # Run vitest in background, monitor for hang
+
+        # Write a diagnostic script that connects to Node.js inspector
+        # and retrieves process._getActiveHandles() and _getActiveRequests()
+        cat > /tmp/diag-handles.js << 'DIAGSCRIPT'
+        const http = require('http');
+
+        function fetchJSON(url) {
+          return new Promise((resolve, reject) => {
+            http.get(url, (res) => {
+              let data = '';
+              res.on('data', (chunk) => data += chunk);
+              res.on('end', () => resolve(JSON.parse(data)));
+            }).on('error', reject);
+          });
+        }
+
+        async function getActiveHandles(port) {
+          const baseUrl = `http://127.0.0.1:${port}`;
+
+          // 1. Get the list of available contexts (isolates)
+          const data = await fetchJSON(`${baseUrl}/json`);
+          console.log(`Inspector contexts on port ${port}:`, JSON.stringify(data, null, 2));
+
+          if (!data || data.length === 0) {
+            console.log('No inspector contexts found');
+            return;
+          }
+
+          const wsUrl = data[0].webSocketDebuggerUrl;
+          console.log(`WebSocket URL: ${wsUrl}`);
+
+          // 2. Use Node.js inspector module to connect
+          const inspector = require('inspector');
+          const session = new inspector.Session();
+          session.connect();
+
+          // 3. Evaluate process._getActiveHandles() in the inspected context
+          //    We need to use Runtime.evaluate through the session
+          //    But session.connect() connects to THIS process, not the remote one
+
+          // Instead, let's use a different approach:
+          // Use the /json protocol to evaluate expressions
+          // Actually, the simplest way is to use the inspector Session
+          // connected to the current process, and also try to use
+          // child_process to run node with --inspect
+
+          // For the MAIN process (this script runs in main):
+          console.log('\n=== ACTIVE HANDLES (main process) ===');
+          const handles = process._getActiveHandles();
+          console.log(`Count: ${handles.length}`);
+          handles.forEach((h, i) => {
+            console.log(`  [${i}] ${h.constructor && h.constructor.name || typeof h}:`, {
+              type: h.constructor && h.constructor.name,
+              fd: h.fd !== undefined ? h.fd : 'N/A',
+              destroyed: h.destroyed !== undefined ? h.destroyed : 'N/A',
+              readable: h.readable !== undefined ? h.readable : 'N/A',
+              writable: h.writable !== undefined ? h.writable : 'N/A',
+              address: h.address ? (() => { try { return h.address(); } catch { return 'err'; } })() : 'N/A',
+              pending: h.pending !== undefined ? h.pending : 'N/A',
+            });
+          });
+
+          console.log('\n=== ACTIVE REQUESTS (main process) ===');
+          const requests = process._getActiveRequests();
+          console.log(`Count: ${requests.length}`);
+          requests.forEach((r, i) => {
+            console.log(`  [${i}] ${r.constructor && r.constructor.name || typeof r}:`, {
+              type: r.constructor && r.constructor.name,
+            });
+          });
+
+          session.disconnect();
+        }
+
+        // Try to connect to the inspector on port 9229
+        getActiveHandles(9229).catch(err => {
+          console.error('Error:', err.message);
+          // If inspector not available, just dump local handles
+          console.log('\n=== FALLBACK: local process handles ===');
+          const handles = process._getActiveHandles();
+          console.log(`Count: ${handles.length}`);
+          handles.forEach((h, i) => {
+            console.log(`  [${i}] ${h.constructor && h.constructor.name || typeof h}`);
+          });
+        });
+        DIAGSCRIPT
+
+        # Run vitest in background
         npm run test:run -- --coverage &
         NPM_PID=$!
         echo "npm PID: $NPM_PID"
 
-        # Wait up to 3 minutes, then collect full diagnostics
+        # Wait up to 90 seconds (tests should finish in ~20s)
         ELAPSED=0
         while kill -0 $NPM_PID 2>/dev/null; do
           sleep 15
           ELAPSED=$((ELAPSED + 15))
           echo "=== Still running after ${ELAPSED}s ==="
 
-          if [ $ELAPSED -ge 180 ]; then
-            echo "=== Vitest still running after 180s — collecting FULL diagnostics ==="
+          if [ $ELAPSED -ge 60 ]; then
+            echo "=== Vitest still running after 60s — collecting active handles ==="
 
-            echo "--- FULL PROCESS TREE (pstree) ---"
-            pstree -ap $NPM_PID 2>/dev/null || echo "(pstree not available)"
+            # Find the main vitest node process
+            VITEST_PID=$(pgrep -f "node.*vitest" | head -1)
+            echo "Vitest main PID: $VITEST_PID"
 
-            echo "--- FULL PROCESS TREE (ps --forest) ---"
-            ps -ef --forest 2>/dev/null | grep -E "PID|npm|vitest|node|sh -c" | head -30
+            if [ -n "$VITEST_PID" ]; then
+              # Send SIGUSR1 to start inspector
+              echo "--- Sending SIGUSR1 to start inspector ---"
+              kill -USR1 $VITEST_PID 2>/dev/null
+              sleep 2
 
-            # Find ALL descendant PIDs recursively
-            echo "--- ALL descendant PIDs ---"
-            ALL_PIDS=$(pstree -p $NPM_PID 2>/dev/null | grep -oP '\d+' | sort -u | tr '\n' ' ')
-            echo "All PIDs: $ALL_PIDS"
+              # Check inspector is running
+              ss -tlnp 2>/dev/null | grep 9229 || echo "(no inspector on 9229)"
 
-            # For each PID in the tree, collect detailed diagnostics
-            for PID in $ALL_PIDS; do
-              echo ""
-              echo "========================================"
-              echo "=== DIAGNOSTICS FOR PID $PID ==="
-              echo "========================================"
+              # Run the diagnostic script to connect to inspector
+              echo "--- Active handles (via inspector connection) ---"
+              node /tmp/diag-handles.js 2>&1 || echo "(diagnostic script failed)"
 
-              echo "--- ps ---"
-              ps -fp $PID 2>/dev/null || echo "(process gone)"
+              # Also try: directly evaluate in the vitest process using /json protocol
+              echo "--- Direct inspector protocol query ---"
+              curl -s http://127.0.0.1:9229/json 2>/dev/null | python3 -m json.tool 2>/dev/null | head -20 || echo "(inspector not reachable)"
 
-              echo "--- /proc/PID/status ---"
-              cat /proc/$PID/status 2>/dev/null | head -25 || echo "(not available)"
+              # Find worker process
+              WORKER_PID=$(pgrep -P $VITEST_PID -f "node" | head -1)
+              echo "Worker PID: $WORKER_PID"
 
-              echo "--- /proc/PID/cmdline ---"
-              cat /proc/$PID/cmdline 2>/dev/null | tr '\0' ' ' || echo "(not available)"
-              echo ""
-
-              echo "--- lsof -p PID ---"
-              lsof -p $PID 2>/dev/null | head -50 || echo "(lsof not available)"
-
-              echo "--- /proc/PID/fd ---"
-              ls -la /proc/$PID/fd 2>/dev/null | head -50 || echo "(not available)"
-
-              echo "--- /proc/PID/stack (if available) ---"
-              cat /proc/$PID/stack 2>/dev/null | head -20 || echo "(not available — requires CONFIG_STACKTRACE)"
-
-              echo "--- /proc/PID/wchan ---"
-              cat /proc/$PID/wchan 2>/dev/null || echo "(not available)"
-              echo ""
-
-              echo "--- threads ---"
-              ls /proc/$PID/task 2>/dev/null | head -30 || echo "(not available)"
-
-              echo "--- network connections for this PID ---"
-              ss -tnp 2>/dev/null | grep "pid=$PID" || echo "(no connections)"
-
-              # If this is a Node.js process, try SIGUSR1 to start inspector
-              CMDLINE=$(cat /proc/$PID/cmdline 2>/dev/null | tr '\0' ' ')
-              if echo "$CMDLINE" | grep -q "node\|vitest"; then
-                echo "--- Node.js process detected — sending SIGUSR1 for inspector ---"
-                kill -USR1 $PID 2>/dev/null && echo "SIGUSR1 sent" || echo "SIGUSR1 failed"
-                sleep 2
-                # Check if inspector started
-                ss -tlnp 2>/dev/null | grep "$PID" || echo "(no inspector port found)"
+              if [ -n "$WORKER_PID" ]; then
+                echo "--- Worker process: sending SIGUSR1 on port 9230 ---"
+                # Worker can't use 9229 (already taken), try to start on different port
+                # Actually SIGUSR1 always uses 9229, so we need a different approach
+                # Let's just get worker handles via /proc
+                echo "--- Worker /proc/PID/status ---"
+                cat /proc/$WORKER_PID/status 2>/dev/null | head -15
+                echo "--- Worker wchan ---"
+                cat /proc/$WORKER_PID/wchan 2>/dev/null
+                echo ""
+                echo "--- Worker lsof ---"
+                lsof -p $WORKER_PID 2>/dev/null | head -30
               fi
-            done
+            fi
 
-            echo ""
-            echo "--- KILLING entire process tree ---"
+            # Also get process tree
+            echo "--- PROCESS TREE ---"
+            pstree -ap $NPM_PID 2>/dev/null
+
+            echo "--- KILLING process tree ---"
             kill -TERM $NPM_PID 2>/dev/null
             sleep 2
-            # Kill all descendants
-            for PID in $ALL_PIDS; do
-              kill -KILL $PID 2>/dev/null
-            done
+            pkill -KILL -P $NPM_PID 2>/dev/null
+            kill -KILL $NPM_PID 2>/dev/null
             break
           fi
         done
