@@ -706,78 +706,135 @@ jobs:
       # WorkerInfo.destroy → worker.terminate). Each step writes a
       # TINYPOOL_TRACE:{...} JSON line to stderr with BOTH wall-clock
       # (Date.now) AND monotonic (process.hrtime.bigint) timestamps.
-      # The monotonic offset lets us distinguish "events stopped
-      # immediately" from "events stopped after a long wait".
       run: |
         cd frontend
         node "$GITHUB_WORKSPACE/scripts/ci/instrument-tinypool-v5.js"
 
-    - name: 🧪 Тесты frontend (v5 full suite WITHOUT coverage + instrumentation)
-      # Per maintainer v5 plan: previous run (FULL + --coverage) showed
-      # tinypool_destroy_enter NEVER called — hang is UPSTREAM of Tinypool
-      # shutdown. Vitest never reached ctx.close()/pool.close().
+    - name: 🔬 Instrument vitest lifecycle beacons (v6)
+      # Patches node_modules/vitest/dist/chunks/cli-api.DVe0nWUx.js to
+      # add 7 strategic "beacon" trace points that divide the vitest
+      # lifecycle into phases. Per maintainer v6 plan, only minimal
+      # beacons to localize WHICH phase the process is stuck in:
       #
-      # This run removes --coverage to test whether coverage pipeline is
-      # a necessary condition for the hang. Decision tree:
+      #   B1  — after runFiles() returns (tests+coverage+reporters done)
+      #   B2  — before ctx.close() (with getActiveResourcesInfo snapshot)
+      #   B2a — inside ctx.close() entry
+      #   B3  — after ctx.close() returns
+      #   B4  — before startVitest returns
+      #   B5  — process.on('beforeExit')
+      #   B6  — process.on('exit')
       #
-      #   FULL + coverage   -> hang (CONFIRMED in previous run)
-      #   FULL - coverage   -> ?
-      #                        |
-      #                        +-- no hang → investigate coverage pipeline
-      #                        |
-      #                        +-- hang    → instrument Vitest lifecycle
-      #
-      # Everything else is identical to the previous run: same instrumentation,
-      # same timeout, same trace extraction. Only --coverage flag is removed.
-      # This makes the two runs directly comparable.
+      # Decision tree:
+      #   No B2 → hang is in main runner, before ctx.close()
+      #   B2 yes, no B3 → hang is inside ctx.close()
+      #   B3 yes, no B5 → hang is in active Node resources
+      #   B5 yes, no B6 → hang is in exit handlers
       run: |
         cd frontend
-        echo "=== Running FULL vitest suite WITHOUT --coverage ==="
-        echo "=== (tinypool instrumentation still active for direct comparison) ==="
+        node "$GITHUB_WORKSPACE/scripts/ci/instrument-vitest-v6.js"
+
+    - name: 🧪 Тесты frontend (v6 lifecycle beacons + tinypool instrumentation)
+      # Per maintainer v6 plan: previous runs showed
+      #   - tinypool_destroy_enter NEVER called (hang is upstream of Tinypool)
+      #   - hang reproduces with AND without --coverage (coverage-independent)
+      #
+      # This run adds vitest lifecycle beacons to localize the exact phase
+      # where the process stalls. Running WITH --coverage (back to original
+      # production config) since coverage independence was already proven.
+      #
+      # Both instrumentation layers (tinypool + vitest) are active, so we
+      # get a complete picture: vitest beacons show lifecycle phase, and
+      # tinypool trace (if it appears) confirms pool shutdown was reached.
+      run: |
+        cd frontend
+        echo "=== Running FULL vitest suite with v6 lifecycle beacons ==="
+        echo "=== (both vitest + tinypool instrumentation active) ==="
         echo ""
 
-        # Same 720s timeout as previous run — apples-to-apples comparison.
-        timeout 720 npx vitest run 2>&1 | tee /tmp/vitest-full-no-cov-output.log
+        # 720s timeout — same as previous runs for direct comparison.
+        timeout 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-v6-output.log
 
         EXIT_CODE=${PIPESTATUS[0]}
         echo ""
         echo "=== Vitest exit code: $EXIT_CODE ==="
 
-        # Extract and display all TINYPOOL_TRACE lines for analysis
+        # Extract VITEST_TRACE beacons
         echo ""
         echo "========================================"
-        echo "=== TINYPOOL SHUTDOWN TRACE (full suite, no coverage) ==="
+        echo "=== VITEST LIFECYCLE BEACONS (v6) ==="
         echo "========================================"
-        grep "TINYPOOL_TRACE:" /tmp/vitest-full-no-cov-output.log > /tmp/tinypool-trace-extracted.log || true
+        grep "VITEST_TRACE:" /tmp/vitest-v6-output.log > /tmp/vitest-trace-extracted.log || true
 
+        if [ -s /tmp/vitest-trace-extracted.log ]; then
+          echo "Total vitest beacons: $(wc -l < /tmp/vitest-trace-extracted.log)"
+          echo ""
+          echo "--- All beacons (in order) ---"
+          cat /tmp/vitest-trace-extracted.log
+          echo ""
+          echo "--- Beacon type counts ---"
+          sed -E 's/.*VITEST_TRACE:.*"beacon":"([^"]+)".*/\1/' /tmp/vitest-trace-extracted.log | sort | uniq -c | sort -rn
+        else
+          echo "(NO VITEST_TRACE beacons found — vitest module may not have loaded)"
+        fi
+
+        # Also extract TINYPOOL_TRACE for cross-reference
+        echo ""
+        echo "========================================"
+        echo "=== TINYPOOL TRACE (cross-reference) ==="
+        echo "========================================"
+        grep "TINYPOOL_TRACE:" /tmp/vitest-v6-output.log > /tmp/tinypool-trace-extracted.log || true
         if [ -s /tmp/tinypool-trace-extracted.log ]; then
-          echo "Total trace events: $(wc -l < /tmp/tinypool-trace-extracted.log)"
-          echo ""
-          echo "--- First 5 events ---"
-          head -5 /tmp/tinypool-trace-extracted.log
-          echo ""
-          echo "--- Last 20 events (most relevant for stall detection) ---"
-          tail -20 /tmp/tinypool-trace-extracted.log
-          echo ""
+          echo "Total tinypool events: $(wc -l < /tmp/tinypool-trace-extracted.log)"
           echo "--- Event type counts ---"
           sed -E 's/.*TINYPOOL_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/tinypool-trace-extracted.log | sort | uniq -c | sort -rn
-        else
-          echo "(NO TINYPOOL_TRACE lines found)"
           echo ""
-          echo "tinypool_destroy_enter was NEVER called."
-          echo "Hang is still UPSTREAM of Tinypool shutdown even without coverage."
+          echo "--- Last 10 tinypool events ---"
+          tail -10 /tmp/tinypool-trace-extracted.log
+        else
+          echo "(NO TINYPOOL_TRACE events — pool.destroy() was never called)"
+        fi
+
+        # Decision tree summary
+        echo ""
+        echo "========================================"
+        echo "=== DECISION TREE LOCALIZATION ==="
+        echo "========================================"
+        VITEST_BEACONS=$(sed -E 's/.*VITEST_TRACE:.*"beacon":"([^"]+)".*/\1/' /tmp/vitest-trace-extracted.log 2>/dev/null | sort -u)
+        echo "Vitest beacons fired:"
+        echo "$VITEST_BEACONS" | sed 's/^/  /'
+        echo ""
+        if echo "$VITEST_BEACONS" | grep -q "B2_before_ctx_close"; then
+          if echo "$VITEST_BEACONS" | grep -q "B3_after_ctx_close"; then
+            if echo "$VITEST_BEACONS" | grep -q "B5_beforeExit"; then
+              if echo "$VITEST_BEACONS" | grep -q "B6_exit"; then
+                echo "→ All beacons fired. Process exited normally. (No hang?)"
+              else
+                echo "→ B5 fired but no B6. Hang is in process exit handlers."
+              fi
+            else
+              echo "→ B3 fired but no B5. Hang is in active Node resources (post-close, pre-exit)."
+              echo "  Check B2 active_resources snapshot above for what's keeping event loop alive."
+            fi
+          else
+            echo "→ B2 fired but no B3. Hang is INSIDE ctx.close()."
+            echo "  Check if B2a fired (ctx.close entered) and tinypool trace for pool.close()."
+          fi
+        else
+          echo "→ B2 NOT fired. Hang is BEFORE ctx.close() — in main vitest runner."
+          echo "  Check if B1 fired (after runFiles)."
+          if echo "$VITEST_BEACONS" | grep -q "B1_after_runFiles"; then
+            echo "  B1 fired — hang is between runFiles return and ctx.close() call."
+          else
+            echo "  B1 NOT fired — hang is INSIDE runFiles (during tests/coverage/reporters)."
+          fi
         fi
 
         echo ""
-        echo "=== Vitest summary (if printed) ==="
-        grep -E "Test Files|Tests |Duration|Start at|Coverage" /tmp/vitest-full-no-cov-output.log || echo "(vitest summary not printed — process hung before summary)"
-
-        echo ""
-        echo "=== Last 50 lines of vitest output (for context) ==="
-        tail -50 /tmp/vitest-full-no-cov-output.log
+        echo "=== Last 30 lines of vitest output ==="
+        tail -30 /tmp/vitest-v6-output.log
 
         if [ $EXIT_CODE -eq 124 ]; then
-          echo "::error::Vitest timed out after 720s (process hang detected — coverage-independent)"
+          echo "::error::Vitest timed out after 720s (see beacons above for stall point)"
           exit 1
         elif [ $EXIT_CODE -ne 0 ]; then
           echo "::error::Vitest exited with code $EXIT_CODE"
