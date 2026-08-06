@@ -700,49 +700,95 @@ jobs:
         cd frontend
         npm ci --legacy-peer-deps
     
-    - name: 🧪 Тесты frontend (with hang diagnostics)
+    - name: 🧪 Тесты frontend (with hang diagnostics v2)
       run: |
         cd frontend
         # Run vitest in background, monitor for hang
         npm run test:run -- --coverage &
-        VITEST_PID=$!
-        echo "Vitest PID: $VITEST_PID"
+        NPM_PID=$!
+        echo "npm PID: $NPM_PID"
 
-        # Wait up to 3 minutes, checking every 15s
+        # Wait up to 3 minutes, then collect full diagnostics
         ELAPSED=0
-        while kill -0 $VITEST_PID 2>/dev/null; do
+        while kill -0 $NPM_PID 2>/dev/null; do
           sleep 15
           ELAPSED=$((ELAPSED + 15))
           echo "=== Still running after ${ELAPSED}s ==="
-          echo "--- ps ---"
-          ps -fp $VITEST_PID 2>/dev/null || echo "(process gone)"
-          echo "--- child processes ---"
-          pgrep -P $VITEST_PID 2>/dev/null | while read child; do
-            ps -fp $child 2>/dev/null
-          done
-          echo "--- open file descriptors (lsof) ---"
-          lsof -p $VITEST_PID 2>/dev/null | head -30
-          echo "--- /proc/PID/fd ---"
-          ls -la /proc/$VITEST_PID/fd 2>/dev/null | head -30
 
           if [ $ELAPSED -ge 180 ]; then
-            echo "=== Vitest still running after 180s — collecting diagnostics ==="
-            echo "--- node active handles ---"
-            # Try to get active handles via /proc
-            cat /proc/$VITEST_PID/status 2>/dev/null | head -20
-            echo "--- threads ---"
-            ls /proc/$VITEST_PID/task 2>/dev/null | head -20
-            echo "--- network connections ---"
-            ss -tnp 2>/dev/null | grep $VITEST_PID || echo "(no connections)"
-            echo "--- killing vitest ---"
-            kill -TERM $VITEST_PID 2>/dev/null
-            sleep 5
-            kill -KILL $VITEST_PID 2>/dev/null
+            echo "=== Vitest still running after 180s — collecting FULL diagnostics ==="
+
+            echo "--- FULL PROCESS TREE (pstree) ---"
+            pstree -ap $NPM_PID 2>/dev/null || echo "(pstree not available)"
+
+            echo "--- FULL PROCESS TREE (ps --forest) ---"
+            ps -ef --forest 2>/dev/null | grep -E "PID|npm|vitest|node|sh -c" | head -30
+
+            # Find ALL descendant PIDs recursively
+            echo "--- ALL descendant PIDs ---"
+            ALL_PIDS=$(pstree -p $NPM_PID 2>/dev/null | grep -oP '\d+' | sort -u | tr '\n' ' ')
+            echo "All PIDs: $ALL_PIDS"
+
+            # For each PID in the tree, collect detailed diagnostics
+            for PID in $ALL_PIDS; do
+              echo ""
+              echo "========================================"
+              echo "=== DIAGNOSTICS FOR PID $PID ==="
+              echo "========================================"
+
+              echo "--- ps ---"
+              ps -fp $PID 2>/dev/null || echo "(process gone)"
+
+              echo "--- /proc/PID/status ---"
+              cat /proc/$PID/status 2>/dev/null | head -25 || echo "(not available)"
+
+              echo "--- /proc/PID/cmdline ---"
+              cat /proc/$PID/cmdline 2>/dev/null | tr '\0' ' ' || echo "(not available)"
+              echo ""
+
+              echo "--- lsof -p PID ---"
+              lsof -p $PID 2>/dev/null | head -50 || echo "(lsof not available)"
+
+              echo "--- /proc/PID/fd ---"
+              ls -la /proc/$PID/fd 2>/dev/null | head -50 || echo "(not available)"
+
+              echo "--- /proc/PID/stack (if available) ---"
+              cat /proc/$PID/stack 2>/dev/null | head -20 || echo "(not available — requires CONFIG_STACKTRACE)"
+
+              echo "--- /proc/PID/wchan ---"
+              cat /proc/$PID/wchan 2>/dev/null || echo "(not available)"
+              echo ""
+
+              echo "--- threads ---"
+              ls /proc/$PID/task 2>/dev/null | head -30 || echo "(not available)"
+
+              echo "--- network connections for this PID ---"
+              ss -tnp 2>/dev/null | grep "pid=$PID" || echo "(no connections)"
+
+              # If this is a Node.js process, try SIGUSR1 to start inspector
+              CMDLINE=$(cat /proc/$PID/cmdline 2>/dev/null | tr '\0' ' ')
+              if echo "$CMDLINE" | grep -q "node\|vitest"; then
+                echo "--- Node.js process detected — sending SIGUSR1 for inspector ---"
+                kill -USR1 $PID 2>/dev/null && echo "SIGUSR1 sent" || echo "SIGUSR1 failed"
+                sleep 2
+                # Check if inspector started
+                ss -tlnp 2>/dev/null | grep "$PID" || echo "(no inspector port found)"
+              fi
+            done
+
+            echo ""
+            echo "--- KILLING entire process tree ---"
+            kill -TERM $NPM_PID 2>/dev/null
+            sleep 2
+            # Kill all descendants
+            for PID in $ALL_PIDS; do
+              kill -KILL $PID 2>/dev/null
+            done
             break
           fi
         done
 
-        wait $VITEST_PID 2>/dev/null
+        wait $NPM_PID 2>/dev/null
         EXIT_CODE=$?
         echo "Vitest exit code: $EXIT_CODE"
         if [ $EXIT_CODE -ne 0 ]; then
