@@ -700,10 +700,55 @@ jobs:
         cd frontend
         npm ci --legacy-peer-deps
     
-    - name: 🧪 Тесты frontend
+    - name: 🧪 Тесты frontend (with hang diagnostics)
       run: |
         cd frontend
-        npm run test:run -- --coverage
+        # Run vitest in background, monitor for hang
+        npm run test:run -- --coverage &
+        VITEST_PID=$!
+        echo "Vitest PID: $VITEST_PID"
+
+        # Wait up to 3 minutes, checking every 15s
+        ELAPSED=0
+        while kill -0 $VITEST_PID 2>/dev/null; do
+          sleep 15
+          ELAPSED=$((ELAPSED + 15))
+          echo "=== Still running after ${ELAPSED}s ==="
+          echo "--- ps ---"
+          ps -fp $VITEST_PID 2>/dev/null || echo "(process gone)"
+          echo "--- child processes ---"
+          pgrep -P $VITEST_PID 2>/dev/null | while read child; do
+            ps -fp $child 2>/dev/null
+          done
+          echo "--- open file descriptors (lsof) ---"
+          lsof -p $VITEST_PID 2>/dev/null | head -30
+          echo "--- /proc/PID/fd ---"
+          ls -la /proc/$VITEST_PID/fd 2>/dev/null | head -30
+
+          if [ $ELAPSED -ge 180 ]; then
+            echo "=== Vitest still running after 180s — collecting diagnostics ==="
+            echo "--- node active handles ---"
+            # Try to get active handles via /proc
+            cat /proc/$VITEST_PID/status 2>/dev/null | head -20
+            echo "--- threads ---"
+            ls /proc/$VITEST_PID/task 2>/dev/null | head -20
+            echo "--- network connections ---"
+            ss -tnp 2>/dev/null | grep $VITEST_PID || echo "(no connections)"
+            echo "--- killing vitest ---"
+            kill -TERM $VITEST_PID 2>/dev/null
+            sleep 5
+            kill -KILL $VITEST_PID 2>/dev/null
+            break
+          fi
+        done
+
+        wait $VITEST_PID 2>/dev/null
+        EXIT_CODE=$?
+        echo "Vitest exit code: $EXIT_CODE"
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "::error::Vitest exited with code $EXIT_CODE or was killed"
+          exit 1
+        fi
 
   frontend-build:
     name: Frontend build
