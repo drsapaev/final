@@ -130,35 +130,85 @@ function patch() {
   // immediately when the module loads, so they fire even if vitest hangs.
   src = TRACE_HELPER + src;
 
-  // === Patch 1 (B1): After runFiles() finishes ===
-  // The runFiles method (line ~9631) has a `finally` block that does
-  // coverage generation + reportCoverage + _testRun.end(). After that
-  // finally block, the inner async IIFE returns, then .finally() runs,
-  // then `return await this.runningPromise` returns.
+  // === Patch 1: Granular beacons inside runFiles finally block ===
+  // Per maintainer v6.1 feedback: B1 fired, but we don't know if runFiles
+  // actually completed or if hang is in its finally{} block. The finally
+  // block (lines 9661-9668) does:
+  //   1. const coverage = await this.coverageProvider?.generateCoverage({ allTestsRun });
+  //   2. const errors = this.state.getUnhandledErrors();
+  //   3. this._checkUnhandledErrors(errors);
+  //   4. await this._testRun.end(specs, errors, coverage);
+  //   5. await this.reportCoverage(coverage, allTestsRun);
   //
-  // We inject B1 right before `return await this.runningPromise;` at the
-  // end of runFiles. This fires AFTER all tests + coverage + reporters.
+  // We add beacons B1a-B1e around each step + B1f at the final return.
+  // Also capture getActiveResourcesInfo() at B1f (last confirmed point).
   //
-  // Original code at end of runFiles:
-  //   })().finally(() => {
-  //       this.runningPromise = void 0;
-  //       this.isFirstRun = false;
-  //       this.config.changed = false;
-  //       this.config.related = void 0;
-  //   });
-  //   return await this.runningPromise;
-  // }
+  // Original finally block:
+  //   } finally {
+  //       // TODO: wait for coverage only if `onFinished` is defined
+  //       const coverage = await this.coverageProvider?.generateCoverage({ allTestsRun });
+  //       const errors = this.state.getUnhandledErrors();
+  //       this._checkUnhandledErrors(errors);
+  //       await this._testRun.end(specs, errors, coverage);
+  //       await this.reportCoverage(coverage, allTestsRun);
+  //   }
   //
-  // We add B1 before `return await this.runningPromise;`
-  const runFilesReturnRegex = /(\t\treturn await this\.runningPromise;\n\t\}\n\t\/\*\*\n\t\* Collect tests in specified modules)/;
-  if (!runFilesReturnRegex.test(src)) {
-    console.error('[vitest-instrument] cannot find runFiles return point');
-    console.error('  Expected: \\t\\treturn await this.runningPromise; followed by collectTests comment');
+  // Patched:
+  //   } finally {
+  //       __vitest_trace("B1a_finally_entered", {});
+  //       const coverage = await this.coverageProvider?.generateCoverage({ allTestsRun });
+  //       __vitest_trace("B1b_after_generateCoverage", {});
+  //       const errors = this.state.getUnhandledErrors();
+  //       this._checkUnhandledErrors(errors);
+  //       __vitest_trace("B1c_after_checkUnhandledErrors", {});
+  //       await this._testRun.end(specs, errors, coverage);
+  //       __vitest_trace("B1d_after_testRun_end", {});
+  //       await this.reportCoverage(coverage, allTestsRun);
+  //       __vitest_trace("B1e_after_reportCoverage", {});
+  //   }
+  const runFilesFinallyRegex = /(\t\t\t\} finally \{\n\t\t\t\t\/\/ TODO: wait for coverage only if `onFinished` is defined\n\t\t\t\t)const coverage = await this\.coverageProvider\?\.generateCoverage\(\{ allTestsRun \}\);\n\t\t\t\t(const errors = this\.state\.getUnhandledErrors\(\);\n\t\t\t\t)this\._checkUnhandledErrors\(errors\);\n\t\t\t\t(await this\._testRun\.end\(specs, errors, coverage\);\n\t\t\t\t)await this\.reportCoverage\(coverage, allTestsRun\);\n\t\t\t\}/;
+  if (!runFilesFinallyRegex.test(src)) {
+    console.error('[vitest-instrument] cannot find runFiles finally block');
+    console.error('  Expected: } finally { ... generateCoverage ... _testRun.end ... reportCoverage }');
     process.exit(1);
   }
   src = src.replace(
+    runFilesFinallyRegex,
+    `$1__vitest_trace("B1a_finally_entered", { phase: "runFiles finally block entered" });\n\t\t\t\tconst coverage = await this.coverageProvider?.generateCoverage({ allTestsRun });\n\t\t\t\t__vitest_trace("B1b_after_generateCoverage", { phase: "generateCoverage returned" });\n\t\t\t\t$2this._checkUnhandledErrors(errors);\n\t\t\t\t__vitest_trace("B1c_after_checkUnhandledErrors", { phase: "unhandled errors checked" });\n\t\t\t\t$3__vitest_trace("B1d_after_testRun_end", { phase: "_testRun.end returned" });\n\t\t\t\tawait this.reportCoverage(coverage, allTestsRun);\n\t\t\t\t__vitest_trace("B1e_after_reportCoverage", { phase: "reportCoverage returned, finally block complete" });\n\t\t\t}`
+  );
+
+  // === Patch 1f: Around `return await this.runningPromise` ===
+  // Per maintainer v6.1: capture active resources at last confirmed point.
+  // We split `return await this.runningPromise` into:
+  //   const __runningResult = await this.runningPromise;
+  //   __vitest_trace("B1f_post_await", { active_resources, ... });
+  //   return __runningResult;
+  //
+  // B1f_post_await fires AFTER runningPromise resolves (i.e. after the
+  // async IIFE + its .finally() callback complete). This is the true
+  // "runFiles fully complete" point.
+  //
+  // We match `\t\treturn await this.runningPromise;\n\t}` — this is the
+  // runFiles method (collectTests at line 9716 uses the same pattern but
+  // we only replace the FIRST occurrence, which is runFiles).
+  const runFilesReturnRegex = /\t\treturn await this\.runningPromise;\n\t\}\n/;
+  if (!runFilesReturnRegex.test(src)) {
+    console.error('[vitest-instrument] cannot find runFiles return point');
+    console.error('  Expected: \\t\\treturn await this.runningPromise;');
+    process.exit(1);
+  }
+  // Replace only the FIRST occurrence (runFiles, not collectTests)
+  src = src.replace(
     runFilesReturnRegex,
-    '\t\t__vitest_trace("B1_after_runFiles", { phase: "tests+coverage+reporters complete, runFiles returning" });\n$1'
+    '\t\tconst __runningResult = await this.runningPromise;\n' +
+    '\t\t__vitest_trace("B1f_post_await", {\n' +
+    '\t\t\tphase: "runningPromise resolved, runFiles about to return",\n' +
+    '\t\t\tactive_resources: (typeof process.getActiveResourcesInfo === "function" ? process.getActiveResourcesInfo() : "getActiveResourcesInfo not available"),\n' +
+    '\t\t\thandles_count: (typeof process._getActiveHandles === "function" ? process._getActiveHandles().length : -1),\n' +
+    '\t\t\trequests_count: (typeof process._getActiveRequests === "function" ? process._getActiveRequests().length : -1)\n' +
+    '\t\t});\n' +
+    '\t\treturn __runningResult;\n' +
+    '\t}\n'
   );
 
   // === Patch 2 + 3 + 4 (B2, B3, B4): Around ctx.close() in startVitest ===
@@ -217,7 +267,12 @@ function patch() {
   fs.writeFileSync(VITEST_CLI_API, src);
   console.log(`[vitest-instrument] patched ${VITEST_CLI_API}`);
   console.log(`[vitest-instrument] beacons added:`);
-  console.log(`  B1  — after runFiles() returns`);
+  console.log(`  B1a — runFiles finally block entered`);
+  console.log(`  B1b — after generateCoverage`);
+  console.log(`  B1c — after checkUnhandledErrors`);
+  console.log(`  B1d — after _testRun.end`);
+  console.log(`  B1e — after reportCoverage (finally complete)`);
+  console.log(`  B1f — after runningPromise resolves, before runFiles returns (with getActiveResourcesInfo, handles_count, requests_count)`);
   console.log(`  B2  — before ctx.close() (with getActiveResourcesInfo)`);
   console.log(`  B2a — inside ctx.close() entry`);
   console.log(`  B3  — after ctx.close() returns`);
@@ -226,7 +281,7 @@ function patch() {
   console.log(`  B6  — process.on('exit')`);
   console.log(`[vitest-instrument] trace lines: VITEST_TRACE:{json} on stderr`);
   patcherLog('vitest_instrument_applied', {
-    beacons: ['B1', 'B2', 'B2a', 'B3', 'B4', 'B5', 'B6'],
+    beacons: ['B1a', 'B1b', 'B1c', 'B1d', 'B1e', 'B1f', 'B2', 'B2a', 'B3', 'B4', 'B5', 'B6'],
   });
 }
 
