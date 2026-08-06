@@ -752,22 +752,35 @@ jobs:
     - name: 🔬 Instrument tinypool worker lifecycle beacons (v8)
       # Patches node_modules/tinypool/dist/entry/process.js (worker entry
       # for child_process runtime, used by forks pool).
-      # Per maintainer v8 plan: v7 confirmed hang is INSIDE pool.run()
-      # for the 170-file singleFork batch. All tests complete, but
-      # pool.run() never resolves. Now we see what the WORKER does
-      # after tests complete.
-      #
-      # Worker beacons:
-      #   W_MSG_RECV      — worker received task message
-      #   W_HANDLER_PRE   — before handler(task) call
-      #   W_HANDLER_DONE  — handler returned (with active_resources)
-      #   W_SEND_PRE      — before send(response)
-      #   W_SEND_POST     — send(response) returned
-      #   W_BEFOREEXIT    — process.on('beforeExit')
-      #   W_EXIT          — process.on('exit')
       run: |
         cd frontend
         node "$GITHUB_WORKSPACE/scripts/ci/instrument-worker-v8.js"
+
+    - name: 🔬 Instrument vitest worker.js execute() beacons (v9)
+      # Patches node_modules/vitest/dist/worker.js to add beacons inside
+      # the execute() function — the handler that tinypool invokes.
+      # Per maintainer v9 plan: v8 confirmed hang is INSIDE handler(task)
+      # for the 170-file batch in Worker 2. Now we instrument execute()
+      # to find which await never returns.
+      #
+      # Beacons (with elapsed_ms for each phase):
+      #   VW_EXECUTE_ENTER     — execute() function entry
+      #   VW_IMPORT_RUNNER     — after import(file)
+      #   VW_ENV_LOADED        — after loadEnvironment()
+      #   VW_RUNTESTS_PRE      — before worker[methodName](state)
+      #   VW_RUNTESTS_POST     — after worker[methodName](state) returns
+      #   VW_FINALLY_ENTER     — finally block entered
+      #   VW_RPCDONE_PRE       — before rpcDone()
+      #   VW_RPCDONE_POST      — after rpcDone() returns
+      #   VW_INSPECTOR_CLEANUP — after inspectorCleanup()
+      #
+      # Interpretation:
+      #   VW_RUNTESTS_PRE yes, VW_RUNTESTS_POST no → hang INSIDE worker.runTests()
+      #   VW_RUNTESTS_POST yes, VW_RPCDONE_POST no → hang in rpcDone()
+      #   VW_RPCDONE_POST yes, VW_INSPECTOR_CLEANUP no → hang in inspectorCleanup()
+      run: |
+        cd frontend
+        node "$GITHUB_WORKSPACE/scripts/ci/instrument-vitest-worker-v9.js"
 
     - name: ✅ Verify instrumentation is in executed file
       # Per maintainer v6.2: MUST verify the patch was actually applied
@@ -813,12 +826,22 @@ jobs:
         grep -n "W_BEFOREEXIT" "$TINYPOOL_WORKER" | head -3 || { echo "::error::W_BEFOREEXIT NOT FOUND"; exit 1; }
 
         echo ""
+        echo "--- v9: vitest dist/worker.js ---"
+        VITEST_WORKER_JS="node_modules/vitest/dist/worker.js"
+        if [ ! -f "$VITEST_WORKER_JS" ]; then
+          echo "::error::Vitest worker.js not found: $VITEST_WORKER_JS"
+          exit 1
+        fi
+        echo "File: $VITEST_WORKER_JS ($(wc -c < $VITEST_WORKER_JS) bytes)"
+        grep -n "VW_EXECUTE_ENTER" "$VITEST_WORKER_JS" | head -3 || { echo "::error::VW_EXECUTE_ENTER NOT FOUND"; exit 1; }
+        grep -n "VW_RUNTESTS_PRE" "$VITEST_WORKER_JS" | head -3 || { echo "::error::VW_RUNTESTS_PRE NOT FOUND"; exit 1; }
+        grep -n "VW_RUNTESTS_POST" "$VITEST_WORKER_JS" | head -3 || { echo "::error::VW_RUNTESTS_POST NOT FOUND"; exit 1; }
+        grep -n "VW_RPCDONE_POST" "$VITEST_WORKER_JS" | head -3 || { echo "::error::VW_RPCDONE_POST NOT FOUND"; exit 1; }
+
+        echo ""
         echo "✓ All critical beacons verified present in executed files"
 
-    - name: 🧪 Тесты frontend (v8 — worker lifecycle beacons)
-      # Per maintainer v8 plan: v7 confirmed hang is INSIDE pool.run()
-      # for 170-file singleFork batch. This run instruments the WORKER
-      # process to see what it does after all tests complete.
+    - name: 🧪 Тесты frontend (v9 — vitest worker execute() beacons)
       #
       # Four interpretation scenarios:
       #   1. W_MSG_RECV yes, W_HANDLER_DONE no → hang INSIDE handler(task)
@@ -833,7 +856,7 @@ jobs:
         echo ""
 
         # 720s timeout — same as previous runs for direct comparison.
-        timeout 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-v8-output.log
+        timeout 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-v9-output.log
 
         EXIT_CODE=${PIPESTATUS[0]}
         echo ""
@@ -844,7 +867,7 @@ jobs:
         echo "========================================"
         echo "=== POOL TRACE (v7 — per-spec beacons) ==="
         echo "========================================"
-        grep "POOL_TRACE:" /tmp/vitest-v8-output.log > /tmp/pool-trace-extracted.log || true
+        grep "POOL_TRACE:" /tmp/vitest-v9-output.log > /tmp/pool-trace-extracted.log || true
 
         if [ -s /tmp/pool-trace-extracted.log ]; then
           echo "Total pool beacons: $(wc -l < /tmp/pool-trace-extracted.log)"
@@ -866,7 +889,7 @@ jobs:
         echo "========================================"
         echo "=== VITEST LIFECYCLE BEACONS (v6) ==="
         echo "========================================"
-        grep "VITEST_TRACE:" /tmp/vitest-v8-output.log > /tmp/vitest-trace-extracted.log || true
+        grep "VITEST_TRACE:" /tmp/vitest-v9-output.log > /tmp/vitest-trace-extracted.log || true
         if [ -s /tmp/vitest-trace-extracted.log ]; then
           echo "Total vitest beacons: $(wc -l < /tmp/vitest-trace-extracted.log)"
           echo ""
@@ -884,7 +907,7 @@ jobs:
         echo "========================================"
         echo "=== TINYPOOL TRACE (cross-reference) ==="
         echo "========================================"
-        grep "TINYPOOL_TRACE:" /tmp/vitest-v8-output.log > /tmp/tinypool-trace-extracted.log || true
+        grep "TINYPOOL_TRACE:" /tmp/vitest-v9-output.log > /tmp/tinypool-trace-extracted.log || true
         if [ -s /tmp/tinypool-trace-extracted.log ]; then
           echo "Total tinypool events: $(wc -l < /tmp/tinypool-trace-extracted.log)"
           echo "--- Event type counts ---"
@@ -896,9 +919,9 @@ jobs:
         # Extract WORKER_TRACE beacons (v8 — worker lifecycle)
         echo ""
         echo "========================================"
-        echo "=== WORKER TRACE (v8 — worker lifecycle) ==="
+        echo "=== WORKER TRACE (v8 — tinypool worker lifecycle) ==="
         echo "========================================"
-        grep "WORKER_TRACE:" /tmp/vitest-v8-output.log > /tmp/worker-trace-extracted.log || true
+        grep "WORKER_TRACE:" /tmp/vitest-v9-output.log > /tmp/worker-trace-extracted.log || true
         if [ -s /tmp/worker-trace-extracted.log ]; then
           echo "Total worker beacons: $(wc -l < /tmp/worker-trace-extracted.log)"
           echo ""
@@ -914,49 +937,75 @@ jobs:
           echo "(NO WORKER_TRACE beacons found — worker process.js may not have been used)"
         fi
 
-        # Decision tree — focused on v8 worker beacons
+        # Extract VW_TRACE beacons (v9 — vitest worker execute() lifecycle)
         echo ""
         echo "========================================"
-        echo "=== DECISION TREE LOCALIZATION (v8 — worker lifecycle) ==="
+        echo "=== VW TRACE (v9 — vitest worker execute() lifecycle) ==="
         echo "========================================"
+        grep "VW_TRACE:" /tmp/vitest-v9-output.log > /tmp/vw-trace-extracted.log || true
+        if [ -s /tmp/vw-trace-extracted.log ]; then
+          echo "Total VW beacons: $(wc -l < /tmp/vw-trace-extracted.log)"
+          echo ""
+          echo "--- Beacon type counts ---"
+          sed -E 's/.*VW_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/vw-trace-extracted.log | sort | uniq -c | sort -rn
+          echo ""
+          echo "--- All VW beacons (in order, with elapsed_ms) ---"
+          cat /tmp/vw-trace-extracted.log
+        else
+          echo "(NO VW_TRACE beacons found — vitest worker.js may not have been used)"
+        fi
+
+        # Decision tree — focused on v9 VW beacons (vitest worker execute)
+        echo ""
+        echo "========================================"
+        echo "=== DECISION TREE LOCALIZATION (v9 — vitest worker execute) ==="
+        echo "========================================"
+        VW_BEACONS=$(sed -E 's/.*VW_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/vw-trace-extracted.log 2>/dev/null | sort -u)
+        echo "VW beacons fired:"
+        echo "$VW_BEACONS" | sed 's/^/  /'
+        echo ""
+        echo "--- VW scenario detection ---"
+        if echo "$VW_BEACONS" | grep -q "VW_RUNTESTS_PRE"; then
+          echo "✓ VW_RUNTESTS_PRE fired — execute() reached worker[methodName](state)"
+          if echo "$VW_BEACONS" | grep -q "VW_RUNTESTS_POST"; then
+            echo "✓ VW_RUNTESTS_POST fired — worker[methodName](state) RETURNED"
+            if echo "$VW_BEACONS" | grep -q "VW_RPCDONE_POST"; then
+              echo "✓ VW_RPCDONE_POST fired — rpcDone() returned"
+              if echo "$VW_BEACONS" | grep -q "VW_INSPECTOR_CLEANUP"; then
+                echo "✓ VW_INSPECTOR_CLEANUP fired — execute() completed cleanup"
+                echo "→ All VW beacons fired. execute() completed. Hang is elsewhere."
+              else
+                echo "✗ VW_INSPECTOR_CLEANUP NOT fired — hang in inspectorCleanup()"
+              fi
+            else
+              echo "✗ VW_RPCDONE_POST NOT fired — hang in rpcDone()"
+              echo "  rpcDone() waits for pending RPC calls to complete"
+            fi
+          else
+            echo "✗ VW_RUNTESTS_POST NOT fired — hang INSIDE worker[methodName](state)"
+            echo "→ worker.runTests() never returned. This is the test execution."
+            echo "  Tests print ✓ but runTests() Promise never resolves."
+            echo "  Next: instrument worker.runTests() internals"
+          fi
+        else
+          echo "✗ VW_RUNTESTS_PRE NOT fired — hang BEFORE worker[methodName](state)"
+          if echo "$VW_BEACONS" | grep -q "VW_ENV_LOADED"; then
+            echo "  VW_ENV_LOADED fired — hang between env load and runTests call"
+          elif echo "$VW_BEACONS" | grep -q "VW_IMPORT_RUNNER"; then
+            echo "  VW_IMPORT_RUNNER fired — hang in loadEnvironment()"
+          elif echo "$VW_BEACONS" | grep -q "VW_EXECUTE_ENTER"; then
+            echo "  VW_EXECUTE_ENTER fired — hang in import(file)"
+          else
+            echo "  No VW beacons fired — execute() never entered"
+          fi
+        fi
+
+        # Cross-reference with v8 worker beacons
+        echo ""
+        echo "--- v8 worker beacons (cross-reference) ---"
         WORKER_BEACONS=$(sed -E 's/.*WORKER_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/worker-trace-extracted.log 2>/dev/null | sort -u)
         echo "Worker beacons fired:"
         echo "$WORKER_BEACONS" | sed 's/^/  /'
-        echo ""
-        echo "--- Worker scenario detection ---"
-        if echo "$WORKER_BEACONS" | grep -q "W_MSG_RECV"; then
-          echo "✓ W_MSG_RECV fired — worker received task message"
-          if echo "$WORKER_BEACONS" | grep -q "W_HANDLER_DONE"; then
-            echo "✓ W_HANDLER_DONE fired — handler(task) returned"
-            if echo "$WORKER_BEACONS" | grep -q "W_SEND_POST"; then
-              echo "✓ W_SEND_POST fired — worker sent response to parent"
-              if echo "$WORKER_BEACONS" | grep -q "W_BEFOREEXIT"; then
-                echo "✓ W_BEFOREEXIT fired — worker reached beforeExit phase"
-                if echo "$WORKER_BEACONS" | grep -q "W_EXIT"; then
-                  echo "✓ W_EXIT fired — worker exited normally"
-                  echo "→ All worker beacons fired. Worker exited. Hang is in PARENT."
-                else
-                  echo "✗ W_EXIT NOT fired — hang in exit handlers"
-                fi
-              else
-                echo "✗ W_BEFOREEXIT NOT fired — worker sent result but can't exit"
-                echo "→ SCENARIO 3: active handles keeping worker event loop alive"
-                echo "  Check W_HANDLER_DONE active_resources above for what's holding it"
-              fi
-            else
-              echo "✗ W_SEND_POST NOT fired — hang in send() IPC"
-              echo "→ SCENARIO 2: worker has result but can't send to parent"
-            fi
-          else
-            echo "✗ W_HANDLER_DONE NOT fired — hang INSIDE handler(task)"
-            echo "→ SCENARIO 1: worker stuck executing tests"
-          fi
-        else
-          echo "✗ W_MSG_RECV NOT fired — worker never received task message"
-          echo "→ Hang is in parent-side message dispatch, OR worker.js (threads) used"
-        fi
-
-        # Also show v7 pool beacons for cross-reference
         echo ""
         echo "--- v7 pool beacons (cross-reference) ---"
         POOL_BEACONS=$(sed -E 's/.*POOL_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/pool-trace-extracted.log 2>/dev/null)
@@ -969,7 +1018,7 @@ jobs:
 
         echo ""
         echo "=== Last 30 lines of vitest output ==="
-        tail -30 /tmp/vitest-v8-output.log
+        tail -30 /tmp/vitest-v9-output.log
 
         if [ $EXIT_CODE -eq 124 ]; then
           echo "::error::Vitest timed out after 720s (see beacons above for stall point)"
