@@ -51,11 +51,27 @@ const TINYPOOL_INDEX = path.join(
 const TRACE_FILE = '/tmp/tinypool-trace.jsonl';
 const SENTINEL = '__tp_trace';
 
-// ESM-safe trace helper injected at top of patched file
+// ESM-safe trace helper injected at top of patched file.
+// Captures BOTH wall-clock (Date.now) AND monotonic time (process.hrtime.bigint)
+// relative to the first trace call. The monotonic offset lets us distinguish
+// "events stopped immediately" from "events stopped after a long wait".
+// Monotonic nanoseconds are immune to system clock adjustments and are the
+// correct primitive for measuring elapsed time between events.
 const TRACE_HELPER = `
+var __tp_trace_start = null;
 function __tp_trace(event, payload) {
   try {
-    var line = JSON.stringify({ts: Date.now(), pid: process.pid, event: event, payload: payload || {}});
+    var now = Date.now();
+    var hr = process.hrtime.bigint();
+    if (__tp_trace_start === null) __tp_trace_start = hr;
+    var monotonic_ns = Number(hr - __tp_trace_start);
+    var line = JSON.stringify({
+      ts: now,
+      mono_ms: Math.round(monotonic_ns / 1000000),
+      pid: process.pid,
+      event: event,
+      payload: payload || {}
+    });
     process.stderr.write('TINYPOOL_TRACE:' + line + '\\n');
   } catch (e) { /* never break vitest */ }
 }

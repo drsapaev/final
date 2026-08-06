@@ -704,41 +704,48 @@ jobs:
       # Patches node_modules/tinypool/dist/index.js to log every step
       # of the shutdown path (Tinypool.destroy → Pool.destroy →
       # WorkerInfo.destroy → worker.terminate). Each step writes a
-      # TINYPOOL_TRACE:{...} JSON line to stderr. Lets us determine
-      # whether shutdown was even initiated, and if so, where it stalls.
+      # TINYPOOL_TRACE:{...} JSON line to stderr with BOTH wall-clock
+      # (Date.now) AND monotonic (process.hrtime.bigint) timestamps.
+      # The monotonic offset lets us distinguish "events stopped
+      # immediately" from "events stopped after a long wait".
       run: |
         cd frontend
         node "$GITHUB_WORKSPACE/scripts/ci/instrument-tinypool-v5.js"
 
-    - name: 🧪 Тесты frontend (v5 subset + instrumentation)
-      # Per maintainer v5 plan — instead of running full suite, run ONLY
-      # the 5 candidate test files that transitively import fetch-using
-      # modules. If hang reproduces, area narrowed. If not, cause is
-      # outside this group.
+    - name: 🧪 Тесты frontend (v5 full suite + instrumentation)
+      # Per maintainer v5 plan: run the FULL suite with instrumentation
+      # active. This is the actual hang scenario — answers 4 mutually
+      # exclusive questions about WHERE the process stalls:
       #
-      # The 5 files (identified in v5-1 import analysis)
-      #   1. hooks/__tests__/useVisitLifecycle.test.tsx (no mocks, real import)
-      #   2. components/laboratory/__tests__/LabReportWorkbench.test.tsx (vi.mock labReporting)
-      #   3. components/dermatology/__tests__/PhotoUploader.test.tsx (no fetch mock)
-      #   4. components/doctor/__tests__/DoctorQueuePanel.test.tsx (global.fetch = fetchMock)
-      #   5. components/layout/__tests__/HeaderNew.test.tsx (transitive via VoiceMessage)
+      # 1. No tinypool_destroy_enter at all
+      #    → shutdown never started. Problem is upstream of Tinypool:
+      #      Vitest Runner, Coverage finalization, Reporter, ctx.close()
+      #      not being called, etc.
+      #
+      # 2. tinypool_destroy_enter present, but no workerinfo_destroy_terminate_done
+      #    → shutdown started but worker.terminate() never returned.
+      #      Continue investigating Tinypool/worker side.
+      #
+      # 3. workerinfo_destroy_terminate_done present, but no tinypool_destroy_complete
+      #    → worker died, but hang is in awaiting other Promises inside
+      #      destroy (e.g. exit event listeners, port.close()).
+      #
+      # 4. tinypool_destroy_complete present, but process still alive
+      #    → Tinypool shutdown ran cleanly. Hang is OUTSIDE Tinypool:
+      #      open handle in Vitest, coverage provider, reporter,
+      #      or another process (esbuild).
+      #
+      # Monotonic timestamps let us distinguish instantaneous stops
+      # from long waits between events.
       run: |
         cd frontend
-        echo "=== Running subset of 5 candidate test files ==="
-        echo "=== (with tinypool shutdown instrumentation active) ==="
+        echo "=== Running FULL vitest suite with tinypool instrumentation ==="
+        echo "=== (this is the actual hang reproduction scenario) ==="
         echo ""
 
-        # Run vitest on the 5 files only, with --coverage to match
-        # the production CI configuration.
-        # Timeout at 5 minutes — if it hangs, we want the log captured
-        # before the job-level timeout-minutes: 15 kicks in.
-        timeout 300 npx vitest run --coverage \
-          src/hooks/__tests__/useVisitLifecycle.test.tsx \
-          src/components/laboratory/__tests__/LabReportWorkbench.test.tsx \
-          src/components/dermatology/__tests__/PhotoUploader.test.tsx \
-          src/components/doctor/__tests__/DoctorQueuePanel.test.tsx \
-          src/components/layout/__tests__/HeaderNew.test.tsx \
-          2>&1 | tee /tmp/vitest-subset-output.log
+        # 12-minute hard timeout — well below the job-level 15-min limit.
+        # If vitest hangs, we still capture the trace log before kill.
+        timeout 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-full-output.log
 
         EXIT_CODE=${PIPESTATUS[0]}
         echo ""
@@ -747,12 +754,36 @@ jobs:
         # Extract and display all TINYPOOL_TRACE lines for analysis
         echo ""
         echo "========================================"
-        echo "=== TINYPOOL SHUTDOWN TRACE ==="
+        echo "=== TINYPOOL SHUTDOWN TRACE (full suite) ==="
         echo "========================================"
-        grep "TINYPOOL_TRACE:" /tmp/vitest-subset-output.log || echo "(no trace lines found — shutdown may not have been initiated)"
+        grep "TINYPOOL_TRACE:" /tmp/vitest-full-output.log > /tmp/tinypool-trace-extracted.log || true
+
+        if [ -s /tmp/tinypool-trace-extracted.log ]; then
+          echo "Total trace events: $(wc -l < /tmp/tinypool-trace-extracted.log)"
+          echo ""
+          echo "--- First 5 events ---"
+          head -5 /tmp/tinypool-trace-extracted.log
+          echo ""
+          echo "--- Last 20 events (most relevant for stall detection) ---"
+          tail -20 /tmp/tinypool-trace-extracted.log
+          echo ""
+          echo "--- Event type counts ---"
+          # Strip payload, extract just the event name, count occurrences
+          sed -E 's/.*TINYPOOL_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/tinypool-trace-extracted.log | sort | uniq -c | sort -rn
+        else
+          echo "(NO TINYPOOL_TRACE lines found)"
+          echo ""
+          echo "This means tinypool_destroy_enter was NEVER called."
+          echo "The hang is UPSTREAM of Tinypool shutdown — likely in"
+          echo "Vitest Runner, Coverage finalization, or ctx.close() orchestration."
+        fi
+
+        echo ""
+        echo "=== Last 50 lines of vitest output (for context) ==="
+        tail -50 /tmp/vitest-full-output.log
 
         if [ $EXIT_CODE -eq 124 ]; then
-          echo "::error::Vitest timed out after 300s (process hang detected)"
+          echo "::error::Vitest timed out after 720s (process hang detected — see TINYPOOL_TRACE above for stall point)"
           exit 1
         elif [ $EXIT_CODE -ne 0 ]; then
           echo "::error::Vitest exited with code $EXIT_CODE"
