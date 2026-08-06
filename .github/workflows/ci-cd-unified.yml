@@ -699,11 +699,65 @@ jobs:
       run: |
         cd frontend
         npm ci --legacy-peer-deps
-    
-    - name: 🧪 Тесты frontend
+
+    - name: 🔬 Instrument tinypool shutdown path (v5)
+      # Patches node_modules/tinypool/dist/index.js to log every step
+      # of the shutdown path (Tinypool.destroy → Pool.destroy →
+      # WorkerInfo.destroy → worker.terminate). Each step writes a
+      # TINYPOOL_TRACE:{...} JSON line to stderr. Lets us determine
+      # whether shutdown was even initiated, and if so, where it stalls.
       run: |
         cd frontend
-        npm run test:run -- --coverage
+        node "$GITHUB_WORKSPACE/scripts/ci/instrument-tinypool-v5.js"
+
+    - name: 🧪 Тесты frontend (v5 subset + instrumentation)
+      # Per maintainer v5 plan — instead of running full suite, run ONLY
+      # the 5 candidate test files that transitively import fetch-using
+      # modules. If hang reproduces, area narrowed. If not, cause is
+      # outside this group.
+      #
+      # The 5 files (identified in v5-1 import analysis)
+      #   1. hooks/__tests__/useVisitLifecycle.test.tsx (no mocks, real import)
+      #   2. components/laboratory/__tests__/LabReportWorkbench.test.tsx (vi.mock labReporting)
+      #   3. components/dermatology/__tests__/PhotoUploader.test.tsx (no fetch mock)
+      #   4. components/doctor/__tests__/DoctorQueuePanel.test.tsx (global.fetch = fetchMock)
+      #   5. components/layout/__tests__/HeaderNew.test.tsx (transitive via VoiceMessage)
+      run: |
+        cd frontend
+        echo "=== Running subset of 5 candidate test files ==="
+        echo "=== (with tinypool shutdown instrumentation active) ==="
+        echo ""
+
+        # Run vitest on the 5 files only, with --coverage to match
+        # the production CI configuration.
+        # Timeout at 5 minutes — if it hangs, we want the log captured
+        # before the job-level timeout-minutes: 15 kicks in.
+        timeout 300 npx vitest run --coverage \
+          src/hooks/__tests__/useVisitLifecycle.test.tsx \
+          src/components/laboratory/__tests__/LabReportWorkbench.test.tsx \
+          src/components/dermatology/__tests__/PhotoUploader.test.tsx \
+          src/components/doctor/__tests__/DoctorQueuePanel.test.tsx \
+          src/components/layout/__tests__/HeaderNew.test.tsx \
+          2>&1 | tee /tmp/vitest-subset-output.log
+
+        EXIT_CODE=${PIPESTATUS[0]}
+        echo ""
+        echo "=== Vitest exit code: $EXIT_CODE ==="
+
+        # Extract and display all TINYPOOL_TRACE lines for analysis
+        echo ""
+        echo "========================================"
+        echo "=== TINYPOOL SHUTDOWN TRACE ==="
+        echo "========================================"
+        grep "TINYPOOL_TRACE:" /tmp/vitest-subset-output.log || echo "(no trace lines found — shutdown may not have been initiated)"
+
+        if [ $EXIT_CODE -eq 124 ]; then
+          echo "::error::Vitest timed out after 300s (process hang detected)"
+          exit 1
+        elif [ $EXIT_CODE -ne 0 ]; then
+          echo "::error::Vitest exited with code $EXIT_CODE"
+          exit 1
+        fi
 
   frontend-build:
     name: Frontend build
