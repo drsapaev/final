@@ -130,6 +130,43 @@ function patch() {
   // immediately when the module loads, so they fire even if vitest hangs.
   src = TRACE_HELPER + src;
 
+  // === Patch B0: Beacons around `await this.pool.runTests(specs, invalidates)` ===
+  // Per maintainer v6.2 feedback: previous v6.1 run showed NO beacons fired
+  // (only B6_exit). This could mean:
+  //   (a) hang is before pool.runTests, OR
+  //   (b) patch was applied to wrong file / wrong chunk version
+  //
+  // To distinguish, we add ONLY 2 beacons around pool.runTests (the most
+  // likely culprit) AND verify the patch is in the executed file.
+  //
+  // Interpretation:
+  //   B0_pre present, B0_post absent → hang INSIDE pool.runTests()
+  //   B0_post present                → pool.runTests returns, look elsewhere
+  //   B0_pre absent                  → hang BEFORE pool.runTests (earlier in
+  //                                    runFiles try block) OR patch not applied
+  //
+  // Original (vitest 3.2.7, line 9648, 5-tab indent):
+  //   \t\t\t\ttry {
+  //   \t\t\t\t\tawait this.pool.runTests(specs, invalidates);
+  //   \t\t\t\t} catch (err) {
+  //
+  // Patched:
+  //   \t\t\t\ttry {
+  //   \t\t\t\t\t__vitest_trace("B0_pre_runTests", {});
+  //   \t\t\t\t\tawait this.pool.runTests(specs, invalidates);
+  //   \t\t\t\t\t__vitest_trace("B0_post_runTests", {});
+  //   \t\t\t\t} catch (err) {
+  const poolRunTestsRegex = /(\t\t\t\ttry \{\n\t\t\t\t\t)await this\.pool\.runTests\(specs, invalidates\);(\n\t\t\t\t\} catch \(err\) \{)/;
+  if (!poolRunTestsRegex.test(src)) {
+    console.error('[vitest-instrument] cannot find pool.runTests call to patch');
+    console.error('  Expected: \\t\\t\\t\\ttry { \\n\\t\\t\\t\\t\\tawait this.pool.runTests(specs, invalidates); \\n\\t\\t\\t\\t} catch (err) {');
+    process.exit(1);
+  }
+  src = src.replace(
+    poolRunTestsRegex,
+    `$1__vitest_trace("B0_pre_runTests", { phase: "about to call pool.runTests" });\n\t\t\t\t\tawait this.pool.runTests(specs, invalidates);\n\t\t\t\t\t__vitest_trace("B0_post_runTests", { phase: "pool.runTests returned" });$2`
+  );
+
   // === Patch 1: Granular beacons inside runFiles finally block ===
   // Per maintainer v6.1 feedback: B1 fired, but we don't know if runFiles
   // actually completed or if hang is in its finally{} block. The finally
@@ -267,6 +304,8 @@ function patch() {
   fs.writeFileSync(VITEST_CLI_API, src);
   console.log(`[vitest-instrument] patched ${VITEST_CLI_API}`);
   console.log(`[vitest-instrument] beacons added:`);
+  console.log(`  B0_pre_runTests  — before await this.pool.runTests()`);
+  console.log(`  B0_post_runTests — after pool.runTests() returns`);
   console.log(`  B1a — runFiles finally block entered`);
   console.log(`  B1b — after generateCoverage`);
   console.log(`  B1c — after checkUnhandledErrors`);
