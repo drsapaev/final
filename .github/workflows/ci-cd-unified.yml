@@ -841,187 +841,106 @@ jobs:
         echo ""
         echo "✓ All critical beacons verified present in executed files"
 
-    - name: 🧪 Тесты frontend (v9 — vitest worker execute() beacons)
+    - name: 🧪 Тесты frontend (v10 — bisect + handle capture)
+      # Per maintainer v10 directive: STOP instrumenting vitest internals.
+      # Strategy shifted to:
+      #   1. Capture active handles after each test file (via setupFiles)
+      #   2. Automatic bisect of 170-file batch to find trigger file
       #
-      # Four interpretation scenarios:
-      #   1. W_MSG_RECV yes, W_HANDLER_DONE no → hang INSIDE handler(task)
-      #   2. W_HANDLER_DONE yes, W_SEND_POST no → hang in send() IPC
-      #   3. W_SEND_POST yes, W_BEFOREEXIT no → worker sent result but
-      #      can't exit (active handles keeping event loop alive)
-      #   4. W_BEFOREEXIT yes, W_EXIT no → hang in exit handlers
+      # This run supports BISECT_HALF env variable:
+      #   BISECT_HALF=first  → run first half of 170-file batch
+      #   BISECT_HALF=second → run second half
+      #   BISECT_HALF=full   → run full suite (default, for handle capture)
+      #
+      # Handle capture: src/test/handles-capture-setup.ts registers afterAll
+      # hook that writes HANDLES_TRACE:{json} to stderr after each test file.
       run: |
         cd frontend
-        echo "=== Running FULL vitest suite with v8 worker lifecycle beacons ==="
-        echo "=== (v6 + v7 + v8 worker + tinypool instrumentation) ==="
+        echo "=== v10: bisect + handle capture ==="
+        echo "=== BISECT_HALF=${BISECT_HALF:-full} ==="
         echo ""
 
-        # 720s timeout — same as previous runs for direct comparison.
-        timeout 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-v9-output.log
+        # Determine which files to run
+        if [ "${BISECT_HALF}" = "first" ] || [ "${BISECT_HALF}" = "second" ]; then
+          # Read batch file list and split
+          # The batch files are stored in scripts/ci/batch-files.txt
+          BATCH_FILE="$GITHUB_WORKSPACE/scripts/ci/batch-files.txt"
+          if [ ! -f "$BATCH_FILE" ]; then
+            echo "::error::Batch file list not found: $BATCH_FILE"
+            exit 1
+          fi
+          TOTAL=$(wc -l < "$BATCH_FILE")
+          HALF=$((TOTAL / 2))
+          echo "Total batch files: $TOTAL, split point: $HALF"
+          if [ "${BISECT_HALF}" = "first" ]; then
+            head -n "$HALF" "$BATCH_FILE" > /tmp/bisect-files.txt
+            echo "Running first half: $(wc -l < /tmp/bisect-files.txt) files"
+          else
+            tail -n +$((HALF + 1)) "$BATCH_FILE" > /tmp/bisect-files.txt
+            echo "Running second half: $(wc -l < /tmp/bisect-files.txt) files"
+          fi
+          echo "Files in this run:"
+          cat /tmp/bisect-files.txt | head -10
+          echo "..."
+          cat /tmp/bisect-files.txt | tail -5
+          echo ""
+
+          # Run vitest with explicit file list
+          # Convert file list to space-separated args
+          FILES_ARGS=$(cat /tmp/bisect-files.txt | tr '\n' ' ')
+          timeout 720 npx vitest run $FILES_ARGS 2>&1 | tee /tmp/vitest-v10-output.log
+        else
+          echo "Running FULL suite (no bisect) with handle capture"
+          timeout 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-v10-output.log
+        fi
 
         EXIT_CODE=${PIPESTATUS[0]}
         echo ""
         echo "=== Vitest exit code: $EXIT_CODE ==="
 
-        # Extract POOL_TRACE beacons (v7 — per-spec)
+        # Extract HANDLES_TRACE — captured after each test file
         echo ""
         echo "========================================"
-        echo "=== POOL TRACE (v7 — per-spec beacons) ==="
+        echo "=== HANDLES TRACE (after each test file) ==="
         echo "========================================"
-        grep "POOL_TRACE:" /tmp/vitest-v9-output.log > /tmp/pool-trace-extracted.log || true
-
-        if [ -s /tmp/pool-trace-extracted.log ]; then
-          echo "Total pool beacons: $(wc -l < /tmp/pool-trace-extracted.log)"
+        grep "HANDLES_TRACE:" /tmp/vitest-v10-output.log > /tmp/handles-trace-extracted.log || true
+        if [ -s /tmp/handles-trace-extracted.log ]; then
+          TOTAL_CAPTURES=$(wc -l < /tmp/handles-trace-extracted.log)
+          echo "Total afterAll captures: $TOTAL_CAPTURES"
           echo ""
-          echo "--- Beacon type counts ---"
-          sed -E 's/.*POOL_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/pool-trace-extracted.log | sort | uniq -c | sort -rn
-          echo ""
-          echo "--- First 30 pool beacons ---"
-          head -30 /tmp/pool-trace-extracted.log
-          echo ""
-          echo "--- Last 30 pool beacons (most relevant for stall detection) ---"
-          tail -30 /tmp/pool-trace-extracted.log
+          echo "--- Last 10 captures (most relevant — shows handles at end) ---"
+          tail -10 /tmp/handles-trace-extracted.log
         else
-          echo "(NO POOL_TRACE beacons found — pool.runTests may not have been called)"
+          echo "(NO HANDLES_TRACE captures found — setup file may not have loaded)"
         fi
 
-        # Extract VITEST_TRACE beacons (v6 — lifecycle)
+        # Extract VW_TRACE for cross-reference (did runTests hang?)
         echo ""
         echo "========================================"
-        echo "=== VITEST LIFECYCLE BEACONS (v6) ==="
+        echo "=== VW TRACE (v9 — did runTests hang?) ==="
         echo "========================================"
-        grep "VITEST_TRACE:" /tmp/vitest-v9-output.log > /tmp/vitest-trace-extracted.log || true
-        if [ -s /tmp/vitest-trace-extracted.log ]; then
-          echo "Total vitest beacons: $(wc -l < /tmp/vitest-trace-extracted.log)"
-          echo ""
-          echo "--- Beacon type counts ---"
-          sed -E 's/.*VITEST_TRACE:.*"beacon":"([^"]+)".*/\1/' /tmp/vitest-trace-extracted.log | sort | uniq -c | sort -rn
-          echo ""
-          echo "--- All vitest beacons ---"
-          cat /tmp/vitest-trace-extracted.log
-        else
-          echo "(NO VITEST_TRACE beacons found)"
-        fi
-
-        # Also extract TINYPOOL_TRACE for cross-reference
-        echo ""
-        echo "========================================"
-        echo "=== TINYPOOL TRACE (cross-reference) ==="
-        echo "========================================"
-        grep "TINYPOOL_TRACE:" /tmp/vitest-v9-output.log > /tmp/tinypool-trace-extracted.log || true
-        if [ -s /tmp/tinypool-trace-extracted.log ]; then
-          echo "Total tinypool events: $(wc -l < /tmp/tinypool-trace-extracted.log)"
-          echo "--- Event type counts ---"
-          sed -E 's/.*TINYPOOL_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/tinypool-trace-extracted.log | sort | uniq -c | sort -rn
-        else
-          echo "(NO TINYPOOL_TRACE events)"
-        fi
-
-        # Extract WORKER_TRACE beacons (v8 — worker lifecycle)
-        echo ""
-        echo "========================================"
-        echo "=== WORKER TRACE (v8 — tinypool worker lifecycle) ==="
-        echo "========================================"
-        grep "WORKER_TRACE:" /tmp/vitest-v9-output.log > /tmp/worker-trace-extracted.log || true
-        if [ -s /tmp/worker-trace-extracted.log ]; then
-          echo "Total worker beacons: $(wc -l < /tmp/worker-trace-extracted.log)"
-          echo ""
-          echo "--- Beacon type counts ---"
-          sed -E 's/.*WORKER_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/worker-trace-extracted.log | sort | uniq -c | sort -rn
-          echo ""
-          echo "--- First 10 worker beacons ---"
-          head -10 /tmp/worker-trace-extracted.log
-          echo ""
-          echo "--- Last 20 worker beacons (most relevant for stall detection) ---"
-          tail -20 /tmp/worker-trace-extracted.log
-        else
-          echo "(NO WORKER_TRACE beacons found — worker process.js may not have been used)"
-        fi
-
-        # Extract VW_TRACE beacons (v9 — vitest worker execute() lifecycle)
-        echo ""
-        echo "========================================"
-        echo "=== VW TRACE (v9 — vitest worker execute() lifecycle) ==="
-        echo "========================================"
-        grep "VW_TRACE:" /tmp/vitest-v9-output.log > /tmp/vw-trace-extracted.log || true
+        grep "VW_TRACE:" /tmp/vitest-v10-output.log > /tmp/vw-trace-extracted.log || true
         if [ -s /tmp/vw-trace-extracted.log ]; then
           echo "Total VW beacons: $(wc -l < /tmp/vw-trace-extracted.log)"
-          echo ""
-          echo "--- Beacon type counts ---"
-          sed -E 's/.*VW_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/vw-trace-extracted.log | sort | uniq -c | sort -rn
-          echo ""
-          echo "--- All VW beacons (in order, with elapsed_ms) ---"
-          cat /tmp/vw-trace-extracted.log
-        else
-          echo "(NO VW_TRACE beacons found — vitest worker.js may not have been used)"
-        fi
-
-        # Decision tree — focused on v9 VW beacons (vitest worker execute)
-        echo ""
-        echo "========================================"
-        echo "=== DECISION TREE LOCALIZATION (v9 — vitest worker execute) ==="
-        echo "========================================"
-        VW_BEACONS=$(sed -E 's/.*VW_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/vw-trace-extracted.log 2>/dev/null | sort -u)
-        echo "VW beacons fired:"
-        echo "$VW_BEACONS" | sed 's/^/  /'
-        echo ""
-        echo "--- VW scenario detection ---"
-        if echo "$VW_BEACONS" | grep -q "VW_RUNTESTS_PRE"; then
-          echo "✓ VW_RUNTESTS_PRE fired — execute() reached worker[methodName](state)"
-          if echo "$VW_BEACONS" | grep -q "VW_RUNTESTS_POST"; then
-            echo "✓ VW_RUNTESTS_POST fired — worker[methodName](state) RETURNED"
-            if echo "$VW_BEACONS" | grep -q "VW_RPCDONE_POST"; then
-              echo "✓ VW_RPCDONE_POST fired — rpcDone() returned"
-              if echo "$VW_BEACONS" | grep -q "VW_INSPECTOR_CLEANUP"; then
-                echo "✓ VW_INSPECTOR_CLEANUP fired — execute() completed cleanup"
-                echo "→ All VW beacons fired. execute() completed. Hang is elsewhere."
-              else
-                echo "✗ VW_INSPECTOR_CLEANUP NOT fired — hang in inspectorCleanup()"
-              fi
-            else
-              echo "✗ VW_RPCDONE_POST NOT fired — hang in rpcDone()"
-              echo "  rpcDone() waits for pending RPC calls to complete"
-            fi
+          VW_PRE=$(grep -c "VW_RUNTESTS_PRE" /tmp/vw-trace-extracted.log || true)
+          VW_POST=$(grep -c "VW_RUNTESTS_POST" /tmp/vw-trace-extracted.log || true)
+          echo "  VW_RUNTESTS_PRE: $VW_PRE"
+          echo "  VW_RUNTESTS_POST: $VW_POST"
+          if [ "$VW_PRE" -gt "$VW_POST" ]; then
+            echo "  → HANG CONFIRMED: runTests() did not return for one worker"
           else
-            echo "✗ VW_RUNTESTS_POST NOT fired — hang INSIDE worker[methodName](state)"
-            echo "→ worker.runTests() never returned. This is the test execution."
-            echo "  Tests print ✓ but runTests() Promise never resolves."
-            echo "  Next: instrument worker.runTests() internals"
+            echo "  → NO HANG: all runTests() returned (bisect half may not contain trigger)"
           fi
         else
-          echo "✗ VW_RUNTESTS_PRE NOT fired — hang BEFORE worker[methodName](state)"
-          if echo "$VW_BEACONS" | grep -q "VW_ENV_LOADED"; then
-            echo "  VW_ENV_LOADED fired — hang between env load and runTests call"
-          elif echo "$VW_BEACONS" | grep -q "VW_IMPORT_RUNNER"; then
-            echo "  VW_IMPORT_RUNNER fired — hang in loadEnvironment()"
-          elif echo "$VW_BEACONS" | grep -q "VW_EXECUTE_ENTER"; then
-            echo "  VW_EXECUTE_ENTER fired — hang in import(file)"
-          else
-            echo "  No VW beacons fired — execute() never entered"
-          fi
+          echo "(NO VW_TRACE beacons — vitest worker.js instrumentation not active)"
         fi
-
-        # Cross-reference with v8 worker beacons
-        echo ""
-        echo "--- v8 worker beacons (cross-reference) ---"
-        WORKER_BEACONS=$(sed -E 's/.*WORKER_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/worker-trace-extracted.log 2>/dev/null | sort -u)
-        echo "Worker beacons fired:"
-        echo "$WORKER_BEACONS" | sed 's/^/  /'
-        echo ""
-        echo "--- v7 pool beacons (cross-reference) ---"
-        POOL_BEACONS=$(sed -E 's/.*POOL_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/pool-trace-extracted.log 2>/dev/null)
-        RUN_PRE_COUNT=$(echo "$POOL_BEACONS" | grep -c "RUN_PRE" || true)
-        RUN_POST_COUNT=$(echo "$POOL_BEACONS" | grep -c "RUN_POST" || true)
-        RECYCLE_PRE_COUNT=$(echo "$POOL_BEACONS" | grep -c "RECYCLE_PRE" || true)
-        RECYCLE_POST_COUNT=$(echo "$POOL_BEACONS" | grep -c "RECYCLE_POST" || true)
-        echo "  RUN_PRE: $RUN_PRE_COUNT, RUN_POST: $RUN_POST_COUNT"
-        echo "  RECYCLE_PRE: $RECYCLE_PRE_COUNT, RECYCLE_POST: $RECYCLE_POST_COUNT"
 
         echo ""
         echo "=== Last 30 lines of vitest output ==="
-        tail -30 /tmp/vitest-v9-output.log
+        tail -30 /tmp/vitest-v10-output.log
 
         if [ $EXIT_CODE -eq 124 ]; then
-          echo "::error::Vitest timed out after 720s (see beacons above for stall point)"
+          echo "::error::Vitest timed out after 720s"
           exit 1
         elif [ $EXIT_CODE -ne 0 ]; then
           echo "::error::Vitest exited with code $EXIT_CODE"
