@@ -749,6 +749,26 @@ jobs:
         cd frontend
         node "$GITHUB_WORKSPACE/scripts/ci/instrument-pool-v7.js"
 
+    - name: 🔬 Instrument tinypool worker lifecycle beacons (v8)
+      # Patches node_modules/tinypool/dist/entry/process.js (worker entry
+      # for child_process runtime, used by forks pool).
+      # Per maintainer v8 plan: v7 confirmed hang is INSIDE pool.run()
+      # for the 170-file singleFork batch. All tests complete, but
+      # pool.run() never resolves. Now we see what the WORKER does
+      # after tests complete.
+      #
+      # Worker beacons:
+      #   W_MSG_RECV      — worker received task message
+      #   W_HANDLER_PRE   — before handler(task) call
+      #   W_HANDLER_DONE  — handler returned (with active_resources)
+      #   W_SEND_PRE      — before send(response)
+      #   W_SEND_POST     — send(response) returned
+      #   W_BEFOREEXIT    — process.on('beforeExit')
+      #   W_EXIT          — process.on('exit')
+      run: |
+        cd frontend
+        node "$GITHUB_WORKSPACE/scripts/ci/instrument-worker-v8.js"
+
     - name: ✅ Verify instrumentation is in executed file
       # Per maintainer v6.2: MUST verify the patch was actually applied
       # to the file that vitest will execute. Without this check, we
@@ -778,29 +798,42 @@ jobs:
         echo "File: $VITEST_POOL ($(wc -c < $VITEST_POOL) bytes)"
         grep -n "RUN_PRE" "$VITEST_POOL" | head -3 || { echo "::error::RUN_PRE NOT FOUND"; exit 1; }
         grep -n "RUN_POST" "$VITEST_POOL" | head -3 || { echo "::error::RUN_POST NOT FOUND"; exit 1; }
-        grep -n "RECYCLE_PRE" "$VITEST_POOL" | head -3 || { echo "::error::RECYCLE_PRE NOT FOUND"; exit 1; }
-        grep -n "SF_RUNFILES_PRE" "$VITEST_POOL" | head -3 || { echo "::error::SF_RUNFILES_PRE NOT FOUND"; exit 1; }
+
+        echo ""
+        echo "--- v8: tinypool entry/process.js ---"
+        TINYPOOL_WORKER="node_modules/tinypool/dist/entry/process.js"
+        if [ ! -f "$TINYPOOL_WORKER" ]; then
+          echo "::error::Tinypool worker file not found: $TINYPOOL_WORKER"
+          exit 1
+        fi
+        echo "File: $TINYPOOL_WORKER ($(wc -c < $TINYPOOL_WORKER) bytes)"
+        grep -n "W_MSG_RECV" "$TINYPOOL_WORKER" | head -3 || { echo "::error::W_MSG_RECV NOT FOUND"; exit 1; }
+        grep -n "W_HANDLER_DONE" "$TINYPOOL_WORKER" | head -3 || { echo "::error::W_HANDLER_DONE NOT FOUND"; exit 1; }
+        grep -n "W_SEND_POST" "$TINYPOOL_WORKER" | head -3 || { echo "::error::W_SEND_POST NOT FOUND"; exit 1; }
+        grep -n "W_BEFOREEXIT" "$TINYPOOL_WORKER" | head -3 || { echo "::error::W_BEFOREEXIT NOT FOUND"; exit 1; }
 
         echo ""
         echo "✓ All critical beacons verified present in executed files"
 
-    - name: 🧪 Тесты frontend (v7 — per-spec pool.runTests beacons)
-      # Per maintainer v7 plan: v6.2 confirmed hang is INSIDE pool.runTests().
-      # This run adds per-spec beacons to identify WHICH spec causes hang,
-      # or if hang is in recycleWorkers() after all specs complete.
+    - name: 🧪 Тесты frontend (v8 — worker lifecycle beacons)
+      # Per maintainer v8 plan: v7 confirmed hang is INSIDE pool.run()
+      # for 170-file singleFork batch. This run instruments the WORKER
+      # process to see what it does after all tests complete.
       #
-      # Three interpretation scenarios:
-      #   1. RUN_PRE(file Y) then silence → hang in pool.run() for file Y
-      #   2. RUN_POST(last) + RECYCLE_PRE, no RECYCLE_POST → recycleWorkers hang
-      #   3. All beacons fire but pool.runTests still hangs → internal sync issue
+      # Four interpretation scenarios:
+      #   1. W_MSG_RECV yes, W_HANDLER_DONE no → hang INSIDE handler(task)
+      #   2. W_HANDLER_DONE yes, W_SEND_POST no → hang in send() IPC
+      #   3. W_SEND_POST yes, W_BEFOREEXIT no → worker sent result but
+      #      can't exit (active handles keeping event loop alive)
+      #   4. W_BEFOREEXIT yes, W_EXIT no → hang in exit handlers
       run: |
         cd frontend
-        echo "=== Running FULL vitest suite with v7 per-spec pool beacons ==="
-        echo "=== (v6 lifecycle + v7 per-spec + tinypool instrumentation) ==="
+        echo "=== Running FULL vitest suite with v8 worker lifecycle beacons ==="
+        echo "=== (v6 + v7 + v8 worker + tinypool instrumentation) ==="
         echo ""
 
         # 720s timeout — same as previous runs for direct comparison.
-        timeout 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-v7-output.log
+        timeout 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-v8-output.log
 
         EXIT_CODE=${PIPESTATUS[0]}
         echo ""
@@ -811,7 +844,7 @@ jobs:
         echo "========================================"
         echo "=== POOL TRACE (v7 — per-spec beacons) ==="
         echo "========================================"
-        grep "POOL_TRACE:" /tmp/vitest-v7-output.log > /tmp/pool-trace-extracted.log || true
+        grep "POOL_TRACE:" /tmp/vitest-v8-output.log > /tmp/pool-trace-extracted.log || true
 
         if [ -s /tmp/pool-trace-extracted.log ]; then
           echo "Total pool beacons: $(wc -l < /tmp/pool-trace-extracted.log)"
@@ -833,7 +866,7 @@ jobs:
         echo "========================================"
         echo "=== VITEST LIFECYCLE BEACONS (v6) ==="
         echo "========================================"
-        grep "VITEST_TRACE:" /tmp/vitest-v7-output.log > /tmp/vitest-trace-extracted.log || true
+        grep "VITEST_TRACE:" /tmp/vitest-v8-output.log > /tmp/vitest-trace-extracted.log || true
         if [ -s /tmp/vitest-trace-extracted.log ]; then
           echo "Total vitest beacons: $(wc -l < /tmp/vitest-trace-extracted.log)"
           echo ""
@@ -851,7 +884,7 @@ jobs:
         echo "========================================"
         echo "=== TINYPOOL TRACE (cross-reference) ==="
         echo "========================================"
-        grep "TINYPOOL_TRACE:" /tmp/vitest-v7-output.log > /tmp/tinypool-trace-extracted.log || true
+        grep "TINYPOOL_TRACE:" /tmp/vitest-v8-output.log > /tmp/tinypool-trace-extracted.log || true
         if [ -s /tmp/tinypool-trace-extracted.log ]; then
           echo "Total tinypool events: $(wc -l < /tmp/tinypool-trace-extracted.log)"
           echo "--- Event type counts ---"
@@ -860,63 +893,83 @@ jobs:
           echo "(NO TINYPOOL_TRACE events)"
         fi
 
-        # Decision tree — focused on v7 per-spec beacons
+        # Extract WORKER_TRACE beacons (v8 — worker lifecycle)
         echo ""
         echo "========================================"
-        echo "=== DECISION TREE LOCALIZATION (v7 — per-spec) ==="
+        echo "=== WORKER TRACE (v8 — worker lifecycle) ==="
         echo "========================================"
+        grep "WORKER_TRACE:" /tmp/vitest-v8-output.log > /tmp/worker-trace-extracted.log || true
+        if [ -s /tmp/worker-trace-extracted.log ]; then
+          echo "Total worker beacons: $(wc -l < /tmp/worker-trace-extracted.log)"
+          echo ""
+          echo "--- Beacon type counts ---"
+          sed -E 's/.*WORKER_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/worker-trace-extracted.log | sort | uniq -c | sort -rn
+          echo ""
+          echo "--- First 10 worker beacons ---"
+          head -10 /tmp/worker-trace-extracted.log
+          echo ""
+          echo "--- Last 20 worker beacons (most relevant for stall detection) ---"
+          tail -20 /tmp/worker-trace-extracted.log
+        else
+          echo "(NO WORKER_TRACE beacons found — worker process.js may not have been used)"
+        fi
+
+        # Decision tree — focused on v8 worker beacons
+        echo ""
+        echo "========================================"
+        echo "=== DECISION TREE LOCALIZATION (v8 — worker lifecycle) ==="
+        echo "========================================"
+        WORKER_BEACONS=$(sed -E 's/.*WORKER_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/worker-trace-extracted.log 2>/dev/null | sort -u)
+        echo "Worker beacons fired:"
+        echo "$WORKER_BEACONS" | sed 's/^/  /'
+        echo ""
+        echo "--- Worker scenario detection ---"
+        if echo "$WORKER_BEACONS" | grep -q "W_MSG_RECV"; then
+          echo "✓ W_MSG_RECV fired — worker received task message"
+          if echo "$WORKER_BEACONS" | grep -q "W_HANDLER_DONE"; then
+            echo "✓ W_HANDLER_DONE fired — handler(task) returned"
+            if echo "$WORKER_BEACONS" | grep -q "W_SEND_POST"; then
+              echo "✓ W_SEND_POST fired — worker sent response to parent"
+              if echo "$WORKER_BEACONS" | grep -q "W_BEFOREEXIT"; then
+                echo "✓ W_BEFOREEXIT fired — worker reached beforeExit phase"
+                if echo "$WORKER_BEACONS" | grep -q "W_EXIT"; then
+                  echo "✓ W_EXIT fired — worker exited normally"
+                  echo "→ All worker beacons fired. Worker exited. Hang is in PARENT."
+                else
+                  echo "✗ W_EXIT NOT fired — hang in exit handlers"
+                fi
+              else
+                echo "✗ W_BEFOREEXIT NOT fired — worker sent result but can't exit"
+                echo "→ SCENARIO 3: active handles keeping worker event loop alive"
+                echo "  Check W_HANDLER_DONE active_resources above for what's holding it"
+              fi
+            else
+              echo "✗ W_SEND_POST NOT fired — hang in send() IPC"
+              echo "→ SCENARIO 2: worker has result but can't send to parent"
+            fi
+          else
+            echo "✗ W_HANDLER_DONE NOT fired — hang INSIDE handler(task)"
+            echo "→ SCENARIO 1: worker stuck executing tests"
+          fi
+        else
+          echo "✗ W_MSG_RECV NOT fired — worker never received task message"
+          echo "→ Hang is in parent-side message dispatch, OR worker.js (threads) used"
+        fi
+
+        # Also show v7 pool beacons for cross-reference
+        echo ""
+        echo "--- v7 pool beacons (cross-reference) ---"
         POOL_BEACONS=$(sed -E 's/.*POOL_TRACE:.*"event":"([^"]+)".*/\1/' /tmp/pool-trace-extracted.log 2>/dev/null)
         RUN_PRE_COUNT=$(echo "$POOL_BEACONS" | grep -c "RUN_PRE" || true)
         RUN_POST_COUNT=$(echo "$POOL_BEACONS" | grep -c "RUN_POST" || true)
-        RUN_ERROR_COUNT=$(echo "$POOL_BEACONS" | grep -c "RUN_ERROR" || true)
         RECYCLE_PRE_COUNT=$(echo "$POOL_BEACONS" | grep -c "RECYCLE_PRE" || true)
         RECYCLE_POST_COUNT=$(echo "$POOL_BEACONS" | grep -c "RECYCLE_POST" || true)
-        SF_RUNFILES_PRE_COUNT=$(echo "$POOL_BEACONS" | grep -c "SF_RUNFILES_PRE" || true)
-        SF_RUNFILES_POST_COUNT=$(echo "$POOL_BEACONS" | grep -c "SF_RUNFILES_POST" || true)
-
-        echo "Beacon counts:"
-        echo "  RUN_PRE:           $RUN_PRE_COUNT"
-        echo "  RUN_POST:          $RUN_POST_COUNT"
-        echo "  RUN_ERROR:         $RUN_ERROR_COUNT"
-        echo "  RECYCLE_PRE:       $RECYCLE_PRE_COUNT"
-        echo "  RECYCLE_POST:      $RECYCLE_POST_COUNT"
-        echo "  SF_RUNFILES_PRE:   $SF_RUNFILES_PRE_COUNT"
-        echo "  SF_RUNFILES_POST:  $SF_RUNFILES_POST_COUNT"
-        echo ""
-
-        # Scenario detection
-        echo "--- Scenario detection ---"
-        if [ "$RUN_PRE_COUNT" -gt 0 ] && [ "$RUN_POST_COUNT" -lt "$RUN_PRE_COUNT" ]; then
-          echo "→ SCENARIO 1: hang INSIDE pool.run() for a specific spec"
-          echo "  RUN_PRE fired $RUN_PRE_COUNT times, RUN_POST only $RUN_POST_COUNT times"
-          echo "  Last RUN_PRE without matching RUN_POST identifies the hanging spec:"
-          echo ""
-          # Find last RUN_PRE and show its paths
-          grep "RUN_PRE" /tmp/pool-trace-extracted.log | tail -1
-          echo ""
-          echo "  Next: investigate this specific test file"
-        elif [ "$RUN_PRE_COUNT" -gt 0 ] && [ "$RUN_PRE_COUNT" -eq "$RUN_POST_COUNT" ]; then
-          if [ "$RECYCLE_PRE_COUNT" -gt "$RECYCLE_POST_COUNT" ]; then
-            echo "→ SCENARIO 2: hang in pool.recycleWorkers()"
-            echo "  All RUN_PRE matched by RUN_POST, but RECYCLE_PRE > RECYCLE_POST"
-            echo "  Last RECYCLE_PRE without matching RECYCLE_POST:"
-            grep "RECYCLE_PRE" /tmp/pool-trace-extracted.log | tail -1
-          elif [ "$SF_RUNFILES_PRE_COUNT" -gt "$SF_RUNFILES_POST_COUNT" ]; then
-            echo "→ SCENARIO 1b: hang inside runFiles() (between SF_RUNFILES_PRE and SF_RUNFILES_POST)"
-            echo "  Last SF_RUNFILES_PRE without matching SF_RUNFILES_POST:"
-            grep "SF_RUNFILES_PRE" /tmp/pool-trace-extracted.log | tail -1
-          else
-            echo "→ SCENARIO 3: all per-spec beacons fire but pool.runTests still hangs"
-            echo "  Internal Promise/sync barrier issue in pool.runTests orchestration"
-          fi
-        else
-          echo "→ UNEXPECTED: no RUN_PRE beacons fired"
-          echo "  Pool.runTests may not have been called, or patch failed"
-        fi
+        echo "  RUN_PRE: $RUN_PRE_COUNT, RUN_POST: $RUN_POST_COUNT"
+        echo "  RECYCLE_PRE: $RECYCLE_PRE_COUNT, RECYCLE_POST: $RECYCLE_POST_COUNT"
 
         echo ""
         echo "=== Last 30 lines of vitest output ==="
-        tail -30 /tmp/vitest-v7-output.log
+        tail -30 /tmp/vitest-v8-output.log
 
         if [ $EXIT_CODE -eq 124 ]; then
           echo "::error::Vitest timed out after 720s (see beacons above for stall point)"
