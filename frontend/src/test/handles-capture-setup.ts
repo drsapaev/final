@@ -1,35 +1,46 @@
 /**
- * v10 — Active handles capture setup file.
+ * v10.1 — Active handles capture setup file.
  *
- * Per maintainer v10 directive: stop instrumenting vitest internals.
- * Instead, capture active handles AFTER each test file completes
- * to identify which test leaves handles that prevent worker exit.
+ * Per Codex P1 #5: Include the test path in each handle capture.
+ * Per Codex P2 #9: Register the beforeExit probe only once.
  *
  * This file is registered as a setupFile in vitest.config.ts.
- * It registers an afterAll hook that:
- *   1. Captures process._getActiveHandles() — internal handle objects
- *   2. Captures process.getActiveResourcesInfo() — readable names
- *   3. Captures process._getActiveRequests() — pending async ops
- *   4. Writes them to stderr as HANDLES_TRACE:{json}
+ * In singleFork mode, setupFiles execute before EACH test file,
+ * and afterAll runs after each file's tests.
  *
- * The afterAll hook runs AFTER all tests in a file complete but
- * BEFORE runTests() returns. If a test file leaves handles, they
- * will appear in the capture for that file.
- *
- * By comparing captures across files, we can identify WHICH file
- * first introduces a persistent handle.
+ * To get the current test file path, we use vitest's internal
+ * __vitest_worker__ global state (available in worker context).
+ * If not available, we fall back to import.meta.url.
  *
  * Output format (one line per afterAll invocation):
- *   HANDLES_TRACE:{"file":"<test-file>","handles_count":N,"requests_count":M,
- *                   "resources":["PipeWrap","Socket","MessagePort",...],
- *                   "handle_details":[{"type":"Socket","fd":1,"destroyed":false},...]}
- *
- * The handle_details array projects each handle to safe fields only
- * (per maintainer v4 feedback — never JSON.stringify handles directly
- * due to circular references).
+ *   HANDLES_TRACE:{"file":"<test-file>","handles_count":N,...}
  */
 
 import { afterAll } from 'vitest';
+
+// Per Codex P2 #9: Guard beforeExit listener with process-global sentinel
+// to prevent accumulating 159 listeners in singleFork mode.
+declare global {
+  // eslint-disable-next-line no-var
+  var __handles_capture_registered: boolean | undefined;
+}
+
+function getCurrentTestFile(): string {
+  // Try vitest's internal worker state
+  try {
+    const worker = (globalThis as Record<string, unknown>).__vitest_worker__;
+    if (worker && typeof worker === 'object') {
+      const filepath = (worker as Record<string, unknown>).filepath;
+      if (typeof filepath === 'string') return filepath;
+    }
+  } catch {}
+  // Try environment variable (vitest may set this)
+  try {
+    const envFile = process.env.VITEST_TEST_FILE;
+    if (envFile) return envFile;
+  } catch {}
+  return '(unknown)';
+}
 
 function captureHandles() {
   try {
@@ -80,34 +91,45 @@ function captureHandles() {
 }
 
 // afterAll runs after all tests in the current file complete.
-// We capture handles at this point to see what's left.
 afterAll(() => {
-  // Get current test file path from vitest's global state
-  // In setupFiles, we don't have direct access to the file path,
-  // but we can use a stack trace or environment variable.
-  // Vitest sets VITEST_POOL_ID and workerId, but not current file.
-  // We'll use a counter and timestamp instead.
+  const file = getCurrentTestFile();
   const capture = captureHandles();
   const line = JSON.stringify({
     ts: Date.now(),
-    mono_ms: 0, // Can't easily get monotonic time here without setup
     pid: process.pid,
-    file: '(afterAll — see preceding test output for file name)',
+    file,
     ...capture,
   });
-  process.stderr.write('HANDLES_TRACE:' + line + '\n');
+  // Per Codex P2 #12: use fs.writeSync for reliability under pipe backpressure
+  try {
+    const fs = require('fs');
+    fs.writeSync(2, 'HANDLES_TRACE:' + line + '\n');
+  } catch {
+    process.stderr.write('HANDLES_TRACE:' + line + '\n');
+  }
 });
 
-// Also capture on process.beforeExit — this fires when event loop
-// has no more work. If it never fires, something is keeping it alive.
-process.on('beforeExit', (code) => {
-  const capture = captureHandles();
-  const line = JSON.stringify({
-    ts: Date.now(),
-    pid: process.pid,
-    file: '(beforeExit)',
-    code: code,
-    ...capture,
+// Per Codex P2 #9: Register beforeExit probe only ONCE
+// In singleFork mode, this setup file executes before each test file,
+// but the worker process is reused. Without this guard, we'd accumulate
+// 159 listeners.
+if (!globalThis.__handles_capture_registered) {
+  globalThis.__handles_capture_registered = true;
+  process.on('beforeExit', (code) => {
+    const file = getCurrentTestFile();
+    const capture = captureHandles();
+    const line = JSON.stringify({
+      ts: Date.now(),
+      pid: process.pid,
+      file: file + ' (beforeExit)',
+      code,
+      ...capture,
+    });
+    try {
+      const fs = require('fs');
+      fs.writeSync(2, 'HANDLES_TRACE:' + line + '\n');
+    } catch {
+      process.stderr.write('HANDLES_TRACE:' + line + '\n');
+    }
   });
-  process.stderr.write('HANDLES_TRACE:' + line + '\n');
-});
+}

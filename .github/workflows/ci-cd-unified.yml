@@ -26,6 +26,15 @@ on:
         options:
           - 'false'
           - 'true'
+      bisect_half:
+        description: 'Bisect mode: run first/second half of hanging batch (for hang investigation)'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - 'full'
+          - 'first'
+          - 'second'
 
 permissions:
   contents: read
@@ -856,12 +865,19 @@ jobs:
       # hook that writes HANDLES_TRACE:{json} to stderr after each test file.
       run: |
         cd frontend
-        echo "=== v10: bisect + handle capture ==="
-        echo "=== BISECT_HALF=${BISECT_HALF:-full} ==="
+        # Per Codex P1: BISECT_HALF from workflow_dispatch input
+        BISECT_HALF="${{ github.event.inputs.bisect_half || 'full' }}"
+        echo "=== v10.1: bisect + handle capture ==="
+        echo "=== BISECT_HALF=$BISECT_HALF ==="
         echo ""
 
+        # Per Codex P1 #7: Disable errexit around the pipeline so trace
+        # extraction runs even when vitest times out (pipefail would
+        # abort the step before EXIT_CODE assignment).
+        set +e
+
         # Determine which files to run
-        if [ "${BISECT_HALF}" = "first" ] || [ "${BISECT_HALF}" = "second" ]; then
+        if [ "$BISECT_HALF" = "first" ] || [ "$BISECT_HALF" = "second" ]; then
           # Read batch file list and split
           # The batch files are stored in scripts/ci/batch-files.txt
           BATCH_FILE="$GITHUB_WORKSPACE/scripts/ci/batch-files.txt"
@@ -872,7 +888,7 @@ jobs:
           TOTAL=$(wc -l < "$BATCH_FILE")
           HALF=$((TOTAL / 2))
           echo "Total batch files: $TOTAL, split point: $HALF"
-          if [ "${BISECT_HALF}" = "first" ]; then
+          if [ "$BISECT_HALF" = "first" ]; then
             head -n "$HALF" "$BATCH_FILE" > /tmp/bisect-files.txt
             echo "Running first half: $(wc -l < /tmp/bisect-files.txt) files"
           else
@@ -885,13 +901,12 @@ jobs:
           cat /tmp/bisect-files.txt | tail -5
           echo ""
 
-          # Run vitest with explicit file list
-          # Convert file list to space-separated args
-          FILES_ARGS=$(cat /tmp/bisect-files.txt | tr '\n' ' ')
-          timeout 720 npx vitest run $FILES_ARGS 2>&1 | tee /tmp/vitest-v10-output.log
+          # Per Codex P2: use --kill-after for reliable SIGKILL escalation
+          # if SIGTERM is caught/ignored by vitest or its children.
+          timeout --kill-after=10 720 npx vitest run $FILES_ARGS 2>&1 | tee /tmp/vitest-v10-output.log
         else
           echo "Running FULL suite (no bisect) with handle capture"
-          timeout 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-v10-output.log
+          timeout --kill-after=10 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-v10-output.log
         fi
 
         EXIT_CODE=${PIPESTATUS[0]}
