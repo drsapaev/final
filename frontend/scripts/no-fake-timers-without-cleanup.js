@@ -14,9 +14,7 @@
  * useDebouncedCallback.test.ts.
  */
 
-const RULE_NAME = 'require-useRealTimers-after-useFakeTimers';
-
-module.exports = {
+export default {
   meta: {
     type: 'problem',
     docs: {

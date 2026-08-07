@@ -59,7 +59,7 @@ export default [
       'custom/no-api-loose-return': 'error',
 
       // Custom: require vi.useRealTimers() when vi.useFakeTimers() is used
-      // Prevents vitest process hang in singleFork mode (see ADR-0019 / v10 investigation)
+      // Prevents vitest process hang in singleFork mode (commit 9706ecda)
       'custom/no-fake-timers-without-cleanup': 'error',
 
       // React правила
