@@ -152,6 +152,13 @@ const MacOSEmptyState = ({
         !React.isValidElement(Icon) &&
         (Icon as { $$typeof: symbol }).$$typeof !== REACT_PORTAL_TYPE));
 
+  // When isIconComponent is true, Icon is a callable component type. Cast it
+  // to React.ElementType so TypeScript accepts <IconComponent /> in JSX —
+  // the union type `React.ElementType | ReactNode` doesn't narrow via the
+  // boolean flag above, so without this cast TS errors with TS2604/TS2786
+  // ("JSX element type 'Icon' does not have any construct or call signatures").
+  const IconComponent = isIconComponent ? (Icon as React.ElementType) : null;
+
   return (
     <div
       className={className}
@@ -161,7 +168,7 @@ const MacOSEmptyState = ({
       aria-describedby={hasDescription ? descriptionId : undefined}
       style={containerStyle}
     >
-      {Icon && isIconComponent && <Icon aria-hidden="true" focusable="false" style={iconStyle} />}
+      {IconComponent && <IconComponent aria-hidden="true" focusable="false" style={iconStyle} />}
       {Icon && !isIconComponent && <span aria-hidden="true">{Icon}</span>}
 
       <h3 style={titleStyle}>{title}</h3>

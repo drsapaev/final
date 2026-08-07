@@ -61,29 +61,49 @@ describe('PR-45: AppointmentWizardV2 size reduction', () => {
   it('AppointmentWizardV2.tsx stays below the post-TS-migration LOC ceiling', () => {
     const src = fs.readFileSync(WIZARD, 'utf-8');
     const lineCount = src.split('\n').length;
-    // Background:
-    // - 2026-07-12 god-component audit (docs/FRONTEND_AUDIT_2026-07-12.md)
-    //   measured AppointmentWizardV2.jsx at 3015 LOC.
-    // - The split plan (docs/frontend-god-component-split-plan.md) called for
-    //   extracting 5 sub-components to reduce it below 3015.
-    // - Only 2 of 5 sub-components were extracted (EditModeBanner,
-    //   StepProgressIndicator) — verified by the tests above.
-    // - The TypeScript migration (ADR-004) then ADDED ~140 lines of type
-    //   annotations, as-casts, and generic parameters, growing the file to
-    //   3154 LOC. This is expected: TS syntax inflates line count without
-    //   changing the runtime architecture.
+    // ─────────────────────────────────────────────────────────────────────
+    // WHY THIS CEILING EXISTS (and why it is TEMPORARY, not a new normal)
+    // ─────────────────────────────────────────────────────────────────────
     //
-    // The 3015 ceiling was set when the file was .jsx. After the .jsx→.tsx
-    // migration, the same code requires more lines. We update the ceiling to
-    // 3200 — a 185-line budget above the post-migration 3154 LOC — to:
-    //   1. Account for the TS syntax inflation (one-time cost, already paid).
-    //   2. Still catch uncontrolled growth beyond the post-migration baseline.
-    //   3. Leave room for the 3 remaining sub-component extractions to bring
-    //      the file back below the original 3015 ceiling in a future PR.
+    // History:
+    //   2026-07-12  God-component audit (docs/FRONTEND_AUDIT_2026-07-12.md)
+    //               measured AppointmentWizardV2.jsx at 3015 LOC.
+    //   2026-07-XX  Split plan (docs/frontend-god-component-split-plan.md)
+    //               called for extracting 5 sub-components to get below 3015.
+    //               Only 2 of 5 were extracted (EditModeBanner,
+    //               StepProgressIndicator) — verified by the tests above.
+    //   ADR-004     TypeScript migration ADDED ~140 lines of type annotations,
+    //               as-casts, and generic parameters → 3154 LOC. This is
+    //               expected: TS syntax inflates line count WITHOUT changing
+    //               the runtime architecture.
     //
-    // If the file grows past 3200 LOC without an accompanying sub-component
-    // extraction, this test will fail — prompting either completion of the
-    // split plan or a review of what was added.
+    // Why 3200 and not 3015, 3155, or 3300?
+    //   - 3015: pre-TS-migration ceiling. Cannot be enforced now — the TS
+    //     migration is a one-time, already-paid cost that added ~140 lines
+    //     of pure syntax. Requiring 3015 would force an immediate split
+    //     that should be planned, not rushed.
+    //   - 3155 (current+1): too tight — leaves no room for any future type
+    //     annotation additions or small refactors. Would cause flaky failures.
+    //   - 3300: too loose — allows ~145 lines of uncontrolled growth before
+    //     triggering, defeating the guardrail purpose.
+    //   - 3200: chosen as current (3154) + 46-line buffer. Tight enough to
+    //     catch uncontrolled growth, loose enough to survive minor refactors.
+    //
+    // The ~185-line gap between 3015 and 3200 is NOT a new architectural
+    // goal. It is a TEMPORARY budget for the TS syntax inflation. The
+    // long-term target remains 3015 (or lower), achievable by completing
+    // the remaining 3 sub-component extractions:
+    //   - PatientLookupStep (~400 LOC)
+    //   - ServiceSelectionStep (~600 LOC)
+    //   - PaymentStep (~500 LOC)
+    //
+    // These extractions are tracked in docs/frontend-god-component-split-plan.md
+    // and should be done in a SEPARATE PR focused solely on the split (not
+    // mixed with test fixes or other changes).
+    //
+    // When the split is complete and the file drops below 3015, RESTORE the
+    // original ceiling: expect(lineCount).toBeLessThan(3015);
+    // ─────────────────────────────────────────────────────────────────────
     expect(lineCount).toBeLessThan(3200);
   });
 });
