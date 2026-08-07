@@ -13,6 +13,17 @@ vi.mock('../../../contexts/ThemeContext', () => ({
 
 import { FormField, FormProvider, FormSelect, FormTextArea } from '../Form';
 
+// ValidationRules contract (Form.tsx:42):
+//   type ValidationRules = Record<string, ValidationRule | string>;
+//   — a map of FIELD NAME → rule spec.
+// The handleBlur implementation (Form.tsx:351) looks up the rule by field name:
+//   const rules = validationRules[name];
+// So validationRules must be keyed by the field's `name` prop, not by rule kind.
+// The earlier test shape `validationRules={{ required: 'msg' }}` only worked when
+// the field name happened to be literally 'required' — it never validated fields
+// named 'fullName', 'notes', 'role', etc. The corrected shape below matches the
+// implemented API contract.
+
 function renderWithProvider(ui: React.ReactNode) {
   return render(<FormProvider>{ui}</FormProvider>);
 }
@@ -25,7 +36,7 @@ describe('Form accessibility', () => {
         name="fullName"
         label="Full name"
         required
-        validationRules={{ required: 'Required field' }}
+        validationRules={{ fullName: { required: 'Required field' }} }
       />,
     );
 
@@ -46,7 +57,7 @@ describe('Form accessibility', () => {
         name="notes"
         label="Notes"
         required
-        validationRules={{ required: 'Notes required' }}
+        validationRules={{ notes: { required: 'Notes required' }} }
       />,
     );
 
@@ -66,7 +77,7 @@ describe('Form accessibility', () => {
         label="Role"
         required
         options={[{ value: 'admin', label: 'Admin' }]}
-        validationRules={{ required: 'Role required' }}
+        validationRules={{ role: { required: 'Role required' }} }
       />,
     );
 
