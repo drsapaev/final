@@ -5,6 +5,19 @@
  * Strategy: strip TS-only syntax from source before matching.
  * Uses iterative regex passes with simple patterns.
  *
+ * INVARIANT: This helper removes ONLY TypeScript syntax. It must NEVER
+ * normalize:
+ *   - Variable names or aliases (e.g., `const t = tI18n`)
+ *   - Function calls or inlining (e.g., `normalizePatientGender(x)` vs `patientGender`)
+ *   - Expression ordering
+ *   - Import statements
+ *   - JSX structure
+ *   - Conditional constructs (&&, ?:, if/else)
+ *   - Control flow
+ *
+ * If a test fails because the code was refactored (not just typed),
+ * update the assertion in the test — do NOT extend this helper.
+ *
  * Usage:
  *   import { normalizeSource } from './source-contract-helper';
  *   const source = fs.readFileSync(path, 'utf8');
@@ -58,6 +71,13 @@ export function normalizeSource(source: string): string {
 
     // 8. Remove `as lowercaseIdentifier` — other lowercase type
     s = s.replace(/\bas\s+[a-z][\w$]*/g, '');
+
+    // 9. Remove `as import('module').Type<...>` — dynamic import type assertion
+    //    e.g., `as import('axios').AxiosResponse<Record<string, unknown>>`
+    s = s.replace(
+      /\bas\s+import\([^)]*\)\.[A-Za-z_$][\w$]*(?:<[^<>]*(?:<[^<>]*>[^<>]*)*>)?/g,
+      ''
+    );
 
     // If nothing changed in this pass, we're done
     if (s === before) break;

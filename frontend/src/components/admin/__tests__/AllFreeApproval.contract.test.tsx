@@ -9,14 +9,14 @@ const sourcePath = path.resolve(
   'src/components/admin/AllFreeApproval.tsx'
 );
 
-const readSource = () => fs.readFileSync(sourcePath, 'utf8');
+const readSource = () => normalizeSource(fs.readFileSync(sourcePath, 'utf8'));
 
 const sourceSlice = (source: string, startMarker: string, endMarker: string) => {
-  const start = source.indexOf(startMarker);
+  const start = source.indexOf(normalizeSource(startMarker));
   expect(start).toBeGreaterThanOrEqual(0);
-  const end = source.indexOf(endMarker, start);
+  const end = source.indexOf(normalizeSource(endMarker), start);
   expect(end).toBeGreaterThan(start);
-  return normalizeSource(source.slice(start, end));
+  return source.slice(start, end);
 };
 
 describe('AllFreeApproval action contract', () => {

@@ -22,28 +22,28 @@ const useRegistrarReschedulePath = path.resolve(__dirname, '../registrar/useRegi
 const useRegistrarDataPath = path.resolve(__dirname, '../registrar/useRegistrarData.ts');
 const useRegistrarActionsPath = path.resolve(__dirname, '../registrar/useRegistrarActions.ts');
 
-const readRegistrarPanelSource = () => fs.readFileSync(registrarPanelPath, 'utf8');
-const readRegistrarHelpersSource = () => fs.readFileSync(registrarHelpersPath, 'utf8');
+const readRegistrarPanelSource = () => normalizeSource(fs.readFileSync(registrarPanelPath, 'utf8'));
+const readRegistrarHelpersSource = () => normalizeSource(fs.readFileSync(registrarHelpersPath, 'utf8'));
 const readRegistrarSourceTree = () => [
   readRegistrarPanelSource(),
   '// ─── registrarHelpers.js ───',
   readRegistrarHelpersSource(),
   '// ─── useRegistrarHotkeys.js ───',
-  fs.readFileSync(useRegistrarHotkeysPath, 'utf8'),
+  normalizeSource(fs.readFileSync(useRegistrarHotkeysPath, 'utf8')),
   '// ─── useRegistrarReschedule.js ───',
-  fs.readFileSync(useRegistrarReschedulePath, 'utf8'),
+  normalizeSource(fs.readFileSync(useRegistrarReschedulePath, 'utf8')),
   '// ─── useRegistrarData.js ───',
-  fs.readFileSync(useRegistrarDataPath, 'utf8'),
+  normalizeSource(fs.readFileSync(useRegistrarDataPath, 'utf8')),
   '// ─── useRegistrarActions.js ───',
-  fs.readFileSync(useRegistrarActionsPath, 'utf8'),
+  normalizeSource(fs.readFileSync(useRegistrarActionsPath, 'utf8')),
 ].join('\n\n');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
-  const start = source.indexOf(startMarker);
+  const start = source.indexOf(normalizeSource(startMarker));
   expect(start).toBeGreaterThanOrEqual(0);
-  const end = source.indexOf(endMarker, start);
+  const end = source.indexOf(normalizeSource(endMarker), start);
   expect(end).toBeGreaterThan(start);
-  return normalizeSource(source.slice(start, end));
+  return source.slice(start, end);
 };
 
 describe('RegistrarPanel command contract', () => {

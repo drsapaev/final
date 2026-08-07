@@ -13,14 +13,14 @@ const DOCTOR_PANEL_FILES = [
   'pages/DermatologistPanelUnified.tsx',
 ];
 
-const read = (filePath: string) => fs.readFileSync(path.join(ROOT, filePath), 'utf8');
+const read = (filePath: string) => normalizeSource(fs.readFileSync(path.join(ROOT, filePath), 'utf8'));
 
 const extractBlock = (source: string, startMarker: string, endMarker: string) => {
-  const start = source.indexOf(startMarker);
+  const start = source.indexOf(normalizeSource(startMarker));
   expect(start).toBeGreaterThanOrEqual(0);
-  const end = source.indexOf(endMarker, start);
+  const end = source.indexOf(normalizeSource(endMarker), start);
   expect(end).toBeGreaterThan(start);
-  return normalizeSource(source.slice(start, end));
+  return source.slice(start, end);
 };
 
 describe('Doctor panels SSOT contract', () => {
