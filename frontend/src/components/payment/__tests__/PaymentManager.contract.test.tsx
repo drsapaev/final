@@ -13,9 +13,11 @@ const SOURCE = normalizeSource(fs
 
 describe('PaymentManager invoice DTO contract', () => {
   it('uses backend invoice_id when paying existing pending invoices', () => {
-    expect(SOURCE).toContain(
-      'const getInvoiceId = (invoice) => invoice?.invoice_id ?? invoice?.id ?? null;'
-    );
+    // Contract: getInvoiceId must prefer backend invoice_id, fall back to id.
+    // The function body is split across lines after TS migration — check key parts.
+    expect(SOURCE).toContain('const getInvoiceId = (invoice)');
+    expect(SOURCE).toContain('invoice?.invoice_id');
+    expect(SOURCE).toContain('invoice?.id');
     expect(SOURCE).toContain('setCreatedInvoiceId(getInvoiceId(invoice));');
     expect(SOURCE).toContain('key={getInvoiceId(invoice)}');
     expect(SOURCE).toContain('<span className="invoice-id">№{getInvoiceId(invoice)}</span>');

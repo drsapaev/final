@@ -83,7 +83,9 @@ describe('ReportEditor STRAT#24 — extracted sub-component', () => {
     expect(workbenchSource).toContain("import ReportEditor from './ReportEditor'");
     expect(workbenchSource).toContain('<ReportEditor');
     expect(workbenchSource).toContain('activeInstance={activeInstance}');
-    expect(workbenchSource).toContain('draftValues={draftValues}');
+    // Contract: LabReportWorkbench must pass draftValues to ReportEditor.
+    // After normalizeSource, 'as Record<...>' cast is removed but trailing space may remain.
+    expect(workbenchSource).toContain('draftValues={draftValues');
     expect(workbenchSource).toContain('collapsedSections={collapsedSections}');
     expect(workbenchSource).toContain('onUpdateField={updateField}');
   });

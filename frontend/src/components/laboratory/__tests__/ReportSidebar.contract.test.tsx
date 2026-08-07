@@ -71,7 +71,9 @@ describe('ReportSidebar STRAT#25 — extracted sub-component', () => {
     expect(workbenchSource).toContain('<ReportSidebar');
     expect(workbenchSource).toContain('activeInstance={activeInstance}');
     expect(workbenchSource).toContain('showRecentReportsBrowser={showRecentReportsBrowser}');
-    expect(workbenchSource).toContain('onOpenInstance={onOpenInstance}');
+    // Contract: LabReportWorkbench must pass onOpenInstance to ReportSidebar.
+    // After normalizeSource, 'as unknown as ...' cast is removed but trailing space may remain.
+    expect(workbenchSource).toContain('onOpenInstance={onOpenInstance');
   });
 
   it('LabReportWorkbench no longer directly imports LabReportAIAnalysis or LabReportHistoryPanel', () => {
