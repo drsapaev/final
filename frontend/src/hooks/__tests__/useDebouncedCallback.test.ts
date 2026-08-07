@@ -13,6 +13,7 @@ describe('useDebouncedCallback', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('invokes callback after delay (number)', () => {
@@ -106,6 +107,7 @@ describe('useDebouncedValue', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('returns initial value immediately', () => {
