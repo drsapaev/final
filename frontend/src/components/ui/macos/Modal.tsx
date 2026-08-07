@@ -287,6 +287,8 @@ const Modal = ({
           variant="ghost"
           size="small"
           onClick={onClose}
+          aria-label="Закрыть"
+          title="Закрыть"
           style={{
             position: 'absolute',
             top: '12px',
