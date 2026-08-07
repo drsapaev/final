@@ -2,15 +2,41 @@
  * Test renderer helper — wraps components with the minimum set of providers
  * required to render most UI components in tests.
  *
+ * ─────────────────────────────────────────────────────────────────────────
+ * GOVERNANCE PRINCIPLE (do not violate without maintainer review):
+ * ─────────────────────────────────────────────────────────────────────────
+ * This helper is intentionally NOT a copy of `AppProviders`. The default
+ * set MUST stay minimal and side-effect-free. Two rules:
+ *
+ * 1. DEFAULT = minimal safe providers only.
+ *    A provider qualifies for the default set ONLY IF it:
+ *       - has NO mount-time network I/O (no fetch, no WebSocket, no polling),
+ *       - has NO mount-time global side effects (no window.* mutation,
+ *         no localStorage writes outside the test's control),
+ *       - is required by a broad class of components (not a niche feature).
+ *    Violating this rule turns the helper into a second AppProviders and
+ *    re-introduces the exact problem it was created to solve.
+ *
+ * 2. HEAVY / STATEFUL PROVIDERS = opt-in via explicit flag only.
+ *    Providers that open sockets, fetch data on mount, or carry meaningful
+ *    state (ChatProvider, NotificationWebSocketProvider) MUST be opt-in.
+ *    Tests that need them pass `{ withNotificationWs: true }` etc.
+ *
+ * If you find yourself wanting to add a provider to the default set,
+ * first ask: can the component be tested with just the existing defaults?
+ * If yes, prefer that. If no, add the provider as an opt-in flag first;
+ * only promote to default after explicit maintainer approval.
+ * ─────────────────────────────────────────────────────────────────────────
+ *
  * Design rationale:
- * - Models the test environment, NOT the full app. Only "safe" providers with
- *   no mount-time side effects (no network, no WebSocket) are included by default.
- * - Optional flags (`withChat`, `withNotificationWs`, `withModal`, `withForm`)
- *   enable heavier/stateful providers when a test actually needs them.
+ * - Models the test environment, NOT the full app.
  * - Prevents the "missing NotificationCenterProvider" class of test failures
  *   that occurs when tests hand-wrap only Theme + Translation.
+ * - Avoids the opposite failure mode (rendering every test under the full
+ *   AppProviders stack) where WebSocket/chat/network side effects bleed
+ *   into unrelated tests.
  *
- * Default providers (always included, in order):
+ * Default providers (always included, in order — ALL side-effect-free):
  *   1. MemoryRouter — react-router context (most components use useNavigate/useLocation)
  *   2. MacOSThemeProvider — design-token theme context
  *   3. ThemeProvider — color-scheme + theme runtime
@@ -18,7 +44,7 @@
  *   5. NotificationCenterProvider — notification inbox state (no mount-time network)
  *   6. ToastProvider — toast UI (used by notify service)
  *
- * Optional providers (opt-in via flags):
+ * Optional providers (opt-in via flags — each has mount-time cost/side effect):
  *   - withNotificationWs — NotificationWebSocketProvider (opens WebSocket on mount)
  *   - withChat — ChatProvider (may establish chat state)
  *   - withModal — ModalProvider

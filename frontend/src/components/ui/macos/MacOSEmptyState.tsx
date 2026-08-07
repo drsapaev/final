@@ -115,6 +115,31 @@ const MacOSEmptyState = ({
     marginTop: '8px'
   };
 
+  // Determine whether `Icon` is a renderable React component (function,
+  // class, forwardRef object, memo object) vs. a plain ReactNode
+  // (string, number, ReactElement, array).
+  //
+  // The previous check `typeof Icon === 'function'` missed forwardRef and
+  // memo objects (e.g. lucide-react icons), which are callable components
+  // wrapped as {$$typeof: Symbol(react.forward_ref), render: function}.
+  // Those fell through to the `<span>{Icon}</span>` branch and React threw
+  // "Objects are not valid as a React child" because the forwardRef object
+  // itself cannot be rendered as a child.
+  //
+  // A component is renderable as <Icon /> if it is:
+  //   - a function (function components, class components)
+  //   - an object with $$typeof (forwardRef, memo)
+  // Strings are intentionally NOT treated as components here — production
+  // callers pass strings as icon content (e.g. icon="calendar", icon="📦"),
+  // which should render as text via the <span>{Icon}</span> branch, not as
+  // a DOM tag (which would throw "Invalid tag: 📦" or render a non-existent
+  // <calendar> element).
+  const isIconComponent =
+    Icon !== null &&
+    Icon !== undefined &&
+    (typeof Icon === 'function' ||
+      (typeof Icon === 'object' && Icon !== null && '$$typeof' in Icon));
+
   return (
     <div
       className={className}
@@ -124,8 +149,8 @@ const MacOSEmptyState = ({
       aria-describedby={hasDescription ? descriptionId : undefined}
       style={containerStyle}
     >
-      {Icon && typeof Icon === 'function' && <Icon aria-hidden="true" focusable="false" style={iconStyle} />}
-      {Icon && typeof Icon !== 'function' && <span aria-hidden="true">{Icon}</span>}
+      {Icon && isIconComponent && <Icon aria-hidden="true" focusable="false" style={iconStyle} />}
+      {Icon && !isIconComponent && <span aria-hidden="true">{Icon}</span>}
 
       <h3 style={titleStyle}>{title}</h3>
 
