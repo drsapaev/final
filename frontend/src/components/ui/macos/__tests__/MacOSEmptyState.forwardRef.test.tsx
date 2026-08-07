@@ -1,4 +1,5 @@
 import React, { forwardRef, memo } from 'react';
+import { createPortal } from 'react-dom';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
@@ -118,6 +119,22 @@ describe('MacOSEmptyState — icon-type coverage (PR-8B)', () => {
     render(<MacOSEmptyState title="Empty" />);
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.getByText('Empty')).toBeInTheDocument();
+  });
+
+  it('renders without error when icon is a portal (excluded from component branch)', () => {
+    // Per P2 review comment: portals have $$typeof but isValidElement(portal)
+    // is false, so they'd be misclassified as components without the explicit
+    // portal-type exclusion. Portals should render as children, not as <Icon />.
+    const portal = createPortal(<svg data-testid="portal-icon" />, document.body);
+    const { container } = render(<MacOSEmptyState icon={portal} title="Empty" />);
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByText('Empty')).toBeInTheDocument();
+    // The portal renders its children into the portal target (document.body),
+    // not into the MacOSEmptyState container. The important assertion is that
+    // the component renders without throwing — if the portal were misclassified
+    // as a component, <Icon /> would throw "Element type is invalid".
+    expect(container.querySelector('svg[data-testid="portal-icon"]')).toBeNull();
+    expect(document.body.querySelector('svg[data-testid="portal-icon"]')).not.toBeNull();
   });
 });
 

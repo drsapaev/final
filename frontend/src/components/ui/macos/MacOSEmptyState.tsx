@@ -117,7 +117,7 @@ const MacOSEmptyState = ({
 
   // Determine whether `Icon` is a renderable React component (function,
   // class, forwardRef object, memo object) vs. a plain ReactNode
-  // (string, number, ReactElement, array).
+  // (string, number, ReactElement, portal, array).
   //
   // The previous check `typeof Icon === 'function'` missed forwardRef and
   // memo objects (e.g. lucide-react icons), which are callable components
@@ -128,15 +128,20 @@ const MacOSEmptyState = ({
   //
   // A component is renderable as <Icon /> if it is:
   //   - a function (function components, class components)
-  //   - an object with $$typeof that is NOT a ReactElement (i.e. forwardRef
-  //     or memo). React.isValidElement() distinguishes between ReactElements
-  //     ($$typeof = Symbol(react.transitional.element)) and component types
-  //     ($$typeof = Symbol(react.forward_ref) or Symbol(react.memo)).
-  //     Without this check, passing <Package /> as icon would be treated as
-  //     a component and React would throw "Element type is invalid: expected
-  //     a string or class/function but got: object".
-  // Strings, numbers, ReactElements, arrays, null, undefined are all treated
-  // as plain ReactNode children and rendered via <span>{Icon}</span>.
+  //   - an object with $$typeof that is a component type (forwardRef, memo,
+  //     lazy) — NOT a ReactElement or portal.
+  //
+  // Excluded from the component branch:
+  //   - ReactElements ($$typeof = Symbol(react.transitional.element)):
+  //     caught by React.isValidElement(). These are pre-rendered elements
+  //     like <AlertCircle /> — production callers pass these (StateWrapper.tsx:100).
+  //   - Portals ($$typeof = Symbol(react.portal)): not caught by
+  //     isValidElement() but excluded via explicit symbol check. Portals
+  //     cannot be rendered as <Icon /> and should be treated as children.
+  //
+  // Strings, numbers, ReactElements, portals, arrays, null, undefined are
+  // all treated as plain ReactNode children and rendered via <span>{Icon}</span>.
+  const REACT_PORTAL_TYPE = Symbol.for('react.portal');
   const isIconComponent =
     Icon !== null &&
     Icon !== undefined &&
@@ -144,7 +149,8 @@ const MacOSEmptyState = ({
       (typeof Icon === 'object' &&
         Icon !== null &&
         '$$typeof' in Icon &&
-        !React.isValidElement(Icon)));
+        !React.isValidElement(Icon) &&
+        (Icon as { $$typeof: symbol }).$$typeof !== REACT_PORTAL_TYPE));
 
   return (
     <div
