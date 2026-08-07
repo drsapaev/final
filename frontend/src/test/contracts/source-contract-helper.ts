@@ -113,7 +113,7 @@ export function normalizeSource(source: string): string {
 
   // Phase 6b: Remove `(expr as Type)` → `expr` — unwrap parens that only contained a cast
   // Unwrap `(identifier)` → `identifier` when followed by ?. or [
-  s = s.replace(/\((\w+)\s*\)(?=[?.\[])/g, '$1');
+  s = s.replace(/\((\w+)\s*\)(?=[?.[])/g, '$1');
   // Also unwrap when preceded by ( (function call wrapping): `setStatus((expr))` → `setStatus(expr)` if expr has no parens
   // Already handled by 6b2 below
 

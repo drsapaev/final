@@ -69,13 +69,17 @@ describe('MacOSEmptyState — icon-type coverage (PR-8B)', () => {
   });
 
   it('renders without error when icon is a custom forwardRef component', () => {
-    const CustomForwardRef = forwardRef<HTMLSpanElement>(() => <svg data-testid="fwd-icon" />);
+    const CustomForwardRef = forwardRef<HTMLSpanElement>(function CustomForwardRef() {
+      return <svg data-testid="fwd-icon" />;
+    });
     const { container } = render(<MacOSEmptyState icon={CustomForwardRef} title="Empty" />);
     expect(container.querySelector('svg[data-testid="fwd-icon"]')).not.toBeNull();
   });
 
   it('renders without error when icon is a memo component', () => {
-    const CustomMemo = memo(() => <svg data-testid="memo-icon" />);
+    const CustomMemo = memo(function CustomMemo() {
+      return <svg data-testid="memo-icon" />;
+    });
     const { container } = render(<MacOSEmptyState icon={CustomMemo} title="Empty" />);
     expect(container.querySelector('svg[data-testid="memo-icon"]')).not.toBeNull();
   });

@@ -36,7 +36,7 @@ describe('Form accessibility', () => {
         name="fullName"
         label="Full name"
         required
-        validationRules={{ fullName: { required: 'Required field' }} }
+        validationRules={{ fullName: { required: 'Required field' } }}
       />,
     );
 
@@ -57,7 +57,7 @@ describe('Form accessibility', () => {
         name="notes"
         label="Notes"
         required
-        validationRules={{ notes: { required: 'Notes required' }} }
+        validationRules={{ notes: { required: 'Notes required' } }}
       />,
     );
 
@@ -77,7 +77,7 @@ describe('Form accessibility', () => {
         label="Role"
         required
         options={[{ value: 'admin', label: 'Admin' }]}
-        validationRules={{ role: { required: 'Role required' }} }
+        validationRules={{ role: { required: 'Role required' } }}
       />,
     );
 
