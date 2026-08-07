@@ -128,17 +128,23 @@ const MacOSEmptyState = ({
   //
   // A component is renderable as <Icon /> if it is:
   //   - a function (function components, class components)
-  //   - an object with $$typeof (forwardRef, memo)
-  // Strings are intentionally NOT treated as components here — production
-  // callers pass strings as icon content (e.g. icon="calendar", icon="📦"),
-  // which should render as text via the <span>{Icon}</span> branch, not as
-  // a DOM tag (which would throw "Invalid tag: 📦" or render a non-existent
-  // <calendar> element).
+  //   - an object with $$typeof that is NOT a ReactElement (i.e. forwardRef
+  //     or memo). React.isValidElement() distinguishes between ReactElements
+  //     ($$typeof = Symbol(react.transitional.element)) and component types
+  //     ($$typeof = Symbol(react.forward_ref) or Symbol(react.memo)).
+  //     Without this check, passing <Package /> as icon would be treated as
+  //     a component and React would throw "Element type is invalid: expected
+  //     a string or class/function but got: object".
+  // Strings, numbers, ReactElements, arrays, null, undefined are all treated
+  // as plain ReactNode children and rendered via <span>{Icon}</span>.
   const isIconComponent =
     Icon !== null &&
     Icon !== undefined &&
     (typeof Icon === 'function' ||
-      (typeof Icon === 'object' && Icon !== null && '$$typeof' in Icon));
+      (typeof Icon === 'object' &&
+        Icon !== null &&
+        '$$typeof' in Icon &&
+        !React.isValidElement(Icon)));
 
   return (
     <div
