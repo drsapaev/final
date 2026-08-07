@@ -2,6 +2,36 @@
 
 # Testing
 
+## Vitest: Fake Timers Rule
+
+**Any test file that calls `vi.useFakeTimers()` MUST call `vi.useRealTimers()` in `afterEach` or `afterAll`.**
+
+This project uses `pool: 'forks'` with `singleFork: true` in `vitest.config.ts`. In this mode, all test files share a single Node.js process. If a test file enables fake timers but does not restore real timers in cleanup, fake timers **leak into subsequent files** and can cause the vitest process to **hang indefinitely** during shutdown.
+
+This was the root cause of a CI process hang that was investigated and fixed in August 2026 (see commit `9706ecda` and worklog `v5`–`v10` investigation).
+
+### Correct pattern
+
+```ts
+describe('myFeature', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers(); // ← REQUIRED
+  });
+
+  it('does something with timers', () => { ... });
+});
+```
+
+### Enforcement
+
+- A global safety net in `src/test/setup.ts` calls `vi.useRealTimers()` in `afterEach`.
+- An ESLint custom rule (`custom/no-fake-timers-without-cleanup`) enforces this at lint time. Files with `vi.useFakeTimers()` but no `vi.useRealTimers()` in `afterEach`/`afterAll` will fail the lint check.
+
 ## Local Windows Python Launchers
 
 - General Python: `C:\final\scripts\run_python.ps1 <python args>`
