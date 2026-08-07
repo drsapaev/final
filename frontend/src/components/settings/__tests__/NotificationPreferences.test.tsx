@@ -36,13 +36,24 @@ vi.mock('../../../stores/auth', () => ({
   getState: getAuthState,
 }));
 
+// ADR-0015: NotificationPreferences calls useServicesApi(), which destructures
+// ALL THREE exports from api/services (servicesService, notificationsService,
+// clearNotificationQueryCache). The mock must export the complete interface —
+// missing exports cause vitest to throw "No X export is defined on the mock"
+// at render time. servicesService and clearNotificationQueryCache are not
+// exercised by these tests, so they get no-op stubs.
 vi.mock('../../../api/services', () => ({
+  servicesService: {
+    getCodeMappings: vi.fn().mockResolvedValue([]),
+    getServiceHistory: vi.fn().mockResolvedValue([]),
+  },
   notificationsService: {
     getSettings: notificationGetSettings,
     updateSettings: notificationUpdateSettings,
     getPolicy: notificationGetPolicy,
     updatePolicy: notificationUpdatePolicy,
   },
+  clearNotificationQueryCache: vi.fn(),
 }));
 
 vi.mock('../../../utils/logger', () => ({
