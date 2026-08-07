@@ -699,7 +699,7 @@ jobs:
       run: |
         cd frontend
         npm ci --legacy-peer-deps
-    
+
     - name: 🧪 Тесты frontend
       run: |
         cd frontend

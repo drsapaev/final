@@ -115,6 +115,50 @@ const MacOSEmptyState = ({
     marginTop: '8px'
   };
 
+  // Determine whether `Icon` is a renderable React component (function,
+  // class, forwardRef object, memo object) vs. a plain ReactNode
+  // (string, number, ReactElement, portal, array).
+  //
+  // The previous check `typeof Icon === 'function'` missed forwardRef and
+  // memo objects (e.g. lucide-react icons), which are callable components
+  // wrapped as {$$typeof: Symbol(react.forward_ref), render: function}.
+  // Those fell through to the `<span>{Icon}</span>` branch and React threw
+  // "Objects are not valid as a React child" because the forwardRef object
+  // itself cannot be rendered as a child.
+  //
+  // A component is renderable as <Icon /> if it is:
+  //   - a function (function components, class components)
+  //   - an object with $$typeof that is a component type (forwardRef, memo,
+  //     lazy) — NOT a ReactElement or portal.
+  //
+  // Excluded from the component branch:
+  //   - ReactElements ($$typeof = Symbol(react.transitional.element)):
+  //     caught by React.isValidElement(). These are pre-rendered elements
+  //     like <AlertCircle /> — production callers pass these (StateWrapper.tsx:100).
+  //   - Portals ($$typeof = Symbol(react.portal)): not caught by
+  //     isValidElement() but excluded via explicit symbol check. Portals
+  //     cannot be rendered as <Icon /> and should be treated as children.
+  //
+  // Strings, numbers, ReactElements, portals, arrays, null, undefined are
+  // all treated as plain ReactNode children and rendered via <span>{Icon}</span>.
+  const REACT_PORTAL_TYPE = Symbol.for('react.portal');
+  const isIconComponent =
+    Icon !== null &&
+    Icon !== undefined &&
+    (typeof Icon === 'function' ||
+      (typeof Icon === 'object' &&
+        Icon !== null &&
+        '$$typeof' in Icon &&
+        !React.isValidElement(Icon) &&
+        (Icon as { $$typeof: symbol }).$$typeof !== REACT_PORTAL_TYPE));
+
+  // When isIconComponent is true, Icon is a callable component type. Cast it
+  // to React.ElementType so TypeScript accepts <IconComponent /> in JSX —
+  // the union type `React.ElementType | ReactNode` doesn't narrow via the
+  // boolean flag above, so without this cast TS errors with TS2604/TS2786
+  // ("JSX element type 'Icon' does not have any construct or call signatures").
+  const IconComponent = isIconComponent ? (Icon as React.ElementType) : null;
+
   return (
     <div
       className={className}
@@ -124,8 +168,8 @@ const MacOSEmptyState = ({
       aria-describedby={hasDescription ? descriptionId : undefined}
       style={containerStyle}
     >
-      {Icon && typeof Icon === 'function' && <Icon aria-hidden="true" focusable="false" style={iconStyle} />}
-      {Icon && typeof Icon !== 'function' && <span aria-hidden="true">{Icon}</span>}
+      {IconComponent && <IconComponent aria-hidden="true" focusable="false" style={iconStyle} />}
+      {Icon && !isIconComponent && <span aria-hidden="true">{Icon}</span>}
 
       <h3 style={titleStyle}>{title}</h3>
 

@@ -5,6 +5,11 @@ import { afterEach } from 'vitest';
 // Очищаем DOM после каждого теста
 afterEach(() => {
   cleanup();
+  // Safety net: ensure real timers are restored after each test.
+  // Some test files call vi.useFakeTimers() but forget vi.useRealTimers()
+  // in their afterEach. In singleFork mode, fake timers leak across files
+  // and can cause vitest's internal shutdown to hang indefinitely.
+  vi.useRealTimers();
 });
 
 if (typeof window !== 'undefined') {

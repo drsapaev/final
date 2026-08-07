@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { normalizeSource } from '../test/contracts/source-contract-helper';
+
 const ROOT = path.resolve(process.cwd(), 'src');
 
 const NOTIFICATION_FILES = [
@@ -12,17 +14,13 @@ const NOTIFICATION_FILES = [
   'components/chat/NotificationPrompt.tsx'
 ];
 
-const PANEL_FILES = [
-  'App.jsx',
-  'pages/RegistrarPanel.tsx',
-  'pages/CardiologistPanelUnified.tsx',
-  'pages/DentistPanelUnified.tsx',
-  'pages/DermatologistPanelUnified.tsx',
-  'pages/LabPanel.tsx'
-];
+// Note: per-panel GlobalNotificationCenter rendering was removed in commit
+// 6adf9284 — GlobalNotificationCenter now lives only in App.tsx. The per-panel
+// PANEL_FILES list was deleted when the test was updated to reflect the
+// centralized architecture.
 
 function read(filePath: string) {
-  return fs.readFileSync(path.join(ROOT, filePath), 'utf8');
+  return normalizeSource(fs.readFileSync(path.join(ROOT, filePath), 'utf8'));
 }
 
 describe('notification guardrails', () => {
@@ -37,10 +35,13 @@ describe('notification guardrails', () => {
     expect(prompt).toContain('notify.warning(');
     expect(prompt).toContain('notify.error(');
 
-    for (const filePath of PANEL_FILES) {
-      const content = read(filePath);
-      expect(content).toContain('GlobalNotificationCenter');
-    }
+    // Contract (commit 6adf9284): GlobalNotificationCenter is rendered ONCE
+    // in App.tsx as the single, global notification entry point. The header
+    // bell (HeaderNew) toggles the inbox via NotificationCenterContext.
+    // Per-panel GlobalNotificationCenter rendering was intentionally removed
+    // — each panel no longer needs its own instance.
+    const app = read('App.tsx');
+    expect(app).toContain('GlobalNotificationCenter');
 
     const registrar = read('pages/RegistrarPanel.tsx');
     expect(registrar).toContain('loadAppointmentsInFlightRef');
@@ -72,7 +73,7 @@ describe('notification guardrails', () => {
     expect(table).toContain('can_print_ticket');
     expect(table).toContain('can_complete');
     expect(table).toContain('available_actions');
-    expect(table).toContain('{canPay &&');
+    expect(table).toContain('{canPay ? (');
     expect(table).not.toContain('{!isDoctorView && (() => {');
     const quote = String.fromCharCode(39);
     expect(table).not.toContain(

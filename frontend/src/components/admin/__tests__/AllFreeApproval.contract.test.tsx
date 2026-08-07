@@ -2,17 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { normalizeSource } from '../../../test/contracts/source-contract-helper';
+
 const sourcePath = path.resolve(
   process.cwd(),
   'src/components/admin/AllFreeApproval.tsx'
 );
 
-const readSource = () => fs.readFileSync(sourcePath, 'utf8');
+const readSource = () => normalizeSource(fs.readFileSync(sourcePath, 'utf8'));
 
 const sourceSlice = (source: string, startMarker: string, endMarker: string) => {
-  const start = source.indexOf(startMarker);
+  const start = source.indexOf(normalizeSource(startMarker));
   expect(start).toBeGreaterThanOrEqual(0);
-  const end = source.indexOf(endMarker, start);
+  const end = source.indexOf(normalizeSource(endMarker), start);
   expect(end).toBeGreaterThan(start);
   return source.slice(start, end);
 };
