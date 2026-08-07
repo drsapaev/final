@@ -14,7 +14,9 @@ describe('Settings generic key/value route contract', () => {
     const source = normalizeSource(fs.readFileSync(settingsPath, 'utf8'));
 
     expect(source).toContain('api.get(\'/settings\', { params: { category } })');
-    expect(source).toContain('const data = res?.data ?? res;');
+    // Contract: settings endpoint response must be unwrapped via ?? res fallback.
+    // Parentheses were added during TS migration to scope the cast — syntactically harmless.
+    expect(source).toContain('res?.data ?? res');
     expect(source).toContain('api.put(\'/settings\', { category, key, value })');
     expect(source).not.toContain('api.put(\'/settings\', { body: { category, key, value } })');
   });

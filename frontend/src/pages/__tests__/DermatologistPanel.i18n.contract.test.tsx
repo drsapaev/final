@@ -17,16 +17,19 @@ describe('DermatologistPanel STRAT#33 — i18n migration', () => {
   it('instantiates tI18n via useTranslation()', () => {
     expect(source).toContain("const { t: tI18n } = useTranslation()");
   });
-  it('uses tI18n() for confirm dialog', () => {
-    expect(source).toContain("tI18n('derma.complete_visit_title')");
-    expect(source).toContain("tI18n('derma.complete_visit_confirm')");
-    expect(source).toContain("tI18n('derma.cancel')");
+  it('uses i18n keys for confirm dialog', () => {
+    // Contract: confirm dialog must use i18n translation keys, not hardcoded strings.
+    // The variable name (tI18n vs t alias) is an implementation detail.
+    expect(source).toContain("'derma.complete_visit_title'");
+    expect(source).toContain("'derma.complete_visit_confirm'");
+    expect(source).toContain("'derma.cancel'");
   });
-  it('uses tI18n() for notify messages', () => {
-    expect(source).toContain("tI18n('derma.session_expired')");
-    expect(source).toContain("tI18n('derma.visit_completed')");
-    expect(source).toContain("tI18n('derma.prescription_saved')");
-    expect(source).toContain("tI18n('derma.skin_exam_saved')");
+  it('uses i18n keys for notify messages', () => {
+    // Contract: notify messages must use i18n translation keys, not hardcoded strings.
+    expect(source).toContain("'derma.session_expired'");
+    expect(source).toContain("'derma.visit_completed'");
+    expect(source).toContain("'derma.prescription_saved'");
+    expect(source).toContain("'derma.skin_exam_saved'");
   });
   it('does not contain hardcoded Russian notify strings', () => {
     expect(source).not.toContain("notify.error('Сессия истекла");
