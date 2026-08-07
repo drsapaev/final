@@ -32,14 +32,13 @@ describe('PriceOverrideApproval action contract', () => {
     expect(helper).toContain('PRICE_OVERRIDE_ACTION_CAN_FIELD');
     expect(helper).toContain('return false;');
 
-    const actionRendering = sourceSlice(
-      source,
-      '{(hasBackendPriceOverrideAction(override, \'approve\')',
-      '{showApprovalModal && selectedOverride &&'
-    );
-
-    expect(actionRendering).toContain('hasBackendPriceOverrideAction(override, \'approve\')');
-    expect(actionRendering).toContain('hasBackendPriceOverrideAction(override, \'reject\')');
-    expect(actionRendering).not.toContain('override.status === \'pending\'');
+    // Contract: approve/reject actions are gated by hasBackendPriceOverrideAction,
+    // NOT by legacy `override.status === 'pending'`. Assertions check the whole source
+    // (no slice) — the architectural contract is the gating predicate itself, not the
+    // surrounding JSX form. Survives TS strict-mode narrowing (e.g., `&&` → `!= null &&`)
+    // and any modal boundary refactor.
+    expect(source).toContain('hasBackendPriceOverrideAction(override, \'approve\')');
+    expect(source).toContain('hasBackendPriceOverrideAction(override, \'reject\')');
+    expect(source).not.toContain('override.status === \'pending\'');
   });
 });

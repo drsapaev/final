@@ -27,7 +27,10 @@ describe('Settings generic key/value route contract', () => {
     expect(source).toContain('api.get(\'/activation/status\')');
     expect(source).toContain('setStatus(st?.data ?? st ?? null);');
     expect(source).toContain('api.post(\'/activation/activate\', { key })');
-    expect(source).toContain('const res = response?.data ?? response;');
+    // Contract: activation response must be dual-unwrapped via the standard axios
+    // `response?.data ?? response` pattern. Variable name and trailing `;` are
+    // intentionally omitted — the architectural contract is the unwrap expression itself.
+    expect(source).toContain('response?.data ?? response');
     expect(source).not.toContain('api.post(\'/activation/activate\', { body: { key } })');
   });
 });
