@@ -213,7 +213,12 @@ describe('NotificationWebSocketContext', () => {
 
     const socket = MockWebSocket.instances[0];
     await act(async () => {
+      // Fixture contract: parseWsEvent (zod WsMessageSchema) requires a top-level
+      // `type: string`. The event_type alias lives in the nested `notification`
+      // payload and is resolved to 'queue_update' by normalizePayload() via
+      // TYPE_ALIASES. This matches the production WS event contract.
       socket.triggerMessage({
+        type: 'notification',
         notification: {
           event_type: 'queue_changed',
           message: 'Пациент вызван',
@@ -240,7 +245,12 @@ describe('NotificationWebSocketContext', () => {
 
     const socket = MockWebSocket.instances[0];
     await act(async () => {
+      // Fixture contract: parseWsEvent (zod WsMessageSchema) requires a top-level
+      // `type: string`. The event_type alias lives in the nested `notification`
+      // payload and is resolved to 'diagnostics_return_needed' by normalizePayload()
+      // via TYPE_ALIASES. This matches the production WS event contract.
       socket.triggerMessage({
+        type: 'notification',
         notification: {
           event_type: 'diagnostics_return',
           title: 'Повторная диагностика',
