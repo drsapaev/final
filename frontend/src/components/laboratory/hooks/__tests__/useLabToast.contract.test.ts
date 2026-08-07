@@ -4,25 +4,26 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 
 import { fileURLToPath } from 'node:url';
+import { normalizeSource } from '../../../../test/contracts/source-contract-helper';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../../..');
 
-const source = fs.readFileSync(
+const source = normalizeSource(fs.readFileSync(
   path.join(ROOT, 'components/laboratory/hooks/useLabToast.ts'),
   'utf8'
-);
+));
 
-const workbenchSource = fs.readFileSync(
+const workbenchSource = normalizeSource(fs.readFileSync(
   path.join(ROOT, 'components/laboratory/LabReportWorkbench.tsx'),
   'utf8'
-);
+));
 
 // STRAT#24: numeric validation moved to ReportEditor component
-const reportEditorSource = fs.readFileSync(
+const reportEditorSource = normalizeSource(fs.readFileSync(
   path.join(ROOT, 'components/laboratory/ReportEditor.tsx'),
   'utf8'
-);
+));
 
 describe('useLabToast hook (STRAT#2)', () => {
   it('exports useLabToast function', () => {

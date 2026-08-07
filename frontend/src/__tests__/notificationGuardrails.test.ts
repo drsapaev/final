@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { normalizeSource } from '../test/contracts/source-contract-helper';
+
 const ROOT = path.resolve(process.cwd(), 'src');
 
 const NOTIFICATION_FILES = [
@@ -22,7 +24,7 @@ const PANEL_FILES = [
 ];
 
 function read(filePath: string) {
-  return fs.readFileSync(path.join(ROOT, filePath), 'utf8');
+  return normalizeSource(fs.readFileSync(path.join(ROOT, filePath), 'utf8'));
 }
 
 describe('notification guardrails', () => {
@@ -72,7 +74,7 @@ describe('notification guardrails', () => {
     expect(table).toContain('can_print_ticket');
     expect(table).toContain('can_complete');
     expect(table).toContain('available_actions');
-    expect(table).toContain('{canPay &&');
+    expect(table).toContain('{canPay ? (');
     expect(table).not.toContain('{!isDoctorView && (() => {');
     const quote = String.fromCharCode(39);
     expect(table).not.toContain(

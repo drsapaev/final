@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { normalizeSource } from '../../test/contracts/source-contract-helper';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const registrarPanelPath = path.resolve(__dirname, '../RegistrarPanel.tsx');
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js.
@@ -41,7 +43,7 @@ const extractSourceBlock = (source: string, startMarker: string, endMarker: stri
   expect(start).toBeGreaterThanOrEqual(0);
   const end = source.indexOf(endMarker, start);
   expect(end).toBeGreaterThan(start);
-  return source.slice(start, end);
+  return normalizeSource(source.slice(start, end));
 };
 
 describe('RegistrarPanel command contract', () => {

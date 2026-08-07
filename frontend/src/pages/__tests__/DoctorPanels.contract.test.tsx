@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { normalizeSource } from '../../test/contracts/source-contract-helper';
+
 const ROOT = path.resolve(process.cwd(), 'src');
 
 const DOCTOR_PANEL_FILES = [
@@ -18,7 +20,7 @@ const extractBlock = (source: string, startMarker: string, endMarker: string) =>
   expect(start).toBeGreaterThanOrEqual(0);
   const end = source.indexOf(endMarker, start);
   expect(end).toBeGreaterThan(start);
-  return source.slice(start, end);
+  return normalizeSource(source.slice(start, end));
 };
 
 describe('Doctor panels SSOT contract', () => {

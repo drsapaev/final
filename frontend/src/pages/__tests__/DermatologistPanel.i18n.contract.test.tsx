@@ -2,11 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
+import { normalizeSource } from '../../test/contracts/source-contract-helper';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../..');
-const source = fs.readFileSync(path.join(ROOT, 'pages/DermatologistPanelUnified.tsx'), 'utf8');
-const translationsSource = fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.ts'), 'utf8');
+const source = normalizeSource(fs.readFileSync(path.join(ROOT, 'pages/DermatologistPanelUnified.tsx'), 'utf8'));
+const translationsSource = normalizeSource(fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.ts'), 'utf8'));
 
 describe('DermatologistPanel STRAT#33 — i18n migration', () => {
   it('imports useTranslation from i18n adapter', () => {
