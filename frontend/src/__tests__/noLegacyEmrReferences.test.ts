@@ -39,7 +39,13 @@ describe('legacy EMR references', () => {
     const offenders: string[] = [];
 
     for (const filePath of collectCodeFiles(ROOT)) {
-      if (path.basename(filePath) === 'noLegacyEmrReferences.test.js') {
+      // Skip this test file itself — it contains the forbidden patterns as
+      // string literals (in FORBIDDEN_PATTERNS and the offenders list). The
+      // original skip check matched only the `.js` extension, but the file is
+      // `.ts`. Match both to be resilient to future extension changes.
+      const basename = path.basename(filePath);
+      if (basename === 'noLegacyEmrReferences.test.js' ||
+          basename === 'noLegacyEmrReferences.test.ts') {
         continue;
       }
 
