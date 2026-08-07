@@ -14,14 +14,10 @@ const NOTIFICATION_FILES = [
   'components/chat/NotificationPrompt.tsx'
 ];
 
-const PANEL_FILES = [
-  'App.jsx',
-  'pages/RegistrarPanel.tsx',
-  'pages/CardiologistPanelUnified.tsx',
-  'pages/DentistPanelUnified.tsx',
-  'pages/DermatologistPanelUnified.tsx',
-  'pages/LabPanel.tsx'
-];
+// Note: per-panel GlobalNotificationCenter rendering was removed in commit
+// 6adf9284 — GlobalNotificationCenter now lives only in App.tsx. The per-panel
+// PANEL_FILES list was deleted when the test was updated to reflect the
+// centralized architecture.
 
 function read(filePath: string) {
   return normalizeSource(fs.readFileSync(path.join(ROOT, filePath), 'utf8'));
@@ -39,10 +35,13 @@ describe('notification guardrails', () => {
     expect(prompt).toContain('notify.warning(');
     expect(prompt).toContain('notify.error(');
 
-    for (const filePath of PANEL_FILES) {
-      const content = read(filePath);
-      expect(content).toContain('GlobalNotificationCenter');
-    }
+    // Contract (commit 6adf9284): GlobalNotificationCenter is rendered ONCE
+    // in App.tsx as the single, global notification entry point. The header
+    // bell (HeaderNew) toggles the inbox via NotificationCenterContext.
+    // Per-panel GlobalNotificationCenter rendering was intentionally removed
+    // — each panel no longer needs its own instance.
+    const app = read('App.tsx');
+    expect(app).toContain('GlobalNotificationCenter');
 
     const registrar = read('pages/RegistrarPanel.tsx');
     expect(registrar).toContain('loadAppointmentsInFlightRef');
