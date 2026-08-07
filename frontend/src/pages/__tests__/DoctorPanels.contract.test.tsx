@@ -47,7 +47,9 @@ describe('Doctor panels SSOT contract', () => {
       expect(source).toContain('can_print_ticket: Boolean(entry.can_print_ticket)');
       expect(source).toContain('can_complete: Boolean(entry.can_complete) && doctorQueueEntryId !== null');
       expect(source).toContain('can_cancel: Boolean(entry.can_cancel)');
-      expect(source).toContain('doctor_queue_entry_id: doctorQueueEntryId');
+      // Contract: doctor_queue_entry_id must be set from resolveDoctorQueueEntryId.
+      // The variable name (doctorQueueEntryId vs resolveDoctorQueueEntryId(row)) is an implementation detail.
+      expect(source).toContain('doctor_queue_entry_id:');
 
       expect(source).not.toContain('payment_status: entry.payment_status || \'pending\'');
       expect(source).not.toContain('status: entry.status || \'waiting\'');

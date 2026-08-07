@@ -87,8 +87,9 @@ export function normalizeSource(source: string): string {
 
   // Phase 2: Remove parameter type annotations
   // `(param: Type` → `(param` — match identifier followed by `: Type` before `,` or `)`
+  // Also handles array types: `param: Type[]` and `param: Type<...>[]`
   s = s.replace(
-    /(\w+)\s*:\s*[A-Za-z_$][\w$]*(?:<[^<>]*(?:<[^<>]*>[^<>]*)*>)?(?:\s*\|\s*[A-Za-z_$][\w$]*)*\s*(?=[,)=])/g,
+    /(\w+)\s*:\s*[A-Za-z_$][\w$]*(?:<[^<>]*(?:<[^<>]*>[^<>]*)*>)?(?:\s*\|\s*[A-Za-z_$][\w$]*)*(?:\[\])*\s*(?=[,)=])/g,
     '$1 '
   );
 

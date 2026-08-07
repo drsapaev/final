@@ -70,7 +70,9 @@ describe('RegistrarPanel command contract', () => {
       'return enrichedAppointments;',
     );
 
-    expect(source).toContain('if (apt.patient_id as string | number && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt)))');
+    // Contract: enrichment must gate on patient_id and backend display/gender contracts.
+    // TS type annotations are stripped by normalizeSource — assertion must match normalized form.
+    expect(source).toContain('if (apt.patient_id && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt)))');
     expect(source).toContain('patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name');
     expect(source).toContain('patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year');
     expect(source).toContain('patient_phone: fullEntry.patient_phone ?? fullEntry.phone');
@@ -90,8 +92,10 @@ describe('RegistrarPanel command contract', () => {
   it('keeps Registrar table view separate from edit mode', () => {
     const source = readRegistrarSourceTree();
 
-    expect(source).toContain('const openRecordPreview = useCallback((row: unknown) => {');
-    expect(source).toContain('const openRecordEditor = useCallback((row: unknown) => {');
+    // Contract: view/edit mode must use separate callbacks.
+    // TS type annotations are stripped by normalizeSource.
+    expect(source).toContain('const openRecordPreview = useCallback((row) => {');
+    expect(source).toContain('const openRecordEditor = useCallback((row) => {');
     expect(source).toContain('case \'view\':');
     expect(source).toContain('openRecordPreview(row);');
     expect(source).toContain('case \'edit\':');
@@ -106,7 +110,9 @@ describe('RegistrarPanel command contract', () => {
       'const handleContextMenuAction = useCallback(async (action: string, row: Appointment) => {',
     );
 
-    expect(source).toContain('export const isMultiRecordAggregateRow = (row: Record<string, unknown>) => (');
+    // Contract: aggregate row detection must use hasMultipleRecordRefs.
+    // TS type annotations are stripped by normalizeSource.
+    expect(source).toContain('export const isMultiRecordAggregateRow = (row) => (');
     expect(source).toContain('hasMultipleRecordRefs(row?.grouped_record_refs)');
     expect(editBlock).toContain('if (isMultiRecordAggregateRow(appt))');
     expect(editBlock).toContain('Opening edit wizard for aggregate all-departments row');
@@ -118,7 +124,9 @@ describe('RegistrarPanel command contract', () => {
   it('restores post-wizard payment or ticket handoff for creates and paid edit deltas', () => {
     const source = readRegistrarSourceTree();
 
-    expect(source).toContain('const buildPostWizardPaymentRow = (wizardResult: Record<string, unknown> | null | undefined) => {');
+    // Contract: post-wizard payment row builder must exist.
+    // TS type annotations are stripped by normalizeSource.
+    expect(source).toContain('const buildPostWizardPaymentRow = (wizardResult) => {');
     expect(source).toContain('const normalizeWizardQueueAssignment = (');
     expect(source).toContain('const resolveWizardQueueEntryId = (assignment: Record<string, unknown> | null | undefined) => {');
     expect(source).toContain('if (hasQueueIdentityValue(assignment.queue_id)) return null;');
