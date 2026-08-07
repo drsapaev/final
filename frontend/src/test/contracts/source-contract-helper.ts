@@ -131,9 +131,10 @@ export function normalizeSource(source: string): string {
   // Phase 7: Clean up whitespace and artifacts from cast removal
   s = s.replace(/  +/g, ' ');
   s = s.replace(/ +$/gm, '');
-  // Remove `[]` left behind after `as Type[]` cast removal.
-  // Only remove when preceded by identifier (not after || which is a default array).
-  s = s.replace(/(\w)\s+\[\]/g, '$1');
+  // Note: `[]` left behind after `as Type[]` cast removal is NOT removed.
+  // The rule was too aggressive — it also removed `return []` and `|| []`.
+  // Instead, contract assertions should account for ` []` in normalized source
+  // (e.g., check for 'entriesForTab' instead of 'entriesForTab;').
   // Remove trailing space before semicolons and commas
   s = s.replace(/\s+([;,])/g, '$1');
   // Remove space after opening paren (left by param annotation removal)
