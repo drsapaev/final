@@ -35,6 +35,20 @@ on:
           - 'full'
           - 'first'
           - 'second'
+          - 'q1'
+          - 'q2'
+          - 'q3'
+          - 'q4'
+      bisect_start:
+        description: 'Bisect custom: start line number (1-indexed) in batch-files.txt'
+        required: false
+        default: '0'
+        type: string
+      bisect_count:
+        description: 'Bisect custom: number of files to run (0 = use bisect_half)'
+        required: false
+        default: '0'
+        type: string
 
 permissions:
   contents: read
@@ -867,8 +881,10 @@ jobs:
         cd frontend
         # Per Codex P1: BISECT_HALF from workflow_dispatch input
         BISECT_HALF="${{ github.event.inputs.bisect_half || 'full' }}"
-        echo "=== v10.1: bisect + handle capture ==="
-        echo "=== BISECT_HALF=$BISECT_HALF ==="
+        BISECT_START="${{ github.event.inputs.bisect_start || '0' }}"
+        BISECT_COUNT="${{ github.event.inputs.bisect_count || '0' }}"
+        echo "=== v10.2: bisect + handle capture ==="
+        echo "=== BISECT_HALF=$BISECT_HALF START=$BISECT_START COUNT=$BISECT_COUNT ==="
         echo ""
 
         # Per Codex P1 #7: Disable errexit around the pipeline so trace
@@ -877,39 +893,57 @@ jobs:
         set +e
 
         # Determine which files to run
-        if [ "$BISECT_HALF" = "first" ] || [ "$BISECT_HALF" = "second" ]; then
-          # Read batch file list and split
-          # The batch files are stored in scripts/ci/batch-files.txt
-          BATCH_FILE="$GITHUB_WORKSPACE/scripts/ci/batch-files.txt"
-          if [ ! -f "$BATCH_FILE" ]; then
-            echo "::error::Batch file list not found: $BATCH_FILE"
-            exit 1
-          fi
-          TOTAL=$(wc -l < "$BATCH_FILE")
+        BATCH_FILE="$GITHUB_WORKSPACE/scripts/ci/batch-files.txt"
+        if [ ! -f "$BATCH_FILE" ]; then
+          echo "::error::Batch file list not found: $BATCH_FILE"
+          exit 1
+        fi
+        TOTAL=$(wc -l < "$BATCH_FILE")
+        echo "Total batch files: $TOTAL"
+
+        if [ "$BISECT_COUNT" != "0" ] && [ "$BISECT_START" != "0" ]; then
+          # Custom range mode
+          END=$((BISECT_START + BISECT_COUNT - 1))
+          echo "Running custom range: lines $BISECT_START-$END ($BISECT_COUNT files)"
+          sed -n "${BISECT_START},${END}p" "$BATCH_FILE" > /tmp/bisect-files.txt
+        elif [ "$BISECT_HALF" = "first" ] || [ "$BISECT_HALF" = "second" ]; then
           HALF=$((TOTAL / 2))
-          echo "Total batch files: $TOTAL, split point: $HALF"
+          echo "Split point: $HALF"
           if [ "$BISECT_HALF" = "first" ]; then
             head -n "$HALF" "$BATCH_FILE" > /tmp/bisect-files.txt
-            echo "Running first half: $(wc -l < /tmp/bisect-files.txt) files"
           else
             tail -n +$((HALF + 1)) "$BATCH_FILE" > /tmp/bisect-files.txt
-            echo "Running second half: $(wc -l < /tmp/bisect-files.txt) files"
           fi
-          echo "Files in this run:"
-          cat /tmp/bisect-files.txt | head -10
-          echo "..."
-          cat /tmp/bisect-files.txt | tail -5
-          echo ""
-
-          # Per Codex P2: use --kill-after for reliable SIGKILL escalation
-          # if SIGTERM is caught/ignored by vitest or its children.
-          timeout --kill-after=10 720 npx vitest run $FILES_ARGS 2>&1 | tee /tmp/vitest-v10-output.log
+        elif [ "$BISECT_HALF" = "q1" ] || [ "$BISECT_HALF" = "q2" ] || [ "$BISECT_HALF" = "q3" ] || [ "$BISECT_HALF" = "q4" ]; then
+          QUARTER=$((TOTAL / 4))
+          echo "Quarter size: $QUARTER"
+          case "$BISECT_HALF" in
+            q1) sed -n "1,${QUARTER}p" "$BATCH_FILE" > /tmp/bisect-files.txt ;;
+            q2) sed -n "$((QUARTER+1)),$((QUARTER*2))p" "$BATCH_FILE" > /tmp/bisect-files.txt ;;
+            q3) sed -n "$((QUARTER*2+1)),$((QUARTER*3))p" "$BATCH_FILE" > /tmp/bisect-files.txt ;;
+            q4) sed -n "$((QUARTER*3+1)),\$p" "$BATCH_FILE" > /tmp/bisect-files.txt ;;
+          esac
         else
           echo "Running FULL suite (no bisect) with handle capture"
           timeout --kill-after=10 720 npx vitest run --coverage 2>&1 | tee /tmp/vitest-v10-output.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          # Skip bisect file processing below
+          BISECT_HALF="full_done"
         fi
 
-        EXIT_CODE=${PIPESTATUS[0]}
+        if [ "$BISECT_HALF" != "full_done" ]; then
+          echo "Running bisect: $(wc -l < /tmp/bisect-files.txt) files"
+          echo "Files in this run:"
+          head -5 /tmp/bisect-files.txt
+          echo "..."
+          tail -5 /tmp/bisect-files.txt
+          echo ""
+
+          FILES_ARGS=$(cat /tmp/bisect-files.txt | tr '\n' ' ')
+          timeout --kill-after=10 720 npx vitest run $FILES_ARGS 2>&1 | tee /tmp/vitest-v10-output.log
+          EXIT_CODE=${PIPESTATUS[0]}
+        fi
+
         echo ""
         echo "=== Vitest exit code: $EXIT_CODE ==="
 
