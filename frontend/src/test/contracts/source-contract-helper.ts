@@ -45,8 +45,8 @@ export function normalizeSource(source: string): string {
       ''
     );
 
-    // 2. Remove `as never`
-    s = s.replace(/\bas\s+never\b/g, '');
+    // 2. Remove `as never` (including preceding space to avoid leaving 'expr }')
+    s = s.replace(/\s+as\s+never\b/g, '');
 
     // 3. Remove `as { ... }` — object type assertion
     s = s.replace(/\bas\s+\{[^}]*\}/g, '');
@@ -69,15 +69,17 @@ export function normalizeSource(source: string): string {
     // 7. Remove `as type` — simple lowercase type cast
     s = s.replace(/\bas\s+(?:string|number|boolean|unknown|any|void|object)\b/g, '');
 
-    // 8. Remove `as lowercaseIdentifier` — other lowercase type
-    s = s.replace(/\bas\s+[a-z][\w$]*/g, '');
-
-    // 9. Remove `as import('module').Type<...>` — dynamic import type assertion
+    // 8. Remove `as import('module').Type<...>` — dynamic import type assertion
+    //    MUST run before step 9 (lowercase identifier) because `import` starts
+    //    with lowercase and would be partially matched by step 9.
     //    e.g., `as import('axios').AxiosResponse<Record<string, unknown>>`
     s = s.replace(
       /\bas\s+import\([^)]*\)\.[A-Za-z_$][\w$]*(?:<[^<>]*(?:<[^<>]*>[^<>]*)*>)?/g,
       ''
     );
+
+    // 9. Remove `as lowercaseIdentifier` — other lowercase type
+    s = s.replace(/\bas\s+[a-z][\w$]*/g, '');
 
     // If nothing changed in this pass, we're done
     if (s === before) break;
@@ -130,12 +132,13 @@ export function normalizeSource(source: string): string {
   s = s.replace(/ +$/gm, '');
   // Remove `[]` left behind after `as Type[]` cast removal
   s = s.replace(/\s+\[\]/g, '');
-  // Remove trailing space before closing delimiters
-  s = s.replace(/\s+([;,\)\}\]])/g, '$1');
+  // Remove trailing space before semicolons and commas
+  s = s.replace(/\s+([;,])/g, '$1');
   // Remove space after opening paren (left by param annotation removal)
   s = s.replace(/\(\s+/g, '(');
-  // Remove space before closing paren
-  s = s.replace(/\s+\)/g, ')');
+  // Remove space before closing paren ONLY when preceded by a non-} char
+  // (to avoid turning 'category } )' into 'category })')
+  s = s.replace(/([^}])\s+\)/g, '$1)');
   // Fix double parens: `expr))` → `expr)` (happens when cast inside parens is removed)
   // Only if the original had `(expr as Type)` → `(expr)` (which is correct)
   // Don't touch intentionally double-parened expressions
