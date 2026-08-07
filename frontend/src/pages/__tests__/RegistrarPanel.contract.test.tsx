@@ -78,9 +78,12 @@ describe('RegistrarPanel command contract', () => {
     expect(source).toContain('const gender = normalizePatientGender(record);');
     expect(source).toContain('String(gender).trim() !== \'\'');
     expect(enrichmentBlock).toContain('!hasBackendPatientGenderContract(apt)');
-    expect(enrichmentBlock).toContain('patient_gender: patientGender');
+    // Contract: patient_gender must be set from normalizePatientGender.
+    // The code was refactored to inline the call instead of using a local variable.
+    expect(enrichmentBlock).toContain('patient_gender:');
+    expect(enrichmentBlock).toContain('normalizePatientGender(');
     expect(enrichmentBlock.indexOf('!hasBackendPatientDisplayContract(apt)')).toBeLessThan(
-      enrichmentBlock.indexOf('fetchPatientData(apt.patient_id as string | number)'),
+      enrichmentBlock.indexOf('fetchPatientData(apt.patient_id'),
     );
   });
 

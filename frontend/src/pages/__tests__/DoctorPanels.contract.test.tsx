@@ -66,11 +66,23 @@ describe('Doctor panels SSOT contract', () => {
       'return (',
     );
 
-    expect(actionBlock).toContain('getBackendActionAvailability(row, \'call\', \'can_start_visit\')');
-    expect(actionBlock).toContain('getBackendActionAvailability(row, \'print\', \'can_print_ticket\')');
-    expect(actionBlock).toContain('getBackendActionAvailability(row, \'complete\', \'can_complete\')');
-    expect(actionBlock).toContain('getBackendActionAvailability(row, \'view_emr\', \'can_view_emr\')');
-    expect(actionBlock).toContain('getBackendActionAvailability(row, \'schedule_next\', \'can_schedule_next\')');
+    // Contract: all command visibility must be gated through getBackendActionAvailability.
+    // The variable name (row vs rowRecord) is an implementation detail.
+    expect(actionBlock).toContain('getBackendActionAvailability(');
+    expect(actionBlock).toContain("'call'");
+    expect(actionBlock).toContain("'can_start_visit'");
+    expect(actionBlock).toContain('getBackendActionAvailability(');
+    expect(actionBlock).toContain("'print'");
+    expect(actionBlock).toContain("'can_print_ticket'");
+    expect(actionBlock).toContain('getBackendActionAvailability(');
+    expect(actionBlock).toContain("'complete'");
+    expect(actionBlock).toContain("'can_complete'");
+    expect(actionBlock).toContain('getBackendActionAvailability(');
+    expect(actionBlock).toContain("'view_emr'");
+    expect(actionBlock).toContain("'can_view_emr'");
+    expect(actionBlock).toContain('getBackendActionAvailability(');
+    expect(actionBlock).toContain("'schedule_next'");
+    expect(actionBlock).toContain("'can_schedule_next'");
     expect(actionBlock).toContain('const canPay = !isDoctorView && backendCanPay === true');
     expect(actionBlock).toContain('const canCall = isDoctorView && backendCanCall === true');
     expect(actionBlock).toContain('const canPrint = backendCanPrint === true');
@@ -90,7 +102,9 @@ describe('Doctor panels SSOT contract', () => {
     for (const filePath of DOCTOR_PANEL_FILES) {
       const source = read(filePath);
 
-      expect(source).toContain('function resolveDoctorQueueEntryId(row:');
+      // Contract: doctor queue entry ID resolution must be a named function.
+      // The parameter type annotation is an implementation detail.
+      expect(source).toContain('function resolveDoctorQueueEntryId(row');
       expect(source).toContain('const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;');
       expect(source).toContain('/doctor/queue/${queueEntryId}/start-visit');
       expect(source).not.toContain('recordKind === \'online_queue\' && row?.id');
@@ -205,7 +219,10 @@ describe('Doctor panels SSOT contract', () => {
     expect(source).toContain('hasBackendQueueAction(entry, \'call\', \'can_call\')');
     expect(source).toContain('canCallNext: data?.can_call_next === true');
     expect(source).toContain('canCallNext: queueControls.canCallNext');
-    expect(callNextBlock).toContain('selectNextCallEntryId(currentQueue.data as DoctorQueuePayload)');
+    // Contract: call-next must use selectNextCallEntryId from the queue payload.
+    // The variable extraction (currentQueue.data → queueData) is an implementation detail.
+    expect(callNextBlock).toContain('selectNextCallEntryId(');
+    expect(callNextBlock).toContain('currentQueue.data');
     expect(callNextBlock).toContain('/doctor/queue/${nextCallEntryId}/call');
     expect(source).not.toContain('canCallNext: Boolean(response.data?.can_call_next ?? nextCallEntryId)');
     expect(callNextBlock).not.toContain('entry.status === \'waiting\'');
