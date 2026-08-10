@@ -398,15 +398,11 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
     results_lock = threading.Lock()
 
     def make_payment():
-        """Each thread gets its OWN Session. Always records a result."""
+        """Each thread gets its OWN Session. ALWAYS records a result."""
+        session = None
         try:
-            barrier.wait(timeout=10)  # release both threads at the same instant
-        except Exception as e:
-            with results_lock:
-                results.append(("barrier_error", type(e).__name__, str(e)[:200]))
-            return
-        session = sessionmaker(bind=db_engine)()
-        try:
+            barrier.wait(timeout=10)
+            session = sessionmaker(bind=db_engine)()
             payment = PaymentInvariantService(session).create_payment_for_visit(
                 visit_id=visit_id,
                 amount=Decimal("10000"),
@@ -429,10 +425,11 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
             with results_lock:
                 results.append(("rejected", type(e).__name__, str(e)[:200]))
         finally:
-            try:
-                session.close()
-            except Exception:
-                pass
+            if session is not None:
+                try:
+                    session.close()
+                except Exception:
+                    pass
 
     t1 = threading.Thread(target=make_payment)
     t2 = threading.Thread(target=make_payment)
