@@ -47,7 +47,7 @@ env:
   PYTHON_VERSION: '3.11.10'
   DATABASE_URL: 'postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb'
   SECRET_KEY: 'ci-secret-key-for-gate-d-runtime-tests-32-chars-min'
-  ENV: 'test'
+  ENV: 'dev'
   ALLOW_SQLITE_DATABASE_URL: '0'
   CORS_DISABLE: '1'
   WS_DEV_ALLOW: '1'
