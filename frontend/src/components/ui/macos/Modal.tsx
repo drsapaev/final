@@ -287,6 +287,8 @@ const Modal = ({
           variant="ghost"
           size="small"
           onClick={onClose}
+          aria-label={t('common.close', 'Close')}
+          title={t('common.close', 'Close')}
           style={{
             position: 'absolute',
             top: '12px',
