@@ -56,8 +56,27 @@ class ProviderWebhookService:
         Issue #06 Phase 4b B2: centralized through this method so that
         unit tests can mock it (instead of creating inline BillingService
         instances that can't be patched).
+
+        P2 fix (Codex): if the payment is already in a terminal state and
+        the new status is 'failed' (late provider error callback), skip the
+        transition — preserve terminal payment status. The webhook failure
+        record is still committed by the caller.
         """
         from app.services.billing_service import BillingService
+        from app.services.payment_state_checks import is_terminal_payment
+
+        # P2 fix: check current status before attempting transition.
+        # If payment is already terminal (paid/refunded/cancelled/void),
+        # a late 'failed' callback should NOT change the status.
+        payment = self.repository.get_payment_by_id(payment_id) if hasattr(self.repository, 'get_payment_by_id') else None
+        if payment and is_terminal_payment(payment.status) and new_status == "failed":
+            logger.warning(
+                "webhook.skip_failed_transition payment_id=%s current=%s is terminal — "
+                "preserving terminal status, webhook failure still recorded",
+                payment_id, payment.status,
+            )
+            return payment
+
         return BillingService(self.db).update_payment_status(
             payment_id=payment_id,
             new_status=new_status,
