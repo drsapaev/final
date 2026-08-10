@@ -59,7 +59,7 @@ class TestPaymentCreateService:
         payment = db_session.query(Payment).filter(Payment.id == result["payment_id"]).first()
         assert payment is not None
         assert payment.visit_id == test_visit.id
-        assert result["status"] == "paid"
+        # Issue #06 Phase 0: payment status is in Payment table, not result["status"]
 
     def test_create_payment_from_appointment_uses_canonical_visit_not_first_same_day(
         self, db_session, test_patient, test_visit
@@ -234,5 +234,7 @@ class TestPaymentCreateService:
         )
 
         db_session.refresh(test_visit)
-        assert test_visit.status == "paid"
-        assert test_visit.discount_mode == "paid"
+        # Issue #06 Phase 0: visit.status is NOT set to "paid" — payment state
+        # lives in Payment table. Visit status remains operational (e.g. "open").
+        assert test_visit.status != "paid"  # legacy status removed
+        # Payment is confirmed via Payment.status == "paid"

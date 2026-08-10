@@ -985,11 +985,17 @@ async def cancel_payment(
         # state machine validation.
         from app.services.billing_service import BillingService
 
-        payment = BillingService(db).update_payment_status(
-            payment_id=payment.id,
-            new_status="cancelled",
-            commit=False,
-        )
+        try:
+            payment = BillingService(db).update_payment_status(
+                payment_id=payment.id,
+                new_status="cancelled",
+                commit=False,
+            )
+        except ValueError as ve:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Cannot cancel payment: {ve}",
+            ) from ve
         if hasattr(payment, 'note') and cancel_data.reason:
             payment.note = f"Отменён: {cancel_data.reason}"
 

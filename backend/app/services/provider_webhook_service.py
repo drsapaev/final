@@ -50,6 +50,20 @@ class ProviderWebhookService:
         # Reset to None at the start of each webhook invocation.
         self._last_cancel_was_completed: bool | None = None
 
+    def _update_payment_status(self, payment_id: int, new_status: str, commit: bool = False):
+        """Update payment status via canonical BillingService.
+
+        Issue #06 Phase 4b B2: centralized through this method so that
+        unit tests can mock it (instead of creating inline BillingService
+        instances that can't be patched).
+        """
+        from app.services.billing_service import BillingService
+        return BillingService(self.db).update_payment_status(
+            payment_id=payment_id,
+            new_status=new_status,
+            commit=commit,
+        )
+
     @staticmethod
     def _decimal_amount(value: Any) -> Decimal | None:
         try:
@@ -211,8 +225,7 @@ class ProviderWebhookService:
                         # transaction (PaymentTransaction + webhook record +
                         # visit projection all committed together by the caller).
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        from app.services.billing_service import BillingService
-                        payment = BillingService(self.db).update_payment_status(
+                        payment = self._update_payment_status(
                             payment_id=payment.id,
                             new_status=mapped_status,
                             commit=False,
@@ -263,8 +276,7 @@ class ProviderWebhookService:
                         failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
                 if failed_payment:
                     # Issue #06 Phase 4b B2: use canonical update_payment_status
-                    from app.services.billing_service import BillingService
-                    failed_payment = BillingService(self.db).update_payment_status(
+                    failed_payment = self._update_payment_status(
                         payment_id=failed_payment.id,
                         new_status="failed",
                         commit=False,
@@ -487,8 +499,7 @@ class ProviderWebhookService:
                         # transaction (PaymentTransaction + webhook record +
                         # visit projection all committed together by the caller).
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        from app.services.billing_service import BillingService
-                        payment = BillingService(self.db).update_payment_status(
+                        payment = self._update_payment_status(
                             payment_id=payment.id,
                             new_status=mapped_status,
                             commit=False,
@@ -579,8 +590,7 @@ class ProviderWebhookService:
                         failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
                 if failed_payment:
                     # Issue #06 Phase 4b B2: use canonical update_payment_status
-                    from app.services.billing_service import BillingService
-                    failed_payment = BillingService(self.db).update_payment_status(
+                    failed_payment = self._update_payment_status(
                         payment_id=failed_payment.id,
                         new_status="failed",
                         commit=False,
@@ -735,8 +745,7 @@ class ProviderWebhookService:
                 else:
                     # Issue #06 Phase 4b B2: use canonical update_payment_status
                     # instead of direct payment.status = payment_status.
-                    from app.services.billing_service import BillingService
-                    payment = BillingService(self.db).update_payment_status(
+                    payment = self._update_payment_status(
                         payment_id=payment.id,
                         new_status=payment_status,
                         commit=False,
@@ -1135,8 +1144,7 @@ class ProviderWebhookService:
                         # transaction (PaymentTransaction + webhook record +
                         # visit projection all committed together by the caller).
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        from app.services.billing_service import BillingService
-                        payment = BillingService(self.db).update_payment_status(
+                        payment = self._update_payment_status(
                             payment_id=payment.id,
                             new_status=mapped_status,
                             commit=False,
@@ -1181,8 +1189,7 @@ class ProviderWebhookService:
                     failed_payment = self.repository.get_payment_by_provider_payment_id(result.payment_id)
                 if failed_payment:
                     # Issue #06 Phase 4b B2: use canonical update_payment_status
-                    from app.services.billing_service import BillingService
-                    failed_payment = BillingService(self.db).update_payment_status(
+                    failed_payment = self._update_payment_status(
                         payment_id=failed_payment.id,
                         new_status="failed",
                         commit=False,
