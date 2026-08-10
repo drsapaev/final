@@ -171,6 +171,7 @@ def check_invoice_status(
                                         method="online",
                                         note=f"Оплата через {invoice.provider} (invoice {invoice.id})",
                                         current_user=current_user,
+                                        provider=invoice.provider,
                                         commit=False,  # composition — caller commits
                                     )
                                     logger.info(

@@ -465,6 +465,17 @@ def start_patient_visit(
             department=getattr(daily_queue, "queue_tag", None) or "general",
         )
 
+        # BUG 3 fix (Codex P1): transition visit open→in_progress when starting
+        # the visit. Without this, visit stays in "open" and complete_visit()
+        # fails because open→completed is not allowed by the state machine
+        # (only open→in_progress is). This was found by Codex review.
+        from app.services.visit_lifecycle_service import VisitLifecycleService
+        if visit.status == "open":
+            visit = VisitLifecycleService(db).start_visit(
+                visit_id=visit.id,
+                current_user=current_user,
+            )
+
         # Обновляем время начала приема
         visit.visit_time = datetime.now().strftime("%H:%M")
         visit.notes = f"Прием начат в {datetime.now().strftime('%H:%M')}"

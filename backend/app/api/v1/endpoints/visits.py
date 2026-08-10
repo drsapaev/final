@@ -444,7 +444,11 @@ def force_reopen_visit(
 
     # Current status must be terminal — otherwise the regular
     # set_status endpoint should be used, not the override.
-    if visit.status not in ("closed", "canceled"):
+    # BUG 6 fix (Codex P2): accept 'expired' as a valid terminal status
+    # for force_reopen. Previously only 'closed' and 'canceled' were
+    # accepted, but 'expired' is also terminal — admin should be able to
+    # reopen accidentally expired visits.
+    if visit.status not in ("closed", "canceled", "expired"):
         raise HTTPException(
             status_code=409,
             detail={

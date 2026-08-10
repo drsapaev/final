@@ -313,10 +313,15 @@ class TelegramStaffActionAdapterService:
                 def __init__(self, user_id: int) -> None:
                     self.id = user_id
 
+            # BUG 5 fix (Codex P1): use commit=False to preserve atomicity
+            # between visit cancellation and queue link cleanup. Previously
+            # commit=True committed visit cancellation BEFORE
+            # staff_cancel_visit_queue_link() ran, breaking atomicity.
             visit = VisitLifecycleService(self.db).cancel_visit(
                 visit_id=visit_id,
                 current_user=_TelegramActor(actor_user_id),
                 reason=f"Cancelled via Telegram by staff user {actor_user_id}",
+                commit=False,  # BUG 5: caller owns the transaction
             )
             queue_result = self.queue_service.staff_cancel_visit_queue_link(
                 self.db,

@@ -99,10 +99,10 @@ def test_init_payment_success_path_updates_pending_status(
     billing.update_payment_status.return_value = payment
     _patch_payment_side_effects(monkeypatch, billing)
 
-    # Issue #06 Phase 4b: payment_init_service now uses
-    # PaymentInvariantService.create_pending_payment instead of
-    # billing.create_payment. Mock it to return the same payment.
-    from app.services import payment_init_service as _pis_module
+    # Issue #06 Phase 4b: payment_init_service imports PaymentInvariantService
+    # locally inside init_payment(). Patch at the source module so the
+    # local import picks up the mock.
+    from app.services import payment_invariant_service as _pis_module
     monkeypatch.setattr(
         _pis_module, "PaymentInvariantService",
         Mock(return_value=Mock(create_pending_payment=Mock(return_value=payment)))
@@ -164,10 +164,10 @@ def test_init_payment_provider_failure_sets_failed_status(
     billing.update_payment_status.return_value = payment
     _patch_payment_side_effects(monkeypatch, billing)
 
-    # Issue #06 Phase 4b: payment_init_service now uses
-    # PaymentInvariantService.create_pending_payment instead of
-    # billing.create_payment. Mock it to return the same payment.
-    from app.services import payment_init_service as _pis_module
+    # Issue #06 Phase 4b: payment_init_service imports PaymentInvariantService
+    # locally inside init_payment(). Patch at the source module so the
+    # local import picks up the mock.
+    from app.services import payment_invariant_service as _pis_module
     monkeypatch.setattr(
         _pis_module, "PaymentInvariantService",
         Mock(return_value=Mock(create_pending_payment=Mock(return_value=payment)))

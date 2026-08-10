@@ -238,6 +238,8 @@ class PaymentInvariantService:
         note: str | None,
         current_user: Any,
         *,
+        currency: str = "UZS",
+        provider: str | None = None,
         allow_overpayment: bool = True,
         commit: bool = True,
     ) -> Payment:
@@ -307,12 +309,13 @@ class PaymentInvariantService:
                         ),
                     },
                 )
+            # BUG 8 fix (CodeQL): redact patient_id from logs to prevent
+            # clear-text logging of sensitive patient identifiers.
             logger.warning(
-                "payment.overpayment_accepted visit_id=%s patient_id=%s "
+                "payment.overpayment_accepted visit_id=%s "
                 "total_cost=%s paid_amount=%s remaining_debt=%s "
                 "payment_amount=%s overpayment=%s cashier_id=%s",
                 visit_id,
-                getattr(visit, "patient_id", None),
                 str(total_cost),
                 str(paid_amount),
                 str(remaining_debt),
@@ -336,8 +339,10 @@ class PaymentInvariantService:
         new_payment = Payment(
             visit_id=visit_id,
             amount=amount,
+            currency=currency,
             method=method,
             status="paid",
+            provider=provider,
             note=note,
             created_at=datetime.now(UTC),
             paid_at=datetime.now(UTC),
