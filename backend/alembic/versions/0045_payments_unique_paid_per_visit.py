@@ -93,7 +93,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers — chained after 0044_audit_logs.
-revision = "0045_payments_unique_paid_per_visit"
+revision = "0045_payments_lock"
 down_revision = "0044_audit_logs"
 branch_labels = None
 depends_on = None
