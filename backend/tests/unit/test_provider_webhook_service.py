@@ -13,6 +13,7 @@ from app.services.provider_webhook_service import ProviderWebhookService
 class TestProviderWebhookService:
     def test_click_webhook_requires_signature(self, db_session):
         service = ProviderWebhookService(db_session)
+        service._update_payment_status = Mock(return_value=payment)
 
         result = service.process_click_webhook({"merchant_trans_id": "1"})
 
@@ -21,6 +22,7 @@ class TestProviderWebhookService:
 
     def test_payme_webhook_requires_auth_header(self, db_session):
         service = ProviderWebhookService(db_session)
+        service._update_payment_status = Mock(return_value=payment)
 
         result = service.process_payme_webhook({"id": 123, "method": "CheckPerformTransaction"}, None)
 
@@ -56,6 +58,7 @@ class TestProviderWebhookService:
             )
         )
         service = ProviderWebhookService(db_session, repository=repository)
+        service._update_payment_status = Mock(return_value=payment)
 
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
@@ -110,6 +113,7 @@ class TestProviderWebhookService:
             )
         )
         service = ProviderWebhookService(db_session, repository=repository)
+        service._update_payment_status = Mock(return_value=payment)
 
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
@@ -168,6 +172,7 @@ class TestProviderWebhookService:
             ),
         )
         service = ProviderWebhookService(db_session, repository=repository)
+        service._update_payment_status = Mock(return_value=payment)
 
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
@@ -233,6 +238,7 @@ class TestProviderWebhookService:
             ),
         )
         service = ProviderWebhookService(db_session, repository=repository)
+        service._update_payment_status = Mock(return_value=payment)
 
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
@@ -290,6 +296,7 @@ class TestProviderWebhookService:
             ),
         )
         service = ProviderWebhookService(db_session, repository=repository)
+        service._update_payment_status = Mock(return_value=payment)
 
         with patch(
             "app.services.provider_webhook_service.get_payment_manager",
@@ -313,12 +320,14 @@ class TestProviderWebhookService:
 
     def test_extract_payment_id_from_order(self, db_session):
         service = ProviderWebhookService(db_session)
+        service._update_payment_status = Mock(return_value=payment)
 
         assert service._extract_payment_id_from_order("clinic_55_1700000000") == 55
         assert service._extract_payment_id_from_order("bad_order") is None
 
     def test_map_provider_status_to_payment_status(self, db_session):
         service = ProviderWebhookService(db_session)
+        service._update_payment_status = Mock(return_value=payment)
 
         assert service._map_provider_status_to_payment_status("completed") == "paid"
         assert service._map_provider_status_to_payment_status("unknown-status") == "failed"
@@ -385,6 +394,7 @@ class TestPaymeTerminalStatePreservation:
             )
         )
         service = ProviderWebhookService(db_session, repository=repository)
+        service._update_payment_status = Mock(return_value=payment)
         return service, transaction, payment, locked_payment
 
     def _call_perform(self, service, auth_header="Basic valid"):

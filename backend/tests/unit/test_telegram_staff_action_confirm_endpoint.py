@@ -176,9 +176,9 @@ def test_confirm_cancel_and_move_visit_use_bound_visit_payloads(
     db_session.refresh(move_visit)
     db_session.refresh(cancel_entry)
     db_session.refresh(move_entry)
-    assert cancel_result["visit_status"] == "cancelled"
-    assert cancel_visit.status == "cancelled"
-    assert cancel_entry.status == "cancelled"
+    assert cancel_result["visit_status"] == "canceled"
+    assert cancel_visit.status == "canceled"
+    assert cancel_entry.status == "canceled"
     assert move_result["visit_date"] == (date.today() + timedelta(days=1)).isoformat()
     assert move_visit.visit_date == date.today() + timedelta(days=1)
     assert move_entry.status == "rescheduled"

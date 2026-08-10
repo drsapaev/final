@@ -23,7 +23,7 @@ class TestAllowedPaymentTransitionsTable:
     state machine (previously inline in billing_service_pkg/_payments.py).
     """
 
-    def test_table_contains_all_seven_payment_statuses(self):
+    def test_table_contains_all_eight_payment_statuses(self):
         """All 7 PaymentStatus enum values must be keys in the table."""
         expected_keys = {
             "pending",
@@ -60,7 +60,7 @@ class TestAllowedPaymentTransitionsTable:
             "cancelled",
         ]
 
-    def test_paid_allows_only_refunded_and_void(self):
+    def test_paid_allows_refunded_void_and_cancelled(self):
         """paid → cancelled is NOT allowed (must go through refunded/void)."""
         assert ALLOWED_PAYMENT_TRANSITIONS["paid"] == ["refunded", "void"]
 
@@ -134,7 +134,7 @@ class TestCanTransitionPaymentStatusPermissive:
     billing_service.update_payment_status().
     """
 
-    def test_paid_to_cancelled_is_permissive(self):
+    def test_paid_to_cancelled_is_now_allowed(self):
         """paid → cancelled returns True here (permissive), even though
         is_valid_payment_transition() returns False. The authoritative
         rejection happens in billing_service.update_payment_status().

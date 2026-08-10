@@ -201,7 +201,7 @@ ALLOWED_VISIT_TRANSITIONS: dict[str, list[str]] = {
     "pending_confirmation": ["confirmed", "canceled", "expired"],
     "confirmed": ["open", "canceled", "expired"],
     # Active visit lifecycle
-    "open": ["in_progress", "canceled"],
+    "open": ["in_progress", "completed", "canceled"],
     "in_progress": ["completed", "canceled"],
     "completed": ["in_progress", "closed"],
     # Terminal states
