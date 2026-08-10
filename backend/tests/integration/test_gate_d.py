@@ -344,7 +344,8 @@ def test_d3b_batch_failure_rollback_discards_all(db_session, new_session_factory
     # which may or may not be wrapped in HTTPException depending on
     # the call path. Catch both.
     from app.services.visit_lifecycle_service import VisitNotFoundError
-    with pytest.raises((HTTPException, VisitNotFoundError)):
+    from fastapi import HTTPException as FastAPIHTTPException
+    with pytest.raises((FastAPIHTTPException, VisitNotFoundError)):
         service.cancel_visit(visit_id=99999, current_user=test_user, commit=False)
 
     # Batch rollback
@@ -397,8 +398,13 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
     results_lock = threading.Lock()
 
     def make_payment():
-        """Each thread gets its OWN Session."""
-        barrier.wait()  # release both threads at the same instant
+        """Each thread gets its OWN Session. Always records a result."""
+        try:
+            barrier.wait(timeout=10)  # release both threads at the same instant
+        except Exception as e:
+            with results_lock:
+                results.append(("barrier_error", type(e).__name__, str(e)[:200]))
+            return
         session = sessionmaker(bind=db_engine)()
         try:
             payment = PaymentInvariantService(session).create_payment_for_visit(
@@ -412,9 +418,6 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
             with results_lock:
                 results.append(("success", payment.id))
         except HTTPException as e:
-            # D4 lock-vs-constraint distinction:
-            # 400 = app-level check fired after FOR UPDATE lock release
-            # 409 = IntegrityError (UNIQUE constraint, shouldn't happen — we removed it)
             reason = ""
             if isinstance(e.detail, dict):
                 reason = e.detail.get("reason", "")
@@ -426,7 +429,10 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
             with results_lock:
                 results.append(("rejected", type(e).__name__, str(e)[:200]))
         finally:
-            session.close()
+            try:
+                session.close()
+            except Exception:
+                pass
 
     t1 = threading.Thread(target=make_payment)
     t2 = threading.Thread(target=make_payment)
