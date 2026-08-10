@@ -397,12 +397,16 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
     results = []
     results_lock = threading.Lock()
 
-    def make_payment():
+    def make_payment(thread_id="T"):
         """Each thread gets its OWN Session. ALWAYS records a result."""
+        import sys as _sys
+        print(f"D4 [{thread_id}]: starting", file=_sys.stderr, flush=True)
         session = None
         try:
             barrier.wait(timeout=10)
+            print(f"D4 [{thread_id}]: barrier passed", file=_sys.stderr, flush=True)
             session = sessionmaker(bind=db_engine)()
+            print(f"D4 [{thread_id}]: session created, calling create_payment", file=_sys.stderr, flush=True)
             payment = PaymentInvariantService(session).create_payment_for_visit(
                 visit_id=visit_id,
                 amount=Decimal("10000"),
@@ -411,6 +415,7 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
                 current_user=type("U", (), {"id": 1})(),
                 commit=True,
             )
+            print(f"D4 [{thread_id}]: payment created id={payment.id}", file=_sys.stderr, flush=True)
             with results_lock:
                 results.append(("success", payment.id))
         except HTTPException as e:
@@ -419,9 +424,11 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
                 reason = e.detail.get("reason", "")
             elif isinstance(e.detail, str):
                 reason = e.detail[:100]
+            print(f"D4 [{thread_id}]: HTTPException {e.status_code} reason={reason}", file=_sys.stderr, flush=True)
             with results_lock:
                 results.append(("rejected", e.status_code, reason))
         except Exception as e:
+            print(f"D4 [{thread_id}]: Exception {type(e).__name__}: {e}", file=_sys.stderr, flush=True)
             with results_lock:
                 results.append(("rejected", type(e).__name__, str(e)[:200]))
         finally:
@@ -430,9 +437,10 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
                     session.close()
                 except Exception:
                     pass
+            print(f"D4 [{thread_id}]: done", file=_sys.stderr, flush=True)
 
-    t1 = threading.Thread(target=make_payment)
-    t2 = threading.Thread(target=make_payment)
+    t1 = threading.Thread(target=make_payment, args=("T1",))
+    t2 = threading.Thread(target=make_payment, args=("T2",))
     t1.start()
     t2.start()
     t1.join(timeout=60)
