@@ -354,10 +354,25 @@ class ConfirmationSecurityService:
 
             count = 0
             for visit in expired_visits:
-                # Обновляем статус на "expired"
-                visit.status = "expired"
-                visit.confirmation_token = None
-                visit.confirmation_expires_at = None
+                # Issue #06 Phase 3 (Gate D fix): delegate to
+                # VisitLifecycleService with commit=False to preserve
+                # batch atomicity. Original code committed ONCE at the
+                # end of the loop (if count > 0: self.db.commit()).
+                from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                try:
+                    VisitLifecycleService(self.db).expire_confirmation(
+                        visit_id=visit.id,
+                        reason="token_expired_cleanup",
+                        commit=False,  # CRITICAL: batch owns the transaction
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "confirmation_security: skip expire for visit_id=%s "
+                        "status=%s reason=%s",
+                        visit.id, visit.status, str(exc),
+                    )
+                    continue
                 count += 1
 
                 self._log_security_event(

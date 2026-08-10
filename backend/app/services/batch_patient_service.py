@@ -298,7 +298,29 @@ class BatchPatientService:
 
         if entry_type == "visit":
             visit = target
-            visit.status = "cancelled"
+            # Issue #06 Phase 3 (Gate D): delegate to VisitLifecycleService
+            # with commit=False to preserve batch atomicity.
+            #
+            # Original semantics: _cancel_entry does NOT commit — it only
+            # mutates the ORM object. The batch process() method commits
+            # ONCE at the end (line 245) or rolls back on exception (line 260).
+            #
+            # Migration: use commit=False so the service stages the mutation
+            # without committing. The batch's single commit at the end will
+            # persist ALL staged mutations atomically.
+            from app.services.visit_lifecycle_service import VisitLifecycleService
+
+            # Create a lightweight user-like object for audit logging.
+            class _BatchActor:
+                def __init__(self, user_id: int | None) -> None:
+                    self.id = user_id or 0
+
+            VisitLifecycleService(self.db).cancel_visit(
+                visit_id=visit.id,
+                current_user=_BatchActor(getattr(self, "_actor_user_id", None)),
+                reason=f"Batch cancel: {action.reason or 'no reason provided'}",
+                commit=False,  # CRITICAL: do not commit — batch owns the transaction
+            )
             return EntryResult(id=action.id, status="cancelled")
 
         return EntryResult(
@@ -346,7 +368,36 @@ class BatchPatientService:
             if action.doctor_id:
                 visit.doctor_id = action.doctor_id
             if action.status:
-                visit.status = action.status
+                # Issue #06 Phase 3 (Gate D): delegate status mutation to
+                # VisitLifecycleService with commit=False to preserve
+                # batch atomicity.
+                #
+                # The batch update action can specify an arbitrary target
+                # status. The state machine validates the transition — if
+                # the transition is invalid (e.g. closed → open), the
+                # service raises 409 and the batch item is recorded as
+                # an error (the caller catches the exception).
+                from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                class _BatchActor:
+                    def __init__(self, user_id: int | None) -> None:
+                        self.id = user_id or 0
+
+                try:
+                    VisitLifecycleService(self.db).transition_status(
+                        visit_id=visit.id,
+                        target_status=action.status,
+                        current_user=_BatchActor(getattr(self, "_actor_user_id", None)),
+                        commit=False,  # CRITICAL: batch owns the transaction
+                    )
+                except Exception as exc:
+                    # State machine rejected the transition — record as
+                    # error but do NOT raise (batch continues with other items).
+                    return EntryResult(
+                        id=action.id,
+                        status="error",
+                        error=f"Invalid status transition: {exc}",
+                    )
             return EntryResult(id=action.id, status="updated")
 
         return EntryResult(

@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F4
 from fastapi.responses import Response  # noqa: F401
 from pydantic import BaseModel, ConfigDict, Field  # noqa: F401
 from sqlalchemy import or_  # noqa: F401
+from sqlalchemy.exc import IntegrityError  # noqa: F401  # H-4: catch double-payment race
 from sqlalchemy.orm import Session, joinedload  # noqa: F401
 
 from app.api import deps  # noqa: F401

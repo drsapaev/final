@@ -198,9 +198,26 @@ class ProviderWebhookService:
                                 "payment_status": None,
                                 "payment_provider": "click",
                             }
+                        # Issue #06 Phase 4b B2: Replaced direct payment.status =
+                        # mapped_status with billing_service.update_payment_status()
+                        # to enforce payment state machine validation.
+                        #
+                        # The lock is already acquired above via
+                        # get_payment_by_id_for_update(). update_payment_status()
+                        # will re-acquire it (idempotent within same transaction)
+                        # and validate the transition via ALLOWED_PAYMENT_TRANSITIONS.
+                        #
+                        # commit=False because this is inside a larger webhook
+                        # transaction (PaymentTransaction + webhook record +
+                        # visit projection all committed together by the caller).
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        payment.status = mapped_status
-                        if payment.status == "paid":
+                        from app.services.billing_service import BillingService
+                        payment = BillingService(self.db).update_payment_status(
+                            payment_id=payment.id,
+                            new_status=mapped_status,
+                            commit=False,
+                        )
+                        if payment.status == "paid" and not payment.paid_at:
                             payment.paid_at = datetime.now(UTC)
 
                         payment.provider_data = {
@@ -245,7 +262,13 @@ class ProviderWebhookService:
                     if payment_id_from_order:
                         failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
                 if failed_payment:
-                    failed_payment.status = "failed"
+                    # Issue #06 Phase 4b B2: use canonical update_payment_status
+                    from app.services.billing_service import BillingService
+                    failed_payment = BillingService(self.db).update_payment_status(
+                        payment_id=failed_payment.id,
+                        new_status="failed",
+                        commit=False,
+                    )
                     failed_payment.provider_data = {
                         **(failed_payment.provider_data or {}),
                         "webhook_error": result.error_message,
@@ -451,9 +474,26 @@ class ProviderWebhookService:
                                 "payment_status": None,
                                 "payment_provider": "payme",
                             }
+                        # Issue #06 Phase 4b B2: Replaced direct payment.status =
+                        # mapped_status with billing_service.update_payment_status()
+                        # to enforce payment state machine validation.
+                        #
+                        # The lock is already acquired above via
+                        # get_payment_by_id_for_update(). update_payment_status()
+                        # will re-acquire it (idempotent within same transaction)
+                        # and validate the transition via ALLOWED_PAYMENT_TRANSITIONS.
+                        #
+                        # commit=False because this is inside a larger webhook
+                        # transaction (PaymentTransaction + webhook record +
+                        # visit projection all committed together by the caller).
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        payment.status = mapped_status
-                        if payment.status == "paid":
+                        from app.services.billing_service import BillingService
+                        payment = BillingService(self.db).update_payment_status(
+                            payment_id=payment.id,
+                            new_status=mapped_status,
+                            commit=False,
+                        )
+                        if payment.status == "paid" and not payment.paid_at:
                             payment.paid_at = datetime.now(UTC)
 
                         payment.provider_data = {
@@ -538,7 +578,13 @@ class ProviderWebhookService:
                     if payment_id_from_order:
                         failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
                 if failed_payment:
-                    failed_payment.status = "failed"
+                    # Issue #06 Phase 4b B2: use canonical update_payment_status
+                    from app.services.billing_service import BillingService
+                    failed_payment = BillingService(self.db).update_payment_status(
+                        payment_id=failed_payment.id,
+                        new_status="failed",
+                        commit=False,
+                    )
                     failed_payment.provider_data = {
                         **(failed_payment.provider_data or {}),
                         "webhook_error": result.error_message,
@@ -687,9 +733,14 @@ class ProviderWebhookService:
                     effective_payment_status = current_payment_status
                     payment_terminal = True
                 else:
-                    payment.status = payment_status
-                    if payment_status == "paid" and not payment.paid_at:
-                        payment.paid_at = datetime.now(UTC)
+                    # Issue #06 Phase 4b B2: use canonical update_payment_status
+                    # instead of direct payment.status = payment_status.
+                    from app.services.billing_service import BillingService
+                    payment = BillingService(self.db).update_payment_status(
+                        payment_id=payment.id,
+                        new_status=payment_status,
+                        commit=False,
+                    )
                 # provider_data is ALWAYS updated — preserves audit trail
                 # of last webhook payload regardless of status transition.
                 payment.provider_data = {
@@ -1071,9 +1122,26 @@ class ProviderWebhookService:
                                 "payment_status": None,
                                 "payment_provider": "kaspi",
                             }
+                        # Issue #06 Phase 4b B2: Replaced direct payment.status =
+                        # mapped_status with billing_service.update_payment_status()
+                        # to enforce payment state machine validation.
+                        #
+                        # The lock is already acquired above via
+                        # get_payment_by_id_for_update(). update_payment_status()
+                        # will re-acquire it (idempotent within same transaction)
+                        # and validate the transition via ALLOWED_PAYMENT_TRANSITIONS.
+                        #
+                        # commit=False because this is inside a larger webhook
+                        # transaction (PaymentTransaction + webhook record +
+                        # visit projection all committed together by the caller).
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        payment.status = mapped_status
-                        if payment.status == "paid":
+                        from app.services.billing_service import BillingService
+                        payment = BillingService(self.db).update_payment_status(
+                            payment_id=payment.id,
+                            new_status=mapped_status,
+                            commit=False,
+                        )
+                        if payment.status == "paid" and not payment.paid_at:
                             payment.paid_at = datetime.now(UTC)
 
                         payment.provider_data = {
@@ -1112,7 +1180,13 @@ class ProviderWebhookService:
                 if result.payment_id:
                     failed_payment = self.repository.get_payment_by_provider_payment_id(result.payment_id)
                 if failed_payment:
-                    failed_payment.status = "failed"
+                    # Issue #06 Phase 4b B2: use canonical update_payment_status
+                    from app.services.billing_service import BillingService
+                    failed_payment = BillingService(self.db).update_payment_status(
+                        payment_id=failed_payment.id,
+                        new_status="failed",
+                        commit=False,
+                    )
                     failed_payment.provider_data = {
                         **(failed_payment.provider_data or {}),
                         "webhook_error": result.error_message,

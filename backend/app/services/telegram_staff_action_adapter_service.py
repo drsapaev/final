@@ -300,7 +300,24 @@ class TelegramStaffActionAdapterService:
                 raise TelegramStaffActionAdapterError("visit_already_closed")
 
             previous_visit_status = visit.status
-            visit.status = "cancelled"
+            # Issue #06 Phase 3: delegate to VisitLifecycleService for
+            # state machine validation + row lock. The cancel policy is
+            # now unified across all channels (UI, Telegram, batch).
+            # Note: "cancelled" (British) is normalized to "canceled"
+            # (American) by the state machine's _normalize_status().
+            from app.services.visit_lifecycle_service import VisitLifecycleService
+
+            # Create a lightweight user-like object for audit logging,
+            # since the Telegram adapter uses actor_user_id, not a User object.
+            class _TelegramActor:
+                def __init__(self, user_id: int) -> None:
+                    self.id = user_id
+
+            visit = VisitLifecycleService(self.db).cancel_visit(
+                visit_id=visit_id,
+                current_user=_TelegramActor(actor_user_id),
+                reason=f"Cancelled via Telegram by staff user {actor_user_id}",
+            )
             queue_result = self.queue_service.staff_cancel_visit_queue_link(
                 self.db,
                 visit_id=visit_id,
@@ -520,7 +537,16 @@ class TelegramStaffActionAdapterService:
             payment.refunded_at = datetime.now(UTC)
             payment.refunded_by = actor_user_id
             if payment.refunded_amount >= payment.amount:
-                payment.status = "refunded"
+                # Issue #06 Phase 4b B3: Replaced direct payment.status = "refunded"
+                # with billing_service.update_payment_status() to enforce payment
+                # state machine validation.
+                from app.services.billing_service import BillingService
+
+                payment = BillingService(self.db).update_payment_status(
+                    payment_id=payment.id,
+                    new_status="refunded",
+                    commit=False,
+                )
 
             self._completed(
                 actor_user_id=actor_user_id,
