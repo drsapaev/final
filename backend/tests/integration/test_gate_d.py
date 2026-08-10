@@ -168,7 +168,7 @@ def test_patient(db_session):
         first_name="Patient",
         middle_name="GateD",
         birth_date=date(1990, 1, 1),
-        gender="M",
+        sex="M",
         phone="+998901234567",
         email="patient@test.local",
         created_at=datetime.now(UTC),
@@ -186,7 +186,7 @@ def create_test_visit(session, status="open", patient=None, **kwargs):
             last_name="Visit",
             first_name="Test",
             birth_date=date(1990, 1, 1),
-            gender="M",
+            sex="M",
             phone="+998901234568",
             created_at=datetime.now(UTC),
             is_deleted=False,
@@ -513,10 +513,10 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
         visit = create_test_visit(setup_session, status="in_progress")
         from app.models.visit import VisitService
         from app.models.service import Service
-        service = Service(name="Test Service", code="TEST001", price=10000, duration=30)
+        service = Service(name="Test Service", code="TEST001", price=10000, duration_minutes=30)
         setup_session.add(service)
         setup_session.flush()
-        vs = VisitService(visit_id=visit.id, service_id=service.id, price=10000, qty=1)
+        vs = VisitService(visit_id=visit.id, service_id=service.id, name="Test Service", price=10000, qty=1)
         setup_session.add(vs)
         setup_session.commit()
         visit_id = visit.id
