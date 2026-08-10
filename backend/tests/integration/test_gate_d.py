@@ -142,11 +142,13 @@ def new_session_factory(db_engine):
 
 @pytest.fixture
 def test_user(db_session):
-    """Create a test user for audit logging."""
+    """Create a test user for audit logging. Uses unique username per test."""
+    import uuid
+    unique = uuid.uuid4().hex[:8]
     user = User(
-        username="gate_d_test_user",
+        username=f"gate_d_test_{unique}",
         full_name="Gate D Test User",
-        email="gate_d@test.local",
+        email=f"gate_d_{unique}@test.local",
         hashed_password="fake_hash",
         role="Admin",
         is_active=True,
@@ -371,12 +373,20 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
     Uses barrier-controlled concurrency to ensure a real race.
     Each thread has its OWN Session (never share between threads).
     """
-    # Setup: create visit with one session
+    # Setup: create visit with total_cost=10000
     setup_session = sessionmaker(bind=db_engine)()
     try:
         visit = create_test_visit(setup_session, status="in_progress")
+        from app.models.visit import VisitService
+        from app.models.service import Service
+        service = Service(name="D4 Test Service", code="D4TEST", price=10000, duration_minutes=30)
+        setup_session.add(service)
+        setup_session.flush()
+        vs = VisitService(visit_id=visit.id, service_id=service.id, name="D4 Test Service", price=10000, qty=1)
+        setup_session.add(vs)
         setup_session.commit()
         visit_id = visit.id
+        service_id = service.id
     finally:
         setup_session.close()
 
@@ -461,7 +471,9 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
     cleanup = new_session_factory()
     try:
         cleanup.execute(text(f"DELETE FROM payments WHERE visit_id = {visit_id}"))
+        cleanup.execute(text(f"DELETE FROM visit_services WHERE visit_id = {visit_id}"))
         cleanup.execute(text(f"DELETE FROM visits WHERE id = {visit_id}"))
+        cleanup.execute(text(f"DELETE FROM services WHERE id = {service_id}"))
         cleanup.commit()
     finally:
         cleanup.close()
