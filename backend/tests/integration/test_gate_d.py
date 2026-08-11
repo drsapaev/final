@@ -400,23 +400,39 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
     def make_payment(thread_id="T"):
         """Each thread gets its OWN Session. ALWAYS records a result.
 
-        TH-1 hardening: the result is recorded as the FIRST action in
-        each except handler (before any print or other code that could
-        raise). This ensures that even if a second exception occurs
-        inside the handler (e.g. GreenletExit raised during results_lock
-        acquisition), the result is already recorded. If even that
-        fails, the outermost `record_fallback` ensures a result is
-        ALWAYS appended.
+        TH-1 hardening (P1 follow-up per Codex review):
+
+        Result tuple semantics (first element is the status):
+        - ("success", payment_id) — worker completed normally.
+        - ("rejected", status_code, reason) — EXPECTED HTTPException
+          (e.g. 409 from lock contention, 400 from validation). This
+          is a legitimate business-level rejection; the test can PASS.
+        - ("error", exception_type, message) — UNEXPECTED BaseException
+          (GreenletExit, SystemExit, RuntimeError, SQLAlchemyError,
+          etc.). The worker CRASHED. The test MUST FAIL.
+        - ("no_result_recorded", thread_id, message) — the worker
+          disappeared without entering any handler that records a
+          result. The test MUST FAIL.
+
+        The post-thread crash assertion rejects any result whose first
+        element is "error" or "no_result_recorded", so a worker crash
+        can NEVER produce a PASS.
         """
         import sys as _sys
 
-        def _record(result_tuple):
-            """Record a result, ignoring any exception during recording."""
+        def _record(result_tuple) -> bool:
+            """Record a result. Returns True if recording succeeded.
+
+            TH-1: returns bool so the caller's `recorded` flag reflects
+            whether the result was actually persisted, not just whether
+            the handler was entered.
+            """
             try:
                 with results_lock:
                     results.append(result_tuple)
+                return True
             except BaseException:
-                pass  # never let recording itself raise
+                return False  # never let recording itself raise
 
         print(f"D4 [{thread_id}]: starting", file=_sys.stderr, flush=True)
         session = None
@@ -435,24 +451,24 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
                 commit=True,
             )
             print(f"D4 [{thread_id}]: payment created id={payment.id}", file=_sys.stderr, flush=True)
-            _record(("success", payment.id))
-            recorded = True
+            recorded = _record(("success", payment.id))
         except HTTPException as e:
             reason = ""
             if isinstance(e.detail, dict):
                 reason = e.detail.get("reason", "")
             elif isinstance(e.detail, str):
                 reason = e.detail[:100]
-            _record(("rejected", e.status_code, reason))
-            recorded = True
+            recorded = _record(("rejected", e.status_code, reason))
             print(f"D4 [{thread_id}]: HTTPException {e.status_code} reason={reason}", file=_sys.stderr, flush=True)
         except BaseException as e:
-            # Catch BaseException (not just Exception) to capture
-            # greenlet.GreenletExit, SystemExit, etc.
-            # Record FIRST, then log — so a second exception during
-            # logging does not lose the result.
-            _record(("rejected", type(e).__name__, str(e)[:200]))
-            recorded = True
+            # TH-1: catch BaseException (not just Exception) to capture
+            # greenlet.GreenletExit, SystemExit, etc. These are UNEXPECTED
+            # worker crashes — record as "error" (NOT "rejected") so the
+            # post-thread crash assertion FAILS the test.
+            #
+            # Record FIRST (before any print), so a second exception
+            # during logging does not lose the result.
+            recorded = _record(("error", type(e).__name__, str(e)[:200]))
             print(f"D4 [{thread_id}]: BaseException {type(e).__name__}: {e}", file=_sys.stderr, flush=True)
         finally:
             if session is not None:
@@ -461,11 +477,11 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
                 except Exception:
                     pass
             # TH-1: if no result was recorded (e.g. exception during
-            # barrier.wait or session creation before the try body could
-            # record), record a fallback so the harness assertion
-            # len(results) == 2 can never be violated by a silent exit.
+            # barrier.wait or session creation, OR _record() itself failed),
+            # record a fallback. This is "no_result_recorded" — the test
+            # MUST FAIL because the worker effectively disappeared.
             if not recorded:
-                _record(("rejected", "no_result_recorded", f"thread {thread_id} exited without recording"))
+                _record(("no_result_recorded", thread_id, "thread exited without recording a result"))
             print(f"D4 [{thread_id}]: done", file=_sys.stderr, flush=True)
 
     t1 = threading.Thread(target=make_payment, args=("T1",))
@@ -488,16 +504,29 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
         )
 
     # TH-1 (post-merge stabilization): harness hardening.
-    # Every worker MUST record a result — "worker disappeared → test treats
-    # it as success" must NEVER happen. If a worker was silently aborted
-    # (e.g. GreenletExit from SQLAlchemy/greenlet pool without entering the
-    # BaseException handler), results would have fewer than 2 entries and
-    # the primary invariant could pass while hiding a harness defect.
+    # Invariant 1: every worker MUST record a result — "worker disappeared
+    # → test treats it as success" must NEVER happen.
     assert len(results) == 2, (
         f"D4 FAILED [harness]: expected 2 worker results, got {len(results)}. "
         f"A worker may have disappeared without recording a result. "
         f"Results: {results}. "
         f"t1 alive: {t1.is_alive()}, t2 alive: {t2.is_alive()}"
+    )
+
+    # TH-1 Invariant 2: no worker may have crashed. A result with status
+    # "error" (unexpected BaseException: GreenletExit, SystemExit,
+    # RuntimeError, SQLAlchemyError, etc.) or "no_result_recorded"
+    # (worker disappeared without entering any recording handler) is a
+    # hard FAIL — the test must NOT pass if a worker crashed, even if
+    # the primary financial invariant (≤1 payment) happens to hold.
+    #
+    # Result tuple shape: (status, ...) where status ∈
+    #   {"success", "rejected", "error", "no_result_recorded"}.
+    crashed = [r for r in results if r[0] in ("error", "no_result_recorded")]
+    assert not crashed, (
+        f"D4 FAILED [worker crash]: a worker ended with an unexpected "
+        f"error or no_result_recorded status. The test must NOT pass when "
+        f"a worker crashes. Crashed results: {crashed}. All results: {results}"
     )
 
     # PRIMARY invariant: at most 1 Payment in DB (no duplicate financial state)
@@ -600,17 +629,19 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
             self.role = "Admin"
             self.username = f"test_user_{uid}"
 
-    def _record(result_tuple):
-        """Record a result, ignoring any exception during recording.
+    def _record(result_tuple) -> bool:
+        """Record a result. Returns True if recording succeeded.
 
-        TH-1 hardening: ensures the result is ALWAYS recorded even if
-        a second exception occurs during results_lock acquisition.
+        TH-1 hardening: returns bool so the caller's `recorded` flag
+        reflects whether the result was actually persisted, not just
+        whether the handler was entered.
         """
         try:
             with results_lock:
                 results.append(result_tuple)
+            return True
         except BaseException:
-            pass
+            return False
 
     def create_payment_thread():
         """Thread A: PRODUCTION create_payment path.
@@ -619,8 +650,12 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
         EXACT same service method that the cashier/_payments.py:create_payment
         endpoint calls. This is production code, not a test reconstruction.
 
-        TH-1: records result FIRST in each handler, with a fallback in
-        finally so the worker can never disappear without recording.
+        TH-1 (P1 follow-up per Codex review): records result FIRST in
+        each handler, uses `recorded = _record(...)` so the flag reflects
+        actual recording success, and uses distinct status values:
+        - "success" / "rejected" (HTTPException) → test can PASS
+        - "error" (BaseException) → test MUST FAIL
+        - "no_result_recorded" (fallback) → test MUST FAIL
         """
         session = None
         recorded = False
@@ -635,21 +670,20 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                 current_user=_TestUser(1),
                 commit=True,
             )
-            _record(("create_payment", "success", payment.id, float(payment.amount)))
-            recorded = True
+            recorded = _record(("create_payment", "success", payment.id, float(payment.amount)))
         except HTTPException as e:
             reason = ""
             if isinstance(e.detail, dict):
                 reason = e.detail.get("reason", "")
             elif isinstance(e.detail, str):
                 reason = e.detail[:100]
-            _record(("create_payment", "rejected", e.status_code, reason))
-            recorded = True
+            recorded = _record(("create_payment", "rejected", e.status_code, reason))
         except BaseException as e:
             # TH-1: catch BaseException (not just Exception) to capture
-            # greenlet.GreenletExit, SystemExit, etc. Record FIRST.
-            _record(("create_payment", "error", type(e).__name__, str(e)[:200]))
-            recorded = True
+            # greenlet.GreenletExit, SystemExit, etc. These are UNEXPECTED
+            # worker crashes — record as "error" so the crash assertion
+            # FAILS the test.
+            recorded = _record(("create_payment", "error", type(e).__name__, str(e)[:200]))
         finally:
             if session is not None:
                 try:
@@ -657,7 +691,7 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                 except Exception:
                     pass
             if not recorded:
-                _record(("create_payment", "error", "no_result_recorded", "thread exited without recording"))
+                _record(("create_payment", "no_result_recorded", None, "thread exited without recording a result"))
 
     def mark_paid_thread():
         """Thread B: PRODUCTION mark_visit_as_paid endpoint function.
@@ -669,8 +703,8 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
         The endpoint function is async, so we run it in an event loop.
         We pass db and current_user directly (bypassing FastAPI Depends).
 
-        TH-1: records result FIRST in each handler, with a fallback in
-        finally so the worker can never disappear without recording.
+        TH-1 (P1 follow-up per Codex review): same status semantics as
+        create_payment_thread — "error" / "no_result_recorded" → FAIL.
         """
         session = None
         recorded = False
@@ -689,8 +723,7 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                         current_user=_TestUser(2),
                     )
                 )
-                _record(("mark_paid", "success", None, None))
-                recorded = True
+                recorded = _record(("mark_paid", "success", None, None))
             finally:
                 loop.close()
         except HTTPException as e:
@@ -699,8 +732,7 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                 reason = e.detail.get("reason", "")
             elif isinstance(e.detail, str):
                 reason = e.detail[:100]
-            _record(("mark_paid", "rejected", e.status_code, reason))
-            recorded = True
+            recorded = _record(("mark_paid", "rejected", e.status_code, reason))
         except BaseException as e:
             # TH-1: catch BaseException to capture GreenletExit etc.
             if session is not None:
@@ -708,8 +740,7 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                     session.rollback()
                 except Exception:
                     pass
-            _record(("mark_paid", "error", type(e).__name__, str(e)[:200]))
-            recorded = True
+            recorded = _record(("mark_paid", "error", type(e).__name__, str(e)[:200]))
         finally:
             if session is not None:
                 try:
@@ -717,7 +748,7 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                 except Exception:
                     pass
             if not recorded:
-                _record(("mark_paid", "error", "no_result_recorded", "thread exited without recording"))
+                _record(("mark_paid", "no_result_recorded", None, "thread exited without recording a result"))
 
     t1 = threading.Thread(target=create_payment_thread)
     t2 = threading.Thread(target=mark_paid_thread)
@@ -727,17 +758,29 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
     t2.join(timeout=30)
 
     # TH-1 (post-merge stabilization): harness hardening.
-    # Every worker MUST record a result — "worker disappeared → test treats
-    # it as success" must NEVER happen. Both workers now catch BaseException
-    # (not just Exception) so GreenletExit/SystemExit are recorded. If a
-    # worker still disappeared without recording, results would have < 2
-    # entries and this assertion would fail — preventing a silent harness
-    # defect from being masked by a passing primary invariant.
+    # Invariant 1: every worker MUST record a result — "worker disappeared
+    # → test treats it as success" must NEVER happen.
     assert len(results) == 2, (
         f"D4b FAILED [harness]: expected 2 worker results, got {len(results)}. "
         f"A worker may have disappeared without recording a result. "
         f"Results: {results}. "
         f"t1 alive: {t1.is_alive()}, t2 alive: {t2.is_alive()}"
+    )
+
+    # TH-1 Invariant 2: no worker may have crashed. A result with status
+    # "error" (unexpected BaseException: GreenletExit, SystemExit,
+    # RuntimeError, SQLAlchemyError, etc.) or "no_result_recorded"
+    # (worker disappeared without entering any recording handler) is a
+    # hard FAIL — the test must NOT pass if a worker crashed, even if
+    # the primary financial invariant happens to hold.
+    #
+    # Result tuple shape: (worker_name, status, ...) where status ∈
+    #   {"success", "rejected", "error", "no_result_recorded"}.
+    crashed = [r for r in results if r[1] in ("error", "no_result_recorded")]
+    assert not crashed, (
+        f"D4b FAILED [worker crash]: a worker ended with an unexpected "
+        f"error or no_result_recorded status. The test must NOT pass when "
+        f"a worker crashes. Crashed results: {crashed}. All results: {results}"
     )
 
     # ─── Primary Persisted Assertions (from NEW independent session) ──
