@@ -18,6 +18,14 @@ def _service_with_repo(
 
 def _patch_payment_side_effects(monkeypatch: pytest.MonkeyPatch, billing: Mock) -> None:
     monkeypatch.setattr(init_module, "BillingService", Mock(return_value=billing))
+    # Issue #06: PaymentInvariantService.create_pending_payment replaces
+    # billing.create_payment. Patch at source module.
+    from app.services import payment_invariant_service as _pis_module
+    _pis_cls = Mock()
+    _pis_instance = Mock()
+    _pis_instance.create_pending_payment = Mock(return_value=payment)
+    _pis_cls.return_value = _pis_instance
+    monkeypatch.setattr(_pis_module, "PaymentInvariantService", _pis_cls)
     monkeypatch.setattr(
         init_module,
         "extract_model_changes",

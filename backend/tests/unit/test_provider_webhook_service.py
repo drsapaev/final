@@ -496,6 +496,9 @@ class TestPaymeTerminalStatePreservation:
                     payment.paid_at = datetime.now(UTC)
                     if hasattr(locked_payment, 'paid_at'):
                         locked_payment.paid_at = payment.paid_at
+                # Also sync provider_data to locked_payment
+                if locked_payment and hasattr(locked_payment, 'provider_data'):
+                    locked_payment.provider_data = payment.provider_data
                 return payment
             service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
