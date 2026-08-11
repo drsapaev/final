@@ -85,6 +85,9 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 # - /health, /healthz, /api/v1/health: unauthenticated probes.
 # - /payments/webhook/*: PayMe/Click/Kaspi callbacks authenticate via
 #   HMAC signatures in Authorization header or body, not cookies.
+# - /telegram/webhook, /telegram/bot/webhook: Telegram Bot API callbacks
+#   authenticate via X-Telegram-Bot-Api-Secret-Token header (constant-time
+#   comparison in _validate_webhook_secret). Server-to-server, not browser.
 # - /emergency: break-glass token-based access, not cookie auth.
 CSRF_EXEMPT_PATHS: tuple[str, ...] = (
     "/auth/login",
@@ -96,6 +99,8 @@ CSRF_EXEMPT_PATHS: tuple[str, ...] = (
     "/healthz",
     "/api/v1/health",
     "/api/v1/payments/webhook/",
+    "/api/v1/telegram/webhook",
+    "/api/v1/telegram/bot/webhook",
     "/emergency",
     "/api/v1/emergency",
 )
