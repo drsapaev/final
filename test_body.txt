@@ -1,0 +1,10 @@
+💡 What: Added `aria-invalid={!!error}` to the core form control components (`Input`, `Textarea`, `Checkbox`, `Select`) in the macOS UI component library.
+
+🎯 Why: While these components visually represented their error states (via red borders), they were not communicating this state semantically. Screen reader users would land on these fields and be unaware they were invalid.
+
+📸 Before/After: Visuals remain unchanged (red borders on error). Screen readers will now announce "invalid data" when focusing on an errored field.
+
+♿ Accessibility: Significantly improves form validation feedback for assistive technologies by natively linking the component's internal error state to the standard ARIA `aria-invalid` attribute.
+
+---
+*PR created automatically by Jules for task [5356410689061570976](https://jules.google.com/task/5356410689061570976) started by @drsapaev*

@@ -1,0 +1,32 @@
+## Summary
+- Added `aria-invalid={!!error}` to `Input`, `Textarea`, `Checkbox`, and `Select`.
+
+## Cyclic Execution Evidence
+- Fresh main sync: yes
+- Clean workspace: yes
+- Branch: yes
+- Scope gate: yes
+- Red-check handling: yes
+
+## Contract Impact
+not applicable - UI change only.
+
+## RBAC / Permissions
+not applicable - no auth changes.
+
+## Notification / Realtime
+not applicable - no realtime changes.
+
+## Frontend Resilience
+not applicable - standard prop passthrough.
+
+## Scope Gate
+- Allowed paths: frontend/src/components/ui/macos/*
+- Denied paths: backend
+- Migration/docs/test impact: none
+- Rollback note: revert the commit
+
+## Validation
+- Targeted tests or smoke run: locally ran pnpm test
+- Result: passed
+- Not checked: backend tests
