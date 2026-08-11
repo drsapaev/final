@@ -1,3 +1,7 @@
 ## 2024-05-12 - Missing aria-busy on Complex Loading States
 **Learning:** While buttons effectively communicated their loading states via `aria-busy`, larger container components in the design system (Tables, Lists, Stat Cards) with custom loading skeletons or empty states completely lacked this attribute. This creates a confusing experience for screen reader users who aren't notified when these regions are processing or waiting for data.
 **Action:** Always add `aria-busy="true"` (or `aria-busy={loading}`) to the root container of complex UI components that handle asynchronous data loading, especially when rendering custom loading skeletons or empty states instead of standard UI elements.
+
+## 2026-08-11 - Native aria-invalid routing for Custom Inputs
+**Learning:** Custom input wrappers (like Input, Textarea, Select, Checkbox) often accept an `error` prop to trigger visual red borders, but frequently fail to pass an `aria-invalid` state to the underlying native element or semantic role element. This causes screen readers to completely miss the error state of the field, even when the UI shows it clearly.
+**Action:** Whenever a custom form control wrapper receives an `error` prop (boolean or string), explicitly bind `aria-invalid={!!error}` to the underlying native HTML element (e.g., `<input>`, `<textarea>`, `<button>`) or the element with the explicit ARIA role (e.g., `role="checkbox"`).
