@@ -18,6 +18,41 @@ from app.services.payment_create_service import (
 
 @pytest.mark.unit
 class TestPaymentCreateService:
+    """Tests for PaymentCreateService.
+
+    Issue #06: PaymentCreateService.create_payment() now delegates to
+    PaymentInvariantService.create_payment_for_visit(). These tests
+    patch PaymentInvariantService to avoid the invariant checks
+    (paid_amount, total_cost) that require VisitService rows.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _mock_payment_invariant(self, monkeypatch):
+        """Mock PaymentInvariantService to bypass invariant checks."""
+        from decimal import Decimal
+        from app.services import payment_create_service as _pcs_module
+
+        class _FakePayment:
+            def __init__(self, visit_id, amount, method, note, **kwargs):
+                self.id = 999
+                self.visit_id = visit_id
+                self.amount = Decimal(str(amount))
+                self.method = method
+                self.status = "paid"
+                self.note = note
+                self.paid_at = None
+                self.provider = kwargs.get("provider")
+                self.currency = kwargs.get("currency", "UZS")
+
+        def _fake_create(self, visit_id, amount, method, note, current_user, **kwargs):
+            return _FakePayment(visit_id, amount, method, note, **kwargs)
+
+        mock_cls = Mock()
+        mock_instance = Mock()
+        mock_instance.create_payment_for_visit = _fake_create
+        mock_cls.return_value = mock_instance
+        monkeypatch.setattr(_pcs_module, "PaymentInvariantService", mock_cls)
+
     def test_create_payment_requires_visit_or_appointment(self, db_session):
         service = PaymentCreateService(db_session)
 

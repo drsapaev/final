@@ -29,6 +29,7 @@ class TestAllowedPaymentTransitionsTable:
             "pending",
             "processing",
             "paid",
+            "completed",
             "failed",
             "cancelled",
             "refunded",
@@ -61,8 +62,8 @@ class TestAllowedPaymentTransitionsTable:
         ]
 
     def test_paid_allows_refunded_void_and_cancelled(self):
-        """paid → cancelled is NOT allowed (must go through refunded/void)."""
-        assert ALLOWED_PAYMENT_TRANSITIONS["paid"] == ["refunded", "void"]
+        """paid → cancelled IS allowed (Issue #06: cashier cancel flow)."""
+        assert ALLOWED_PAYMENT_TRANSITIONS["paid"] == ["refunded", "void", "cancelled"]
 
     def test_failed_allows_pending_and_cancelled(self):
         """failed → paid is NOT allowed (must return to pending first)."""
@@ -100,7 +101,7 @@ class TestIsValidPaymentTransition:
             ("refunded", "refunded", True),
             ("void", "void", True),
             # Invalid transitions
-            ("paid", "cancelled", False),  # paid → cancelled not allowed
+            ("paid", "cancelled", True),  # Issue #06: paid → cancelled now allowed
             ("paid", "pending", False),
             ("paid", "processing", False),
             ("paid", "failed", False),
@@ -135,12 +136,10 @@ class TestCanTransitionPaymentStatusPermissive:
     """
 
     def test_paid_to_cancelled_is_now_allowed(self):
-        """paid → cancelled returns True here (permissive), even though
-        is_valid_payment_transition() returns False. The authoritative
-        rejection happens in billing_service.update_payment_status().
-        """
+        """Issue #06: paid → cancelled is now allowed in both permissive
+        and strict checks (cashier cancel flow)."""
         assert can_transition_payment_status("paid", "cancelled") is True
-        assert is_valid_payment_transition("paid", "cancelled") is False
+        assert is_valid_payment_transition("paid", "cancelled") is True
 
     def test_failed_to_paid_is_blocked(self):
         """Both permissive and strict agree: failed → paid is not allowed."""

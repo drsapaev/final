@@ -347,7 +347,7 @@ def test_registrar_batch_update_rejects_visit_for_other_patient(
                 {
                     "id": unrelated_visit.id,
                     "action": "update",
-                    "status": "cancelled",
+                    "status": "canceled",
                 }
             ]
         },
@@ -394,7 +394,7 @@ def test_registrar_batch_update_rejects_ambiguous_untyped_entry_id(
                 {
                     "id": collision_id,
                     "action": "update",
-                    "status": "cancelled",
+                    "status": "canceled",
                 }
             ]
         },
@@ -444,7 +444,7 @@ def test_registrar_batch_update_uses_typed_visit_when_ids_collide(
                     "id": collision_id,
                     "entry_type": "visit",
                     "action": "update",
-                    "status": "cancelled",
+                    "status": "canceled",
                 }
             ]
         },
