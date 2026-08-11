@@ -455,7 +455,28 @@ class VisitLifecycleService:
             visit.confirmed_by = confirmed_by
 
         # Transition: pending_confirmation → confirmed
-        if visit.status == "pending_confirmation":
+        #
+        # TH-2 (post-merge stabilization): also accept "confirmation_processing"
+        # as a valid source status. This is an internal lock/claim status set
+        # by VisitConfirmationService._claim_pending_visit_for_confirmation()
+        # to serialize concurrent confirmations. It is logically equivalent to
+        # pending_confirmation — the only difference is that the visit has
+        # been atomically claimed by one confirmer.
+        #
+        # Without this, the confirmation flow returns HTTP 500:
+        #   1. _claim_pending_visit_for_confirmation() sets status to
+        #      "confirmation_processing"
+        #   2. _confirm_visit() calls confirm_visit()
+        #   3. confirm_visit() sees "confirmation_processing" → hits else → 409
+        #   4. confirm_by_telegram/confirm_by_pwa catches Exception → 500
+        #
+        # "confirmation_processing" is never committed between transactions
+        # (rollback on error restores "pending_confirmation"), so the only
+        # way confirm_visit() sees it is via _confirm_visit() in the same
+        # transaction. Accepting it here does NOT expand the public state
+        # transition API in a dangerous way — it recognizes an existing
+        # internal transition path.
+        if visit.status in ("pending_confirmation", "confirmation_processing"):
             visit.status = "confirmed"
         elif visit.status == "confirmed":
             # Idempotent — already confirmed, just refresh metadata.
