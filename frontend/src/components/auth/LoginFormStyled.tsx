@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowRight, Eye, EyeOff, LogIn, CircleHelp, UserPlus, UserRound, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { api, setToken, setRefreshToken } from '../../api/client';
+import { api, setToken, setRefreshToken, ensureCSRFToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors';
@@ -190,6 +190,15 @@ const LoginFormStyled = () => {
           setRefreshToken(String(data.refresh_token));
         }
 
+        // #05 Tier 1: Eagerly fetch CSRF token after successful login.
+        // This ensures the csrf_token cookie is set before the first
+        // state-changing request, avoiding a lazy-fetch race.
+        // ensureCSRFToken() is single-flight and cookie-first — cheap if
+        // the cookie is already present.
+        ensureCSRFToken().catch(() => {
+          // Non-fatal — the request interceptor will retry on demand.
+        });
+
         try {
           // UX Audit Stage 1 (Login issue 3.7):
           // Удалён 100-мс setTimeout + auth.getState() race-condition workaround.
@@ -273,6 +282,11 @@ const LoginFormStyled = () => {
         if (response.data?.refresh_token) {
           setRefreshToken(String(response.data.refresh_token));
         }
+
+        // #05 Tier 1: Eagerly fetch CSRF token after 2FA success.
+        ensureCSRFToken().catch(() => {
+          // Non-fatal — the request interceptor will retry on demand.
+        });
 
         const profileResponse = (await api.get('/auth/me')) as import('axios').AxiosResponse<Record<string, unknown>>;
         setProfile(profileResponse.data);

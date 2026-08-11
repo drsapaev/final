@@ -103,6 +103,7 @@ CSRF_EXEMPT_PREFIXES: tuple[str, ...] = (
     "/auth/refresh",
     "/auth/csrf-token",
     "/auth/webauthn",
+    "/authentication/login",
     "/health",
     "/healthz",
     "/api/v1/health",

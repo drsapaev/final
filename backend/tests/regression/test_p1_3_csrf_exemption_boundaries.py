@@ -182,3 +182,19 @@ class TestCSRFExemptSets:
         # Telegram webhooks should NOT be in the prefix set
         assert "/api/v1/telegram/webhook" not in CSRF_EXEMPT_PREFIXES
         assert "/api/v1/telegram/bot/webhook" not in CSRF_EXEMPT_PREFIXES
+
+    def test_authentication_login_is_exempt(self):
+        """#05 Tier 1: /authentication/login must be CSRF-exempt.
+
+        The frontend's login endpoint is POST /authentication/login
+        (not /auth/login). Without this exemption, enabling CSRF_ENABLED=1
+        in production would reject every login request because no
+        csrf_token cookie exists yet.
+        """
+        from app.middleware.csrf_middleware import CSRF_EXEMPT_PREFIXES
+
+        assert "/authentication/login" in CSRF_EXEMPT_PREFIXES, (
+            "/authentication/login must be in CSRF_EXEMPT_PREFIXES. "
+            "The frontend's login endpoint is POST /authentication/login "
+            "and must be exempt from CSRF (no cookie exists before login)."
+        )
