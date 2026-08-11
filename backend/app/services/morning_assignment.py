@@ -211,10 +211,22 @@ class MorningAssignmentService:
                         # activate_confirmed_visit() does confirmed → open.
                         # This is a system-initiated transition (batch job),
                         # so current_user is None.
+                        #
+                        # P2-1 (post-merge stabilization): commit=False is
+                        # MANDATORY here. The default commit=True fires
+                        # db.commit() per-visit inside this batch loop,
+                        # breaking the commit=False composition contract
+                        # established by Issue #06. With commit=True the
+                        # top-level rollback at L253 cannot undo visits
+                        # processed before a mid-batch failure, leaving
+                        # partial state (some visits 'open' with queue
+                        # entries, others 'confirmed' without).
+                        # See tests/regression/test_p2_1_morning_assignment_txn.py.
                         from app.services.visit_lifecycle_service import VisitLifecycleService
 
                         VisitLifecycleService(self.db).activate_confirmed_visit(
                             visit_id=visit.id,
+                            commit=False,
                         )
 
                         logger.info(
