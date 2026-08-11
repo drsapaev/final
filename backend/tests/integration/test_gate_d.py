@@ -460,6 +460,19 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
             f"results: {results}"
         )
 
+    # TH-1 (post-merge stabilization): harness hardening.
+    # Every worker MUST record a result — "worker disappeared → test treats
+    # it as success" must NEVER happen. If a worker was silently aborted
+    # (e.g. GreenletExit from SQLAlchemy/greenlet pool without entering the
+    # BaseException handler), results would have fewer than 2 entries and
+    # the primary invariant could pass while hiding a harness defect.
+    assert len(results) == 2, (
+        f"D4 FAILED [harness]: expected 2 worker results, got {len(results)}. "
+        f"A worker may have disappeared without recording a result. "
+        f"Results: {results}. "
+        f"t1 alive: {t1.is_alive()}, t2 alive: {t2.is_alive()}"
+    )
+
     # PRIMARY invariant: at most 1 Payment in DB (no duplicate financial state)
     # This is the real invariant — the exact number of successes/rejections
     # depends on thread scheduling and is non-deterministic.
@@ -588,7 +601,11 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                 reason = e.detail[:100]
             with results_lock:
                 results.append(("create_payment", "rejected", e.status_code, reason))
-        except Exception as e:
+        except BaseException as e:
+            # TH-1 (post-merge stabilization): catch BaseException (not just
+            # Exception) to capture greenlet.GreenletExit, SystemExit, etc.
+            # A worker that disappears via GreenletExit without recording a
+            # result would hide a harness defect.
             with results_lock:
                 results.append(("create_payment", "error", type(e).__name__, str(e)[:200]))
         finally:
@@ -631,7 +648,8 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                 reason = e.detail[:100]
             with results_lock:
                 results.append(("mark_paid", "rejected", e.status_code, reason))
-        except Exception as e:
+        except BaseException as e:
+            # TH-1: catch BaseException to capture GreenletExit etc.
             session.rollback()
             with results_lock:
                 results.append(("mark_paid", "error", type(e).__name__, str(e)[:200]))
@@ -644,6 +662,20 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
     t2.start()
     t1.join(timeout=30)
     t2.join(timeout=30)
+
+    # TH-1 (post-merge stabilization): harness hardening.
+    # Every worker MUST record a result — "worker disappeared → test treats
+    # it as success" must NEVER happen. Both workers now catch BaseException
+    # (not just Exception) so GreenletExit/SystemExit are recorded. If a
+    # worker still disappeared without recording, results would have < 2
+    # entries and this assertion would fail — preventing a silent harness
+    # defect from being masked by a passing primary invariant.
+    assert len(results) == 2, (
+        f"D4b FAILED [harness]: expected 2 worker results, got {len(results)}. "
+        f"A worker may have disappeared without recording a result. "
+        f"Results: {results}. "
+        f"t1 alive: {t1.is_alive()}, t2 alive: {t2.is_alive()}"
+    )
 
     # ─── Primary Persisted Assertions (from NEW independent session) ──
 
