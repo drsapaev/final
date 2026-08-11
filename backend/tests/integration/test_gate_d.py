@@ -67,6 +67,7 @@ from app.models.payment import Payment  # noqa: E402
 from app.models.patient import Patient  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.models.visit import Visit  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
 from app.services.payment_invariant_service import PaymentInvariantService  # noqa: E402
 from app.services.visit_lifecycle_service import VisitLifecycleService  # noqa: E402
 
