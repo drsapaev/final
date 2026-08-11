@@ -45,7 +45,7 @@ class TestPaymentCreateService:
                 self.provider = kwargs.get("provider")
                 self.currency = kwargs.get("currency", "UZS")
 
-        def _fake_create(self, visit_id, amount, method, note, current_user, **kwargs):
+        def _fake_create(visit_id, amount, method, note, current_user, **kwargs):
             return _FakePayment(visit_id, amount, method, note, **kwargs)
 
         mock_cls = Mock()
