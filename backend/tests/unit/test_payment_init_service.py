@@ -16,14 +16,19 @@ def _service_with_repo(
     return init_module.PaymentInitService(db=Mock(), payment_manager=payment_manager)
 
 
-def _patch_payment_side_effects(monkeypatch: pytest.MonkeyPatch, billing: Mock) -> None:
+def _patch_payment_side_effects(
+    monkeypatch: pytest.MonkeyPatch,
+    billing: Mock,
+    payment=None,
+) -> None:
     monkeypatch.setattr(init_module, "BillingService", Mock(return_value=billing))
     # Issue #06: PaymentInvariantService.create_pending_payment replaces
     # billing.create_payment. Patch at source module.
     from app.services import payment_invariant_service as _pis_module
     _pis_cls = Mock()
     _pis_instance = Mock()
-    _pis_instance.create_pending_payment = Mock(return_value=payment)
+    if payment is not None:
+        _pis_instance.create_pending_payment = Mock(return_value=payment)
     _pis_cls.return_value = _pis_instance
     monkeypatch.setattr(_pis_module, "PaymentInvariantService", _pis_cls)
     monkeypatch.setattr(
@@ -105,7 +110,7 @@ def test_init_payment_success_path_updates_pending_status(
     payment = SimpleNamespace(id=501, provider_payment_id=None, payment_url=None, provider_data={})
     billing = Mock()
     billing.update_payment_status.return_value = payment
-    _patch_payment_side_effects(monkeypatch, billing)
+    _patch_payment_side_effects(monkeypatch, billing, payment)
 
     # Issue #06 Phase 4b: payment_init_service imports PaymentInvariantService
     # locally inside init_payment(). Patch at the source module so the
@@ -174,7 +179,7 @@ def test_init_payment_provider_failure_sets_failed_status(
     payment = SimpleNamespace(id=777, provider_payment_id=None, payment_url=None, provider_data={})
     billing = Mock()
     billing.update_payment_status.return_value = payment
-    _patch_payment_side_effects(monkeypatch, billing)
+    _patch_payment_side_effects(monkeypatch, billing, payment)
 
     # Issue #06 Phase 4b: payment_init_service imports PaymentInvariantService
     # locally inside init_payment(). Patch at the source module so the
@@ -236,7 +241,7 @@ def test_init_payment_unexpected_error_returns_with_payment_id(
     payment = SimpleNamespace(id=888, provider_payment_id=None, payment_url=None, provider_data={})
     billing = Mock()
     # billing.create_payment no longer used (Issue #06)
-    _patch_payment_side_effects(monkeypatch, billing)
+    _patch_payment_side_effects(monkeypatch, billing, payment)
 
     manager = Mock()
     manager.get_providers_for_currency.return_value = ["payme"]

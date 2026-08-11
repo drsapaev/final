@@ -488,6 +488,7 @@ class TestPaymeTerminalStatePreservation:
         # Issue #06: mock _update_payment_status to simulate status changes
         try:
             def _mock_update_status(payment_id, new_status, commit=False):
+                # Update both payment and locked_payment
                 payment.status = new_status
                 if locked_payment and hasattr(locked_payment, 'status'):
                     locked_payment.status = new_status
@@ -496,10 +497,11 @@ class TestPaymeTerminalStatePreservation:
                     payment.paid_at = datetime.now(UTC)
                     if hasattr(locked_payment, 'paid_at'):
                         locked_payment.paid_at = payment.paid_at
-                # Also sync provider_data to locked_payment
-                if locked_payment and hasattr(locked_payment, 'provider_data'):
-                    locked_payment.provider_data = payment.provider_data
-                return payment
+                # Return locked_payment (not payment) — this matches the real
+                # BillingService.update_payment_status() which does FOR UPDATE
+                # and returns the locked object. The webhook code then updates
+                # provider_data on the returned object.
+                return locked_payment if locked_payment else payment
             service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass
