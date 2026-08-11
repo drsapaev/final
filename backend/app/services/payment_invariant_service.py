@@ -59,6 +59,26 @@ The clinic allows overpayment as an "advance / deposit" — a patient
 can pay 15000 for a 10000 visit, with the excess recorded for future
 use. This is logged at WARNING level for audit.
 
+P1-1 (post-merge stabilization): the overpayment/deposit policy is an
+explicit business decision (Option A). ``Payment.amount`` MAY exceed
+``Visit.total_cost``. The overpayment is treated as a patient
+deposit/advance.
+
+Business policy nuance (verified by regression tests):
+- Overpayment IS allowed when ``remaining_debt > 0`` (a partial payment
+  that exceeds the remaining debt is accepted as deposit).
+- Overpayment is NOT allowed when ``remaining_debt <= 0`` (visit already
+  fully paid → further payments rejected with 400 "Все услуги уже
+  оплачены" to prevent accidental double-payment).
+
+This means grouped payments use the same overpayment/deposit policy as
+individual payments. A stale allocation (visit fully paid by a concurrent
+transaction between allocation calculation and FOR UPDATE lock) is
+rejected, not accepted as an additional deposit — the "already fully
+paid" check fires before the overpayment-as-deposit policy.
+
+See: tests/regression/test_p1_1_overpayment_policy.py
+
 The ``allow_overpayment`` parameter (default True) can be set to False
 by callers that want to reject overpayment (e.g. a strict mode where
 only exact amounts are accepted).
