@@ -14,8 +14,13 @@ class TestProviderWebhookService:
     def test_click_webhook_requires_signature(self, db_session):
         service = ProviderWebhookService(db_session)
         try:
-
-            service._update_payment_status = Mock(return_value=payment)
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
 
@@ -27,8 +32,13 @@ class TestProviderWebhookService:
     def test_payme_webhook_requires_auth_header(self, db_session):
         service = ProviderWebhookService(db_session)
         try:
-
-            service._update_payment_status = Mock(return_value=payment)
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
 
@@ -67,8 +77,13 @@ class TestProviderWebhookService:
         )
         service = ProviderWebhookService(db_session, repository=repository)
         try:
-
-            service._update_payment_status = Mock(return_value=payment)
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
 
@@ -126,8 +141,13 @@ class TestProviderWebhookService:
         )
         service = ProviderWebhookService(db_session, repository=repository)
         try:
-
-            service._update_payment_status = Mock(return_value=payment)
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
 
@@ -189,8 +209,13 @@ class TestProviderWebhookService:
         )
         service = ProviderWebhookService(db_session, repository=repository)
         try:
-
-            service._update_payment_status = Mock(return_value=payment)
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
 
@@ -259,8 +284,13 @@ class TestProviderWebhookService:
         )
         service = ProviderWebhookService(db_session, repository=repository)
         try:
-
-            service._update_payment_status = Mock(return_value=payment)
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
 
@@ -321,8 +351,13 @@ class TestProviderWebhookService:
         )
         service = ProviderWebhookService(db_session, repository=repository)
         try:
-
-            service._update_payment_status = Mock(return_value=payment)
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
 
@@ -349,8 +384,13 @@ class TestProviderWebhookService:
     def test_extract_payment_id_from_order(self, db_session):
         service = ProviderWebhookService(db_session)
         try:
-
-            service._update_payment_status = Mock(return_value=payment)
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
 
@@ -360,8 +400,13 @@ class TestProviderWebhookService:
     def test_map_provider_status_to_payment_status(self, db_session):
         service = ProviderWebhookService(db_session)
         try:
-
-            service._update_payment_status = Mock(return_value=payment)
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
 
@@ -431,8 +476,13 @@ class TestPaymeTerminalStatePreservation:
         )
         service = ProviderWebhookService(db_session, repository=repository)
         try:
-
-            service._update_payment_status = Mock(return_value=payment)
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
         return service, transaction, payment, locked_payment
