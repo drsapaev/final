@@ -26,21 +26,25 @@ class PaymentsMixin(BillingServiceMixinBase):
     ) -> Payment:
         """Create a payment (DEPRECATED — use PaymentInvariantService).
 
-        Issue #06 Phase 4b: this method is DEPRECATED. All 3 production
-        callers have been migrated to ``PaymentInvariantService``:
+        Issue #06 Phase 4b: this method is DEPRECATED. All 3 original
+        production callers have been migrated to ``PaymentInvariantService``:
 
         - ``payment_init_service.py`` → ``create_pending_payment()``
         - ``payment_create_service.py`` → ``create_payment_for_visit()``
         - ``registrar_wizard/_invoice.py`` → ``create_payment_for_visit()``
 
-        Audit confirmed 0 production callers (grep across app/api,
-        app/services, app/crud). This method is retained ONLY as a
-        compatibility/dead-code marker and will be removed in a follow-up
-        cleanup PR after CI green + E2E green confirmation.
+        CL-1 audit (post-merge stabilization): 2 production callers remain:
+        - ``billing_service_pkg/_payments.py:record_payment()`` (L540) —
+          called from ``POST /billing/payments`` endpoint (billing.py L351).
+          ACTIVE in production for BILLING_WRITE_ROLES.
+        - ``payment_test_init_service.py`` (L39) — gated by
+          ``ENABLE_TEST_PAYMENT_INIT`` (default False, must be False in
+          production). Dev/staging only.
 
-        Why not removed now: static grep may miss dynamic/import-based
-        call paths. Keeping the method with a DeprecationWarning ensures
-        any missed caller surfaces visibly during testing.
+        This method will be removed after both callers are migrated to
+        ``PaymentInvariantService``. See follow-up issue: "Migrate
+        record_payment() and payment_test_init_service to
+        PaymentInvariantService, then remove BillingService.create_payment()".
 
         For new code, use:
         - ``PaymentInvariantService.create_payment_for_visit()`` for
@@ -56,11 +60,11 @@ class PaymentsMixin(BillingServiceMixinBase):
         import warnings
 
         warnings.warn(
-            "BillingService.create_payment() is deprecated and has 0 "
-            "production callers. Use PaymentInvariantService."
-            "create_payment_for_visit() for paid payments or "
-            "create_pending_payment() for online provider flow. "
-            "This method will be removed in a future release.",
+            "BillingService.create_payment() is deprecated. Use "
+            "PaymentInvariantService.create_payment_for_visit() for paid "
+            "payments or create_pending_payment() for online provider "
+            "flow. This method will be removed after record_payment() "
+            "and payment_test_init_service are migrated.",
             DeprecationWarning,
             stacklevel=2,
         )
