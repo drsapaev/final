@@ -44,6 +44,9 @@ class TestPaymentCreateService:
                 self.paid_at = None
                 self.provider = kwargs.get("provider")
                 self.currency = kwargs.get("currency", "UZS")
+                # Attributes needed by _build_payment_response
+                self.receipt_no = None
+                self.created_at = None
 
         def _fake_create(visit_id, amount, method, note, current_user, **kwargs):
             return _FakePayment(visit_id, amount, method, note, **kwargs)
@@ -53,6 +56,16 @@ class TestPaymentCreateService:
         mock_instance.create_payment_for_visit = _fake_create
         mock_cls.return_value = mock_instance
         monkeypatch.setattr(_pcs_module, "PaymentInvariantService", mock_cls)
+        # Also mock repository.get_payment to return a payment object
+        # so _build_payment_response doesn't fail
+        from app.services.payment_create_service import PaymentCreateRepository
+        _fake_repo_payment = type('P', (), {
+            'id': 999, 'visit_id': 1, 'amount': Decimal('1000'),
+            'method': 'cash', 'status': 'paid', 'note': None,
+            'paid_at': None, 'provider': None, 'currency': 'UZS',
+            'receipt_no': None, 'created_at': None
+        })()
+        monkeypatch.setattr(PaymentCreateRepository, 'get_payment', lambda self, payment_id: _fake_repo_payment)
 
     def test_create_payment_requires_visit_or_appointment(self, db_session):
         service = PaymentCreateService(db_session)
