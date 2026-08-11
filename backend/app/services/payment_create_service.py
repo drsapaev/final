@@ -54,7 +54,6 @@ class PaymentCreateService:
         #   - paid_amount vs total_cost check
         #   - overpayment policy
         #   - IntegrityError defense-in-depth
-        from app.services.payment_invariant_service import PaymentInvariantService
         from decimal import Decimal
 
         payment = PaymentInvariantService(self.billing_service.db).create_payment_for_visit(
