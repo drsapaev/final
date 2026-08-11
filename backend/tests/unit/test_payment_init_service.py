@@ -102,11 +102,15 @@ def test_init_payment_success_path_updates_pending_status(
     # Issue #06 Phase 4b: payment_init_service imports PaymentInvariantService
     # locally inside init_payment(). Patch at the source module so the
     # local import picks up the mock.
+    # Issue #06: patch at source module — payment_init_service imports
+    # PaymentInvariantService locally inside init_payment(), so we need
+    # to patch the class at its source.
     from app.services import payment_invariant_service as _pis_module
-    monkeypatch.setattr(
-        _pis_module, "PaymentInvariantService",
-        Mock(return_value=Mock(create_pending_payment=Mock(return_value=payment)))
-    )
+    _pis_mock_cls = Mock()
+    _pis_instance = Mock()
+    _pis_instance.create_pending_payment = Mock(return_value=payment)
+    _pis_mock_cls.return_value = _pis_instance
+    monkeypatch.setattr(_pis_module, "PaymentInvariantService", _pis_mock_cls)
 
     manager = Mock()
     manager.get_providers_for_currency.return_value = ["payme"]
@@ -167,11 +171,15 @@ def test_init_payment_provider_failure_sets_failed_status(
     # Issue #06 Phase 4b: payment_init_service imports PaymentInvariantService
     # locally inside init_payment(). Patch at the source module so the
     # local import picks up the mock.
+    # Issue #06: patch at source module — payment_init_service imports
+    # PaymentInvariantService locally inside init_payment(), so we need
+    # to patch the class at its source.
     from app.services import payment_invariant_service as _pis_module
-    monkeypatch.setattr(
-        _pis_module, "PaymentInvariantService",
-        Mock(return_value=Mock(create_pending_payment=Mock(return_value=payment)))
-    )
+    _pis_mock_cls = Mock()
+    _pis_instance = Mock()
+    _pis_instance.create_pending_payment = Mock(return_value=payment)
+    _pis_mock_cls.return_value = _pis_instance
+    monkeypatch.setattr(_pis_module, "PaymentInvariantService", _pis_mock_cls)
 
     manager = Mock()
     manager.get_providers_for_currency.return_value = ["click"]

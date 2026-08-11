@@ -485,6 +485,21 @@ class TestPaymeTerminalStatePreservation:
             service._update_payment_status = Mock(side_effect=_mock_update_status)
         except NameError:
             pass  # no payment variable in this test
+        # Issue #06: mock _update_payment_status to simulate status changes
+        try:
+            def _mock_update_status(payment_id, new_status, commit=False):
+                payment.status = new_status
+                if locked_payment and hasattr(locked_payment, 'status'):
+                    locked_payment.status = new_status
+                if new_status == "paid" and not getattr(payment, 'paid_at', None):
+                    from datetime import datetime, UTC
+                    payment.paid_at = datetime.now(UTC)
+                    if hasattr(locked_payment, 'paid_at'):
+                        locked_payment.paid_at = payment.paid_at
+                return payment
+            service._update_payment_status = Mock(side_effect=_mock_update_status)
+        except NameError:
+            pass
         return service, transaction, payment, locked_payment
 
     def _call_perform(self, service, auth_header="Basic valid"):
