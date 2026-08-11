@@ -398,10 +398,29 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
     results_lock = threading.Lock()
 
     def make_payment(thread_id="T"):
-        """Each thread gets its OWN Session. ALWAYS records a result."""
+        """Each thread gets its OWN Session. ALWAYS records a result.
+
+        TH-1 hardening: the result is recorded as the FIRST action in
+        each except handler (before any print or other code that could
+        raise). This ensures that even if a second exception occurs
+        inside the handler (e.g. GreenletExit raised during results_lock
+        acquisition), the result is already recorded. If even that
+        fails, the outermost `record_fallback` ensures a result is
+        ALWAYS appended.
+        """
         import sys as _sys
+
+        def _record(result_tuple):
+            """Record a result, ignoring any exception during recording."""
+            try:
+                with results_lock:
+                    results.append(result_tuple)
+            except BaseException:
+                pass  # never let recording itself raise
+
         print(f"D4 [{thread_id}]: starting", file=_sys.stderr, flush=True)
         session = None
+        recorded = False
         try:
             barrier.wait(timeout=10)
             print(f"D4 [{thread_id}]: barrier passed", file=_sys.stderr, flush=True)
@@ -416,29 +435,37 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
                 commit=True,
             )
             print(f"D4 [{thread_id}]: payment created id={payment.id}", file=_sys.stderr, flush=True)
-            with results_lock:
-                results.append(("success", payment.id))
+            _record(("success", payment.id))
+            recorded = True
         except HTTPException as e:
             reason = ""
             if isinstance(e.detail, dict):
                 reason = e.detail.get("reason", "")
             elif isinstance(e.detail, str):
                 reason = e.detail[:100]
+            _record(("rejected", e.status_code, reason))
+            recorded = True
             print(f"D4 [{thread_id}]: HTTPException {e.status_code} reason={reason}", file=_sys.stderr, flush=True)
-            with results_lock:
-                results.append(("rejected", e.status_code, reason))
         except BaseException as e:
             # Catch BaseException (not just Exception) to capture
             # greenlet.GreenletExit, SystemExit, etc.
+            # Record FIRST, then log — so a second exception during
+            # logging does not lose the result.
+            _record(("rejected", type(e).__name__, str(e)[:200]))
+            recorded = True
             print(f"D4 [{thread_id}]: BaseException {type(e).__name__}: {e}", file=_sys.stderr, flush=True)
-            with results_lock:
-                results.append(("rejected", type(e).__name__, str(e)[:200]))
         finally:
             if session is not None:
                 try:
                     session.close()
                 except Exception:
                     pass
+            # TH-1: if no result was recorded (e.g. exception during
+            # barrier.wait or session creation before the try body could
+            # record), record a fallback so the harness assertion
+            # len(results) == 2 can never be violated by a silent exit.
+            if not recorded:
+                _record(("rejected", "no_result_recorded", f"thread {thread_id} exited without recording"))
             print(f"D4 [{thread_id}]: done", file=_sys.stderr, flush=True)
 
     t1 = threading.Thread(target=make_payment, args=("T1",))
@@ -573,16 +600,33 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
             self.role = "Admin"
             self.username = f"test_user_{uid}"
 
+    def _record(result_tuple):
+        """Record a result, ignoring any exception during recording.
+
+        TH-1 hardening: ensures the result is ALWAYS recorded even if
+        a second exception occurs during results_lock acquisition.
+        """
+        try:
+            with results_lock:
+                results.append(result_tuple)
+        except BaseException:
+            pass
+
     def create_payment_thread():
         """Thread A: PRODUCTION create_payment path.
 
         Calls PaymentInvariantService.create_payment_for_visit() — the
         EXACT same service method that the cashier/_payments.py:create_payment
         endpoint calls. This is production code, not a test reconstruction.
+
+        TH-1: records result FIRST in each handler, with a fallback in
+        finally so the worker can never disappear without recording.
         """
-        barrier.wait()
-        session = sessionmaker(bind=db_engine)()
+        session = None
+        recorded = False
         try:
+            barrier.wait()
+            session = sessionmaker(bind=db_engine)()
             payment = PaymentInvariantService(session).create_payment_for_visit(
                 visit_id=visit_id,
                 amount=Decimal("5000"),
@@ -591,25 +635,29 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                 current_user=_TestUser(1),
                 commit=True,
             )
-            with results_lock:
-                results.append(("create_payment", "success", payment.id, float(payment.amount)))
+            _record(("create_payment", "success", payment.id, float(payment.amount)))
+            recorded = True
         except HTTPException as e:
             reason = ""
             if isinstance(e.detail, dict):
                 reason = e.detail.get("reason", "")
             elif isinstance(e.detail, str):
                 reason = e.detail[:100]
-            with results_lock:
-                results.append(("create_payment", "rejected", e.status_code, reason))
+            _record(("create_payment", "rejected", e.status_code, reason))
+            recorded = True
         except BaseException as e:
-            # TH-1 (post-merge stabilization): catch BaseException (not just
-            # Exception) to capture greenlet.GreenletExit, SystemExit, etc.
-            # A worker that disappears via GreenletExit without recording a
-            # result would hide a harness defect.
-            with results_lock:
-                results.append(("create_payment", "error", type(e).__name__, str(e)[:200]))
+            # TH-1: catch BaseException (not just Exception) to capture
+            # greenlet.GreenletExit, SystemExit, etc. Record FIRST.
+            _record(("create_payment", "error", type(e).__name__, str(e)[:200]))
+            recorded = True
         finally:
-            session.close()
+            if session is not None:
+                try:
+                    session.close()
+                except Exception:
+                    pass
+            if not recorded:
+                _record(("create_payment", "error", "no_result_recorded", "thread exited without recording"))
 
     def mark_paid_thread():
         """Thread B: PRODUCTION mark_visit_as_paid endpoint function.
@@ -620,11 +668,16 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
 
         The endpoint function is async, so we run it in an event loop.
         We pass db and current_user directly (bypassing FastAPI Depends).
-        """
-        barrier.wait()
-        session = sessionmaker(bind=db_engine)()
 
+        TH-1: records result FIRST in each handler, with a fallback in
+        finally so the worker can never disappear without recording.
+        """
+        session = None
+        recorded = False
         try:
+            barrier.wait()
+            session = sessionmaker(bind=db_engine)()
+
             # Call the PRODUCTION endpoint function directly
             # (not a reconstruction — the actual function from the module)
             loop = asyncio.new_event_loop()
@@ -636,8 +689,8 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                         current_user=_TestUser(2),
                     )
                 )
-                with results_lock:
-                    results.append(("mark_paid", "success", None, None))
+                _record(("mark_paid", "success", None, None))
+                recorded = True
             finally:
                 loop.close()
         except HTTPException as e:
@@ -646,15 +699,25 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                 reason = e.detail.get("reason", "")
             elif isinstance(e.detail, str):
                 reason = e.detail[:100]
-            with results_lock:
-                results.append(("mark_paid", "rejected", e.status_code, reason))
+            _record(("mark_paid", "rejected", e.status_code, reason))
+            recorded = True
         except BaseException as e:
             # TH-1: catch BaseException to capture GreenletExit etc.
-            session.rollback()
-            with results_lock:
-                results.append(("mark_paid", "error", type(e).__name__, str(e)[:200]))
+            if session is not None:
+                try:
+                    session.rollback()
+                except Exception:
+                    pass
+            _record(("mark_paid", "error", type(e).__name__, str(e)[:200]))
+            recorded = True
         finally:
-            session.close()
+            if session is not None:
+                try:
+                    session.close()
+                except Exception:
+                    pass
+            if not recorded:
+                _record(("mark_paid", "error", "no_result_recorded", "thread exited without recording"))
 
     t1 = threading.Thread(target=create_payment_thread)
     t2 = threading.Thread(target=mark_paid_thread)
