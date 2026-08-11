@@ -10,7 +10,7 @@
  * - Plain 403 (no CSRF header) → no retry
  * - /authentication/login is CSRF-exempt
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { isCSRFRejection } from '../client';
 

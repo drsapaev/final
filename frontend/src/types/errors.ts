@@ -68,6 +68,7 @@ export interface ApiErrorResponse {
   statusText?: string;
   data?: ApiErrorPayload;
   config?: unknown;
+  headers?: Record<string, string>;
 }
 
 // ===========================================================================
