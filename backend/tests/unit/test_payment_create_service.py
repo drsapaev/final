@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from unittest.mock import Mock, patch
 
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
