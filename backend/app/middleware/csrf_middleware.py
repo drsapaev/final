@@ -85,8 +85,19 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 # - /health, /healthz, /api/v1/health: unauthenticated probes.
 # - /payments/webhook/*: PayMe/Click/Kaspi callbacks authenticate via
 #   HMAC signatures in Authorization header or body, not cookies.
+# - /telegram/webhook, /telegram/webhook/enhanced, /telegram/bot/webhook:
+#   Telegram Bot API callbacks authenticate via
+#   X-Telegram-Bot-Api-Secret-Token header (constant-time comparison in
+#   _validate_webhook_secret). Server-to-server, not browser.
+#   P1-3 (post-merge stabilization): these are EXACT-match only — NOT
+#   prefix-match. This prevents accidental over-exemption of sibling
+#   admin endpoints like /telegram/webhook/test (which is browser-facing
+#   and requires CSRF protection).
 # - /emergency: break-glass token-based access, not cookie auth.
-CSRF_EXEMPT_PATHS: tuple[str, ...] = (
+#
+# P1-3: paths that are exempted by PREFIX (e.g. /payments/webhook/ is a
+# prefix for /payments/webhook/click, /payments/webhook/payme, etc.).
+CSRF_EXEMPT_PREFIXES: tuple[str, ...] = (
     "/auth/login",
     "/auth/json-login",
     "/auth/refresh",
@@ -99,6 +110,25 @@ CSRF_EXEMPT_PATHS: tuple[str, ...] = (
     "/emergency",
     "/api/v1/emergency",
 )
+
+# P1-3: paths that are exempted by EXACT match only (no prefix matching).
+# These are webhook endpoints that share a path prefix with browser-facing
+# admin endpoints. Using exact match prevents the admin endpoints from
+# accidentally losing CSRF protection.
+#
+# Example: /api/v1/telegram/webhook is a webhook (exempted), but
+# /api/v1/telegram/webhook/test is an admin endpoint (NOT exempted).
+# If we used prefix match, /webhook/test would be incorrectly exempted.
+CSRF_EXEMPT_EXACT: frozenset[str] = frozenset({
+    "/api/v1/telegram/webhook",
+    "/api/v1/telegram/webhook/enhanced",
+    "/api/v1/telegram/bot/webhook",
+})
+
+# Backward compatibility: combined set for any code that still references
+# CSRF_EXEMPT_PATHS. New code should use CSRF_EXEMPT_PREFIXES or
+# CSRF_EXEMPT_EXACT directly.
+CSRF_EXEMPT_PATHS: tuple[str, ...] = CSRF_EXEMPT_PREFIXES
 
 # Cookie name — must match /auth/csrf-token endpoint (auth.py:149).
 CSRF_COOKIE_NAME = "csrf_token"
@@ -144,9 +174,19 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # Exempt paths (login, csrf-token issue, webhooks, health).
-        for exempt in CSRF_EXEMPT_PATHS:
+        # P1-3: prefix-based exemption for paths that are genuinely
+        # hierarchical (e.g. /payments/webhook/click).
+        for exempt in CSRF_EXEMPT_PREFIXES:
             if path == exempt or path.startswith(exempt):
                 return await call_next(request)
+
+        # P1-3: exact-match exemption for webhook endpoints that share
+        # a path prefix with browser-facing admin endpoints. Using exact
+        # match prevents the admin endpoints from accidentally losing
+        # CSRF protection (e.g. /telegram/webhook/test must NOT be
+        # exempted just because /telegram/webhook is).
+        if path in CSRF_EXEMPT_EXACT:
+            return await call_next(request)
 
         # WebSocket upgrade requests — CSRF does not apply; the WS
         # handler validates the JWT via Sec-WebSocket-Protocol
