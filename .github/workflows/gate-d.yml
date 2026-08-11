@@ -1,0 +1,132 @@
+# Gate D — Transaction/Locking Runtime Tests
+#
+# Issue #06 Phase 4b Gate D: Real PostgreSQL integration tests that prove
+# transaction/locking invariants hold under real DB semantics.
+#
+# These tests MUST run against real PostgreSQL (NOT SQLite) with:
+# - Independent SQLAlchemy Session per concurrent worker
+# - Barrier-controlled concurrency for D4/D4b
+#
+# Gate D PASS criterion:
+#   D1-D6/D6b pass against real PostgreSQL with independent SQLAlchemy
+#   sessions, including concurrency-controlled D4/D4b.
+#
+# #06 is NOT CLOSED until this workflow passes.
+
+name: 🔒 Gate D — Transaction/Locking Runtime Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/app/services/visit_lifecycle_service.py'
+      - 'backend/app/services/payment_invariant_service.py'
+      - 'backend/app/services/visit_state_checks.py'
+      - 'backend/app/services/payment_state_checks.py'
+      - 'backend/app/services/billing_service_pkg/**'
+      - 'backend/app/services/provider_webhook_service.py'
+      - 'backend/app/api/v1/endpoints/cashier/**'
+      - 'backend/app/api/v1/endpoints/registrar_wizard/**'
+      - 'backend/app/api/v1/endpoints/visits.py'
+      - 'backend/app/crud/visit.py'
+      - 'backend/tests/integration/test_gate_d.py'
+      - 'backend/pytest.ini'
+      - '.github/workflows/gate-d.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:  # Manual trigger
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-d-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.11.10'
+  DATABASE_URL: 'postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb'
+  SECRET_KEY: 'ci-secret-key-for-gate-d-runtime-tests-32-chars-min'
+  ENV: 'dev'
+  ALLOW_SQLITE_DATABASE_URL: '0'
+  CORS_DISABLE: '1'
+  WS_DEV_ALLOW: '1'
+  DISABLE_2FA_REQUIREMENT: '1'
+  PYTHONIOENCODING: 'utf-8'
+  PYTHONUTF8: '1'
+
+jobs:
+  gate-d:
+    name: 🔒 Gate D (PostgreSQL + concurrency)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: clinicdb
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinic_ci_only_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: 📦 Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: 🔒 Run Gate D tests (D1-D6/D6b)
+        working-directory: backend
+        run: |
+          echo "=== Gate D: Transaction/Locking Runtime Tests ==="
+          echo "Database: PostgreSQL 16"
+          echo "Tests: D1, D2, D3a, D3b, D4, D4b, D5, D6, D6b"
+          echo ""
+          python -m pytest tests/integration/test_gate_d.py -v -m gate_d -s --tb=long
+
+      - name: 📊 Gate D Summary
+        if: always()
+        working-directory: backend
+        run: |
+          echo "=== Gate D Status ==="
+          echo ""
+          echo "Gate D tests verify:"
+          echo "  D1:  commit=False + rollback = no persistence"
+          echo "  D2:  composition (multiple commit=False + 1 commit)"
+          echo "  D3a: batch success (N mutations + 1 commit)"
+          echo "  D3b: batch failure (N mutations + exception + rollback)"
+          echo "  D4:  concurrent create_payment (barrier-controlled)"
+          echo "  D4b: CRITICAL — mixed-path create_payment + mark_visit_as_paid"
+          echo "  D5:  webhook settlement atomic rollback"
+          echo "  D6:  refund atomicity (SQL guard + status + visit)"
+          echo "  D6b: refund failure rollback"
+          echo ""
+          echo "All tests use real PostgreSQL with independent SQLAlchemy sessions."
+          echo "D4/D4b use threading.Barrier for controlled concurrency."
+          echo ""
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Gate D: PASS — #06 can be CLOSED"
+          else
+            echo "❌ Gate D: FAIL — #06 remains NOT CLOSED"
+            echo ""
+            echo "Investigate the failing test above."
+            echo "D4b is the most critical: it tests mixed-path concurrency"
+            echo "between create_payment and mark_visit_as_paid endpoints."
+          fi

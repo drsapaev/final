@@ -13,6 +13,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.models.clinic import Doctor
 from app.models.visit import Visit
+from app.services.visit_state_checks import (
+    ACCEPTED_VISIT_STATUSES,
+    force_reopen_target_allowed,
+    is_valid_visit_transition,
+)
 from app.services.visits_api_service import VisitsApiService
 
 router = APIRouter()
@@ -282,12 +287,55 @@ def set_status(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("Admin", "Doctor", "Registrar")),
 ):
-    if status_new not in {"open", "in_progress", "closed", "canceled"}:
+    # H-3 (Launch Blockers Audit): visit state machine.
+    # Previously this endpoint validated ONLY the target status (it
+    # had to be one of {open, in_progress, closed, canceled}) but
+    # did NOT check the current status. This allowed arbitrary
+    # transitions like ``closed → in_progress`` (reopening a closed
+    # visit after payment was collected and change given) or
+    # ``canceled → open`` (reviving a canceled visit), which silently
+    # broke financial/EMR invariants.
+    #
+    # Now the transition is validated against
+    # ``ALLOWED_VISIT_TRANSITIONS`` in visit_state_checks.py. Terminal
+    # statuses (``closed``, ``canceled``) can only be left via the
+    # dedicated admin ``force_reopen`` endpoint, which logs the
+    # override with an explicit reason.
+    if status_new not in ACCEPTED_VISIT_STATUSES:
         raise HTTPException(400, "Invalid status")
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
         raise HTTPException(404, "Visit not found")
     _ensure_visit_doctor_access(db, visit, current_user)
+
+    allowed, reason = is_valid_visit_transition(visit.status, status_new)
+    if not allowed:
+        # 409 Conflict: the transition itself is well-formed but
+        # violates the state machine. Distinct from 400 (malformed
+        # request) so the frontend can render a specific message.
+        logger.warning(
+            "visit.set_status rejected transition visit_id=%s "
+            "current=%s target=%s reason=%s user_id=%s",
+            visit_id,
+            visit.status,
+            status_new,
+            reason,
+            getattr(current_user, "id", None),
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": reason,
+                "message": (
+                    f"Недопустимый переход статуса визита: "
+                    f"'{visit.status}' → '{status_new}'. "
+                    "Используйте force-reopen (только для Admin) для "
+                    "операционного восстановления закрытого/отменённого визита."
+                ),
+                "current_status": visit.status,
+                "target_status": status_new,
+            },
+        )
 
     visit.status = status_new
     if status_new == "in_progress" and hasattr(visit, "started_at"):
@@ -322,6 +370,126 @@ def set_status(
         finished_at=getattr(visit, "finished_at", None),
         notes=visit.notes,
         planned_date=visit.visit_date
+    )
+
+
+# ─── H-3: Admin force-reopen ─────────────────────────────────────────────
+#
+# Break-glass endpoint for operational recovery: move a visit OUT of
+# a terminal status (``closed`` or ``canceled``) back to a
+# non-terminal status. Required because the regular ``set_status``
+# endpoint now rejects terminal → non-terminal transitions (see
+# ``visit_state_checks.py``).
+#
+# Use cases (real examples from clinic operations):
+# - A registrar accidentally clicked "Close visit" before the doctor
+#   finished the EMR. The EMR is still unsigned; the visit must be
+#   reopened to ``in_progress``.
+# - A visit was marked ``canceled`` due to a no-show, but the patient
+#   arrived 10 minutes later and the doctor agrees to see them.
+# - A cashier closed the visit, then realised the wrong patient was
+#   selected and the real visit needs to be reopened.
+#
+# Constraints:
+# - Admin-only (NOT Doctor/Registrar) — this is an operational
+#   override, not a routine workflow.
+# - ``reason`` is REQUIRED (≥10 chars) and is logged at WARNING
+#   level. Future improvement: write to the unified ``audit_logs``
+#   table once coverage is added (see H-5).
+# - ``target_status`` must be a non-terminal status (``open``,
+#   ``in_progress``, or ``completed``). Reopening to another terminal
+#   status makes no sense (and would be a no-op).
+# - ``finished_at`` is cleared when reopening, so the visit's
+#   duration metrics are not corrupted by the gap.
+class ForceReopenRequest(BaseModel):
+    target_status: str = Field(
+        ...,
+        description="Non-terminal target status: open | in_progress | completed",
+    )
+    reason: str = Field(
+        ...,
+        min_length=10,
+        max_length=512,
+        description="Operational reason for the override (≥10 chars). Logged.",
+    )
+
+
+@router.post(
+    "/visits/{visit_id}/force-reopen",
+    summary="Admin override: reopen a closed/canceled visit (H-3 break-glass)",
+    response_model=VisitOut,
+)
+def force_reopen_visit(
+    visit_id: int,
+    payload: ForceReopenRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Admin")),
+):
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(404, "Visit not found")
+
+    # Target must be a non-terminal status.
+    if not force_reopen_target_allowed(payload.target_status):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "reason": "invalid_target_status",
+                "message": (
+                    f"target_status must be one of: open, in_progress, completed. "
+                    f"Got: {payload.target_status!r}"
+                ),
+            },
+        )
+
+    # Current status must be terminal — otherwise the regular
+    # set_status endpoint should be used, not the override.
+    # BUG 6 fix (Codex P2): accept 'expired' as a valid terminal status
+    # for force_reopen. Previously only 'closed' and 'canceled' were
+    # accepted, but 'expired' is also terminal — admin should be able to
+    # reopen accidentally expired visits.
+    if visit.status not in ("closed", "canceled", "expired"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "visit_not_terminal",
+                "message": (
+                    f"Visit {visit_id} is in status '{visit.status}' — "
+                    "force-reopen is only for closed/canceled visits. "
+                    "Use POST /visits/{id}/status for non-terminal transitions."
+                ),
+                "current_status": visit.status,
+            },
+        )
+
+    logger.warning(
+        "visit.force_reopen visit_id=%s current=%s target=%s reason=%r admin_id=%s",
+        visit_id,
+        visit.status,
+        payload.target_status,
+        payload.reason,
+        getattr(current_user, "id", None),
+    )
+
+    visit.status = payload.target_status
+    # Clear the finished_at timestamp so the visit's duration metrics
+    # are not corrupted by the gap between close and reopen.
+    if hasattr(visit, "finished_at"):
+        visit.finished_at = None
+
+    db.commit()
+    db.refresh(visit)
+
+    return VisitOut(
+        id=visit.id,
+        patient_id=visit.patient_id,
+        doctor_id=visit.doctor_id,
+        status=visit.status,
+        created_at=visit.created_at,
+        started_at=getattr(visit, "started_at", None),
+        finished_at=getattr(visit, "finished_at", None),
+        notes=visit.notes,
+        planned_date=visit.visit_date,
     )
 
 

@@ -24,27 +24,47 @@ class PaymentsMixin(BillingServiceMixinBase):
         provider_payment_id: str | None = None,
         commit: bool = True,
     ) -> Payment:
+        """Create a payment (DEPRECATED — use PaymentInvariantService).
+
+        Issue #06 Phase 4b: this method is DEPRECATED. All 3 production
+        callers have been migrated to ``PaymentInvariantService``:
+
+        - ``payment_init_service.py`` → ``create_pending_payment()``
+        - ``payment_create_service.py`` → ``create_payment_for_visit()``
+        - ``registrar_wizard/_invoice.py`` → ``create_payment_for_visit()``
+
+        Audit confirmed 0 production callers (grep across app/api,
+        app/services, app/crud). This method is retained ONLY as a
+        compatibility/dead-code marker and will be removed in a follow-up
+        cleanup PR after CI green + E2E green confirmation.
+
+        Why not removed now: static grep may miss dynamic/import-based
+        call paths. Keeping the method with a DeprecationWarning ensures
+        any missed caller surfaces visibly during testing.
+
+        For new code, use:
+        - ``PaymentInvariantService.create_payment_for_visit()`` for
+          cashier/full/partial payments (status='paid')
+        - ``PaymentInvariantService.create_pending_payment()`` for
+          online provider redirect flow (status='pending')
+
+        Both methods provide ``with_for_update()`` lock, paid_amount
+        check (where applicable), overpayment policy, and
+        IntegrityError defense-in-depth — none of which this method
+        provides.
         """
-        Создание платежа - единая функция для всех типов платежей (SSOT).
+        import warnings
 
-        Args:
-            visit_id: ID визита
-            amount: Сумма платежа
-            currency: Валюта (по умолчанию "UZS")
-            method: Метод оплаты (по умолчанию "cash")
-            status: Статус платежа (по умолчанию "paid")
-            receipt_no: Номер чека
-            note: Примечание
-            provider: Провайдер платежа (для онлайн-платежей)
-            provider_payment_id: ID платежа у провайдера
-            commit: Коммитить транзакцию (по умолчанию True)
+        warnings.warn(
+            "BillingService.create_payment() is deprecated and has 0 "
+            "production callers. Use PaymentInvariantService."
+            "create_payment_for_visit() for paid payments or "
+            "create_pending_payment() for online provider flow. "
+            "This method will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
-        Returns:
-            Payment - созданный платеж
-
-        Raises:
-            ValueError: Если визит не найден или данные некорректны
-        """
         # Валидация визита
         visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:

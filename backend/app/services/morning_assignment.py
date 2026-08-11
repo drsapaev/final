@@ -207,8 +207,15 @@ class MorningAssignmentService:
                         processed_count += 1
                         assigned_queues_count += len(queue_assignments)
 
-                        # Обновляем статус визита
-                        visit.status = "open"  # Готов к приему
+                        # Issue #06 Phase 3: delegate to VisitLifecycleService.
+                        # activate_confirmed_visit() does confirmed → open.
+                        # This is a system-initiated transition (batch job),
+                        # so current_user is None.
+                        from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                        VisitLifecycleService(self.db).activate_confirmed_visit(
+                            visit_id=visit.id,
+                        )
 
                         logger.info(
                             f"✅ Визит {visit.id}: присвоено {len(queue_assignments)} номеров"

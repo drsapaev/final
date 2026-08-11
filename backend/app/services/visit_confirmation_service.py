@@ -473,9 +473,37 @@ class VisitConfirmationService:
         confirmation_phone: str | None = None,
         confirmation_telegram_id: str | None = None,
     ) -> dict[str, Any]:
-        visit.confirmed_at = datetime.now(UTC)
-        visit.confirmed_by = confirmed_by
-        visit.status = "confirmed"
+        # Issue #06 Phase 3 (Gate D): delegate to VisitLifecycleService
+        # with commit=False to preserve the original transaction boundary.
+        #
+        # Original semantics (lines 478-491 before migration):
+        #   1. visit.confirmed_at = now()
+        #   2. visit.confirmed_by = confirmed_by
+        #   3. visit.status = "confirmed"
+        #   4. if same-day: assign_queue_numbers_on_confirmation(...)
+        #   5. visit.status = "open"
+        #   6. self.repository.commit()  ← ONE commit for the whole flow
+        #
+        # Migration: use commit=False for confirm_visit() and
+        # activate_confirmed_visit(), then commit ONCE at the end.
+        # This preserves the atomicity of "confirm + queue + activate".
+        from app.services.visit_lifecycle_service import VisitLifecycleService
+
+        # Create a lightweight user-like object for audit logging.
+        class _ConfirmationActor:
+            def __init__(self, confirmed_by: str) -> None:
+                self.id = confirmed_by
+
+        actor = _ConfirmationActor(confirmed_by)
+        lifecycle = VisitLifecycleService(self.repository.db)
+
+        # Step 1: confirm_visit(commit=False) — pending_confirmation → confirmed
+        visit = lifecycle.confirm_visit(
+            visit_id=visit.id,
+            current_user=actor,
+            confirmed_by=confirmed_by,
+            commit=False,
+        )
 
         queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
@@ -485,8 +513,14 @@ class VisitConfirmationService:
                 confirmation_phone=confirmation_phone,
                 confirmation_telegram_id=confirmation_telegram_id,
             )
-            visit.status = "open"
+            # Step 2: activate_confirmed_visit(commit=False) — confirmed → open
+            visit = lifecycle.activate_confirmed_visit(
+                visit_id=visit.id,
+                current_user=actor,
+                commit=False,
+            )
 
+        # Step 3: caller commits ONCE (preserves original atomicity)
         self.repository.commit()
         self.repository.refresh(visit)
 

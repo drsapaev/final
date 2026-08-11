@@ -150,15 +150,29 @@ def check_invoice_status(
                                 )
 
                                 if not existing_payment:
-                                    # Создаем платеж через SSOT
-                                    payment = billing_service.create_payment(
+                                    # Issue #06 Phase 4b B1+: Replaced
+                                    # BillingService.create_payment() with
+                                    # PaymentInvariantService.create_payment_for_visit().
+                                    #
+                                    # This caller creates PAID payments (after
+                                    # provider confirmation via webhook), so it
+                                    # uses create_payment_for_visit() (cashier
+                                    # path), NOT create_pending_payment().
+                                    #
+                                    # commit=False because this is inside a
+                                    # composition (payment + visit confirmation
+                                    # committed together at line 200).
+                                    from app.services.payment_invariant_service import PaymentInvariantService
+                                    from decimal import Decimal
+
+                                    payment = PaymentInvariantService(db).create_payment_for_visit(
                                         visit_id=visit.id,
-                                        amount=float(iv.visit_amount),
-                                        currency=invoice.currency,
-                                        method="online",  # Онлайн оплата через провайдера
-                                        status="paid",
-                                        provider=invoice.provider,
+                                        amount=Decimal(str(iv.visit_amount)),
+                                        method="online",
                                         note=f"Оплата через {invoice.provider} (invoice {invoice.id})",
+                                        current_user=current_user,
+                                        provider=invoice.provider,
+                                        commit=False,  # composition — caller commits
                                     )
                                     logger.info(
                                         "check_invoice_status: Создан платеж ID=%d для визита %d",
@@ -166,7 +180,36 @@ def check_invoice_status(
                                         visit.id,
                                     )
 
-                                visit.status = "confirmed"  # Оплачено и подтверждено
+                                # Issue #06 Phase 4b Fix #4: Replaced direct
+                                # visit.status = "confirmed" with
+                                # VisitLifecycleService.confirm_visit(commit=False).
+                                #
+                                # Business semantics: this is a PAYMENT-DRIVEN
+                                # confirmation — the visit was in pending_confirmation
+                                # status, and after the online payment is confirmed
+                                # by the provider, the visit transitions to confirmed.
+                                # This is NOT a user-driven confirmation (registrar
+                                # clicking "confirm" button).
+                                #
+                                # commit=False because this is inside a larger
+                                # transaction (invoice status + payment + visit
+                                # status all committed together at line 171).
+                                #
+                                # Note: billing_service.create_payment() above is
+                                # another potential bypass (Gate B) — will be
+                                # caught in the second adversarial audit.
+                                from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                                class _InvoiceActor:
+                                    def __init__(self, invoice_id: int) -> None:
+                                        self.id = f"invoice_{invoice_id}"
+
+                                VisitLifecycleService(db).confirm_visit(
+                                    visit_id=visit.id,
+                                    current_user=_InvoiceActor(invoice.id),
+                                    confirmed_by=f"invoice_{invoice.id}",
+                                    commit=False,  # caller owns the transaction
+                                )
 
                         db.commit()
                     elif result.status in ["failed", "cancelled"]:

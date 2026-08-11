@@ -198,11 +198,51 @@ def create_visit(
 
 
 def update_visit(db: Session, visit_id: int, **kwargs) -> Visit | None:
-    """Обновить визит"""
+    """Deprecated — do not use. Accepts arbitrary kwargs including ``status``,
+    which bypasses the VisitLifecycleService state machine.
+
+    Issue #06 Phase 4b Gate C: this function is a generic ``setattr``-based
+    update that can set ANY field on the Visit model, including ``status``.
+    This makes it a potential lifecycle-invariant bypass — a caller could
+    do ``update_visit(db, visit_id, status="open")`` and skip the state
+    machine entirely.
+
+    Audit confirmed 0 production callers (grep across app/api, app/services,
+    app/crud for ``crud_visit.update_visit``, ``crud.visit.update_visit``,
+    ``visit_crud.update_visit`` patterns). The function is retained only
+    as a deprecation marker and will be removed in a follow-up cleanup PR.
+
+    For visit status transitions, use ``VisitLifecycleService``.
+    For other field updates, use a specific repository method or the
+    SQLAlchemy session directly.
+    """
+    import warnings
+
+    warnings.warn(
+        "crud.visit.update_visit() is deprecated and has 0 production "
+        "callers. It accepts arbitrary kwargs including 'status', which "
+        "bypasses the VisitLifecycleService state machine. Use "
+        "VisitLifecycleService for status transitions, or a specific "
+        "repository method for other field updates. This function will "
+        "be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
 
     if not visit:
         return None
+
+    # Issue #06 Phase 4b Gate C: reject 'status' in kwargs to prevent
+    # lifecycle-invariant bypass. Callers must use VisitLifecycleService.
+    if "status" in kwargs:
+        raise ValueError(
+            "crud.visit.update_visit() no longer accepts 'status' as a "
+            "kwarg. Use VisitLifecycleService.transition_status() or a "
+            "specific convenience method (complete_visit, cancel_visit, "
+            "etc.) for status transitions."
+        )
 
     for key, value in kwargs.items():
         if hasattr(visit, key):
@@ -216,13 +256,41 @@ def update_visit(db: Session, visit_id: int, **kwargs) -> Visit | None:
 def complete_visit(
     db: Session, visit_id: int, medical_data: dict[str, Any] | None = None
 ) -> Visit | None:
-    """Завершить визит"""
+    """Attach medical data to a visit (legacy — status mutation removed).
+
+    Issue #06 Phase 4b: this function previously set ``visit.status = "closed"``
+    directly, bypassing the state machine. The status mutation has been
+    REMOVED — callers must use ``VisitLifecycleService.close_visit()`` or
+    ``complete_visit()`` to transition the visit status.
+
+    This function is retained ONLY for attaching medical data (diagnosis,
+    treatment, recommendations) to the visit's notes field. The 2 remaining
+    callers in ``doctor_integration/_queue_ops.py`` call this AFTER
+    ``VisitLifecycleService.complete_visit()`` has already set the status.
+
+    Deprecated: this function should be removed once the medical-data
+    attachment logic is moved into a proper service method.
+    """
+    import warnings
+
+    warnings.warn(
+        "crud.visit.complete_visit() is deprecated — use "
+        "VisitLifecycleService for status transitions and a separate "
+        "method for medical data attachment. The status mutation has "
+        "been removed; this function now only attaches medical data.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
 
     if not visit:
         return None
 
-    visit.status = "closed"
+    # Issue #06 Phase 4b: visit.status = "closed" REMOVED.
+    # Callers must use VisitLifecycleService.close_visit() or
+    # complete_visit() for status transitions.
+    # This function now ONLY attaches medical data.
 
     if medical_data:
         # Добавляем медицинские данные в заметки
@@ -251,13 +319,37 @@ def complete_visit(
 def cancel_visit(
     db: Session, visit_id: int, reason: str | None = None
 ) -> Visit | None:
-    """Отменить визит"""
+    """Deprecated — use VisitLifecycleService.cancel_visit() instead.
+
+    Issue #06 Phase 4b: this function set ``visit.status = "canceled"``
+    directly, bypassing the state machine. Audit confirmed 0 production
+    callers (grep across app/api, app/services, app/crud). The Telegram
+    cancel path now uses ``TelegramStaffActionAdapterService`` →
+    ``VisitLifecycleService.cancel_visit()``.
+
+    This function is retained only as a deprecation marker. It will be
+    removed in a follow-up cleanup PR after the deprecation window.
+    """
+    import warnings
+
+    warnings.warn(
+        "crud.visit.cancel_visit() is deprecated and has 0 production "
+        "callers. Use VisitLifecycleService.cancel_visit() instead. "
+        "This function will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
 
     if not visit:
         return None
 
-    visit.status = "canceled"
+    # Issue #06 Phase 4b: direct status mutation REMOVED.
+    # This function is a no-op for status — callers must use
+    # VisitLifecycleService.cancel_visit() for the actual transition.
+    # Only the reason note is attached (for backward compat with any
+    # hypothetical caller that relied on this side effect).
 
     if reason:
         visit.notes = (visit.notes or "") + f"\nОтменен: {reason}"
