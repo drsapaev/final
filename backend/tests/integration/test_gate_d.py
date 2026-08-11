@@ -67,6 +67,7 @@ from app.models.payment import Payment  # noqa: E402
 from app.models.patient import Patient  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.models.visit import Visit  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
 from app.services.payment_invariant_service import PaymentInvariantService  # noqa: E402
 from app.services.visit_lifecycle_service import VisitLifecycleService  # noqa: E402
 
@@ -395,18 +396,39 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
 
     barrier = threading.Barrier(2)  # ensure both threads start simultaneously
     results = []
-    results_lock = threading.Lock()
 
-    def make_payment(thread_id="T"):
-        """Each thread gets its OWN Session. ALWAYS records a result."""
-        import sys as _sys
-        print(f"D4 [{thread_id}]: starting", file=_sys.stderr, flush=True)
-        session = None
+    # TH-1 P1 follow-up: ThreadPoolExecutor rewrite.
+    #
+    # The previous threading.Thread + shared-results-list + results_lock
+    # approach had a critical flaw: if the worker raised BaseException
+    # (e.g. GreenletExit), the except handler tried to acquire results_lock
+    # to record the result — but a SECOND BaseException during lock
+    # acquisition would cause the worker to disappear without recording.
+    # The main thread could not distinguish "worker crashed" from
+    # "worker succeeded" because the original exception was lost.
+    #
+    # ThreadPoolExecutor fixes this: WorkItem.run() catches BaseException
+    # and stores it in the Future. future.result() re-raises it in the
+    # main thread WITH FULL TRACEBACK. The worker function does NOT
+    # catch exceptions — it lets them propagate.
+    #
+    # This gives us three possible outcomes:
+    #   Case A: GreenletExit → investigate stack/traceback
+    #   Case B: Application exception (IntegrityError, OperationalError,
+    #           HTTPException, ValueError) → investigate production path
+    #   Case C: Both workers complete normally → harness artifact confirmed
+
+    def make_payment(thread_id):
+        """Worker function. Does NOT catch exceptions.
+
+        Returns ("success", payment_id) on success.
+        Raises HTTPException on expected rejection (lock contention).
+        Lets any other exception propagate for diagnosis via
+        future.result().
+        """
+        barrier.wait(timeout=10)
+        session = sessionmaker(bind=db_engine)()
         try:
-            barrier.wait(timeout=10)
-            print(f"D4 [{thread_id}]: barrier passed", file=_sys.stderr, flush=True)
-            session = sessionmaker(bind=db_engine)()
-            print(f"D4 [{thread_id}]: session created, calling create_payment", file=_sys.stderr, flush=True)
             payment = PaymentInvariantService(session).create_payment_for_visit(
                 visit_id=visit_id,
                 amount=Decimal("10000"),
@@ -415,50 +437,54 @@ def test_d4_concurrent_payment_creation_no_duplicate(db_engine, new_session_fact
                 current_user=type("U", (), {"id": 1})(),
                 commit=True,
             )
-            print(f"D4 [{thread_id}]: payment created id={payment.id}", file=_sys.stderr, flush=True)
-            with results_lock:
-                results.append(("success", payment.id))
-        except HTTPException as e:
-            reason = ""
-            if isinstance(e.detail, dict):
-                reason = e.detail.get("reason", "")
-            elif isinstance(e.detail, str):
-                reason = e.detail[:100]
-            print(f"D4 [{thread_id}]: HTTPException {e.status_code} reason={reason}", file=_sys.stderr, flush=True)
-            with results_lock:
-                results.append(("rejected", e.status_code, reason))
-        except BaseException as e:
-            # Catch BaseException (not just Exception) to capture
-            # greenlet.GreenletExit, SystemExit, etc.
-            print(f"D4 [{thread_id}]: BaseException {type(e).__name__}: {e}", file=_sys.stderr, flush=True)
-            with results_lock:
-                results.append(("rejected", type(e).__name__, str(e)[:200]))
+            return ("success", payment.id)
         finally:
-            if session is not None:
-                try:
-                    session.close()
-                except Exception:
-                    pass
-            print(f"D4 [{thread_id}]: done", file=_sys.stderr, flush=True)
+            session.close()
 
-    t1 = threading.Thread(target=make_payment, args=("T1",))
-    t2 = threading.Thread(target=make_payment, args=("T2",))
-    t1.start()
-    t2.start()
-    t1.join(timeout=60)
-    t2.join(timeout=60)
+    import traceback as _tb
 
-    # Check if threads are still alive (timeout)
-    if t1.is_alive() or t2.is_alive():
-        # Give extra time — PostgreSQL lock contention may cause delay
-        t1.join(timeout=30)
-        t2.join(timeout=30)
-    if t1.is_alive() or t2.is_alive():
-        pytest.fail(
-            f"D4 FAILED: threads did not complete within 90s. "
-            f"t1 alive: {t1.is_alive()}, t2 alive: {t2.is_alive()}, "
-            f"results: {results}"
-        )
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            (executor.submit(make_payment, "T1"), "T1"),
+            (executor.submit(make_payment, "T2"), "T2"),
+        ]
+
+        for future, thread_id in futures:
+            try:
+                outcome = future.result(timeout=90)
+                results.append(outcome)
+            except HTTPException as e:
+                reason = ""
+                if isinstance(e.detail, dict):
+                    reason = e.detail.get("reason", "")
+                elif isinstance(e.detail, str):
+                    reason = e.detail[:100]
+                results.append(("rejected", e.status_code, reason))
+            except TimeoutError:
+                results.append(("timeout", thread_id, "worker did not complete within 90s"))
+            except BaseException as e:
+                # TH-1: future.result() re-raises the ORIGINAL exception
+                # from the worker, including GreenletExit/SystemExit.
+                # Capture full traceback for classification.
+                tb_str = _tb.format_exc()
+                results.append(("error", type(e).__name__, str(e)[:200], tb_str))
+
+    # TH-1 Invariant 1: every worker MUST produce a result.
+    assert len(results) == 2, (
+        f"D4 FAILED [harness]: expected 2 worker results, got {len(results)}. "
+        f"Results: {results}"
+    )
+
+    # TH-1 Invariant 2: no worker may have crashed.
+    # "error" = unexpected BaseException (GreenletExit, SystemExit, etc.)
+    # "timeout" = worker did not complete within 90s
+    # Both are hard FAIL — the test must NOT pass if a worker crashed.
+    crashed = [r for r in results if r[0] in ("error", "timeout")]
+    assert not crashed, (
+        f"D4 FAILED [worker crash]: a worker ended with an unexpected "
+        f"error or timeout status. The test must NOT pass when a worker "
+        f"crashes. Crashed results: {crashed}. All results: {results}"
+    )
 
     # PRIMARY invariant: at most 1 Payment in DB (no duplicate financial state)
     # This is the real invariant — the exact number of successes/rejections
@@ -551,7 +577,6 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
 
     barrier = threading.Barrier(2)
     results = []
-    results_lock = threading.Lock()
 
     # Create a lightweight user-like object for audit logging
     class _TestUser:
@@ -560,12 +585,16 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
             self.role = "Admin"
             self.username = f"test_user_{uid}"
 
-    def create_payment_thread():
-        """Thread A: PRODUCTION create_payment path.
+    # TH-1 P1 follow-up: ThreadPoolExecutor rewrite (same as D4).
+    # Workers do NOT catch exceptions — they let them propagate.
+    # future.result() re-raises in the main thread with full traceback.
 
-        Calls PaymentInvariantService.create_payment_for_visit() — the
-        EXACT same service method that the cashier/_payments.py:create_payment
-        endpoint calls. This is production code, not a test reconstruction.
+    def create_payment_worker():
+        """Worker A: PRODUCTION create_payment path.
+
+        Returns ("create_payment", "success", payment_id, amount) on success.
+        Raises HTTPException on expected rejection.
+        Lets any other exception propagate for diagnosis.
         """
         barrier.wait()
         session = sessionmaker(bind=db_engine)()
@@ -578,38 +607,20 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                 current_user=_TestUser(1),
                 commit=True,
             )
-            with results_lock:
-                results.append(("create_payment", "success", payment.id, float(payment.amount)))
-        except HTTPException as e:
-            reason = ""
-            if isinstance(e.detail, dict):
-                reason = e.detail.get("reason", "")
-            elif isinstance(e.detail, str):
-                reason = e.detail[:100]
-            with results_lock:
-                results.append(("create_payment", "rejected", e.status_code, reason))
-        except Exception as e:
-            with results_lock:
-                results.append(("create_payment", "error", type(e).__name__, str(e)[:200]))
+            return ("create_payment", "success", payment.id, float(payment.amount))
         finally:
             session.close()
 
-    def mark_paid_thread():
-        """Thread B: PRODUCTION mark_visit_as_paid endpoint function.
+    def mark_paid_worker():
+        """Worker B: PRODUCTION mark_visit_as_paid endpoint function.
 
-        Calls the ACTUAL async endpoint function `mark_visit_as_paid()`
-        from app.api.v1.endpoints.cashier._visits — NOT a manual
-        reconstruction. This is the real production code path.
-
-        The endpoint function is async, so we run it in an event loop.
-        We pass db and current_user directly (bypassing FastAPI Depends).
+        Returns ("mark_paid", "success", None, None) on success.
+        Raises HTTPException on expected rejection.
+        Lets any other exception propagate for diagnosis.
         """
         barrier.wait()
         session = sessionmaker(bind=db_engine)()
-
         try:
-            # Call the PRODUCTION endpoint function directly
-            # (not a reconstruction — the actual function from the module)
             loop = asyncio.new_event_loop()
             try:
                 loop.run_until_complete(
@@ -619,31 +630,55 @@ def test_d4b_concurrent_create_payment_plus_mark_paid_no_duplicate(db_engine, ne
                         current_user=_TestUser(2),
                     )
                 )
-                with results_lock:
-                    results.append(("mark_paid", "success", None, None))
+                return ("mark_paid", "success", None, None)
             finally:
                 loop.close()
-        except HTTPException as e:
-            reason = ""
-            if isinstance(e.detail, dict):
-                reason = e.detail.get("reason", "")
-            elif isinstance(e.detail, str):
-                reason = e.detail[:100]
-            with results_lock:
-                results.append(("mark_paid", "rejected", e.status_code, reason))
-        except Exception as e:
-            session.rollback()
-            with results_lock:
-                results.append(("mark_paid", "error", type(e).__name__, str(e)[:200]))
         finally:
             session.close()
 
-    t1 = threading.Thread(target=create_payment_thread)
-    t2 = threading.Thread(target=mark_paid_thread)
-    t1.start()
-    t2.start()
-    t1.join(timeout=30)
-    t2.join(timeout=30)
+    import traceback as _tb
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            (executor.submit(create_payment_worker), "create_payment"),
+            (executor.submit(mark_paid_worker), "mark_paid"),
+        ]
+
+        for future, worker_name in futures:
+            try:
+                outcome = future.result(timeout=60)
+                results.append(outcome)
+            except HTTPException as e:
+                reason = ""
+                if isinstance(e.detail, dict):
+                    reason = e.detail.get("reason", "")
+                elif isinstance(e.detail, str):
+                    reason = e.detail[:100]
+                results.append((worker_name, "rejected", e.status_code, reason))
+            except TimeoutError:
+                results.append((worker_name, "timeout", None, "worker did not complete within 60s"))
+            except BaseException as e:
+                # TH-1: future.result() re-raises the ORIGINAL exception
+                # from the worker. Capture full traceback for classification.
+                tb_str = _tb.format_exc()
+                results.append((worker_name, "error", type(e).__name__, str(e)[:200], tb_str))
+
+    # TH-1 Invariant 1: every worker MUST produce a result.
+    assert len(results) == 2, (
+        f"D4b FAILED [harness]: expected 2 worker results, got {len(results)}. "
+        f"Results: {results}"
+    )
+
+    # TH-1 Invariant 2: no worker may have crashed.
+    # "error" = unexpected BaseException (GreenletExit, SystemExit, etc.)
+    # "timeout" = worker did not complete within 60s
+    # Both are hard FAIL — the test must NOT pass if a worker crashed.
+    crashed = [r for r in results if r[1] in ("error", "timeout")]
+    assert not crashed, (
+        f"D4b FAILED [worker crash]: a worker ended with an unexpected "
+        f"error or timeout status. The test must NOT pass when a worker "
+        f"crashes. Crashed results: {crashed}. All results: {results}"
+    )
 
     # ─── Primary Persisted Assertions (from NEW independent session) ──
 
