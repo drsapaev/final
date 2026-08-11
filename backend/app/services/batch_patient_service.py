@@ -25,6 +25,7 @@ from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
 from app.services.queue_domain_service import QueueDomainService
+from app.services.queue_status import is_terminal_queue
 from app.services.queue_service import get_queue_service
 from app.services.service_mapping import (
     get_default_service_by_specialty,
@@ -292,6 +293,21 @@ class BatchPatientService:
 
         if entry_type == "online_queue":
             entry = target
+            # P2-2 (post-merge stabilization): reject cancel on terminal
+            # queue entries. A cancelled/served/no_show entry is already
+            # in a final state — silently "cancelling" it again returns
+            # success='cancelled' which misleads the caller into thinking
+            # a real mutation happened. Return an explicit error instead.
+            if is_terminal_queue(entry.status):
+                return EntryResult(
+                    id=action.id,
+                    status="error",
+                    error_code="entry_already_terminal",
+                    error=(
+                        f"Queue entry {action.id} is in terminal status "
+                        f"'{entry.status}' and cannot be cancelled again."
+                    ),
+                )
             entry.status = "cancelled"
             entry.cancel_reason = action.reason
             return EntryResult(id=action.id, status="cancelled")
@@ -355,6 +371,28 @@ class BatchPatientService:
 
         if entry_type == "online_queue":
             entry = target
+            # P2-2 (post-merge stabilization): reject update on terminal
+            # queue entries. Before this check, _find_online_queue_entry_for_action
+            # returned cancelled/served/no_show entries (no status filter),
+            # and _update_entry directly set entry.status = action.status,
+            # RESURRECTING terminal queue entries. This violated the
+            # invariant: terminal queue statuses must not be silently
+            # regressed by a batch update.
+            #
+            # Note: we reject ANY update on a terminal entry, even a
+            # non-status field update (service_id, service_code), because
+            # a terminal entry is immutable by definition — its audit
+            # trail must be preserved.
+            if is_terminal_queue(entry.status):
+                return EntryResult(
+                    id=action.id,
+                    status="error",
+                    error_code="entry_already_terminal",
+                    error=(
+                        f"Queue entry {action.id} is in terminal status "
+                        f"'{entry.status}' and cannot be updated."
+                    ),
+                )
             if action.service_id:
                 entry.service_id = action.service_id
             if action.service_code:
