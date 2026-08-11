@@ -9,6 +9,7 @@ from typing import Any
 from app.models.enums import PaymentStatus
 from app.repositories.payment_create_repository import PaymentCreateRepository
 from app.services.billing_service import BillingService
+from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.canonical_visit_service import (
     CanonicalVisitResolutionError,
     CanonicalVisitService,

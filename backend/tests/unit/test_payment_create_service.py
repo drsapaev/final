@@ -31,6 +31,7 @@ class TestPaymentCreateService:
         """Mock PaymentInvariantService to bypass invariant checks."""
         from decimal import Decimal
         from app.services import payment_create_service as _pcs_module
+        from decimal import Decimal
 
         class _FakePayment:
             def __init__(self, visit_id, amount, method, note, **kwargs):
