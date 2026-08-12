@@ -894,14 +894,55 @@ def _run_single_registrar_record_action(
 
         if action == "cancel":
             if record_kind == "visit":
-                visit = VisitsApiService(db).set_status(
+                # Gate C bypass fix: delegate to VisitLifecycleService.cancel_visit()
+                # instead of VisitsApiService.set_status().
+                #
+                # The old code (VisitsApiService.set_status) bypassed the state
+                # machine — it did NOT call is_valid_visit_transition(), allowing
+                # invalid transitions like completed→canceled, closed→canceled,
+                # expired→canceled. These silently broke financial/EMR invariants
+                # (a completed visit has clinical work done; a closed visit has
+                # EMR signed + payment collected).
+                #
+                # VisitLifecycleService.cancel_visit() provides:
+                #   - SELECT FOR UPDATE row lock (concurrency safety)
+                #   - is_valid_visit_transition() validation (state machine)
+                #   - Audit logging (logger.info with visit_id, user_id, reason)
+                #   - commit=False for caller-controlled transaction
+                #
+                # If the transition is invalid (e.g. completed→canceled), the
+                # service raises HTTPException(409), which is caught by the
+                # outer except HTTPException → returns success=False with error.
+                from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                visit = VisitLifecycleService(db).cancel_visit(
                     visit_id=record_id,
-                    status_new="canceled",
+                    current_user=current_user,
+                    reason=request.reason,
+                    commit=False,  # caller owns the transaction
                 )
                 if request.reason:
                     visit.notes = (visit.notes or "") + f"\nCanceled: {request.reason}"
-                    db.commit()
-                    db.refresh(visit)
+                # Cascade cancel to queue entries (preserves behavior of the
+                # old VisitsApiService.set_status which did this internally).
+                # Uses commit=False — the cascade is staged in the same
+                # transaction as the visit status change.
+                try:
+                    from app.api.v1.endpoints.visits import (
+                        _update_queue_entries_for_visit_owner,
+                    )
+                    _update_queue_entries_for_visit_owner(
+                        db,
+                        visit_id=record_id,
+                        patient_id=visit.patient_id,
+                        status_value="canceled",
+                    )
+                except Exception:
+                    # Queue cascade failure must not block visit cancellation
+                    # (same behavior as the old code).
+                    pass
+                db.commit()
+                db.refresh(visit)
                 result = {"id": visit.id, "status": visit.status}
             elif record_kind == "online_queue":
                 entry = OnlineQueueNewService(db).cancel_entry(entry_id=record_id)
