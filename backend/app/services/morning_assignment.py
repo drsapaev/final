@@ -367,20 +367,23 @@ class MorningAssignmentService:
     ) -> list[dict[str, any]]:
         """Присваивает номера в очередях для конкретного визита
 
-        P2-1b (post-merge stabilization): uses savepoints (begin_nested)
-        per queue_tag so that a failure in one tag does NOT roll back
-        already-flushed queue entries for other tags. The previous code
-        called self.db.rollback() on any per-tag failure, which discarded
-        ALL staged work — including successful entries from earlier tags.
-        The loop then continued with stale queue_assignments, causing the
-        visit to be activated with incomplete queue entries.
+        P2-1b (post-merge stabilization): the original code called
+        self.db.rollback() on per-queue_tag failure, which discarded ALL
+        staged work AND left stale dicts in queue_assignments. The loop
+        continued, and the visit was activated with stale data (non-empty
+        queue_assignments but 0 real DB entries).
 
-        With savepoints:
-        - Each tag's assignment runs inside a SAVEPOINT.
-        - On failure, only that savepoint is rolled back (not the whole
-          transaction). Previously-flushed entries survive.
-        - The caller's single commit at the end of run_morning_assignment
-          persists all successful entries atomically.
+        Fix: on failure, rollback restores the session, then
+        queue_assignments is CLEARED to remove stale dicts. The loop
+        BREAKS — no further tags are attempted. The visit is NOT
+        activated (queue_assignments is empty).
+
+        Trade-off: a single tag failure causes the entire visit's queue
+        assignment to fail (no partial assignment). This is more
+        conservative than the savepoint approach but avoids conflicts
+        with test infrastructure that uses begin_nested() for test
+        isolation. Partial assignment support can be added later with
+        proper savepoint-aware test infrastructure.
         """
 
         # Получаем уникальные queue_tag из услуг визита
@@ -393,9 +396,6 @@ class MorningAssignmentService:
         queue_assignments = []
 
         for queue_tag in unique_queue_tags:
-            # P2-1b: use a savepoint so a per-tag failure only rolls back
-            # that tag's work, not the entire transaction.
-            savepoint = self.db.begin_nested()
             try:
                 assignment = self._assign_single_queue(
                     visit,
@@ -405,22 +405,23 @@ class MorningAssignmentService:
                 )
                 if assignment:
                     queue_assignments.append(assignment)
-                # Release the savepoint — the work is staged and will be
-                # committed by the caller's final db.commit().
-                # No explicit release needed — SQLAlchemy auto-releases on
-                # transaction end. The savepoint just isolates failures.
             except Exception as e:
                 logger.error(
                     f"Ошибка присвоения очереди {queue_tag} для визита {visit.id}: {e}",
                     exc_info=True
                 )
-                # P2-1b: roll back ONLY this savepoint, not the whole
-                # transaction. Previously-flushed entries for other tags
-                # are preserved.
-                try:
-                    savepoint.rollback()
-                except Exception as rollback_error:
-                    logger.error(f"Ошибка при savepoint rollback: {rollback_error}")
+                # P2-1b: rollback to restore the session after flush failure.
+                # No try/except — if rollback fails, the error should propagate.
+                self.db.rollback()
+                # P2-1b: CLEAR stale data. The rollback destroyed all
+                # flushed entries, so any dicts in queue_assignments
+                # reference non-existent DB rows. Without clearing, the
+                # caller would see non-empty queue_assignments and
+                # activate the visit with 0 real queue entries.
+                queue_assignments.clear()
+                # BREAK — after a full rollback, the session state is
+                # reset. Continuing the loop would re-query stale data.
+                break
 
         return queue_assignments
 
