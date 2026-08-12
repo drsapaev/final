@@ -89,11 +89,11 @@ test.describe('Visual regression — cashier panel', () => {
       if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
       if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(cashierProfile)); return; }
       if (pathname === '/api/v1/cashier/pending-payments') {
-        await route.fulfill(jsonResponse({ success: true, data: [samplePendingPayment], pagination: { pages: 1, total: 1 } }));
+        await route.fulfill(jsonResponse({ success: true, data: [samplePendingPayment], items: [samplePendingPayment], total: 1, page: 1, size: 20, pages: 1, pagination: { pages: 1, total: 1 } }));
         return;
       }
       if (pathname === '/api/v1/cashier/payments') {
-        await route.fulfill(jsonResponse({ success: true, data: [sampleHistoryPayment], pagination: { pages: 1, total: 1 } }));
+        await route.fulfill(jsonResponse({ success: true, data: [sampleHistoryPayment], items: [sampleHistoryPayment], total: 1, page: 1, size: 20, pages: 1, pagination: { pages: 1, total: 1 } }));
         return;
       }
       if (pathname === '/api/v1/cashier/stats') {
@@ -190,7 +190,7 @@ test.describe('Visual regression — registrar wizard', () => {
         await route.fulfill(jsonResponse({ services_by_group: { cardio: [{ id: 101, code: 'C001', name: 'Консультация кардиолога', price: 150000, requires_doctor: true }] } }));
         return;
       }
-      if (pathname === '/api/v1/registrar/appointments') {
+      if (pathname === '/api/v1/registrar/appointments' || pathname === '/api/v1/registrar/all-appointments') {
         await route.fulfill(jsonResponse({ appointments: [], total: 0, has_more: false }));
         return;
       }

@@ -124,6 +124,8 @@ test.describe('UX Audit Cashier — new interactions', () => {
         await route.fulfill(jsonResponse({
           success: true,
           data: [samplePendingPayment],
+          items: [samplePendingPayment],
+          total: 1, page: 1, size: 20, pages: 1,
           pagination: { pages: 1, total: 1 },
         }));
         return;
@@ -132,6 +134,8 @@ test.describe('UX Audit Cashier — new interactions', () => {
         await route.fulfill(jsonResponse({
           success: true,
           data: [sampleHistoryPayment],
+          items: [sampleHistoryPayment],
+          total: 1, page: 1, size: 20, pages: 1,
           pagination: { pages: 1, total: 1 },
         }));
         return;
@@ -204,7 +208,7 @@ test.describe('UX Audit Cashier — new interactions', () => {
     await page.waitForTimeout(2000);
 
     const searchInput = page.locator('#cashier-search-input').first();
-    await expect(searchInput).toHaveAttribute('placeholder', /имя пациента.*ID.*телефон/i);
+    await expect(searchInput).toHaveAttribute('placeholder', /ФИО.*телефон.*ID|имя.*ID.*телефон/i);
   });
 
   // ========================================================================
