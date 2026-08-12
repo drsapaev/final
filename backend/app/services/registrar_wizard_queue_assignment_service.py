@@ -14,6 +14,7 @@ from app.services.morning_assignment import (
     MorningAssignmentService,
 )
 from app.services.queue_domain_service import QueueDomainService
+from app.services.visit_lifecycle_service import VisitLifecycleService
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,14 @@ class RegistrarWizardQueueAssignmentService:
                     source=source,
                 )
                 if queue_assignments:
-                    visit.status = "open"
+                    # Gate C bypass fix: delegate to VisitLifecycleService
+                    # instead of direct visit.status = "open".
+                    # This ensures state machine validation, with_for_update()
+                    # row lock, and audit logging.
+                    VisitLifecycleService(self.db).activate_confirmed_visit(
+                        visit_id=visit.id,
+                        commit=False,
+                    )
                     queue_numbers[visit.id] = queue_assignments
                     logger.info(
                         "REGISTRATION: Visit %d - assigned %d queue numbers (source=%s)",

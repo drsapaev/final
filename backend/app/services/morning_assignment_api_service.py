@@ -81,7 +81,16 @@ class MorningAssignmentApiService:
                     visit.visit_date,
                 )
                 if queue_assignments:
-                    visit.status = "open"
+                    # Gate C bypass fix: delegate to VisitLifecycleService
+                    # instead of direct visit.status = "open".
+                    # This ensures state machine validation, with_for_update()
+                    # row lock, and audit logging.
+                    from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                    VisitLifecycleService(self.repository.db).activate_confirmed_visit(
+                        visit_id=visit.id,
+                        commit=False,
+                    )
                     results.append(
                         {
                             "visit_id": visit_id,
