@@ -83,6 +83,9 @@ test.describe('Visual regression — cashier panel', () => {
       sessionStorage.setItem('user', JSON.stringify(profile));
     }, { token: createToken(cashierProfile), profile: cashierProfile });
 
+    // Mock WebSocket to prevent ECONNREFUSED noise (no backend in E2E).
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+
     await page.route('**/api/v1/**', async (route) => {
       const url = new URL(route.request().url());
       const { pathname } = url;
@@ -109,10 +112,7 @@ test.describe('Visual regression — cashier panel', () => {
     });
   });
 
-  test.fixme('cashier pending tab with payment row', async ({ page }) => {
-    // TODO(VISUAL-REGRESSION): no baseline screenshot exists in
-    // e2e/__screenshots__/. Run with --update-snapshots first, verify
-    // the screenshot is correct, then remove .fixme.
+  test('cashier pending tab with payment row', async ({ page }) => {
     await page.goto('/cashier');
     await page.waitForTimeout(3000);
     // Screenshot of the main content area
@@ -122,13 +122,23 @@ test.describe('Visual regression — cashier panel', () => {
     });
   });
 
-  test.fixme('cashier empty state', async ({ page }) => {
-    // TODO(VISUAL-REGRESSION): no baseline screenshot + needs same route
-    // override fix as cashier-ux-audit empty state test (page.unroute +
-    // re-register). Apply that fix, generate baseline, then remove .fixme.
-    // Override to return empty
+  test('cashier empty state', async ({ page }) => {
+    // Override to return empty pending payments.
+    // Use page.unroute + re-register pattern (Playwright 1.62 is
+    // first-registered-wins — see cashier-ux-audit empty-state test).
+    await page.unroute('**/api/v1/**');
     await page.route('**/api/v1/cashier/pending-payments', async (route) => {
-      await route.fulfill(jsonResponse({ success: true, data: [], pagination: { pages: 1, total: 0 } }));
+      await route.fulfill(jsonResponse({ success: true, data: [], items: [], total: 0, page: 1, size: 20, pages: 1, pagination: { pages: 1, total: 0 } }));
+    });
+    // Re-register catch-all for other API paths.
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const { pathname } = url;
+      if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
+      if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(cashierProfile)); return; }
+      if (pathname === '/api/v1/cashier/payments') { await route.fulfill(jsonResponse({ success: true, data: [], items: [], total: 0, page: 1, size: 20, pages: 1, pagination: { pages: 1, total: 0 } })); return; }
+      if (pathname === '/api/v1/cashier/stats') { await route.fulfill(jsonResponse({ total_amount: 0, cash_amount: 0, card_amount: 0, pending_count: 0, pending_amount: 0, paid_count: 0, cancelled_count: 0 })); return; }
+      await route.fulfill(jsonResponse({ success: true }));
     });
     await page.goto('/cashier');
     await page.waitForTimeout(3000);
@@ -138,8 +148,7 @@ test.describe('Visual regression — cashier panel', () => {
     });
   });
 
-  test.fixme('cashier history tab with sortable headers', async ({ page }) => {
-    // TODO(VISUAL-REGRESSION): no baseline screenshot exists.
+  test('cashier history tab with sortable headers', async ({ page }) => {
     await page.goto('/cashier');
     await page.waitForTimeout(2000);
     // Switch to history tab
@@ -151,8 +160,7 @@ test.describe('Visual regression — cashier panel', () => {
     });
   });
 
-  test.fixme('cashier overflow menu open', async ({ page }) => {
-    // TODO(VISUAL-REGRESSION): no baseline screenshot exists.
+  test('cashier overflow menu open', async ({ page }) => {
     await page.goto('/cashier');
     await page.waitForTimeout(2000);
     // Switch to history tab
@@ -177,6 +185,9 @@ test.describe('Visual regression — registrar wizard', () => {
       sessionStorage.setItem('user', JSON.stringify(profile));
     }, { token: createToken(registrarProfile), profile: registrarProfile });
 
+    // Mock WebSocket to prevent ECONNREFUSED noise (no backend in E2E).
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+
     await page.route('**/api/v1/**', async (route) => {
       const url = new URL(route.request().url());
       const { pathname } = url;
@@ -190,26 +201,20 @@ test.describe('Visual regression — registrar wizard', () => {
         }));
         return;
       }
-      if (pathname === '/api/v1/registrar/doctors') {
-        await route.fulfill(jsonResponse({ doctors: [{ id: 1, full_name: 'Dr Test', specialty: 'cardiology', cabinet: '12' }] }));
+      if (pathname === '/api/v1/registrar/doctors') { await route.fulfill(jsonResponse({ doctors: [{ id: 1, full_name: 'Dr Test', specialty: 'cardiology', cabinet: '12' }] })); return; }
+      if (pathname === '/api/v1/registrar/services') { await route.fulfill(jsonResponse({ services_by_group: { cardio: [{ id: 101, code: 'C001', name: 'Консультация кардиолога', price: 150000, requires_doctor: true, is_consultation: true, department_key: 'cardiology' }] } })); return; }
+      // REAL endpoint used by loadAppointments() (see PR A #2716 for details).
+      if (pathname === '/api/v1/registrar/queues/today') {
+        await route.fulfill(jsonResponse({ queues: [], total_queues: 0, date: new Date().toISOString().split('T')[0], timezone: 'Asia/Tashkent' }));
         return;
       }
-      if (pathname === '/api/v1/registrar/services') {
-        await route.fulfill(jsonResponse({ services_by_group: { cardio: [{ id: 101, code: 'C001', name: 'Консультация кардиолога', price: 150000, requires_doctor: true }] } }));
-        return;
-      }
-      if (pathname === '/api/v1/registrar/appointments' || pathname === '/api/v1/registrar/all-appointments') {
-        await route.fulfill(jsonResponse({ appointments: [], total: 0, has_more: false }));
-        return;
-      }
+      if (pathname === '/api/v1/registrar/appointments' || pathname === '/api/v1/registrar/all-appointments') { await route.fulfill(jsonResponse({ appointments: [], total: 0, has_more: false })); return; }
       if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
       await route.fulfill(jsonResponse({ success: true }));
     });
   });
 
-  test.fixme('registrar wizard step progress indicator', async ({ page }) => {
-    // TODO(VISUAL-REGRESSION): no baseline + wizard crashes (see
-    // registrar-ux-audit gender field test for root cause).
+  test('registrar wizard step progress indicator', async ({ page }) => {
     await page.goto('/registrar');
     await page.waitForTimeout(2000);
     // Open wizard
@@ -223,7 +228,7 @@ test.describe('Visual regression — registrar wizard', () => {
     });
   });
 
-  test.fixme('registrar wizard patient step', async ({ page }) => {
+  test('registrar wizard patient step', async ({ page }) => {
     // TODO(VISUAL-REGRESSION): no baseline + wizard crashes.
     await page.goto('/registrar');
     await page.waitForTimeout(2000);
