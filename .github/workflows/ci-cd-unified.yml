@@ -806,12 +806,17 @@ jobs:
           echo "ERROR: ux-audit-output.txt not found. The UX Audit step may not have run."
           exit 1
         fi
-        # Extract the final summary line (e.g. "  27 passed (2.0m)")
-        SUMMARY=$(grep -E "^\s+[0-9]+ passed" ux-audit-output.txt | tail -1)
-        echo "Playwright summary: $SUMMARY"
-        PASSED=$(echo "$SUMMARY" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "0")
-        SKIPPED=$(echo "$SUMMARY" | grep -oE "[0-9]+ skipped" | grep -oE "[0-9]+" || echo "0")
-        FAILED=$(echo "$SUMMARY" | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo "0")
+        # Playwright outputs the summary on MULTIPLE lines when there are failures:
+        #   1 failed
+        #   26 passed (2.2m)
+        # We must extract ALL summary lines (failed, passed, skipped) separately.
+        FAILED_SUMMARY=$(grep -E "^\s+[0-9]+ failed" ux-audit-output.txt | tail -1 || echo "0 failed")
+        PASSED_SUMMARY=$(grep -E "^\s+[0-9]+ passed" ux-audit-output.txt | tail -1 || echo "0 passed")
+        SKIPPED_SUMMARY=$(grep -E "^\s+[0-9]+ skipped" ux-audit-output.txt | tail -1 || echo "0 skipped")
+        echo "Playwright summary: $FAILED_SUMMARY $PASSED_SUMMARY $SKIPPED_SUMMARY"
+        PASSED=$(echo "$PASSED_SUMMARY" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "0")
+        SKIPPED=$(echo "$SKIPPED_SUMMARY" | grep -oE "[0-9]+ skipped" | grep -oE "[0-9]+" || echo "0")
+        FAILED=$(echo "$FAILED_SUMMARY" | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo "0")
         echo "Parsed: passed=$PASSED skipped=$SKIPPED failed=$FAILED"
         if [ "$FAILED" != "0" ]; then
           echo "ERROR: $FAILED test(s) failed. UX/Visual E2E must have 0 failures."

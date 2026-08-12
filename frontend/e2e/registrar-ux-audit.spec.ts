@@ -257,15 +257,16 @@ test.describe('UX Audit Registrar — new interactions', () => {
 
     // ArrowRight should switch to "Женский"
     await radiogroup.press('ArrowRight');
-    await page.waitForTimeout(300);
 
     const femaleRadio = radiogroup.locator('[role="radio"]').filter({ hasText: 'Женский' });
-    await expect(femaleRadio).toHaveAttribute('aria-checked', 'true');
+    // Use expect with timeout instead of fixed waitForTimeout — React state
+    // update may take variable time, and the assertion polls until it passes
+    // or times out. This is more reliable than a fixed 300ms sleep.
+    await expect(femaleRadio).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
 
     // ArrowLeft should switch back to "Мужской"
     await radiogroup.press('ArrowLeft');
-    await page.waitForTimeout(300);
-    await expect(maleRadio).toHaveAttribute('aria-checked', 'true');
+    await expect(maleRadio).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
   });
 
   // ========================================================================
