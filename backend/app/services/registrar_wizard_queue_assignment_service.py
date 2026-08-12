@@ -102,6 +102,23 @@ class RegistrarWizardQueueAssignmentService:
         *,
         source: str,
     ) -> list[dict[str, Any]]:
+        """Assign queue entries for all queue_tags of a visit.
+
+        P2-1c (post-merge stabilization): same defect class as P2-1b.
+        The original code called self._rollback_session() on per-queue_tag
+        failure, which discarded ALL staged work AND left stale dicts in
+        queue_assignments. The loop continued, and the visit was activated
+        with stale data (non-empty queue_assignments but 0 real DB entries).
+
+        Fix: on failure, rollback restores the session, queue_assignments
+        is CLEARED to remove stale dicts, and the loop BREAKS. The visit
+        is NOT activated (queue_assignments is empty).
+
+        Contract (consistent with P2-1b):
+            Partial queue assignment is intentionally unsupported. On any
+            queue-tag assignment failure, all assignments for the current
+            visit are discarded and processing stops.
+        """
         unique_queue_tags = assignment_service._get_visit_queue_tags(visit)
         if not unique_queue_tags:
             logger.warning("Визит %d: нет queue_tag в услугах", visit.id)
@@ -127,7 +144,18 @@ class RegistrarWizardQueueAssignmentService:
                     str(exc),
                     exc_info=True,
                 )
+                # P2-1c: rollback to restore the session after failure.
                 self._rollback_session()
+                # P2-1c: CLEAR stale data. The rollback destroyed all
+                # flushed entries, so any dicts in queue_assignments
+                # reference non-existent DB rows. Without clearing, the
+                # caller would see non-empty queue_assignments and
+                # activate the visit with 0 real queue entries.
+                queue_assignments.clear()
+                # P2-1c: BREAK — after a full rollback, the session state
+                # is reset. Continuing the loop would re-query stale data
+                # and potentially create partial/inconsistent state.
+                break
 
         return queue_assignments
 
