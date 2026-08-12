@@ -127,7 +127,7 @@ test.describe('UX Audit Registrar — new interactions', () => {
         }));
         return;
       }
-      if (pathname === '/api/v1/registrar/appointments') {
+      if (pathname === '/api/v1/registrar/appointments' || pathname === '/api/v1/registrar/all-appointments') {
         await route.fulfill(jsonResponse({
           appointments: [sampleAppointment],
           total: 1,
@@ -253,7 +253,7 @@ test.describe('UX Audit Registrar — new interactions', () => {
 
   test('payment badge does not render for paid status', async ({ page }) => {
     // Override appointments to return paid status
-    await page.route('**/api/v1/registrar/appointments', async (route) => {
+    await page.route('**/api/v1/registrar/all-appointments', async (route) => {
       await route.fulfill(jsonResponse({
         appointments: [{ ...sampleAppointment, payment_status: 'paid' }],
         total: 1,
