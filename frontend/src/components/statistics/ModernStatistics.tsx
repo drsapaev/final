@@ -5,11 +5,44 @@ import {
   Button, Card, Icon,
 } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 
 type StatsAppointmentAccessor = ((key: string) => unknown) & Record<string, unknown>;
 
-const getAppointmentDate = (appointment: StatsAppointmentAccessor): unknown => appointment.date || appointment.appointment_date;
+// Helper: normalize an appointment entry to an accessor function.
+// Some callers pass raw API objects (Record<string, unknown>) instead of
+// accessor functions. Without this, `apt('misc.ms_status')` throws
+// "apt is not a function" and crashes the entire WelcomeView dashboard.
+// PR A (E2E registrar fixme tests): defensive normalization.
+const toAccessor = (apt: unknown): StatsAppointmentAccessor => {
+  if (typeof apt === 'function') return apt as StatsAppointmentAccessor;
+  if (apt && typeof apt === 'object') {
+    const obj = apt as Record<string, unknown>;
+    // Create an accessor function that supports both flat keys
+    // ('misc.ms_status') and nested paths for forward-compat.
+    return ((key: string) => {
+      if (key in obj) return obj[key];
+      // Support 'misc.ms_status' → obj.misc?.ms_status (legacy nested path)
+      const parts = key.split('.');
+      let cur: unknown = obj;
+      for (const p of parts) {
+        if (cur && typeof cur === 'object' && p in (cur as Record<string, unknown>)) {
+          cur = (cur as Record<string, unknown>)[p];
+        } else {
+          return undefined;
+        }
+      }
+      return cur;
+    }) as StatsAppointmentAccessor;
+  }
+  return (() => undefined) as StatsAppointmentAccessor;
+};
+
+const getAppointmentDate = (appointment: unknown): unknown => {
+  const apt = toAccessor(appointment);
+  // Try accessor first (flat key), then fall back to property access.
+  return apt('date') ?? apt('appointment_date') ?? (apt as Record<string, unknown>).date ?? (apt as Record<string, unknown>).appointment_date;
+};
 
 const shiftDate = (dateString: string, days: number): string => {
   const date = new Date(`${dateString}T00:00:00`);
@@ -36,9 +69,12 @@ const getTrendDirection = (current: number, previous: number, goodWhenDown: bool
   return current > previous ? 'up' : 'down';
 };
 
-const getAverageWaitTime = (appointments: StatsAppointmentAccessor[]): number => {
+const getAverageWaitTime = (appointments: unknown[]): number => {
   const waitTimes = appointments.
-  map((apt: StatsAppointmentAccessor) => toNumber(apt('misc.ms_wait_time_minutes') ?? apt('misc.ms_wait_minutes') ?? apt('misc.ms_queue_wait_minutes') ?? apt('misc.ms_wait_time'))).
+  map((rawApt: unknown) => {
+    const apt = toAccessor(rawApt);
+    return toNumber(apt('misc.ms_wait_time_minutes') ?? apt('misc.ms_wait_minutes') ?? apt('misc.ms_queue_wait_minutes') ?? apt('misc.ms_wait_time'));
+  }).
   filter((minutes: number) => minutes > 0);
 
   if (waitTimes.length === 0) {
@@ -50,13 +86,13 @@ const getAverageWaitTime = (appointments: StatsAppointmentAccessor[]): number =>
 
 interface ModernStatisticsProps {
   // TECH-DEBT(modern-stats-appointments): appointments is `any[]` — parent passes raw API responses
-  appointments?: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+  appointments?: any[];  
   language?: string;
   selectedDate?: string | null;
   onExport?: () => void;
   onRefresh?: () => void;
   // TECH-DEBT(modern-stats-index-sig): index signature is `any` — callers pass ad-hoc props
-  [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  [key: string]: any;  
 }
 
 const ModernStatistics = ({
@@ -153,8 +189,10 @@ const ModernStatistics = ({
   const statistics = useMemo(() => {
     const targetDate = selectedDate || new Date().toISOString().split('T')[0];
     const previousDate = shiftDate(targetDate, -1);
-    const dayAppointments = appointments.filter((apt) => getAppointmentDate(apt) === targetDate);
-    const previousDayAppointments = appointments.filter((apt) => getAppointmentDate(apt) === previousDate);
+    // Normalize all appointments to accessor functions first (PR A fix).
+    const normalizedAppts = appointments.map(toAccessor);
+    const dayAppointments = normalizedAppts.filter((apt) => getAppointmentDate(apt) === targetDate);
+    const previousDayAppointments = normalizedAppts.filter((apt) => getAppointmentDate(apt) === previousDate);
 
     // Завершенные визиты за выбранный день
     const completedToday = dayAppointments.filter((apt) =>
@@ -257,7 +295,7 @@ const ModernStatistics = ({
   const statCards = [
   {
     id: 'totalPatients',
-    title: t("misc.ms_total_patients"),
+    title: t('misc.ms_total_patients'),
     value: animatedValues.totalPatients || 0,
     iconName: 'person',
     color: 'var(--mac-accent-blue)',
