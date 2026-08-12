@@ -35,7 +35,10 @@ const toAccessor = (apt: unknown): StatsAppointmentAccessor => {
       return cur;
     }) as StatsAppointmentAccessor;
   }
-  return (() => undefined) as StatsAppointmentAccessor;
+  // Fallback for null/primitive values: return an accessor that always returns undefined.
+  // Cast through `unknown` because StatsAppointmentAccessor is a function & Record intersection
+  // and TypeScript can't convert a bare arrow function directly.
+  return (() => undefined) as unknown as StatsAppointmentAccessor;
 };
 
 const getAppointmentDate = (appointment: unknown): unknown => {
