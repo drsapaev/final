@@ -35,6 +35,8 @@ class RegistrarWizardQueueAssignmentService:
             Any,
         ]
         | None = None,
+        lifecycle_service_factory: Callable[[Session], VisitLifecycleService]
+        | None = None,
     ) -> None:
         self.db = db
         self._assignment_service_factory = (
@@ -45,6 +47,9 @@ class RegistrarWizardQueueAssignmentService:
         )
         self._create_entry_allocator = (
             create_entry_allocator or self._allocate_create_branch_handoff
+        )
+        self._lifecycle_service_factory = (
+            lifecycle_service_factory or (lambda session: VisitLifecycleService(session))
         )
 
     def assign_same_day_queue_numbers(
@@ -73,7 +78,7 @@ class RegistrarWizardQueueAssignmentService:
                     # instead of direct visit.status = "open".
                     # This ensures state machine validation, with_for_update()
                     # row lock, and audit logging.
-                    VisitLifecycleService(self.db).activate_confirmed_visit(
+                    self._lifecycle_service_factory(self.db).activate_confirmed_visit(
                         visit_id=visit.id,
                         commit=False,
                     )

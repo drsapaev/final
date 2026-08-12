@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -52,6 +53,9 @@ def test_assign_same_day_queue_numbers_uses_extracted_wizard_seam():
     service = RegistrarWizardQueueAssignmentService(
         db=object(),
         assignment_service_factory=lambda _: fake_assignment_service,
+        lifecycle_service_factory=lambda db: SimpleNamespace(
+            activate_confirmed_visit=lambda visit_id, commit=False: None
+        ),
     )
 
     queue_numbers = service.assign_same_day_queue_numbers(
@@ -63,7 +67,7 @@ def test_assign_same_day_queue_numbers_uses_extracted_wizard_seam():
     assert queue_numbers == {
         101: [{"queue_tag": "cardiology_common", "number": 17, "queue_id": 5}]
     }
-    assert visit.status == "open"
+    assert visit.status == "confirmed"  # Gate C: status set by VisitLifecycleService, not directly
     assert fake_assignment_service.calls == [(101, "cardiology_common", today, "desk")]
 
 
@@ -82,6 +86,9 @@ def test_assign_same_day_queue_numbers_preserves_safe_behavior_for_empty_and_fai
     service = RegistrarWizardQueueAssignmentService(
         db=object(),
         assignment_service_factory=lambda _: fake_assignment_service,
+        lifecycle_service_factory=lambda db: SimpleNamespace(
+            activate_confirmed_visit=lambda visit_id, commit=False: None
+        ),
     )
 
     queue_numbers = service.assign_same_day_queue_numbers(
