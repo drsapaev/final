@@ -365,7 +365,23 @@ class MorningAssignmentService:
         target_date: date,
         source: str = "morning_assignment",
     ) -> list[dict[str, any]]:
-        """Присваивает номера в очередях для конкретного визита"""
+        """Присваивает номера в очередях для конкретного визита
+
+        P2-1b (post-merge stabilization): uses savepoints (begin_nested)
+        per queue_tag so that a failure in one tag does NOT roll back
+        already-flushed queue entries for other tags. The previous code
+        called self.db.rollback() on any per-tag failure, which discarded
+        ALL staged work — including successful entries from earlier tags.
+        The loop then continued with stale queue_assignments, causing the
+        visit to be activated with incomplete queue entries.
+
+        With savepoints:
+        - Each tag's assignment runs inside a SAVEPOINT.
+        - On failure, only that savepoint is rolled back (not the whole
+          transaction). Previously-flushed entries survive.
+        - The caller's single commit at the end of run_morning_assignment
+          persists all successful entries atomically.
+        """
 
         # Получаем уникальные queue_tag из услуг визита
         unique_queue_tags = self._get_visit_queue_tags(visit)
@@ -377,6 +393,9 @@ class MorningAssignmentService:
         queue_assignments = []
 
         for queue_tag in unique_queue_tags:
+            # P2-1b: use a savepoint so a per-tag failure only rolls back
+            # that tag's work, not the entire transaction.
+            savepoint = self.db.begin_nested()
             try:
                 assignment = self._assign_single_queue(
                     visit,
@@ -386,16 +405,22 @@ class MorningAssignmentService:
                 )
                 if assignment:
                     queue_assignments.append(assignment)
+                # Release the savepoint — the work is staged and will be
+                # committed by the caller's final db.commit().
+                # No explicit release needed — SQLAlchemy auto-releases on
+                # transaction end. The savepoint just isolates failures.
             except Exception as e:
                 logger.error(
                     f"Ошибка присвоения очереди {queue_tag} для визита {visit.id}: {e}",
                     exc_info=True
                 )
-                # ✅ SECURITY: Rollback session при ошибке foreign key
+                # P2-1b: roll back ONLY this savepoint, not the whole
+                # transaction. Previously-flushed entries for other tags
+                # are preserved.
                 try:
-                    self.db.rollback()
+                    savepoint.rollback()
                 except Exception as rollback_error:
-                    logger.error(f"Ошибка при rollback: {rollback_error}")
+                    logger.error(f"Ошибка при savepoint rollback: {rollback_error}")
 
         return queue_assignments
 
