@@ -9,11 +9,20 @@ queue entries.
 Fix: use savepoints (begin_nested) per queue_tag so that a failure in
 one tag only rolls back that tag's work, not the whole transaction.
 
-These tests verify:
-1. A successful queue entry is PRESERVED when a subsequent tag fails.
-2. The failed tag's entry is NOT created.
-3. queue_assignments contains only the successful entries.
-4. After commit, the DB has the successful entry but not the failed one.
+Target contract (confirmed by user):
+    A succeeds → A exists in DB
+    B fails (flush-time IntegrityError) → B does NOT exist in DB
+    C succeeds → C exists in DB
+    queue_assignments = [A, C] (no stale data)
+    visit may become open (existing business policy: partial assignment OK)
+    final commit persists exactly A + C
+
+Critical invariant for PostgreSQL:
+    flush failure in queue_tag B
+    → SAVEPOINT rollback
+    → Session remains usable
+    → queue_tag C can execute
+    → final commit succeeds
 
 Run:
     pytest backend/tests/regression/test_p2_1b_over_broad_rollback.py -v
@@ -25,10 +34,10 @@ import sys
 import uuid
 from datetime import UTC, date, datetime
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine, event
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -100,8 +109,10 @@ def clean_db(db_engine):
         conn.commit()
 
 
-def _setup_visit_with_two_tags(session):
-    """Create a visit with 2 services (cardio + lab), both with DailyQueues."""
+def _setup_visit_with_three_tags(session):
+    """Create a visit with 3 services (A, B, C), each with a different queue_tag
+    and a corresponding DailyQueue. Returns (visit_id, [tag_a, tag_b, tag_c]).
+    """
     unique = uuid.uuid4().hex[:8]
     doctor_user = User(
         username=f"doctor_{unique}", full_name="Dr", email=f"d_{unique}@t.local",
@@ -121,26 +132,25 @@ def _setup_visit_with_two_tags(session):
     session.add(patient)
     session.flush()
 
-    s1 = Service(
-        code=f"CARDIO_{unique}", name="Cardio", price=100000,
-        duration_minutes=30, active=True, requires_doctor=True,
-        queue_tag=f"cardio_{unique}", is_consultation=True,
-        allow_doctor_price_override=False,
-    )
-    s2 = Service(
-        code=f"LAB_{unique}", name="Lab", price=50000,
-        duration_minutes=15, active=True, requires_doctor=True,
-        queue_tag=f"lab_{unique}", is_consultation=False,
-        allow_doctor_price_override=False,
-    )
-    session.add_all([s1, s2])
-    session.flush()
-
-    q1 = DailyQueue(day=date.today(), specialist_id=doctor_user.id,
-                    queue_tag=s1.queue_tag, active=True)
-    q2 = DailyQueue(day=date.today(), specialist_id=doctor_user.id,
-                    queue_tag=s2.queue_tag, active=True)
-    session.add_all([q1, q2])
+    tags = []
+    services = []
+    queues = []
+    for label in ["a", "b", "c"]:
+        tag = f"tag_{label}_{unique}"
+        tags.append(tag)
+        svc = Service(
+            code=f"SVC_{label}_{unique}", name=f"Service {label}", price=10000,
+            duration_minutes=30, active=True, requires_doctor=True,
+            queue_tag=tag, is_consultation=True,
+            allow_doctor_price_override=False,
+        )
+        services.append(svc)
+        session.add(svc)
+        session.flush()
+        q = DailyQueue(day=date.today(), specialist_id=doctor_user.id,
+                       queue_tag=tag, active=True)
+        queues.append(q)
+        session.add(q)
     session.flush()
 
     visit = Visit(
@@ -152,52 +162,97 @@ def _setup_visit_with_two_tags(session):
     )
     session.add(visit)
     session.flush()
-    vs1 = VisitService(visit_id=visit.id, service_id=s1.id, code=s1.code,
-                       name=s1.name, qty=1, price=s1.price, currency="UZS")
-    vs2 = VisitService(visit_id=visit.id, service_id=s2.id, code=s2.code,
-                       name=s2.name, qty=1, price=s2.price, currency="UZS")
-    session.add_all([vs1, vs2])
+    for svc in services:
+        vs = VisitService(visit_id=visit.id, service_id=svc.id, code=svc.code,
+                          name=svc.name, qty=1, price=svc.price, currency="UZS")
+        session.add(vs)
     session.commit()
-    return visit.id
+    return visit.id, tags
+
+
+def _patch_create_queue_entry_to_fail_on_tag(service_obj, fail_tag_fragment):
+    """Monkey-patch _assign_single_queue to inject a real flush-time
+    IntegrityError when processing the tag containing fail_tag_fragment.
+
+    The patch intercepts _assign_single_queue and, for the failing tag,
+    creates an OnlineQueueEntry with an invalid FK (queue_id=999999)
+    and calls db.flush() — triggering a REAL IntegrityError at the
+    DB level, exactly like a constraint violation on PostgreSQL.
+
+    For non-failing tags, the original _assign_single_queue runs normally.
+
+    This is NOT a post-success exception — the failure occurs DURING
+    the flush, before _assign_single_queue returns.
+    """
+    original_assign = service_obj._assign_single_queue
+
+    def patched_assign(visit, queue_tag, target_date, *, source="morning_assignment"):
+        if fail_tag_fragment in queue_tag:
+            # Create an entry with invalid FK → flush will fail
+            entry = OnlineQueueEntry(
+                queue_id=999999,  # non-existent FK → IntegrityError
+                number=1,
+                patient_id=visit.patient_id,
+                patient_name="Test",
+                visit_id=visit.id,
+                source=source,
+                status="waiting",
+            )
+            service_obj.db.add(entry)
+            service_obj.db.flush()  # ← raises IntegrityError at flush time
+            # This line is never reached — flush raises
+            return {"queue_tag": queue_tag, "number": 1}
+        return original_assign(visit, queue_tag, target_date, source=source)
+
+    service_obj._assign_single_queue = patched_assign
+
+    def restore():
+        service_obj._assign_single_queue = original_assign
+
+    return restore
 
 
 @pytest.mark.unit
 class TestP21bSavepointIsolation:
-    """P2-1b: savepoint isolation prevents over-broad rollback."""
+    """P2-1b: savepoint isolation prevents over-broad rollback.
 
-    def test_successful_entry_preserved_when_subsequent_tag_fails(
+    Target contract:
+        A succeeds → A exists in DB
+        B fails (flush-time IntegrityError) → B does NOT exist
+        C succeeds → C exists in DB
+        queue_assignments = [A, C] (no stale data)
+        visit may become open (existing business policy)
+        final commit persists exactly A + C
+    """
+
+    def test_flush_time_failure_preserves_successful_entry(
         self, session_factory, clean_db
     ):
-        """REGRESSION: when the second queue_tag fails, the first tag's
-        entry must be preserved (not rolled back by the over-broad rollback).
+        """REGRESSION: when tag B fails during flush (IntegrityError),
+        tag A's entry must be preserved.
 
-        Before fix: self.db.rollback() discarded the first entry.
-        After fix: savepoint.rollback() only discards the second tag's work.
+        Before fix: self.db.rollback() destroyed A's flushed entry.
+        After fix: savepoint.rollback() only rolls back B; A survives.
+
+        This test uses a REAL flush-time IntegrityError (invalid FK),
+        not a post-success exception injection.
         """
         setup = session_factory()
-        visit_id = _setup_visit_with_two_tags(setup)
+        visit_id, tags = _setup_visit_with_three_tags(setup)
         setup.close()
 
         repro = session_factory()
         service = MorningAssignmentService(repro)
 
-        # Monkey-patch _assign_single_queue to fail on the lab tag
-        original = service._assign_single_queue
-
-        def patched(visit, queue_tag, target_date, *, source="morning_assignment"):
-            result = original(visit, queue_tag, target_date, source=source)
-            if "lab_" in queue_tag:
-                raise RuntimeError("INJECTED ERROR for lab tag")
-            return result
-
-        service._assign_single_queue = patched
+        # Patch create_queue_entry to fail on tag B with a real flush-time error
+        restore = _patch_create_queue_entry_to_fail_on_tag(service, tags[1])
 
         visit = repro.query(Visit).filter(Visit.id == visit_id).first()
         queue_assignments = service._assign_queues_for_visit(visit, date.today())
 
-        # Commit to simulate run_morning_assignment's final commit
         repro.commit()
         repro.close()
+        restore()  # remove the monkey-patch
 
         # ─── Verify in NEW independent session ─────────────────────
         verify = session_factory()
@@ -206,66 +261,181 @@ class TestP21bSavepointIsolation:
                 OnlineQueueEntry.visit_id == visit_id
             ).all()
 
-            # The cardio entry must be preserved (not rolled back by lab failure)
-            assert len(entries) >= 1, (
-                f"Expected ≥1 queue entry (cardio preserved), got {len(entries)}. "
-                f"The over-broad rollback destroyed the successful cardio entry."
+            # A and C must exist; B must NOT exist
+            entry_tags = set()
+            for entry in entries:
+                queue = verify.query(DailyQueue).filter(
+                    DailyQueue.id == entry.queue_id
+                ).first()
+                if queue:
+                    entry_tags.add(queue.queue_tag)
+
+            assert tags[0] in entry_tags, (
+                f"Tag A ({tags[0]}) entry was NOT preserved after tag B failure. "
+                f"The over-broad rollback destroyed it. "
+                f"Entry tags found: {entry_tags}"
+            )
+            assert tags[1] not in entry_tags, (
+                f"Tag B ({tags[1]}) entry exists — should have been rolled back. "
+                f"Entry tags found: {entry_tags}"
+            )
+            assert tags[2] in entry_tags, (
+                f"Tag C ({tags[2]}) entry was NOT created after tag B failure. "
+                f"Session may be unusable after savepoint rollback. "
+                f"Entry tags found: {entry_tags}"
             )
 
-            # queue_assignments should contain only the cardio entry
-            assert len(queue_assignments) == 1, (
-                f"Expected 1 assignment (cardio only), got {len(queue_assignments)}. "
-                f"queue_assignments: {queue_assignments}"
+            # queue_assignments must contain only A and C (no stale B)
+            assert len(queue_assignments) == 2, (
+                f"Expected 2 assignments (A + C), got {len(queue_assignments)}. "
+                f"queue_assignments may contain stale data for failed tag B."
             )
         finally:
             verify.close()
 
-    def test_failed_tag_entry_not_created(self, session_factory, clean_db):
-        """REGRESSION: the failed tag's entry must NOT be in the DB."""
+    def test_session_remains_usable_after_savepoint_rollback(
+        self, session_factory, clean_db
+    ):
+        """CRITICAL: after a flush-time failure in tag B, the session must
+        remain usable so tag C can execute.
+
+        This is the PostgreSQL-specific concern: on PostgreSQL, a constraint
+        violation during INSERT puts the transaction in an error state.
+        With SAVEPOINT, the savepoint rollback restores the transaction to
+        a usable state, allowing subsequent operations.
+
+        Without savepoint (old code): self.db.rollback() rolls back the
+        ENTIRE transaction, and subsequent flush calls would work but
+        destroy earlier work. With savepoint: only B is rolled back;
+        A is preserved and C can proceed.
+        """
         setup = session_factory()
-        visit_id = _setup_visit_with_two_tags(setup)
+        visit_id, tags = _setup_visit_with_three_tags(setup)
         setup.close()
 
         repro = session_factory()
         service = MorningAssignmentService(repro)
+        restore = _patch_create_queue_entry_to_fail_on_tag(service, tags[1])
 
-        original = service._assign_single_queue
-
-        def patched(visit, queue_tag, target_date, *, source="morning_assignment"):
-            result = original(visit, queue_tag, target_date, source=source)
-            if "lab_" in queue_tag:
-                raise RuntimeError("INJECTED ERROR for lab tag")
-            return result
-
-        service._assign_single_queue = patched
         visit = repro.query(Visit).filter(Visit.id == visit_id).first()
-        service._assign_queues_for_visit(visit, date.today())
+        queue_assignments = service._assign_queues_for_visit(visit, date.today())
+
         repro.commit()
         repro.close()
+        restore()
+
+        # The fact that queue_assignments has entries for A and C proves
+        # the session was usable after B's savepoint rollback.
+        # If the session were unusable, C would have failed too.
+        assert len(queue_assignments) >= 2, (
+            f"Expected ≥2 assignments (A + C), got {len(queue_assignments)}. "
+            f"Session may be unusable after savepoint rollback — "
+            f"tag C could not execute after tag B's flush-time failure."
+        )
+
+    def test_queue_assignments_match_db_entries(
+        self, session_factory, clean_db
+    ):
+        """INVARIANT: queue_assignments must exactly match the DB queue entries.
+
+        Before fix: queue_assignments contained stale dicts for entries
+        that were rolled back by the over-broad rollback.
+        After fix: every dict in queue_assignments corresponds to a real
+        DB entry.
+        """
+        setup = session_factory()
+        visit_id, tags = _setup_visit_with_three_tags(setup)
+        setup.close()
+
+        repro = session_factory()
+        service = MorningAssignmentService(repro)
+        restore = _patch_create_queue_entry_to_fail_on_tag(service, tags[1])
+
+        visit = repro.query(Visit).filter(Visit.id == visit_id).first()
+        queue_assignments = service._assign_queues_for_visit(visit, date.today())
+        repro.commit()
+        repro.close()
+        restore()
 
         verify = session_factory()
         try:
             entries = verify.query(OnlineQueueEntry).filter(
                 OnlineQueueEntry.visit_id == visit_id
             ).all()
-            # All entries should have cardio queue_tag, not lab
-            for entry in entries:
-                queue = verify.query(DailyQueue).filter(
-                    DailyQueue.id == entry.queue_id
-                ).first()
-                assert "cardio_" in queue.queue_tag, (
-                    f"Found lab queue entry that should have been rolled back: "
-                    f"queue_tag={queue.queue_tag}"
-                )
+
+            # queue_assignments count must match DB entry count
+            assert len(queue_assignments) == len(entries), (
+                f"queue_assignments ({len(queue_assignments)}) does not match "
+                f"DB entries ({len(entries)}). Stale data detected."
+            )
+        finally:
+            verify.close()
+
+    def test_all_tags_fail_no_activation(
+        self, session_factory, clean_db
+    ):
+        """INVARIANT: when ALL queue_tags fail, queue_assignments is empty
+        and the visit must NOT be activated.
+
+        This is the existing business policy: visit is activated only when
+        queue_assignments is non-empty.
+        """
+        setup = session_factory()
+        visit_id, tags = _setup_visit_with_three_tags(setup)
+        setup.close()
+
+        repro = session_factory()
+        service = MorningAssignmentService(repro)
+
+        # Patch _assign_single_queue to fail on ALL tags
+        original_assign = service._assign_single_queue
+
+        def fail_all(visit, queue_tag, target_date, *, source="morning_assignment"):
+            entry = OnlineQueueEntry(
+                queue_id=999999,  # invalid FK → IntegrityError
+                number=1,
+                patient_id=visit.patient_id,
+                patient_name="Test",
+                visit_id=visit.id,
+                source=source,
+                status="waiting",
+            )
+            service.db.add(entry)
+            service.db.flush()  # raises IntegrityError
+            return {"queue_tag": queue_tag, "number": 1}
+
+        service._assign_single_queue = fail_all
+
+        visit = repro.query(Visit).filter(Visit.id == visit_id).first()
+        queue_assignments = service._assign_queues_for_visit(visit, date.today())
+        repro.commit()
+        repro.close()
+
+        service._assign_single_queue = original_assign
+
+        assert len(queue_assignments) == 0, (
+            f"Expected 0 assignments (all tags failed), got {len(queue_assignments)}"
+        )
+
+        # Visit must remain 'confirmed' (not activated)
+        verify = session_factory()
+        try:
+            db_visit = verify.query(Visit).filter(Visit.id == visit_id).first()
+            assert db_visit.status == "confirmed", (
+                f"Visit should remain 'confirmed' when all queue tags fail. "
+                f"Got: {db_visit.status}"
+            )
         finally:
             verify.close()
 
     def test_both_tags_succeed_without_savepoint_interference(
         self, session_factory, clean_db
     ):
-        """NON-REGRESSION: when both tags succeed, savepoints don't interfere."""
+        """NON-REGRESSION: when no tags fail, savepoints don't interfere
+        with normal operation. All entries are created.
+        """
         setup = session_factory()
-        visit_id = _setup_visit_with_two_tags(setup)
+        visit_id, tags = _setup_visit_with_three_tags(setup)
         setup.close()
 
         repro = session_factory()
@@ -280,9 +450,9 @@ class TestP21bSavepointIsolation:
             entries = verify.query(OnlineQueueEntry).filter(
                 OnlineQueueEntry.visit_id == visit_id
             ).all()
-            assert len(entries) == 2, (
-                f"Expected 2 queue entries (both tags succeeded), got {len(entries)}"
+            assert len(entries) == 3, (
+                f"Expected 3 queue entries (all tags succeeded), got {len(entries)}"
             )
-            assert len(queue_assignments) == 2
+            assert len(queue_assignments) == 3
         finally:
             verify.close()
