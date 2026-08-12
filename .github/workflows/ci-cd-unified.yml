@@ -781,10 +781,53 @@ jobs:
     - name: 📸 UX Audit e2e + Visual regression (Chromium)
       run: |
         cd frontend
-        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts --project=chromium
+        # --retries=0 is MANDATORY for UX/Visual E2E. These tests must pass
+        # on the FIRST attempt — retries would mask flaky tests. The
+        # e2e-coverage-invariant.mjs gate enforces this.
+        # Output is tee'd to a file so the next step can verify the test count.
+        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts --project=chromium --retries=0 2>&1 | tee ux-audit-output.txt
       # E2E root-cause fix: removed continue-on-error. All non-fixme tests
       # must pass. Tests marked test.fixme have documented root causes and
       # are tracked for follow-up. See PR description for details.
+
+    - name: 🔒 UX/Visual E2E test count invariant
+      run: |
+        cd frontend
+        # Verify that Playwright actually executed the expected number of tests.
+        # This catches the failure mode where tests are silently skipped via
+        # test.fixme/test.skip (the e2e-coverage-invariant.mjs gate catches
+        # the source-level patterns, but this catches the runtime-level
+        # reality: if the count drops below 27, something was skipped).
+        #
+        # Expected: 27 passed, 0 skipped, 0 failed (12 cashier + 9 registrar + 6 visual).
+        # If a test is intentionally added/removed, update EXPECTED_COUNT below.
+        EXPECTED_COUNT=27
+        if [ ! -f ux-audit-output.txt ]; then
+          echo "ERROR: ux-audit-output.txt not found. The UX Audit step may not have run."
+          exit 1
+        fi
+        # Extract the final summary line (e.g. "  27 passed (2.0m)")
+        SUMMARY=$(grep -E "^\s+[0-9]+ passed" ux-audit-output.txt | tail -1)
+        echo "Playwright summary: $SUMMARY"
+        PASSED=$(echo "$SUMMARY" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "0")
+        SKIPPED=$(echo "$SUMMARY" | grep -oE "[0-9]+ skipped" | grep -oE "[0-9]+" || echo "0")
+        FAILED=$(echo "$SUMMARY" | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo "0")
+        echo "Parsed: passed=$PASSED skipped=$SKIPPED failed=$FAILED"
+        if [ "$FAILED" != "0" ]; then
+          echo "ERROR: $FAILED test(s) failed. UX/Visual E2E must have 0 failures."
+          exit 1
+        fi
+        if [ "$SKIPPED" != "0" ]; then
+          echo "ERROR: $SKIPPED test(s) skipped. UX/Visual E2E must have 0 skipped (no test.fixme/test.skip allowed)."
+          echo "If a test was intentionally skipped, remove the skip and fix the test, or update EXPECTED_COUNT."
+          exit 1
+        fi
+        if [ "$PASSED" -lt "$EXPECTED_COUNT" ]; then
+          echo "ERROR: Only $PASSED tests passed, expected at least $EXPECTED_COUNT."
+          echo "This means some tests were silently excluded. Check for test.fixme/test.skip."
+          exit 1
+        fi
+        echo "✓ UX/Visual E2E count invariant intact: $PASSED passed, $SKIPPED skipped, $FAILED failed (expected ≥ $EXPECTED_COUNT)."
 
     - name: 📸 Update visual regression baseline snapshots (manual only)
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_snapshots == 'true'
