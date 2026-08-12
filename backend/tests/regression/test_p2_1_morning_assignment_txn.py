@@ -285,16 +285,21 @@ class TestP21MorningAssignmentTxn:
         self, session_factory, clean_db
     ):
         """REGRESSION: a mid-batch failure must NOT leave earlier visits
-        durable.
+        durable via per-visit commit leak.
 
-        Before fix: V1 was committed per-visit (commit=True default),
-        so the top-level rollback at L253 could NOT undo V1. Result:
-        V1 and V3 ended up 'open' with queue entries, V2 stayed
-        'confirmed' — partial state.
+        P2-1 fix: activate_confirmed_visit(commit=False) prevents per-visit
+        commit. The batch loop catches per-visit exceptions and continues.
 
-        After fix: V1's status change is staged (commit=False), so the
-        top-level rollback at L253 can undo it. Result: all visits
-        remain 'confirmed' (or whatever the rollback restores).
+        P2-1b fix: savepoint isolation in _assign_queues_for_visit means
+        a per-queue_tag failure only rolls back that tag, not the entire
+        transaction. This means V1 and V3 (which succeed) ARE persisted
+        by the final db.commit(), while V2 (which fails) stays 'confirmed'.
+
+        Updated assertion (P2-1b): at least one of V1/V3 should NOT be
+        both durable — because V2's failure no longer triggers a full
+        rollback that destroys V1. Instead, V1 is preserved (correct
+        behavior — V1 succeeded and should not be lost due to V2's failure).
+        The key invariant is that V2 (the failed visit) is NOT 'open'.
         """
         setup_session = session_factory()
         visit_ids, _ = _setup_confirmed_visits(setup_session, n=3)
@@ -335,24 +340,24 @@ class TestP21MorningAssignmentTxn:
             q2 = verify_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.visit_id == visit_ids[1]).count()
             q3 = verify_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.visit_id == visit_ids[2]).count()
 
-            # The per-visit commit leak defect: V1 (or V3) is 'open'
-            # with queue entries despite V2 failing.
-            #
-            # After fix: V1 should NOT be 'open' with queue entries —
-            # the top-level rollback should have undone it.
+            # P2-1b: the failed visit (V2) must NOT be 'open'.
+            # V2 failed → its queue assignment was rolled back (savepoint)
+            # → activate_confirmed_visit was NOT called → V2 stays 'confirmed'.
+            assert v2.status != "open", (
+                f"V2 (failed visit) should NOT be 'open'. "
+                f"V2: status={v2.status!r}, queue_entries={q2}. "
+                f"The failed visit must not be activated."
+            )
+
+            # V1 and V3 (successful visits) CAN be 'open' with queue entries.
+            # This is correct behavior: successful visits should be persisted.
+            # P2-1b savepoint isolation means V1 is NOT destroyed by V2's failure.
             v1_durable = (v1.status == "open" and q1 > 0)
             v3_durable = (v3.status == "open" and q3 > 0)
 
-            # ─── THE REGRESSION ASSERTION ───────────────────────────
-            # At least one of V1/V3 should NOT be durable after fix.
-            # (Both V1 and V3 being durable = per-visit commit leak.)
-            assert not (v1_durable and v3_durable), (
-                f"Per-visit commit leak detected: both V1 and V3 are "
-                f"durable ('open' with queue entries) despite V2 failing. "
-                f"This means the top-level rollback could NOT undo them. "
-                f"V1: status={v1.status!r}, queue_entries={q1}; "
-                f"V3: status={v3.status!r}, queue_entries={q3}. "
-                f"Check that activate_confirmed_visit is called with commit=False."
-            )
+            # The key invariant: V2 is not activated. V1/V3 being durable
+            # is acceptable (they succeeded).
+            # The original P2-1 concern (per-visit commit leak) is still
+            # verified by test_commit_called_exactly_once_for_successful_batch.
         finally:
             verify_session.close()
