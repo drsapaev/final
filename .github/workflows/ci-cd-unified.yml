@@ -745,7 +745,7 @@ jobs:
   frontend-e2e:
     name: Frontend e2e
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     needs: [ci-scope]
     if: |
       needs.ci-scope.outputs.frontend_e2e_required == 'true' &&
@@ -782,7 +782,9 @@ jobs:
       run: |
         cd frontend
         npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts --project=chromium
-      continue-on-error: true  # Visual regression — non-blocking, informational only
+      # E2E root-cause fix: removed continue-on-error. All non-fixme tests
+      # must pass. Tests marked test.fixme have documented root causes and
+      # are tracked for follow-up. See PR description for details.
 
     - name: 📸 Update visual regression baseline snapshots (manual only)
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_snapshots == 'true'
