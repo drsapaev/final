@@ -37,6 +37,10 @@ _TEMP_ALLOWED_CROSS_CONTEXT_IMPORTS: set[tuple[str, str]] = {
     ("app.services.batch_patient_service", "app.services.visit_lifecycle_service"),
     ("app.services.payment_init_service", "app.services.payment_invariant_service"),
     ("app.services.payment_create_service", "app.services.payment_invariant_service"),
+    # Gate C bypass fix: these services now delegate visit status transitions
+    # to VisitLifecycleService instead of direct mutation.
+    ("app.services.morning_assignment_api_service", "app.services.visit_lifecycle_service"),
+    ("app.services.registrar_wizard_queue_assignment_service", "app.services.visit_lifecycle_service"),
 }
 
 

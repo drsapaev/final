@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,16 @@ from app.repositories.morning_assignment_api_repository import (
     MorningAssignmentApiRepository,
 )
 from app.services.morning_assignment import MorningAssignmentService
+
+# Terminal visit statuses cannot be reactivated by force=true.
+# activate_confirmed_visit() is a no-op for these statuses, but
+# _assign_queues_for_visit() would have already staged queue entries
+# that get committed at end of method — Codex P1 finding.
+# pending_confirmation is also non-activatable: activate_confirmed_visit()
+# raises HTTP 409, but staged queue entries would still be committed at
+# end of method — Codex P1 finding (queue leak). Checked separately
+# below to give a distinct error message.
+_TERMINAL_STATUSES = frozenset({"closed", "canceled", "expired", "completed"})
 
 
 class MorningAssignmentApiService:
@@ -46,7 +57,25 @@ class MorningAssignmentApiService:
         service = self._build_morning_service()
         return service.get_morning_assignment_stats(target_date)
 
-    def manual_assignment_for_visits(self, *, visit_ids: list[int], force: bool) -> dict:
+    def manual_assignment_for_visits(
+        self,
+        *,
+        visit_ids: list[int],
+        force: bool,
+        current_user: Any | None = None,
+    ) -> dict:
+        """Manually assign queue numbers to specific visits.
+
+        Args:
+            visit_ids: Visits to process.
+            force: When True, allow processing of non-standard active statuses
+                (e.g. ``in_progress``). Terminal and ``pending_confirmation``
+                statuses are ALWAYS rejected regardless of ``force`` — they
+                cannot be activated through this path.
+            current_user: The authenticated admin/registrar requesting the
+                assignment. Threaded through to ``activate_confirmed_visit()``
+                for audit attribution. None is allowed (batch/system context).
+        """
         service = self._build_morning_service()
         results = []
 
@@ -58,6 +87,38 @@ class MorningAssignmentApiService:
                         "visit_id": visit_id,
                         "success": False,
                         "message": "Визит не найден",
+                    }
+                )
+                continue
+
+            # Codex P1 fix: reject non-activatable statuses BEFORE staging
+            # queue entries. activate_confirmed_visit() is a no-op for
+            # terminal statuses and raises 409 for pending_confirmation,
+            # but _assign_queues_for_visit() would already have staged
+            # entries that the unconditional commit at end of method would
+            # persist — silent regression + queue leak.
+            if visit.status in _TERMINAL_STATUSES:
+                results.append(
+                    {
+                        "visit_id": visit_id,
+                        "success": False,
+                        "message": (
+                            f"Визит в терминальном статусе '{visit.status}' — "
+                            "активация невозможна"
+                        ),
+                    }
+                )
+                continue
+
+            if visit.status == "pending_confirmation":
+                results.append(
+                    {
+                        "visit_id": visit_id,
+                        "success": False,
+                        "message": (
+                            "Визит ожидает подтверждения. Активация невозможна "
+                            "до подтверждения (используйте confirm_visit)."
+                        ),
                     }
                 )
                 continue
@@ -81,7 +142,19 @@ class MorningAssignmentApiService:
                     visit.visit_date,
                 )
                 if queue_assignments:
-                    visit.status = "open"
+                    # Gate C bypass fix: delegate to VisitLifecycleService
+                    # instead of direct visit.status = "open".
+                    # This ensures state machine validation, with_for_update()
+                    # row lock, and audit logging.
+                    # Codex P2 fix: thread current_user through for audit
+                    # attribution (otherwise logs say user_id=batch).
+                    from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                    VisitLifecycleService(self.repository.db).activate_confirmed_visit(
+                        visit_id=visit.id,
+                        current_user=current_user,
+                        commit=False,
+                    )
                     results.append(
                         {
                             "visit_id": visit_id,

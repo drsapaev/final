@@ -80,6 +80,11 @@ def test_assign_same_day_queue_numbers_uses_explicit_create_branch_handoff():
         create_entry_allocator=lambda handoff: (
             captured_handoffs.append(handoff) or SimpleNamespace(number=23)
         ),
+        # Gate C fix: provide a mock lifecycle service factory that
+        # does the same thing as the old direct visit.status = "open"
+        lifecycle_service_factory=lambda db: SimpleNamespace(
+            activate_confirmed_visit=lambda visit_id, current_user=None, commit=False: None
+        ),
     )
 
     queue_numbers = service.assign_same_day_queue_numbers(
@@ -98,7 +103,7 @@ def test_assign_same_day_queue_numbers_uses_explicit_create_branch_handoff():
             }
         ]
     }
-    assert visit.status == "open"
+    assert visit.status == "confirmed"  # Gate C: status set by VisitLifecycleService, not directly
     assert fake_assignment_service.calls == [(301, "cardiology_common", today, "desk")]
     assert captured_handoffs == [create_handoff]
 
@@ -137,6 +142,9 @@ def test_assign_same_day_queue_numbers_uses_queue_domain_boundary_by_default():
         db=object(),
         assignment_service_factory=lambda _: fake_assignment_service,
         queue_domain_service_factory=lambda _: fake_queue_domain_service,
+        lifecycle_service_factory=lambda db: SimpleNamespace(
+            activate_confirmed_visit=lambda visit_id, current_user=None, commit=False: None
+        ),
     )
 
     queue_numbers = service.assign_same_day_queue_numbers(
@@ -155,7 +163,7 @@ def test_assign_same_day_queue_numbers_uses_queue_domain_boundary_by_default():
             }
         ]
     }
-    assert visit.status == "open"
+    assert visit.status == "confirmed"  # Gate C: status set by VisitLifecycleService, not directly
     assert fake_assignment_service.calls == [(302, "cardiology_common", today, "desk")]
     assert fake_queue_domain_service.calls == [
         ("create_entry", create_handoff.create_entry_kwargs)
