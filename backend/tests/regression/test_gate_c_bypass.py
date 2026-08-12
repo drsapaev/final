@@ -99,8 +99,14 @@ def clean_db(db_engine):
         conn.commit()
 
 
-def _setup_confirmed_visit(session):
-    """Create a confirmed visit with a queue_tag and DailyQueue."""
+def _setup_confirmed_visit(session, *, status: str = "confirmed"):
+    """Create a visit with a queue_tag and DailyQueue.
+
+    Args:
+        status: Visit status to create. Defaults to "confirmed".
+            Codex P1 tests need to create visits in non-confirmed statuses
+            (closed, canceled, pending_confirmation) to verify rejection.
+    """
     unique = uuid.uuid4().hex[:8]
     doctor_user = User(
         username=f"doctor_{unique}", full_name="Dr", email=f"d_{unique}@t.local",
@@ -114,7 +120,12 @@ def _setup_confirmed_visit(session):
     session.flush()
     patient = Patient(
         last_name="P", first_name="Patient", birth_date=date(1990, 1, 1),
-        sex="M", phone="+998901234567", email=f"p_{unique}@t.local",
+        sex="M",
+        # Codex P1 fix: synthetic unique phone (AGENTS.md L377/L451 — no
+        # real-looking phone numbers in committed test fixtures).
+        # Pattern follows test_p1_1_overpayment_policy.py.
+        phone=f"+9989012{uuid.uuid4().hex[:5]}",
+        email=f"p_{unique}@t.local",
         created_at=datetime.now(UTC), is_deleted=False,
     )
     session.add(patient)
@@ -132,7 +143,7 @@ def _setup_confirmed_visit(session):
     session.add(q)
     session.flush()
     visit = Visit(
-        patient_id=patient.id, doctor_id=doctor.id, status="confirmed",
+        patient_id=patient.id, doctor_id=doctor.id, status=status,
         visit_date=date.today(), visit_time="10:00", discount_mode="none",
         department="cardiology", confirmation_token=f"tok-{unique}",
         confirmation_channel="telegram", confirmed_at=datetime.now(UTC),
@@ -280,3 +291,261 @@ class TestGateCBypassFix:
             "direct visit.status = \"open\". This is a Gate C bypass. "
             "Use VisitLifecycleService.activate_confirmed_visit() instead."
         )
+
+
+@pytest.mark.unit
+class TestGateCCodexFollowUp:
+    """Codex review follow-up: P1 regressions + P2 audit attribution.
+
+    Codex found that the Gate C bypass fix introduced 2 silent regressions
+    (terminal visit + queue entry leak) and 1 attribution gap (current_user
+    not threaded through). These tests verify the fixes.
+    """
+
+    def test_force_true_on_closed_visit_is_rejected(
+        self, session_factory, clean_db
+    ):
+        """P1: force=true on a 'closed' visit MUST be rejected.
+
+        Before fix: activate_confirmed_visit() was a no-op for non-confirmed
+        statuses, but _assign_queues_for_visit() had already staged queue
+        entries that get committed at end of method. Success reported, visit
+        stayed 'closed' but had live queue entries — silent regression.
+
+        After fix: terminal statuses are rejected BEFORE _assign_queues_for_visit().
+        """
+        from app.services.morning_assignment_api_service import MorningAssignmentApiService
+        from app.repositories.morning_assignment_api_repository import (
+            MorningAssignmentApiRepository,
+        )
+
+        setup = session_factory()
+        visit_id = _setup_confirmed_visit(setup, status="closed")
+        setup.close()
+
+        session = session_factory()
+        repository = MorningAssignmentApiRepository(session)
+        api_service = MorningAssignmentApiService(db=session, repository=repository)
+
+        result = api_service.manual_assignment_for_visits(
+            visit_ids=[visit_id],
+            force=True,  # Admin override — should still be rejected.
+        )
+        session.close()
+
+        # Result: rejected, not silently successful.
+        assert result["success"] is True  # Endpoint level (always True for batch)
+        item = result["results"][0]
+        assert item["success"] is False, (
+            "force=true on a terminal visit must NOT succeed — "
+            "activate_confirmed_visit() is a no-op for terminal statuses, "
+            "but staged queue entries would be committed (silent regression)."
+        )
+        assert "терминальном статусе" in item["message"], (
+            f"Rejection message should mention terminal status. Got: {item['message']}"
+        )
+
+        # Verify NO queue entries were committed.
+        from app.models.online_queue import OnlineQueueEntry
+        verify = session_factory()
+        try:
+            entries = verify.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.visit_id == visit_id
+            ).all()
+            assert entries == [], (
+                f"Terminal visit must NOT have queue entries committed. "
+                f"Found: {len(entries)} entries."
+            )
+            db_visit = verify.query(Visit).filter(Visit.id == visit_id).first()
+            assert db_visit.status == "closed", (
+                f"Terminal visit status should be unchanged. Got: {db_visit.status}"
+            )
+        finally:
+            verify.close()
+
+    def test_force_true_on_canceled_visit_is_rejected(
+        self, session_factory, clean_db
+    ):
+        """P1: force=true on a 'canceled' visit MUST be rejected (same as closed)."""
+        from app.services.morning_assignment_api_service import MorningAssignmentApiService
+        from app.repositories.morning_assignment_api_repository import (
+            MorningAssignmentApiRepository,
+        )
+
+        setup = session_factory()
+        visit_id = _setup_confirmed_visit(setup, status="canceled")
+        setup.close()
+
+        session = session_factory()
+        repository = MorningAssignmentApiRepository(session)
+        api_service = MorningAssignmentApiService(db=session, repository=repository)
+
+        result = api_service.manual_assignment_for_visits(
+            visit_ids=[visit_id],
+            force=True,
+        )
+        session.close()
+
+        item = result["results"][0]
+        assert item["success"] is False
+        assert "терминальном статусе" in item["message"]
+
+    def test_force_true_on_pending_confirmation_is_rejected_no_leak(
+        self, session_factory, clean_db
+    ):
+        """P1: force=true on 'pending_confirmation' MUST be rejected without
+        leaking queue entries.
+
+        Before fix: activate_confirmed_visit() raised HTTP 409, broad except
+        caught and marked as failed, but the unconditional commit at end of
+        method persisted the staged queue entry anyway. Unconfirmed patient
+        occupying a live queue number.
+
+        After fix: pending_confirmation is rejected BEFORE _assign_queues_for_visit().
+        """
+        from app.services.morning_assignment_api_service import MorningAssignmentApiService
+        from app.repositories.morning_assignment_api_repository import (
+            MorningAssignmentApiRepository,
+        )
+        from app.models.online_queue import OnlineQueueEntry
+
+        setup = session_factory()
+        visit_id = _setup_confirmed_visit(setup, status="pending_confirmation")
+        setup.close()
+
+        session = session_factory()
+        repository = MorningAssignmentApiRepository(session)
+        api_service = MorningAssignmentApiService(db=session, repository=repository)
+
+        result = api_service.manual_assignment_for_visits(
+            visit_ids=[visit_id],
+            force=True,
+        )
+        session.close()
+
+        item = result["results"][0]
+        assert item["success"] is False, (
+            "force=true on pending_confirmation must NOT succeed — "
+            "would leak a queue entry to an unconfirmed patient."
+        )
+        assert "ожидает подтверждения" in item["message"], (
+            f"Rejection message should mention pending confirmation. Got: {item['message']}"
+        )
+
+        # CRITICAL: verify NO queue entries were committed (no leak).
+        verify = session_factory()
+        try:
+            entries = verify.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.visit_id == visit_id
+            ).all()
+            assert entries == [], (
+                f"pending_confirmation visit must NOT have queue entries committed. "
+                f"Found: {len(entries)} entries — queue leak."
+            )
+        finally:
+            verify.close()
+
+    def test_manual_assignment_threads_current_user_to_lifecycle_service(
+        self, session_factory, clean_db
+    ):
+        """P2: current_user must be threaded through to activate_confirmed_visit()
+        for audit attribution.
+
+        Before fix: current_user was not passed, so audit logs said
+        'user_id=batch' even when an admin/registrar initiated the request.
+
+        After fix: current_user is threaded through.
+        """
+        from app.services.morning_assignment_api_service import MorningAssignmentApiService
+        from app.repositories.morning_assignment_api_repository import (
+            MorningAssignmentApiRepository,
+        )
+
+        setup = session_factory()
+        visit_id = _setup_confirmed_visit(setup)
+        setup.close()
+
+        # Fake current_user with id=42 to verify threading.
+        class FakeUser:
+            id = 42
+
+        fake_user = FakeUser()
+
+        session = session_factory()
+        repository = MorningAssignmentApiRepository(session)
+        api_service = MorningAssignmentApiService(db=session, repository=repository)
+
+        # Capture the current_user passed to activate_confirmed_visit.
+        captured_user = []
+        original_activate = (
+            __import__(
+                "app.services.visit_lifecycle_service", fromlist=["VisitLifecycleService"]
+            ).VisitLifecycleService.activate_confirmed_visit
+        )
+
+        def spy_activate(self, visit_id, current_user=None, *, commit=True):
+            captured_user.append(current_user)
+            return original_activate(self, visit_id, current_user, commit=commit)
+
+        from app.services.visit_lifecycle_service import VisitLifecycleService
+        original_method = VisitLifecycleService.activate_confirmed_visit
+        VisitLifecycleService.activate_confirmed_visit = spy_activate
+        try:
+            api_service.manual_assignment_for_visits(
+                visit_ids=[visit_id],
+                force=False,
+                current_user=fake_user,
+            )
+        finally:
+            VisitLifecycleService.activate_confirmed_visit = original_method
+        session.close()
+
+        assert len(captured_user) == 1, (
+            f"activate_confirmed_visit should be called exactly once. "
+            f"Got: {len(captured_user)} calls."
+        )
+        assert captured_user[0] is fake_user, (
+            "current_user should be threaded through to activate_confirmed_visit() "
+            "for audit attribution (Codex P2 fix)."
+        )
+
+    def test_wizard_threads_current_user_to_lifecycle_service(
+        self, session_factory, clean_db
+    ):
+        """P2: current_user must be threaded through wizard path too."""
+        setup = session_factory()
+        visit_id = _setup_confirmed_visit(setup)
+        setup.close()
+
+        class FakeUser:
+            id = 99
+
+        fake_user = FakeUser()
+
+        session = session_factory()
+        service = RegistrarWizardQueueAssignmentService(session)
+
+        captured_user = []
+        from app.services.visit_lifecycle_service import VisitLifecycleService
+        original_method = VisitLifecycleService.activate_confirmed_visit
+
+        def spy_activate(self, visit_id, current_user=None, *, commit=True):
+            captured_user.append(current_user)
+            return original_method(self, visit_id, current_user, commit=commit)
+
+        VisitLifecycleService.activate_confirmed_visit = spy_activate
+        try:
+            visit = session.query(Visit).filter(Visit.id == visit_id).first()
+            service.assign_same_day_queue_numbers(
+                [visit],
+                target_day=date.today(),
+                source="desk",
+                current_user=fake_user,
+            )
+            session.commit()
+        finally:
+            VisitLifecycleService.activate_confirmed_visit = original_method
+        session.close()
+
+        assert len(captured_user) == 1
+        assert captured_user[0] is fake_user

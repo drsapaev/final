@@ -83,7 +83,7 @@ def test_assign_same_day_queue_numbers_uses_explicit_create_branch_handoff():
         # Gate C fix: provide a mock lifecycle service factory that
         # does the same thing as the old direct visit.status = "open"
         lifecycle_service_factory=lambda db: SimpleNamespace(
-            activate_confirmed_visit=lambda visit_id, commit=False: None
+            activate_confirmed_visit=lambda visit_id, current_user=None, commit=False: None
         ),
     )
 
@@ -143,7 +143,7 @@ def test_assign_same_day_queue_numbers_uses_queue_domain_boundary_by_default():
         assignment_service_factory=lambda _: fake_assignment_service,
         queue_domain_service_factory=lambda _: fake_queue_domain_service,
         lifecycle_service_factory=lambda db: SimpleNamespace(
-            activate_confirmed_visit=lambda visit_id, commit=False: None
+            activate_confirmed_visit=lambda visit_id, current_user=None, commit=False: None
         ),
     )
 

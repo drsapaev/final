@@ -54,7 +54,7 @@ def test_assign_same_day_queue_numbers_uses_extracted_wizard_seam():
         db=object(),
         assignment_service_factory=lambda _: fake_assignment_service,
         lifecycle_service_factory=lambda db: SimpleNamespace(
-            activate_confirmed_visit=lambda visit_id, commit=False: None
+            activate_confirmed_visit=lambda visit_id, current_user=None, commit=False: None
         ),
     )
 
@@ -87,7 +87,7 @@ def test_assign_same_day_queue_numbers_preserves_safe_behavior_for_empty_and_fai
         db=object(),
         assignment_service_factory=lambda _: fake_assignment_service,
         lifecycle_service_factory=lambda db: SimpleNamespace(
-            activate_confirmed_visit=lambda visit_id, commit=False: None
+            activate_confirmed_visit=lambda visit_id, current_user=None, commit=False: None
         ),
     )
 

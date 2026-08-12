@@ -58,7 +58,20 @@ class RegistrarWizardQueueAssignmentService:
         *,
         target_day: date,
         source: str = "desk",
+        current_user: Any | None = None,
     ) -> dict[int, list[dict[str, Any]]]:
+        """Assign same-day queue numbers to confirmed visits.
+
+        Args:
+            visits: Visits to process. Only visits with ``visit_date == target_day``
+                and ``status == "confirmed"`` are processed.
+            target_day: The day to assign queues for.
+            source: Audit source label (e.g. "desk", "morning_assignment").
+            current_user: The authenticated admin/registrar requesting the
+                assignment. Threaded through to ``activate_confirmed_visit()``
+                for audit attribution (Codex P2 fix). None is allowed
+                (batch/system context).
+        """
         queue_numbers: dict[int, list[dict[str, Any]]] = {}
         assignment_service = self._assignment_service_factory(self.db)
 
@@ -78,8 +91,11 @@ class RegistrarWizardQueueAssignmentService:
                     # instead of direct visit.status = "open".
                     # This ensures state machine validation, with_for_update()
                     # row lock, and audit logging.
+                    # Codex P2 fix: thread current_user through for audit
+                    # attribution (otherwise logs say user_id=batch).
                     self._lifecycle_service_factory(self.db).activate_confirmed_visit(
                         visit_id=visit.id,
+                        current_user=current_user,
                         commit=False,
                     )
                     queue_numbers[visit.id] = queue_assignments
