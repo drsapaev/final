@@ -59,7 +59,21 @@ PII_KEY_REGEX = re.compile(
 PHONE_REGEX = re.compile(r"(\+\d{6})\d{3}(\d{3})")
 
 # Email: john.doe@example.com → j•••@example.com
-EMAIL_REGEX = re.compile(r"([a-zA-Z0-9._%+-])[a-zA-Z0-9._%+-]*@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
+#
+# SECURITY (CodeQL py/polynomial-redos #1201): the previous pattern used
+# `[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` for the domain part. The character class
+# `[a-zA-Z0-9.-]` includes `.`, which overlaps with the literal `\.` that
+# follows — for inputs with many dots, the engine could try multiple
+# split points. While linear in practice, CodeQL flagged this as a
+# potential polynomial-redos source.
+#
+# Fix: use `(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}` — each dot is a structural
+# separator between domain labels, no ambiguity. The character class
+# `[a-zA-Z0-9-]` no longer includes `.`.
+EMAIL_REGEX = re.compile(
+    r"([a-zA-Z0-9._%+-])[a-zA-Z0-9._%+-]*@"
+    r"((?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})"
+)
 
 # Passport/doc: AB1234567 → AB•••••••
 PASSPORT_REGEX = re.compile(r"\b([A-Z]{2})\d{6,8}\b")

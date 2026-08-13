@@ -189,8 +189,12 @@ class PIIAnonymizer(IAnonymizer):
         )
 
         # Email
+        # SECURITY (CodeQL py/polynomial-redos #1203): use unambiguous domain
+        # pattern `(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}` instead of
+        # `[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` (which overlapped `.` between the
+        # character class and the literal).
         text = re.sub(
-            r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',
+            r'[a-zA-Z0-9._%+-]+@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}',
             '[EMAIL]',
             text
         )
