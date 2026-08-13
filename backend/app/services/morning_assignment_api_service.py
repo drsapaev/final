@@ -148,18 +148,39 @@ class MorningAssignmentApiService:
                     # row lock, and audit logging.
                     # Codex P2 fix: thread current_user through for audit
                     # attribution (otherwise logs say user_id=batch).
+                    #
+                    # Codex P1 fix (PR 2721): for visits that are ALREADY
+                    # active (open, in_progress, completed), activate_confirmed_visit()
+                    # is a no-op (it only transitions confirmed → open). Previously,
+                    # the no-op was silently reported as success, which was misleading.
+                    # Now we only call activate_confirmed_visit for visits that
+                    # actually need activation (status == "confirmed"). For already-
+                    # active visits, queue assignment is still legitimate (admin
+                    # re-assigning queue numbers), but we report it as "reassignment"
+                    # rather than "activation".
                     from app.services.visit_lifecycle_service import VisitLifecycleService
 
-                    VisitLifecycleService(self.repository.db).activate_confirmed_visit(
-                        visit_id=visit.id,
-                        current_user=current_user,
-                        commit=False,
-                    )
+                    if visit.status == "confirmed":
+                        VisitLifecycleService(self.repository.db).activate_confirmed_visit(
+                            visit_id=visit.id,
+                            current_user=current_user,
+                            commit=False,
+                        )
+                        message = f"Присвоено {len(queue_assignments)} номеров"
+                    else:
+                        # Already active (open, in_progress, completed) —
+                        # queue reassignment without lifecycle transition.
+                        # This is the legitimate force=true use case.
+                        message = (
+                            f"Переназначено {len(queue_assignments)} номеров "
+                            f"(визит уже активен: {visit.status})"
+                        )
+
                     results.append(
                         {
                             "visit_id": visit_id,
                             "success": True,
-                            "message": f"Присвоено {len(queue_assignments)} номеров",
+                            "message": message,
                             "queue_assignments": queue_assignments,
                         }
                     )

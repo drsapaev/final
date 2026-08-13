@@ -76,7 +76,8 @@ const getAverageWaitTime = (appointments: unknown[]): number => {
   const waitTimes = appointments.
   map((rawApt: unknown) => {
     const apt = toAccessor(rawApt);
-    return toNumber(apt('misc.ms_wait_time_minutes') ?? apt('misc.ms_wait_minutes') ?? apt('misc.ms_queue_wait_minutes') ?? apt('misc.ms_wait_time'));
+    // Codex P1 fix (PR 2721): use real field names, not misc.ms_* prefix.
+    return toNumber(apt('wait_time_minutes') ?? apt('wait_minutes') ?? apt('queue_wait_minutes') ?? apt('wait_time'));
   }).
   filter((minutes: number) => minutes > 0);
 
@@ -198,29 +199,33 @@ const ModernStatistics = ({
     const previousDayAppointments = normalizedAppts.filter((apt) => getAppointmentDate(apt) === previousDate);
 
     // Завершенные визиты за выбранный день
+    // Codex P1 fix (PR 2721): accessor keys must match actual appointment
+    // field names (status, payment_status, patient_id, cost), NOT the
+    // i18n namespace prefix 'misc.ms_*'. The old keys always returned
+    // undefined, making all statistics zero.
     const completedToday = dayAppointments.filter((apt) =>
-    apt('misc.ms_status') === 'completed' || apt('misc.ms_status') === 'done'
+    apt('status') === 'completed' || apt('status') === 'done'
     );
 
     // Ожидают оплаты за выбранный день
     const pendingPayments = dayAppointments.filter((apt) =>
-    apt('misc.ms_status') === 'paid_pending' || apt('misc.ms_payment_status') === 'pending'
+    apt('status') === 'paid_pending' || apt('payment_status') === 'pending'
     );
     const previousPendingPayments = previousDayAppointments.filter((apt) =>
-    apt('misc.ms_status') === 'paid_pending' || apt('misc.ms_payment_status') === 'pending'
+    apt('status') === 'paid_pending' || apt('payment_status') === 'pending'
     );
 
     // Выручка: суммируем оплаченные записи (по payment_status), а не только завершенные
     const totalRevenue = dayAppointments.
-    filter((apt) => apt('misc.ms_payment_status') === 'paid').
-    reduce((sum, apt) => sum + toNumber(apt('misc.ms_payment_amount') || apt('misc.ms_cost')), 0);
+    filter((apt) => apt('payment_status') === 'paid').
+    reduce((sum, apt) => sum + toNumber(apt('payment_amount') || apt('cost')), 0);
     const previousRevenue = previousDayAppointments.
-    filter((apt) => apt('misc.ms_payment_status') === 'paid').
-    reduce((sum, apt) => sum + toNumber(apt('misc.ms_payment_amount') || apt('misc.ms_cost')), 0);
+    filter((apt) => apt('payment_status') === 'paid').
+    reduce((sum, apt) => sum + toNumber(apt('payment_amount') || apt('cost')), 0);
 
     // Уникальные пациенты
-    const uniquePatients = new Set(dayAppointments.map((apt) => apt('misc.ms_patient_id'))).size;
-    const previousUniquePatients = new Set(previousDayAppointments.map((apt) => apt('misc.ms_patient_id'))).size;
+    const uniquePatients = new Set(dayAppointments.map((apt) => apt('patient_id'))).size;
+    const previousUniquePatients = new Set(previousDayAppointments.map((apt) => apt('patient_id'))).size;
 
     // Среднее время ожидания
     const averageWaitTime = getAverageWaitTime(dayAppointments);
