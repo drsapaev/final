@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 # Ensure backend/ is importable
-BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
+BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
@@ -78,19 +78,19 @@ class TestResolveBackupPath:
         assert tmp_path.resolve() in result.parents
 
     def test_rejects_traversal(self, tmp_path: Path) -> None:
-        with pytest.raises(BackupSecurityError, match="forbidden sequence|escapes"):
+        with pytest.raises(BackupSecurityError, match="Invalid backup filename|forbidden sequence|escapes backup_dir"):
             _resolve_backup_path(tmp_path, "../../etc/passwd")
 
     def test_rejects_absolute_path(self, tmp_path: Path) -> None:
-        with pytest.raises(BackupSecurityError, match="forbidden sequence|escapes"):
+        with pytest.raises(BackupSecurityError, match="Invalid backup filename|forbidden sequence|escapes backup_dir"):
             _resolve_backup_path(tmp_path, "/etc/passwd")
 
     def test_rejects_subdir(self, tmp_path: Path) -> None:
-        with pytest.raises(BackupSecurityError, match="forbidden sequence|escapes"):
+        with pytest.raises(BackupSecurityError, match="Invalid backup filename|forbidden sequence|escapes backup_dir"):
             _resolve_backup_path(tmp_path, "subdir/backup.db")
 
     def test_rejects_dotdot_in_name(self, tmp_path: Path) -> None:
-        with pytest.raises(BackupSecurityError, match="forbidden sequence|escapes"):
+        with pytest.raises(BackupSecurityError, match="Invalid backup filename|forbidden sequence|escapes backup_dir"):
             _resolve_backup_path(tmp_path, "backup..db")
 
 
@@ -165,7 +165,7 @@ class TestBackupServiceRejectsMaliciousFilename:
         """restore_backup re-raises (its except-Exception block calls `raise`).
         The error is logged then propagated."""
         svc = self._make_service(tmp_path)
-        with pytest.raises(BackupSecurityError, match="forbidden sequence|escapes"):
+        with pytest.raises(BackupSecurityError, match="Invalid backup filename|forbidden sequence|escapes backup_dir"):
             svc.restore_backup("../../etc/passwd")
 
     def test_verify_backup_rejects_traversal(self, tmp_path: Path) -> None:
@@ -180,7 +180,7 @@ class TestBackupServiceRejectsMaliciousFilename:
 
     def test_restore_backup_rejects_absolute(self, tmp_path: Path) -> None:
         svc = self._make_service(tmp_path)
-        with pytest.raises(BackupSecurityError, match="forbidden sequence|escapes"):
+        with pytest.raises(BackupSecurityError, match="Invalid backup filename|forbidden sequence|escapes backup_dir"):
             svc.restore_backup("/etc/passwd")
 
     def test_verify_backup_rejects_subdir(self, tmp_path: Path) -> None:
