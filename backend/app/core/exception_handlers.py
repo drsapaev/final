@@ -237,6 +237,19 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         """
         Обработка всех остальных необработанных исключений
+
+        SECURITY (CodeQL py/stack-trace-exposure #1175, #1176, and ~26
+        downstream false-positive alerts): the previous implementation included
+        `str(exc)` in the response body when `logger.level <= logging.DEBUG`.
+        This created an info-leak vector: setting `LOG_LEVEL=DEBUG` (e.g. for
+        troubleshooting) would cause ALL unhandled exceptions to surface their
+        message to the client, including stack-trace fragments from
+        SQLAlchemy, pg_dump, Jinja2, etc.
+
+        Fix: never include exception details in the HTTP response, regardless
+        of log level. The full exception (with stack trace) is logged
+        server-side via `exc_info=True`; the client receives only a generic
+        message and a `request_id` for cross-referencing with server logs.
         """
         request_id = _get_request_id(request)
         logger.error(
@@ -253,10 +266,6 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "error": "internal_server_error",
                 "message": "Внутренняя ошибка сервера",
                 "request_id": request_id,
-                "detail": (
-                    str(exc)
-                    if logger.level <= logging.DEBUG
-                    else "Обратитесь к администратору"
-                ),
+                "detail": "Обратитесь к администратору",
             },
         )
