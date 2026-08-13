@@ -25,7 +25,7 @@
  *   1 — debt exceeded baseline OR undocumented casts found (CI failure)
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
@@ -74,10 +74,18 @@ const TECH_DEBT_PATTERN = /TECH-DEBT\([a-z0-9-]+\)/i;
 function runRgCount(pattern, cwd) {
   // rg -c returns `path:count` per file (one line per file with matches).
   // Exclude .d.ts ambient declaration files — see comment in findUndocumentedCasts.
+  //
+  // SECURITY (CodeQL js/shell-command-injection-from-environment #1249):
+  // Previously used execSync with a shell string `${pattern} ${cwd}` which
+  // could allow argument injection if pattern/cwd ever came from untrusted
+  // input. While both are currently trusted constants, we switch to
+  // execFileSync with an explicit argv array — this never invokes a shell,
+  // so there's no injection vector even if the inputs become untrusted later.
   try {
-    const output = execSync(`rg -c '${pattern}' ${cwd} -g '!*.d.ts' 2>/dev/null || true`, {
+    const output = execFileSync('rg', ['-c', pattern, cwd, '-g', '!*.d.ts'], {
       encoding: 'utf-8',
       maxBuffer: 1024 * 1024 * 10,
+      stdio: ['ignore', 'pipe', 'ignore'],  // suppress stderr (rg exits 1 on no matches)
     });
     return output
       .trim()
@@ -95,10 +103,14 @@ function runRgCount(pattern, cwd) {
 function runRgLines(pattern, cwd) {
   // rg -n returns `path:line:content` per match (one line per match).
   // Exclude .d.ts ambient declaration files — see comment in findUndocumentedCasts.
+  //
+  // SECURITY (CodeQL js/shell-command-injection-from-environment #1250):
+  // Same hardening as runRgCount — use execFileSync with argv array.
   try {
-    return execSync(`rg -n '${pattern}' ${cwd} -g '!*.d.ts' 2>/dev/null || true`, {
+    return execFileSync('rg', ['-n', pattern, cwd, '-g', '!*.d.ts'], {
       encoding: 'utf-8',
       maxBuffer: 1024 * 1024 * 10,
+      stdio: ['ignore', 'pipe', 'ignore'],
     });
   } catch {
     return '';
