@@ -49,6 +49,11 @@ const EXEMPT_FILES = new Set([
   'backend/tests/unit/test_telegram_notifications_privacy.py',
   'backend/tests/integration/test_pr31_pii_masking.py',
   'backend/tests/unit/test_telegram_staff_read_only_menu_runtime.py',
+  // PII-01: these files test that PII IS scrubbed from notifications/logs.
+  // They need real-looking phone numbers to verify masking works.
+  // Same pattern as test_pii_masker.py and test_sentry_sanitization.py.
+  'backend/tests/unit/test_notifications_push_logging.py',
+  'backend/tests/unit/test_patient_onboarding_request_policy.py',
 ]);
 
 const REAL_LOOKING_PHONE = /\+9989\d[1-9]\d{6}/;
@@ -58,7 +63,7 @@ const CANONICAL_SYNTHETIC = new Set([
 
 // Baseline: pre-existing violations before this guard was added.
 // New violations ABOVE this baseline cause CI failure.
-const BASELINE_VIOLATIONS = 127;
+const BASELINE_VIOLATIONS = 114;
 
 let violations = 0;
 let filesScanned = 0;
