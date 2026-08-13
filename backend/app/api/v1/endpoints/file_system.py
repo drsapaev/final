@@ -635,6 +635,12 @@ async def export_files(
 
         return FileExportResponse(
             export_id=f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            # SECURITY (CodeQL py/path-injection #449): os.path.basename strips
+            # any directory components from the server-generated temp_file.name,
+            # ensuring the download_url is a clean filename. The temp file is
+            # created by tempfile.NamedTemporaryFile (server-side), so the path
+            # is not user-controlled — but CodeQL cannot prove that. os.path.basename
+            # is a recognized sanitizer that breaks the taint chain.
             download_url=f"/api/v1/files/download-export/{os.path.basename(temp_file.name)}",
             expires_at=datetime.now() + timedelta(hours=24),
         )

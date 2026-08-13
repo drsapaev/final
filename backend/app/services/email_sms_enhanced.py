@@ -569,7 +569,20 @@ class EmailSMSEnhancedService:
         """Добавление вложения к email"""
         try:
             if attachment.get('type') == 'image':
-                with open(attachment['path'], 'rb') as f:
+                # SECURITY (CodeQL py/path-injection #448): use os.path.basename
+                # to strip any path components from user-supplied path. Combined
+                # with the schema validator (SendCustomEmailRequest._validate_attachments),
+                # this blocks path traversal via attachment['path'].
+                import os
+                safe_path = os.path.basename(attachment['path'])
+                if not safe_path or safe_path != attachment['path']:
+                    logger.warning(
+                        "Email attachment path rejected (traversal attempt): %s",
+                        attachment['path'],
+                    )
+                    return
+                # codeql[py/path-injection]
+                with open(safe_path, 'rb') as f:
                     img_data = f.read()
                 image = MIMEImage(img_data)
                 image.add_header(
