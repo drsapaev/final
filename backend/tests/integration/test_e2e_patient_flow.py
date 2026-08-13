@@ -47,13 +47,13 @@ def patient_user_with_data(db_session):
         db_session.refresh(user)
 
     # Создаем запись пациента
-    patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+    patient = db_session.query(Patient).filter(Patient.phone == "+998900000010").first()
     if not patient:
         patient = Patient(
             first_name="Тест",
             last_name="Пациентов",
             middle_name="Тестович",
-            phone="+998901112233",
+            phone="+998900000010",
             birth_date=date(1990, 5, 15),
         )
         db_session.add(patient)
@@ -271,7 +271,7 @@ class TestPatientFlow:
         other_patient = Patient(
             first_name="Другой",
             last_name="Пациент",
-            phone="+998999999999",
+            phone="+998900000011",
             birth_date=date(1985, 1, 1),
         )
         db_session.add(other_patient)
