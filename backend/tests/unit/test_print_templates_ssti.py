@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 from jinja2.exceptions import SecurityError, TemplateError
 
-BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
+BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
