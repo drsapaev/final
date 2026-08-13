@@ -107,7 +107,7 @@ class TestVisitConfirmationAPI:
 
         response = client.post("/api/v1/patient/visits/confirm", json={
             "token": test_visit.confirmation_token,
-            "patient_phone": "+998901111111"
+            "patient_phone": "+998900000999"
         })
 
         assert response.status_code == 400
