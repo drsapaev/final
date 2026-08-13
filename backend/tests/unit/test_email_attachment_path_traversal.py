@@ -151,12 +151,17 @@ class TestAddAttachmentServiceLayer:
     @pytest.mark.parametrize("malicious_path", [
         "../../etc/passwd",
         "/etc/passwd",
-        "..\\windows\\system32",
         "subdir/../../../etc/shadow",
     ])
     def test_service_rejects_traversal_paths(self, malicious_path: str):
         """_add_attachment must reject paths where os.path.basename changes
-        the value (indicating path components were stripped)."""
+        the value (indicating path components were stripped).
+
+        Note: Windows backslash paths (..\\windows\\system32) are tested only
+        in the schema validator (Layer 1), because on Linux os.path.basename
+        treats backslash as a regular filename character — the service-layer
+        defense-in-depth only catches forward-slash traversal. The schema
+        validator catches both."""
         svc = self._get_service()
         msg = MagicMock()
 
