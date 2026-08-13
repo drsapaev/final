@@ -65,7 +65,7 @@ def _create_existing_entry(
         number=number,
         patient_id=patient_id,
         patient_name="Characterization Patient",
-        phone="+998901234567",
+        phone="+998900000121",
         source=source,
         status=status,
     )
@@ -103,7 +103,7 @@ def _create_other_patient(db_session) -> Patient:
     patient = Patient(
         first_name="Other",
         last_name="Batch",
-        phone="+998901110022",
+        phone="+998900000109",
         birth_date=date(1991, 1, 1),
     )
     db_session.add(patient)

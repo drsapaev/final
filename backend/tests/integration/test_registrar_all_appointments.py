@@ -436,7 +436,7 @@ class TestRegistrarAllAppointments:
         other_patient = Patient(
             first_name="Other",
             last_name="QueueOwner",
-            phone="+998901119091",
+            phone="+998900000115",
         )
         queue = DailyQueue(
             day=date.today(),
@@ -785,7 +785,7 @@ class TestRegistrarAllAppointments:
         other_patient = Patient(
             first_name="Other",
             last_name="Patient",
-            phone="+998901119001",
+            phone="+998900000114",
         )
         db_session.add_all([queue, other_patient])
         db_session.flush()

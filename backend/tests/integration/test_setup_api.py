@@ -17,7 +17,7 @@ def build_payload(**overrides):
         "clinic": {
             "name": "Central Clinic",
             "address": "Main street 1",
-            "phone": "+998901112233",
+            "phone": "+998900000111",
             "email": "clinic@example.com",
             "timezone": "Asia/Tashkent",
             "logo_url": "https://example.com/logo.png",
@@ -25,7 +25,7 @@ def build_payload(**overrides):
         "branch": {
             "name": "Main Branch",
             "address": "Main street 1",
-            "phone": "+998901112233",
+            "phone": "+998900000111",
             "email": "branch@example.com",
             "timezone": "Asia/Tashkent",
         },

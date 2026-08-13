@@ -219,7 +219,7 @@ class TestPaymentCreateService:
         other_patient = Patient(
             first_name="Other",
             last_name="PaymentOwner",
-            phone="+998901990001",
+            phone="+998900000132",
             birth_date=date(1991, 1, 1),
         )
         db_session.add(other_patient)

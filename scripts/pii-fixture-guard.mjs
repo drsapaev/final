@@ -63,7 +63,7 @@ const CANONICAL_SYNTHETIC = new Set([
 
 // Baseline: pre-existing violations before this guard was added.
 // New violations ABOVE this baseline cause CI failure.
-const BASELINE_VIOLATIONS = 96;
+const BASELINE_VIOLATIONS = 0;
 
 let violations = 0;
 let filesScanned = 0;

@@ -22,7 +22,7 @@ async def test_appointment_reminder_preserves_no_id_payload(monkeypatch):
 
     response = await telegram_integration.send_appointment_reminder(
         {
-            "patient_phone": "+998901234567",
+            "patient_phone": "+998900000121",
             "appointment_data": {
                 "patient_name": "Sensitive Patient",
                 "doctor_name": "Dr Privacy",
@@ -43,7 +43,7 @@ async def test_appointment_reminder_preserves_no_id_payload(monkeypatch):
 async def test_appointment_reminder_rejects_other_patient_appointment(
     monkeypatch,
 ):
-    patient = SimpleNamespace(id=123, phone="+998901234567")
+    patient = SimpleNamespace(id=123, phone="+998900000121")
     appointment = SimpleNamespace(id=456, patient_id=999)
     telegram_user = SimpleNamespace(chat_id=998877, language_code="ru")
     background_tasks = BackgroundTasks()
@@ -80,7 +80,7 @@ async def test_appointment_reminder_rejects_other_patient_appointment(
     with pytest.raises(HTTPException) as exc_info:
         await telegram_integration.send_appointment_reminder(
             {
-                "patient_phone": "+998901234567",
+                "patient_phone": "+998900000121",
                 "appointment_data": {
                     "appointment_id": 456,
                     "patient_name": "Other Patient",
@@ -111,7 +111,7 @@ async def test_lab_results_notification_preserves_no_id_payload(monkeypatch):
 
     response = await telegram_integration.send_lab_results_notification(
         {
-            "patient_phone": "+998901234567",
+            "patient_phone": "+998900000121",
             "lab_data": {
                 "patient_name": "Sensitive Patient",
                 "test_type": "CBC",
@@ -132,7 +132,7 @@ async def test_lab_results_notification_preserves_no_id_payload(monkeypatch):
 async def test_lab_results_notification_rejects_other_patient_result(
     monkeypatch,
 ):
-    patient = SimpleNamespace(id=123, phone="+998901234567")
+    patient = SimpleNamespace(id=123, phone="+998900000121")
     lab_result = SimpleNamespace(id=456, order_id=789)
     lab_order = SimpleNamespace(id=789, patient_id=999)
     telegram_user = SimpleNamespace(chat_id=998877, language_code="ru")
@@ -172,7 +172,7 @@ async def test_lab_results_notification_rejects_other_patient_result(
     with pytest.raises(HTTPException) as exc_info:
         await telegram_integration.send_lab_results_notification(
             {
-                "patient_phone": "+998901234567",
+                "patient_phone": "+998900000121",
                 "lab_data": {
                     "lab_results_id": 456,
                     "patient_name": "Other Patient",

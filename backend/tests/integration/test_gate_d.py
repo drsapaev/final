@@ -172,7 +172,7 @@ def test_patient(db_session):
         middle_name="GateD",
         birth_date=date(1990, 1, 1),
         sex="M",
-        phone="+998901234567",
+        phone="+998900000121",
         email="patient@test.local",
         created_at=datetime.now(UTC),
         is_deleted=False,
@@ -190,7 +190,7 @@ def create_test_visit(session, status="open", patient=None, **kwargs):
             first_name="Test",
             birth_date=date(1990, 1, 1),
             sex="M",
-            phone="+998901234568",
+            phone="+998900000122",
             created_at=datetime.now(UTC),
             is_deleted=False,
         )

@@ -80,7 +80,7 @@ def test_doctor_cannot_save_emr_for_another_doctors_visit(client, db_session):
     patient = Patient(
         first_name="EMR",
         last_name="Owner",
-        phone="+998909601000",
+        phone="+998900000146",
         birth_date=date(1990, 1, 1),
     )
     db_session.add_all(
@@ -250,7 +250,7 @@ def test_patient_emr_history_filters_other_doctors_summaries(client, db_session)
     patient = Patient(
         first_name="Shared",
         last_name="Patient",
-        phone="+998909701000",
+        phone="+998900000147",
         birth_date=date(1990, 1, 1),
     )
     db_session.add_all(

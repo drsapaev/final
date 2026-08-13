@@ -20,7 +20,7 @@ def test_registrar_can_search_patient_directory(
     patient = Patient(
         first_name="Searchable",
         last_name="Patient",
-        phone="+998901110000",
+        phone="+998900000106",
         birth_date=date(1991, 2, 3),
     )
     db_session.add(patient)

@@ -186,7 +186,7 @@ class TestQueueDomainService:
             daily_queue=SimpleNamespace(id=3),
             patient_id=7,
             patient_name="Test Patient",
-            phone="+998901234567",
+            phone="+998900000121",
             source="desk",
             auto_number=True,
             commit=False,

@@ -176,12 +176,12 @@ def test_purchase_package_rejects_cross_patient_visit_and_appointment(
     purchase_patient = Patient(
         first_name="Package",
         last_name="Owner",
-        phone="+998901110001",
+        phone="+998900000107",
     )
     other_patient = Patient(
         first_name="Other",
         last_name="Context",
-        phone="+998901110002",
+        phone="+998900000108",
     )
     db_session.add_all([purchase_patient, other_patient])
     db_session.flush()

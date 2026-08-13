@@ -192,7 +192,7 @@ class TestFileSecurity:
         other_patient = Patient(
             first_name="Other",
             last_name="Patient",
-            phone="+998901112233",
+            phone="+998900000111",
             birth_date=date(1985, 1, 1),
         )
         db_session.add(other_patient)
@@ -242,7 +242,7 @@ class TestFileSecurity:
         other_patient = Patient(
             first_name="Appointment",
             last_name="Other",
-            phone="+998901112244",
+            phone="+998900000112",
             birth_date=date(1986, 1, 1),
         )
         db_session.add(other_patient)
