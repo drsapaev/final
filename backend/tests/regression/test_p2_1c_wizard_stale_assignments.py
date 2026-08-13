@@ -118,7 +118,7 @@ def _setup_visit_with_three_tags(session):
     session.flush()
     patient = Patient(
         last_name="P", first_name="Patient", birth_date=date(1990, 1, 1),
-        sex="M", phone="+998901234567", email=f"p_{unique}@t.local",
+        sex="M", phone="+998900000000", email=f"p_{unique}@t.local",
         created_at=datetime.now(UTC), is_deleted=False,
     )
     session.add(patient)

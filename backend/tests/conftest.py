@@ -252,7 +252,7 @@ def test_patient(db_session):
         first_name="Иван",
         last_name="Иванов",
         middle_name="Иванович",
-        phone="+998901234567",
+        phone="+998900000000",
         birth_date=date(1990, 1, 1),
         address="Тестовый адрес",
     )
