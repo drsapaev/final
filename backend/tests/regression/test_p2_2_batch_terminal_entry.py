@@ -159,7 +159,7 @@ def _setup_patient_and_queue(session):
         first_name="Patient",
         birth_date=date(1990, 1, 1),
         sex="M",
-        phone=f"+998901234567",
+        phone=f"+998900000000",
         email=f"patient_{unique}@test.local",
         created_at=datetime.now(UTC),
         is_deleted=False,
@@ -208,7 +208,7 @@ class TestP22BatchTerminalEntry:
             number=1,
             patient_id=patient_id,
             patient_name="Reg Patient",
-            phone="+998901234567",
+            phone="+998900000000",
             source="desk",
             status="cancelled",
         )
@@ -281,7 +281,7 @@ class TestP22BatchTerminalEntry:
             number=1,
             patient_id=patient_id,
             patient_name="Reg Patient",
-            phone="+998901234567",
+            phone="+998900000000",
             source="desk",
             status="cancelled",
         )
@@ -337,7 +337,7 @@ class TestP22BatchTerminalEntry:
             number=1,
             patient_id=patient_id,
             patient_name="Reg Patient",
-            phone="+998901234567",
+            phone="+998900000000",
             source="desk",
             status="served",  # terminal
         )
@@ -394,7 +394,7 @@ class TestP22BatchTerminalEntry:
             number=1,
             patient_id=patient_id,
             patient_name="Reg Patient",
-            phone="+998901234567",
+            phone="+998900000000",
             source="desk",
             status="waiting",  # active
         )
@@ -448,7 +448,7 @@ class TestP22BatchTerminalEntry:
             number=1,
             patient_id=patient_id,
             patient_name="Reg Patient",
-            phone="+998901234567",
+            phone="+998900000000",
             source="desk",
             status="waiting",  # active
         )

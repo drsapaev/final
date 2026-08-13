@@ -151,7 +151,7 @@ def _setup_pending_visit(session, channel="telegram"):
         first_name="Patient",
         birth_date=date(1990, 1, 1),
         sex="M",
-        phone="+998901234567",
+        phone="+998900000000",
         email=f"patient_{unique}@test.local",
         created_at=datetime.now(UTC),
         is_deleted=False,
@@ -366,7 +366,7 @@ class TestPWAConfirmationFlow:
             service = VisitConfirmationService(repro)
             result = service.confirm_by_pwa(
                 token=token,
-                patient_phone="+998901234567",
+                patient_phone="+998900000000",
                 source_ip="127.0.0.1",
                 user_agent="Mozilla/5.0",
             )

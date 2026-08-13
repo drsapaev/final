@@ -110,7 +110,7 @@ test.describe('Queue System Tests', () => {
       await addToQueueButton.first().click();
       
       // Заполняем форму
-      await page.fill('input[placeholder*="Телефон"], input[name="phone"]', '+998901234567');
+      await page.fill('input[placeholder*="Телефон"], input[name="phone"]', '+998900000000');
       await page.fill('input[placeholder*="Имя"], input[name="name"]', 'Тестовый Пациент');
       
       // Выбираем специалиста
@@ -135,7 +135,7 @@ test.describe('Queue System Tests', () => {
     if (await addButton.count() > 0) {
       // Добавляем первого пациента
       await addButton.first().click();
-      await page.fill('input[name="phone"]', '+998901111111');
+      await page.fill('input[name="phone"]', '+998900000000');
       await page.fill('input[name="name"]', 'Первый Пациент');
       await page.click('button[type="submit"]');
       
@@ -144,7 +144,7 @@ test.describe('Queue System Tests', () => {
       
       // Пытаемся добавить с тем же номером
       await addButton.first().click();
-      await page.fill('input[name="phone"]', '+998901111111');
+      await page.fill('input[name="phone"]', '+998900000000');
       await page.fill('input[name="name"]', 'Второй Пациент');
       await page.click('button[type="submit"]');
       

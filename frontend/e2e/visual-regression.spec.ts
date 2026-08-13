@@ -54,7 +54,7 @@ function jsonResponse(body) {
 
 const samplePendingPayment = {
   id: 2001, patient_id: 101, patient_last_name: 'Иванов', patient_first_name: 'Иван',
-  patient_name: 'Иванов Иван Иванович', patient_phone: '+998901234567',
+  patient_name: 'Иванов Иван Иванович', patient_phone: '+998900000000',
   total_amount: 150000, remaining_amount: 150000, status: 'pending',
   created_at: new Date().toISOString(),
   appointment_date: new Date().toISOString().split('T')[0], appointment_time: '10:00',

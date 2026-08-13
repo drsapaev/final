@@ -59,7 +59,7 @@ const sampleQueueEntry = {
     id: 1001,
     patient_id: 101,
     patient_fio: 'Иванов Иван Иванович',
-    patient_phone: '+998901234567',
+    patient_phone: '+998900000000',
     patient_birth_year: 1985,
     patient_gender: 'male',
     services: [{ id: 101, code: 'C001', name: 'Консультация кардиолога', price: 150000 }],

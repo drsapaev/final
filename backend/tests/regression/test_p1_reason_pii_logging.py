@@ -119,7 +119,7 @@ def _setup_visit(session, *, status: str = "confirmed", notes: str | None = None
     patient = Patient(
         last_name="P", first_name="Patient", birth_date=date(1990, 1, 1),
         sex="M",
-        phone=f"+9989012{uuid.uuid4().hex[:5]}",
+        phone="+998900000000",
         email=f"p_{unique}@t.local",
         created_at=datetime.now(UTC), is_deleted=False,
     )

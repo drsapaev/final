@@ -61,7 +61,7 @@ const samplePendingPayment = {
   patient_last_name: 'Иванов',
   patient_first_name: 'Иван',
   patient_name: 'Иванов Иван Иванович',
-  patient_phone: '+998901234567',
+  patient_phone: '+998900000000',
   total_amount: 150000,
   remaining_amount: 150000,
   status: 'pending',

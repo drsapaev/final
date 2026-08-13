@@ -124,7 +124,7 @@ def _setup_confirmed_visit(session, *, status: str = "confirmed"):
         # Codex P1 fix: synthetic unique phone (AGENTS.md L377/L451 — no
         # real-looking phone numbers in committed test fixtures).
         # Pattern follows test_p1_1_overpayment_policy.py.
-        phone=f"+9989012{uuid.uuid4().hex[:5]}",
+        phone="+998900000000",
         email=f"p_{unique}@t.local",
         created_at=datetime.now(UTC), is_deleted=False,
     )
