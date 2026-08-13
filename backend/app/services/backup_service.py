@@ -5,6 +5,7 @@ Database Backup Service
 """
 import logging
 import os
+import re
 import shutil
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -13,6 +14,82 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Security validators
+#
+# These close the CodeQL alerts:
+#   - py/path-injection (11 instances) on `self.backup_dir / backup_filename`
+#   - py/command-line-injection (2 instances) on subprocess.run([...])
+#
+# `backup_filename` originates from an API parameter (admin-only endpoint),
+# but we still validate defensively in case of compromised admin credentials
+# or future route changes. Likewise, `DATABASE_URL` is server-side env, but
+# CodeQL cannot prove that, and an env-var injection elsewhere (e.g. via a
+# misconfigured `.env` loader) could let an attacker influence pg_dump args.
+# ---------------------------------------------------------------------------
+
+# Backup filenames are server-generated ("backup_<type>_<YYYYMMDD_HHMMSS>.db[.gz]"),
+# but we accept any reasonable name. Reject path separators, NUL bytes, leading
+# dots, and `..` segments - this blocks path traversal via `..` or absolute paths.
+_SAFE_BACKUP_FILENAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,254}$")
+
+# PostgreSQL connection components. Same character set as a conservative
+# superset of valid PostgreSQL identifiers (unquoted identifiers are
+# [a-z_][a-z0-9_$]* but quoted identifiers and hostnames allow more).
+# Crucially, no leading '-' - blocks argument injection via DATABASE_URL
+# like `postgresql://--role=evil@host/db` where `--role=evil` is parsed as
+# the username and then passed to `pg_dump -U --role=evil ...`.
+_PG_HOST_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.\-]{0,253}$")
+_PG_USER_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,62}$")
+_PG_DB_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,62}$")
+
+
+class BackupSecurityError(ValueError):
+    """Raised when a backup/restore argument fails security validation."""
+
+
+def _validate_backup_filename(filename: str) -> None:
+    """Reject filenames that could escape backup_dir or contain shell metachars.
+
+    Closes CodeQL py/path-injection alerts #1183-#1193.
+    """
+    if not filename or not _SAFE_BACKUP_FILENAME_RE.match(filename):
+        raise BackupSecurityError(f"Invalid backup filename: {filename!r}")
+    if ".." in filename or "/" in filename or "\\" in filename or "\x00" in filename:
+        raise BackupSecurityError(f"Backup filename contains forbidden sequence: {filename!r}")
+
+
+def _resolve_backup_path(backup_dir: Path, filename: str) -> Path:
+    """Resolve filename under backup_dir and verify the resolved path stays inside."""
+    _validate_backup_filename(filename)
+    base = backup_dir.resolve()
+    candidate = (backup_dir / filename).resolve()
+    # `candidate` must equal base (degenerate) or be a direct child of base.
+    if candidate != base and base not in candidate.parents:
+        raise BackupSecurityError(
+            f"Backup path escapes backup_dir: {filename!r} -> {candidate}"
+        )
+    return candidate
+
+
+def _validate_pg_component(value: str | None, kind: str) -> str:
+    """Validate a PostgreSQL connection component (hostname/username/database).
+
+    Prevents argument injection via DATABASE_URL. Closes CodeQL
+    py/command-line-injection alerts #1179, #1180.
+    """
+    if value is None or value == "":
+        return value or ""
+    if value.startswith("-"):
+        raise BackupSecurityError(
+            f"Invalid {kind}: must not start with '-' (argument injection): {value!r}"
+        )
+    patterns = {"hostname": _PG_HOST_RE, "username": _PG_USER_RE, "database": _PG_DB_RE}
+    pattern = patterns.get(kind)
+    if pattern and not pattern.match(value):
+        raise BackupSecurityError(f"Invalid {kind}: contains forbidden characters: {value!r}")
+    return value
 
 
 def _is_sqlite_url(url: str) -> bool:
@@ -99,20 +176,34 @@ class BackupService:
                 import urllib.parse
                 parsed = urllib.parse.urlparse(db_url.replace("postgresql://", "http://"))
 
+                # SECURITY: validate each parsed component to prevent argument
+                # injection via a hostile DATABASE_URL. Even though DATABASE_URL
+                # is server-side env, CodeQL py/command-line-injection flagged
+                # this call site (alert #1179). We harden defensively.
+                pg_host = _validate_pg_component(parsed.hostname, "hostname") or "localhost"
+                pg_user = _validate_pg_component(parsed.username, "username") or "postgres"
+                pg_db = _validate_pg_component(parsed.path.lstrip("/"), "database")
+                pg_port = parsed.port or 5432
+                if not isinstance(pg_port, int) or not (1 <= pg_port <= 65535):
+                    raise BackupSecurityError(f"Invalid PostgreSQL port: {pg_port!r}")
+
                 env = os.environ.copy()
                 env["PGPASSWORD"] = parsed.password or ""
 
                 cmd = [
                     "pg_dump",
-                    "-h", parsed.hostname or "localhost",
-                    "-p", str(parsed.port or 5432),
-                    "-U", parsed.username or "postgres",
-                    "-d", parsed.path.lstrip("/"),
+                    "-h", pg_host,
+                    "-p", str(pg_port),
+                    "-U", pg_user,
+                    "-d", pg_db,
                     "-F", "c",  # Custom format
                     "-f", str(backup_path),
                 ]
 
-                result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+                # subprocess.run with list argv (no shell=True) is the safe
+                # calling convention; combined with component validation above,
+                # this closes CodeQL py/command-line-injection #1179.
+                result = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
                 if result.returncode != 0:
                     raise Exception(f"pg_dump failed: {result.stderr}")
 
@@ -229,7 +320,9 @@ class BackupService:
         ⚠️ WARNING: This will overwrite the current database!
         """
         try:
-            backup_path = self.backup_dir / backup_filename
+            # SECURITY: validate filename before joining to backup_dir.
+            # Closes CodeQL py/path-injection #1187-#1190 (restore path).
+            backup_path = _resolve_backup_path(self.backup_dir, backup_filename)
             if not backup_path.exists():
                 raise FileNotFoundError(f"Backup not found: {backup_filename}")
 
@@ -270,20 +363,29 @@ class BackupService:
                 import urllib.parse
                 parsed = urllib.parse.urlparse(db_url.replace("postgresql://", "http://"))
 
+                # SECURITY: same component validation as create_backup -
+                # closes CodeQL py/command-line-injection #1180 on pg_restore.
+                pg_host = _validate_pg_component(parsed.hostname, "hostname") or "localhost"
+                pg_user = _validate_pg_component(parsed.username, "username") or "postgres"
+                pg_db = _validate_pg_component(parsed.path.lstrip("/"), "database")
+                pg_port = parsed.port or 5432
+                if not isinstance(pg_port, int) or not (1 <= pg_port <= 65535):
+                    raise BackupSecurityError(f"Invalid PostgreSQL port: {pg_port!r}")
+
                 env = os.environ.copy()
                 env["PGPASSWORD"] = parsed.password or ""
 
                 cmd = [
                     "pg_restore",
-                    "-h", parsed.hostname or "localhost",
-                    "-p", str(parsed.port or 5432),
-                    "-U", parsed.username or "postgres",
-                    "-d", parsed.path.lstrip("/"),
+                    "-h", pg_host,
+                    "-p", str(pg_port),
+                    "-U", pg_user,
+                    "-d", pg_db,
                     "-c",  # Clean (drop) database objects before recreating
                     restore_source,
                 ]
 
-                result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+                result = subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
                 if result.returncode != 0:
                     raise Exception(f"pg_restore failed: {result.stderr}")
 
@@ -310,7 +412,9 @@ class BackupService:
     def verify_backup(self, backup_filename: str) -> dict[str, any]:
         """Verify backup integrity"""
         try:
-            backup_path = self.backup_dir / backup_filename
+            # SECURITY: validate filename before joining to backup_dir.
+            # Closes CodeQL py/path-injection #1191-#1193 (verify path).
+            backup_path = _resolve_backup_path(self.backup_dir, backup_filename)
             if not backup_path.exists():
                 raise FileNotFoundError(f"Backup not found: {backup_filename}")
 
