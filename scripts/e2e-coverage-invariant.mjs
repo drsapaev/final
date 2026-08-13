@@ -102,8 +102,215 @@ function recordFail(name, reason, file, line) {
 }
 
 /**
+ * Strip comments and string literals from source code, preserving line
+ * numbers for accurate error reporting.
+ *
+ * P2 #6 fix (PR 2726): The old line-by-line regex approach had 5 weaknesses:
+ *   1. Inline comments: `const x = 1; // test.skip(...) → false positive
+ *   2. Block comments mid-line: `const x = /* test.skip() *\/ 1;` → false positive
+ *   3. String literals: const note = 'test.skip(...)';` → false positive
+ *   4. Multiline calls: `test\n.skip(...)` → false negative (regex tested per-line)
+ *   5. Template literals: `` `${test.skip()}` `` → false positive
+ *
+ * This function uses a character-by-character state machine to strip:
+ *   - Line comments (//)
+ *   - Block comments (/* ... *​/)
+ *   - Single-quoted strings ('...')
+ *   - Double-quoted strings ("...")
+ *   - Template literals (`...`)
+ *   - Regex literals (/pattern/flags) — best-effort, may have edge cases
+ *
+ * The output preserves newlines so line numbers stay accurate.
+ * Stripped content is replaced with spaces (not removed) to preserve
+ * column positions for debugging.
+ *
+ * @param {string} source — raw TypeScript/JavaScript source
+ * @returns {string} — source with comments and strings stripped
+ */
+export function stripCommentsAndStrings(source) {
+  const len = source.length;
+  const out = new Array(len);
+  let i = 0;
+  let state = 'code'; // code | lineComment | blockComment | singleStr | doubleStr | template | regex
+
+  while (i < len) {
+    const ch = source[i];
+    const next = source[i + 1];
+
+    switch (state) {
+      case 'code':
+        if (ch === '/' && next === '/') {
+          state = 'lineComment';
+          out[i] = ' ';
+          out[i + 1] = ' ';
+          i += 2;
+          continue;
+        }
+        if (ch === '/' && next === '*') {
+          state = 'blockComment';
+          out[i] = ' ';
+          out[i + 1] = ' ';
+          i += 2;
+          continue;
+        }
+        if (ch === "'") {
+          state = 'singleStr';
+          out[i] = ' ';
+          i++;
+          continue;
+        }
+        if (ch === '"') {
+          state = 'doubleStr';
+          out[i] = ' ';
+          i++;
+          continue;
+        }
+        if (ch === '`') {
+          state = 'template';
+          out[i] = ' ';
+          i++;
+          continue;
+        }
+        // Best-effort regex detection: / after certain tokens
+        // This is imperfect but catches most cases. False positives in
+        // regex detection would OVER-strip (turn code into spaces),
+        // which could cause false negatives for forbidden patterns
+        // inside regex. However, test.skip() inside a regex is extremely
+        // unlikely. We accept this trade-off for simplicity.
+        if (ch === '/' && i > 0) {
+          const prev = out[i - 1];
+          if (prev === '(' || prev === ',' || prev === '=' || prev === ':' ||
+              prev === '[' || prev === '!' || prev === '&' || prev === '|' ||
+              prev === '{' || prev === ';' || prev === '\n') {
+            state = 'regex';
+            out[i] = ' ';
+            i++;
+            continue;
+          }
+        }
+        out[i] = ch;
+        i++;
+        break;
+
+      case 'lineComment':
+        if (ch === '\n') {
+          out[i] = ch;
+          state = 'code';
+          i++;
+        } else {
+          out[i] = ' ';
+          i++;
+        }
+        break;
+
+      case 'blockComment':
+        if (ch === '*' && next === '/') {
+          out[i] = ' ';
+          out[i + 1] = ' ';
+          state = 'code';
+          i += 2;
+          continue;
+        }
+        out[i] = ch === '\n' ? ch : ' ';
+        i++;
+        break;
+
+      case 'singleStr':
+        if (ch === '\\' && i + 1 < len) {
+          out[i] = ' ';
+          out[i + 1] = ' ';
+          i += 2;
+          continue;
+        }
+        if (ch === "'") {
+          out[i] = ' ';
+          state = 'code';
+          i++;
+          continue;
+        }
+        out[i] = ch === '\n' ? ch : ' ';
+        i++;
+        break;
+
+      case 'doubleStr':
+        if (ch === '\\' && i + 1 < len) {
+          out[i] = ' ';
+          out[i + 1] = ' ';
+          i += 2;
+          continue;
+        }
+        if (ch === '"') {
+          out[i] = ' ';
+          state = 'code';
+          i++;
+          continue;
+        }
+        out[i] = ch === '\n' ? ch : ' ';
+        i++;
+        break;
+
+      case 'template':
+        if (ch === '\\' && i + 1 < len) {
+          out[i] = ' ';
+          out[i + 1] = ' ';
+          i += 2;
+          continue;
+        }
+        if (ch === '`') {
+          out[i] = ' ';
+          state = 'code';
+          i++;
+          continue;
+        }
+        // Template expressions ${...} — we don't recurse, just keep stripping.
+        // This means test.skip() inside ${} would be stripped (over-conservative).
+        // Acceptable: test files rarely use dynamic test.skip in template expressions.
+        out[i] = ch === '\n' ? ch : ' ';
+        i++;
+        break;
+
+      case 'regex':
+        if (ch === '\\' && i + 1 < len) {
+          out[i] = ' ';
+          out[i + 1] = ' ';
+          i += 2;
+          continue;
+        }
+        if (ch === '/') {
+          out[i] = ' ';
+          // Consume flags
+          let j = i + 1;
+          while (j < len && /[gimsuy]/.test(source[j])) {
+            out[j] = ' ';
+            j++;
+          }
+          state = 'code';
+          i = j;
+          continue;
+        }
+        if (ch === '\n') {
+          // Newline in regex — likely not a regex (was a division).
+          // Restore as code.
+          out[i] = ch;
+          state = 'code';
+          i++;
+          continue;
+        }
+        out[i] = ' ';
+        i++;
+        break;
+    }
+  }
+
+  return out.join('');
+}
+
+/**
  * Check a single file for forbidden patterns.
- * Returns the list of violations (empty if none).
+ *
+ * P2 #6 fix (PR 2726): uses stripCommentsAndStrings() before applying
+ * regex patterns. This eliminates false positives from comments and
+ * string literals, and handles multiline patterns correctly.
  */
 function checkFile(filePath) {
   const fullPath = join(FRONTEND, filePath);
@@ -118,27 +325,37 @@ function checkFile(filePath) {
   }
 
   const content = readFileSync(fullPath, 'utf-8');
-  const lines = content.split('\n');
+
+  // P2 #6 fix: strip comments and strings before pattern matching.
+  // This prevents false positives from:
+  //   - Inline comments: const x = 1; // test.skip(...)
+  //   - String literals: const note = 'test.skip(...)'
+  //   - Template literals: `test.skip(...)
+  // And handles multiline patterns correctly (the whole source is
+  // scanned, not per-line).
+  const cleaned = stripCommentsAndStrings(content);
+  const cleanedLines = cleaned.split('\n');
 
   let fileHasViolation = false;
 
   for (const { name, pattern, reason } of FORBIDDEN_PATTERNS) {
-    lines.forEach((line, idx) => {
-      // Skip comment lines (lines that start with // or * after trim)
-      const trimmed = line.trim();
-      if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
-        return;
-      }
-      if (pattern.test(line)) {
-        recordFail(
-          `${name} in ${filePath}`,
-          reason,
-          filePath,
-          idx + 1,
-        );
-        fileHasViolation = true;
-      }
-    });
+    // Apply regex on the FULL cleaned source (not per-line) to catch
+    // multiline patterns like:
+    //   test
+    //     .skip('async test')
+    if (pattern.test(cleaned)) {
+      // Find the line number for error reporting
+      const match = cleaned.match(pattern);
+      const matchIndex = match.index;
+      const lineNumber = cleaned.substring(0, matchIndex).split('\n').length;
+      recordFail(
+        `${name} in ${filePath}`,
+        reason,
+        filePath,
+        lineNumber,
+      );
+      fileHasViolation = true;
+    }
   }
 
   if (!fileHasViolation) {
@@ -334,8 +551,11 @@ function checkCIWorkflowContinueOnError() {
   }
 }
 
-// ─── Main ───────────────────────────────────────────────────────────
+// ─── Main (only runs when executed directly, not when imported) ─────
 
+const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+
+if (isMainModule) {
 log('');
 log('══════════════════════════════════════════════════════════════════════');
 log('  E2E Coverage Invariant — UX/Visual E2E must be fully executed');
@@ -390,3 +610,4 @@ if (failed > 0) {
 log('');
 log('✓ All E2E coverage invariants intact.');
 process.exit(0);
+} // end if (isMainModule)
