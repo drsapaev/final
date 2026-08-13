@@ -11,6 +11,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
 )  # noqa: F401
 from app.api.v1.endpoints.registrar_wizard._settings import VisitResponse  # noqa
 from app.services.visit_confirmation_service import _as_aware_utc  # noqa: F401
+from app.services.visit_lifecycle_service import VisitNotFoundError  # noqa: F401
 
 
 @router.get("/registrar/visits", response_model=list[VisitResponse])
@@ -1028,6 +1029,26 @@ def _run_single_registrar_record_action(
             record_id=record_id,
             success=False,
             error=exc.detail,
+        )
+    except VisitNotFoundError:
+        # P2 #5 fix (PR 2725): VisitNotFoundError is raised by
+        # VisitLifecycleService._load_visit_for_update() when a visit
+        # ID doesn't exist. It's a VisitLifecycleError(Exception), NOT
+        # an HTTPException — so the except HTTPException above does NOT
+        # catch it. Without this catch, the exception propagates out of
+        # _run_single, aborts the batch list comprehension, and reaches
+        # FastAPI's global handler as HTTP 500.
+        #
+        # This was a REGRESSION from PR #2719: the old VisitsApiService
+        # raised HTTPException(404) which WAS caught. The migration to
+        # VisitLifecycleService introduced VisitNotFoundError which is not.
+        #
+        # Fix: catch it here → per-record failure (batch isolation).
+        return _registrar_command_item(
+            record_kind=record_kind,
+            record_id=record_id,
+            success=False,
+            error="Visit not found",
         )
     except HTTPException as exc:
         return _registrar_command_item(
