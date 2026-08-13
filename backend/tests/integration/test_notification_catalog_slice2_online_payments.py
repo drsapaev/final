@@ -41,7 +41,7 @@ def _create_patient_visit_with_user(db_session, *, username: str):
     patient = Patient(
         first_name="Тест",
         last_name="Пациент",
-        phone="+998901234500",
+        phone="+998900000120",
         birth_date=date(1990, 1, 1),
         user_id=patient_user.id,
     )

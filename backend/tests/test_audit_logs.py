@@ -34,7 +34,7 @@ def test_audit_log_create_patient(client: TestClient, db: Session, admin_user: U
         "first_name": "Пациент",
         "birth_date": "1990-01-01",
         "sex": "M",
-        "phone": "+998901234999",
+        "phone": "+998900000125",
     }
 
     response = client.post(

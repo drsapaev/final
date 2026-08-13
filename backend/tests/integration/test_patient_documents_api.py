@@ -29,7 +29,7 @@ def test_create_patient_accepts_document_type_and_number_pair(
             "middle_name": "Тест",
             "birth_date": str(date(1991, 4, 15)),
             "sex": "M",
-            "phone": "+998901234599",
+            "phone": "+998900000124",
             "doc_type": "passport",
             "doc_number": "AA7654321",
             "address": "QA patient document test",

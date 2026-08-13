@@ -62,7 +62,7 @@ def _queue_entry(db_session, *, test_doctor, test_patient, visit_id: int | None 
         number=1,
         patient_id=test_patient.id,
         patient_name="Target Bound Patient",
-        phone="+998901234575",
+        phone="+998900000123",
         source="desk",
         status="waiting",
         queue_time=datetime.utcnow().replace(microsecond=0),

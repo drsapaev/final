@@ -100,7 +100,7 @@ def test_cashier_create_payment_creates_canonical_payment_notification(
     patient = Patient(
         first_name="Игорь",
         last_name="Платежный",
-        phone="+998901000100",
+        phone="+998900000101",
         birth_date=date(1992, 3, 3),
         user_id=patient_user.id,
     )
@@ -362,7 +362,7 @@ def test_cashier_cancel_payment_creates_cancelled_payment_notification(
     patient = Patient(
         first_name="Анвар",
         last_name="Возвратов",
-        phone="+998901000200",
+        phone="+998900000102",
         birth_date=date(1991, 6, 6),
         user_id=patient_user.id,
     )

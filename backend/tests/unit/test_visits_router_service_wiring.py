@@ -255,7 +255,7 @@ def _create_cross_patient_queue_link(db_session, *, visit: Visit, doctor):
     other_patient = Patient(
         first_name="Other",
         last_name="Queue",
-        phone="+998901239999",
+        phone="+998900000127",
     )
     db_session.add(other_patient)
     db_session.flush()
@@ -275,7 +275,7 @@ def _create_cross_patient_queue_link(db_session, *, visit: Visit, doctor):
         number=1,
         patient_id=visit.patient_id,
         patient_name="Visit Owner",
-        phone="+998901230001",
+        phone="+998900000118",
         source="desk",
         status="waiting",
         queue_time=datetime.utcnow().replace(microsecond=0),
@@ -286,7 +286,7 @@ def _create_cross_patient_queue_link(db_session, *, visit: Visit, doctor):
         number=2,
         patient_id=other_patient.id,
         patient_name="Wrong Owner",
-        phone="+998901230002",
+        phone="+998900000119",
         source="desk",
         status="waiting",
         queue_time=datetime.utcnow().replace(microsecond=0),

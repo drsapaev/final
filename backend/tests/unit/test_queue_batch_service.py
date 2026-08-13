@@ -103,7 +103,7 @@ def test_create_entries_reuses_existing_entry(
     repo.get_patient.return_value = SimpleNamespace(
         first_name="Test",
         last_name="Patient",
-        phone="+998901234567",
+        phone="+998900000121",
         short_name=lambda: "Test Patient",
     )
     repo.get_active_service.return_value = SimpleNamespace(id=11)
@@ -140,7 +140,7 @@ def test_create_entries_creates_new_queue_entry(
     repo.get_patient.return_value = SimpleNamespace(
         first_name="Test",
         last_name="Patient",
-        phone="+998901234567",
+        phone="+998900000121",
         short_name=lambda: "Test Patient",
     )
     repo.get_active_service.return_value = SimpleNamespace(id=12)
@@ -225,7 +225,7 @@ def test_create_entries_rejects_ambiguous_active_entries(
     repo.get_patient.return_value = SimpleNamespace(
         first_name="Test",
         last_name="Patient",
-        phone="+998901234567",
+        phone="+998900000121",
         short_name=lambda: "Test Patient",
     )
     repo.get_active_service.return_value = SimpleNamespace(id=14)

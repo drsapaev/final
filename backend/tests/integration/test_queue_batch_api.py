@@ -586,7 +586,7 @@ class TestQueueBatchAPI:
             first_name="Петр",
             last_name="Петров",
             middle_name="Петрович",
-            phone="+998901234568",
+            phone="+998900000122",
             birth_date=date(1985, 5, 5)
         )
         db_session.add(patient2)

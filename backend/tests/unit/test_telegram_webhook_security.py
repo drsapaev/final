@@ -973,7 +973,7 @@ class TestTelegramWebhookSecurity:
                 "from": {"id": 111},
                 "contact": {
                     "user_id": 222,
-                    "phone_number": "+998901234567",
+                    "phone_number": "+998900000121",
                 },
             },
         }

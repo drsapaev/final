@@ -219,7 +219,7 @@ class TestE2EMigrationFlow:
             queue_id=new_queue.id,
             number=1,
             patient_name="Новый Пациент",
-            phone="+998901234567",
+            phone="+998900000121",
             source="new_test_data",
             status="waiting"
         )
