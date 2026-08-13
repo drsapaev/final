@@ -18,7 +18,7 @@ class TestPatientService:
             full_name="Петров Петр",
             last_name="",
             first_name="",
-            phone="+998901111111",
+            phone="+998900000040",
         )
 
         patient = service.create_patient(
@@ -28,7 +28,7 @@ class TestPatientService:
         assert patient.id is not None
         assert patient.last_name == "Петров"
         assert patient.first_name == "Петр"
-        assert patient.phone == "+998901111111"
+        assert patient.phone == "+998900000040"
         assert mock_audit.called
 
     @patch("app.services.patient_service.log_critical_change")
