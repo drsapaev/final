@@ -103,7 +103,6 @@ def get_queue_profiles(
                 for p in INITIAL_QUEUE_PROFILES
             ],
             "source": "fallback_error",
-            "error": str(e),
         }
 
 
@@ -179,7 +178,6 @@ def get_queue_profiles_public(
                 {"id": 4, "specialty": "lab", "specialty_display": "Лаборатория", "icon": "🔬", "color": "#34C759"},
             ],
             "source": "fallback_error",
-            "error": str(e),
         }
 
 

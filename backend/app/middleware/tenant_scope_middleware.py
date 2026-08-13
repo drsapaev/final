@@ -86,7 +86,10 @@ class TenantScopeMiddleware(BaseHTTPMiddleware):
             )
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                content={"detail": str(error)},
+                content={
+                    "detail": "Tenant scope rejected",
+                    "reason": "tenant_scope_rejected",
+                },
             )
 
         request.state.tenant_scope = scope
