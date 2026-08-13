@@ -462,16 +462,28 @@ def force_reopen_visit(
             },
         )
 
+    # P1 #2 fix (PR 2723): remove reason from application log.
+    # Reason is AUDIT DATA — stored in visit.notes (DB) below.
+    # WARNING level auto-captured as Sentry breadcrumb → PII risk.
     logger.warning(
-        "visit.force_reopen visit_id=%s current=%s target=%s reason=%r admin_id=%s",
+        "visit.force_reopen visit_id=%s current=%s target=%s admin_id=%s",
         visit_id,
         visit.status,
         payload.target_status,
-        payload.reason,
         getattr(current_user, "id", None),
     )
 
     visit.status = payload.target_status
+    # P1 #2 fix (PR 2723): store reason in visit.notes (DB audit).
+    # Atomic with the status change — same db.commit() below.
+    # Append (not overwrite) to preserve existing clinical notes.
+    if payload.reason and hasattr(visit, "notes"):
+        existing_notes = visit.notes or ""
+        visit.notes = (
+            existing_notes
+            + f"\n[Force reopen: → {payload.target_status}] "
+            f"Reason: {payload.reason}"
+        )
     # Clear the finished_at timestamp so the visit's duration metrics
     # are not corrupted by the gap between close and reopen.
     if hasattr(visit, "finished_at"):

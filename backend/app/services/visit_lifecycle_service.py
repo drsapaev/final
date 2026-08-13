@@ -209,15 +209,27 @@ class VisitLifecycleService:
                         ),
                     },
                 )
+            # P1 #2 fix (PR 2723): remove reason from application log.
+            # Reason is AUDIT DATA — stored in visit.notes (DB) below.
+            # WARNING level auto-captured as Sentry breadcrumb → PII risk.
             logger.warning(
                 "visit.force_transition visit_id=%s current=%s target=%s "
-                "reason=%r user_id=%s",
+                "user_id=%s",
                 visit_id,
                 visit.status,
                 target_status,
-                reason,
                 getattr(current_user, "id", None),
             )
+            # P1 #2 fix (PR 2723): store reason in visit.notes (DB audit).
+            # This is ATOMIC with the status change — same transaction.
+            # Append (not overwrite) to preserve existing clinical notes.
+            if reason and hasattr(visit, "notes"):
+                existing_notes = visit.notes or ""
+                visit.notes = (
+                    existing_notes
+                    + f"\n[Force reopen: {visit.status} → {target_status}] "
+                    f"Reason: {reason}"
+                )
             # Clear finished_at when force-reopening a terminal status,
             # so duration metrics are not corrupted by the gap.
             if visit.status in ("closed", "canceled", "expired") and hasattr(visit, "finished_at"):
@@ -345,16 +357,20 @@ class VisitLifecycleService:
     ) -> Visit:
         """Mark a visit as canceled.
 
-        Logs the cancellation reason (if provided) for audit.
+        The cancellation reason is NOT logged via logger (narrative PII risk).
+        Callers should store the reason in ``visit.notes`` for DB audit trail.
 
         Args:
             commit: See ``transition_status()`` docstring. Default True.
         """
+        # P1 #2 fix (PR 2723): remove reason from application log.
+        # Reason is AUDIT DATA, not LOG DATA. Narrative text (patient names,
+        # diagnoses, complaints) cannot be masked by pattern-based PIIMaskingFilter.
+        # The caller (_visits.py) already appends reason to visit.notes (DB).
         logger.info(
-            "visit.cancel visit_id=%s user_id=%s reason=%r",
+            "visit.cancel visit_id=%s user_id=%s",
             visit_id,
             getattr(current_user, "id", None),
-            reason,
         )
         return self.transition_status(
             visit_id=visit_id,
