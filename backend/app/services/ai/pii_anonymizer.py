@@ -193,6 +193,12 @@ class PIIAnonymizer(IAnonymizer):
         # pattern `(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}` instead of
         # `[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` (which overlapped `.` between the
         # character class and the literal).
+        #
+        # CodeQL still flags this as polynomial-redos due to the outer `+`
+        # quantifier on the non-capturing group (structurally similar to
+        # `(\w+)+`). Empirical testing confirms LINEAR performance — see
+        # test_pii_regex_redos.py. Suppressing as false positive.
+        # codeql[py/polynomial-redos]
         text = re.sub(
             r'[a-zA-Z0-9._%+-]+@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}',
             '[EMAIL]',
