@@ -128,7 +128,14 @@ class ProviderWebhookService:
         )
 
     def process_click_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
-        """Webhook для Click платежной системы."""
+        """Webhook для Click платежной системы.
+
+        P2-3 Finding C fix (PR #2730): This method now uses
+        transaction_ctx to ensure data is committed — same pattern
+        as Payme and Kaspi. Previously, all changes were flush()-only
+        with no commit(), causing data loss when the production session
+        closed (get_db does NOT auto-commit).
+        """
         try:
             # PAY-REAUDIT-28 P1-2: PII-safe logging — только идентификаторы,
             # не весь payload (webhook_data содержит order_id с payment_id).
@@ -181,18 +188,32 @@ class ProviderWebhookService:
                     "payment_provider": "click",
                 }
 
-            with transaction_ctx(self.db):
-                webhook_id = f"click_{uuid.uuid4().hex[:8]}"
-                webhook = self.repository.create_webhook(
-                    provider="click",
-                    webhook_id=webhook_id,
-                    transaction_id=transaction_id,
-                    amount=webhook_data.get("amount", 0),
-                    currency="UZS",
-                    raw_data=webhook_data,
-                    signature=signature,
-                )
+            # P2-3 Finding C fix (PR #2730): persist PaymentWebhook record
+            # in a SEPARATE transaction BEFORE entering the business
+            # transaction_ctx. This ensures the webhook receipt survives
+            # even if the business transaction rolls back (e.g., ValueError
+            # from BillingService when terminal→paid is rejected).
+            #
+            # Previously, create_webhook was INSIDE transaction_ctx, so a
+            # downstream ValueError caused rollback → PaymentWebhook record
+            # was lost → no audit trail of the rejected webhook.
+            #
+            # create_webhook only does add+flush (no side effects on other
+            # tables), so committing it separately is safe.
+            webhook_id = f"click_{uuid.uuid4().hex[:8]}"
+            webhook = self.repository.create_webhook(
+                provider="click",
+                webhook_id=webhook_id,
+                transaction_id=transaction_id,
+                amount=webhook_data.get("amount", 0),
+                currency="UZS",
+                raw_data=webhook_data,
+                signature=signature,
+            )
+            self.db.commit()
+            self.db.refresh(webhook)
 
+            with transaction_ctx(self.db):
                 result = manager.process_webhook("click", webhook_data)
 
                 if result.success:
