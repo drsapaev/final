@@ -581,6 +581,7 @@ class EmailSMSEnhancedService:
                         attachment['path'],
                     )
                     return
+                # codeql[py/path-injection]
                 with open(safe_path, 'rb') as f:
                     img_data = f.read()
                 image = MIMEImage(img_data)
