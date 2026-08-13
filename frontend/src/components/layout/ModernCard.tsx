@@ -54,8 +54,8 @@ const ModernCard = ({
     color: getColor('textPrimary'),
     borderColor: border ? getColor('border') : 'transparent',
     padding: paddingValues[padding as keyof typeof paddingValues] || paddingValues.medium,
-    boxShadow: theme === 'dark' 
-      ? shadowValues[shadow as keyof typeof shadowValues]?.replace('rgba(0, 0, 0,', 'rgba(0, 0, 0,') 
+    boxShadow: theme === 'dark'
+      ? shadowValues[shadow as keyof typeof shadowValues] || shadowValues.medium
       : shadowValues[shadow as keyof typeof shadowValues] || shadowValues.medium,
     cursor: clickable ? 'pointer' : 'default'
   };
