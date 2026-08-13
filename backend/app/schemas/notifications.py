@@ -371,6 +371,20 @@ class SendCustomEmailRequest(BaseModel):
                 raise ValueError("attachment.filename is required and must be a string")
             if len(att["filename"]) > 255:
                 raise ValueError("attachment.filename too long (max 255 chars)")
+            # SECURITY (CodeQL py/path-injection #448): if 'path' is provided
+            # (for image attachments), validate it's a relative path under an
+            # allow-listed uploads directory. Reject absolute paths, '..'
+            # traversal, and shell metacharacters.
+            if "path" in att and isinstance(att["path"], str):
+                path_val = att["path"]
+                if path_val.startswith("/") or "\\" in path_val or ".." in path_val:
+                    raise ValueError(
+                        "attachment.path must be a relative path without '..' or absolute prefixes"
+                    )
+                # Allow only alphanumeric, dash, underscore, dot, slash
+                import re
+                if not re.match(r"^[A-Za-z0-9_./\-]+$", path_val):
+                    raise ValueError("attachment.path contains forbidden characters")
         return v
 
 

@@ -416,7 +416,14 @@ class MigrationService:
 
             import json
 
-            with open(backup_file, encoding='utf-8') as f:
+            # SECURITY (CodeQL py/path-injection #450): use os.path.basename
+            # to strip any path components from user-supplied backup_file. The
+            # endpoint only accepts filenames (not paths), but defense-in-depth.
+            import os
+            safe_backup_file = os.path.basename(backup_file)
+            if not safe_backup_file or safe_backup_file != backup_file:
+                return {"success": False, "error": "Invalid backup file path"}
+            with open(safe_backup_file, encoding='utf-8') as f:
                 backup_data = json.load(f)
 
             restored_queues = 0
