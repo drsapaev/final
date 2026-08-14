@@ -258,11 +258,20 @@ match-dir = "(?!tests|test_).*"
 # Mutation testing (nightly CI: .github/workflows/mutation.yml, mutmut 3.x).
 # Whole `app/` tree is copied into `mutants/` so package imports resolve;
 # only the critical crud modules are actually mutated.
-# Test selection is unit-only: integration/architecture suites contain
-# repo-root file audits whose path assumptions break under mutants/ layout.
+# Test selection is unit-only with repo-audit tests deselected: audits that
+# read files via parents[3] (repo root, e.g. ops/, frontend/) break under
+# the mutants/ layout and do not exercise mutated code anyway.
 [tool.mutmut]
 source_paths = ["app/"]
-pytest_add_cli_args_test_selection = ["tests/unit/"]
+pytest_add_cli_args_test_selection = [
+    "tests/unit/",
+    "--deselect", "tests/unit/test_extract_frontend_api_usage.py",
+    "--deselect", "tests/unit/test_frontend_backend_parity.py",
+    "--deselect", "tests/unit/test_frontend_backend_parity_gate.py",
+    "--deselect", "tests/unit/test_load_regression_profiles.py",
+    "--deselect", "tests/unit/test_notification_endpoint_inventory.py",
+    "--deselect", "tests/unit/test_no_legacy_ports_in_active_text.py",
+]
 only_mutate = [
     "app/crud/appointment.py",
     "app/crud/payment.py",
