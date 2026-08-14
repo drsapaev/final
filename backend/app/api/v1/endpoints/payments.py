@@ -426,6 +426,7 @@ def test_init_payment(
             description=payment_request.description,
             return_url=payment_request.return_url,
             cancel_url=payment_request.cancel_url,
+            current_user=current_user,
         )
         return PaymentInitResponse(**result)
     except PaymentTestInitDomainError as exc:
