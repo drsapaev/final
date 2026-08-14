@@ -12,101 +12,6 @@ from decimal import Decimal
 class PaymentsMixin(BillingServiceMixinBase):
     """Payments methods for BillingService."""
 
-    def create_payment(
-        self,
-        visit_id: int,
-        amount: float,
-        currency: str = "UZS",
-        method: str = "cash",
-        status: str = "paid",
-        receipt_no: str | None = None,
-        note: str | None = None,
-        provider: str | None = None,
-        provider_payment_id: str | None = None,
-        commit: bool = True,
-    ) -> Payment:
-        """Create a payment (DEPRECATED — use PaymentInvariantService).
-
-        Issue #06 Phase 4b: this method is DEPRECATED. All 3 original
-        production callers have been migrated to ``PaymentInvariantService``:
-
-        - ``payment_init_service.py`` → ``create_pending_payment()``
-        - ``payment_create_service.py`` → ``create_payment_for_visit()``
-        - ``registrar_wizard/_invoice.py`` → ``create_payment_for_visit()``
-
-        CL-1 audit (post-merge stabilization): 2 production callers remain:
-        - ``billing_service_pkg/_payments.py:record_payment()`` (L540) —
-          called from ``POST /billing/payments`` endpoint (billing.py L351).
-          ACTIVE in production for BILLING_WRITE_ROLES.
-        - ``payment_test_init_service.py`` (L39) — gated by
-          ``ENABLE_TEST_PAYMENT_INIT`` (default False, must be False in
-          production). Dev/staging only.
-
-        This method will be removed after both callers are migrated to
-        ``PaymentInvariantService``. See follow-up issue: "Migrate
-        record_payment() and payment_test_init_service to
-        PaymentInvariantService, then remove BillingService.create_payment()".
-
-        For new code, use:
-        - ``PaymentInvariantService.create_payment_for_visit()`` for
-          cashier/full/partial payments (status='paid')
-        - ``PaymentInvariantService.create_pending_payment()`` for
-          online provider redirect flow (status='pending')
-
-        Both methods provide ``with_for_update()`` lock, paid_amount
-        check (where applicable), overpayment policy, and
-        IntegrityError defense-in-depth — none of which this method
-        provides.
-        """
-        import warnings
-
-        warnings.warn(
-            "BillingService.create_payment() is deprecated. Use "
-            "PaymentInvariantService.create_payment_for_visit() for paid "
-            "payments or create_pending_payment() for online provider "
-            "flow. This method will be removed after record_payment() "
-            "and payment_test_init_service are migrated.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        # Валидация визита
-        visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
-        if not visit:
-            raise ValueError(f"Визит {visit_id} не найден")
-
-        # Валидация суммы
-        if amount <= 0:
-            raise ValueError("Сумма платежа должна быть больше нуля")
-
-        # Создаем платеж
-        payment = Payment(
-            visit_id=visit_id,
-            amount=amount,
-            currency=currency,
-            method=method,
-            status=status,
-            receipt_no=receipt_no,
-            note=note,
-            provider=provider,
-            provider_payment_id=provider_payment_id,
-        )
-
-        # Устанавливаем paid_at если статус "paid"
-        if status == PaymentStatus.PAID.value:
-            payment.paid_at = self._get_local_timestamp_naive()
-
-        self.db.add(payment)
-
-        if commit:
-            self.db.commit()
-            self.db.refresh(payment)
-        else:
-            self.db.flush()
-
-        return payment
-
-
     def get_payments_list(
         self,
         visit_id: int | None = None,
@@ -509,9 +414,8 @@ class PaymentsMixin(BillingServiceMixinBase):
         """
         Записать платеж для счета.
 
-        CL-1a migration: now delegates payment creation to
-        ``PaymentInvariantService.create_payment_for_visit(commit=False)``
-        instead of the deprecated ``BillingService.create_payment()``.
+        Delegates payment creation to
+        ``PaymentInvariantService.create_payment_for_visit(commit=False)``.
 
         This provides:
         - ``with_for_update()`` lock on Visit row (serializes concurrent payments)
@@ -569,8 +473,7 @@ class PaymentsMixin(BillingServiceMixinBase):
                 f"payment_method must be PaymentMethod enum or string, got {type(payment_method)}"
             )
 
-        # CL-1a: Delegate to PaymentInvariantService for race-condition protection.
-        # This replaces the deprecated self.create_payment() call with:
+        # Delegate to PaymentInvariantService for race-condition protection:
         #   - with_for_update() on Visit row
         #   - paid_amount vs total_cost check
         #   - overpayment policy
@@ -580,8 +483,7 @@ class PaymentsMixin(BillingServiceMixinBase):
         # The Visit lock is held until we commit at the end of this method.
         #
         # Note: create_payment_for_visit() sets status='paid' and paid_at automatically.
-        # The deprecated create_payment() also accepted receipt_no and provider_payment_id;
-        # create_payment_for_visit() does not, so we set them after the call.
+        # It does not accept receipt_no and provider_payment_id, so we set them after.
         from app.services.payment_invariant_service import PaymentInvariantService
 
         # Build current_user object if only created_by (int) was provided

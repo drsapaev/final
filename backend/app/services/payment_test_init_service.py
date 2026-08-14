@@ -41,9 +41,8 @@ class PaymentTestInitService:
     ) -> dict[str, Any]:
         """Initialize a test online payment.
 
-        CL-1b migration: now delegates payment creation to
-        ``PaymentInvariantService.create_pending_payment(commit=False)``
-        instead of the deprecated ``BillingService.create_payment()``.
+        Delegates payment creation to
+        ``PaymentInvariantService.create_pending_payment(commit=False)``.
 
         This provides:
         - ``with_for_update()`` lock on Visit row (serializes concurrent inits)
@@ -54,8 +53,7 @@ class PaymentTestInitService:
         status transitions (pending → processing/failed) are preserved.
         """
         try:
-            # CL-1b: Use PaymentInvariantService for race-condition protection.
-            # This replaces the deprecated self.billing_service.create_payment() call.
+            # Use PaymentInvariantService for race-condition protection.
             # create_pending_payment() acquires with_for_update() on Visit,
             # checks for duplicate pending payments with the same provider,
             # and wraps the insert in IntegrityError defense-in-depth.

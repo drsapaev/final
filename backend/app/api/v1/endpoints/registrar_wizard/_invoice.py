@@ -194,10 +194,6 @@ def check_invoice_status(
                                 # commit=False because this is inside a larger
                                 # transaction (invoice status + payment + visit
                                 # status all committed together at line 171).
-                                #
-                                # Note: billing_service.create_payment() above is
-                                # another potential bypass (Gate B) — will be
-                                # caught in the second adversarial audit.
                                 from app.services.visit_lifecycle_service import VisitLifecycleService
 
                                 class _InvoiceActor:
