@@ -207,7 +207,15 @@ class ClickProvider(BasePaymentProvider):
                 status=status,
                 provider_data={
                     "click_trans_id": click_trans_id,
-                    "amount": amount_decimal,
+                    # SECURITY (Finding F followup): store amount as str, not Decimal.
+                    # Decimal is not JSON-serializable → PostgreSQL JSON columns reject
+                    # it with "Object of type Decimal is not JSON serializable" →
+                    # transaction_ctx rolls back → payment status stays pending.
+                    # This bug was masked by SQLite/savepoint-based unit tests but
+                    # caught by the real-DB integration test (test_webhook_real_db.py,
+                    # PR #2743). str() is JSON-safe; _decimal_amount() does
+                    # Decimal(str(value)) so downstream amount comparison still works.
+                    "amount": str(amount_decimal),
                     "error": error,
                     "error_note": error_note,
                     "action": action,
