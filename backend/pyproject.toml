@@ -255,3 +255,16 @@ add-ignore = ["D100", "D104", "D107"]
 match = "(?!test_).*\\.py"
 match-dir = "(?!tests|test_).*"
 
+# Mutation testing (nightly CI: .github/workflows/mutation.yml, mutmut 3.x).
+# Whole `app/` tree is copied into `mutants/` so package imports resolve;
+# only the critical crud modules are actually mutated.
+[tool.mutmut]
+source_paths = ["app/"]
+pytest_add_cli_args_test_selection = ["tests/"]
+only_mutate = [
+    "app/crud/appointment.py",
+    "app/crud/payment.py",
+    "app/crud/queue.py",
+    "app/crud/emr.py",
+]
+
