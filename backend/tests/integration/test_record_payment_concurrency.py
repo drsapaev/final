@@ -73,9 +73,9 @@ def db_engine():
     with engine.connect() as conn:
         for table in [
             "payment_transactions", "payment_webhooks", "payments",
+            "invoices",  # FK: patients
             "queue_entries", "visit_services", "visits",
             "daily_queues", "services", "doctors", "patients", "users",
-            "invoices",
         ]:
             conn.execute(text(f"DELETE FROM {table}"))
         conn.commit()
@@ -104,13 +104,18 @@ def verify_session_factory(db_engine):
 
 @pytest.fixture
 def clean_db(db_engine):
-    """Clean all relevant tables before each test."""
+    """Clean all relevant tables before each test.
+
+    Order matters: invoices must be deleted BEFORE patients (FK constraint),
+    and visit_services before visits.
+    """
     with db_engine.connect() as conn:
+        # Delete in FK-safe order (children first, parents last)
         for table in [
             "payment_transactions", "payment_webhooks", "payments",
+            "invoices",  # FK: patients
             "queue_entries", "visit_services", "visits",
             "daily_queues", "services", "doctors", "patients", "users",
-            "invoices",
         ]:
             conn.execute(text(f"DELETE FROM {table}"))
         conn.commit()
