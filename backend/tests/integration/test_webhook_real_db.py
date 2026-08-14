@@ -231,7 +231,7 @@ def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = Non
     mock_result.success = True
     mock_result.status = status
     mock_result.payment_id = f"clinic_{payment_id}_{ts}"
-    mock_result.provider_data = {"test": "data"}
+    mock_result.provider_data = {"test": "data", "amount": Decimal("10000")}
     mock_result.error_message = None
     mock_manager.process_webhook.return_value = mock_result
     return mock_manager
