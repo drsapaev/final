@@ -57,6 +57,11 @@ class TestRecordPaymentMigration:
         # Mock _get_local_timestamp_naive
         service._get_local_timestamp_naive = MagicMock(return_value=datetime.now(UTC))
 
+        # Mock db.commit and db.refresh — unit tests don't have real DB state
+        # for the mock payment returned by create_payment_for_visit
+        service.db.commit = MagicMock()
+        service.db.refresh = MagicMock()
+
         return service
 
     def _make_invoice(self, db_session, visit_id=None, total_amount=10000, paid_amount=0):

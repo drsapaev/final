@@ -117,13 +117,18 @@ def clean_db(db_engine):
 
 
 def _setup_invoice_with_visit(session, *, total_amount=10000):
-    """Create a Visit + Invoice (with visit_id) for testing record_payment."""
+    """Create a Visit + VisitService + Invoice (with visit_id) for testing record_payment.
+
+    VisitService with price is required because PaymentInvariantService.compute_total_cost()
+    sums VisitService.price * qty. Without it, total_cost=0 and the payment is rejected
+    with 'Все услуги уже оплачены' (remaining_debt = 0 - 0 = 0).
+    """
     from app.models.billing import Invoice, InvoiceStatus
     from app.models.clinic import Doctor
     from app.models.patient import Patient
     from app.models.service import Service
     from app.models.user import User
-    from app.models.visit import Visit
+    from app.models.visit import Visit, VisitService
 
     unique = uuid.uuid4().hex[:8]
     doctor_user = User(
@@ -143,6 +148,14 @@ def _setup_invoice_with_visit(session, *, total_amount=10000):
     )
     session.add(patient)
     session.flush()
+    svc = Service(
+        code=f"SVC_{unique}", name="Service", price=total_amount,
+        duration_minutes=30, active=True, requires_doctor=True,
+        queue_tag=f"tag_{unique}", is_consultation=True,
+        allow_doctor_price_override=False,
+    )
+    session.add(svc)
+    session.flush()
     visit = Visit(
         patient_id=patient.id, doctor_id=doctor.id, status="confirmed",
         visit_date=date.today(), visit_time="10:00", discount_mode="none",
@@ -151,6 +164,12 @@ def _setup_invoice_with_visit(session, *, total_amount=10000):
         confirmation_expires_at=datetime.now(UTC), created_at=datetime.now(UTC),
     )
     session.add(visit)
+    session.flush()
+    # VisitService with price — required for compute_total_cost() to return non-zero
+    visit_service = VisitService(
+        visit_id=visit.id, service_id=svc.id, price=total_amount, qty=1,
+    )
+    session.add(visit_service)
     session.flush()
 
     invoice = Invoice(
