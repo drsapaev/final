@@ -11,11 +11,14 @@ The existing unit tests use SQLite with savepoint-based test sessions
 This test file uses REAL PostgreSQL with independent sessions (same
 pattern as Gate D) to prove that:
 
-  1. Click webhook SUCCESS: PaymentWebhook + payment status persist
-     across session boundaries (commit actually works).
+  1. Click webhook SUCCESS: PaymentWebhook + PaymentTransaction + payment
+     status persist across session boundaries (commit actually works).
   2. Click webhook ERROR (terminal→paid): PaymentWebhook persists
      despite ValueError rollback (Finding C fix verified on real DB).
-  3. Click webhook AMOUNT MISMATCH: PaymentWebhook persists.
+     Payment status, PaymentTransaction, and provider_data remain
+     UNCHANGED — business transaction atomicity verified.
+  3. Click webhook AMOUNT MISMATCH: PaymentWebhook persists, payment
+     status unchanged.
 
 Each test:
   Session A → process webhook → commit/rollback → close
@@ -25,10 +28,12 @@ Requirements:
   - PostgreSQL (NOT SQLite) — same as Gate D
   - Independent sessions — no shared session between process and verify
   - Real PaymentWebhook + Payment records (not mocks)
+  - Real transaction_ctx (NOT mocked)
+  - NO begin_nested() savepoint masking
 
 CI Integration:
   pytest backend/tests/integration/test_webhook_real_db.py -m integration
-  (runs in the 'integration' job which has PostgreSQL service)
+  (runs in the 'backend-tests' job which has PostgreSQL service)
 """
 from __future__ import annotations
 
@@ -206,7 +211,15 @@ def _make_click_webhook_data(payment_id: int) -> dict:
 
 
 def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = None):
-    """Create a mock payment manager that returns success for the given payment."""
+    """Create a mock payment manager that returns success for the given payment.
+
+    The mock replaces get_payment_manager() so that:
+    - validate_webhook_signature returns True (bypasses real signature check)
+    - process_webhook returns a PaymentResult with the correct payment_id format
+
+    transaction_ctx is NOT mocked — real transaction boundaries are used.
+    BillingService is NOT mocked — real state machine validation applies.
+    """
     if ts is None:
         ts = int(datetime.now(UTC).timestamp())
     mock_manager = MagicMock()
@@ -234,37 +247,44 @@ class TestClickWebhookRealDBPersistence:
     Pattern:
         Session A → process webhook → close
         Session B (NEW) → verify persisted state
+
+    Contract verified (from PR #2730):
+
+        Click webhook
+              │
+              ├── create PaymentWebhook
+              ├── COMMIT audit transaction
+              └── business transaction
+                     │
+                     ├── success → COMMIT payment changes
+                     │
+                     └── error → ROLLBACK payment changes
+                                  │
+                                  └── PaymentWebhook remains persisted
     """
 
-    @pytest.mark.skip(
-        reason="Success path requires real Click payment manager integration, not mock. "
-               "The mock returns result.payment_id in the right format, but BillingService "
-               "is not mocked and the real state transition requires a real payment provider. "
-               "This test should be enabled when integration test infrastructure includes "
-               "a real payment manager stub. The 2 error-path tests below verify the "
-               "Finding C fix on real PostgreSQL — those are the critical ones."
-    )
     def test_click_success_persists_across_sessions(
         self, production_session, verify_session_factory, clean_db
     ):
-        """Click SUCCESS: PaymentWebhook AND payment status persist.
+        """Click SUCCESS: PaymentWebhook AND payment status AND PaymentTransaction persist.
 
         Session A: process Click webhook (success)
         Session A: close
-        Session B (NEW): verify PaymentWebhook exists, payment status changed.
+        Session B (NEW): verify PaymentWebhook exists, payment status='paid',
+                         PaymentTransaction exists.
 
-        This test was skipped in PR #2730 (audit durability) because it
-        needed complex mock setup. Finding F provides the real-DB
-        infrastructure to run it properly.
+        This proves that transaction_ctx commits on the success path and
+        the data survives session close — real production commit semantics.
         """
         from app.services.provider_webhook_service import ProviderWebhookService
         from app.repositories.provider_webhook_repository import ProviderWebhookRepository
-        from app.models.payment import Payment
+        from app.models.payment import Payment, PaymentTransaction
         from app.models.payment_webhook import PaymentWebhook
 
         # Setup: create payment in pending state
         payment = _setup_payment(production_session, status="pending")
         payment_id = payment.id
+        original_provider_data = None  # pending payment has no provider_data yet
         production_session.expunge_all()
 
         # Process Click webhook
@@ -287,7 +307,7 @@ class TestClickWebhookRealDBPersistence:
         # Verify from NEW Session B
         verify = verify_session_factory()
         try:
-            # PaymentWebhook must exist
+            # 1. PaymentWebhook must exist
             webhook_records = verify.query(PaymentWebhook).filter(
                 PaymentWebhook.provider == "click"
             ).all()
@@ -296,14 +316,36 @@ class TestClickWebhookRealDBPersistence:
                 "Click webhook data was not committed — production data loss."
             )
 
-            # Payment status must be updated
+            # 2. Payment status must be updated to 'paid'
             committed_payment = verify.query(Payment).filter(
                 Payment.id == payment_id
             ).first()
             assert committed_payment is not None, "Payment not found"
-            assert committed_payment.status in ("paid", "processing"), (
-                f"Payment status should be 'paid' or 'processing' after Click webhook. "
+            assert committed_payment.status == "paid", (
+                f"Payment status should be 'paid' after Click webhook success. "
                 f"Got: {committed_payment.status}. Data was not committed to PostgreSQL."
+            )
+
+            # 3. PaymentTransaction must exist
+            tx_records = verify.query(PaymentTransaction).filter(
+                PaymentTransaction.payment_id == payment_id
+            ).all()
+            assert len(tx_records) >= 1, (
+                "PaymentTransaction NOT found after Click webhook success. "
+                "Business transaction did not commit."
+            )
+
+            # 4. provider_data must be updated
+            assert committed_payment.provider_data is not None, (
+                "provider_data should be set after successful webhook"
+            )
+            assert "test" in committed_payment.provider_data, (
+                f"provider_data should contain mock data. Got: {committed_payment.provider_data}"
+            )
+
+            # 5. paid_at must be set
+            assert committed_payment.paid_at is not None, (
+                "paid_at should be set after payment status='paid'"
             )
         finally:
             verify.close()
@@ -315,18 +357,21 @@ class TestClickWebhookRealDBPersistence:
 
         Session A: process Click webhook for terminal payment → ValueError
         Session A: close (transaction_ctx rolled back)
-        Session B (NEW): PaymentWebhook EXISTS, payment status unchanged.
+        Session B (NEW): PaymentWebhook EXISTS, payment status UNCHANGED,
+                         PaymentTransaction ABSENT, provider_data UNCHANGED.
 
-        This is the Finding C fix verified on real PostgreSQL.
+        This is the Finding C fix verified on real PostgreSQL. It proves
+        BOTH audit trail durability AND business transaction atomicity.
         """
         from app.services.provider_webhook_service import ProviderWebhookService
         from app.repositories.provider_webhook_repository import ProviderWebhookRepository
-        from app.models.payment import Payment
+        from app.models.payment import Payment, PaymentTransaction
         from app.models.payment_webhook import PaymentWebhook
 
         # Setup: create payment in terminal state (refunded)
         payment = _setup_payment(production_session, status="refunded")
         payment_id = payment.id
+        original_provider_data = payment.provider_data  # should be None for new payment
         production_session.expunge_all()
 
         webhook_data = _make_click_webhook_data(payment_id)
@@ -348,7 +393,7 @@ class TestClickWebhookRealDBPersistence:
         # Verify from NEW Session B
         verify = verify_session_factory()
         try:
-            # PaymentWebhook MUST persist despite ValueError rollback
+            # 1. PaymentWebhook MUST persist despite ValueError rollback
             webhook_records = verify.query(PaymentWebhook).filter(
                 PaymentWebhook.provider == "click"
             ).all()
@@ -357,13 +402,35 @@ class TestClickWebhookRealDBPersistence:
                 "Finding C fix not working on real DB — audit trail lost."
             )
 
-            # Payment status must NOT change (terminal preserved)
+            # 2. Payment status must NOT change (terminal preserved)
             committed_payment = verify.query(Payment).filter(
                 Payment.id == payment_id
             ).first()
             assert committed_payment.status == "refunded", (
                 f"Terminal payment status changed to '{committed_payment.status}' on PostgreSQL. "
                 f"Should remain 'refunded' — business transaction should have rolled back."
+            )
+
+            # 3. PaymentTransaction must NOT exist (business transaction rolled back)
+            tx_records = verify.query(PaymentTransaction).filter(
+                PaymentTransaction.payment_id == payment_id
+            ).all()
+            assert len(tx_records) == 0, (
+                f"PaymentTransaction found ({len(tx_records)} records) after ValueError rollback. "
+                f"Business transaction should have rolled back — PaymentTransaction should NOT exist."
+            )
+
+            # 4. provider_data must NOT be changed by the failed business transaction
+            assert committed_payment.provider_data == original_provider_data, (
+                f"provider_data changed from {original_provider_data!r} to "
+                f"{committed_payment.provider_data!r} — business transaction should have "
+                f"rolled back all mutations."
+            )
+
+            # 5. paid_at must NOT be set (payment is still refunded, not paid)
+            assert committed_payment.paid_at is None, (
+                "paid_at should not be set for a refunded payment — "
+                "business transaction rollback should have reverted it."
             )
         finally:
             verify.close()
@@ -375,15 +442,17 @@ class TestClickWebhookRealDBPersistence:
 
         Session A: process Click webhook with wrong amount → rejected
         Session A: close
-        Session B (NEW): PaymentWebhook EXISTS, payment status unchanged.
+        Session B (NEW): PaymentWebhook EXISTS, payment status unchanged,
+                         PaymentTransaction ABSENT, provider_data unchanged.
         """
         from app.services.provider_webhook_service import ProviderWebhookService
         from app.repositories.provider_webhook_repository import ProviderWebhookRepository
-        from app.models.payment import Payment
+        from app.models.payment import Payment, PaymentTransaction
         from app.models.payment_webhook import PaymentWebhook
 
         payment = _setup_payment(production_session, status="pending")
         payment_id = payment.id
+        original_provider_data = payment.provider_data
         production_session.expunge_all()
 
         webhook_data = _make_click_webhook_data(payment_id)
@@ -405,6 +474,7 @@ class TestClickWebhookRealDBPersistence:
 
         verify = verify_session_factory()
         try:
+            # 1. PaymentWebhook must persist
             webhook_records = verify.query(PaymentWebhook).filter(
                 PaymentWebhook.provider == "click"
             ).all()
@@ -413,11 +483,27 @@ class TestClickWebhookRealDBPersistence:
                 "Audit trail should persist even for rejected webhooks."
             )
 
+            # 2. Payment status must remain 'pending'
             committed_payment = verify.query(Payment).filter(
                 Payment.id == payment_id
             ).first()
             assert committed_payment.status == "pending", (
                 f"Payment status should remain 'pending'. Got: {committed_payment.status}"
+            )
+
+            # 3. PaymentTransaction must NOT exist
+            tx_records = verify.query(PaymentTransaction).filter(
+                PaymentTransaction.payment_id == payment_id
+            ).all()
+            assert len(tx_records) == 0, (
+                f"PaymentTransaction found ({len(tx_records)} records) after amount mismatch. "
+                f"Should NOT exist — business transaction should not have committed."
+            )
+
+            # 4. provider_data must be unchanged
+            assert committed_payment.provider_data == original_provider_data, (
+                f"provider_data changed from {original_provider_data!r} to "
+                f"{committed_payment.provider_data!r} — should be unchanged."
             )
         finally:
             verify.close()
