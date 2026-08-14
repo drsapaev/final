@@ -66,8 +66,11 @@ class ProviderWebhookService:
         from app.services.payment_state_checks import is_terminal_payment
 
         # P2 fix: check current status before attempting transition.
-        # If payment is already terminal (paid/refunded/cancelled/void),
+        # If payment is already terminal (refunded/cancelled/void),
         # a late 'failed' callback should NOT change the status.
+        # Note: "paid" is NOT terminal — it has outgoing transitions
+        # to refunded/void/cancelled (see ALLOWED_PAYMENT_TRANSITIONS
+        # in payment_state_checks.py, the authoritative SSOT).
         payment = self.repository.get_payment_by_id(payment_id) if hasattr(self.repository, 'get_payment_by_id') else None
         if payment and is_terminal_payment(payment.status) and new_status == "failed":
             logger.warning(

@@ -25,12 +25,12 @@ sufficient for the invariant (terminal states {refunded, cancelled,
 void} are correctly preserved). These tests pin that behavior without
 changing production code.
 
-FINDINGS DOCUMENTED (NOT fixed in this PR — separate follow-ups):
-- FINDING A: comment at provider_webhook_service.py:69 says terminal
-  includes "paid", but is_terminal_payment() excludes paid. This is
-  a doc mismatch, not a logic bug — paid is NOT terminal by design
-  (it can transition to refunded/cancelled/void). The paid→failed
-  case falls through to BillingService which correctly rejects it.
+FINDINGS DOCUMENTED (status as of Finding A fix):
+- FINDING A: FIXED — the comment at provider_webhook_service.py:69 now
+  correctly lists terminal statuses as (refunded/cancelled/void), excluding
+  "paid". This was always a doc-only mismatch — paid is NOT terminal by
+  design (it can transition to refunded/cancelled/void). The paid→failed
+  case correctly falls through to BillingService which rejects it.
 - FINDING C: when a NEW webhook (different transaction_id) arrives
   for an already-terminal payment with new_status="paid", BillingService
   raises ValueError → outer except rolls back → audit trail lost.
@@ -146,10 +146,10 @@ class TestUpdatePaymentStatusTerminalShortCircuit:
         refunded/cancelled/void). A paid→failed transition is invalid and
         BillingService will reject it with ValueError.
 
-        FINDING A (documented, not fixed): the comment at
-        provider_webhook_service.py:69 says terminal includes "paid", but
-        is_terminal_payment() excludes paid. This test pins the actual
-        behavior.
+        FINDING A: FIXED — the comment at provider_webhook_service.py:69
+        previously said terminal includes "paid", but is_terminal_payment()
+        excludes paid. The comment was corrected to list only
+        (refunded/cancelled/void). This test pins the actual behavior.
         """
         service, payment, billing_mock, _ = self._make_service(
             db_session, payment_status="paid"
