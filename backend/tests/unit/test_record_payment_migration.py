@@ -263,36 +263,6 @@ class TestRecordPaymentMigration:
         assert mock_payment.receipt_no == "RCPT-TEST-001"
         assert mock_payment.provider_payment_id == "REF-12345"
 
-    def test_record_payment_does_not_call_deprecated_create_payment(self, db_session):
-        """Verify record_payment does NOT call the deprecated BillingService.create_payment()."""
-        from unittest.mock import patch, MagicMock
-        from app.models.payment import Payment
-
-        service = self._make_service(db_session)
-        invoice = self._make_invoice(db_session, visit_id=1, total_amount=10000)
-
-        mock_payment = Payment(
-            id=1, visit_id=1, amount=10000, currency="UZS",
-            method="cash", status="paid", paid_at=datetime.now(UTC),
-        )
-
-        # Patch BOTH create_payment_for_visit AND the deprecated create_payment
-        with patch(
-            "app.services.payment_invariant_service.PaymentInvariantService.create_payment_for_visit",
-            return_value=mock_payment,
-        ), patch.object(
-            service, "create_payment",
-        ) as mock_deprecated:
-            service.record_payment(
-                invoice_id=invoice.id,
-                amount=10000,
-                payment_method="cash",
-                current_user=type("U", (), {"id": 1})(),
-            )
-
-        # The deprecated create_payment must NOT have been called
-        mock_deprecated.assert_not_called()
-
     def test_record_payment_amount_passed_as_decimal(self, db_session):
         """Verify amount is converted to Decimal before passing to create_payment_for_visit."""
         from unittest.mock import patch

@@ -48,7 +48,8 @@ def list_payments(
     return list(db.execute(stmt).scalars().all())
 
 
-# create_payment() удалена - используйте billing_service.create_payment() (SSOT)
+# create_payment() удалена — используйте PaymentInvariantService.create_payment_for_visit()
+# или PaymentInvariantService.create_pending_payment() (SSOT).
 
 
 def sum_paid_by_visit(db: Session, *, visit_id: int) -> float:
