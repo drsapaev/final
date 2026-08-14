@@ -278,8 +278,8 @@ class TestClickWebhookRealDBPersistence:
         """
         from app.services.provider_webhook_service import ProviderWebhookService
         from app.repositories.provider_webhook_repository import ProviderWebhookRepository
-        from app.models.payment import Payment, PaymentTransaction
-        from app.models.payment_webhook import PaymentWebhook
+        from app.models.payment import Payment
+        from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 
         # Setup: create payment in pending state
         payment = _setup_payment(production_session, status="pending")
@@ -365,8 +365,8 @@ class TestClickWebhookRealDBPersistence:
         """
         from app.services.provider_webhook_service import ProviderWebhookService
         from app.repositories.provider_webhook_repository import ProviderWebhookRepository
-        from app.models.payment import Payment, PaymentTransaction
-        from app.models.payment_webhook import PaymentWebhook
+        from app.models.payment import Payment
+        from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 
         # Setup: create payment in terminal state (refunded)
         payment = _setup_payment(production_session, status="refunded")
@@ -447,8 +447,8 @@ class TestClickWebhookRealDBPersistence:
         """
         from app.services.provider_webhook_service import ProviderWebhookService
         from app.repositories.provider_webhook_repository import ProviderWebhookRepository
-        from app.models.payment import Payment, PaymentTransaction
-        from app.models.payment_webhook import PaymentWebhook
+        from app.models.payment import Payment
+        from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
 
         payment = _setup_payment(production_session, status="pending")
         payment_id = payment.id
