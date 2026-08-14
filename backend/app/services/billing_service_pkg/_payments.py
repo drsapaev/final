@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from app.services.billing_service_pkg._base import *  # noqa: F401, F403
 from app.services.billing_service_pkg._base import BillingServiceMixinBase
+from decimal import Decimal
 
 
 class PaymentsMixin(BillingServiceMixinBase):
@@ -503,15 +504,43 @@ class PaymentsMixin(BillingServiceMixinBase):
         reference_number: str = None,
         description: str = None,
         created_by: int = None,
+        current_user: Any = None,
     ) -> Payment:
         """
         Записать платеж для счета.
 
-        Устаревший метод-обертка, теперь использует Payment (SSOT) вместо BillingPayment.
-        Платеж привязывается к визиту, связанному с инвойсом (invoice.visit_id).
+        CL-1a migration: now delegates payment creation to
+        ``PaymentInvariantService.create_payment_for_visit(commit=False)``
+        instead of the deprecated ``BillingService.create_payment()``.
+
+        This provides:
+        - ``with_for_update()`` lock on Visit row (serializes concurrent payments)
+        - ``paid_amount`` vs ``total_cost`` check (prevents overpayment)
+        - Overpayment policy (allow as advance/deposit, logged at WARNING)
+        - ``IntegrityError`` defense-in-depth (degrades to 409)
+
+        The Invoice update logic (paid_amount, balance, status) is preserved
+        — ``create_payment_for_visit()`` does NOT touch Invoice, so we update
+        it here in the same transaction.
+
+        Args:
+            invoice_id: ID of the Invoice to record payment against.
+            amount: Payment amount (must be > 0).
+            payment_method: PaymentMethod enum or string (cash, card, etc.).
+            reference_number: Optional reference number (stored as provider_payment_id).
+            description: Optional note for the payment.
+            created_by: Optional user ID (deprecated, use current_user).
+            current_user: The User object creating the payment (required for
+                PaymentInvariantService audit logging). If None, a lightweight
+                wrapper with .id=created_by is used for backward compatibility.
 
         Returns:
             Payment - созданный платеж
+
+        Raises:
+            ValueError: if invoice not found or invoice has no visit_id.
+            HTTPException: 400/409 from PaymentInvariantService (overpayment,
+                concurrent payment race, etc.).
         """
         invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
         if not invoice:
@@ -540,21 +569,46 @@ class PaymentsMixin(BillingServiceMixinBase):
                 f"payment_method must be PaymentMethod enum or string, got {type(payment_method)}"
             )
 
-        # Создаем платеж через SSOT Payment
-        payment = self.create_payment(
+        # CL-1a: Delegate to PaymentInvariantService for race-condition protection.
+        # This replaces the deprecated self.create_payment() call with:
+        #   - with_for_update() on Visit row
+        #   - paid_amount vs total_cost check
+        #   - overpayment policy
+        #   - IntegrityError defense-in-depth
+        #
+        # commit=False because we need to update Invoice in the same transaction.
+        # The Visit lock is held until we commit at the end of this method.
+        #
+        # Note: create_payment_for_visit() sets status='paid' and paid_at automatically.
+        # The deprecated create_payment() also accepted receipt_no and provider_payment_id;
+        # create_payment_for_visit() does not, so we set them after the call.
+        from app.services.payment_invariant_service import PaymentInvariantService
+
+        # Build current_user object if only created_by (int) was provided
+        # (backward compatibility for callers that haven't been updated)
+        if current_user is None and created_by is not None:
+            current_user = type("UserRef", (), {"id": created_by})()
+        if current_user is None:
+            current_user = type("UserRef", (), {"id": None})()
+
+        payment_service = PaymentInvariantService(self.db)
+        payment = payment_service.create_payment_for_visit(
             visit_id=invoice.visit_id,
-            amount=amount,
-            currency=currency,
+            amount=Decimal(str(amount)),
             method=method_str,
-            status=PaymentStatus.PAID.value,
-            receipt_no=payment_number,
             note=description,
+            current_user=current_user,
+            currency=currency,
             provider=None,
-            provider_payment_id=reference_number,
             commit=False,
         )
 
-        # Обновляем статус счета
+        # Set fields that create_payment_for_visit() doesn't accept
+        # (receipt_no and provider_payment_id were in the deprecated method)
+        payment.receipt_no = payment_number
+        payment.provider_payment_id = reference_number
+
+        # Обновляем статус счета (preserved from original record_payment)
         invoice.paid_amount += amount
         invoice.balance = invoice.total_amount - invoice.paid_amount
 

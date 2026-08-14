@@ -355,6 +355,7 @@ def record_payment(
             reference_number=payment_data.reference_number,
             description=payment_data.description,
             created_by=current_user.id,
+            current_user=current_user,
         )
         return payment
     except ValueError:
