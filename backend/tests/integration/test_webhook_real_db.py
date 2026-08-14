@@ -210,7 +210,7 @@ def _make_click_webhook_data(payment_id: int) -> dict:
     }
 
 
-def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = None):
+def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = None, amount: str = "10000"):
     """Create a mock payment manager that returns success for the given payment.
 
     The mock replaces get_payment_manager() so that:
@@ -231,7 +231,7 @@ def _make_mock_manager(payment_id: int, status: str = "completed", ts: int = Non
     mock_result.success = True
     mock_result.status = status
     mock_result.payment_id = f"clinic_{payment_id}_{ts}"
-    mock_result.provider_data = {"test": "data", "amount": "10000"}
+    mock_result.provider_data = {"test": "data", "amount": amount}
     mock_result.error_message = None
     mock_manager.process_webhook.return_value = mock_result
     return mock_manager
@@ -459,7 +459,7 @@ class TestClickWebhookRealDBPersistence:
         webhook_data["amount"] = 999  # wrong amount
 
         mock_manager = _make_mock_manager(
-            payment_id, "completed", ts=webhook_data.get("_test_ts")
+            payment_id, "completed", ts=webhook_data.get("_test_ts"), amount="999"
         )
 
         with patch(
