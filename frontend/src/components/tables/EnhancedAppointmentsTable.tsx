@@ -1210,7 +1210,7 @@ const EnhancedAppointmentsTable = ({
 
       
       {loading ? loaderNode : null}
-      <div className="eat-table-scroll">
+      <div className="eat-table-scroll" aria-busy={loading} aria-live="polite">
         <div className="admin-table-wrapper">
 <table className="eat-table-container" style={{
           width: '100%',
