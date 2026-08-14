@@ -125,15 +125,15 @@ class TestClickProviderDataJsonSerializable:
 
         # _decimal_amount does Decimal(str(value))
         recovered = ProviderWebhookService._decimal_amount(amount_str)
-        assert recovered == Decimal("10000"), (
-            f"Amount should recover to Decimal('10000'), got {recovered!r}"
+        assert recovered == Decimal("100"), (
+            f"Amount should recover to Decimal('100') (10000 tiyins = 100 UZS), got {recovered!r}"
         )
 
         # Verify amount comparison still works (the actual use case)
-        payment_amount = Decimal("10000")
+        payment_amount = Decimal("100")  # 100 UZS = 10000 tiyins
         assert ProviderWebhookService._amounts_match(payment_amount, amount_str), (
-            "Amount comparison should succeed: payment.amount=10000, "
-            f"provider_data.amount={amount_str!r}"
+            "Amount comparison should succeed: payment.amount=100 UZS, "
+            f"provider_data.amount={amount_str!r} (from 10000 tiyins)"
         )
 
     def test_click_amount_mismatch_detected_downstream(self):
@@ -147,10 +147,10 @@ class TestClickProviderDataJsonSerializable:
         amount_str = result.provider_data["amount"]
 
         # Different payment amount → mismatch should be detected
-        payment_amount = Decimal("9999")
+        payment_amount = Decimal("99")  # 99 UZS ≠ 100 UZS
         assert not ProviderWebhookService._amounts_match(payment_amount, amount_str), (
-            "Amount mismatch should be detected: payment.amount=9999, "
-            f"provider_data.amount={amount_str!r}"
+            "Amount mismatch should be detected: payment.amount=99 UZS, "
+            f"provider_data.amount={amount_str!r} (100 UZS)"
         )
 
 
