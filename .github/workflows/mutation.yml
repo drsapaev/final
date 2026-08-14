@@ -129,7 +129,7 @@ jobs:
 
       - name: Run Stryker
         working-directory: frontend
-        run: npx stryker run --configFile stryker.config.mjs
+        run: npx stryker run
         continue-on-error: true
 
       - name: Parse mutation score
