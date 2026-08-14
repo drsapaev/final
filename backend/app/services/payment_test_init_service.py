@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from app.models.enums import PaymentStatus
 from app.repositories.payment_test_init_repository import PaymentTestInitRepository
 from app.services.billing_service import BillingService
+from app.services.payment_invariant_service import PaymentInvariantService
 
 
 @dataclass
@@ -23,6 +25,7 @@ class PaymentTestInitService:
         self.repository = PaymentTestInitRepository(db)
         self.billing_service = BillingService(db)
         self.payment_manager = payment_manager
+        self.db = db
 
     def init_test_payment(
         self,
@@ -34,15 +37,48 @@ class PaymentTestInitService:
         description: str | None,
         return_url: str | None,
         cancel_url: str | None,
+        current_user: Any = None,
     ) -> dict[str, Any]:
+        """Initialize a test online payment.
+
+        CL-1b migration: now delegates payment creation to
+        ``PaymentInvariantService.create_pending_payment(commit=False)``
+        instead of the deprecated ``BillingService.create_payment()``.
+
+        This provides:
+        - ``with_for_update()`` lock on Visit row (serializes concurrent inits)
+        - Duplicate pending payment check (B1/B4 coordination)
+        - ``IntegrityError`` defense-in-depth (degrades to 409)
+
+        The provider redirect flow (payment_url, provider_payment_id) and
+        status transitions (pending → processing/failed) are preserved.
+        """
         try:
-            payment = self.billing_service.create_payment(
+            # CL-1b: Use PaymentInvariantService for race-condition protection.
+            # This replaces the deprecated self.billing_service.create_payment() call.
+            # create_pending_payment() acquires with_for_update() on Visit,
+            # checks for duplicate pending payments with the same provider,
+            # and wraps the insert in IntegrityError defense-in-depth.
+            #
+            # commit=False because we need to:
+            # 1. Set provider_payment_id and payment_url after creation
+            # 2. Update payment status to processing/failed
+            # 3. Commit everything in one transaction
+            payment_service = PaymentInvariantService(self.db)
+
+            # Build current_user if not provided (backward compatibility)
+            # — the endpoint always has current_user, but tests may not.
+            if current_user is None:
+                current_user = type("UserRef", (), {"id": None})()
+
+            payment = payment_service.create_pending_payment(
                 visit_id=visit_id,
-                amount=float(amount),
+                amount=Decimal(str(amount)),
                 currency=currency,
                 method="online",
-                status=PaymentStatus.PENDING.value,
                 provider=provider,
+                note=description,
+                current_user=current_user,
                 commit=False,
             )
 
