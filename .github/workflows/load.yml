@@ -26,9 +26,12 @@ jobs:
       - name: Install k6
         run: |
           # The old apt+keyserver method fails on GitHub runners with
-          # "gpg: keyserver receive failed: No data" (broken for weeks).
-          # Grafana's install script downloads the release binary directly.
-          curl -sL https://raw.githubusercontent.com/grafana/k6/master/install.sh | sudo bash
+          # "gpg: keyserver receive failed: No data" (broken for weeks);
+          # Grafana's master install.sh is gone (404) too. Install the
+          # official .deb from the latest GitHub release.
+          K6_VER=$(curl -s https://api.github.com/repos/grafana/k6/releases/latest | grep -oE '"tag_name": *"[^"]+"' | cut -d'"' -f4)
+          curl -sL -o /tmp/k6.deb "https://github.com/grafana/k6/releases/download/${K6_VER}/k6-${K6_VER}-linux-amd64.deb"
+          sudo dpkg -i /tmp/k6.deb
           k6 version
 
       - name: Check runner type
