@@ -41,14 +41,21 @@ latest_run() {
 }
 
 # Human duration from run timestamps (n/a on any parse failure).
+# Deliberately plain: single-field jq extracts + GNU date arithmetic — the
+# earlier multi-line jq program failed silently on the runner (rendered n/a).
 run_duration() {
-  jq -r '
-    (.updated_at | fromdateiso8601) as $end | (.created_at | fromdateiso8601) as $start
-    | ($end - $start) as $s
-    | if $s >= 3600 then "\($s / 3600 | floor)h \($s % 3600 / 60 | floor)m"
-      elif $s >= 60 then "\($s / 60 | floor)m \($s % 60)s"
-      else "\($s)s" end
-  ' <<<"$1" 2>/dev/null || echo "n/a"
+  local start end secs
+  start=$(jq -r '.created_at // empty' <<<"$1")
+  end=$(jq -r '.updated_at // empty' <<<"$1")
+  if [ -z "$start" ] || [ -z "$end" ]; then echo "n/a"; return; fi
+  secs=$(( $(date -u -d "$end" +%s) - $(date -u -d "$start" +%s) ))
+  if [ "$secs" -ge 3600 ]; then
+    echo "$(( secs / 3600 ))h $(( (secs % 3600) / 60 ))m"
+  elif [ "$secs" -ge 60 ]; then
+    echo "$(( secs / 60 ))m $(( secs % 60 ))s"
+  else
+    echo "${secs}s"
+  fi
 }
 
 # Mutation scores, best-effort: parse steps' conclusions + log grep is heavy,
