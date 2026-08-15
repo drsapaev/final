@@ -1,6 +1,14 @@
 # 🚀 MIGRATION PLAN
 ## From Chaotic Styles → Unified Design System
 
+> **Status: historical planning document (pre-TypeScript-migration era).**
+> This plan was never implemented as written — `unifiedTheme.js` and
+> `styles/unified.css` do not exist in the codebase. All `.jsx` file
+> references below predate the JS→TS migration; the files are now `.tsx`
+> (e.g. `src/App.tsx`, `src/main.tsx`). Design-system work that did land
+> uses the CSS-token approach under `src/styles/` (see `emr-tokens.css`,
+> `macos.css` and the theme compliance scripts). Kept for planning history.
+
 **Goal:** Full design system unification in 4 weeks  
 **Team:** 2-3 developers  
 **Complexity:** Medium  
