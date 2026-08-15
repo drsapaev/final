@@ -140,6 +140,8 @@ All 4 previously-documented casts were eliminated in Phase F5:
 **Zero explicit `any` casts remain** (`as any`, `: any`).
 
 > **Note on implicit `any`:** `strict` and `noImplicitAny` remain disabled in `tsconfig.json`. This means implicit `any` (untyped function parameters, untyped variables) is NOT yet prohibited at the compiler level. The codebase has zero *explicit* `any` casts, but implicit `any` may still exist in untyped code paths. Enabling `strict: true` is tracked as a separate project (see Phase G below and Future Work).
+>
+> **[Update 2026-08-15:** this note described the pre-G8 state. Phase G8 (PR #2598) enabled `strict: true` in `frontend/tsconfig.json` with 0 errors — implicit `any` and null-unsafety are now prohibited across `src/`, and the e2e + node-config boundaries were added in PR #2755.**]
 
 ---
 
