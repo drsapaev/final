@@ -2354,16 +2354,27 @@ jobs:
   notifications:
     name: 📧 Уведомления
     runs-on: ubuntu-latest
-    needs: [deploy-staging, deploy-production]
+    needs: [ci-scope, metadata-checks, code-quality, frontend-lint, frontend-unit-tests, frontend-build, frontend-e2e, backend-tests, architecture-boundary, frontend-backend-parity, security, docker, integration, load-tests-nightly, dast-zap-nightly, docs, telegram-miniapp-release-gate, pr-required-gate, deploy-staging, deploy-production]
     if: always()
-    
+
     steps:
     - name: 📧 Отправка уведомлений
       run: |
         if [ "${{ needs.deploy-staging.result }}" == "success" ] || [ "${{ needs.deploy-production.result }}" == "success" ]; then
           echo "✅ Развертывание успешно завершено"
-          echo "📧 Уведомления отправлены"
         else
-          echo "❌ Развертывание не выполнено"
+          echo "ℹ️ Развертывание не выполнено (обычно для schedule/PR-прогонов)"
         fi
+
+    - name: 🔔 Notify on scheduled failure (issue)
+      if: failure() && github.event_name == 'schedule'
+      uses: ./.github/actions/notify-failure
+      with:
+        title: 🔴 Nightly unified CI failed on main
+        detail: |
+          The scheduled run of the unified CI on main has at least one failed job.
+          Nightly failures are otherwise invisible — this issue is the alert.
+    permissions:
+      issues: write
+      contents: read
 

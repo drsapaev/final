@@ -44,3 +44,21 @@ jobs:
           # gitleaks-action writes to results.sarif in the workspace root
           sarif_file: results.sarif
           category: gitleaks
+
+  # Alert on scheduled-run failures: a red nightly is invisible without this
+  # (mutation.yml was red for 4+ nights before anyone noticed).
+  notify-failure:
+    name: 🔔 Notify on failure
+    runs-on: ubuntu-latest
+    needs: [gitleaks]
+    if: failure() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create failure issue
+        uses: ./.github/actions/notify-failure
+        with:
+          title: "🔴 Gitleaks nightly failed"
+          detail: |
+            Secret detection over the full history of main.

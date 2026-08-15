@@ -103,3 +103,21 @@ jobs:
         with:
           name: k6-results
           path: tests/load/*-results.json
+
+  # Alert on scheduled-run failures: a red nightly is invisible without this
+  # (mutation.yml was red for 4+ nights before anyone noticed).
+  notify-failure:
+    name: 🔔 Notify on failure
+    runs-on: ubuntu-latest
+    needs: [load-test]
+    if: failure() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create failure issue
+        uses: ./.github/actions/notify-failure
+        with:
+          title: "🔴 Weekly load testing failed"
+          detail: |
+            k6 load tests with baseline degradation gate (>15% p95 regression fails).

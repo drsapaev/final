@@ -82,7 +82,7 @@ jobs:
         echo "=== Итоги ==="
         if [ -f backend/pip-audit-report.json ]; then
           issues=$(python -c "import json;d=json.load(open('backend/pip-audit-report.json'));print(len(d.get('dependencies',[])))" 2>/dev/null || echo "?")
-          echo "pip-audit: $issues зависимостей с vulns (блокирует CI при >0)"
+          echo "pip-audit: $issues зависимостей с vulns (report-only — НЕ блокирует CI)"
         fi
         if [ -f backend/safety-report.json ]; then
           issues=$(python -c "import json;d=json.load(open('backend/safety-report.json'));print(len(d.get('vulnerabilities',[])))" 2>/dev/null || echo "?")
@@ -93,4 +93,22 @@ jobs:
           echo "bandit: $metrics (HIGH+MEDIUM блокируют; LOW report-only)"
         fi
         echo ""
-        echo "✅ Security posture: strict (pip-audit CVEs block CI, bandit MEDIUM+ blocks CI)."
+        echo "🔍 Security posture: bandit MEDIUM+ is the only blocking check; pip-audit/safety are report-only (upstream transitive CVEs)."
+
+  # Alert on scheduled-run failures: a red nightly is invisible without this
+  # (mutation.yml was red for 4+ nights before anyone noticed).
+  notify-failure:
+    name: 🔔 Notify on failure
+    runs-on: ubuntu-latest
+    needs: [security-scan]
+    if: failure() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create failure issue
+        uses: ./.github/actions/notify-failure
+        with:
+          title: "🔴 Nightly security scan failed"
+          detail: |
+            Blocking surface: bandit MEDIUM+ on backend code. pip-audit and safety run report-only by design.

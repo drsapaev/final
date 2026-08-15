@@ -144,3 +144,21 @@ jobs:
         with:
           name: stryker-report
           path: frontend/reports/mutation/
+
+  # Alert on scheduled-run failures: a red nightly is invisible without this
+  # (mutation.yml was red for 4+ nights before anyone noticed).
+  notify-failure:
+    name: 🔔 Notify on failure
+    runs-on: ubuntu-latest
+    needs: [backend-mutation, frontend-mutation]
+    if: failure() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create failure issue
+        uses: ./.github/actions/notify-failure
+        with:
+          title: "🔴 Nightly mutation testing failed"
+          detail: |
+            Guards the mutation-score floors: backend mutmut (4 crud modules, threshold 30) and frontend Stryker (state machines + mappers, threshold 70).
