@@ -444,6 +444,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/visits/visits/{visit_id}/force-reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin override: reopen a closed/canceled visit (H-3 break-glass) */
+        post: operations["force_reopen_visit_api_v1_visits_visits__visit_id__force_reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/visits/{visit_id}/reschedule": {
         parameters: {
             query?: never;
@@ -872,6 +889,32 @@ export type paths = {
          * @description Get single department by ID
          */
         get: operations["get_department_api_v1_departments__department_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/payment-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Payment Methods
+         * @description Get available payment methods for the clinic.
+         *
+         *     Returns a list of payment methods with value, label, and icon_name.
+         *     Frontend maps icon_name to a lucide-react icon component.
+         *
+         *     Per-clinic configuration: if clinic_settings has key="payment_methods",
+         *     returns that value. Otherwise returns hardcoded defaults.
+         */
+        get: operations["get_payment_methods_api_v1_payments_payment_methods_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1319,6 +1362,235 @@ export type paths = {
          * @description Получение информации о визите по токену (без подтверждения).
          */
         get: operations["get_visit_info_by_token_api_v1_visits_info__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/register/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Register Begin
+         * @description Begin passkey registration (M4-P1-4).
+         *
+         *     Requires existing patient authentication (initData in body).
+         *     Returns WebAuthn registration options for navigator.credentials.create().
+         */
+        post: operations["webauthn_register_begin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/register/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Register Finish
+         * @description Finish passkey registration (M4-P1-4).
+         *
+         *     Verifies browser response and stores credential.
+         */
+        post: operations["webauthn_register_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/login/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Login Begin
+         * @description Begin passkey authentication (M4-P1-4).
+         *
+         *     Returns WebAuthn authentication options for navigator.credentials.get().
+         */
+        post: operations["webauthn_login_begin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/login/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Login Finish
+         * @description Finish passkey authentication (M4-P1-4).
+         *
+         *     Verifies assertion and issues JWT.
+         */
+        post: operations["webauthn_login_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/credentials/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn List Credentials
+         * @description List active passkeys for the authenticated patient (M4-P1-4).
+         */
+        post: operations["webauthn_list_credentials"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/credentials/{credential_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Deactivate Credential
+         * @description Deactivate a passkey (M4-P1-4).
+         */
+        post: operations["webauthn_deactivate_credential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/security/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Security Dashboard
+         * @description M5.6: Security dashboard — recent logins, downloads, suspicious IPs.
+         */
+        get: operations["admin_security_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/security/compliance/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compliance Report
+         * @description M5.10: Automated compliance report — 8 checks.
+         */
+        get: operations["admin_compliance_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/security/secrets/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Secrets Status
+         * @description M5.8: Secrets rotation status.
+         */
+        get: operations["admin_secrets_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/security/backup/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Backup Verify
+         * @description M5.9: Record a backup verification event.
+         */
+        post: operations["admin_backup_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/security/backup/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Backup Status
+         * @description M5.9: Check backup status.
+         */
+        get: operations["admin_backup_status"];
         put?: never;
         post?: never;
         delete?: never;
@@ -13254,6 +13526,84 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram/mini-app/auth/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange Mini App Auth
+         * @description Exchange Telegram Mini App initData for short-lived JWT.
+         *
+         *     M4-P0-2: Secure alternative to per-request initData replay.
+         *     - initData validated ONCE (max_age=5min, replay protection)
+         *     - Returns JWT access_token (15 min) + refresh_token (7 days)
+         *     - Subsequent requests should use Authorization: Bearer <access_token>
+         *
+         *     Request body: { "init_data": "<Telegram.WebApp.initData>" }
+         */
+        post: operations["telegram_mini_app_auth_exchange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/mini-app/sessions/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List Mini App Patient Sessions
+         * @description List active patient sessions (M4-P0-3).
+         *
+         *     Returns active sessions for the authenticated patient, including
+         *     IP, user-agent, and creation timestamp. Uses initData for auth
+         *     (backward compat — will be replaced by JWT in future).
+         *
+         *     Request body: { "init_data": "<Telegram.WebApp.initData>" }
+         */
+        post: operations["telegram_mini_app_patient_sessions_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/mini-app/sessions/revoke-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke All Mini App Patient Sessions
+         * @description Revoke all patient sessions except the current one (M4-P0-3).
+         *
+         *     Used when patient suspects their phone is stolen or wants to
+         *     log out from all other devices.
+         *
+         *     Request body: { "init_data": "<Telegram.WebApp.initData>" }
+         */
+        post: operations["telegram_mini_app_patient_sessions_revoke_all"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/telegram/mini-app/appointments/preview": {
         parameters: {
             query?: never;
@@ -21239,23 +21589,6 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/_routes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Routes */
-        get: operations["_routes__routes_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -22936,16 +23269,6 @@ export type components = {
             common_updates?: components["schemas"]["CommonUpdates"] | null;
         };
         /**
-         * StructuredErrorResponse
-         * @description Structured error response for batch operations.
-         */
-        StructuredErrorResponse: {
-            /** Code */
-            code: string;
-            /** Message */
-            message: string;
-        };
-        /**
          * BatchUpdateResponse
          * @description Ответ на batch-обновление
          */
@@ -22964,10 +23287,7 @@ export type components = {
             } | null;
             /** Error */
             error?: string | null;
-            /**
-             * Error Code
-             * @description Machine-readable error code from the first failed entry
-             */
+            /** Error Code */
             error_code?: string | null;
         };
         /** BenefitCreate */
@@ -26503,10 +26823,7 @@ export type components = {
             status: "updated" | "cancelled" | "created" | "error";
             /** Error */
             error?: string | null;
-            /**
-             * Error Code
-             * @description Machine-readable error code (e.g. ambiguous_entry_id, entry_not_found)
-             */
+            /** Error Code */
             error_code?: string | null;
         };
         /** EquipmentCreate */
@@ -27466,6 +27783,19 @@ export type components = {
              * @default true
              */
             send_notifications: boolean;
+        };
+        /** ForceReopenRequest */
+        ForceReopenRequest: {
+            /**
+             * Target Status
+             * @description Non-terminal target status: open | in_progress | completed
+             */
+            target_status: string;
+            /**
+             * Reason
+             * @description Operational reason for the override (≥10 chars). Logged.
+             */
+            reason: string;
         };
         /**
          * FullUpdateOnlineEntryRequest
@@ -29675,6 +30005,11 @@ export type components = {
              * @description JWT токен
              */
             access_token: string;
+            /**
+             * Refresh Token
+             * @description Refresh token для продления сессии (использовать с /mobile/auth/refresh)
+             */
+            refresh_token?: string | null;
             /**
              * Token Type
              * @description Тип токена
@@ -34636,6 +34971,26 @@ export type components = {
             measurements_this_week: number;
         };
         /**
+         * StructuredErrorResponse
+         * @description Structured error response for batch operations.
+         *
+         *     Returned as HTTP 400 detail when error_code is present (e.g.
+         *     ambiguous_entry_id, entry_not_found). When error_code is None,
+         *     the detail is a plain string for backward compatibility.
+         */
+        StructuredErrorResponse: {
+            /**
+             * Code
+             * @description Machine-readable error code
+             */
+            code: string;
+            /**
+             * Message
+             * @description Human-readable error message
+             */
+            message: string;
+        };
+        /**
          * SuggestICD10IntegrationRequest
          * @description Request body for POST /ai-integration/suggest-icd10 (legacy integration).
          */
@@ -38935,6 +39290,41 @@ export interface operations {
             };
         };
     };
+    force_reopen_visit_api_v1_visits_visits__visit_id__force_reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForceReopenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     reschedule_visit_api_v1_visits__visit_id__reschedule_post: {
         parameters: {
             query: {
@@ -39709,6 +40099,28 @@ export interface operations {
             };
         };
     };
+    get_payment_methods_api_v1_payments_payment_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     get_available_providers_api_v1_payments_providers_get: {
         parameters: {
             query?: {
@@ -40426,6 +40838,249 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    webauthn_register_begin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    webauthn_register_finish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    webauthn_login_begin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    webauthn_login_finish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    webauthn_list_credentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    webauthn_deactivate_credential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_security_dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    admin_compliance_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    admin_secrets_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    admin_backup_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    admin_backup_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -61097,6 +61752,72 @@ export interface operations {
             };
         };
     };
+    telegram_mini_app_auth_exchange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    telegram_mini_app_patient_sessions_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    telegram_mini_app_patient_sessions_revoke_all: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     telegram_mini_app_preview_appointment_booking: {
         parameters: {
             query?: never;
@@ -73855,6 +74576,15 @@ export interface operations {
                     "application/json": components["schemas"]["BatchUpdateResponse"];
                 };
             };
+            /** @description Batch operation failed — structured error with code and message */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructuredErrorResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75166,26 +75896,6 @@ export interface operations {
         };
     };
     detailed_health_api_v1_health_detailed_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    _routes__routes_get: {
         parameters: {
             query?: never;
             header?: never;
