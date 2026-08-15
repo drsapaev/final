@@ -18,7 +18,6 @@ on:
       - 'frontend/package.json'
       - 'frontend/tsconfig.json'
       - 'scripts/regression-audit-check.mjs'
-      - 'scripts/strict-baseline.json'
   push:
     branches: [main]
     paths:
@@ -28,7 +27,6 @@ on:
       - 'frontend/package.json'
       - 'frontend/tsconfig.json'
       - 'scripts/regression-audit-check.mjs'
-      - 'scripts/strict-baseline.json'
 
 permissions:
   contents: read
