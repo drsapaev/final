@@ -663,6 +663,12 @@ jobs:
         npm run generate:api-types:check
         echo "✅ Generated API types are in sync with backend/openapi.json"
 
+    - name: 🔒 Type-check vite/vitest configs (tsconfig.node.json)
+      run: |
+        cd frontend
+        npx tsc --noEmit -p tsconfig.node.json
+        echo "✅ Node-config type-check passed"
+
     - name: 🚫 Type debt gate (prevents new `any`/`@ts-ignore`/`@ts-nocheck`)
       run: |
         cd frontend
@@ -779,6 +785,12 @@ jobs:
       run: |
         cd frontend
         npm ci --legacy-peer-deps
+
+    - name: 🔒 Type-check e2e specs + Playwright config (e2e/tsconfig.json)
+      run: |
+        cd frontend
+        npx tsc --noEmit -p e2e/tsconfig.json
+        echo "✅ e2e type-check passed"
 
     - name: 🧪 Registrar time e2e (Chromium)
       run: |

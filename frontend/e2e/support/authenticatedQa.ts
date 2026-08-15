@@ -1,6 +1,42 @@
+import type { Page } from '@playwright/test';
+
 const API_PREFIX = '/api/v1';
 
-export const AUTHENTICATED_ROLE_QA_ROUTES = [
+export interface RoleQaRoute {
+  key: string;
+  role: string;
+  path: string;
+  routeId: string;
+}
+
+export interface SpecialtyQaRoute extends RoleQaRoute {
+  summaryLabel: string;
+}
+
+export interface DenyQaRoute {
+  key: string;
+  role: string;
+  path: string;
+  deniedRouteId: string;
+}
+
+export interface QaProfile {
+  id: string;
+  username: string;
+  email: string;
+  full_name: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  role_name: string;
+  roles: string[];
+  permissions: string[];
+  is_admin: boolean;
+  is_superuser: boolean;
+  qa_harness: boolean;
+}
+
+export const AUTHENTICATED_ROLE_QA_ROUTES: RoleQaRoute[] = [
   {
     key: 'admin',
     role: 'Admin',
@@ -39,7 +75,7 @@ export const AUTHENTICATED_ROLE_QA_ROUTES = [
   },
 ];
 
-export const AUTHENTICATED_SPECIALTY_QA_ROUTES = [
+export const AUTHENTICATED_SPECIALTY_QA_ROUTES: SpecialtyQaRoute[] = [
   {
     key: 'doctor-cardiology',
     role: 'Doctor',
@@ -63,12 +99,12 @@ export const AUTHENTICATED_SPECIALTY_QA_ROUTES = [
   },
 ];
 
-export const AUTHENTICATED_UI_QA_ROUTES = [
+export const AUTHENTICATED_UI_QA_ROUTES: Array<RoleQaRoute | SpecialtyQaRoute> = [
   ...AUTHENTICATED_ROLE_QA_ROUTES,
   ...AUTHENTICATED_SPECIALTY_QA_ROUTES,
 ];
 
-export const AUTHENTICATED_RBAC_DENY_QA_ROUTES = [
+export const AUTHENTICATED_RBAC_DENY_QA_ROUTES: DenyQaRoute[] = [
   {
     key: 'cashier-denied-admin',
     role: 'Cashier',
@@ -95,7 +131,7 @@ export const AUTHENTICATED_RBAC_DENY_QA_ROUTES = [
   },
 ];
 
-function base64UrlEncode(value) {
+function base64UrlEncode(value: unknown) {
   return Buffer.from(JSON.stringify(value))
     .toString('base64')
     .replace(/=/g, '')
@@ -103,7 +139,7 @@ function base64UrlEncode(value) {
     .replace(/\//g, '_');
 }
 
-function createQaJwt(profile) {
+function createQaJwt(profile: QaProfile) {
   const nowSeconds = Math.floor(Date.now() / 1000);
   const header = { alg: 'none', typ: 'JWT' };
   const payload = {
@@ -117,7 +153,7 @@ function createQaJwt(profile) {
   return `${base64UrlEncode(header)}.${base64UrlEncode(payload)}.qa`;
 }
 
-export function createAuthenticatedQaProfile(role) {
+export function createAuthenticatedQaProfile(role: string): QaProfile {
   const normalizedRole = String(role || 'Admin');
   const isAdmin = normalizedRole === 'Admin';
   const username = `qa_${normalizedRole.toLowerCase()}`;
@@ -150,7 +186,7 @@ function collectionPayload() {
   };
 }
 
-function buildQaApiPayload(pathname, profile, method) {
+function buildQaApiPayload(pathname: string, profile: QaProfile, method: string) {
   const path = pathname.replace(API_PREFIX, '') || '/';
   const lowerPath = path.toLowerCase();
 
@@ -222,9 +258,8 @@ function buildQaApiPayload(pathname, profile, method) {
   }
 
   if (lowerPath.includes('summary') || lowerPath.includes('stats') || lowerPath.includes('dashboard')) {
+    // collectionPayload() already provides success: true and total: 0 via the spread below.
     return {
-      success: true,
-      total: 0,
       pending: 0,
       completed: 0,
       cancelled: 0,
@@ -234,13 +269,17 @@ function buildQaApiPayload(pathname, profile, method) {
   }
 
   if (lowerPath.includes('settings') || lowerPath.includes('config') || lowerPath.includes('profile')) {
-    return { success: true, ...collectionPayload() };
+    // collectionPayload() already provides success: true via the spread below.
+    return { ...collectionPayload() };
   }
 
   return collectionPayload();
 }
 
-export async function installAuthenticatedQaHarness(page, { role }) {
+export async function installAuthenticatedQaHarness(
+  page: Page,
+  { role }: { role: string }
+): Promise<{ token: string; profile: QaProfile }> {
   const profile = createAuthenticatedQaProfile(role);
   const token = createQaJwt(profile);
 

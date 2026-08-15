@@ -37,9 +37,11 @@ export default defineConfig({
       forks: {
         singleFork: true
       }
-    },
-    // Уменьшаем количество worker'ов до 1
-    minThreads: 1,
-    maxThreads: 1
+    }
+    // NOTE: the original config also set minThreads/maxThreads=1, but those
+    // options were removed in vitest 3 (silently ignored); singleFork above
+    // already forces a single worker process. To limit threads in vitest 3,
+    // set minWorkers/maxWorkers — deliberately not done here to keep runtime
+    // behavior identical to before this type-check boundary was added.
   }
 });
