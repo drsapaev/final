@@ -3,7 +3,7 @@
   "info": {
     "title": "MediClinic Pro API",
     "description": "\n    Medical clinic management system API.\n\n    ## Authentication\n    All endpoints (except /auth/login, /auth/csrf-token, /health) require\n    a Bearer JWT token in the Authorization header.\n\n    ## Rate Limiting\n    Sensitive endpoints (login, SMS, broadcast) are rate-limited via slowapi.\n    Rate limit headers are included in responses.\n\n    ## Audit Logging\n    Admin actions are logged to the AuditLog table for HIPAA compliance.\n\n    ## WebSocket\n    Real-time endpoints available at /ws/notifications, /ws/queue, /ws/cashier.\n    Authentication via ?token= query parameter (JWT).\n    ",
-    "version": "0.9.0"
+    "version": "1.1.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -1330,6 +1330,63 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/visits/visits/{visit_id}/force-reopen": {
+      "post": {
+        "tags": [
+          "visits"
+        ],
+        "summary": "Admin override: reopen a closed/canceled visit (H-3 break-glass)",
+        "operationId": "force_reopen_visit_api_v1_visits_visits__visit_id__force_reopen_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForceReopenRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2725,6 +2782,35 @@
         }
       }
     },
+    "/api/v1/payments/payment-methods": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Get Payment Methods",
+        "description": "Get available payment methods for the clinic.\n\nReturns a list of payment methods with value, label, and icon_name.\nFrontend maps icon_name to a lucide-react icon component.\n\nPer-clinic configuration: if clinic_settings has key=\"payment_methods\",\nreturns that value. Otherwise returns hardcoded defaults.",
+        "operationId": "get_payment_methods_api_v1_payments_payment_methods_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Payment Methods Api V1 Payments Payment Methods Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/payments/providers": {
       "get": {
         "tags": [
@@ -3893,6 +3979,307 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/webauthn/register/begin": {
+      "post": {
+        "tags": [
+          "webauthn",
+          "webauthn"
+        ],
+        "summary": "Webauthn Register Begin",
+        "description": "Begin passkey registration (M4-P1-4).\n\nRequires existing patient authentication (initData in body).\nReturns WebAuthn registration options for navigator.credentials.create().",
+        "operationId": "webauthn_register_begin",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Webauthn Register Begin"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webauthn/register/finish": {
+      "post": {
+        "tags": [
+          "webauthn",
+          "webauthn"
+        ],
+        "summary": "Webauthn Register Finish",
+        "description": "Finish passkey registration (M4-P1-4).\n\nVerifies browser response and stores credential.",
+        "operationId": "webauthn_register_finish",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Webauthn Register Finish"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webauthn/login/begin": {
+      "post": {
+        "tags": [
+          "webauthn",
+          "webauthn"
+        ],
+        "summary": "Webauthn Login Begin",
+        "description": "Begin passkey authentication (M4-P1-4).\n\nReturns WebAuthn authentication options for navigator.credentials.get().",
+        "operationId": "webauthn_login_begin",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Webauthn Login Begin"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webauthn/login/finish": {
+      "post": {
+        "tags": [
+          "webauthn",
+          "webauthn"
+        ],
+        "summary": "Webauthn Login Finish",
+        "description": "Finish passkey authentication (M4-P1-4).\n\nVerifies assertion and issues JWT.",
+        "operationId": "webauthn_login_finish",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Webauthn Login Finish"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webauthn/credentials/list": {
+      "post": {
+        "tags": [
+          "webauthn",
+          "webauthn"
+        ],
+        "summary": "Webauthn List Credentials",
+        "description": "List active passkeys for the authenticated patient (M4-P1-4).",
+        "operationId": "webauthn_list_credentials",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Webauthn List Credentials"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webauthn/credentials/{credential_id}/deactivate": {
+      "post": {
+        "tags": [
+          "webauthn",
+          "webauthn"
+        ],
+        "summary": "Webauthn Deactivate Credential",
+        "description": "Deactivate a passkey (M4-P1-4).",
+        "operationId": "webauthn_deactivate_credential",
+        "parameters": [
+          {
+            "name": "credential_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Credential Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Webauthn Deactivate Credential"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/security/dashboard": {
+      "get": {
+        "tags": [
+          "admin-security",
+          "admin-security"
+        ],
+        "summary": "Security Dashboard",
+        "description": "M5.6: Security dashboard — recent logins, downloads, suspicious IPs.",
+        "operationId": "admin_security_dashboard",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/security/compliance/report": {
+      "get": {
+        "tags": [
+          "admin-security",
+          "admin-security"
+        ],
+        "summary": "Compliance Report",
+        "description": "M5.10: Automated compliance report — 8 checks.",
+        "operationId": "admin_compliance_report",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/security/secrets/status": {
+      "get": {
+        "tags": [
+          "admin-security",
+          "admin-security"
+        ],
+        "summary": "Secrets Status",
+        "description": "M5.8: Secrets rotation status.",
+        "operationId": "admin_secrets_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/security/backup/verify": {
+      "post": {
+        "tags": [
+          "admin-security",
+          "admin-security"
+        ],
+        "summary": "Backup Verify",
+        "description": "M5.9: Record a backup verification event.",
+        "operationId": "admin_backup_verify",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/security/backup/status": {
+      "get": {
+        "tags": [
+          "admin-security",
+          "admin-security"
+        ],
+        "summary": "Backup Status",
+        "description": "M5.9: Check backup status.",
+        "operationId": "admin_backup_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/admin/morning-assignment/run": {
@@ -38862,6 +39249,78 @@
         }
       }
     },
+    "/api/v1/telegram/mini-app/auth/exchange": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "Exchange Mini App Auth",
+        "description": "Exchange Telegram Mini App initData for short-lived JWT.\n\nM4-P0-2: Secure alternative to per-request initData replay.\n- initData validated ONCE (max_age=5min, replay protection)\n- Returns JWT access_token (15 min) + refresh_token (7 days)\n- Subsequent requests should use Authorization: Bearer <access_token>\n\nRequest body: { \"init_data\": \"<Telegram.WebApp.initData>\" }",
+        "operationId": "telegram_mini_app_auth_exchange",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Telegram Mini App Auth Exchange"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/telegram/mini-app/sessions/list": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "List Mini App Patient Sessions",
+        "description": "List active patient sessions (M4-P0-3).\n\nReturns active sessions for the authenticated patient, including\nIP, user-agent, and creation timestamp. Uses initData for auth\n(backward compat — will be replaced by JWT in future).\n\nRequest body: { \"init_data\": \"<Telegram.WebApp.initData>\" }",
+        "operationId": "telegram_mini_app_patient_sessions_list",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Telegram Mini App Patient Sessions List"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/telegram/mini-app/sessions/revoke-all": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "Revoke All Mini App Patient Sessions",
+        "description": "Revoke all patient sessions except the current one (M4-P0-3).\n\nUsed when patient suspects their phone is stolen or wants to\nlog out from all other devices.\n\nRequest body: { \"init_data\": \"<Telegram.WebApp.initData>\" }",
+        "operationId": "telegram_mini_app_patient_sessions_revoke_all",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Telegram Mini App Patient Sessions Revoke All"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/telegram/mini-app/appointments/preview": {
       "post": {
         "tags": [
@@ -61092,6 +61551,16 @@
               }
             }
           },
+          "400": {
+            "description": "Batch operation failed — structured error with code and message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StructuredErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -63249,22 +63718,6 @@
         "summary": "Detailed Health",
         "description": "Comprehensive health check for uptime monitoring (e.g. UptimeRobot, BetterStack).\n\nReturns status of all subsystems. If any critical subsystem is down,\nreturns HTTP 503 (suitable for load balancer health checks).\n\nLight check — does NOT hit external services (Sentry, Telegram API).\nOnly checks local DB + Redis connectivity.\n\nPublic endpoint (no auth) — safe to expose to uptime monitors.",
         "operationId": "detailed_health_api_v1_health_detailed_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/_routes": {
-      "get": {
-        "summary": " Routes",
-        "operationId": "_routes__routes_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -67516,6 +67969,17 @@
               }
             ],
             "title": "Error"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
           }
         },
         "type": "object",
@@ -77172,6 +77636,17 @@
               }
             ],
             "title": "Error"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
           }
         },
         "type": "object",
@@ -79999,6 +80474,28 @@
         ],
         "title": "ForceMajeureTransferRequest",
         "description": "Запрос на массовый перенос очереди"
+      },
+      "ForceReopenRequest": {
+        "properties": {
+          "target_status": {
+            "type": "string",
+            "title": "Target Status",
+            "description": "Non-terminal target status: open | in_progress | completed"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 10,
+            "title": "Reason",
+            "description": "Operational reason for the override (≥10 chars). Logged."
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_status",
+          "reason"
+        ],
+        "title": "ForceReopenRequest"
       },
       "FullUpdateOnlineEntryRequest": {
         "properties": {
@@ -85882,6 +86379,18 @@
             "type": "string",
             "title": "Access Token",
             "description": "JWT токен"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token",
+            "description": "Refresh token для продления сессии (использовать с /mobile/auth/refresh)"
           },
           "token_type": {
             "type": "string",
@@ -98685,6 +99194,27 @@
         ],
         "title": "StatisticsResponse",
         "description": "Ответ со статистикой устройства"
+      },
+      "StructuredErrorResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Machine-readable error code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable error message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "StructuredErrorResponse",
+        "description": "Structured error response for batch operations.\n\nReturned as HTTP 400 detail when error_code is present (e.g.\nambiguous_entry_id, entry_not_found). When error_code is None,\nthe detail is a plain string for backward compatibility."
       },
       "SuggestICD10IntegrationRequest": {
         "properties": {
