@@ -132,7 +132,7 @@ interface Window {
 // runtime validators, not TypeScript types — consumers use them as values
 // (e.g. `PropTypes.string.isRequired`), not as type annotations.
 declare module 'prop-types' {
-  /* eslint-disable @typescript-eslint/no-explicit-any */
+
   export const any: any;
   export const string: any;
   export const number: any;
@@ -173,5 +173,4 @@ declare module 'prop-types' {
     exact(shape: Record<string, any>): any;
   };
   export default PropTypes;
-  /* eslint-enable @typescript-eslint/no-explicit-any */
 }

@@ -1739,7 +1739,6 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     }
   ];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // TECH-DEBT(cardio-queue-panel): queuePanel is `any` — QueueIntegration return type inference issue under strict:true
   const queuePanel: any = activeTab === 'queue' ? (
     <QueueIntegration specialty="cardiology" />
