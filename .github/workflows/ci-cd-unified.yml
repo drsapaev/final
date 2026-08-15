@@ -138,6 +138,8 @@ jobs:
             - 'backend/app/routers/**'
             - 'backend/app/schemas/**'
             - 'backend/app/models/**'
+          openapi_spec:
+            - 'backend/openapi.json'
           ops:
             - 'ops/**'
           parity_tools:
@@ -188,6 +190,7 @@ jobs:
         PR_FRONTEND_E2E: ${{ steps.changes.outputs.frontend_e2e }}
         PR_TELEGRAM_RELEASE_GATE: ${{ steps.changes.outputs.telegram_release_gate }}
         PR_API_DOCS: ${{ steps.changes.outputs.api_docs }}
+        PR_OPENAPI_SPEC: ${{ steps.changes.outputs.openapi_spec }}
         PR_OPS: ${{ steps.changes.outputs.ops }}
         PR_PARITY_TOOLS: ${{ steps.changes.outputs.parity_tools }}
         PR_WORKFLOW: ${{ steps.changes.outputs.workflow }}
@@ -210,6 +213,7 @@ jobs:
           FRONTEND_E2E="${PR_FRONTEND_E2E:-false}"
           TELEGRAM_RELEASE_GATE_REQUIRED="${PR_TELEGRAM_RELEASE_GATE:-false}"
           API_DOCS_CHANGED="${PR_API_DOCS:-false}"
+          OPENAPI_SPEC_CHANGED="${PR_OPENAPI_SPEC:-false}"
           OPS_CHANGED="${PR_OPS:-false}"
           PARITY_TOOLS_CHANGED="${PR_PARITY_TOOLS:-false}"
           ROOT_DEPS_CHANGED="${PR_ROOT_DEPS:-false}"
@@ -241,6 +245,10 @@ jobs:
           FRONTEND_REQUIRED="true"
           FRONTEND_E2E="true"
           API_DOCS_CHANGED="true"
+        fi
+        if [ "$OPENAPI_SPEC_CHANGED" = "true" ]; then
+          # A spec change without regenerated api.ts must fail the generated-types gate.
+          FRONTEND_REQUIRED="true"
         fi
         if [ "$FRONTEND_DEPS_CHANGED" = "true" ]; then
           FRONTEND_REQUIRED="true"
@@ -648,6 +656,12 @@ jobs:
         cd frontend
         npm run type-check
         echo "✅ Frontend type-check passed"
+
+    - name: 🔒 Generated API types freshness (backend/openapi.json → src/types/generated/api.ts)
+      run: |
+        cd frontend
+        npm run generate:api-types:check
+        echo "✅ Generated API types are in sync with backend/openapi.json"
 
     - name: 🚫 Type debt gate (prevents new `any`/`@ts-ignore`/`@ts-nocheck`)
       run: |
@@ -2074,7 +2088,19 @@ jobs:
           echo "❌ Файл openapi.json не создан"
           exit 1
         fi
-    
+
+    - name: 🔬 OpenAPI spec freshness (app code → backend/openapi.json)
+      run: |
+        cd backend
+        if git diff --exit-code -- openapi.json; then
+          echo "✅ backend/openapi.json matches the schema generated from app code"
+        else
+          echo "❌ backend/openapi.json is stale: the schema generated from app.main differs from the committed spec."
+          echo "   Regenerate: import app.main → app.openapi() → json.dump(indent=2, ensure_ascii=False) → commit"
+          git diff --stat -- openapi.json
+          exit 1
+        fi
+
     - name: 📤 Загрузка документации
       uses: actions/upload-artifact@v7
       with:
