@@ -43,8 +43,7 @@ latest_run() {
 # Human duration from run timestamps (n/a on any parse failure).
 run_duration() {
   jq -r '
-    def ts: sub("\\..*"; "") | sub("T"; " ") | sub("Z"; "") | strptime("%Y-%m-%d %H:%M:%S") | mktime;
-    (.updated_at | ts) as $end | (.created_at | ts) as $start
+    (.updated_at | fromdateiso8601) as $end | (.created_at | fromdateiso8601) as $start
     | ($end - $start) as $s
     | if $s >= 3600 then "\($s / 3600 | floor)h \($s % 3600 / 60 | floor)m"
       elif $s >= 60 then "\($s / 60 | floor)m \($s % 60)s"
