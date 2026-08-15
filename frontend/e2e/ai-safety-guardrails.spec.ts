@@ -34,6 +34,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18000';
 
@@ -45,7 +46,7 @@ const REGISTRAR_PASSWORD = process.env.QA_REGISTRAR_PASSWORD;
 /**
  * Log in and return the access token. Throws if creds are missing.
  */
-async function login(request, username, password, role) {
+async function login(request: APIRequestContext, username: string, password: string | undefined, role: string): Promise<string> {
   if (!password) {
     throw new Error(`Set QA_${role.toUpperCase()}_PASSWORD to run AI safety tests.`);
   }
@@ -61,7 +62,7 @@ async function login(request, username, password, role) {
 /**
  * Helper: call an AI endpoint with auth bearer token.
  */
-async function callAiEndpoint(request, endpoint, payload, token) {
+async function callAiEndpoint(request: APIRequestContext, endpoint: string, payload: Record<string, unknown>, token: string) {
   return request.post(`${BACKEND_URL}${endpoint}`, {
     data: payload,
     headers: {
@@ -75,7 +76,15 @@ async function callAiEndpoint(request, endpoint, payload, token) {
  * Assert that a response JSON contains the AI safety metadata block
  * with the required fields set correctly.
  */
-function expectSafetyMeta(body) {
+interface SafetyMeta {
+  requires_doctor_confirmation?: unknown;
+  decision_boundary?: unknown;
+  ai_notice?: unknown;
+  ai_safety_meta?: SafetyMeta;
+  safety_meta?: SafetyMeta;
+}
+
+function expectSafetyMeta(body: SafetyMeta) {
   // The safety meta may be at root level or nested under 'ai_safety_meta' / 'safety_meta'.
   const meta = body.ai_safety_meta || body.safety_meta || body;
   expect(meta, 'response should contain AI safety metadata').toBeDefined();
@@ -92,8 +101,8 @@ function expectSafetyMeta(body) {
 test.describe('AI Safety Guardrails', () => {
   test.describe.configure({ mode: 'serial' });
 
-  let doctorToken;
-  let registrarToken;
+  let doctorToken!: string;
+  let registrarToken: string | undefined;
 
   test.beforeAll(async ({ request }) => {
     doctorToken = await login(request, DOCTOR_USERNAME, DOCTOR_PASSWORD, 'doctor');
@@ -194,7 +203,8 @@ test.describe('AI Safety Guardrails', () => {
     ];
 
     for (const endpoint of endpoints) {
-      const resp = await callAiEndpoint(request, endpoint, {}, registrarToken);
+      // test.skip above guarantees registrarToken is set when the test runs.
+      const resp = await callAiEndpoint(request, endpoint, {}, registrarToken!);
       expect(
         [401, 403].includes(resp.status()),
         `${endpoint} should reject registrar (got ${resp.status()})`,

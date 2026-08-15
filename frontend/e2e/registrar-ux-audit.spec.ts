@@ -13,7 +13,7 @@
 
 import { test, expect } from '@playwright/test';
 
-function base64UrlEncode(value) {
+function base64UrlEncode(value: unknown): string {
   return Buffer.from(JSON.stringify(value))
     .toString('base64')
     .replace(/=/g, '')
@@ -21,7 +21,7 @@ function base64UrlEncode(value) {
     .replace(/\//g, '_');
 }
 
-function createJwt(payload) {
+function createJwt(payload: Record<string, unknown>): string {
   return `${base64UrlEncode({ alg: 'HS256', typ: 'JWT' })}.${base64UrlEncode(payload)}.sig`;
 }
 
@@ -42,7 +42,7 @@ const accessToken = createJwt({
   exp: Math.floor(Date.now() / 1000) + 3600,
 });
 
-function jsonResponse(body) {
+function jsonResponse(body: unknown): { status: number; contentType: string; body: string } {
   return {
     status: 200,
     contentType: 'application/json; charset=utf-8',

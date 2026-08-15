@@ -1,12 +1,29 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
+import type { Page, TestInfo } from '@playwright/test';
 import {
   AUTHENTICATED_ROLE_QA_ROUTES,
   AUTHENTICATED_SPECIALTY_QA_ROUTES,
   installAuthenticatedQaHarness,
-} from './support/authenticatedQa.js';
+} from './support/authenticatedQa';
+import type { RoleQaRoute, SpecialtyQaRoute } from './support/authenticatedQa';
 
-const AUTHENTICATED_ADMIN_ROUTE_FAMILY_QA_ROUTES = [
+interface AdminRouteFamilyQaRoute {
+  key: string;
+  path: string;
+  routeId: string;
+}
+
+interface AdminActionQaRoute {
+  key: string;
+  path: string;
+  routeId: string;
+  primaryActionText: RegExp;
+  openedFormHeading: RegExp;
+  requiresFormElement?: boolean;
+}
+
+const AUTHENTICATED_ADMIN_ROUTE_FAMILY_QA_ROUTES: AdminRouteFamilyQaRoute[] = [
   {
     key: 'admin-overview-dashboard',
     path: '/admin',
@@ -59,7 +76,7 @@ const AUTHENTICATED_ADMIN_ROUTE_FAMILY_QA_ROUTES = [
   },
 ];
 
-const AUTHENTICATED_ADMIN_ACTION_QA_ROUTES = [
+const AUTHENTICATED_ADMIN_ACTION_QA_ROUTES: AdminActionQaRoute[] = [
   {
     key: 'admin-services-catalog',
     path: '/admin/services?servicesTab=catalog',
@@ -98,7 +115,10 @@ const AUTHENTICATED_ADMIN_ACTION_QA_ROUTES = [
   },
 ];
 
-async function expectRenderedRolePanel(page, route) {
+async function expectRenderedRolePanel(
+  page: Page,
+  route: RoleQaRoute | AdminRouteFamilyQaRoute | AdminActionQaRoute
+) {
   await expect(page).not.toHaveURL(/\/login$/);
   await expect(page).not.toHaveURL(/\/(?:forbidden|unauthorized)$/);
   await expect(page.locator(`.app-shell[data-route-id="${route.routeId}"]`)).toBeVisible({
@@ -110,20 +130,23 @@ async function expectRenderedRolePanel(page, route) {
   ).toBeGreaterThan(0);
 }
 
-async function expectNoHorizontalOverflow(page, route) {
+async function expectNoHorizontalOverflow(
+  page: Page,
+  route: RoleQaRoute | AdminRouteFamilyQaRoute | AdminActionQaRoute
+) {
   await expect.poll(
     async () => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1),
     { message: `${route.key} route should not create horizontal document overflow` }
   ).toBe(true);
 }
 
-async function expectRouteSpecificEvidence(page, route) {
+async function expectRouteSpecificEvidence(page: Page, route: RoleQaRoute & { summaryLabel?: string }) {
   if (route.summaryLabel) {
     await expect(page.getByRole('list', { name: route.summaryLabel })).toBeVisible();
   }
 }
 
-async function expectVisibleRouteHeading(page, route) {
+async function expectVisibleRouteHeading(page: Page, route: AdminRouteFamilyQaRoute | AdminActionQaRoute) {
   const heading = page.locator('main').locator('h1, h2, h3, h4, h5, h6, [role="heading"]').filter({
     hasText: /\S/,
   }).first();
@@ -133,8 +156,8 @@ async function expectVisibleRouteHeading(page, route) {
   });
 }
 
-async function runAuthenticatedRouteSmoke(page, testInfo, route) {
-  const pageErrors = [];
+async function runAuthenticatedRouteSmoke(page: Page, testInfo: TestInfo, route: RoleQaRoute | SpecialtyQaRoute) {
+  const pageErrors: string[] = [];
   page.on('pageerror', (error) => {
     pageErrors.push(error.message);
   });
@@ -158,8 +181,8 @@ async function runAuthenticatedRouteSmoke(page, testInfo, route) {
   expect(pageErrors).toEqual([]);
 }
 
-async function runAdminRouteFamilyHeadingSmoke(page, testInfo, route) {
-  const pageErrors = [];
+async function runAdminRouteFamilyHeadingSmoke(page: Page, testInfo: TestInfo, route: AdminRouteFamilyQaRoute) {
+  const pageErrors: string[] = [];
   page.on('pageerror', (error) => {
     pageErrors.push(error.message);
   });
@@ -184,7 +207,7 @@ async function runAdminRouteFamilyHeadingSmoke(page, testInfo, route) {
   expect(pageErrors).toEqual([]);
 }
 
-async function expectVisibleButtonsHaveNames(page, route) {
+async function expectVisibleButtonsHaveNames(page: Page, route: AdminActionQaRoute) {
   const unnamedButtons = await page.locator('main button:visible').evaluateAll((buttons) =>
     buttons
       .map((button, index) => {
@@ -206,8 +229,8 @@ async function expectVisibleButtonsHaveNames(page, route) {
   expect(unnamedButtons, `${route.key} should not render unnamed visible buttons`).toEqual([]);
 }
 
-async function runAdminRouteActionSmoke(page, testInfo, route) {
-  const pageErrors = [];
+async function runAdminRouteActionSmoke(page: Page, testInfo: TestInfo, route: AdminActionQaRoute) {
+  const pageErrors: string[] = [];
   page.on('pageerror', (error) => {
     pageErrors.push(error.message);
   });

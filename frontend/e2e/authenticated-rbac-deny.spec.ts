@@ -1,11 +1,13 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import {
   AUTHENTICATED_RBAC_DENY_QA_ROUTES,
   installAuthenticatedQaHarness,
-} from './support/authenticatedQa.js';
+} from './support/authenticatedQa';
+import type { DenyQaRoute } from './support/authenticatedQa';
 
-async function expectForbiddenForSeededRole(page, route) {
+async function expectForbiddenForSeededRole(page: Page, route: DenyQaRoute) {
   await expect(page).not.toHaveURL(/\/login$/);
   await expect(page).toHaveURL(/\/forbidden$/);
   await expect(page.locator(`.app-shell[data-route-id="${route.deniedRouteId}"]`)).toHaveCount(0);
@@ -15,7 +17,7 @@ async function expectForbiddenForSeededRole(page, route) {
 test.describe('Authenticated RBAC denial UI QA harness', () => {
   for (const route of AUTHENTICATED_RBAC_DENY_QA_ROUTES) {
     test(`${route.key} redirects seeded ${route.role} session to forbidden`, async ({ page }, testInfo) => {
-      const pageErrors = [];
+      const pageErrors: string[] = [];
       page.on('pageerror', (error) => {
         pageErrors.push(error.message);
       });

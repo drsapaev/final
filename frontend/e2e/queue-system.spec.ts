@@ -40,17 +40,20 @@ test.describe('Queue System Tests', () => {
       
       const OriginalDate = Date;
       global.Date = class extends OriginalDate {
-        constructor(...args) {
+        constructor(...args: unknown[]) {
           if (args.length === 0) {
+            super();
             return mockDate;
           }
-          return new OriginalDate(...args);
+          return new OriginalDate(...(args as ConstructorParameters<typeof Date>));
         }
-        
+
         static now() {
           return mockDate.getTime();
         }
-      };
+        // Type-level only: the mock class's shape is not assignable to the
+        // overloaded DateConstructor type, but the runtime behavior is exact.
+      } as unknown as DateConstructor;
     });
 
     await page.goto('/registrar');
@@ -74,17 +77,20 @@ test.describe('Queue System Tests', () => {
       
       const OriginalDate = Date;
       global.Date = class extends OriginalDate {
-        constructor(...args) {
+        constructor(...args: unknown[]) {
           if (args.length === 0) {
+            super();
             return mockDate;
           }
-          return new OriginalDate(...args);
+          return new OriginalDate(...(args as ConstructorParameters<typeof Date>));
         }
-        
+
         static now() {
           return mockDate.getTime();
         }
-      };
+        // Type-level only: the mock class's shape is not assignable to the
+        // overloaded DateConstructor type, but the runtime behavior is exact.
+      } as unknown as DateConstructor;
     });
 
     await page.goto('/registrar');

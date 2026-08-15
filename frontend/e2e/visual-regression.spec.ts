@@ -20,7 +20,7 @@
 
 import { test, expect } from '@playwright/test';
 
-function base64UrlEncode(value) {
+function base64UrlEncode(value: unknown): string {
   return Buffer.from(JSON.stringify(value))
     .toString('base64')
     .replace(/=/g, '')
@@ -28,7 +28,7 @@ function base64UrlEncode(value) {
     .replace(/\//g, '_');
 }
 
-function createJwt(payload) {
+function createJwt(payload: Record<string, unknown>): string {
   return `${base64UrlEncode({ alg: 'HS256', typ: 'JWT' })}.${base64UrlEncode(payload)}.sig`;
 }
 
@@ -41,14 +41,14 @@ const registrarProfile = {
   full_name: 'Registrar User', role: 'Receptionist', is_active: true, is_superuser: false,
 };
 
-function createToken(profile) {
+function createToken(profile: { id: number; username: string }): string {
   return createJwt({
     sub: String(profile.id), username: profile.username,
     user_id: profile.id, exp: Math.floor(Date.now() / 1000) + 3600,
   });
 }
 
-function jsonResponse(body) {
+function jsonResponse(body: unknown): { status: number; contentType: string; body: string } {
   return { status: 200, contentType: 'application/json; charset=utf-8', body: JSON.stringify(body) };
 }
 
@@ -76,7 +76,7 @@ const sampleHistoryPayment = {
 
 test.describe('Visual regression — cashier panel', () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(({ token, profile }) => {
+    await page.addInitScript(({ token, profile }: { token: string; profile: typeof cashierProfile }) => {
       sessionStorage.setItem('auth_token', token);
       sessionStorage.setItem('refresh_token', token);
       sessionStorage.setItem('auth_profile', JSON.stringify(profile));
@@ -178,7 +178,7 @@ test.describe('Visual regression — cashier panel', () => {
 
 test.describe('Visual regression — registrar wizard', () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(({ token, profile }) => {
+    await page.addInitScript(({ token, profile }: { token: string; profile: typeof registrarProfile }) => {
       sessionStorage.setItem('auth_token', token);
       sessionStorage.setItem('refresh_token', token);
       sessionStorage.setItem('auth_profile', JSON.stringify(profile));
