@@ -11,7 +11,7 @@ import { useTranslation } from '@/i18n/useTranslation';
  * - BP Warning/Critical thresholds
  */
 const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled }: { vitals?: Record<string, unknown>; onChange?: (v: Record<string, any>) => void; onFieldTouch?: (field: string) => void; disabled?: boolean }) => {
-  const vitals = vitalsRaw as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const vitals = vitalsRaw as Record<string, any>;
   const { t: rawT } = useTranslation(); const t = rawT;
     const handleChange = (field: string, value: string) => {
         onChange?.({ ...vitals, [field]: value });

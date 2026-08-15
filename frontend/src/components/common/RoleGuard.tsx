@@ -75,11 +75,9 @@ export function RoleGuard({
 /**
  * HOC для ролевых ограничений
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withRoleGuard(WrappedComponent: ComponentType<any>, guardProps: Record<string, unknown> = {}) {
   // TECH-DEBT(role-guard-hoc): props is `any` because this is a generic HOC
   // that wraps any component. The props are passed through opaquely.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function WithRoleGuardComponent(props: any) {
     return (
       <RoleGuard {...guardProps}>

@@ -759,7 +759,6 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
     toggleReaction,
     deleteMessage,
     uploadFile
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [
     conversations, messages, activeConversation, unreadCount,
     isConnected, isLoading, typingUsers, isChatOpen,
