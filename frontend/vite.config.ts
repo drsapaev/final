@@ -2,6 +2,7 @@
 // Added: `@/*` path alias (plan 0.2)
 // Preserved: all original behavior (proxy, sentry, visualizer, build options)
 import { defineConfig } from "vite";
+import type { Plugin, PluginOption } from "vite";
 import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
 import path from "node:path";
@@ -19,7 +20,9 @@ const wsProxyTarget =
 // 2. SENTRY_AUTH_TOKEN env var is set (CI only)
 // 3. VITE_SENTRY_DSN env var is set
 // In dev without these, sentryPlugin is an empty array — Vite proceeds normally.
-let sentryPlugin: unknown[] = [];
+// (Module shape declared in types/declarations.node.d.ts — the package is
+// deliberately not a dependency.)
+let sentryPlugin: Plugin[] = [];
 if (process.env.SENTRY_AUTH_TOKEN && process.env.VITE_SENTRY_DSN) {
   try {
     const { sentryVitePlugin } = await import("@sentry/vite-plugin");
@@ -39,18 +42,22 @@ if (process.env.SENTRY_AUTH_TOKEN && process.env.VITE_SENTRY_DSN) {
   }
 }
 
-function createPlugins(enableBundleVisualizer: boolean) {
-  const plugins = [react(), ...sentryPlugin];
+function createPlugins(enableBundleVisualizer: boolean): PluginOption[] {
+  const plugins: PluginOption[] = [react(), ...sentryPlugin];
 
   if (enableBundleVisualizer) {
     plugins.push(
+      // rollup-plugin-visualizer returns a rollup.Plugin. Runtime-compatible
+      // with Vite, but its standalone rollup typings differ from Vite's
+      // bundled rollup typings (resolveId assertions vs attributes), so the
+      // assertion is type-level only.
       visualizer({
         filename: "dist/bundle-visualizer.html",
         template: "treemap",
         gzipSize: true,
         brotliSize: true,
         open: false,
-      }),
+      }) as unknown as Plugin,
     );
   }
 
