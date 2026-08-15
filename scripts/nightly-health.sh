@@ -79,7 +79,7 @@ run_duration() {
     run_number=$(jq -r .run_number <<<"$run_json")
     run_id=$(jq -r .id <<<"$run_json")
     created=$(jq -r .created_at <<<"$run_json")
-    duration=$(run_duration <<<"$run_json")
+    duration=$(run_duration "$run_json")
 
     icon="❓ ${conclusion}"
     [ "$conclusion" = "success" ] && icon="✅ PASS"
