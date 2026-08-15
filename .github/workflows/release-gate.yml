@@ -68,11 +68,12 @@ jobs:
       # === 5. Load test with baseline (k6) ===
       - name: Install k6
         run: |
-          sudo gpg -k
-          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A36442D5730B2B1A0669E2A2A
-          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
-          sudo apt-get update
-          sudo apt-get install -y k6
+          # The old apt+keyserver method fails on GitHub runners with
+          # "gpg: keyserver receive failed: No data" — this is what kept
+          # release-gate from ever passing. Grafana's install script
+          # downloads the release binary directly, no keyserver involved.
+          curl -sL https://raw.githubusercontent.com/grafana/k6/master/install.sh | sudo bash
+          k6 version
 
       - name: Run k6 load tests (with baseline gate)
         working-directory: tests/load
