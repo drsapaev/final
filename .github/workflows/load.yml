@@ -170,15 +170,21 @@ jobs:
       - name: Check runner type
         id: runner
         run: |
-          if [ "${{ runner.name }}" = "GitHub Actions" ] && [ "${{ runner.os }}" = "Linux" ]; then
-            echo "is_reference=true" >> $GITHUB_OUTPUT
-            echo "ENFORCE_LATENCY=false" >> $GITHUB_ENV
-            echo "⚠️ GitHub-hosted runner — latency thresholds informational; error-rate gate enforced"
-          else
-            echo "is_reference=false" >> $GITHUB_OUTPUT
-            echo "ENFORCE_LATENCY=true" >> $GITHUB_ENV
-            echo "✅ Self-hosted runner — full threshold enforcement"
-          fi
+          # GitHub-hosted runner names are "GitHub Actions <id>" (the old
+          # equality check never matched and misclassified hosted runners
+          # as self-hosted — which also silently enabled the baseline gate).
+          case "${{ runner.name }}" in
+            "GitHub Actions"*)
+              echo "is_reference=true" >> $GITHUB_OUTPUT
+              echo "ENFORCE_LATENCY=false" >> $GITHUB_ENV
+              echo "⚠️ GitHub-hosted runner — latency thresholds informational; error-rate gate enforced"
+              ;;
+            *)
+              echo "is_reference=false" >> $GITHUB_OUTPUT
+              echo "ENFORCE_LATENCY=true" >> $GITHUB_ENV
+              echo "✅ Self-hosted runner — full threshold enforcement"
+              ;;
+          esac
 
       - name: Run k6 — Queue load test
         working-directory: tests/load
