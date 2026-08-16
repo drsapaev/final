@@ -8,7 +8,11 @@ on:
   workflow_dispatch:
 
 permissions:
+  # Codex review follow-up (P1): the collector calls the workflow-runs and
+  # run-artifacts REST endpoints, which need actions:read; with only
+  # contents:read declared, unspecified scopes default to none.
   contents: read
+  actions: read
 
 jobs:
   nightly-health:

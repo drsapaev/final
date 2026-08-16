@@ -73,10 +73,17 @@ jobs:
           # release-gate from ever passing. Grafana's master install.sh is
           # gone (404) too. Install the official .deb from the latest
           # GitHub release: no keyserver, no removed scripts.
-          K6_VER=$(curl -s https://api.github.com/repos/grafana/k6/releases/latest | grep -oE '"tag_name": *"[^"]+"' | cut -d'"' -f4)
+          # Codex review follow-up: authenticate the release lookup (avoids
+          # API rate limits) and keep the version overridable via env.
+          K6_VER="${K6_VERSION:-}"
+          if [ -z "$K6_VER" ]; then
+            K6_VER=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" https://api.github.com/repos/grafana/k6/releases/latest | grep -oE '"tag_name": *"[^"]+"' | cut -d'"' -f4)
+          fi
           curl -sL -o /tmp/k6.deb "https://github.com/grafana/k6/releases/download/${K6_VER}/k6-${K6_VER}-linux-amd64.deb"
           sudo dpkg -i /tmp/k6.deb
           k6 version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run k6 load tests (with baseline gate)
         working-directory: tests/load

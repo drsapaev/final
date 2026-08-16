@@ -2366,6 +2366,13 @@ jobs:
           echo "ℹ️ Развертывание не выполнено (обычно для schedule/PR-прогонов)"
         fi
 
+    # Codex review follow-up (P1): job workspaces are isolated — without a
+    # checkout the local composite action below does not exist and the
+    # notifier crashes instead of creating the alert issue.
+    - name: 📥 Checkout (for the local notify action)
+      if: failure() && github.event_name == 'schedule'
+      uses: actions/checkout@v7
+
     - name: 🔔 Notify on scheduled failure (issue)
       if: failure() && github.event_name == 'schedule'
       uses: ./.github/actions/notify-failure
