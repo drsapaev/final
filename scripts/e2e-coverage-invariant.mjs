@@ -364,7 +364,7 @@ function checkFile(filePath) {
 }
 
 /**
- * Check that playwright.config.js does not set retries > 0 for the
+ * Check that playwright.config.ts does not set retries > 0 for the
  * target E2E files. We check the global retries setting; if it's > 0
  * on CI, the UX/Visual suite inherits it UNLESS the CI command
  * explicitly overrides with --retries=0 (which takes precedence).
@@ -375,12 +375,12 @@ function checkFile(filePath) {
  *   3. If global config retries>0 on CI, and CI step has no --retries=0 → FAIL
  */
 function checkRetriesConfig() {
-  const configPath = join(FRONTEND, 'playwright.config.js');
+  const configPath = join(FRONTEND, 'playwright.config.ts');
   if (!existsSync(configPath)) {
     recordFail(
-      'playwright.config.js exists',
+      'playwright.config.ts exists',
       'Cannot verify retries setting — config file missing.',
-      'playwright.config.js',
+      'playwright.config.ts',
       null,
     );
     return;
@@ -429,8 +429,8 @@ function checkRetriesConfig() {
   if (!existsSync(workflowPath)) {
     recordFail(
       'retries=0 for UX/Visual on CI',
-      `playwright.config.js sets retries: ${retriesValue} (CI retries = ${ciRetriesFromConfig}), and ci-cd-unified.yml not found to verify --retries=0 override.`,
-      'playwright.config.js',
+      `playwright.config.ts sets retries: ${retriesValue} (CI retries = ${ciRetriesFromConfig}), and ci-cd-unified.yml not found to verify --retries=0 override.`,
+      'playwright.config.ts',
       null,
     );
     return;
@@ -444,8 +444,8 @@ function checkRetriesConfig() {
   if (!uxStepMatch) {
     recordFail(
       'retries=0 for UX/Visual on CI',
-      `playwright.config.js sets retries: ${retriesValue} (CI retries = ${ciRetriesFromConfig}), and UX Audit step not found in workflow to verify --retries=0 override.`,
-      'playwright.config.js',
+      `playwright.config.ts sets retries: ${retriesValue} (CI retries = ${ciRetriesFromConfig}), and UX Audit step not found in workflow to verify --retries=0 override.`,
+      'playwright.config.ts',
       null,
     );
     return;
@@ -459,8 +459,8 @@ function checkRetriesConfig() {
   } else {
     recordFail(
       'retries=0 for UX/Visual on CI',
-      `playwright.config.js sets retries: ${retriesValue} (CI retries = ${ciRetriesFromConfig}). UX/Visual E2E must run with retries=0 to catch flaky tests. Add --retries=0 to the UX Audit CI step, or set retries: process.env.CI ? 0 : 0 in playwright.config.js.`,
-      'playwright.config.js',
+      `playwright.config.ts sets retries: ${retriesValue} (CI retries = ${ciRetriesFromConfig}). UX/Visual E2E must run with retries=0 to catch flaky tests. Add --retries=0 to the UX Audit CI step, or set retries: process.env.CI ? 0 : 0 in playwright.config.ts.`,
+      'playwright.config.ts',
       null,
     );
   }
@@ -497,7 +497,7 @@ function checkCIWorkflowRetries() {
     recordPass('UX Audit CI step includes --retries=0');
   } else {
     // Check if the global config is already retries=0 on CI
-    const configPath = join(FRONTEND, 'playwright.config.js');
+    const configPath = join(FRONTEND, 'playwright.config.ts');
     const configContent = readFileSync(configPath, 'utf-8');
     const retriesMatch = configContent.match(/retries\s*:\s*([^,}\n]+)/);
     if (retriesMatch) {
@@ -508,7 +508,7 @@ function checkCIWorkflowRetries() {
       } else {
         recordFail(
           'UX Audit CI step has --retries=0',
-          'The UX Audit e2e CI step does NOT include --retries=0, and the global playwright config allows retries > 0 on CI. Add --retries=0 to the npx playwright test command, OR set retries: process.env.CI ? 0 : 0 in playwright.config.js.',
+          'The UX Audit e2e CI step does NOT include --retries=0, and the global playwright config allows retries > 0 on CI. Add --retries=0 to the npx playwright test command, OR set retries: process.env.CI ? 0 : 0 in playwright.config.ts.',
           '.github/workflows/ci-cd-unified.yml',
           null,
         );
