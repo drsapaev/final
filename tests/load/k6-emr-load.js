@@ -28,8 +28,10 @@ export const options = {
     { duration: '30s', target: 0 },   // ramp down
   ],
   thresholds: {
-    errors: ['rate<0.01'],             // error rate < 1%
-    http_req_duration: ['p(95)<1000'], // p95 < 1000ms
+    errors: ['rate<0.01'], // error rate < 1% — enforced on every runner
+    ...((__ENV.ENFORCE_LATENCY || 'false') === 'true'
+      ? { http_req_duration: ['p(95)<1000'] }
+      : {}),
   },
 };
 

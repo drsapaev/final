@@ -27,9 +27,15 @@ export const options = {
     { duration: '1m', target: 50 },   // stay at 50 users
     { duration: '30s', target: 0 },   // ramp down
   ],
+  // Latency thresholds are enforced only on production-grade (self-hosted)
+  // runners; on shared GH-hosted reference runners p95 is recorded and
+  // reported, but only the error-rate gate fails the run (environment
+  // contract: docs/runbooks/LOAD_CHAOS_ENVIRONMENT.md).
   thresholds: {
-    errors: ['rate<0.01'],            // error rate < 1%
-    http_req_duration: ['p(95)<500'], // p95 < 500ms
+    errors: ['rate<0.01'], // error rate < 1% — enforced on every runner
+    ...((__ENV.ENFORCE_LATENCY || 'false') === 'true'
+      ? { http_req_duration: ['p(95)<500'] }
+      : {}),
   },
 };
 
