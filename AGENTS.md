@@ -305,7 +305,7 @@ DB / Alembic / SQLAlchemy migrations:
 
 Routing:
 
-- Start from routing SSOT files such as `frontend/src/routing/routeRegistry.js`.
+- Start from routing SSOT files such as `frontend/src/routing/routeRegistry.ts`.
 - Verify route contract/snapshot tests before broad cleanup.
 - Do not mass-edit unrelated routes in the first slice.
 

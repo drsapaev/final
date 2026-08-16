@@ -513,7 +513,7 @@ This phase starts only after Tasks 26-28 are completed or explicitly deferred wi
 
 - [x] Task 38: Add Frontend 10/10 route smoke gates.
   Continue only through `/aif-implement @.ai-factory/PLAN.md`. Use `gate` if authenticated role smoke requires live credentials or backend state; otherwise use `direct_execute` for public/static route smoke. Add or refine Playwright/browser smoke coverage for `/login`, `/queue/join`, `/payment/success`, `/payment/cancel`, `/admin`, one registrar route, one doctor route, and one lab route. Resolve credentials only from live DB/auth response per `.ai-factory/RULES.md`; do not guess from docs.
-  Files: `frontend/e2e/*`, `frontend/playwright.config.js` as reference unless evidence requires edits, frontend route/source files as reference only
+  Files: `frontend/e2e/*`, `frontend/playwright.config.ts` as reference unless evidence requires edits, frontend route/source files as reference only
   Validation target: targeted Playwright smoke on frontend `5173` through the Vite proxy to backend `18000`, or a documented blocker with exact missing environment/credential requirement.
   LOGGING REQUIREMENTS: log route, role, browser/device, pass/fail/blocker, and credential source class only; do not log passwords, tokens, patient data, or entered usernames.
 
