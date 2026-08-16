@@ -172,10 +172,12 @@ jobs:
         run: |
           if [ "${{ runner.name }}" = "GitHub Actions" ] && [ "${{ runner.os }}" = "Linux" ]; then
             echo "is_reference=true" >> $GITHUB_OUTPUT
-            echo "⚠️ Running on GitHub-hosted runner — results are reference only, not for baseline comparison"
+            echo "ENFORCE_LATENCY=false" >> $GITHUB_ENV
+            echo "⚠️ GitHub-hosted runner — latency thresholds informational; error-rate gate enforced"
           else
             echo "is_reference=false" >> $GITHUB_OUTPUT
-            echo "✅ Running on self-hosted runner — results are production-grade"
+            echo "ENFORCE_LATENCY=true" >> $GITHUB_ENV
+            echo "✅ Self-hosted runner — full threshold enforcement"
           fi
 
       - name: Run k6 — Queue load test
@@ -184,7 +186,9 @@ jobs:
           k6 run k6-queue-load.js \
             --out json=queue-results.json \
             --env BASE_URL=http://localhost:8000 \
-            --env TEST_JWT="${TEST_JWT}"
+            --env TEST_JWT="${TEST_JWT}" \
+            --env SPECIALIST_ID="${SPECIALIST_ID}" \
+            --env ENFORCE_LATENCY="${ENFORCE_LATENCY}"
 
       - name: Run k6 — EMR load test
         working-directory: tests/load
@@ -192,7 +196,8 @@ jobs:
           k6 run k6-emr-load.js \
             --out json=emr-results.json \
             --env BASE_URL=http://localhost:8000 \
-            --env TEST_JWT="${TEST_JWT}"
+            --env TEST_JWT="${TEST_JWT}" \
+            --env ENFORCE_LATENCY="${ENFORCE_LATENCY}"
 
       - name: Parse k6 results (fail if no results)
         run: |
