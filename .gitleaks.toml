@@ -67,21 +67,26 @@ paths = [
   # Files deleted from HEAD; findings remain in git history only. The HEAD
   # tree scans clean. Full remediation (history purge + dev credential
   # rotation) is a separate destructive decision — see PR #2765 notes.
-  # Committed test-run logs contained dev-session Bearer tokens.
-  '''backend/(pytest_|backend_test_log).*\.txt''',
-  # .venv was accidentally committed in history; matches are public crypto
-  # test vectors (ecdsa/passlib/cryptography test suites).
-  '''backend/\.venv/.*''',
-  '''\.venv/.*''',
-  # Generated Playwright QA evidence (AGENTS.md: generated evidence in output/).
-  '''output/.*''',
-  # CI temp junk committed once.
-  '''_tmp_artifacts_.*/.*''',
-  # Deleted root-level dev scripts with hardcoded dev JWTs (dev-seed users).
+  # POLICY NOTE (AUTHENTICATION_SECURITY_POLICY.md forbids broad global
+  # allowlist growth): every entry below is an EXACT historical filename,
+  # so any NEW file (even with a similar name) is still scanned.
+  # Committed test-run logs with dev-session Bearer tokens (exact names).
+  '''backend/pytest_(tests_log(_2)?|full_log_2|final_log|patient_payment_log)\.txt''',
+  '''backend/backend_test_log_[345]\.txt''',
+  # .venv committed once in history; matches are upstream public code of
+  # these exact packages (ecdsa/passlib test vectors, sqlalchemy plugin...).
+  '''backend/\.venv/Lib/site-packages/(ecdsa|jose|passlib|rsa|setuptools|sqlalchemy|websocket)/.*''',
+  # Generated QA evidence with dev-session artifacts (AGENTS.md: output/ is
+  # generated evidence); exact historical filenames.
+  '''output/playwright/(doc-04-console\.txt|lab-05-live-ui-login-followup-v2\.json|lab-05-live-ui-open-report-v3\.json|lab-06-live-ui-history-v4\.json|reg-01-login-debug\.json|reg-02-cycle-2\.json|reg-02-cycle-2-fixed2\.json|task4-chat-diagnostic/diagnostic\.json|inspect_derma_(endpoints|queues)\.ps1)''',
+  '''output/(cashier-print-recon|print-flow-live-check|print-flow-recon)\.mjs''',
+  # Deleted root-level dev scripts with hardcoded dev JWTs (exact names).
   '''test_api\.py''',
-  '''test_registration_.*\.py''',
+  '''test_registration_(api|creation|endpoint)\.py''',
   '''backend/get_services\.py''',
-  # Deleted dev-session token store (.ai-factory/profile_tokens.json).
+  # CI temp junk committed once (bandit report with embedded dev tokens).
+  '''_tmp_artifacts_22278525949/bandit\.json''',
+  # Deleted dev-session token store.
   '''profile_tokens\.json''',
   # Deleted dev notes with pasted tokens/logs.
   '''Fixing New Service Queue Time\.md''',
