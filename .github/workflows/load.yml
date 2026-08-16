@@ -142,6 +142,31 @@ jobs:
           echo "✅ TEST_JWT minted and verified"
           echo "TEST_JWT=$TEST_JWT" >> "$GITHUB_ENV"
 
+          # Deterministic specialist id for the queue-status load target.
+          SPECIALIST_ID=$(python - <<'PY'
+          from app.db.session import SessionLocal
+          from app.models.user import User
+
+          db = SessionLocal()
+          try:
+              doctor = db.query(User).filter(User.role == "Doctor").order_by(User.id.asc()).first()
+              if doctor is None:
+                  raise SystemExit("No Doctor user found after dev_seed")
+              print(doctor.id)
+          finally:
+              db.close()
+          PY
+          )
+          echo "SPECIALIST_ID=$SPECIALIST_ID (validated below)"
+          # The load target must exist and accept the token before k6 starts.
+          qcode=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${TEST_JWT}" \
+            "http://127.0.0.1:8000/api/v1/queue/status/${SPECIALIST_ID}")
+          if [ "$qcode" != "200" ]; then
+            echo "❌ Queue load target rejected (HTTP $qcode) — refusing vacuous run"; exit 1
+          fi
+          echo "SPECIALIST_ID=$SPECIALIST_ID" >> "$GITHUB_ENV"
+
       - name: Check runner type
         id: runner
         run: |

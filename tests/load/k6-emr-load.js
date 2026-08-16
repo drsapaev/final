@@ -36,17 +36,15 @@ export const options = {
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1';
 
-const TEST_PATIENT_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
 export default function () {
-  const patientId = TEST_PATIENT_IDS[Math.floor(Math.random() * TEST_PATIENT_IDS.length)];
   const headers = {
     'Authorization': `Bearer ${__ENV.TEST_JWT || 'test-token'}`,
     'Content-Type': 'application/json',
   };
 
-  // GET /emr/{patient_id} — main EMR endpoint
-  const res = http.get(`${BASE_URL}${API_PREFIX}/emr/${patientId}`, { headers });
+  // EMR templates list — a stable, id-free read endpoint (the old
+  // /emr/{patient_id} target never existed in the API).
+  const res = http.get(`${BASE_URL}${API_PREFIX}/emr/templates`, { headers });
 
   latencyTrend.add(res.timings.duration);
 

@@ -35,16 +35,19 @@ export const options = {
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1';
+// Seeded specialist id, provisioned by the workflow (queried from the demo
+// database after dev_seed — no hardcoded ids).
+const SPECIALIST_ID = __ENV.SPECIALIST_ID || '1';
 
 export default function () {
-  // Authenticate (mock — in real test, use test JWT)
   const headers = {
     'Authorization': `Bearer ${__ENV.TEST_JWT || 'test-token'}`,
     'Content-Type': 'application/json',
   };
 
-  // GET /queue — main queue endpoint
-  const res = http.get(`${BASE_URL}${API_PREFIX}/queue/today`, { headers });
+  // Canonical queue status endpoint (the old /queue/today target never
+  // existed; /queue/legacy/today requires specialist_id and is deprecated).
+  const res = http.get(`${BASE_URL}${API_PREFIX}/queue/status/${SPECIALIST_ID}`, { headers });
 
   latencyTrend.add(res.timings.duration);
 
