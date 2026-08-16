@@ -107,11 +107,11 @@ jobs:
       - name: Start API + readiness proof (/health, hard gate)
         working-directory: backend
         run: |
-          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/uvicorn.log 2>&1 &
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 18000 > /tmp/uvicorn.log 2>&1 &
           echo $! > /tmp/uvicorn.pid
           for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1 \
-               || curl -sf http://127.0.0.1:8000/api/v1/health/detailed >/dev/null 2>&1; then
+            if curl -sf http://127.0.0.1:18000/health >/dev/null 2>&1 \
+               || curl -sf http://127.0.0.1:18000/api/v1/health/detailed >/dev/null 2>&1; then
               echo "✅ API ready"
               exit 0
             fi
@@ -135,7 +135,7 @@ jobs:
           # Validate the token against the live API before handing it to k6.
           code=$(curl -s -o /dev/null -w '%{http_code}' \
             -H "Authorization: Bearer ${TEST_JWT}" \
-            http://127.0.0.1:8000/api/v1/auth/me)
+            http://127.0.0.1:18000/api/v1/auth/me)
           if [ "$code" != "200" ]; then
             echo "❌ Minted token rejected by /auth/me (HTTP $code)"; exit 1
           fi
@@ -161,7 +161,7 @@ jobs:
           # The load target must exist and accept the token before k6 starts.
           qcode=$(curl -s -o /dev/null -w '%{http_code}' \
             -H "Authorization: Bearer ${TEST_JWT}" \
-            "http://127.0.0.1:8000/api/v1/queue/status/${SPECIALIST_ID}")
+            "http://127.0.0.1:18000/api/v1/queue/status/${SPECIALIST_ID}")
           if [ "$qcode" != "200" ]; then
             echo "❌ Queue load target rejected (HTTP $qcode) — refusing vacuous run"; exit 1
           fi
@@ -191,7 +191,7 @@ jobs:
         run: |
           k6 run k6-queue-load.js \
             --out json=queue-results.json \
-            --env BASE_URL=http://localhost:8000 \
+            --env BASE_URL=http://localhost:18000 \
             --env TEST_JWT="${TEST_JWT}" \
             --env SPECIALIST_ID="${SPECIALIST_ID}" \
             --env ENFORCE_LATENCY="${ENFORCE_LATENCY}"
@@ -201,7 +201,7 @@ jobs:
         run: |
           k6 run k6-emr-load.js \
             --out json=emr-results.json \
-            --env BASE_URL=http://localhost:8000 \
+            --env BASE_URL=http://localhost:18000 \
             --env TEST_JWT="${TEST_JWT}" \
             --env ENFORCE_LATENCY="${ENFORCE_LATENCY}"
 

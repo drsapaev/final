@@ -13,13 +13,13 @@ tests** — a green workflow that cannot reach its subject tests nothing.
 | Service | Provisioning | Readiness proof (hard gate) |
 |---|---|---|
 | PostgreSQL 16 | `services: postgres` container | `SELECT 1` retry loop (≤30×2s), then `alembic upgrade head` must succeed |
-| Backend API | `uvicorn app.main:app --port 8000` (background) with `DATABASE_URL`, `TESTING=1`, `CORS_DISABLE=1` | `GET /health` → 200, ≤30×2s retries; failing readiness fails the job |
+| Backend API | `uvicorn app.main:app --port 18000` (background) with `DATABASE_URL`, `TESTING=1`, `CORS_DISABLE=1` | `GET /health` → 200, ≤30×2s retries; failing readiness fails the job |
 | Test user + JWT | seed via `python -m app.scripts.dev_seed` (or synthetic seed), then `POST /api/v1/authentication/login` with seeded credentials | login response contains `access_token`; no secrets required |
 
 ### k6 execution semantics
 
 - Scripts: `tests/load/k6-queue-load.js`, `k6-emr-load.js`; 2m stage profile each.
-- `BASE_URL=http://localhost:8000`; `TEST_JWT` from the login step above —
+- `BASE_URL=http://localhost:18000`; `TEST_JWT` from the login step above —
   never a placeholder (`test-token` fallback is forbidden).
 - **GitHub-hosted runner = reference-only** for absolute latency (shared
   hardware): k6 `p(95)` thresholds are recorded and compared to
