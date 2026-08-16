@@ -63,6 +63,31 @@ paths = [
   '''docs/archives/.*\.md''',
   # MCP server descriptions may contain example tokens
   '''mcp-servers/.*\.py''',
+  # ---- History-only paths (2026-08-15 triage of the 437-finding backlog) ----
+  # Files deleted from HEAD; findings remain in git history only. The HEAD
+  # tree scans clean. Full remediation (history purge + dev credential
+  # rotation) is a separate destructive decision — see PR #2765 notes.
+  # Committed test-run logs contained dev-session Bearer tokens.
+  '''backend/(pytest_|backend_test_log).*\.txt''',
+  # .venv was accidentally committed in history; matches are public crypto
+  # test vectors (ecdsa/passlib/cryptography test suites).
+  '''backend/\.venv/.*''',
+  '''\.venv/.*''',
+  # Generated Playwright QA evidence (AGENTS.md: generated evidence in output/).
+  '''output/.*''',
+  # CI temp junk committed once.
+  '''_tmp_artifacts_.*/.*''',
+  # Deleted root-level dev scripts with hardcoded dev JWTs (dev-seed users).
+  '''test_api\.py''',
+  '''test_registration_.*\.py''',
+  '''backend/get_services\.py''',
+  # Deleted dev-session token store (.ai-factory/profile_tokens.json).
+  '''profile_tokens\.json''',
+  # Deleted dev notes with pasted tokens/logs.
+  '''Fixing New Service Queue Time\.md''',
+  '''PROBLEMS_RESOLVED_REPORT\.md''',
+  # Deleted API-docs service whose curl examples carried placeholder tokens.
+  '''backend/app/services/api_documentation_api_service\.py''',
 ]
 
 # Allowlist specific regex patterns that gitleaks tends to flag in medical code
@@ -71,6 +96,12 @@ regexes = [
   '''clinic_ci_only_password''',
   # Example JWT tokens used in docs/tests
   '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ\.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c''',
+  # Documentation placeholder in curl examples (api_documentation service).
+  '''Bearer YOUR_TOKEN''',
+  # generic-api-key false positives on non-secret literals (verified against
+  # the JSON report: the captured "secrets" are an assignment and prose).
+  '''docs_url=None''',
+  '''EMR/lab/patient''',
 ]
 
 # ---------------------------------------------------------------------------
@@ -85,16 +116,21 @@ tags = ["key", "telegram"]
 [[rules]]
 id = "click-uz-merchant"
 description = "Click.uz merchant/user ID + secret combo"
-# Match Click.uz credential patterns: env-style secret values or merchant
-# identifiers, but NOT the public API base URL `https://api.click.uz/v2`
-# (which is a public documentation endpoint, not a secret).
-regex = '''CLICK_SECRET_KEY|CLICK_MERCHANT_USER_ID|CLICK_SERVICE_ID|CLICK_SECRET\s*[:=]'''
+# Match actual credential ASSIGNMENTS (name + quoted literal value), but NOT:
+# - bare identifier references (pydantic Field declarations like
+#   `CLICK_SECRET_KEY: str | None = Field(default=None)`)
+# - settings attribute reads (`app_settings.CLICK_MERCHANT_ID`)
+# - the public API base URL `https://api.click.uz/v2`
+# The old bare-name regex fired 12 times on declarations with zero literals.
+regex = '''(CLICK_SECRET_KEY|CLICK_MERCHANT_USER_ID|CLICK_SERVICE_ID|CLICK_SECRET)\s*[:=]\s*["'][^"'\n]{4,}["']'''
 tags = ["key", "payment"]
 
 [[rules]]
 id = "payme-merchant"
 description = "Payme merchant credentials"
-regex = '''PAYME_KEY|PAYME_MERCHANT_ID|PAYME_END_POINT'''
+# Same fix as click-uz-merchant: require a quoted literal value; bare
+# identifier declarations are not secrets.
+regex = '''(PAYME_KEY|PAYME_MERCHANT_ID|PAYME_END_POINT)\s*[:=]\s*["'][^"'\n]{3,}["']'''
 tags = ["key", "payment"]
 
 [[rules]]
