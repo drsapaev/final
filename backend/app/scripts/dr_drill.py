@@ -210,7 +210,7 @@ def smoke_test_drill_db(user: str, password: str, host: str, port: int) -> None:
         ("SELECT COUNT(*) FROM users;",            "users"),
         ("SELECT COUNT(*) FROM appointments;",     "appointments"),
         ("SELECT COUNT(*) FROM services;",         "services"),
-        ("SELECT COUNT(*) FROM audit_log;",        "audit_log"),
+        ("SELECT COUNT(*) FROM audit_logs;",       "audit_logs"),
     ]
 
     failed = []

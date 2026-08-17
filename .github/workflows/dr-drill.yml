@@ -64,19 +64,15 @@ jobs:
           cd backend
           alembic upgrade head
 
-      - name: Seed synthetic data (so we have something to back up)
+      - name: Seed demo data (so the backup has rows and an admin)
         run: |
           cd backend
-          # Override DB name to 'clinicdb' (synthetic_seed refuses prod-looking names; clinicdb is in PROTECTED list).
-          # Use dev_seed instead — it's designed for this.
-          python -c "
-          import os
-          os.environ['ALLOW_SQLITE_DATABASE_URL'] = '0'
-          from sqlalchemy import create_engine, text
-          e = create_engine(os.environ['DATABASE_URL'])
-          with e.connect() as c:
-            print('Tables:', c.execute(text(\"SELECT count(*) FROM information_schema.tables WHERE table_schema='public'\")).scalar())
-          "
+          # The old step only COUNTED tables (synthetic_seed refuses
+          # prod-looking names) — the dump was schema-only and the drill's
+          # admin-RBAC check could never pass. dev_seed is designed for
+          # exactly this (proven in load.yml).
+          DEV_DEMO_PASSCODE=dr-drill-demo-passcode \
+            python -m app.scripts.dev_seed --confirm-dev-seed
 
       - name: Create a backup (pg_dump)
         run: |
