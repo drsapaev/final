@@ -64,19 +64,15 @@ jobs:
           cd backend
           alembic upgrade head
 
-      - name: Seed synthetic data (so we have something to back up)
+      - name: Seed demo data (so the backup has rows and an admin)
         run: |
           cd backend
-          # Override DB name to 'clinicdb' (synthetic_seed refuses prod-looking names; clinicdb is in PROTECTED list).
-          # Use dev_seed instead — it's designed for this.
-          python -c "
-          import os
-          os.environ['ALLOW_SQLITE_DATABASE_URL'] = '0'
-          from sqlalchemy import create_engine, text
-          e = create_engine(os.environ['DATABASE_URL'])
-          with e.connect() as c:
-            print('Tables:', c.execute(text(\"SELECT count(*) FROM information_schema.tables WHERE table_schema='public'\")).scalar())
-          "
+          # The old step only COUNTED tables (synthetic_seed refuses
+          # prod-looking names) — the dump was schema-only and the drill's
+          # admin-RBAC check could never pass. dev_seed is designed for
+          # exactly this (proven in load.yml).
+          DEV_DEMO_PASSCODE=dr-drill-demo-passcode \
+            python -m app.scripts.dev_seed --confirm-dev-seed
 
       - name: Create a backup (pg_dump)
         run: |
@@ -104,33 +100,27 @@ jobs:
             python -m app.scripts.dr_drill
           fi
 
-      - name: Notify on failure (issue creation)
-        if: failure()
-        uses: actions/github-script@v9
+  # Canonical R1 notifier (the previous inline issues.create failed silently
+  # with 403: workflow grants only contents:read; issue creation needs
+  # issues:write — granted job-scoped here). DR failures alert on any event:
+  # a broken restore is a P0 regardless of how the drill was triggered.
+  notify-failure:
+    name: 🔔 Notify on failure
+    runs-on: ubuntu-latest
+    needs: [dr-drill]
+    if: failure()
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create failure issue
+        uses: ./.github/actions/notify-failure
         with:
-          script: |
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `🔴 DR Drill failed — backup does NOT restore cleanly`,
-              body: [
-                `**Disaster Recovery Drill failed in run ${context.runId}**`,
-                ``,
-                `This means the latest backup file cannot be restored to a working state.`,
-                `For a medical system this is a P0 incident — if prod burns tonight, you cannot recover.`,
-                ``,
-                `**Action required:**`,
-                `1. Open the failed run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-                `2. Identify whether the failure is in pg_dump, pg_restore, or smoke test`,
-                `3. If pg_restore fails: backup format is wrong. Check pg_dump version compatibility.`,
-                `4. If smoke test fails: schema drift between backup and current code. Run alembic upgrade head on the backup.`,
-                `5. Do NOT delete this issue until DR drill passes again.`,
-                ``,
-                `**Run details:**`,
-                `- Workflow: ${context.workflow}`,
-                `- Branch: ${context.ref}`,
-                `- Commit: ${context.sha}`,
-                `- Triggered by: ${context.eventName}`,
-              ].join('\n'),
-              labels: ['dr-drill', 'p0-incident', 'auto-generated'],
-            });
+          title: 🔴 DR Drill failed — backup does NOT restore cleanly
+          detail: |
+            The latest backup cannot be restored to a working state.
+            For a medical system this is a P0 incident — if prod burns tonight, you cannot recover.
+            Identify whether the failure is in pg_dump, pg_restore, or the smoke test:
+            - pg_restore failing → backup format problem (check pg_dump version compatibility)
+            - smoke test failing → schema drift; run `alembic upgrade head` against the restored backup
+            Do NOT close this issue until the DR drill passes again.

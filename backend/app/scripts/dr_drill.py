@@ -75,8 +75,12 @@ def _run(cmd: list[str], env: dict | None = None, check: bool = True) -> subproc
 
 def find_latest_backup() -> Path:
     """Find the newest backup file in BACKUP_DIR."""
-    if "BACKUP_FILE" in os.environ:
-        p = Path(os.environ["BACKUP_FILE"])
+    # Truthiness, not presence: CI passes BACKUP_FILE='' when no explicit
+    # file is requested — Path('') resolves to '.' and pg_restore then fails
+    # with "directory . does not appear to be a valid archive".
+    explicit_backup = os.environ.get("BACKUP_FILE", "").strip()
+    if explicit_backup:
+        p = Path(explicit_backup)
         if not p.exists():
             _exit(2, f"BACKUP_FILE set but not found: {p}")
         return p
@@ -206,7 +210,7 @@ def smoke_test_drill_db(user: str, password: str, host: str, port: int) -> None:
         ("SELECT COUNT(*) FROM users;",            "users"),
         ("SELECT COUNT(*) FROM appointments;",     "appointments"),
         ("SELECT COUNT(*) FROM services;",         "services"),
-        ("SELECT COUNT(*) FROM audit_log;",        "audit_log"),
+        ("SELECT COUNT(*) FROM audit_logs;",       "audit_logs"),
     ]
 
     failed = []
