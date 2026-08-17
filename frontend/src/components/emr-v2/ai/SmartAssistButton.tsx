@@ -39,6 +39,7 @@ export function SmartAssistButton({
             onClick={onClick}
             disabled={disabled || isLoading}
             title={hasSuggestions ? 'Есть AI подсказки' : 'Получить AI подсказки'}
+            aria-label={hasSuggestions ? 'Есть AI подсказки' : 'Получить AI подсказки'}
         >
             {isLoading ? (
                 <span className="smart-assist-btn__spinner">⏳</span>
