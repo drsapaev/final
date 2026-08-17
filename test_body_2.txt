@@ -1,0 +1,35 @@
+## Summary
+💡 **What:** Added an `aria-label` attribute to the `SmartAssistButton` component.
+🎯 **Why:** Icon-only buttons that use emojis (like ✨ and 🧠) are read literally by screen readers (e.g. "sparkles" or "brain") which lacks context. By adding an `aria-label` that mirrors the conditional `title` attribute, screen reader users get the exact same helpful text as mouse users ("Есть AI подсказки" or "Получить AI подсказки").
+📸 **Before/After:** No visual changes.
+♿ **Accessibility:** Fixes a critical WCAG violation for missing accessible names on icon-only interactive controls, dramatically improving the screen reader experience for the AI assist feature.
+
+## Cyclic Execution Evidence
+- Fresh main sync: yes, created branch from origin/main.
+- Clean workspace: Verified no unintended files were modified or added.
+- Branch: palette/add-aria-label-smart-assist-button
+- Scope gate: Allowed changes to `frontend/src/components/emr-v2/ai/SmartAssistButton.tsx`. Denied other paths.
+- Red-check handling: Ran frontend tests and linters cleanly.
+
+## Contract Impact
+not applicable - UI accessibility improvement only, no API changes.
+
+## RBAC / Permissions
+not applicable - UI accessibility improvement only, no role or permission changes.
+
+## Notification / Realtime
+not applicable - UI accessibility improvement only, no notification changes.
+
+## Frontend Resilience
+not applicable - Added `aria-label` attribute to ensure screen reader compatibility for dynamic icon buttons. Does not alter data fetching or component lifecycle.
+
+## Scope Gate
+- Allowed paths: frontend/src/components/emr-v2/ai/SmartAssistButton.tsx
+- Denied paths: backend runtime, backend endpoints, migrations, core infrastructure
+- Migration/docs/test impact: none expected, UI change only.
+- Rollback note: Revert the single file change to remove the `aria-label` attribute.
+
+## Validation
+- Targeted tests or smoke run: `pnpm test --run` passes, `pnpm lint:check` passes.
+- Result: passed
+- Not checked: backend behavior, real-time messaging, because no backend or realtime logic was touched.
