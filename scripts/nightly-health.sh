@@ -29,8 +29,11 @@ WORKFLOWS=(
   "release-gate.yml|release gate|workflow_dispatch|on-release|-"
   "ai-safety-guardrails.yml|AI safety guardrails|schedule|daily|-"
   "dr-drill.yml|DR drill|schedule|weekly|-"
-  "load.yml|load testing|schedule|weekly|-"
-  "chaos.yml|chaos testing|schedule|weekly|-"
+  "load.yml|load testing (real stack)|schedule|weekly|-"
+  # Mock-based by design (route-injection, no backend) — do NOT read this
+  # row as production-like resilience; real failure injection is a separate
+  # future contract (docs/runbooks/LOAD_CHAOS_ENVIRONMENT.md §2).
+  "chaos.yml|chaos testing (mock-based)|schedule|weekly|-"
   "weekly-maintenance.yml|weekly maintenance|schedule|weekly|-"
 )
 
