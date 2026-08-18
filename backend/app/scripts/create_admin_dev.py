@@ -114,6 +114,10 @@ def upsert_admin() -> None:
         for key, value in {
             "is_active": True,
             "is_superuser": True,
+            # users.must_change_password is NOT NULL without a default;
+            # bootstrap admins must rotate the env-provided password on
+            # first login.
+            "must_change_password": True,
             "email": admin_email,
             "full_name": admin_full_name,
         }.items():
