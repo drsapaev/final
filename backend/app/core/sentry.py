@@ -111,6 +111,11 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
       contain phone/email/IIN/passport from bound SQL params
     - ``event["exception"]["values"][*]["stacktrace"]["frames"][*]["vars"]``
       — frame local variables, may contain patient objects
+    - ``event["logentry"]`` — ``message``, ``params``, ``formatted`` from
+      ``LoggingIntegration`` (ERROR-level logs). The ``PIIMaskingFilter``
+      in ``logging_config.py`` is attached to the app's own stdout
+      handler, NOT to the root logger, so Sentry's logging handler sees
+      the raw LogRecord; this is the only scrubbing layer for logentry.
 
     Missing fields are skipped silently — this function must not raise on
     events with partial structure (e.g. ``{}`` or ``{"exception": {}}``).
@@ -119,10 +124,26 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
         event["request"] = mask_pii(event["request"])
 
     if "breadcrumbs" in event:
-        event["breadcrumbs"] = [
-            {**b, "data": mask_pii(b.get("data", {}))}
-            for b in event["breadcrumbs"]
-        ]
+        # Sentry event protocol ships breadcrumbs as {"values": [...]};
+        # tolerate both that dict and a bare list, preserve the container
+        # shape, and skip non-dict crumbs.
+        crumbs = event["breadcrumbs"]
+
+        def _scrumb(b: Any) -> Any:
+            return (
+                {**b, "data": mask_pii(b.get("data", {}))}
+                if isinstance(b, dict)
+                else mask_pii(b)
+            )
+
+        if isinstance(crumbs, dict):
+            values = crumbs.get("values", [])
+            if isinstance(values, list):
+                crumbs["values"] = [_scrumb(b) for b in values]
+        elif isinstance(crumbs, list):
+            event["breadcrumbs"] = [_scrumb(b) for b in crumbs]
+        else:
+            event["breadcrumbs"] = mask_pii(crumbs)
 
     if "extra" in event:
         event["extra"] = mask_pii(event["extra"])
@@ -140,6 +161,23 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
             }
         else:
             event["contexts"] = mask_pii(contexts)
+
+    if "logentry" in event:
+        logentry = event["logentry"]
+        if isinstance(logentry, dict):
+            # LoggingIntegration puts the raw record message/args here.
+            # PIIMaskingFilter runs on the app's stdout handler only, so
+            # without this block PHI in logger.error(...)/logger.exception(...)
+            # arguments reaches Sentry unscrubbed.
+            message = logentry.get("message")
+            if isinstance(message, str):
+                logentry["message"] = mask_pii(message)
+            params = logentry.get("params")
+            if params is not None:
+                logentry["params"] = mask_pii(params)
+            formatted = logentry.get("formatted")
+            if isinstance(formatted, str):
+                logentry["formatted"] = mask_pii(formatted)
 
     exception = event.get("exception")
     if isinstance(exception, dict):
@@ -182,6 +220,13 @@ def init_sentry() -> None:
             from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
         except ImportError:
             AsyncPGIntegration = None  # older sentry-sdk
+        except Exception:
+            # sentry_sdk.integrations.DidNotEnable — raised when asyncpg is
+            # not installed. This app uses psycopg, so the integration is
+            # optional; DidNotEnable is not an ImportError subclass and
+            # previously crashed init_sentry() (and app startup) whenever
+            # SENTRY_DSN was set on a psycopg-only host.
+            AsyncPGIntegration = None
     except ImportError:
         logger.warning(
             "[sentry] sentry-sdk not installed. "
