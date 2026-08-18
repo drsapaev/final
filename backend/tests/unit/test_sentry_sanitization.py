@@ -326,6 +326,32 @@ class TestSanitizeEventBreadcrumbsShape:
         sanitize_event(event)
         assert "+998901234567" not in event["breadcrumbs"]
 
+    def test_scrubs_phone_in_breadcrumb_message(self):
+        """Breadcrumb messages carry raw log lines (logging integration)
+        — a primary PHI carrier, found by the synthetic-PHI E2E probe."""
+        event = {
+            "breadcrumbs": {
+                "values": [
+                    {"message": "visit failed for +998901234567 john@example.com", "data": {}}
+                ]
+            }
+        }
+        sanitize_event(event)
+        msg = event["breadcrumbs"]["values"][0]["message"]
+        assert "+998901234567" not in msg
+        assert "john@example.com" not in msg
+        assert "+998901•••567" in msg
+
+    def test_scrubs_breadcrumb_message_in_bare_list_shape(self):
+        event = {"breadcrumbs": [{"message": "PHI_TEST_MARKER iin=12345678901234"}]}
+        sanitize_event(event)
+        assert "12345678901234" not in event["breadcrumbs"][0]["message"]
+
+    def test_non_string_breadcrumb_message_untouched(self):
+        event = {"breadcrumbs": {"values": [{"message": None, "data": {}}]}}
+        sanitize_event(event)
+        assert event["breadcrumbs"]["values"][0]["message"] is None
+
 
 class TestSanitizeEventUnicode:
     def test_preserves_unicode_around_pii(self):

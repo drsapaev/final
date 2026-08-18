@@ -101,7 +101,9 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
 
     Fields scrubbed:
     - ``event["request"]`` — request body, headers, query string
-    - ``event["breadcrumbs"][*]["data"]`` — breadcrumb payloads
+    - ``event["breadcrumbs"]`` — ``values[*].data`` payloads and
+      ``values[*].message`` (raw formatted log lines recorded by the
+      logging integration on subsequent events)
     - ``event["extra"]`` — extra context
     - ``event["contexts"]`` — ALL contexts are scrubbed; for standard
       Sentry contexts (runtime, os, device, etc.), known diagnostic
@@ -130,11 +132,17 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
         crumbs = event["breadcrumbs"]
 
         def _scrumb(b: Any) -> Any:
-            return (
-                {**b, "data": mask_pii(b.get("data", {}))}
-                if isinstance(b, dict)
-                else mask_pii(b)
-            )
+            if not isinstance(b, dict):
+                return mask_pii(b)
+            scrubbed = {**b, "data": mask_pii(b.get("data", {}))}
+            message = scrubbed.get("message")
+            if isinstance(message, str):
+                # Breadcrumb messages carry raw formatted log lines: the
+                # logging integration records every log record as a
+                # breadcrumb on subsequent events, so PHI logged anywhere
+                # surfaces here on the next captured error.
+                scrubbed["message"] = mask_pii(message)
+            return scrubbed
 
         if isinstance(crumbs, dict):
             values = crumbs.get("values", [])
