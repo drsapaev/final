@@ -3,7 +3,7 @@
   "info": {
     "title": "MediClinic Pro API",
     "description": "\n    Medical clinic management system API.\n\n    ## Authentication\n    All endpoints (except /auth/login, /auth/csrf-token, /health) require\n    a Bearer JWT token in the Authorization header.\n\n    ## Rate Limiting\n    Sensitive endpoints (login, SMS, broadcast) are rate-limited via slowapi.\n    Rate limit headers are included in responses.\n\n    ## Audit Logging\n    Admin actions are logged to the AuditLog table for HIPAA compliance.\n\n    ## WebSocket\n    Real-time endpoints available at /ws/notifications, /ws/queue, /ws/cashier.\n    Authentication via ?token= query parameter (JWT).\n    ",
-    "version": "0.9.0"
+    "version": "1.1.0"
   },
   "paths": {
     "/api/v1/auth/login": {
