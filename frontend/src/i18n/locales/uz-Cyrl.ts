@@ -8155,6 +8155,11 @@ const uzCyrl = {
     tfsw_next_step_backup: '• Резервные коды можно использовать при потере устройства',
     tfsw_next_step_settings: '• Настройки можно изменить в разделе «Безопасность»',
     tfsw_finish_button: 'Завершить',
+    tfsw2_title: 'Икки факторли аутентификация',
+    tfsw2_step1_title: 'Иловани тайёрланг',
+    tfsw2_step1_desc: 'Аутентификатор иловасини ўрнатинг — Google Authenticator, Authy ёки 1Password. Ҳар бир киришда тизим ундан код сўрайди.',
+    tfsw2_step2_title: 'QR-кодни сканерланг',
+    tfsw2_step3_title: 'Илова кодини киритинг',
     // ─── DataExporter.jsx (de_*) ──────────────────────────────────────────────
     de_format_json_desc: 'Структурированные данные',
     de_format_csv_desc: 'Табличные данные',

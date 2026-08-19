@@ -8148,6 +8148,11 @@ const kk = {
     tfsw_next_step_backup: '• Резервные коды можно использовать при потере устройства',
     tfsw_next_step_settings: '• Настройки можно изменить в разделе «Безопасность»',
     tfsw_finish_button: 'Завершить',
+    tfsw2_title: 'Екі факторлы аутентификация',
+    tfsw2_step1_title: 'Қосымшаны дайындаңыз',
+    tfsw2_step1_desc: 'Аутентификатор қосымшасын орнатыңыз — Google Authenticator, Authy немесе 1Password. Әр кіруде жүйе одан код сұрайды.',
+    tfsw2_step2_title: 'QR-кодты сканерлеңіз',
+    tfsw2_step3_title: 'Қосымшадан кодты енгізіңіз',
     // ─── DataExporter.jsx (de_*) ──────────────────────────────────────────────
     de_format_json_desc: 'Структурированные данные',
     de_format_csv_desc: 'Табличные данные',

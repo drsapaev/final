@@ -8149,6 +8149,11 @@ const uzLatn = {
     tfsw_next_step_backup: '• Qurilma yo\'qolganda zaxira kodlardan foydalanish mumkin',
     tfsw_next_step_settings: '• Sozlamalarni «Xavfsizlik» bo\'limida o\'zgartirish mumkin',
     tfsw_finish_button: 'Yakunlash',
+    tfsw2_title: 'Ikki faktorli autentifikatsiya',
+    tfsw2_step1_title: 'Ilovani tayyorlang',
+    tfsw2_step1_desc: 'Autentifikator ilovasini oʻrnating — Google Authenticator, Authy yoki 1Password. Har bir kirishda tizim undan kod soʻraydi.',
+    tfsw2_step2_title: 'QR-kodni skanerlang',
+    tfsw2_step3_title: 'Ilova kodini kiriting',
     // ─── DataExporter.jsx (de_*) ──────────────────────────────────────────────
     de_format_json_desc: 'Tuzilgan ma\'lumotlar',
     de_format_csv_desc: 'Jadval ma\'lumotlari',
