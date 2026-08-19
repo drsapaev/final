@@ -8148,6 +8148,11 @@ const en = {
     tfsw_next_step_backup: '• Резервные коды можно использовать при потере устройства',
     tfsw_next_step_settings: '• Настройки можно изменить в разделе «Безопасность»',
     tfsw_finish_button: 'Завершить',
+    tfsw2_title: 'Two-factor authentication',
+    tfsw2_step1_title: 'Prepare your authenticator',
+    tfsw2_step1_desc: 'Install an authenticator app — Google Authenticator, Authy or 1Password. At each login the system will ask for a code from it.',
+    tfsw2_step2_title: 'Scan the QR code',
+    tfsw2_step3_title: 'Enter the code from the app',
     // ─── DataExporter.jsx (de_*) ──────────────────────────────────────────────
     de_format_json_desc: 'Структурированные данные',
     de_format_csv_desc: 'Табличные данные',

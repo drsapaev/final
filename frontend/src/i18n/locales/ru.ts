@@ -8277,6 +8277,11 @@ const ru = {
     tfsw_next_step_backup: '• Резервные коды можно использовать при потере устройства',
     tfsw_next_step_settings: '• Настройки можно изменить в разделе «Безопасность»',
     tfsw_finish_button: 'Завершить',
+    tfsw2_title: 'Двухфакторная аутентификация',
+    tfsw2_step1_title: 'Подготовьте приложение',
+    tfsw2_step1_desc: 'Установите приложение-аутентификатор — Google Authenticator, Authy или 1Password. При каждом входе система будет запрашивать код из него.',
+    tfsw2_step2_title: 'Отсканируйте QR-код',
+    tfsw2_step3_title: 'Введите код из приложения',
     // ─── DataExporter.jsx (de_*) ──────────────────────────────────────────────
     de_format_json_desc: 'Структурированные данные',
     de_format_csv_desc: 'Табличные данные',
