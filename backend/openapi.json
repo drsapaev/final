@@ -3,7 +3,7 @@
   "info": {
     "title": "MediClinic Pro API",
     "description": "\n    Medical clinic management system API.\n\n    ## Authentication\n    All endpoints (except /auth/login, /auth/csrf-token, /health) require\n    a Bearer JWT token in the Authorization header.\n\n    ## Rate Limiting\n    Sensitive endpoints (login, SMS, broadcast) are rate-limited via slowapi.\n    Rate limit headers are included in responses.\n\n    ## Audit Logging\n    Admin actions are logged to the AuditLog table for HIPAA compliance.\n\n    ## WebSocket\n    Real-time endpoints available at /ws/notifications, /ws/queue, /ws/cashier.\n    Authentication via ?token= query parameter (JWT).\n    ",
-    "version": "0.9.0"
+    "version": "1.1.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -37231,7 +37231,7 @@
           "two-factor-auth"
         ],
         "summary": "Setup Two Factor Auth",
-        "description": "Настроить 2FA для текущего пользователя",
+        "description": "Настроить 2FA для текущего пользователя.\n\nАвторизация: Bearer JWT (уже вошедший) ИЛИ одноразовый\nenrollment_token из login-ответа (двухстадийная аутентификация\nдля критичных ролей без 2FA).",
         "operationId": "setup_two_factor_auth_api_v1_2fa_setup_post",
         "requestBody": {
           "content": {
@@ -37264,12 +37264,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/2fa/verify-setup": {
@@ -37278,7 +37273,7 @@
           "two-factor-auth"
         ],
         "summary": "Verify Totp Setup",
-        "description": "Верифицировать настройку TOTP.\n\nSECURITY (AUTH-REAUDIT-28): totp_code перенесён из query-param в body.",
+        "description": "Верифицировать настройку TOTP.\n\nSECURITY (AUTH-REAUDIT-28): totp_code перенесён из query-param в body.\n\nДвухстадийная аутентификация: при авторизации через enrollment_token\nуспешная верификация завершает enrollment — токен отзывается\n(одноразовость) и выдаются нормальные access/refresh токены.",
         "operationId": "verify_totp_setup_api_v1_2fa_verify_setup_post",
         "requestBody": {
           "content": {
@@ -37311,12 +37306,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/2fa/verify": {
@@ -85238,6 +85228,22 @@
             "type": "boolean",
             "title": "Must Change Password",
             "default": false
+          },
+          "requires_2fa_setup": {
+            "type": "boolean",
+            "title": "Requires 2Fa Setup",
+            "default": false
+          },
+          "enrollment_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrollment Token"
           }
         },
         "type": "object",
@@ -101237,6 +101243,18 @@
               }
             ],
             "title": "Device Type"
+          },
+          "enrollment_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrollment Token"
           }
         },
         "type": "object",
@@ -101572,6 +101590,18 @@
             "maxLength": 6,
             "minLength": 6,
             "title": "Totp Code"
+          },
+          "enrollment_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrollment Token"
           }
         },
         "type": "object",
