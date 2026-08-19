@@ -81,6 +81,9 @@ secrets/
 .ruff_cache/
 .pytest_cache/
 
+# Agent skills CLI (machine-specific local symlinks, not shareable)
+.zcode/
+
 # Additional security
 *.pem
 *.key
