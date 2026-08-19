@@ -202,7 +202,12 @@ class Test2FAEnforcement:
     def test_admin_cannot_login_without_2fa(
         self, client: TestClient, admin_user_without_2fa: User, admin_password: str
     ):
-        """Admin НЕ может войти без настройки 2FA"""
+        """Admin НЕ получает полного доступа без настройки 2FA.
+
+        Двухстадийная аутентификация: верный пароль даёт только
+        одноразовый enrollment-токен (для /2fa/setup и /2fa/verify-setup),
+        но НЕ access/refresh токены.
+        """
         response = client.post(
             "/api/v1/authentication/login",
             json={
@@ -211,18 +216,21 @@ class Test2FAEnforcement:
             },
         )
 
-        # Эндпоинт возвращает 401, когда success=False
-        assert response.status_code == 401, f"Expected 401, got {response.status_code}. Response: {response.text}"
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}. Response: {response.text}"
         data = response.json()
-        assert "detail" in data, "Response should include detail field"
-        detail = data["detail"]
-        assert "2fa" in detail.lower() or "двухфакторной" in detail.lower(), \
-            f"Message should mention 2FA setup requirement. Detail: {detail}"
+        assert data.get("requires_2fa_setup") is True, \
+            f"Login should flag 2FA setup requirement. Response: {data}"
+        assert data.get("enrollment_token"), \
+            "Login should issue a single-use enrollment token"
+        assert data.get("access_token") is None, \
+            "No full access without enrolled 2FA"
+        assert data.get("refresh_token") is None, \
+            "No full access without enrolled 2FA"
 
     def test_cashier_cannot_login_without_2fa(
         self, client: TestClient, cashier_user_without_2fa: User
     ):
-        """Cashier НЕ может войти без настройки 2FA"""
+        """Cashier НЕ получает полного доступа без настройки 2FA"""
         response = client.post(
             "/api/v1/authentication/login",
             json={
@@ -231,13 +239,16 @@ class Test2FAEnforcement:
             },
         )
 
-        # Эндпоинт возвращает 401, когда success=False
-        assert response.status_code == 401, f"Expected 401, got {response.status_code}. Response: {response.text}"
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}. Response: {response.text}"
         data = response.json()
-        assert "detail" in data, "Response should include detail field"
-        detail = data["detail"]
-        assert "2fa" in detail.lower() or "двухфакторной" in detail.lower(), \
-            f"Message should mention 2FA setup requirement. Detail: {detail}"
+        assert data.get("requires_2fa_setup") is True, \
+            f"Login should flag 2FA setup requirement. Response: {data}"
+        assert data.get("enrollment_token"), \
+            "Login should issue a single-use enrollment token"
+        assert data.get("access_token") is None, \
+            "No full access without enrolled 2FA"
+        assert data.get("refresh_token") is None, \
+            "No full access without enrolled 2FA"
 
     def test_admin_can_login_with_correct_otp(
         self, client: TestClient, admin_user_with_2fa: tuple[User, str], admin_password: str

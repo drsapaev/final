@@ -73,15 +73,65 @@ async def get_two_factor_status(
         raise_two_factor_internal_error("getting 2FA status", e)
 
 
+async def _resolve_user_bearer_or_enrollment(
+    request: Request,
+    enrollment_token: str | None,
+    db: Session,
+):
+    """Resolve the acting user from a Bearer JWT or an enrollment token.
+
+    Two-stage authentication: a critical-role user whose password verified
+    at login holds a single-use server-side '2fa_enrollment' session token
+    (NOT a JWT). It is valid ONLY here — business endpoints require JWTs,
+    so the enrollment token can never reach them by construction.
+    Returns (user, enrollment_token_or_None); (None, None) if unauthorized.
+    """
+    # 1) Bearer JWT — уже вошедший пользователь управляет своей 2FA
+    try:
+        from fastapi.security import HTTPBearer
+
+        security = HTTPBearer(auto_error=False)
+        token_result = await security(request)
+        if token_result and token_result.credentials:
+            try:
+                return await get_current_user(token_result.credentials, db), None
+            except HTTPException:
+                pass
+    except Exception:
+        pass
+
+    # 2) enrollment-токен из двухстадийного логина
+    if enrollment_token:
+        user = TwoFactorAuthApiService(db).get_user_from_enrollment_token(
+            enrollment_token
+        )
+        if user:
+            return user, enrollment_token
+    return None, None
+
+
 @router.post("/setup", response_model=TwoFactorSetupResponse)
 async def setup_two_factor_auth(
     request_data: TwoFactorSetupRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
-    """Настроить 2FA для текущего пользователя"""
+    """Настроить 2FA для текущего пользователя.
+
+    Авторизация: Bearer JWT (уже вошедший) ИЛИ одноразовый
+    enrollment_token из login-ответа (двухстадийная аутентификация
+    для критичных ролей без 2FA).
+    """
     try:
+        current_user, _ = await _resolve_user_bearer_or_enrollment(
+            request, request_data.enrollment_token, db
+        )
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required. Provide a Bearer token or a valid enrollment_token",
+            )
+
         service = get_two_factor_service()
 
         # Проверяем, не настроена ли уже 2FA
@@ -110,14 +160,27 @@ async def setup_two_factor_auth(
 @router.post("/verify-setup", response_model=TwoFactorVerifyResponse)
 async def verify_totp_setup(
     request_data: TwoFactorVerifySetupRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Верифицировать настройку TOTP.
 
     SECURITY (AUTH-REAUDIT-28): totp_code перенесён из query-param в body.
+
+    Двухстадийная аутентификация: при авторизации через enrollment_token
+    успешная верификация завершает enrollment — токен отзывается
+    (одноразовость) и выдаются нормальные access/refresh токены.
     """
     try:
+        current_user, enrollment_token = await _resolve_user_bearer_or_enrollment(
+            request, request_data.enrollment_token, db
+        )
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required. Provide a Bearer token or a valid enrollment_token",
+            )
+
         service = get_two_factor_service()
         totp_code = request_data.totp_code
 
@@ -130,8 +193,23 @@ async def verify_totp_setup(
         success = service.verify_totp_setup(db, current_user.id, totp_code)
 
         if success:
+            tokens_payload = None
+            if enrollment_token:
+                auth = get_authentication_service()
+                tokens_payload = TwoFactorAuthApiService(
+                    db
+                ).exchange_enrollment_token_for_tokens(
+                    user=current_user,
+                    enrollment_token=enrollment_token,
+                    auth_service=auth,
+                )
             return TwoFactorVerifyResponse(
-                success=True, message="TOTP setup verified successfully"
+                success=True,
+                message="TOTP setup verified successfully",
+                access_token=(tokens_payload or {}).get("access_token"),
+                refresh_token=(tokens_payload or {}).get("refresh_token"),
+                token_type=(tokens_payload or {}).get("token_type"),
+                expires_in=(tokens_payload or {}).get("expires_in"),
             )
         else:
             return TwoFactorVerifyResponse(success=False, message="Invalid TOTP code")
