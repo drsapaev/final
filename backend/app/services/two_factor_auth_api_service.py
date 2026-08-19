@@ -21,6 +21,69 @@ class TwoFactorAuthApiService:
             return None
         return self.repository.get_user(pending_session.user_id)
 
+    def get_user_from_enrollment_token(self, enrollment_token: str):
+        """Resolve user from a single-use '2fa_enrollment' session token.
+
+        The token is a random server-side session value, not a JWT: it is
+        accepted only by /2fa/setup and /2fa/verify-setup and can never
+        authenticate on business endpoints (those require JWTs).
+        """
+        enrollment_session = self.repository.get_active_enrollment_session_by_token(
+            enrollment_token
+        )
+        if not enrollment_session:
+            return None
+        return self.repository.get_user(enrollment_session.user_id)
+
+    def exchange_enrollment_token_for_tokens(
+        self,
+        *,
+        user,
+        enrollment_token: str,
+        auth_service,
+    ) -> dict | None:
+        """Complete enrollment: verify-setup success -> normal tokens.
+
+        Single-use: the enrollment session is revoked immediately, so a
+        replayed token resolves to nothing.
+        """
+        enrollment_session = self.repository.get_active_enrollment_session_for_user(
+            user_id=user.id,
+            enrollment_token=enrollment_token,
+        )
+        if not enrollment_session:
+            return None
+
+        jti = str(uuid.uuid4())
+        access_token = auth_service.create_access_token(
+            {
+                "sub": str(user.id),
+                "username": user.username,
+                "role": user.role,
+                "is_active": user.is_active,
+                "is_superuser": user.is_superuser,
+            }
+        )
+        refresh_token = auth_service.create_refresh_token(user.id, jti)
+        self.repository.add_refresh_token(
+            RefreshToken(
+                user_id=user.id,
+                token=refresh_token,
+                jti=jti,
+                expires_at=datetime.now(UTC)
+                + timedelta(days=auth_service.refresh_token_expire_days),
+            )
+        )
+        enrollment_session.revoked = True  # single-use
+        self.repository.commit()
+
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "expires_in": auth_service.access_token_expire_minutes * 60,
+        }
+
     def exchange_pending_token_for_tokens(
         self,
         *,

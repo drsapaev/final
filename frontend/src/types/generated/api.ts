@@ -12745,7 +12745,11 @@ export type paths = {
         put?: never;
         /**
          * Setup Two Factor Auth
-         * @description Настроить 2FA для текущего пользователя
+         * @description Настроить 2FA для текущего пользователя.
+         *
+         *     Авторизация: Bearer JWT (уже вошедший) ИЛИ одноразовый
+         *     enrollment_token из login-ответа (двухстадийная аутентификация
+         *     для критичных ролей без 2FA).
          */
         post: operations["setup_two_factor_auth_api_v1_2fa_setup_post"];
         delete?: never;
@@ -12768,6 +12772,10 @@ export type paths = {
          * @description Верифицировать настройку TOTP.
          *
          *     SECURITY (AUTH-REAUDIT-28): totp_code перенесён из query-param в body.
+         *
+         *     Двухстадийная аутентификация: при авторизации через enrollment_token
+         *     успешная верификация завершает enrollment — токен отзывается
+         *     (одноразовость) и выдаются нормальные access/refresh токены.
          */
         post: operations["verify_totp_setup_api_v1_2fa_verify_setup_post"];
         delete?: never;
@@ -29486,6 +29494,13 @@ export type components = {
              * @default false
              */
             must_change_password: boolean;
+            /**
+             * Requires 2Fa Setup
+             * @default false
+             */
+            requires_2fa_setup: boolean;
+            /** Enrollment Token */
+            enrollment_token?: string | null;
         };
         /**
          * LogoutRequest
@@ -35810,6 +35825,8 @@ export type components = {
             device_name?: string | null;
             /** Device Type */
             device_type?: string | null;
+            /** Enrollment Token */
+            enrollment_token?: string | null;
         };
         /**
          * TwoFactorSetupResponse
@@ -35925,6 +35942,8 @@ export type components = {
         TwoFactorVerifySetupRequest: {
             /** Totp Code */
             totp_code: string;
+            /** Enrollment Token */
+            enrollment_token?: string | null;
         };
         /**
          * UnreadCountResponse
