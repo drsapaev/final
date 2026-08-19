@@ -124,3 +124,17 @@ def extract_ws_token(websocket: WebSocket) -> str | None:
         return token
 
     return None
+
+
+async def accept_echoing_subprotocol(websocket: WebSocket) -> None:
+    """Accept a WebSocket handshake, echoing the offered subprotocol.
+
+    RFC 6455: when a client sends ``Sec-WebSocket-Protocol`` (clinic clients
+    send ``bearer.<jwt>``), the server MUST answer with one of the offered
+    subprotocols — a bare accept() makes the browser abort the handshake
+    ("Sent non-empty 'Sec-WebSocket-Protocol' header but no response was
+    received"). If nothing was offered, this is a plain accept.
+    """
+    offered = websocket.headers.get("sec-websocket-protocol", "")
+    protocols = [p.strip() for p in offered.split(",") if p.strip()]
+    await websocket.accept(subprotocol=protocols[0] if protocols else None)

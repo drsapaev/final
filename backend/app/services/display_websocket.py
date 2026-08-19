@@ -15,6 +15,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.db.session import SessionLocal
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.services.ws_redis_pubsub import RedisPubSubBridge
+from app.api.v1.endpoints.ws_token import accept_echoing_subprotocol
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class DisplayWebSocketManager:
     async def connect(self, websocket: WebSocket, board_id: str, user=None) -> None:
         """Подключение нового WebSocket с опциональной аутентификацией"""
         try:
-            await websocket.accept()
+            await accept_echoing_subprotocol(websocket)
 
             if board_id not in self.connections:
                 self.connections[board_id] = set()
