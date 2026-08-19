@@ -95,6 +95,7 @@ Evaluate the touched surface against:
 - internationalization: layout holds across all supported locales (ru, uz-Latn, uz-Cyrl, en, kk); no meaning lost to truncation; no hardcoded user-facing strings bypassing the i18n layer
 - performance: no heavy decorative motion, avoid layout shift, avoid unnecessary bundles
 - workflow safety: role clarity, no misleading status, no hidden critical action
+- copy and microcopy: action labels say what happens from the staff side, one action name stays stable through the flow, errors state what went wrong and what to do next, empty states invite the next action
 - offline safety: break-glass states — cached patient data with clear offline/read-only/sync-pending treatment; medical workflow never blocked on AI or backend availability (see AGENTS.md break-glass procedure)
 - PHI display: identity masked to initials and medical fields redacted on shared or non-medical screens; diagnosis, phone, and document numbers only in medical contexts that need them (see AGENTS.md PII table)
 
@@ -117,6 +118,7 @@ Remove, merge, or downgrade anything that fails these checks, unless clinical sa
 - Do not introduce a new design framework, duplicate token system, unusual font stack, decorative background system, or broad animation layer.
 - Replace inline-style and legacy-class drift incrementally; do not rewrite whole role panels in one pass.
 - Keep cards shallow. Do not put cards inside cards unless the existing design system requires it for a specific component.
+- Spend visual boldness in one place: at most one signature element per screen; everything else stays quiet and disciplined.
 - Use stable layout constraints: grid tracks, min/max widths, fixed control sizes, aspect ratios, and predictable wrapping.
 - Treat tables and forms as operational tools: compact, scannable, keyboard-friendly, with clear empty/loading/error states.
 - For charts and analytics, prioritize readable labels, legends, units, and state messaging over decoration.

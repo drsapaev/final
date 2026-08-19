@@ -20,6 +20,8 @@ Use this reference to block common mistakes in clinic UI/UX work.
 - Copying styles from one page into another instead of extracting a proven pattern.
 - Treating historical design docs as stronger than current source and tests.
 - Replacing many files to remove a small visual inconsistency.
+- Defaulting to the current AI-slop looks regardless of subject: cream background with a serif display and terracotta accent, near-black with a single acid-green or vermilion accent, or a broadsheet layout of hairline rules and dense columns. These are template defaults, not choices.
+- Spreading visual boldness evenly across a screen instead of concentrating it in one signature element.
 
 ## Layout Anti-Patterns
 
