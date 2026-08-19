@@ -1,6 +1,6 @@
 # Design-System Convergence
 
-Use this reference when reducing mixed UI layers, inline styles, legacy classes, MUI drift, or duplicated tokens.
+Use this reference when reducing mixed UI layers, inline styles, legacy classes, or duplicated tokens.
 
 ## Goal
 
@@ -14,7 +14,7 @@ Collect a small inventory before editing:
 - imported UI layers
 - `style={{` count in the touched file
 - `legacy-` classes in the touched file
-- `@mui/` imports in the touched file
+- `@mui/` imports in the touched file (must be zero — MUI is removed from this codebase)
 - hardcoded colors, spacing, radius, shadows, z-index
 - repeated local style objects
 - existing tests or nearby examples
@@ -43,7 +43,7 @@ Avoid:
 - creating a new `ui2`, `new-ui`, `modern`, or parallel component namespace
 - copying a component to make a one-off variant
 - introducing new global tokens before checking existing ones
-- mixing MUI and canonical components in the same new slice unless migration is staged
+- reintroducing MUI (removed codebase-wide) instead of using canonical components
 
 ## Inline Style Reduction
 
@@ -80,16 +80,12 @@ For `legacy-*` classes:
 
 Prioritize legacy migration on active operational routes over historical/demo pages.
 
-## MUI Drift
+## MUI Reintroduction Guard
 
-MUI may exist as legacy compatibility. Do not remove MUI from shared theme/provider code casually.
+MUI was fully removed from this frontend: no `@mui` dependency in `frontend/package.json` and zero imports in `frontend/src`. There is no legacy MUI compatibility layer to preserve or migrate.
 
-For active screens:
-
-- do not introduce new MUI imports
-- replace MUI screen-level cards, buttons, alerts, tables, and menus only when a canonical equivalent exists
-- keep complex menus/dialogs if replacement would be a behavioral rewrite
-- treat MUI cleanup as its own small PR when it touches interactions
+- any new `@mui` import or dependency is P1 drift — reject it and use canonical clinic components
+- if a task seems to need MUI-specific behavior, stop and check the canonical component layer and `frontend/DESIGN_SYSTEM.md` first
 
 ## Token Rules
 

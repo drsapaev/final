@@ -95,7 +95,7 @@ Drift signals:
 
 - `style={{` in many repeated elements
 - `legacy-` classes on active routes
-- `@mui/` imports in screens that otherwise use canonical clinic components
+- any `@mui/` import (MUI is removed codebase-wide; reintroduction is drift)
 - duplicate colors, shadows, border radii, or spacing constants
 
 ## Forms
@@ -140,6 +140,7 @@ Every touched workflow should account for:
 - loading
 - empty
 - partial data
+- offline or cached-data mode (break-glass)
 - error
 - forbidden or role-denied
 - disabled action
@@ -147,6 +148,21 @@ Every touched workflow should account for:
 - success confirmation
 
 Payment, queue, lab, and EMR screens must not collapse multiple states into the same visual treatment.
+
+When the backend or AI is unavailable, doctor panels must degrade to cached/read-only break-glass states with a visible offline indicator instead of blocking care (see the AGENTS.md break-glass procedure).
+
+## PHI Display
+
+Check:
+
+- shared or non-medical screens show initials or masked identity, not full names
+- phone, IIN, document numbers, diagnosis, and prescriptions appear only in medical contexts that require them
+- screen-sharing surfaces (dashboards, queue displays, reports) minimize visible PHI
+- masking follows the AGENTS.md PII table
+
+Clinical risks:
+
+- unmasked PHI on shared screens is at least P1; stop and report instead of polishing
 
 ## Accessibility
 
@@ -189,6 +205,21 @@ High-risk mobile surfaces:
 - patient portal
 - registration/check-in
 - public callback pages
+
+## Internationalization
+
+Check:
+
+- layout holds across all supported locales: ru, uz-Latn, uz-Cyrl, en, kk
+- language switch does not clip actions, labels, table columns, or statuses
+- truncation never removes meaning from status, amount, date, or patient identity
+- no hardcoded user-facing strings bypassing the i18n layer (`frontend/src/i18n`)
+- locale-specific dates, numbers, and currency render consistently
+
+Clinical risks:
+
+- meaning-changing truncation in another locale is P1
+- hardcoded strings staff cannot read on operational screens is P1
 
 ## Performance
 

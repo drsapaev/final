@@ -64,7 +64,7 @@ Look for:
 
 - barrel imports from large libraries
 - importing heavy chart/editor/AI modules before the feature opens
-- MUI imports on routes moving to canonical UI
+- any `@mui` import (MUI is removed codebase-wide; reintroduction is drift)
 - duplicate icon libraries on the same route
 - large demo or example modules in production paths
 
