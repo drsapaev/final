@@ -28,7 +28,7 @@ Load only the reference needed for the current task:
 - `references/source-synthesis.md`: when choosing which external-skill behavior to apply.
 - `references/audit-matrix.md`: for detailed P0-P3 audits, checklists, and scoring.
 - `references/role-workflows.md`: for role-specific Admin, Doctor, Registrar, Cashier, Lab, Patient, queue, payment, EMR, and reporting work.
-- `references/design-system-convergence.md`: for inline-style, legacy-class, MUI, token, or component-layer cleanup.
+- `references/design-system-convergence.md`: for inline-style, legacy-class, token, or component-layer cleanup.
 - `references/visual-qa-playbook.md`: for browser screenshots, viewport checks, console/network review, and re-verification.
 - `references/accessibility-hardening.md`: for WCAG, keyboard, focus, screen-reader, reduced-motion, and touch target reviews.
 - `references/react-performance-ux.md`: for React render, bundle, effects, state, and interaction performance that affects UX.
@@ -47,7 +47,7 @@ Before advising, planning, or editing, inspect the smallest relevant set:
 - `frontend/DESIGN_SYSTEM.md`
   - Start with `UI Layer Contract`.
 - `frontend/THEME_SYSTEM_GUIDE.md`
-- `frontend/src/routing/routeRegistry.js` for route, panel, role, shell, or nav work
+- `frontend/src/routing/routeRegistry.ts` (with `routeGuards.tsx` and `routeSelectors.ts`) for route, panel, role, shell, or nav work
 - relevant role panel/page/component/style/hook/test files
 - `ARCHITECTURE_RULES.md` only if it exists
 
@@ -57,7 +57,7 @@ Prefer executable source and tests over historical reports. If a required anchor
 
 - `audit-only`: inspect and report. Do not edit files.
 - `safe-patch`: one screen, component, state, or narrow styling slice.
-- `system-convergence`: move a small surface from inline styles, legacy classes, or MUI drift toward the canonical UI layer.
+- `system-convergence`: move a small surface from inline styles or legacy classes toward the canonical UI layer.
 - `visual-qa`: run or inspect the app, capture screenshots, compare viewports, and report before/after.
 
 Escalate before changing auth, RBAC, route semantics, queue behavior, payment behavior, EMR behavior, lab behavior, backend contracts, data models, or API calls.
@@ -92,8 +92,11 @@ Evaluate the touched surface against:
 - accessibility: keyboard path, focus visibility, labels, ARIA where needed, contrast
 - responsiveness: 375, 768, 1280, and 1920px; no overflow, clipping, or overlap
 - touch: mobile controls large enough for thumb use
+- internationalization: layout holds across all supported locales (ru, uz-Latn, uz-Cyrl, en, kk); no meaning lost to truncation; no hardcoded user-facing strings bypassing the i18n layer
 - performance: no heavy decorative motion, avoid layout shift, avoid unnecessary bundles
 - workflow safety: role clarity, no misleading status, no hidden critical action
+- offline safety: break-glass states — cached patient data with clear offline/read-only/sync-pending treatment; medical workflow never blocked on AI or backend availability (see AGENTS.md break-glass procedure)
+- PHI display: identity masked to initials and medical fields redacted on shared or non-medical screens; diagnosis, phone, and document numbers only in medical contexts that need them (see AGENTS.md PII table)
 
 ## Reduction Filter
 
@@ -112,7 +115,7 @@ Remove, merge, or downgrade anything that fails these checks, unless clinical sa
 - Use existing components, tokens, CSS variables, route/state patterns, and tests first.
 - Prefer canonical clinic/macOS UI primitives for role dashboards, forms, tables, payment states, queue screens, and app shell work.
 - Do not introduce a new design framework, duplicate token system, unusual font stack, decorative background system, or broad animation layer.
-- Replace inline styles and legacy/MUI drift incrementally; do not rewrite whole role panels in one pass.
+- Replace inline-style and legacy-class drift incrementally; do not rewrite whole role panels in one pass.
 - Keep cards shallow. Do not put cards inside cards unless the existing design system requires it for a specific component.
 - Use stable layout constraints: grid tracks, min/max widths, fixed control sizes, aspect ratios, and predictable wrapping.
 - Treat tables and forms as operational tools: compact, scannable, keyboard-friendly, with clear empty/loading/error states.
