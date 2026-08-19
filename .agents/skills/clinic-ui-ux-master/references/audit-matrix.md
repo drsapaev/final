@@ -115,6 +115,24 @@ Clinical risks:
 - ambiguous patient identity, phone, payment amount, queue date, or procedure selection is P1/P0
 - errors shown only at top of a long form are P1 on critical flows
 
+## Copy And Microcopy
+
+Borrowed from the 2026-06 frontend-design upstream rewrite: words are design material, not decoration.
+
+Check:
+
+- action labels say what happens from the staff side, not how the system is built
+- one action keeps the same name through the whole flow: button, confirmation, toast, and status agree
+- active voice by default; the primary action states exactly what it does
+- errors say what went wrong and how to fix it, in the interface voice; no vague apologies
+- empty states invite the next action instead of decorating the void
+- no clever wording where staff need direct task labels (see anti-patterns)
+
+Clinical risks:
+
+- an ambiguous action label on payment, queue, or EMR flow is P1 (wrong-button risk)
+- a vague error on a critical flow is P1 if staff cannot tell what to do next
+
 ## Tables And Lists
 
 Check:
