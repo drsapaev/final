@@ -16,7 +16,7 @@ Use this reference to block common mistakes in clinic UI/UX work.
 
 - Creating a new token system for one patch.
 - Adding a new UI component family without checking existing primitives.
-- Mixing canonical components and MUI in a new surface without a migration reason.
+- Reintroducing MUI (removed codebase-wide) instead of using canonical clinic components.
 - Copying styles from one page into another instead of extracting a proven pattern.
 - Treating historical design docs as stronger than current source and tests.
 - Replacing many files to remove a small visual inconsistency.
