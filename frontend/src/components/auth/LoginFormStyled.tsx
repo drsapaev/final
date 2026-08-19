@@ -11,6 +11,7 @@ import { useSetupStatus } from '../../hooks/useSetupStatus';
 import { colorsLight as colors } from '../../theme/tokens';
 import { BRAND } from '../../config/brand';
 import TwoFactorVerify from '../TwoFactorVerify';
+import TwoFactorSetupWizard from '../security/TwoFactorSetupWizard';
 import ForgotPassword from './ForgotPassword';
 import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from './loginErrorUtils';
 import {
@@ -101,6 +102,10 @@ const LoginFormStyled = () => {
   const [pending2FAToken, setPending2FAToken] = useState('');
   const [twoFactorMethod, setTwoFactorMethod] = useState('totp');
 
+  // Двухстадийная аутентификация: критичная роль без настроенной 2FA
+  const [requires2FASetup, setRequires2FASetup] = useState(false);
+  const [enrollmentToken, setEnrollmentToken] = useState('');
+
   // Функция для проверки защищенных панелей
   const isProtectedPanelPath = (pathname: string) => {
     const route = getEffectiveRouteByPath(pathname);
@@ -159,6 +164,15 @@ const LoginFormStyled = () => {
         setRequires2FA(true);
         setPending2FAToken(String(data.pending_2fa_token ?? ""));
         setTwoFactorMethod(String(data.two_factor_method || 'totp'));
+        setLoading(false);
+        return;
+      }
+
+      // Двухстадийная аутентификация: пароль верен, но для критичной роли
+      // (Admin/Cashier) требуется первичная настройка 2FA — открыт мастер.
+      if (data.requires_2fa_setup && data.enrollment_token) {
+        setRequires2FASetup(true);
+        setEnrollmentToken(String(data.enrollment_token));
         setLoading(false);
         return;
       }
@@ -312,6 +326,43 @@ const LoginFormStyled = () => {
     setError('');
   };
 
+  // Двухстадийная аутентификация: /2fa/verify-setup обменял enrollment-токен
+  // на нормальные токены — завершаем вход ровно как после 2FA-верификации.
+  const handle2FAEnrolled = async (payload: Record<string, unknown>) => {
+    try {
+      if (payload.access_token) {
+        const accessToken = typeof payload.access_token === 'string' ? payload.access_token.trim() : payload.access_token;
+        setToken(String(accessToken));
+        if (payload.refresh_token) {
+          setRefreshToken(String(payload.refresh_token));
+        }
+        ensureCSRFToken().catch(() => {
+          // Non-fatal — the request interceptor will retry on demand.
+        });
+
+        const profileResponse = (await api.get('/auth/me')) as import('axios').AxiosResponse<Record<string, unknown>>;
+        setProfile(profileResponse.data);
+
+        const profile = profileResponse.data || null;
+        const computedRoute = getRouteForProfile(profile);
+        const target = computedRoute || from || landingRoute;
+
+        navigate(target, { replace: true });
+      }
+    } catch (postEnrollError) {
+      logger.warn('[AUTH] Post-enrollment navigation error (non-fatal — token already obtained):', postEnrollError);
+      setError(t('misc.lfs_oshibka_posle_2fa_verifikats'));
+      setRequires2FASetup(false);
+      setEnrollmentToken('');
+    }
+  };
+
+  const handle2FASetupCancel = () => {
+    setRequires2FASetup(false);
+    setEnrollmentToken('');
+    setError('');
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -368,6 +419,37 @@ const LoginFormStyled = () => {
       document.getElementById(`twofactor-tab-${last.id}`)?.focus();
     }
   };
+
+  // Двухстадийная аутентификация: критичной роли без 2FA показываем мастер
+  // первичной настройки (QR → код → полноценная сессия).
+  if (requires2FASetup) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'var(--mac-spacing-5)'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: 'var(--mac-radius-lg)',
+          padding: 'var(--mac-spacing-5)',
+          maxWidth: '640px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto'
+        }}>
+          <TwoFactorSetupWizard
+            enrollmentToken={enrollmentToken}
+            onEnrolled={handle2FAEnrolled}
+            onCancel={handle2FASetupCancel}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // Если требуется 2FA, показываем компонент верификации
   if (requires2FA) {

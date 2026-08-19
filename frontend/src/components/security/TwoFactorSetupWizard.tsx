@@ -26,8 +26,21 @@ import {
 /**
  * Мастер настройки Two-Factor Authentication
  * Пошаговая настройка всех методов 2FA
+ *
+ * Двухстадийная аутентификация: если передан enrollmentToken (из login-ответа
+ * критичной роли без 2FA), он уходит в /2fa/setup и /2fa/verify-setup, а
+ * успешная верификация возвращает нормальные токены — колбэк onEnrolled
+ * завершает вход. Без токена визард работает как прежде (уже вошедший
+ * пользователь, авторизация Bearer JWT).
  */
-const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => void; onCancel?: () => void }) => {
+type TwoFactorSetupWizardProps = {
+  onComplete?: () => void;
+  onCancel?: () => void;
+  enrollmentToken?: string;
+  onEnrolled?: (payload: Record<string, unknown>) => void;
+};
+
+const TwoFactorSetupWizard = ({ onComplete, onCancel, enrollmentToken, onEnrolled }: TwoFactorSetupWizardProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const [currentStep, setCurrentStep] = useState(1);
@@ -89,11 +102,12 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
         method: selectedMethod,
         recovery_email: recoveryEmail || null,
         recovery_phone: recoveryPhone || null,
-      }) as unknown as { json: () => Promise<Record<string, unknown>>; ok: boolean; status: number; data: Record<string, unknown> };
+        ...(enrollmentToken ? { enrollment_token: enrollmentToken } : {}),
+      }) as unknown as import('axios').AxiosResponse<Record<string, unknown>>;
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         setSetupData(data);
         setBackupCodes((data.backup_codes as string[]) || []);
         setCurrentStep(3);
@@ -118,18 +132,27 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
     setError('');
 
     try {
+      // Контракт /2fa/verify-setup: totp_code (AUTH-REAUDIT-28 — в body),
+      // опционально enrollment_token из двухстадийного логина.
       const response = await api.post('/2fa/verify-setup', {
-        method: selectedMethod,
-        code: verificationCode,
-      }) as unknown as { json: () => Promise<Record<string, unknown>>; ok: boolean; status: number; data: Record<string, unknown> };
+        totp_code: verificationCode,
+        ...(enrollmentToken ? { enrollment_token: enrollmentToken } : {}),
+      }) as unknown as import('axios').AxiosResponse<Record<string, unknown>>;
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300 && data.success) {
+        // Двухстадийная аутентификация: verify-setup обменял enrollment-токен
+        // на нормальные токены — завершаем вход колбэком.
+        if (data.access_token && onEnrolled) {
+          onEnrolled(data);
+          setLoading(false);
+          return;
+        }
         setCurrentStep(4);
         setSuccess(t('misc.tfsw_code_confirmed'));
       } else {
-        setError(String(data.detail || t('misc.tfsw_invalid_code')));
+        setError(String(data.detail || data.message || t('misc.tfsw_invalid_code')));
       }
     } catch {
       setError(t('misc.tfsw_code_verify_error'));

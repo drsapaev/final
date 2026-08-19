@@ -33,6 +33,7 @@ import type {
 import type {
   LoginResult,
   LoginRequires2FA,
+  LoginRequires2FASetup,
   LoginSucceeded,
   TwoFactorVerifyFailure,
   TwoFactorVerifyResult,
@@ -76,6 +77,17 @@ export class AuthInvariantViolationError extends Error {
  * @throws AuthInvariantViolationError if the backend violates ЗАКОН 2.
  */
 export function parseLoginResponse(dto: LoginResponseRaw): LoginResult {
+  if (dto.requires_2fa === true && dto.requires_2fa_setup === true) {
+    // Enrollment and challenge flows are mutually exclusive — reject the
+    // combination explicitly so neither branch silently wins.
+    throw new AuthInvariantViolationError(
+      'AUTH_LAW_2_BLOCKING_2FA',
+      'Backend returned requires_2fa_setup=true together with requires_2fa=true. ' +
+        'Enrollment and challenge flows are mutually exclusive.',
+      dto,
+    );
+  }
+
   if (dto.requires_2fa === true) {
     // Branch 1: 2FA required. pending_2fa_token must be present,
     // access_token must be absent.
@@ -100,6 +112,36 @@ export function parseLoginResponse(dto: LoginResponseRaw): LoginResult {
       pending_2fa_token: dto.pending_2fa_token,
     };
     if (dto.two_factor_method != null) result.two_factor_method = dto.two_factor_method;
+    if (dto.must_change_password !== undefined) result.must_change_password = dto.must_change_password;
+    return result;
+  }
+
+  if (dto.requires_2fa_setup === true) {
+    // Branch 1a (two-stage enrollment): password verified, critical role
+    // (Admin/Cashier) without enrolled 2FA. The backend issues a single-use
+    // enrollment token; access tokens MUST NOT be present.
+    if (dto.access_token != null || dto.refresh_token != null) {
+      throw new AuthInvariantViolationError(
+        'AUTH_LAW_2_BLOCKING_2FA',
+        'Backend returned requires_2fa_setup=true together with access/refresh tokens. ' +
+          'Access tokens MUST NOT be issued before 2FA enrollment is completed.',
+        dto,
+      );
+    }
+    if (!dto.enrollment_token) {
+      throw new AuthInvariantViolationError(
+        'AUTH_LAW_2_BLOCKING_2FA',
+        'Backend returned requires_2fa_setup=true without enrollment_token. ' +
+          'Cannot start the 2FA enrollment flow without a token.',
+        dto,
+      );
+    }
+    const result: LoginRequires2FASetup = {
+      requires_2fa: false,
+      requires_2fa_setup: true,
+      enrollment_token: dto.enrollment_token,
+      user: dto.user,
+    };
     if (dto.must_change_password !== undefined) result.must_change_password = dto.must_change_password;
     return result;
   }
