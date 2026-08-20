@@ -261,16 +261,7 @@ const TwoFactorSetupWizard = ({
         <h2 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)' as CSSProperties['fontWeight'] }}>
           {t('misc.tfsw2_title')}
         </h2>
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="mt-1"
-            style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
-          >
-            {t('misc.cancel')}
-          </button>
-        )}
+
       </div>
 
       {step !== 4 && renderStepper()}
@@ -499,6 +490,18 @@ const TwoFactorSetupWizard = ({
             <CheckCircle className="w-4 h-4 mr-2" />
             {t('misc.tfsw_finish_button')}
           </Button>
+        </div>
+      )}
+
+      {onCancel && step !== 4 && (
+        <div className="text-center" style={{ marginTop: 'var(--mac-spacing-4)' }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', background: 'transparent', border: 'none', padding: 0 }}
+          >
+            {t('misc.cancel')}
+          </button>
         </div>
       )}
     </div>
