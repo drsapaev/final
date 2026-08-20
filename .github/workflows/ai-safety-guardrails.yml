@@ -138,10 +138,14 @@ jobs:
             # Admin is a critical 2FA role: pre-enroll verified TOTP with a
             # fixed CI-only secret so the spec can complete the challenge.
             # 2FA enforcement is unconditional (no bypass flag exists).
+            # backup_codes_generated/backup_codes_count are NOT NULL without
+            # server defaults (ORM-level defaults only) — set them explicitly.
             c.execute(text('''
-              INSERT INTO two_factor_auth (user_id, totp_secret, totp_enabled, totp_verified)
+              INSERT INTO two_factor_auth
+                (user_id, totp_secret, totp_enabled, totp_verified,
+                 backup_codes_generated, backup_codes_count, recovery_enabled)
               VALUES ((SELECT id FROM users WHERE username = 'qa_admin@clinic.com'),
-                      :secret, true, true)
+                      :secret, true, true, false, 0, false)
               ON CONFLICT (user_id) DO UPDATE SET
                 totp_secret = EXCLUDED.totp_secret,
                 totp_enabled = true,
