@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowRight, Eye, EyeOff, LogIn, CircleHelp, UserPlus, UserRound, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, LogIn, CircleHelp, UserPlus, UserRound, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { api, setToken, setRefreshToken, ensureCSRFToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
@@ -477,118 +477,119 @@ const LoginFormStyled = () => {
         justifyContent: 'center',
         padding: 'var(--mac-spacing-5)'
       }}>
-        <div style={{
-          background: 'white',
-          borderRadius: 'var(--mac-radius-lg)',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-          padding: '40px',
+        <Card className="twofactor-verify-auth" style={{
           width: '100%',
-          maxWidth: '400px',
-          position: 'relative'
+          maxWidth: '460px',
+          // Та же стеклянная Card-композиция, что у визарда и карточки логина.
+          background: isDark
+            ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-text-primary)), transparent 26%) 100%)'
+            : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), transparent 26%) 100%)',
+          backdropFilter: 'blur(26px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(26px) saturate(140%)',
+          border: '1px solid var(--mac-card-border, rgba(255, 255, 255, 0.42))',
+          boxShadow: `
+            0 18px 48px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 82%),
+            0 2px 8px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 94%),
+            inset 0 1px 0 color-mix(in srgb, var(--mac-card-bg, #fff), transparent 45%)
+          `,
+          borderRadius: '24px',
+          overflow: 'hidden',
+          position: 'relative',
+          zIndex: 1,
+          maxHeight: '92vh',
+          overflowY: 'auto'
         }}>
-          <div style={{
-            textAlign: 'center',
-            marginBottom: '30px'
-          }}>
-            <div style={{
-              width: '60px',
-              height: '60px',
-              background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 20px',
-              fontSize: 'var(--mac-font-size-3xl)',
-              color: 'white',
-              position: 'relative'
-            }}>
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'color-mix(in srgb, black, transparent 80%)',
-                borderRadius: '50%'
-              }} />
-              <span style={{ position: 'relative', zIndex: 1 }}>🔐</span>
+          <CardContent style={{ paddingTop: 18, paddingBottom: 18 }}>
+            <div className="flex flex-col items-center text-center" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 'var(--mac-radius-full)',
+                  background: 'var(--mac-accent-blue-bg)',
+                  marginBottom: 'var(--mac-spacing-3)',
+                }}
+              >
+                <ShieldCheck style={{ width: 24, height: 24, color: 'var(--mac-accent-blue)' }} />
+              </div>
+              <h2 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)' as CSSProperties['fontWeight'], margin: 0 }}>
+                Двухфакторная аутентификация
+              </h2>
+              <p style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)', margin: 'var(--mac-spacing-2) 0 0 0' }}>
+                Подтвердите вход с помощью кода
+              </p>
             </div>
-            <h1 style={{
-              fontSize: 'var(--mac-font-size-3xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: colors.primary[700],
-              margin: '0 0 8px 0'
-            }}>
-              Двухфакторная аутентификация
-            </h1>
-            <p style={{
-              color: colors.secondary[500],
-              margin: '0',
-              fontSize: 'var(--mac-font-size-base)'
-            }}>
-              Подтвердите вход с помощью кода
-            </p>
-          </div>
 
-          {/* UX Audit Stage 2 (Login issue 3.4):
-              Переключатель методов 2FA теперь proper tablist с ARIA roles.
-              Раньше это были 3 обычные <button> без role/aria-selected/aria-controls.
-              Теперь screen reader правильно объявляет это как таб-лист с 3 табами.
-              Keyboard navigation: ArrowLeft/Right, Home, End. */}
-          <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
+            {/* UX Audit Stage 2 (Login issue 3.4):
+                Переключатель методов 2FA — proper tablist с ARIA roles.
+                Keyboard navigation: ArrowLeft/Right, Home, End. */}
+            <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+              <div
+                role="tablist"
+                aria-label={t('misc.lfs_metody_dvuhfaktornoy_autenti')}
+                style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}
+              >
+                {twoFactorTabs.map((tab, index) => {
+                  const isActive = twoFactorMethod === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      id={`twofactor-tab-${tab.id}`}
+                      role="tab"
+                      type="button"
+                      aria-selected={isActive}
+                      aria-controls={twoFactorTabPanelId}
+                      tabIndex={isActive ? 0 : -1}
+                      onClick={() => setTwoFactorMethod(tab.id)}
+                      onKeyDown={(e) => handle2FATabKeyDown(e, index)}
+                      style={{
+                        flex: 1,
+                        padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                        background: isActive ? 'var(--mac-accent-blue)' : 'transparent',
+                        color: isActive ? 'var(--mac-text-inverse)' : 'var(--mac-text-secondary)',
+                        border: '1px solid var(--mac-border)',
+                        borderRadius: 'var(--mac-radius-sm)',
+                        fontSize: 'var(--mac-font-size-xs)',
+                        cursor: 'pointer',
+                        font: 'inherit',
+                        outline: isActive ? '2px solid var(--mac-accent-blue)' : 'none',
+                        outlineOffset: '2px',
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div
-              role="tablist"
-              aria-label={t('misc.lfs_metody_dvuhfaktornoy_autenti')}
-              style={{ display: 'flex', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-4)' }}
+              id={twoFactorTabPanelId}
+              role="tabpanel"
+              aria-labelledby={`twofactor-tab-${twoFactorMethod}`}
+              tabIndex={-1}
             >
-              {twoFactorTabs.map((tab, index) => {
-                const isActive = twoFactorMethod === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    id={`twofactor-tab-${tab.id}`}
-                    role="tab"
-                    type="button"
-                    aria-selected={isActive}
-                    aria-controls={twoFactorTabPanelId}
-                    tabIndex={isActive ? 0 : -1}
-                    onClick={() => setTwoFactorMethod(tab.id)}
-                    onKeyDown={(e) => handle2FATabKeyDown(e, index)}
-                    style={{
-                      flex: 1,
-                      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
-                      background: isActive ? colors.primary[500] : 'transparent',
-                      color: isActive ? 'white' : colors.secondary[500],
-                      border: '1px solid var(--mac-border)',
-                      borderRadius: 'var(--mac-radius-sm)',
-                      fontSize: 'var(--mac-font-size-xs)',
-                      cursor: 'pointer',
-                      font: 'inherit',
-                      outline: isActive ? `2px solid ${colors.primary[500]}` : 'none',
-                      outlineOffset: '2px',
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
+              <TwoFactorVerify
+                method={twoFactorMethod}
+                pendingToken={pending2FAToken}
+                onSuccess={handle2FASuccess}
+                onCancel={handle2FACancel} />
             </div>
-          </div>
 
-          <div
-            id={twoFactorTabPanelId}
-            role="tabpanel"
-            aria-labelledby={`twofactor-tab-${twoFactorMethod}`}
-            tabIndex={-1}
-          >
-            <TwoFactorVerify
-              method={twoFactorMethod}
-              pendingToken={pending2FAToken}
-              onSuccess={handle2FASuccess}
-              onCancel={handle2FACancel} />
-          </div>
-
-        </div>
-      </div>);
-
+            <div className="text-center" style={{ marginTop: 'var(--mac-spacing-3)' }}>
+              <button
+                type="button"
+                onClick={handle2FACancel}
+                style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', background: 'transparent', border: 'none', padding: 0 }}
+              >
+                {t('misc.cancel')}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Если нажали "Забыли пароль", показываем компонент восстановления
