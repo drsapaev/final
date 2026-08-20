@@ -432,21 +432,36 @@ const LoginFormStyled = () => {
         justifyContent: 'center',
         padding: 'var(--mac-spacing-5)'
       }}>
-        <div style={{
-          background: 'white',
-          borderRadius: 'var(--mac-radius-lg)',
-          padding: 'var(--mac-spacing-5)',
-          maxWidth: '640px',
+        <Card className="twofactor-setup-auth" style={{
           width: '100%',
-          maxHeight: '90vh',
+          maxWidth: '460px',
+          // Тот же стеклянный стиль, что у карточки логина (UX Audit tokens).
+          background: isDark
+            ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-text-primary)), transparent 26%) 100%)'
+            : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), transparent 26%) 100%)',
+          backdropFilter: 'blur(26px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(26px) saturate(140%)',
+          border: '1px solid var(--mac-card-border, rgba(255, 255, 255, 0.42))',
+          boxShadow: `
+            0 18px 48px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 82%),
+            0 2px 8px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 94%),
+            inset 0 1px 0 color-mix(in srgb, var(--mac-card-bg, #fff), transparent 45%)
+          `,
+          borderRadius: '24px',
+          overflow: 'hidden',
+          position: 'relative',
+          zIndex: 1,
+          maxHeight: '92vh',
           overflowY: 'auto'
         }}>
-          <TwoFactorSetupWizard
-            enrollmentToken={enrollmentToken}
-            onEnrolled={handle2FAEnrolled}
-            onCancel={handle2FASetupCancel}
-          />
-        </div>
+          <CardContent style={{ paddingTop: 18, paddingBottom: 18 }}>
+            <TwoFactorSetupWizard
+              enrollmentToken={enrollmentToken}
+              onEnrolled={handle2FAEnrolled}
+              onCancel={handle2FASetupCancel}
+            />
+          </CardContent>
+        </Card>
       </div>
     );
   }

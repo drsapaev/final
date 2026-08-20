@@ -24,7 +24,7 @@ import TwoFactorSetupWizard from '../TwoFactorSetupWizard';
 
 const setupPayload = {
   secret_key: 'JBSWY3DPEHPK3PXPTESTSECRET',
-  qr_code_url: 'otpauth://totp/Clinic:admin@test?secret=JBSWY3DPEHPK3PXPTESTSECRET&issuer=Clinic',
+  qr_code_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARAAAAE',
   backup_codes: ['1111-1111', '2222-2222'],
 };
 
@@ -44,7 +44,7 @@ afterEach(() => {
 describe('TwoFactorSetupWizard', () => {
   it('renders step 1 with recovery email and no fake methods', () => {
     render(<TwoFactorSetupWizard />);
-    expect(screen.getByText('misc.tfsw2_step1_title')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'misc.tfsw2_step1_title' })).toBeTruthy();
     expect(screen.getByLabelText('2FA recovery email')).toBeTruthy();
     // SMS/Email fake methods removed — only the TOTP flow exists
     expect(screen.queryByText('misc.tfsw_method_sms_name')).toBeNull();
@@ -61,11 +61,11 @@ describe('TwoFactorSetupWizard', () => {
       expect(apiPostMock).toHaveBeenCalledWith('/2fa/setup', { recovery_email: null });
     });
     await waitFor(() => {
-      expect(screen.getByText('misc.tfsw2_step2_title')).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'misc.tfsw2_step2_title' })).toBeTruthy();
     });
     // QR is rendered by qrcode.react as an <svg> built from the otpauth URI
-    const qr = document.querySelector('svg');
-    expect(qr).toBeTruthy();
+    const qr = document.querySelector('img[alt="QR-код 2FA"]');
+    expect(qr).toBeTruthy(); // data-URL PNG рендерится как img
     // secret shown (masked by default) — reveal and check the correct field
     fireEvent.click(screen.getByLabelText('misc.tfsw_aria_show_secret'));
     expect(screen.getByText(/JBSWY3DPEHPK3PXPTESTSECRET/)).toBeTruthy();
@@ -81,7 +81,7 @@ describe('TwoFactorSetupWizard', () => {
     render(<TwoFactorSetupWizard enrollmentToken="enroll-tok" onEnrolled={onEnrolled} />);
 
     fireEvent.click(screen.getByText('misc.tfsw_next'));
-    await waitFor(() => screen.getByText('misc.tfsw2_step2_title'));
+    await waitFor(() => screen.getByRole('heading', { name: 'misc.tfsw2_step2_title' }));
     fireEvent.click(screen.getByText('misc.tfsw_next'));
 
     const codeInput = screen.getByLabelText('2FA verification code');
@@ -115,7 +115,7 @@ describe('TwoFactorSetupWizard', () => {
     render(<TwoFactorSetupWizard onComplete={onComplete} />);
 
     fireEvent.click(screen.getByText('misc.tfsw_next'));
-    await waitFor(() => screen.getByText('misc.tfsw2_step2_title'));
+    await waitFor(() => screen.getByRole('heading', { name: 'misc.tfsw2_step2_title' }));
     fireEvent.click(screen.getByText('misc.tfsw_next'));
     fireEvent.change(screen.getByLabelText('2FA verification code'), { target: { value: '654321' } });
     fireEvent.click(screen.getByText('misc.tfsw_confirm_button'));
