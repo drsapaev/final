@@ -3,7 +3,7 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 
 const serviceWorkerSource = fs
-  .readFileSync(path.resolve(process.cwd(), 'public/sw.js'), 'utf8')
+  .readFileSync(path.resolve(process.cwd(), 'sw.template.js'), 'utf8')
   .replace(/\r\n/g, '\n');
 
 describe('service worker HEIC policy', () => {
