@@ -58,6 +58,7 @@ const TwoFactorSetupWizard = ({
   const [code, setCode] = useState('');
   const [showSecret, setShowSecret] = useState(false);
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [enrolledPayload, setEnrolledPayload] = useState<Record<string, unknown> | null>(null);
   const [copied, setCopied] = useState('');
   const codeRef = useRef<HTMLInputElement>(null);
 
@@ -104,7 +105,10 @@ const TwoFactorSetupWizard = ({
       const data = response.data;
       if (response.status >= 200 && response.status < 300 && data.success) {
         if (data.access_token && onEnrolled) {
-          onEnrolled(data);
+          // Резервные коды показываем ДО завершения входа: второй шанс их
+          // увидеть есть только в настройках профиля (regenerate).
+          setEnrolledPayload(data);
+          setStep(4);
           return;
         }
         setStep(4);
@@ -458,7 +462,16 @@ const TwoFactorSetupWizard = ({
               </div>
             </div>
           )}
-          <Button onClick={() => onComplete?.()}>
+          <Button
+            onClick={() => {
+              // Завершение входа — только после показа резервных кодов
+              if (enrolledPayload && onEnrolled) {
+                onEnrolled(enrolledPayload);
+                return;
+              }
+              onComplete?.();
+            }}
+          >
             <CheckCircle className="w-4 h-4 mr-2" />
             {t('misc.tfsw_finish_button')}
           </Button>

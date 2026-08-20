@@ -71,7 +71,7 @@ describe('TwoFactorSetupWizard', () => {
     expect(screen.getByText(/JBSWY3DPEHPK3PXPTESTSECRET/)).toBeTruthy();
   });
 
-  it('completes enrollment: verify-setup exchanges token via onEnrolled', async () => {
+  it('completes enrollment: backup codes shown BEFORE onEnrolled exchange', async () => {
     apiPostMock
       .mockResolvedValueOnce(axiosOk(setupPayload))
       .mockResolvedValueOnce(
@@ -94,6 +94,12 @@ describe('TwoFactorSetupWizard', () => {
         enrollment_token: 'enroll-tok',
       });
     });
+    // Успех → сначала экран с резервными кодами, сессия ещё не завершена
+    await waitFor(() => screen.getByText('misc.tfsw_step5_title'));
+    expect(screen.getByText('1111-1111')).toBeTruthy();
+    expect(onEnrolled).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('misc.tfsw_finish_button'));
     await waitFor(() => {
       expect(onEnrolled).toHaveBeenCalledWith(
         expect.objectContaining({ access_token: 'at', refresh_token: 'rt' }),
