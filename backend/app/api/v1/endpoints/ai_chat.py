@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.api.v1.endpoints.ws_token import extract_ws_token
+from app.api.v1.endpoints.ws_token import extract_ws_token, accept_echoing_subprotocol
 from app.core.config import settings
 from app.core.messaging_contract import CONTRACT_VERSION
 from app.core.rbac import AIPermission, has_permission, require_ai_permission
@@ -350,7 +350,7 @@ async def chat_websocket(
     {"type": "error", "message": "Rate limit exceeded"}
     ```
     """
-    await websocket.accept()
+    await accept_echoing_subprotocol(websocket)
 
     # PR-4: extract JWT from secure sources (subprotocol/header preferred,
     # query string as deprecated fallback).

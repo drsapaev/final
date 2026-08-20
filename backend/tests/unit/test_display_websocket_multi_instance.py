@@ -39,7 +39,7 @@ class _FakeWebSocket:
         self.accepted = False
         self.messages: list[dict] = []
 
-    async def accept(self) -> None:
+    async def accept(self, subprotocol: str | None = None) -> None:
         self.accepted = True
 
     async def send_text(self, data: str) -> None:
