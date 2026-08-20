@@ -145,39 +145,57 @@ const TwoFactorSetupWizard = ({
   const stepTitles = [t('misc.tfsw2_step1_title'), t('misc.tfsw2_step2_title'), t('misc.tfsw2_step3_title')];
 
   const renderStepper = () => (
-    <div className="flex items-center justify-center gap-2" style={{ marginBottom: 'var(--mac-spacing-6)' }}>
+    <div
+      className="flex items-start justify-center"
+      style={{ marginBottom: 'var(--mac-spacing-5)', gap: 'var(--mac-spacing-2)' }}
+    >
       {stepTitles.map((title, idx) => {
         const n = idx + 1;
         const done = step > n || step === 4;
         const active = step === n && step !== 4;
         return (
-          <div key={title} className="flex items-center gap-2">
-            <div
-              aria-label={title}
-              className="flex items-center justify-center"
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 'var(--mac-radius-full)',
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-medium)' as CSSProperties['fontWeight'],
-                color: done || active ? 'var(--mac-text-inverse)' : 'var(--mac-text-secondary)',
-                background: done || active ? 'var(--mac-accent-blue)' : 'var(--mac-background-tertiary)',
-                transition: 'background 150ms ease',
-              }}
-            >
-              {done ? <CheckCircle style={{ width: 16, height: 16 }} /> : n}
-            </div>
-            {idx < stepTitles.length - 1 && (
+          <div key={title} className="flex flex-col items-center" style={{ width: 96 }}>
+            <div className="flex items-center" style={{ gap: 6 }}>
               <div
+                aria-label={title}
+                className="flex items-center justify-center"
                 style={{
                   width: 28,
-                  height: 2,
-                  borderRadius: 1,
-                  background: step > n ? 'var(--mac-accent-blue)' : 'var(--mac-border-secondary)',
+                  height: 28,
+                  borderRadius: 'var(--mac-radius-full)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)' as CSSProperties['fontWeight'],
+                  color: done || active ? 'var(--mac-text-inverse)' : 'var(--mac-text-secondary)',
+                  background: done || active ? 'var(--mac-accent-blue)' : 'var(--mac-background-tertiary)',
+                  transition: 'background 150ms ease',
                 }}
-              />
-            )}
+              >
+                {done ? <CheckCircle style={{ width: 16, height: 16 }} /> : n}
+              </div>
+              {idx < stepTitles.length - 1 && (
+                <div
+                  style={{
+                    width: 24,
+                    height: 2,
+                    borderRadius: 1,
+                    marginTop: 13,
+                    background: step > n ? 'var(--mac-accent-blue)' : 'var(--mac-border-secondary)',
+                  }}
+                />
+              )}
+            </div>
+            <div
+              style={{
+                marginTop: 'var(--mac-spacing-1)',
+                fontSize: 'var(--mac-font-size-xs)',
+                color: active ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
+                fontWeight: active ? ('var(--mac-font-weight-medium)' as CSSProperties['fontWeight']) : undefined,
+                textAlign: 'center',
+                lineHeight: 1.2,
+              }}
+            >
+              {title}
+            </div>
           </div>
         );
       })}
@@ -225,7 +243,7 @@ const TwoFactorSetupWizard = ({
   return (
     <div
       className="mx-auto w-full"
-      style={{ maxWidth: 420, padding: 'var(--mac-spacing-5)', fontFamily: 'inherit' }}
+      style={{ maxWidth: 400, padding: '0 var(--mac-spacing-2)', fontFamily: 'inherit' }}
     >
       <div className="flex flex-col items-center text-center" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
         <div
@@ -307,7 +325,13 @@ const TwoFactorSetupWizard = ({
           >
             {qrValue ? (
               <div style={{ padding: 'var(--mac-spacing-3)', background: '#fff', borderRadius: 'var(--mac-radius-md)' }}>
-                <QRCodeSVG value={qrValue} size={176} level="M" />
+                {/* Контракт: qr_code_url — ГОТОВОЕ PNG-изображение QR (data:image/png;base64),
+                    сгенерированное бэкендом из otpauth-URI. otpauth:// на случай смены контракта. */}
+                {qrValue.startsWith('data:image') ? (
+                  <img src={qrValue} width={176} height={176} alt="QR-код 2FA" style={{ display: 'block' }} />
+                ) : (
+                  <QRCodeSVG value={qrValue} size={176} level="M" />
+                )}
               </div>
             ) : null}
             <div style={{ marginTop: 'var(--mac-spacing-3)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', textAlign: 'center' }}>
