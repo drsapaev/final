@@ -17,13 +17,6 @@ from app.models.two_factor_auth import TwoFactorAuth, TwoFactorBackupCode
 from app.models.user import User
 from app.services.two_factor_service import get_two_factor_service
 
-
-@pytest.fixture(autouse=True)
-def enforce_2fa_requirement(monkeypatch):
-    """В этой группе тестов 2FA requirement должен быть включен."""
-    monkeypatch.setenv("DISABLE_2FA_REQUIREMENT", "false")
-
-
 @pytest.fixture
 def admin_user_without_2fa(db_session: Session, admin_password: str) -> User:
     """Создает тестового админа БЕЗ настроенной 2FA"""

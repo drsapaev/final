@@ -232,10 +232,6 @@ class TokensMixin(AuthenticationServiceMixinBase):
         two_factor_method = None
 
         # ✅ CERTIFICATION: Принудительное 2FA для критичных ролей (Admin, Cashier)
-        # ✅ CI/TESTING: Можно отключить через переменную окружения DISABLE_2FA_REQUIREMENT=1
-        import os
-        disable_2fa_requirement = os.getenv("DISABLE_2FA_REQUIREMENT", "").lower() in ("1", "true", "yes")
-
         from app.core.roles import Roles
 
         CRITICAL_2FA_ROLES = {Roles.ADMIN, Roles.CASHIER}
@@ -253,8 +249,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
         # двухстадийная аутентификация: пароль уже верен, поэтому выдаём
         # строго ограниченный одноразовый enrollment-токен (сервер-сайд,
         # НЕ JWT), который принимают ТОЛЬКО /2fa/setup и /2fa/verify-setup.
-        # КРОМЕ случая, когда DISABLE_2FA_REQUIREMENT=1 (bootstrap/тесты)
-        if is_critical_role and not has_2fa_enabled and not disable_2fa_requirement:
+        if is_critical_role and not has_2fa_enabled:
             enrollment_token = secrets.token_urlsafe(32)
             db.add(
                 UserSession(

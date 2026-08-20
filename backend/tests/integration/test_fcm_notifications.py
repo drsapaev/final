@@ -40,6 +40,13 @@ def _make_user(db_session, *, role: str = "Patient") -> User:
 
 
 def _login(client, user: User) -> dict[str, str]:
+    if user.role in ("Admin", "Cashier"):
+        # Critical roles never get an access_token from /login directly —
+        # they route through the two-stage 2FA flow (see _tokens.py).
+        from tests.conftest import mint_access_token
+
+        return {"Authorization": f"Bearer {mint_access_token(user)}"}
+
     response = client.post(
         "/api/v1/authentication/login",
         json={"username": user.username, "password": "pass123"},

@@ -28,9 +28,7 @@ The seed also creates departments, services, doctors, schedules, patients,
 today's queue entries, visits, payments, EMR examples, lab reports, and a small
 audit marker for manual UI testing.
 
-For local Admin/Cashier login smoke, set the existing development-only 2FA
-override if your local auth config enforces critical-role 2FA:
-
-```powershell
-$env:DISABLE_2FA_REQUIREMENT="1"
-```
+Admin and Cashier logins always require two-stage 2FA (there is no disable
+flag anymore): on first login the wizard walks you through TOTP enrollment
+and shows backup codes. Complete it once per dev database — after that the
+login asks for the TOTP code from your authenticator app.

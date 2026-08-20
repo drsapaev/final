@@ -34,14 +34,6 @@ VERIFY_SETUP = "/api/v1/2fa/verify-setup"
 VERIFY = "/api/v1/2fa/verify"
 
 
-@pytest.fixture(autouse=True)
-def _no_2fa_bypass(monkeypatch):
-    """Isolate tests from a developer-machine DISABLE_2FA_REQUIREMENT=1
-    that leaks from backend/.env via load_dotenv — the enrollment flow
-    must be exercised with the requirement active."""
-    monkeypatch.delenv("DISABLE_2FA_REQUIREMENT", raising=False)
-
-
 def _make_user(db, *, username: str, role: str, password: str = "Passw0rd!123") -> User:
     user = User(
         username=username,

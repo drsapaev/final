@@ -56,14 +56,12 @@ and audit marker instead of creating duplicates.
 
 ## Local Demo Login
 
-Admin and cashier are production-sensitive roles. If local auth requires 2FA for
-those roles, use the existing dev/test override only for manual local UI smoke:
-
-```powershell
-$env:DISABLE_2FA_REQUIREMENT="1"
-```
-
-Do not use that flag in production-like environments.
+Admin and cashier are production-sensitive roles and always go through
+two-stage 2FA — the disable flag was removed, so there is no override.
+On first login the setup wizard enrolls TOTP (scan the QR with an
+authenticator app) and shows backup codes; subsequent logins ask for the
+TOTP code. Non-critical roles (doctor, registrar, patient) log in with
+password only.
 
 ## Non-Destructive Local Launch
 
