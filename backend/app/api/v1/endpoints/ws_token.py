@@ -135,6 +135,8 @@ async def accept_echoing_subprotocol(websocket: WebSocket) -> None:
     ("Sent non-empty 'Sec-WebSocket-Protocol' header but no response was
     received"). If nothing was offered, this is a plain accept.
     """
-    offered = websocket.headers.get("sec-websocket-protocol", "")
+    offered = (getattr(websocket, "headers", None) or {}).get(
+        "sec-websocket-protocol", ""
+    )
     protocols = [p.strip() for p in offered.split(",") if p.strip()]
     await websocket.accept(subprotocol=protocols[0] if protocols else None)
