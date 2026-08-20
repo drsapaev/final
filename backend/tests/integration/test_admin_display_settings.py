@@ -4,12 +4,9 @@ import pytest
 
 
 def _login_admin(client, admin_user, admin_password):
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    assert response.status_code == 200, response.text
-    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+    from tests.conftest import mint_access_token
+
+    return {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
 
 
 @pytest.mark.integration
