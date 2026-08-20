@@ -38,7 +38,6 @@ For manual UI testing, use a local disposable PostgreSQL database such as
 cd C:\final\backend
 $env:ENV="dev"
 $env:DATABASE_URL="postgresql+psycopg://clinic:<dev_password>@localhost:5432/clinic_dev"
-$env:DISABLE_2FA_REQUIREMENT="1"
 
 python -m app.scripts.reset_dev_db `
   --mode schema `

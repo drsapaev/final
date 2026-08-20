@@ -588,14 +588,6 @@ def get_settings() -> Settings:
                 "and login-attempt logging. Set ENABLE_FALLBACK_AUTH=false."
             )
 
-        # 7. DISABLE_2FA_REQUIREMENT must not be set in production
-        # Skipped in test environments.
-        if not os.environ.get("TESTING") and os.getenv("DISABLE_2FA_REQUIREMENT", "").lower() in ("1", "true", "yes"):
-            errors.append(
-                "DISABLE_2FA_REQUIREMENT must not be set in production. "
-                "This env var disables 2FA enforcement for Admin/Cashier roles."
-            )
-
         # AI-REAUDIT-28 P0-8: ENCRYPTION_KEY обязателен в production.
         # Skipped in test environments.
         if not os.environ.get("TESTING") and not s.ENCRYPTION_KEY:

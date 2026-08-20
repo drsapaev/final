@@ -25,14 +25,11 @@ from app.core.security import get_password_hash
 # ===================== FIXTURES =====================
 
 @pytest.fixture
-def admin_token(client: TestClient, admin_user: User, admin_password: str) -> str:
-    """Токен администратора"""
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    assert response.status_code == 200
-    return response.json()["access_token"]
+def admin_token(admin_user: User) -> str:
+    """Токен администратора (Admin — критичная 2FA-роль, минтим напрямую)"""
+    from tests.conftest import mint_access_token
+
+    return mint_access_token(admin_user)
 
 
 @pytest.fixture
@@ -77,12 +74,11 @@ def cashier_token(client: TestClient, db_session: Session) -> str:
         db_session.commit()
         db_session.refresh(cashier)
 
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": cashier.username, "password": "cashier123"},
-    )
-    assert response.status_code == 200
-    return response.json()["access_token"]
+    # Cashier — критичная 2FA-роль: /login уходит в enrollment-флоу,
+    # поэтому минтим access-токен напрямую.
+    from tests.conftest import mint_access_token
+
+    return mint_access_token(cashier)
 
 
 @pytest.fixture

@@ -170,7 +170,6 @@ function Start-Backend {
         ENV = "dev"
         APP_ENV = "dev"
         DATABASE_URL = $DevDatabaseUrl
-        DISABLE_2FA_REQUIREMENT = "1"
         BACKEND_HOST = "0.0.0.0"
         BACKEND_PORT = [string] $BackendPort
     }

@@ -60,8 +60,6 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb
       PYTHONPATH: ${{ github.workspace }}/backend
-      # Skip 2FA for CI logins
-      DISABLE_2FA_REQUIREMENT: '1'
       # Use mock AI provider (no real API calls)
       AI_PROVIDER_MOCK: '1'
       # PR-8: disable rate limiting in CI — Playwright spec makes 6+ login
@@ -136,8 +134,23 @@ jobs:
                   role = EXCLUDED.role,
                   must_change_password = false
               '''), {'u': username, 'e': email, 'r': role, 'p': pw_hash})
-            print('Test users seeded.')
+
+            # Admin is a critical 2FA role: pre-enroll verified TOTP with a
+            # fixed CI-only secret so the spec can complete the challenge.
+            # 2FA enforcement is unconditional (no bypass flag exists).
+            c.execute(text('''
+              INSERT INTO two_factor_auth (user_id, totp_secret, totp_enabled, totp_verified)
+              VALUES ((SELECT id FROM users WHERE username = 'qa_admin@clinic.com'),
+                      :secret, true, true)
+              ON CONFLICT (user_id) DO UPDATE SET
+                totp_secret = EXCLUDED.totp_secret,
+                totp_enabled = true,
+                totp_verified = true
+            '''), {'secret': os.environ['QA_ADMIN_TOTP_SECRET']})
+            print('Test users + admin TOTP enrolled.')
           "
+        env:
+          QA_ADMIN_TOTP_SECRET: JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP
 
       - name: Start backend
         run: |
@@ -172,6 +185,8 @@ jobs:
           QA_ADMIN_PASSWORD: QA_PASSWORD_123
           QA_REGISTRAR_USERNAME: qa_registrar@clinic.com
           QA_REGISTRAR_PASSWORD: QA_PASSWORD_123
+          # Same CI-only secret the seed step enrolled for qa_admin.
+          QA_ADMIN_TOTP_SECRET: JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP
         run: |
           cd frontend
           # Spec migrated .spec.js -> .spec.ts in PR #2433 (TS migration).

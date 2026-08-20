@@ -3,6 +3,8 @@ from app.models.user import User
 
 
 def _cashier_headers(client, db_session):
+    from tests.conftest import mint_access_token
+
     cashier = db_session.query(User).filter(User.username == "route_cashier").first()
     if cashier is None:
         cashier = User(
@@ -17,12 +19,9 @@ def _cashier_headers(client, db_session):
         db_session.commit()
         db_session.refresh(cashier)
 
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": cashier.username, "password": "cashier123"},
-    )
-    assert response.status_code == 200
-    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+    # Cashier is a critical 2FA role: /login would return the two-stage
+    # enrollment flow instead of tokens, so mint the access token directly.
+    return {"Authorization": f"Bearer {mint_access_token(cashier)}"}
 
 
 def test_reconcile_all_route_dispatches_to_all_provider_service(
