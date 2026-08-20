@@ -130,8 +130,7 @@ const Checkbox = React.forwardRef<HTMLDivElement, CheckboxProps>(({
         tabIndex={disabled ? -1 : 0}
         role="checkbox"
         aria-checked={checked}
-        aria-disabled={disabled}
-        aria-invalid={!!error}>
+        aria-disabled={disabled}>
 
         <div
           ref={ref}
