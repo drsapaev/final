@@ -432,7 +432,7 @@ content WITHOUT the `ai_safety_meta` block containing
 If the AI/DB is down while a doctor is with a patient:
 
 1. The doctor's panel must show cached patient data (PWA offline cache) —
-   verify `frontend/public/sw.js` includes `/api/v1/patients/:id` and
+   verify `frontend/sw.template.js` includes `/api/v1/patients/:id` and
    `/api/v1/emr/:patient_id` in the runtime cache.
 2. The doctor can record the visit manually in the EMR editor — all fields
    are editable, AI suggestions are optional.

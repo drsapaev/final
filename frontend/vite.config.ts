@@ -5,10 +5,34 @@ import { defineConfig } from "vite";
 import type { Plugin, PluginOption } from "vite";
 import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// PWA cache busting: emit /sw.js from sw.template.js with the build version
+// stamped in. Without this, the service worker kept serving caches from the
+// build a returning user first visited — stale bundles after every deploy.
+function serviceWorkerCacheBustingPlugin(): Plugin {
+  const version =
+    process.env.VERCEL_GIT_COMMIT_SHA || `local-${Date.now().toString(36)}`;
+  return {
+    name: "clinic-sw-cache-busting",
+    apply: "build",
+    generateBundle() {
+      const template = fs.readFileSync(
+        path.resolve(__dirname, "sw.template.js"),
+        "utf8",
+      );
+      this.emitFile({
+        type: "asset",
+        fileName: "sw.js",
+        source: template.replaceAll("__SW_BUILD_VERSION__", version),
+      });
+    },
+  };
+}
 
 const apiProxyTarget = process.env.VITE_PROXY_TARGET || process.env.BACKEND_URL || "http://localhost:18000";
 const wsProxyTarget =
@@ -43,7 +67,7 @@ if (process.env.SENTRY_AUTH_TOKEN && process.env.VITE_SENTRY_DSN) {
 }
 
 function createPlugins(enableBundleVisualizer: boolean): PluginOption[] {
-  const plugins: PluginOption[] = [react(), ...sentryPlugin];
+  const plugins: PluginOption[] = [react(), ...sentryPlugin, serviceWorkerCacheBustingPlugin()];
 
   if (enableBundleVisualizer) {
     plugins.push(
