@@ -170,15 +170,15 @@ class PasswordResetService:
             © 2024 Медицинская клиника
             """
 
-            email_result = await self.email_service.send_email(
+            send_ok, send_message = await self.email_service.send_email_enhanced(
                 to_email=email,
                 subject=subject,
                 html_content=html_content,
                 text_content=text_content,
             )
 
-            if email_result.get("success"):
-                logger.info(f"Password reset email sent to {email}")
+            if send_ok:
+                logger.info("Password reset email sent", extra={"has_recipient": True})
                 return {
                     "success": True,
                     "message": "Ссылка для сброса пароля отправлена на ваш email",
@@ -187,12 +187,12 @@ class PasswordResetService:
             else:
                 return {
                     "success": False,
-                    "error": f"Ошибка отправки email: {email_result.get('error')}",
+                    "error": f"Ошибка отправки email: {send_message}",
                     "error_code": "EMAIL_SEND_FAILED",
                 }
 
         except Exception as e:
-            logger.error(f"Error initiating email reset for {email}: {e}")
+            logger.error("Error initiating email reset: %s", e, extra={"has_recipient": True})
             return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
 
     async def verify_phone_and_get_token(
