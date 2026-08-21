@@ -242,3 +242,42 @@ def test_requires_authentication(client, user_with_2fa):
     )
     assert resp.status_code in (401, 403)
 
+
+
+
+def test_recovery_rate_limited_per_account(
+    client, db_session, user_with_2fa, capture_send
+):
+    """Лимит привязан к аккаунту: 4-й dispatch за час → 429 без письма."""
+    user, tfa = user_with_2fa
+    for _ in range(3):
+        resp = client.post(
+            REQUEST,
+            headers=_headers(user),
+            json={"recovery_type": "email", "recovery_value": "x@y.test"},
+        )
+        assert resp.status_code == 200, resp.text
+
+    resp4 = client.post(
+        REQUEST,
+        headers=_headers(user),
+        json={"recovery_type": "email", "recovery_value": "x@y.test"},
+    )
+    assert resp4.status_code == 429
+    assert len(capture_send["tokens"]) == 3  # 4-е письмо не отправлялось
+
+
+def test_success_message_masks_recipient(
+    client, db_session, user_with_2fa, capture_send
+):
+    """Сообщение показывает маскированный адрес, не полный."""
+    user, tfa = user_with_2fa
+    resp = client.post(
+        REQUEST,
+        headers=_headers(user),
+        json={"recovery_type": "email", "recovery_value": "x@y.test"},
+    )
+    assert resp.status_code == 200, resp.text
+    message = resp.json()["message"]
+    assert "configured.recovery@test.local" not in message
+    assert "c•••@test.local" in message
