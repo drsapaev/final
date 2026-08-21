@@ -27,6 +27,11 @@ import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
+import {
+  UZ_PHONE_PREFIX,
+  normalizePhoneInput,
+  validatePhone,
+} from './phoneInput';
 
 // ============================================================================
 // PASSWORD STRENGTH (shared with Setup.jsx — same logic)
@@ -64,7 +69,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
   // All state at the top (UX Audit #15 — was scattered)
   const [step, setStep] = useState('method');
   const [method, setMethod] = useState('phone');
-  const [contact, setContact] = useState('');
+  const [contact, setContact] = useState(UZ_PHONE_PREFIX);
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -94,61 +99,15 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
     setPasswordsMatch(newPassword === confirmPassword);
   }, [newPassword, confirmPassword]);
 
-  const validatePhone = (phone: string) => /^\+998\d{9}$/.test(phone);
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  // UX Audit ForgotPassword #1: formatPhone переписан с нуля.
-  //
-  // Прошлый formatPhone имел 4 бага:
-  //   1. НЕЛЬЗЯ БЫЛО СТЕРЕТЬ номер: при `+9989` (digits='9989') не попадал
-  //      ни в одно условие → return value → поле «залипало» на +9989.
-  //   2. НЕЛЬЗЯ БЫЛО СТЕРЕТЬ префикс +998: digits='998' → return '+998'
-  //      всегда возвращало +998, стереть было нельзя.
-  //   3. При вводе 12+ цифр, начинающихся на 9, не форматировалось.
-  //   4. При вставке номера с префиксом 8 (РФ-стиль) не обрабатывалось.
-  //
-  // Новый форматтер:
-  //   - принимает ЛЮБОЙ ввод (включая пустую строку — возвращает '');
-  //   - нормализует к формату +998XXXXXXXXX (12 цифр с +);
-  //   - поддерживает ввод: 9XXXXXXXXX (10 цифр), 998XXXXXXXXX (12 цифр),
-  //     +998XXXXXXXXX, 8XXXXXXXXX (РФ-стиль, считается опечаткой);
-  //   - ограничивает длину до 12 цифр (защита от paste-атак);
-  //   - всегда возвращает либо '', либо строку, начинающуюся с '+998'.
-  const formatPhone = (value: string) => {
-    if (!value) return '';
-    const digits = String(value).replace(/\D/g, '');
-
-    // Пустой ввод → пустая строка (старый код здесь возвращал `value`,
-    // из-за чего поле показывало '+', '+' или '998').
-    if (digits.length === 0) return '';
-
-    // Нормализуем к 12-значному узбекскому номеру.
-    let normalized = digits;
-
-    // Если ввели 10 цифр начиная с 9 — это локальный UZ номер без кода страны.
-    if (normalized.length <= 10 && normalized.startsWith('9')) {
-      normalized = '998' + normalized;
-    }
-    // Если ввели 11 цифр начиная с 8 (РФ-стиль, частая опечатка) —
-    // считаем что имелся в виду +998, берём последние 9 цифр.
-    else if (normalized.length === 11 && normalized.startsWith('8')) {
-      normalized = '998' + normalized.slice(2);
-    }
-    // Если ввели номер с кодом 998 — оставляем как есть.
-    else if (normalized.startsWith('998')) {
-      // уже в нужном формате
-    }
-    // Любой другой случай (например, 7-значный городской) —
-    // не форматируем, оставляем как есть (пусть валидация покажет ошибку).
-    else {
-      return value;
-    }
-
-    // Ограничиваем до 12 цифр (998 + 9 цифр номера).
-    normalized = normalized.slice(0, 12);
-
-    return '+' + normalized;
-  };
+  // UX Audit ForgotPassword #1 (revised): phone normalization moved to
+  // phoneInput.ts. The old inline formatter guessed on every keystroke
+  // whether leading '998' digits were the country code or the start of a
+  // local number; for local numbers starting 99/98+8 it prepended an extra
+  // '+998' per keystroke until the field froze at 12 digits and swallowed
+  // all further input. The field now keeps a fixed '+998' prefix and the
+  // user types the 9 subscriber digits; see phoneInput.ts for the contract.
 
   const startResendCountdown = useCallback(() => {
     setResendCountdown(RESEND_COOLDOWN_SECONDS);
@@ -382,9 +341,10 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
               onClick={() => {
                 // UX Audit ForgotPassword #2: при переключении method phone↔email
                 // очищаем поле contact и ошибку, чтобы пользователь не видел
-                // «телефон в поле email» или наоборот.
+                // «телефон в поле email» или наоборот. Телефон сбрасывается
+                // к постоянному префиксу +998 (см. phoneInput.ts).
                 setMethod(key);
-                setContact('');
+                setContact(key === 'phone' ? UZ_PHONE_PREFIX : '');
                 setInlineError('');
               }}
               style={{
@@ -417,7 +377,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
             aria-label={method === 'phone' ? t('final.fp_phone_label') : t('final.fp_email_label')}
             value={contact}
             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-              const value = method === 'phone' ? formatPhone(e.target.value) : e.target.value;
+              const value = method === 'phone' ? normalizePhoneInput(e.target.value) : e.target.value;
               setContact(value);
               setInlineError('');
             }}
@@ -461,7 +421,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
             onClick={handleMethodSelect}
             style={btnPrimaryStyle}
             aria-label={loading ? t('final.fp_sending') : t('final.fp_continue')}
-            disabled={loading || !contact.trim()}
+            disabled={loading || (method === 'phone' ? !validatePhone(contact) : !validateEmail(contact))}
           >
             {loading ? (
               <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />{t('final.fp_sending')}</>
