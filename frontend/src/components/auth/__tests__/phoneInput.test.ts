@@ -63,3 +63,44 @@ describe('validatePhone', () => {
     expect(validatePhone('998998999899')).toBe(false);
   });
 });
+
+describe('bare paste vs typed input (#2801 review follow-up)', () => {
+  it('keeps all digits of a bare 9-digit local paste starting with 998', () => {
+    // Operator-99 number whose subscriber begins with '8' — the leading
+    // '998' is NOT the country code here. Old code ate three real digits.
+    expect(normalizePhoneInput('998901234')).toBe('+998' + '998901234');
+    expect(validatePhone(normalizePhoneInput('998901234'))).toBe(true);
+  });
+
+  it('still strips the code from longer bare international pastes', () => {
+    expect(normalizePhoneInput('998998901234')).toBe('+998' + '998901234'); // 12
+    expect(normalizePhoneInput('9989989012349')).toBe('+998' + '998901234'); // 13, capped
+  });
+
+  it('normalizes the legacy RF local paste 8 + 9 digits (10 total)', () => {
+    expect(normalizePhoneInput('8' + '998901234')).toBe('+998' + '998901234');
+    expect(normalizePhoneInput('8' + '901234567')).toBe('+998' + '901234567');
+  });
+
+  it('merge-paste after the fixed prefix resolves to the same subscriber', () => {
+    // Cursor at the end of '+998', local digits pasted without selection:
+    // the DOM value is prefix + pasted text.
+    expect(normalizePhoneInput('+998' + '998901234')).toBe('+998' + '998901234');
+    // RF-style paste merged after the prefix also collapses correctly.
+    expect(normalizePhoneInput('+998' + '8998998901234')).toBe(
+      '+998' + '998901234',
+    );
+  });
+
+  it('a bare 9-digit local starting with 8 is a subscriber, not RF dialing', () => {
+    expect(normalizePhoneInput('890123456')).toBe('+998' + '890123456');
+  });
+
+  it('typing a subscriber that starts with 998 keeps every digit', () => {
+    // Regression guard for the paste fix: rule 3 must never eat the
+    // typed tail's own leading '998'.
+    let v = '+998';
+    for (const ch of '998901234') v = normalizePhoneInput(v + ch);
+    expect(v).toBe('+998' + '998901234');
+  });
+});

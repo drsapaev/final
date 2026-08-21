@@ -9,8 +9,12 @@
  * third digit the composed value hit the 12-digit cap and the field
  * silently stopped accepting input (reproduced character-by-character).
  *
- * The normalizer is idempotent — feeding its own output back is a no-op —
- * which makes character typing, paste, and autofill all behave the same.
+ * The normalizer is idempotent — feeding its own output back is a no-op.
+ * Typing always arrives through the '+' prefix, so the first '998' is
+ * the country code. A bare paste has no '+': there, a value of exactly
+ * 9 digits starting with '998' is an operator-99 LOCAL number
+ * (99 + '8…') whose digits belong to the subscriber and must survive
+ * (#2801 review follow-up); longer bare values get the code stripped.
  */
 
 export const UZ_PHONE_PREFIX = '+998';
@@ -26,6 +30,7 @@ export const validatePhone = (phone: string): boolean =>
  * to the bare prefix instead of leaking prefix digits into the number.
  */
 export const normalizePhoneInput = (raw: string): string => {
+  const hasPlus = String(raw ?? '').trim().startsWith('+');
   let digits = String(raw ?? '').replace(/\D/g, '');
 
   // Backspace ate part of the '+998' prefix → snap back to the prefix.
@@ -33,14 +38,28 @@ export const normalizePhoneInput = (raw: string): string => {
     return UZ_PHONE_PREFIX;
   }
 
-  // 8-prefixed RF-style paste: 8 + 998 + 9 digits (13 total).
-  if (digits.startsWith('8') && digits.length >= 12) {
+  // 1) Country code at the start. Typed input always carries it (the
+  //    field prefix); a bare paste carries it UNLESS the value is
+  //    exactly a 9-digit local — operator-99 locals also start with
+  //    '998', and those digits belong to the subscriber.
+  if (digits.startsWith('998') && (hasPlus || digits.length !== 9)) {
+    digits = digits.slice(3);
+  }
+
+  // 2) 8-prefixed RF dialing: 8 + full number (13 digits) or the
+  //    legacy local form 8 + 9 digits (10 total).
+  if (
+    digits.startsWith('8') &&
+    (digits.length === 10 || digits.length >= 12)
+  ) {
     digits = digits.slice(1);
   }
 
-  // Full number with the country code (pasted, autofilled, or the field's
-  // own prefix) — strip the code so the prefix is never duplicated.
-  if (digits.startsWith('998')) {
+  // 3) A second code left after RF cleanup (e.g. the fixed prefix
+  //    followed by an RF-style paste). Only fires at full length:
+  //    a typed subscriber tail is ≤ 9 digits and must keep its own
+  //    leading '998' digits.
+  if (digits.startsWith('998') && digits.length >= 12) {
     digits = digits.slice(3);
   }
 
