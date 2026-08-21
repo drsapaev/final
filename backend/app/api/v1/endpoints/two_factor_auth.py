@@ -374,7 +374,9 @@ async def disable_two_factor_auth(
 
 
 @router.post("/recovery/request", response_model=TwoFactorRecoveryResponse)
-@limiter.limit("3/hour")
+# IP-бакет — грубая защита от абьюза SMTP-провайдера; точный лимит
+# по аккаунту (3/час) считает сервис — NAT-клинику не блокируем.
+@limiter.limit("10/hour")
 async def request_two_factor_recovery(
     request: Request,
     request_data: TwoFactorRecoveryRequest,
@@ -421,6 +423,7 @@ async def request_two_factor_recovery(
                 "CHANNEL_NOT_CONFIGURED": 400,
                 "UNSUPPORTED_CHANNEL": 400,
                 "PHONE_CHANNEL_UNAVAILABLE": 503,
+                "RATE_LIMITED": 429,
             }.get(error_code, 500)
             raise HTTPException(
                 status_code=status_code,
@@ -436,7 +439,9 @@ async def request_two_factor_recovery(
         return TwoFactorRecoveryResponse(
             recovery_token=None,  # не возвращаем
             expires_at=result["expires_at"],
-            message="Код восстановления отправлен на настроенный канал.",
+            message=result.get(
+                "message", "Код восстановления отправлен на настроенный канал."
+            ),
         )
 
     except HTTPException:

@@ -83,6 +83,7 @@ class EmailSMSEnhancedService:
         self.smtp_password = getattr(settings, "SMTP_PASSWORD", None)
         self.smtp_use_tls = getattr(settings, "SMTP_USE_TLS", True)
         self.smtp_from = getattr(settings, "SMTP_FROM", None)
+        self.smtp_timeout = int(getattr(settings, "SMTP_TIMEOUT", 30) or 30)
 
         # SMS настройки
         self.sms_api_key = getattr(settings, "SMS_API_KEY", None)
@@ -151,13 +152,10 @@ class EmailSMSEnhancedService:
                 for attachment in attachments:
                     await self._add_attachment(msg, attachment)
 
-            # Отправляем письмо
-            context = ssl.create_default_context()
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                if self.smtp_use_tls:
-                    server.starttls(context=context)
-                server.login(self.smtp_username, self.smtp_password)
-                server.send_message(msg)
+            # Отправляем письмо. smtplib синхронный — уводим в поток,
+            # чтобы медленный/недоступный SMTP не блокировал event
+            # loop; длительность операции ограничена таймаутом.
+            await asyncio.to_thread(self._smtp_send_message, msg)
 
             self.stats['emails_sent'] += 1
             # NOTIF-REAUDIT-28 P1: PII-safe logging
@@ -172,6 +170,18 @@ class EmailSMSEnhancedService:
             masked = mask_pii_text(str(e))
             logger.error("Ошибка отправки email: %s", masked)
             return False, masked
+
+    def _smtp_send_message(self, msg) -> None:
+        """Синхронная SMTP-отправка; вызывается через asyncio.to_thread."""
+        context = ssl.create_default_context()
+        with smtplib.SMTP(
+            self.smtp_server, self.smtp_port, timeout=self.smtp_timeout
+        ) as server:
+            if self.smtp_use_tls:
+                server.starttls(context=context)
+            server.login(self.smtp_username, self.smtp_password)
+            server.send_message(msg)
+
 
     async def send_sms_enhanced(
         self,

@@ -13,9 +13,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import qrcode
-from sqlalchemy import and_
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
+from app.core.pii_masker import mask_email
 from app.core.security import verify_password
 from app.models.two_factor_auth import (
     TwoFactorAuth,
@@ -40,6 +41,7 @@ class TwoFactorService:
         self.recovery_token_length = 32  # Длина токена восстановления
         self.session_expiry_hours = 24  # Время жизни сессии
         self.recovery_expiry_hours = 1  # Время жизни токена восстановления
+        self.recovery_rate_limit_per_hour = 3  # dispatch-запросов на аккаунт в час
         self.sms_manager = get_sms_manager()
         self.email_service = EmailSMSEnhancedService()
 
@@ -177,6 +179,25 @@ class TwoFactorService:
                 "error": "Recovery email не настроен для этого аккаунта",
             }
 
+        # Rate limit по АККАУНТУ, а не по IP: весь персонал клиники
+        # сидит за одним NAT — IP-бакет блокировал бы всех разом.
+        # Учитываются и сгоревшие токены: каждый dispatch = письмо.
+        hour_ago = datetime.now(UTC) - timedelta(hours=1)
+        recent_count = (
+            db.query(TwoFactorRecovery)
+            .filter(
+                TwoFactorRecovery.two_factor_auth_id == two_factor_auth.id,
+                TwoFactorRecovery.created_at >= hour_ago,
+            )
+            .count()
+        )
+        if recent_count >= self.recovery_rate_limit_per_hour:
+            return {
+                "success": False,
+                "error_code": "RATE_LIMITED",
+                "error": "Превышен лимит запросов восстановления, попробуйте через час",
+            }
+
         token = self.generate_recovery_token()
         expires_at = datetime.now(UTC) + timedelta(hours=self.recovery_expiry_hours)
         ttl_hours = self.recovery_expiry_hours
@@ -216,6 +237,16 @@ class TwoFactorService:
                 "error": "Не удалось отправить письмо восстановления, попробуйте позже",
             }
 
+        # Сериализуем конкурирующие запросы одного аккаунта: без
+        # блокировки оба успевают сжечь «прошлые» токены до вставки
+        # своих и оставляют два действующих. Lock по строке 2FA-
+        # конфигурации аккаунта (SQLite в тестах его игнорирует,
+        # PostgreSQL — нет).
+        db.execute(
+            select(TwoFactorAuth.id).where(
+                TwoFactorAuth.id == two_factor_auth.id
+            ).with_for_update()
+        )
         # Доставка успешна — сжигаем прежние неотработанные токены и
         # фиксируем единственный действующий.
         db.query(TwoFactorRecovery).filter(
@@ -241,7 +272,11 @@ class TwoFactorService:
         )
         db.commit()
         logger.info("2FA recovery email sent", extra={"has_recipient": True})
-        return {"success": True, "expires_at": expires_at}
+        return {
+            "success": True,
+            "expires_at": expires_at,
+            "message": f"Код восстановления отправлен на {mask_email(recipient)}",
+        }
 
     def generate_device_fingerprint(self, user_agent: str, ip_address: str) -> str:
         """Генерирует отпечаток устройства"""
