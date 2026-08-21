@@ -246,6 +246,16 @@ def _mask_string_inplace(s: str) -> str:
     return s
 
 
+def mask_pii_text(s: str) -> str:
+    """Mask PII embedded in free text (emails, phones, passports, IINs).
+
+    Public seam for scrubbing provider error strings — e.g. smtplib
+    exceptions quote the recipient address (SMTPRecipientsRefused) —
+    before they reach logs or API responses.
+    """
+    return _mask_string_inplace(s)
+
+
 # ---------------------------------------------------------------------------
 # Convenience: structured logging filter
 # ---------------------------------------------------------------------------

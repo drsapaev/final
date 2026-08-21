@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.pii_masker import mask_pii_text
 from app.core.security import get_password_hash, verify_password
 from app.crud import user as crud_user
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
@@ -185,15 +186,30 @@ class PasswordResetService:
                     "expires_in_hours": self.token_ttl_hours,
                 }
             else:
+                # PII: текст ошибки провайдера может содержать адрес
+                # получателя. Логируем замаскированным, клиенту — общий
+                # текст без потрохова провайдера.
+                logger.warning(
+                    "Password reset email send failed: %s",
+                    mask_pii_text(send_message),
+                )
                 return {
                     "success": False,
-                    "error": f"Ошибка отправки email: {send_message}",
+                    "error": "Не удалось отправить письмо, попробуйте позже",
                     "error_code": "EMAIL_SEND_FAILED",
                 }
 
         except Exception as e:
-            logger.error("Error initiating email reset: %s", e, extra={"has_recipient": True})
-            return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
+            logger.error(
+                "Error initiating email reset: %s",
+                mask_pii_text(str(e)),
+                extra={"has_recipient": True},
+            )
+            return {
+                "success": False,
+                "error": "Внутренняя ошибка, попробуйте позже",
+                "error_code": "INTERNAL_ERROR",
+            }
 
     async def verify_phone_and_get_token(
         self, db: Session, phone: str, verification_code: str
