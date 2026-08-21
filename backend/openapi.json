@@ -37404,7 +37404,7 @@
           "two-factor-auth"
         ],
         "summary": "Request Two Factor Recovery",
-        "description": "Запросить восстановление 2FA",
+        "description": "Запросить восстановление 2FA.\n\nТокен ДОСТАВЛЯЕТСЯ по настроенному каналу (email через SMTP-провайдера).\nДоставка выполняется до записи в БД: при сбое провайдера не остаётся\n«повисшего» невыданного токена (HTTP 502, можно безопасно повторить).\nПрежние неотработанные токены сжигаются — действующий всегда один.",
         "operationId": "request_two_factor_recovery_api_v1_2fa_recovery_request_post",
         "requestBody": {
           "content": {
@@ -101178,7 +101178,6 @@
         },
         "type": "object",
         "required": [
-          "recovery_token",
           "expires_at",
           "message"
         ],
