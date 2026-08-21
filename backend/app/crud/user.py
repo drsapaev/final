@@ -59,6 +59,12 @@ def get_user_by_phone(db: Session, phone: str) -> User | None:
     return db.execute(stmt).scalar_one_or_none()
 
 
+def get_user_by_email(db: Session, email: str) -> User | None:
+    """Получить пользователя по email (используется password reset)"""
+    stmt = select(User).where(User.email == email)
+    return db.execute(stmt).scalar_one_or_none()
+
+
 def get_user_by_telegram_id(db: Session, telegram_id: str) -> User | None:
     """Получить пользователя по Telegram ID"""
     stmt = select(User).where(User.telegram_id == telegram_id)
