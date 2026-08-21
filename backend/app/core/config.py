@@ -348,6 +348,7 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str | None = None
     SMTP_PASSWORD: str | None = None
     SMTP_USE_TLS: bool = True
+    SMTP_FROM: str | None = Field(default=None, description="Envelope/From address for outgoing mail; falls back to SMTP_USERNAME when unset")
 
     # --- Telegram Settings ---
     TELEGRAM_BOT_TOKEN: str | None = Field(default=None, description="Telegram Bot API token for notifications")

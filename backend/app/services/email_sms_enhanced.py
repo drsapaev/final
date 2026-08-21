@@ -81,6 +81,7 @@ class EmailSMSEnhancedService:
         self.smtp_username = getattr(settings, "SMTP_USERNAME", None)
         self.smtp_password = getattr(settings, "SMTP_PASSWORD", None)
         self.smtp_use_tls = getattr(settings, "SMTP_USE_TLS", True)
+        self.smtp_from = getattr(settings, "SMTP_FROM", None)
 
         # SMS настройки
         self.sms_api_key = getattr(settings, "SMS_API_KEY", None)
@@ -120,7 +121,8 @@ class EmailSMSEnhancedService:
 
             # Создаем сообщение
             msg = MIMEMultipart("alternative")
-            msg["From"] = f"Programma Clinic <{self.smtp_username}>"
+            sender = self.smtp_from or self.smtp_username
+            msg["From"] = f"Programma Clinic <{sender}>"
             msg["To"] = to_email
             msg["Subject"] = subject
             msg["X-Priority"] = "1" if priority == "high" else "3"
