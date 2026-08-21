@@ -17,6 +17,7 @@ import httpx
 from jinja2 import Environment, FileSystemLoader
 
 from app.core.config import settings
+from app.core.pii_masker import mask_pii_text
 
 logger = logging.getLogger(__name__)
 
@@ -165,8 +166,12 @@ class EmailSMSEnhancedService:
 
         except Exception as e:
             self.stats['emails_failed'] += 1
-            logger.error(f"Ошибка отправки email: {e}")
-            return False, str(e)
+            # PII: провайдерские исключения (SMTPRecipientsRefused)
+            # содержат адрес получателя — чистим до лога и до возврата
+            # вызывающему (текст доходит до detail HTTP-ответа).
+            masked = mask_pii_text(str(e))
+            logger.error("Ошибка отправки email: %s", masked)
+            return False, masked
 
     async def send_sms_enhanced(
         self,
@@ -215,14 +220,16 @@ class EmailSMSEnhancedService:
                 return True, "SMS отправлено успешно"
             else:
                 self.stats['sms_failed'] += 1
-                error_msg = result.get('error', 'Неизвестная ошибка')
-                logger.error(f"Ошибка отправки SMS: {error_msg}")
+                # PII: ответ SMS-провайдера может цитировать номер.
+                error_msg = mask_pii_text(result.get('error', 'Неизвестная ошибка'))
+                logger.error("Ошибка отправки SMS: %s", error_msg)
                 return False, error_msg
 
         except Exception as e:
             self.stats['sms_failed'] += 1
-            logger.error(f"Ошибка отправки SMS: {e}")
-            return False, str(e)
+            masked = mask_pii_text(str(e))
+            logger.error("Ошибка отправки SMS: %s", masked)
+            return False, masked
 
     async def send_bulk_email(
         self,
