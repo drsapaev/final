@@ -35793,7 +35793,7 @@ export type components = {
          */
         TwoFactorRecoveryResponse: {
             /** Recovery Token */
-            recovery_token: string;
+            recovery_token: string | null;
             /**
              * Expires At
              * Format: date-time

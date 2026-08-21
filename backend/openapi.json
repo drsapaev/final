@@ -101156,7 +101156,14 @@
       "TwoFactorRecoveryResponse": {
         "properties": {
           "recovery_token": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Recovery Token"
           },
           "expires_at": {
