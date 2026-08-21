@@ -315,7 +315,7 @@ class TwoFactorRecoveryResponse(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    recovery_token: str
+    recovery_token: str | None = None  # None: токен уходит только в канал доставки
     expires_at: datetime
     message: str
 

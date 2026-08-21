@@ -136,6 +136,113 @@ class TwoFactorService:
         """Генерирует токен восстановления"""
         return secrets.token_urlsafe(self.recovery_token_length)
 
+    async def create_and_dispatch_recovery(
+        self,
+        db: Session,
+        two_factor_auth: TwoFactorAuth,
+        recovery_type: str,
+        ip_address: str | None,
+        user_agent: str | None,
+    ) -> dict[str, Any]:
+        """Создать одноразовый recovery-токен и доставить его по каналу.
+
+        Порядок важен для консистентности: СНАЧАЛА доставка, ПОТОМ запись в
+        БД — при сбое провайдера не остаётся «повисшего» токена, который
+        пользователь так и не увидел. Получатель всегда берётся из
+        НАСТРОЕННОГО в 2FA канала (two_factor_auth.recovery_email), а не из
+        произвольного значения запроса — адрес подменить нельзя.
+
+        Перед сохранением нового токена все прежние неотработанные токены
+        этого аккаунта сжигаются (verified=True), поэтому в почте
+        пользователя действует ровно один токен.
+        """
+        if recovery_type == "backup_code":
+            return {
+                "success": False,
+                "error_code": "UNSUPPORTED_CHANNEL",
+                "error": "Backup codes are verified directly via /2fa/verify",
+            }
+        if recovery_type != "email":
+            return {
+                "success": False,
+                "error_code": "PHONE_CHANNEL_UNAVAILABLE",
+                "error": "Восстановление по SMS пока недоступно, используйте email",
+            }
+
+        recipient = two_factor_auth.recovery_email
+        if not recipient:
+            return {
+                "success": False,
+                "error_code": "CHANNEL_NOT_CONFIGURED",
+                "error": "Recovery email не настроен для этого аккаунта",
+            }
+
+        token = self.generate_recovery_token()
+        expires_at = datetime.now(UTC) + timedelta(hours=self.recovery_expiry_hours)
+        ttl_hours = self.recovery_expiry_hours
+
+        subject = "Восстановление двухфакторной аутентификации"
+        html_content = f"""
+        <html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Восстановление 2FA</h2>
+        <p>Кто-то (надеемся, вы) запросил восстановление доступа к аккаунту клиники.</p>
+        <p>Ваш одноразовый код восстановления:</p>
+        <p style="font-family: monospace; font-size: 18px; font-weight: bold; padding: 12px; background: #f3f4f6; border-radius: 6px;">{token}</p>
+        <p>Код действует <b>{ttl_hours} час</b> и может быть использован только один раз.</p>
+        <p>Если вы не запрашивали восстановление — проигнорируйте это письмо и смените пароль.</p>
+        </body></html>
+        """
+        text_content = (
+            f"Восстановление 2FA.\n\n"
+            f"Одноразовый код восстановления: {token}\n"
+            f"Код действует {ttl_hours} час и может быть использован один раз.\n"
+            f"Если вы не запрашивали восстановление — проигнорируйте письмо.\n"
+        )
+
+        send_ok, _send_message = await self.email_service.send_email_enhanced(
+            to_email=recipient,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content,
+        )
+        if not send_ok:
+            logger.error(
+                "2FA recovery email dispatch failed",
+                extra={"has_recipient": True},
+            )
+            return {
+                "success": False,
+                "error_code": "EMAIL_SEND_FAILED",
+                "error": "Не удалось отправить письмо восстановления, попробуйте позже",
+            }
+
+        # Доставка успешна — сжигаем прежние неотработанные токены и
+        # фиксируем единственный действующий.
+        db.query(TwoFactorRecovery).filter(
+            and_(
+                TwoFactorRecovery.two_factor_auth_id == two_factor_auth.id,
+                TwoFactorRecovery.verified == False,  # noqa: E712
+            )
+        ).update(
+            {"verified": True, "verified_at": datetime.now(UTC)},
+            synchronize_session=False,
+        )
+        db.add(
+            TwoFactorRecovery(
+                two_factor_auth_id=two_factor_auth.id,
+                recovery_type="email",
+                recovery_value=recipient,
+                recovery_token=token,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                verified=False,
+                expires_at=expires_at,
+            )
+        )
+        db.commit()
+        logger.info("2FA recovery email sent", extra={"has_recipient": True})
+        return {"success": True, "expires_at": expires_at}
+
     def generate_device_fingerprint(self, user_agent: str, ip_address: str) -> str:
         """Генерирует отпечаток устройства"""
         data = f"{user_agent}:{ip_address}"
