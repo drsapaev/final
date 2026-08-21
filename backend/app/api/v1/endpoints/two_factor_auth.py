@@ -10,11 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.rate_limiter import limiter
 from app.crud.two_factor_auth import (
     two_factor_auth,
     two_factor_backup_code,
     two_factor_device,
-    two_factor_recovery,
 )
 from app.db.session import get_db
 from app.models.user import User
@@ -374,13 +374,20 @@ async def disable_two_factor_auth(
 
 
 @router.post("/recovery/request", response_model=TwoFactorRecoveryResponse)
+@limiter.limit("3/hour")
 async def request_two_factor_recovery(
-    request_data: TwoFactorRecoveryRequest,
     request: Request,
+    request_data: TwoFactorRecoveryRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Запросить восстановление 2FA"""
+    """Запросить восстановление 2FA.
+
+    Токен ДОСТАВЛЯЕТСЯ по настроенному каналу (email через SMTP-провайдера).
+    Доставка выполняется до записи в БД: при сбое провайдера не остаётся
+    «повисшего» невыданного токена (HTTP 502, можно безопасно повторить).
+    Прежние неотработанные токены сжигаются — действующий всегда один.
+    """
     try:
         service = get_two_factor_service()
         ip_address, user_agent = get_client_info(request)
@@ -393,11 +400,6 @@ async def request_two_factor_recovery(
                 detail="2FA is not enabled for this user",
             )
 
-        # Создаем токен восстановления
-        recovery_token = service.generate_recovery_token()
-        expires_at = datetime.now(UTC) + timedelta(hours=1)
-
-        # Сохраняем попытку восстановления
         two_factor_auth_obj = two_factor_auth.get_by_user_id(db, current_user.id)
         if not two_factor_auth_obj:
             raise HTTPException(
@@ -405,28 +407,36 @@ async def request_two_factor_recovery(
                 detail="2FA configuration not found",
             )
 
-        two_factor_recovery.create(
-            db,
-            obj_in={
-                "two_factor_auth_id": two_factor_auth_obj.id,
-                "recovery_type": request_data.recovery_type,
-                "recovery_value": request_data.recovery_value,
-                "recovery_token": recovery_token,
-                "ip_address": ip_address,
-                "user_agent": user_agent,
-            },
+        result = await service.create_and_dispatch_recovery(
+            db=db,
+            two_factor_auth=two_factor_auth_obj,
+            recovery_type=request_data.recovery_type,
+            ip_address=ip_address,
+            user_agent=user_agent,
         )
+        if not result.get("success"):
+            error_code = result.get("error_code", "RECOVERY_FAILED")
+            status_code = {
+                "EMAIL_SEND_FAILED": 502,
+                "CHANNEL_NOT_CONFIGURED": 400,
+                "UNSUPPORTED_CHANNEL": 400,
+                "PHONE_CHANNEL_UNAVAILABLE": 503,
+            }.get(error_code, 500)
+            raise HTTPException(
+                status_code=status_code,
+                detail=result.get("error", "Recovery dispatch failed"),
+            )
 
         # SECURITY (AUTH-REAUDIT-28): НЕ возвращаем recovery_token в ответе.
         # Раньше токен возвращался напрямую, что позволяло атакующему с
         # украденным паролем (но заблокированным 2FA) получить recovery-токен
         # и обойти канал восстановления (email/phone).
-        # Токен должен отправляться через recovery-канал; API возвращает только
+        # Токен отправляется через recovery-канал; API возвращает только
         # подтверждение и expiry.
         return TwoFactorRecoveryResponse(
             recovery_token=None,  # не возвращаем
-            expires_at=expires_at,
-            message="Recovery token generated. It was sent to your configured recovery channel.",
+            expires_at=result["expires_at"],
+            message="Код восстановления отправлен на настроенный канал.",
         )
 
     except HTTPException:

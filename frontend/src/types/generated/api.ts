@@ -12837,7 +12837,12 @@ export type paths = {
         put?: never;
         /**
          * Request Two Factor Recovery
-         * @description Запросить восстановление 2FA
+         * @description Запросить восстановление 2FA.
+         *
+         *     Токен ДОСТАВЛЯЕТСЯ по настроенному каналу (email через SMTP-провайдера).
+         *     Доставка выполняется до записи в БД: при сбое провайдера не остаётся
+         *     «повисшего» невыданного токена (HTTP 502, можно безопасно повторить).
+         *     Прежние неотработанные токены сжигаются — действующий всегда один.
          */
         post: operations["request_two_factor_recovery_api_v1_2fa_recovery_request_post"];
         delete?: never;
@@ -35793,7 +35798,7 @@ export type components = {
          */
         TwoFactorRecoveryResponse: {
             /** Recovery Token */
-            recovery_token: string;
+            recovery_token?: string | null;
             /**
              * Expires At
              * Format: date-time
