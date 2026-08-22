@@ -18,6 +18,19 @@ from app.services.phone_verification_service import get_phone_verification_servi
 
 logger = logging.getLogger(__name__)
 
+# Анти-enumeration: ЕДИНАЯ форма ответа /2fa…/password-reset/initiate
+# для неизвестного адреса, успешной доставки и сбоя доставки — по
+# ответу нельзя отличить существующий аккаунт от несуществующего.
+_EMAIL_RESET_GENERIC_MESSAGE = (
+    "Если пользователь с таким email существует, ссылка для сброса отправлена"
+)
+_PHONE_RESET_GENERIC_MESSAGE = (
+    "Если пользователь с таким номером существует, код для сброса отправлен"
+)
+# Срок жизни SMS-кода; синхронизирован с текстом сообщения
+# ("Код действителен 5 минут") в initiate_phone_reset.
+_PHONE_CODE_TTL_MINUTES = 5
+
 
 class PasswordResetService:
     """Сервис для восстановления паролей"""
@@ -54,10 +67,11 @@ class PasswordResetService:
             # Проверяем, существует ли пользователь с таким номером
             user = crud_user.get_user_by_phone(db, phone=phone)
             if not user:
-                # Не раскрываем информацию о существовании пользователя
+                # Одинаковая форма ответа для всех исходов.
                 return {
                     "success": True,
-                    "message": "Если пользователь с таким номером существует, код будет отправлен",
+                    "message": _PHONE_RESET_GENERIC_MESSAGE,
+                    "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
                 }
 
             # Отправляем код верификации
@@ -68,22 +82,37 @@ class PasswordResetService:
             )
 
             if verification_result["success"]:
-                logger.info(f"Password reset code sent to phone {phone}")
+                # PII: номер не пишем в лог — только факт отправки.
+                logger.info("Password reset code sent", extra={"has_recipient": True})
                 return {
                     "success": True,
-                    "message": "Код для сброса пароля отправлен на ваш номер",
-                    "expires_in_minutes": verification_result["expires_in_minutes"],
+                    "message": _PHONE_RESET_GENERIC_MESSAGE,
+                    "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
                 }
             else:
+                # Сбой доставки SMS — та же форма ответа, что и для
+                # успеха (анти-enumeration); причина логируется.
+                logger.warning(
+                    "Password reset SMS send failed: %s",
+                    mask_pii_text(str(verification_result.get("error", ""))),
+                )
                 return {
-                    "success": False,
-                    "error": verification_result["error"],
-                    "error_code": verification_result.get("error_code"),
+                    "success": True,
+                    "message": _PHONE_RESET_GENERIC_MESSAGE,
+                    "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
                 }
 
         except Exception as e:
-            logger.error(f"Error initiating phone reset for {phone}: {e}")
-            return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
+            logger.error(
+                "Error initiating phone reset: %s",
+                mask_pii_text(str(e)),
+                extra={"has_recipient": True},
+            )
+            return {
+                "success": False,
+                "error": "Внутренняя ошибка, попробуйте позже",
+                "error_code": "INTERNAL_ERROR",
+            }
 
     async def initiate_email_reset(self, db: Session, email: str) -> dict[str, Any]:
         """Инициация сброса пароля по email"""
@@ -91,10 +120,12 @@ class PasswordResetService:
             # Проверяем, существует ли пользователь с таким email
             user = crud_user.get_user_by_email(db, email=email)
             if not user:
-                # Не раскрываем информацию о существовании пользователя
+                # Не раскрываем информацию о существовании пользователя:
+                # одинаковая форма ответа для всех исходов.
                 return {
                     "success": True,
-                    "message": "Если пользователь с таким email существует, ссылка будет отправлена",
+                    "message": _EMAIL_RESET_GENERIC_MESSAGE,
+                    "expires_in_hours": self.token_ttl_hours,
                 }
 
             # Генерируем токен сброса
@@ -182,21 +213,23 @@ class PasswordResetService:
                 logger.info("Password reset email sent", extra={"has_recipient": True})
                 return {
                     "success": True,
-                    "message": "Ссылка для сброса пароля отправлена на ваш email",
+                    "message": _EMAIL_RESET_GENERIC_MESSAGE,
                     "expires_in_hours": self.token_ttl_hours,
                 }
             else:
                 # PII: текст ошибки провайдера может содержать адрес
-                # получателя. Логируем замаскированным, клиенту — общий
-                # текст без потрохова провайдера.
+                # получателя — логируем замаскированным. Клиенту — та
+                # же форма ответа, что и для успеха/неизвестного
+                # адреса: сбой доставки не должен выдавать
+                # существование аккаунта (анти-enumeration).
                 logger.warning(
                     "Password reset email send failed: %s",
                     mask_pii_text(send_message),
                 )
                 return {
-                    "success": False,
-                    "error": "Не удалось отправить письмо, попробуйте позже",
-                    "error_code": "EMAIL_SEND_FAILED",
+                    "success": True,
+                    "message": _EMAIL_RESET_GENERIC_MESSAGE,
+                    "expires_in_hours": self.token_ttl_hours,
                 }
 
         except Exception as e:

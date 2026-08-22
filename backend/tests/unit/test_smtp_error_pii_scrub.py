@@ -109,10 +109,14 @@ async def test_password_reset_send_failure_is_generic_to_client(
     with caplog.at_level(logging.WARNING):
         result = await svc.initiate_email_reset(db_session, email=scrub_user.email)
 
-    assert result["success"] is False
-    assert result["error_code"] == "EMAIL_SEND_FAILED"
-    # Клиент получает общий текст — без адреса и без потрохов провайдера
-    assert RECIPIENT not in result["error"]
-    assert "SMTPRecipientsRefused" not in result["error"]
+    # Анти-enumeration (#2800 follow-up): сбой доставки неотличим от
+    # успеха и от неизвестного адреса — единая форма ответа.
+    assert result["success"] is True
+    assert result["message"] == (
+        "Если пользователь с таким email существует, "
+        "ссылка для сброса отправлена"
+    )
+    assert "error" not in result and "error_code" not in result
     # Сервер логирует причину замаскированной
     assert "drsapaev" not in caplog.text
+    assert MASKED_LOCAL in caplog.text
