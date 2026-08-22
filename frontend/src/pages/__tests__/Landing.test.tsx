@@ -7,7 +7,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import Landing from '../Landing';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { TranslationProvider } from '../../i18n/useTranslation';
-import { MacOSThemeProvider } from '../../theme/macosTheme';
 
 function renderLanding() {
   let root = document.getElementById('root');
@@ -19,13 +18,11 @@ function renderLanding() {
 
   return render(
     <MemoryRouter>
-      <MacOSThemeProvider>
-        <ThemeProvider>
+              <ThemeProvider>
           <TranslationProvider>
             <Landing />
           </TranslationProvider>
         </ThemeProvider>
-      </MacOSThemeProvider>
     </MemoryRouter>,
     { container: root }
   );

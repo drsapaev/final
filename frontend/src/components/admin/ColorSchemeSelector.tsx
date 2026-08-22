@@ -1,9 +1,8 @@
 import type { CSSProperties } from 'react';
 
 import { useMemo } from 'react';
-import { Layers, Monitor, Moon, Palette, Rainbow, Sparkles, Sun, SwatchBook } from 'lucide-react';
+import { Layers, Monitor, Moon, Palette, Rainbow, Sparkles, Sun } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useMacOSTheme } from '../../theme/macosTheme';
 import { COLOR_SCHEMES } from '../../theme/colorScheme';
 import {
   MacOSCard, Select,
@@ -122,7 +121,9 @@ function ThemePreviewCard({ scheme, isActive, onSelect }: ThemePreviewCardProps)
 export default function ColorSchemeSelector() {
   const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   const { colorScheme, setColorScheme } = useTheme();
-  const { accent } = useMacOSTheme();
+  // PR-UI-01: accent picker removed — only canonical 'blue' accent is supported now.
+  // Multi-accent system (8 colors via MacOSThemeProvider) was deleted in PR-UI-01.
+  const accent = 'blue' as const;
 
   const colorSchemes = useMemo(() =>
     COLOR_SCHEMES.map((scheme) => ({
@@ -159,15 +160,6 @@ export default function ColorSchemeSelector() {
             </p>
           </div>
         </div>
-
-        <div
-          role="status"
-          aria-label={t('admin2.css_accent_noway_aria', { accent: currentAccentLabel })}
-          className="admin-inline-flex-ai-center-gap-8-p-10px12-radius-14-bg-bg-secondary-bd-1solidva-9204ee03"
-        >
-          <SwatchBook aria-hidden="true" focusable="false" className="admin-w-14-h-14-blue" />
-          {t('admin2.css_accent_noway_prefix')} <strong className="admin-text-primary">{currentAccentLabel}</strong>
-        </div>
       </div>
 
       <div
@@ -179,7 +171,6 @@ export default function ColorSchemeSelector() {
         </div>
         <div className="admin-grid-gap-6-fontsize-6b9c17-secondary">
           <div>{t('admin2.css_scheme_saved_profile')}</div>
-          <div>{t('admin2.css_accent_local_browser')}</div>
         </div>
       </div>
 

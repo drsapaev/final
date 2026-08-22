@@ -2,7 +2,6 @@ import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { TranslationProvider } from './i18n/useTranslation';
-import { MacOSThemeProvider } from './theme/macosTheme';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import LoginFormStyled from './components/auth/LoginFormStyled';
@@ -11,11 +10,9 @@ const App = lazy(() => import('./App'));
 
 function PublicProviders({ children }: { children: React.ReactNode }) {
   return (
-    <MacOSThemeProvider>
-      <ThemeProvider>
-        <TranslationProvider>{children}</TranslationProvider>
-      </ThemeProvider>
-    </MacOSThemeProvider>
+    <ThemeProvider>
+      <TranslationProvider>{children}</TranslationProvider>
+    </ThemeProvider>
   );
 }
 

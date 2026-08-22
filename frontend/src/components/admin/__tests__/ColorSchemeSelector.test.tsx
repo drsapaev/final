@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ColorSchemeSelector from '../ColorSchemeSelector';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { MacOSThemeProvider } from '@/theme/macosTheme';
 
 const { apiMock } = vi.hoisted(() => ({
   apiMock: {
@@ -17,11 +16,9 @@ vi.mock('../../../api/client.ts', () => ({
 
 function renderSelector() {
   return render(
-    <MacOSThemeProvider>
-      <ThemeProvider>
+          <ThemeProvider>
         <ColorSchemeSelector />
       </ThemeProvider>
-    </MacOSThemeProvider>
   );
 }
 
@@ -47,7 +44,8 @@ describe('ColorSchemeSelector', () => {
     renderSelector();
 
     expect(screen.getByText('Что именно меняет настройка')).toBeInTheDocument();
-    expect(screen.getByText(/Accent сейчас:/)).toBeInTheDocument();
+    // PR-UI-01: accent picker removed (multi-accent system deleted).
+    // Test no longer asserts on the obsolete 'Accent сейчас:' status block.
 
     fireEvent.click(screen.getByRole('button', { name: /Полупрозрачная стеклянная/i }));
 

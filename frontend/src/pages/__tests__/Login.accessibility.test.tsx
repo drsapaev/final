@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Login from '../Login';
 import { ThemeProvider } from '../../contexts/ThemeContext';
-import { MacOSThemeProvider } from '../../theme/macosTheme';
 
 vi.mock('../../api/client', () => ({
   api: {
@@ -36,11 +35,9 @@ vi.mock('../../hooks/useTranslation', () => ({
 function renderLogin() {
   return render(
     <MemoryRouter>
-      <MacOSThemeProvider>
-        <ThemeProvider>
+              <ThemeProvider>
           <Login />
         </ThemeProvider>
-      </MacOSThemeProvider>
     </MemoryRouter>
   );
 }
