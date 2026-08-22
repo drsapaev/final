@@ -60,9 +60,14 @@ def get_user_by_phone(db: Session, phone: str) -> User | None:
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
-    """Получить пользователя по email (используется password reset)"""
-    stmt = select(User).where(User.email == email)
-    return db.execute(stmt).scalar_one_or_none()
+    """Получить пользователя по email (используется password reset).
+
+    users.email не имеет DB-уникальности — терпим legacy-дубликаты
+    так же, как authentication-CRUD (.first()), иначе
+    MultipleResultsFound ломает reset-путь для затронутых адресов.
+    """
+    stmt = select(User).where(User.email == email).limit(1)
+    return db.execute(stmt).scalars().first()
 
 
 def get_user_by_telegram_id(db: Session, telegram_id: str) -> User | None:
