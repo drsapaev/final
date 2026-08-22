@@ -22,6 +22,20 @@ from app.core.pii_masker import mask_pii_text
 logger = logging.getLogger(__name__)
 
 
+def build_from_header(sender: str | None, username: str | None = None) -> str:
+    """Канонический заголовок From для всех email-отправителей.
+
+    SMTP_FROM может быть голым mailbox (no-reply@…) либо полным
+    заголовком «Name <mailbox>» (формат из docs/DEPLOYMENT_GUIDE.md).
+    Вторую обёртку добавлять нельзя: «Name <Name <mailbox>>» парсится
+    с пустым envelope-sender, и провайдер отклоняет письмо.
+    """
+    value = (sender or username or "").strip()
+    if "<" in value and ">" in value:
+        return value
+    return f"Programma Clinic <{value}>"
+
+
 def _escape_html(text: str | None) -> str:
     """NOTIF-REAUDIT-28 P1-4: escape user-supplied text before interpolating
     into HTML email body (was raw f-string → XSS via <script>, <img onerror>,
@@ -41,22 +55,6 @@ def _protected_frontend_url(path: str) -> str:
     normalized_base = base_url.rstrip("/") or "http://localhost:5173"
     normalized_path = f"/{str(path or '').strip().lstrip('/')}"
     return f"{normalized_base}{normalized_path}"
-
-
-def _escape_html(text: str | None) -> str:
-    """NOTIF-REAUDIT-28 P1-4: escape user-supplied text before interpolating
-    into HTML email body (was raw f-string → XSS via <script>, <img onerror>,
-    phishing <a> tags)."""
-    from html import escape
-    return escape(str(text or ""))
-
-
-def _escape_html(text: str | None) -> str:
-    """NOTIF-REAUDIT-28 P1-4: escape user-supplied text before interpolating
-    into HTML email body (was raw f-string → XSS via <script>, <img onerror>,
-    phishing <a> tags)."""
-    from html import escape
-    return escape(str(text or ""))
 
 
 def _protected_frontend_url(path: str) -> str:
@@ -123,8 +121,7 @@ class EmailSMSEnhancedService:
 
             # Создаем сообщение
             msg = MIMEMultipart("alternative")
-            sender = self.smtp_from or self.smtp_username
-            msg["From"] = f"Programma Clinic <{sender}>"
+            msg["From"] = build_from_header(self.smtp_from, self.smtp_username)
             msg["To"] = to_email
             msg["Subject"] = subject
             msg["X-Priority"] = "1" if priority == "high" else "3"

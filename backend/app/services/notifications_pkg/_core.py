@@ -25,6 +25,7 @@ class CoreMixin(NotificationSenderMixinBase):
         self.smtp_port = getattr(settings, "SMTP_PORT", 587)
         self.smtp_username = getattr(settings, "SMTP_USERNAME", None)
         self.smtp_password = getattr(settings, "SMTP_PASSWORD", None)
+        self.smtp_from = getattr(settings, "SMTP_FROM", None)
 
         self.telegram_bot_token = settings.TELEGRAM_BOT_TOKEN
         self.telegram_chat_id = settings.TELEGRAM_CHAT_ID
