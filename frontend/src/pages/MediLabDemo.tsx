@@ -1,20 +1,50 @@
 import { useState, useEffect } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { Plus, Search, Filter, Calendar, Stethoscope, Edit, Trash2 } from 'lucide-react';
 
 // Компоненты
-import UnifiedLayout from '../components/layout/UnifiedLayout';
+// PR-UI-03: UnifiedLayout + UnifiedSidebar deleted (used only here, demo-only).
+// Replaced with a local DemoLayout wrapper that provides the same structure
+// (sidebar slot + main content) without the dead UnifiedSidebar dependency.
+// Full migration to canonical AppShell will happen in PR-UI-17.
 import { PatientCard, MetricCard, MedicalTable } from '../components/medical';
 import MedicalCard from '../components/medical/MedicalCard';
 import logger from '../utils/logger';
 import '../styles/full-width.css';
-import '../styles/cursor-effects.css';
 import '../styles/animations.css';
 import '../styles/responsive.css';
 import { Input } from '../components/ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
+import { useTheme } from '../contexts/ThemeContext';
+
+// Local DemoLayout — minimal replacement for deleted UnifiedLayout.
+// Used ONLY in this demo page (route: /internal-demo/medilab, Admin-only).
+function DemoLayout({ children }: { children: ReactNode }) {
+  const { isDark } = useTheme();
+  const style: CSSProperties = {
+    display: 'flex',
+    minHeight: '100vh',
+    backgroundColor: isDark ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)',
+  };
+  const mainStyle: CSSProperties = {
+    flex: 1,
+    width: '100%',
+    maxWidth: '100%',
+    minHeight: '100vh',
+    backgroundColor: isDark ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)',
+    padding: 'var(--mac-spacing-5)',
+    overflow: 'auto',
+  };
+  return (
+    <div className="demo-layout" style={style} data-demo="true">
+      <main style={mainStyle} className="demo-main-content">
+        {children}
+      </main>
+    </div>
+  );
+}
 
 const resolveTabFromPath = (path: string) => {
   if (path.includes('/patients')) return 'patients';
@@ -770,9 +800,9 @@ const MediLabDemo = () => {
   };
 
   return (
-    <UnifiedLayout showSidebar={true}>
+    <DemoLayout>
       {renderContent()}
-    </UnifiedLayout>
+    </DemoLayout>
   );
 };
 
