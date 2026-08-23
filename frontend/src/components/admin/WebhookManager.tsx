@@ -31,7 +31,7 @@ import {
   Button,
   Badge,
   SegmentedControl,
-  MacOSStatCard,
+  StatCard,
   Input,
   Select,
   MacOSEmptyState,
@@ -289,28 +289,28 @@ const WebhookManager = () => {
       {/* Статистика */}
       {stats &&
       <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_total')}
           value={String((stats as Record<string, unknown>)?.total_webhooks ?? "")}
           icon={Globe}
           color="blue" />
 
           
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_active')}
           value={String((stats as Record<string, unknown>)?.active_webhooks ?? "")}
           icon={CheckCircle}
           color="green" />
 
           
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_calls_24h')}
           value={String(((stats as Record<string, unknown>)?.recent_24h as Record<string, unknown>)?.total_calls ?? "")}
           icon={Activity}
           color="orange" />
 
           
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_success_rate')}
           value={`${Number(((stats as Record<string, unknown>)?.recent_24h as Record<string, unknown>)?.success_rate ?? 0).toFixed(1) ?? '0'}%`}
           icon={Zap}
@@ -683,28 +683,28 @@ const WebhookManager = () => {
 
           {/* Статистика событий */}
           <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_event_types_total')}
             value={new Set(webhooks.flatMap((w) => w.events)).size}
             icon={Clock}
             color="blue" />
 
             
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_active_events')}
             value={webhooks.filter((w) => w.is_active).flatMap((w) => w.events).length}
             icon={CheckCircle}
             color="green" />
 
             
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_patient_events')}
             value={webhooks.flatMap((w) => w.events ?? []).filter((e) => e.includes('patient')).length}
             icon={Users}
             color="orange" />
 
             
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_payment_events')}
             value={webhooks.flatMap((w) => w.events ?? []).filter((e) => e.includes('payment')).length}
             icon={CreditCard}

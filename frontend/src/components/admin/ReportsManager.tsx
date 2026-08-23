@@ -23,7 +23,7 @@ import {
 'lucide-react';
 import { MacOSCard, Button, Badge } from '../ui/macos';
 import {
-  MacOSStatCard,
+  StatCard,
   Table,
   Input,
   MacOSEmptyState,
@@ -345,7 +345,7 @@ const ReportsManager = () => {
         </h3>
 
         <div className="admin-grid-auto-240-16">
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.rm_today_stat_title')}
           value={quickReports.daily?.summary?.total_patients_served || 0}
           subtitle={`${quickReports.daily?.summary?.total_revenue || 0} ${t('admin2.rm_currency')}`}

@@ -22,7 +22,7 @@ import {
   MacOSEmptyState,
   Button,
   Skeleton,
-  MacOSStatCard,
+  StatCard,
 } from '../ui/macos';
 import useAdminData from '../../hooks/useAdminData';
 import AdminRouteSwitcher from './AdminRouteSwitcher';
@@ -335,7 +335,7 @@ const AdminDashboard = () => {
           <div className="admin-kpi-grid" role="list" aria-label={t('admin2.adm_kpi_list_aria')}>
             {dashboardKpis.map((kpi) => (
               <div key={kpi.key} role="listitem">
-                <MacOSStatCard
+                <StatCard
                   title={kpi.title}
                   value={kpi.value}
                   icon={kpi.icon}
