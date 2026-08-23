@@ -11,14 +11,14 @@
     --glass-stroke: color-mix(in srgb, white, transparent 92%);
     --shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
 
-    /* Новый тёмный стиль (по PNG) */
-    --mac-bg-primary: #16171a;
-    --mac-bg-secondary: #1f2024;
-    --mac-bg-toolbar: #24262b;
-    --mac-text-primary: #f3f4f7;
-    --mac-text-secondary: #b6bac1;
-    --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(10, 132, 255, 0.35), transparent 55%), radial-gradient(120% 120% at 100% 0%, rgba(94, 92, 230, 0.3), transparent 55%);
-    --mac-separator: color-mix(in srgb, white, transparent 88%);
+    /* C-4 fix (UI_AUDIT_PLAN.md): canonical --mac-* dark overrides removed.
+       This :root block loaded after design-system/tokens.css (main.tsx:11-12),
+       so its (0,1,0) specificity tied with the explicit theme classes in
+       tokens.css and won by source order — OS dark beat the explicit user
+       theme choice, and with NON-canonical values (#16171a vs canonical #1c1c1e).
+       Canonical dark tokens: tokens.css @media :root (line ~172) + dark theme class.
+       Legacy vars above (--bg/--text/--surface/--glass-stroke/--shadow) are kept:
+       they are not part of the canonical token system. */
   }
 }
 
