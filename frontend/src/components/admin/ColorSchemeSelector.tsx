@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 
 import { useMemo } from 'react';
-import { Layers, Monitor, Moon, Palette, Rainbow, Sparkles, Sun } from 'lucide-react';
+import { Monitor, Moon, Palette, Sun } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { COLOR_SCHEMES } from '../../theme/colorScheme';
 import {
@@ -13,9 +13,6 @@ const ICONS = {
   light: Sun,
   dark: Moon,
   auto: Monitor,
-  vibrant: Rainbow,
-  glass: Layers,
-  gradient: Sparkles,
 };
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string;

@@ -25,7 +25,7 @@ import {
 ### 2. Use macOS Theme
 
 ```javascript
-import '../theme/macos-tokens.css';
+import '../design-system/tokens.css';
 ```
 
 ### 3. Basic Usage

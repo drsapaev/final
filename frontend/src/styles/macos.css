@@ -1,6 +1,7 @@
-/* P0 fix: :root overrides removed — canonical tokens are in theme/macos-tokens.css.
+/* P0 fix: :root overrides removed — canonical tokens are in src/design-system/tokens.css.
    This block was overriding --mac-bg-primary, --mac-border, --mac-radius-* etc.
-   Removed 32 lines of duplicate/conflicting token definitions. */
+   Removed 32 lines of duplicate/conflicting token definitions.
+   PR-UI-02: vibrant/glass/gradient CSS blocks removed (custom schemes deleted). */
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -22,304 +23,45 @@
 }
 
 /* 💡 Яркая тема - матовая версия */
-[data-color-scheme="vibrant"] {
-  --mac-bg-primary: #2d1f28;
-  --mac-bg-secondary: #432733;
-  --mac-bg-tertiary: #5a3442;
-  --mac-text-primary: #f8fbff;
-  --mac-text-secondary: rgba(248, 244, 239, 0.8);
-  --mac-success: #5bcf84;
-  --mac-warning: #ffca78;
-  --mac-error: #ff7a6b;
-  --mac-gradient-window:
-    radial-gradient(circle at 16% 14%, rgba(255, 181, 120, 0.28), transparent 24%),
-    radial-gradient(circle at 82% 18%, rgba(255, 118, 113, 0.16), transparent 20%),
-    linear-gradient(145deg, rgba(65, 34, 53, 0.97) 0%, rgba(143, 79, 85, 0.92) 54%, rgba(228, 156, 97, 0.9) 100%);
-  --mac-separator: color-mix(in srgb, white, transparent 88%);
-  --mac-border: color-mix(in srgb, white, transparent 84%);
-  --mac-border-secondary: color-mix(in srgb, white, transparent 90%);
-  --mac-gradient-sidebar: linear-gradient(180deg, rgba(55, 29, 42, 0.82) 0%, rgba(98, 50, 60, 0.72) 100%);
-  --mac-bg-toolbar: rgba(58, 31, 42, 0.64);
-  --mac-shadow-sm: 0 2px 10px rgba(28, 12, 19, 0.24);
-  --mac-shadow-md: 0 10px 24px rgba(28, 12, 19, 0.32);
-}
 
 /* 🪟 Стеклянная тема */
-[data-color-scheme="glass"] {
-  --mac-bg-primary: color-mix(in srgb, var(--mac-text-primary), transparent 28%);
-  --mac-bg-secondary: rgba(25, 37, 52, 0.6);
-  --mac-bg-toolbar: color-mix(in srgb, var(--mac-text-primary), transparent 28%);
-  --mac-bg-tertiary: rgba(52, 70, 90, 0.46);
-  --mac-text-primary: #f7fbff;
-  --mac-text-secondary: rgba(247, 251, 255, 0.76);
-  --mac-success: #58d38b;
-  --mac-warning: #ffc261;
-  --mac-error: #ff8b7e;
-  --mac-border: rgba(255, 255, 255, 0.18);
-  --mac-border-secondary: rgba(255, 255, 255, 0.11);
-  --mac-separator: color-mix(in srgb, white, transparent 86%);
-  --mac-gradient-window:
-    radial-gradient(circle at 18% 16%, rgba(125, 211, 252, 0.2), transparent 26%),
-    linear-gradient(160deg, rgba(9, 15, 24, 0.96) 0%, rgba(26, 44, 63, 0.84) 100%);
-  --mac-gradient-sidebar: linear-gradient(180deg, rgba(12, 18, 27, 0.74) 0%, rgba(23, 37, 54, 0.66) 100%);
-  --shadow: 0 8px 28px color-mix(in srgb, black, transparent 62%);
-  --mac-shadow-sm: 0 2px 10px color-mix(in srgb, black, transparent 70%);
-  --mac-shadow-md: 0 10px 28px color-mix(in srgb, black, transparent 62%);
-  --mac-blur-light: saturate(185%) blur(24px);
-  background: rgba(8, 12, 18, 0.22);
-  backdrop-filter: blur(24px) saturate(170%);
-}
 
 /* 🎨 Градиентная тема */
-[data-color-scheme="gradient"] {
-  --mac-bg-primary: #112845;
-  --mac-bg-secondary: #183d66;
-  --mac-bg-tertiary: #23588b;
-  --mac-text-primary: #fbfdff;
-  --mac-text-secondary: rgba(251, 253, 255, 0.78);
-  --mac-success: #4ade80;
-  --mac-warning: #9fe4ff;
-  --mac-error: #ff7cb6;
-  --mac-border: color-mix(in srgb, white, transparent 84%);
-  --mac-border-secondary: color-mix(in srgb, white, transparent 90%);
-  --mac-separator: color-mix(in srgb, white, transparent 86%);
-  --mac-gradient-window:
-    radial-gradient(circle at 18% 16%, rgba(102, 233, 255, 0.26), transparent 26%),
-    radial-gradient(circle at 82% 16%, rgba(178, 132, 255, 0.22), transparent 24%),
-    linear-gradient(145deg, rgba(16, 40, 71, 0.96) 0%, rgba(21, 84, 147, 0.88) 52%, rgba(113, 84, 255, 0.88) 100%);
-  --mac-gradient-sidebar: linear-gradient(180deg, rgba(10, 26, 48, 0.32) 0%, rgba(20, 66, 118, 0.2) 100%);
-  --mac-bg-toolbar: rgba(11, 29, 54, 0.28);
-  --bg: transparent;
-  --mac-shadow-sm: 0 2px 10px rgba(7, 17, 40, 0.2);
-  --mac-shadow-md: 0 10px 26px rgba(7, 17, 40, 0.28);
-}
 
-[data-color-scheme="vibrant"] .mac-card,
-[data-color-scheme="glass"] .mac-card,
-[data-color-scheme="gradient"] .mac-card {
-  background-color: var(--mac-card-bg) !important;
-  border: 1px solid var(--mac-card-border) !important;
-  box-shadow: var(--mac-shadow-md), 0 0 0 1px color-mix(in srgb, var(--mac-border), transparent 40%) inset !important;
-}
 
-[data-color-scheme="vibrant"] .mac-card {
-  backdrop-filter: blur(16px) saturate(165%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(165%) !important;
-}
 
-[data-color-scheme="glass"] .mac-card {
-  backdrop-filter: blur(20px) saturate(185%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(185%) !important;
-}
 
-[data-color-scheme="gradient"] .mac-card {
-  background-color: var(--mac-card-bg) !important;
-  backdrop-filter: var(--mac-blur-light) !important;
-  -webkit-backdrop-filter: var(--mac-blur-light) !important;
-}
 
-[data-color-scheme="vibrant"] .mac-card:hover,
-[data-color-scheme="glass"] .mac-card:hover,
-[data-color-scheme="gradient"] .mac-card:hover {
-  background-color: var(--mac-card-hover-bg) !important;
-  border-color: color-mix(in srgb, var(--mac-card-border), white 18%) !important;
-}
 
-[data-color-scheme="glass"] .mac-card-header,
-[data-color-scheme="gradient"] .mac-card-header {
-  border-bottom-color: color-mix(in srgb, var(--mac-border), white 10%) !important;
-}
 
-[data-color-scheme="glass"] .mac-card-footer,
-[data-color-scheme="gradient"] .mac-card-footer {
-  border-top-color: color-mix(in srgb, var(--mac-border), white 10%) !important;
-}
 
-[data-color-scheme="vibrant"] aside,
-[data-color-scheme="glass"] aside,
-[data-color-scheme="gradient"] aside {
-  background: var(--mac-gradient-sidebar) !important;
-  border-right: 1px solid color-mix(in srgb, var(--mac-border), white 10%) !important;
-  box-shadow: 4px 0 18px rgba(0, 0, 0, 0.26), 0 0 0 1px color-mix(in srgb, var(--mac-border), transparent 35%) inset !important;
-}
 
-[data-color-scheme="vibrant"] aside {
-  backdrop-filter: blur(16px) saturate(165%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(165%) !important;
-}
 
-[data-color-scheme="glass"] aside {
-  backdrop-filter: blur(20px) saturate(185%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(185%) !important;
-}
 
-[data-color-scheme="gradient"] aside {
-  backdrop-filter: blur(10px) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(150%) !important;
-}
 
-[data-color-scheme="vibrant"] aside > div[style*="border"],
-[data-color-scheme="glass"] aside > div[style*="border"],
-[data-color-scheme="gradient"] aside > div[style*="border"] {
-  border-color: color-mix(in srgb, var(--mac-border), white 8%) !important;
-}
 
-[data-color-scheme="vibrant"] aside nav,
-[data-color-scheme="glass"] aside nav,
-[data-color-scheme="gradient"] aside nav {
-  background: transparent !important;
-}
 
-[data-color-scheme="glass"] aside nav div[style*="backgroundColor"],
-[data-color-scheme="gradient"] aside nav div[style*="backgroundColor"],
-[data-color-scheme="vibrant"] aside nav div[style*="backgroundColor"] {
-  background-color: color-mix(in srgb, var(--mac-bg-secondary), white 8%) !important;
-}
 
-[data-color-scheme="vibrant"] .app-header,
-[data-color-scheme="glass"] .app-header,
-[data-color-scheme="gradient"] .app-header {
-  background-color: var(--mac-header-bg) !important;
-  border-bottom: 1px solid color-mix(in srgb, var(--mac-border), white 10%) !important;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22), 0 0 0 1px color-mix(in srgb, var(--mac-border), transparent 36%) inset !important;
-}
 
-[data-color-scheme="vibrant"] .app-header {
-  backdrop-filter: blur(16px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
-}
 
-[data-color-scheme="glass"] .app-header {
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-}
 
-[data-color-scheme="gradient"] .app-header {
-  backdrop-filter: blur(10px) saturate(145%) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(145%) !important;
-}
 
-[data-color-scheme="glass"] .app-header .hdr-nav-item,
-[data-color-scheme="gradient"] .app-header .hdr-nav-item {
-  background-color: transparent !important;
-}
 
-[data-color-scheme="glass"] .app-header .hdr-nav-item:hover,
-[data-color-scheme="gradient"] .app-header .hdr-nav-item:hover {
-  background-color: color-mix(in srgb, var(--mac-bg-secondary), white 8%) !important;
-}
 
-[data-color-scheme="glass"] .app-header .hdr-nav-item.active,
-[data-color-scheme="gradient"] .app-header .hdr-nav-item.active {
-  background-color: var(--mac-accent-bg) !important;
-  border-color: var(--mac-accent-border) !important;
-}
 
-[data-color-scheme="vibrant"] .app-shell,
-[data-color-scheme="glass"] .app-shell,
-[data-color-scheme="gradient"] .app-shell {
-  position: relative;
-  isolation: isolate;
-}
 
-[data-color-scheme="vibrant"] .app-shell::before,
-[data-color-scheme="glass"] .app-shell::before,
-[data-color-scheme="gradient"] .app-shell::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -2;
-}
 
-[data-color-scheme="vibrant"] .app-shell::after,
-[data-color-scheme="glass"] .app-shell::after,
-[data-color-scheme="gradient"] .app-shell::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-}
 
-[data-color-scheme="vibrant"] .app-shell::before {
-  background:
-    radial-gradient(circle at 12% 14%, rgba(255, 190, 126, 0.22), transparent 24%),
-    radial-gradient(circle at 86% 18%, rgba(255, 128, 114, 0.16), transparent 22%),
-    radial-gradient(circle at 50% 88%, rgba(255, 233, 202, 0.07), transparent 28%);
-}
 
-[data-color-scheme="vibrant"] .app-shell::after {
-  background:
-    linear-gradient(165deg, rgba(255, 241, 229, 0.05) 0%, transparent 32%),
-    linear-gradient(345deg, rgba(255, 162, 117, 0.06) 0%, transparent 42%);
-}
 
-[data-color-scheme="glass"] .app-shell::before {
-  background:
-    radial-gradient(circle at 14% 18%, rgba(144, 224, 239, 0.18), transparent 26%),
-    radial-gradient(circle at 84% 20%, rgba(125, 160, 255, 0.14), transparent 24%),
-    radial-gradient(circle at 50% 90%, color-mix(in srgb, white, transparent 94%), transparent 32%);
-}
 
-[data-color-scheme="glass"] .app-shell::after {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, white, transparent 96%), transparent 26%),
-    linear-gradient(145deg, rgba(98, 149, 255, 0.04) 0%, transparent 34%);
-}
 
-[data-color-scheme="gradient"] .app-shell::before {
-  background:
-    radial-gradient(circle at 16% 18%, rgba(102, 233, 255, 0.22), transparent 26%),
-    radial-gradient(circle at 82% 16%, rgba(178, 132, 255, 0.2), transparent 24%),
-    radial-gradient(circle at 52% 86%, rgba(214, 233, 255, 0.08), transparent 30%);
-}
 
-[data-color-scheme="gradient"] .app-shell::after {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, white, transparent 94%), transparent 22%),
-    linear-gradient(135deg, rgba(140, 225, 255, 0.05) 0%, transparent 30%);
-}
 
-[data-color-scheme="vibrant"] .app-main,
-[data-color-scheme="glass"] .app-main,
-[data-color-scheme="gradient"] .app-main {
-  background: var(--mac-gradient-sidebar);
-  border: 1px solid var(--mac-main-shell-border);
-  border-radius: 24px;
-  box-shadow: var(--mac-main-shell-shadow);
-}
 
-[data-color-scheme="vibrant"] .app-main::before,
-[data-color-scheme="glass"] .app-main::before,
-[data-color-scheme="gradient"] .app-main::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: -1;
-}
 
-[data-color-scheme="vibrant"] .app-main::before {
-  background:
-    linear-gradient(180deg, rgba(255, 210, 164, 0.08) 0%, transparent 16%),
-    radial-gradient(circle at 0% 0%, rgba(255, 169, 112, 0.12), transparent 22%);
-}
 
-[data-color-scheme="glass"] .app-main::before {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, white, transparent 96%) 0%, transparent 18%),
-    radial-gradient(circle at 12% 0%, rgba(144, 224, 239, 0.1), transparent 20%);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
 
-[data-color-scheme="gradient"] .app-main::before {
-  background:
-    linear-gradient(180deg, rgba(222, 237, 255, 0.1) 0%, transparent 14%),
-    radial-gradient(circle at 0% 0%, rgba(102, 233, 255, 0.12), transparent 24%);
-}
 
 [data-theme="light"] .app-shell {
   position: relative;
