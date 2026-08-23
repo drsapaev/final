@@ -674,3 +674,38 @@
     --mac-text-tertiary: #000000;
   }
 }
+
+/* ============================================
+   SCREEN READER ONLY — canonical definitions
+   C-5 fix (UI_AUDIT_PLAN.md): previously defined only in the
+   never-imported styles/accessibility.css, so .sr-only elements
+   rendered VISIBLE (position:static, auto size) in production.
+   Only the sr-only pair is canonicalized here; the remaining
+   accessibility.css content (global 44px touch targets, body/p
+   text spacing, aria-required stars, [disabled] opacity) is NOT
+   imported — it would visually regress existing UI and overlaps
+   rules already covered elsewhere (focus-visible: emr-tokens.css,
+   reduced-motion: tokens.css+animations.css, skip-link: App.tsx PR-49).
+   ============================================ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sr-only-focusable:focus,
+.sr-only-focusable:active {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
