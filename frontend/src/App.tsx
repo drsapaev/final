@@ -8,7 +8,7 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
-import './theme/macos-tokens.css';
+import './design-system/tokens.css';
 import './styles/macos.css';
 import './styles/header-new.css';
 import 'react-toastify/dist/ReactToastify.css';

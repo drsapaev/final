@@ -40,19 +40,14 @@ describe('ColorSchemeSelector', () => {
     });
   });
 
-  it('renders the shared theme catalog copy and applies a selected custom scheme', async () => {
+  it('renders the shared theme catalog copy with 3 standard schemes', async () => {
     renderSelector();
 
     expect(screen.getByText('Что именно меняет настройка')).toBeInTheDocument();
-    // PR-UI-01: accent picker removed (multi-accent system deleted).
-    // Test no longer asserts on the obsolete 'Accent сейчас:' status block.
-
-    fireEvent.click(screen.getByRole('button', { name: /Полупрозрачная стеклянная/i }));
-
-    await waitFor(() => {
-      expect(document.documentElement.getAttribute('data-color-scheme')).toBe('glass');
-      expect(screen.getByText('Премиальная')).toBeInTheDocument();
-      expect(screen.getAllByText('Стекло').length).toBeGreaterThan(0);
-    });
+    // PR-UI-02: custom schemes (vibrant/glass/gradient) deleted.
+    // Only 3 standard schemes remain: light, dark, auto.
+    expect(screen.getAllByText('Светлая').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Темная').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Авто').length).toBeGreaterThan(0);
   });
 });

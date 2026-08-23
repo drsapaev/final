@@ -8,7 +8,7 @@ import App from './App';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
-import './theme/macos-tokens.css';
+import './design-system/tokens.css';
 import './styles/macos.css';
 import './components/admin/admin.css';
 import { bootstrapStoredColorScheme } from './theme/colorScheme';

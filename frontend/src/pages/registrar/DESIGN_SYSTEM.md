@@ -15,7 +15,7 @@ The UX audit (§5.6 Consistency, score 3/10) identified **six competing design s
 
 **Strategic Direction 2** (audit §8) calls for choosing ONE design system. The macOS Design System was selected because:
 - 38 components already written in `components/ui/macos/`
-- `macos-tokens.css` (677 lines) is the most complete token file
+- `design-system/tokens.css` (677 lines) is the most complete token file
 - `styles/macos.css` (870 lines) provides comprehensive utility classes
 - The `Unified` theme was an incomplete migration attempt
 

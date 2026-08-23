@@ -226,7 +226,7 @@ grep -r 'boxShadow: ["\047]' frontend/src/components/ --include="*.jsx"
   - [ ] `/styles/global-fixes.css`
   - [ ] `/styles/admin-dark-theme.css`
   - [ ] `/styles/admin-styles.css`
-  - [ ] `/theme/macos-tokens.css`
+  - [ ] NOTE: `/design-system/tokens.css` is CANONICAL — do NOT delete (PR-UI-02)
   - [ ] `/design-system/styles/global.css`
   - [ ] `/design-system/styles/animations.css`
 
