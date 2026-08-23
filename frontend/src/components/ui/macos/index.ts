@@ -29,6 +29,9 @@ export { default as List } from './List';
 
 // Utility Components
 export { AppLoading, AppEmpty, AppError } from './AppState';
+// PR-UI-07: MacOSEmptyState is internal implementation of AppEmpty.
+// 31 production files still import it via barrel — migration to AppEmpty is PR-UI-07a.
+// New code should use AppEmpty instead. This export will be removed in PR-UI-07a.
 export { default as MacOSEmptyState } from './MacOSEmptyState';
 export { default as Skeleton } from './Skeleton';
 export { default as Alert } from './Alert';
