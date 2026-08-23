@@ -84,7 +84,7 @@ export default function LabReportActionsBar({
           </Button>
           {/* P1 fix: Notify patient via Telegram — only for finalized/printed reports */}
           {canNotify && (
-            <Button variant="success" onClick={onNotify} disabled={saving || busyAction === 'notify'}>
+            <Button variant="secondary" color="success" onClick={onNotify} disabled={saving || busyAction === 'notify'}>
               <Icon name="paperplane" size={16} />
               {busyAction === 'notify' ? t('actions.notifying') : t('actions.notify_patient')}
             </Button>

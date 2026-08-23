@@ -1625,7 +1625,7 @@ const CashierPanel = () => {
                 <div className="cashier-empty-state-text">
                   {tI18n('cashier.empty_pending_text')}
                 </div>
-                <Button size="small" variant="outlined" onClick={() => setActiveTab('history')}>
+                <Button size="small" variant="outline" onClick={() => setActiveTab('history')}>
                   {tI18n('cashier.open_history_btn')}
                 </Button>
               </div>
@@ -1871,7 +1871,7 @@ const CashierPanel = () => {
               </Typography>
             </DialogContent>
             <DialogActions>
-              <Button variant="outlined" onClick={() => setCancelDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
                 {tI18n('cashier.close_btn')}
               </Button>
               <Button
@@ -1979,7 +1979,7 @@ const CashierPanel = () => {
             </DialogContent>
 
             <DialogActions>
-              <Button onClick={() => setPaymentSuccess(null)} variant="contained">
+              <Button onClick={() => setPaymentSuccess(null)} variant="primary">
                 OK
               </Button>
             </DialogActions>
@@ -2023,7 +2023,7 @@ const CashierPanel = () => {
               </Box>
             </DialogContent>
             <DialogActions>
-              <Button variant="outlined" onClick={() => setRefundDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
                 {tI18n('cashier.cancel')}
               </Button>
               <Button variant="danger" onClick={handleRefund} disabled={processingAction?.type === 'refund'}>
