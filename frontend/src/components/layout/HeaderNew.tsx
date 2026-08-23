@@ -10,6 +10,7 @@ import CompactConnectionStatus from '../pwa/CompactConnectionStatus';
 import {
   Button, Icon,
 } from '../ui/macos';
+import LanguageSwitcher from '../LanguageSwitcher';
 import GlobalSearchBar from '../search/GlobalSearchBar';
 import ChatButton from '../chat/ChatButton';
 import { COLOR_SCHEMES } from '../../theme/colorScheme';
@@ -42,12 +43,11 @@ export function isThemeMenuInteraction(event: { composedPath?: () => EventTarget
 export default function HeaderNew() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t: rawT, language, setLanguage } = useTranslation();  // PR-50: i18n wired
+  const { t: rawT } = useTranslation();  // PR-UI-03b: language handled by LanguageSwitcher
   const t = rawT;
 
   const [state, setState] = useState(auth.getState());
   const { inboxOpen, setInboxOpen, getUnreadCount } = useNotificationCenter();
-  const [lang, setLang] = useState(language || 'ru');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);  // PR-50: profile dropdown
   const themeMenuRef = useRef<HTMLDivElement | null>(null);
@@ -56,8 +56,6 @@ export default function HeaderNew() {
 
   useEffect(() => auth.subscribe(setState), []);
 
-  // PR-50: sync lang with useTranslation
-  useEffect(() => { setLang(language); }, [language]);
 
   const { theme, colorScheme, setColorScheme } = useTheme();
 
@@ -171,13 +169,6 @@ export default function HeaderNew() {
     return items;
   }, [roleNormalized]);
 
-  // PR-50: changeLang now uses useTranslation's setLanguage (which updates
-  // React context + triggers re-render). Previously only wrote to localStorage
-  // — the toggle was decorative.
-  const changeLang = (v: string) => {
-    setLang(v);
-    setLanguage(v);  // updates useTranslation context → re-renders all consumers
-  };
 
   // QW-05 fix: global Back button. Previously navigate(-1) was used only in 2 of ~50
   // pages, leaving users on detail screens (PatientPickupView, etc.)
@@ -342,30 +333,10 @@ export default function HeaderNew() {
         background: theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-separator)'
       }} />
 
-      {/* 1) Язык — PR-50: replaced cycling button with <select> (H-1, H-2 fix) */}
-      <select
-        value={lang}
-        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => changeLang(e.target.value)}
-        aria-label={t('legacy.hn_select_language')}
-        title={t('legacy.hn_select_language')}
-        style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          padding: '6px 10px',
-          flex: '0 0 auto',
-          border: theme === 'dark' ? '1px solid rgba(255,255,255,0.14)' : '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-sm)',
-          backgroundColor: 'var(--mac-bg-secondary)',
-          color: 'var(--mac-text-primary)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-1)'
-        }}>
-        <option value="ru">RU</option>
-        <option value="uz">UZ</option>
-        <option value="en">EN</option>
-      </select>
+      {/* 1) Язык — PR-UI-03b: replaced inline <select> with canonical LanguageSwitcher
+          component (dropdown UI with flags + nativeName). LanguageSwitcher uses
+          useTranslation().setLanguage() directly — no local state duplication. */}
+      <LanguageSwitcher compact />
 
       {/* 2) Сеть */}
       <div style={{ flex: '0 0 auto' }}>
