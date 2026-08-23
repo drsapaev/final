@@ -22,7 +22,7 @@ import {
   MacOSCard,
   MacOSEmptyState,
   Input,
-  MacOSStatCard,
+  StatCard,
   Table,
 } from '../ui/macos';
 
@@ -375,28 +375,28 @@ const QueueCabinetManagement = () => {
 
           <div
             className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-mb-24">
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.qcm_stat_queues')}
               value={summary.totalQueues}
               icon={CalendarDays}
               color="blue"
               loading={loading}
             />
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.qcm_stat_with_cabinet')}
               value={summary.queuesWithCabinet}
               icon={MapPin}
               color="green"
               loading={loading}
             />
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.qcm_stat_cabinets')}
               value={summary.uniqueCabinets}
               icon={Building2}
               color="purple"
               loading={loading}
             />
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.qcm_stat_entries')}
               value={summary.totalEntries}
               icon={Users}

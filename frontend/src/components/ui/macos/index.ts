@@ -22,8 +22,9 @@ export { default as MacOSPagination } from './MacOSPagination';
 
 // Data Display Components
 export { default as Table } from './Table';
-export { default as MacOSStatCard } from './MacOSStatCard';
-export { default as MacOSMetricCard } from './MacOSMetricCard';
+// PR-UI-06: StatCard is canonical name. MacOSStatCard kept as backward-compat alias.
+export { default as StatCard } from './StatCard';
+export { default as MacOSStatCard } from './StatCard';
 export { default as List } from './List';
 
 // Utility Components
