@@ -51,7 +51,9 @@
 ### 5. ONE navigation model
 
 - ✅ **DO:** Все роли (Admin, Registrar, Doctor, Cashier, Lab, specialties) получают навигацию из одного и того же `SIDEBAR_PRESETS` registry, отфильтрованного по `profile.roles`.
-- ❌ **DON'T:** Хардкодить кнопки навигации в `HeaderNew.tsx` (текущая практика для registrar/cashier). Header = brand + search + notifications + profile + language + theme. НЕ навигация.
+- ❌ **DON'T:** Хардкодить кнопки навигации в `HeaderNew.tsx`. Header = brand + search + notifications + profile + language + theme. НЕ навигация.
+- ⚠️ **Shared-clinical workspace boundary (PR-UI-04c audit, 23.08.2026):**
+  `sidebarPreset: 'default'` is the canonical navigation boundary for shared clinical routes (`/clinical/appointments`, `/clinical/search`, `/clinical/scheduler`, `/clinical/pickup`). Role-specific presets (`registrar`, `cashier`, `doctor`, `lab`) apply to role workspaces only. The `default` preset provides RBAC-filtered shared clinical navigation via `getClinicalNavRoutes(profile)` — each role sees only the clinical routes it can access. **Do NOT override `default` with a role-specific preset based solely on the user's role.** This is a verified architectural decision, not a bug.
 
 ### 6. ONE icon system
 
