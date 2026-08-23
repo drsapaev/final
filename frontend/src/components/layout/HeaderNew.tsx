@@ -273,28 +273,9 @@ export default function HeaderNew() {
 
       {roleNormalized === 'registrar' && isRegistrarPanel &&
     <>
-          <Button
-        variant="outline"
-        size="small"
-        title={t('legacy.hn_registrar_home_title')}
-        onClick={() => navigate('/registrar/welcome')}
-        className="hdr-hide-md"
-        style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
-
-            <Icon name="house" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : undefined }} />
-            <span className="hdr-hide-md">{t('legacy.hn_registrar_home_title')}</span>
-          </Button>
-          <Button
-        variant="outline"
-        size="small"
-        title={t('legacy.hn_online_queue_title')}
-        onClick={() => navigate('/registrar/queue')}
-        className="hdr-hide-xs"
-        style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
-
-            <Icon name="bell" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
-            <span className="hdr-hide-sm">{t('legacy.hn_online_queue_title')}</span>
-          </Button>
+          {/* PR-UI-04: removed hardcoded "Home" and "Queue" nav buttons —
+              they're now in canonical Sidebar via SIDEBAR_PRESETS.registrar.
+              Kept only the "New appointment" CTA — it's a primary action, not navigation. */}
           <Button
         variant="primary"
         size="small"
