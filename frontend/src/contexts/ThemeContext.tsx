@@ -330,9 +330,10 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   useEffect(() => {
     persistColorSchemeLocally(colorScheme, theme);
     applyColorSchemeToDom(colorScheme, theme);
-    window.dispatchEvent(new CustomEvent('colorSchemeChanged', {
-      detail: colorScheme,
-    }));
+    // PR-UI-01: removed dispatch of 'colorSchemeChanged' CustomEvent.
+    // The only consumer was MacOSThemeProvider (deleted in this PR). Components
+    // that need to react to theme changes should read useTheme().colorScheme
+    // or useTheme().theme directly — React re-renders propagate the change.
   }, [colorScheme, theme]);
 
   useEffect(() => {

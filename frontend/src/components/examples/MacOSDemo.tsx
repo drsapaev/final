@@ -22,7 +22,6 @@ import {
   Textarea,
 } from '../ui/macos';
 import './MacOSDemo.css';
-import { AccentPicker } from '../ui/macos';
 import { notify } from '../../services/notify';
 
 /**
@@ -163,7 +162,6 @@ const MacOSDemo = () => {
 
               {/* Right section - Accent & Theme */}
               <div className="demo-header-right">
-                <AccentPicker />
                 <Button
               variant="ghost"
               size="small"

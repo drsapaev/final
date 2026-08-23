@@ -2,11 +2,9 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import FinanceModal from '../FinanceModal';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { MacOSThemeProvider } from '@/theme/macosTheme';
 
 const renderFinanceModal = (props = {}) => render(
-  <MacOSThemeProvider>
-    <ThemeProvider>
+      <ThemeProvider>
       <FinanceModal
         isOpen
         onClose={vi.fn()}
@@ -17,7 +15,6 @@ const renderFinanceModal = (props = {}) => render(
         {...props}
       />
     </ThemeProvider>
-  </MacOSThemeProvider>
 );
 
 describe('FinanceModal', () => {

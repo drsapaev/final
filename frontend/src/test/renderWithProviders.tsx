@@ -38,8 +38,7 @@
  *
  * Default providers (always included, in order — ALL side-effect-free):
  *   1. MemoryRouter — react-router context (most components use useNavigate/useLocation)
- *   2. MacOSThemeProvider — design-token theme context
- *   3. ThemeProvider — color-scheme + theme runtime
+ *   2. ThemeProvider — color-scheme + theme runtime + design-token accent context
  *   4. TranslationProvider — i18n (most components use useTranslation)
  *   5. NotificationCenterProvider — notification inbox state (no mount-time network)
  *   6. ToastProvider — toast UI (used by notify service)
@@ -67,7 +66,6 @@ import React from 'react';
 import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
 import { MemoryRouter, type MemoryRouterProps } from 'react-router-dom';
 import { ThemeProvider } from '../contexts/ThemeContext';
-import { MacOSThemeProvider } from '../theme/macosTheme';
 import { TranslationProvider } from '../i18n/useTranslation';
 import { NotificationCenterProvider } from '../contexts/NotificationCenterContext';
 import { NotificationWebSocketProvider } from '../contexts/NotificationWebSocketContext';
@@ -130,7 +128,6 @@ export function buildProviderWrapper(options: RenderWithProvidersOptions = {}) {
     }
     tree = <TranslationProvider>{tree}</TranslationProvider>;
     tree = <ThemeProvider>{tree}</ThemeProvider>;
-    tree = <MacOSThemeProvider>{tree}</MacOSThemeProvider>;
     if (!skipRouter) {
       tree = <MemoryRouter {...routerProps}>{tree}</MemoryRouter>;
     }

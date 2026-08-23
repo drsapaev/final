@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { MacOSThemeProvider } from '@/theme/macosTheme';
 
 const { apiGet, apiPost, apiDelete, loggerInfo, loggerError } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -89,11 +88,9 @@ function mockApiGetState({ statusSequence = [disabledStatus], devices = [] as Re
 function renderManager() {
   return render(
     <MemoryRouter>
-      <MacOSThemeProvider>
-        <ThemeProvider>
+              <ThemeProvider>
           <TwoFactorManager />
         </ThemeProvider>
-      </MacOSThemeProvider>
     </MemoryRouter>
   );
 }
