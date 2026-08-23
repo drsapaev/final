@@ -343,7 +343,7 @@
 .registrar-card-surface {
   margin: 0 1rem 2rem 1rem;
   max-width: none;
-  width: calc(100vw - 32px);
+  width: calc(100% - 2rem);
   background-color: var(--mac-bg-toolbar);
   border: 1px solid var(--mac-separator);
   border-radius: var(--mac-radius-lg);
@@ -659,7 +659,7 @@
 .registrar-tabs-wrapper {
   margin: 0 1rem;
   max-width: none;
-  width: calc(100vw - 32px);
+  width: calc(100% - 2rem);
 }
 
 /* Table container — visually merges with tabs above.
@@ -677,7 +677,7 @@
   margin: 0 1rem 2rem 1rem;
   box-shadow: var(--mac-shadow-lg);
   max-width: none;
-  width: calc(100vw - 32px);
+  width: calc(100% - 2rem);
   overflow: hidden;
 }
 .registrar-table-container[data-breakpoint="mobile"] {
