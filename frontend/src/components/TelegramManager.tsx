@@ -2484,7 +2484,7 @@ const TelegramManager = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowTemplateDialog(false)}>{t('misc.tg_cancel')}</Button>
-          <Button onClick={handleCreateTemplate} variant="contained">
+          <Button onClick={handleCreateTemplate} variant="primary">
             {t('misc.tg_create')}
           </Button>
         </DialogActions>

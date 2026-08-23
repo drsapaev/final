@@ -1199,15 +1199,15 @@ const DoctorPanel = () => {
                     <Calendar size={20} />
                     Отчет по записям
                   </Button>
-                  <Button variant="success" fullWidth disabled title={t("doctor.feature_in_development")}>
+                  <Button variant="secondary" color="success" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Activity size={20} />
                     Статистика работы
                   </Button>
-                  <Button variant="warning" fullWidth disabled title={t("doctor.feature_in_development")}>
+                  <Button variant="secondary" color="warning" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Pill size={20} />
                     Отчет по лекарствам
                   </Button>
-                  <Button variant="info" fullWidth disabled title={t("doctor.feature_in_development")}>
+                  <Button variant="secondary" color="info" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Heart size={20} />
                     Медицинская статистика
                   </Button>

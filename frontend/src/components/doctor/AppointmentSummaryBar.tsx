@@ -35,7 +35,8 @@ interface AppointmentSummaryBarProps {
   refreshDisabled?: boolean;
   refreshLabel?: string;
   BadgeComponent?: ComponentType<React.HTMLAttributes<HTMLSpanElement> & { variant?: string; children?: React.ReactNode }>;
-  ButtonComponent?: ComponentType<React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: React.ReactNode }>;
+  // PR-UI-05: Button is ForwardRefExoticComponent
+  ButtonComponent?: React.ComponentType<any>;
   buttonProps?: { style?: CSSProperties; [key: string]: unknown };
 }
 

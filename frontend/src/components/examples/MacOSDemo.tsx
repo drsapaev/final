@@ -234,11 +234,11 @@ const MacOSDemo = () => {
                   </Button>
                 </div>
                 <div className="demo-flex-wrap-2">
-                  <Button variant="success" className="demo-btn-icon">
+                  <Button variant="secondary" color="success" className="demo-btn-icon">
                     <Icon name="checkmark.circle" size="small" style={{ color: 'var(--mac-success)' }} />
                     Success
                   </Button>
-                  <Button variant="warning" className="demo-btn-icon">
+                  <Button variant="secondary" color="warning" className="demo-btn-icon">
                     <Icon name="exclamationmark.triangle" size="small" style={{ color: 'var(--mac-warning)' }} />
                     Warning
                   </Button>

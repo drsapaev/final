@@ -1,12 +1,18 @@
 import React, { type ReactNode, type CSSProperties, type MouseEvent } from 'react';
 import { useTranslation } from '@/i18n/useTranslation';
 
-type ButtonVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'destructive' | 'error' | 'ghost' | 'outline' | 'link' | string;
+// PR-UI-05: narrowed from 11 variants to 6.
+// Removed: default (-> secondary), success (-> secondary + color), warning (-> secondary + color),
+// destructive (-> danger), error (-> danger).
+// Semantic coloring now via `color` prop on secondary variant.
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger' | 'link' | string;
+type ButtonColor = 'default' | 'success' | 'warning' | 'danger' | 'info';
 type ButtonSize = 'small' | 'default' | 'large' | 'sm' | 'md' | 'lg' | string;
 
 interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style' | 'onClick'> {
   children?: ReactNode;
   variant?: ButtonVariant;
+  color?: ButtonColor;
   size?: ButtonSize;
   disabled?: boolean;
   loading?: boolean;
@@ -16,7 +22,6 @@ interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
   startIcon?: ReactNode;
   endIcon?: ReactNode;
-  color?: string;
   icon?: ReactNode;
   label?: ReactNode;
   action?: ReactNode;
@@ -42,7 +47,8 @@ interface SizeStyle extends CSSProperties {
  */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   children,
-  variant = 'default',
+  variant = 'secondary',
+  color = 'default',
   size = 'default',
   disabled = false,
   loading = false,
@@ -98,12 +104,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
       }
     };
 
-    const variantStyles: Record<ButtonVariant, CSSProperties> = {
-      default: {
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-        color: 'var(--mac-text-primary)',
-        border: '1px solid rgba(0, 0, 0, 0.1)'
-      },
+    // PR-UI-05: 6 canonical variants.
+    const variantStyles: Record<string, CSSProperties> = {
       primary: {
         backgroundColor: 'var(--mac-accent-blue)',
         color: 'white',
@@ -113,12 +115,41 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
         WebkitBackdropFilter: 'blur(10px)'
       },
       secondary: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
         color: 'var(--mac-text-primary)',
-        border: '1px solid rgba(255, 255, 255, 0.15)',
+        border: '1px solid rgba(0, 0, 0, 0.1)'
+      },
+      ghost: {
+        backgroundColor: 'transparent',
+        color: 'var(--mac-text-primary)',
+        border: '1px solid transparent',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)'
       },
+      outline: {
+        backgroundColor: 'transparent',
+        color: 'var(--mac-text-primary)',
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)'
+      },
+      danger: {
+        backgroundColor: 'var(--mac-error)',
+        color: 'white',
+        border: '1px solid #ff3b30',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+      },
+      link: {
+        backgroundColor: 'transparent',
+        color: 'var(--mac-accent-blue)',
+        border: 'none',
+        padding: '4px 8px',
+        textDecoration: 'none'
+      }
+    };
+
+    // PR-UI-05: color overrides for secondary variant (semantic coloring)
+    const colorOverrides: Record<string, Partial<CSSProperties>> = {
       success: {
         backgroundColor: 'var(--mac-success)',
         color: 'white',
@@ -137,26 +168,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
         border: '1px solid #ff3b30',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
-      ghost: {
-        backgroundColor: 'transparent',
-        color: 'var(--mac-text-primary)',
-        border: '1px solid transparent',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)'
-      },
-      outline: {
-        backgroundColor: 'transparent',
-        color: 'var(--mac-text-primary)',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)'
-      },
-      link: {
-        backgroundColor: 'transparent',
-        color: 'var(--mac-accent-blue)',
-        border: 'none',
-        padding: '4px 8px',
-        textDecoration: 'none'
+      info: {
+        backgroundColor: 'var(--mac-accent-blue)',
+        color: 'white',
+        border: '1px solid #007aff',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       }
     };
 
@@ -164,6 +180,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
       ...baseStyles,
       ...sizeStyles[size],
       ...variantStyles[variant],
+      // PR-UI-05: apply color overrides when variant is secondary
+      ...(color !== 'default' && (variant === 'secondary' || !variantStyles[variant]) ? colorOverrides[color] : {}),
       ...(fullWidth && { width: '100%' }),
       ...(disabled && {
         opacity: 0.5,
