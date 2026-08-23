@@ -40,7 +40,7 @@ export const SIDEBAR_PRESETS = {
     defaultItem: 'clinical-search',
   },
   // PR-UI-04: restored registrar preset (P-016 fix partially reversed).
-  // Cashier sidebar deferred — visual regression snapshots need updating first.
+  // Cashier sidebar restored — AppShell migration complete for all clinical roles.
   // Patient remains on TelegramMiniAppPatientShell (separate surface).
   registrar: {
     navigation: 'path',
@@ -52,9 +52,17 @@ export const SIDEBAR_PRESETS = {
       { id: 'clinical-search', label: 'Пациенты', icon: 'person.2', to: '/clinical/search' },
     ],
   },
-  // PR-UI-04: cashier sidebar deferred — visual regression snapshots need updating.
-  // Will be done in a follow-up PR after snapshots are regenerated.
-  // cashier: { navigation: 'path', defaultItem: 'cashier-home', items: [...] },
+  // PR-UI-04b: restored cashier preset (completes AppShell migration).
+  // Cashier sidebar: Касса (home) + Записи (shared clinical route).
+  // admin-finance excluded — role-scoped to Admin only.
+  cashier: {
+    navigation: 'path',
+    defaultItem: 'cashier-home',
+    items: [
+      { id: 'cashier-home', label: 'Касса', icon: 'creditcard', to: '/cashier' },
+      { id: 'clinical-appointments', label: 'Записи', icon: 'calendar', to: '/clinical/appointments' },
+    ],
+  },
   doctor: {
     navigation: 'query',
     queryParam: 'tab',
@@ -1083,7 +1091,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.cashier',
     component: 'CashierPanel',
     legacyRedirectFrom: ['/cashier-panel'],
-    layout: layout({ hideSidebar: true, pageTitle: 'Cashier Panel' }),
+    layout: layout({ sidebarPreset: 'cashier', activeSidebarItem: 'cashier-home', pageTitle: 'Cashier Panel' }),
   },
   {
     id: 'lab-home',

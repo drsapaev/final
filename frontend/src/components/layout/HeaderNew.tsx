@@ -163,8 +163,10 @@ export default function HeaderNew() {
   const navItems = useMemo(() => {
     const items: Array<{ to: string; label: string; icon: string }> = [];
     if (roleNormalized !== 'admin') {
+      // PR-UI-04b: cashier home button removed from header — now in canonical Sidebar
+      // via SIDEBAR_PRESETS.cashier. Cross-role navigation (registrar → cashier)
+      // is still available here for roles that don't have their own sidebar.
       if (roleNormalized === 'registrar') items.push({ to: getRoleHomeRoute('cashier'), label: t('legacy.hn_nav_cashier_role'), icon: 'creditcard' });
-      if (roleNormalized === 'cashier') items.push({ to: getRoleHomeRoute('cashier'), label: t('legacy.hn_nav_cashier_home'), icon: 'creditcard' });
     }
     return items;
   }, [roleNormalized]);
