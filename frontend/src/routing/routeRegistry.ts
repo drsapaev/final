@@ -39,14 +39,22 @@ export const SIDEBAR_PRESETS = {
     navigation: 'path',
     defaultItem: 'clinical-search',
   },
-  // P-016 fix: removed the `registrar`, `patient`, and `cashier` presets —
-  // all routes that referenced them set hideSidebar:true, so the items below
-  // were never rendered. The actual navigation for these roles lives in:
-  //   - registrar: HeaderNew.jsx (hardcoded buttons) + ModernTabs in page body
-  //   - patient:   TelegramMiniAppPatientShell (separate surface, no sidebar)
-  //   - cashier:   HeaderNew.jsx (single "Касса" button) + tabs in CashierPanel
-  // Keeping dead preset configuration here was misleading: it looked
-  // authoritative but never surfaced in the UI.
+  // PR-UI-04: restored registrar preset (P-016 fix partially reversed).
+  // Cashier sidebar deferred — visual regression snapshots need updating first.
+  // Patient remains on TelegramMiniAppPatientShell (separate surface).
+  registrar: {
+    navigation: 'path',
+    defaultItem: 'registrar-home',
+    items: [
+      { id: 'registrar-home', label: 'Обзор', icon: 'chart.bar', to: '/registrar/welcome' },
+      { id: 'registrar-queue', label: 'Очередь', icon: 'person.2', to: '/registrar/queue' },
+      { id: 'clinical-appointments', label: 'Записи', icon: 'calendar', to: '/clinical/appointments' },
+      { id: 'clinical-search', label: 'Пациенты', icon: 'person.2', to: '/clinical/search' },
+    ],
+  },
+  // PR-UI-04: cashier sidebar deferred — visual regression snapshots need updating.
+  // Will be done in a follow-up PR after snapshots are regenerated.
+  // cashier: { navigation: 'path', defaultItem: 'cashier-home', items: [...] },
   doctor: {
     navigation: 'query',
     queryParam: 'tab',
@@ -1003,7 +1011,7 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.registrar',
     component: 'RegistrarPanel',
     legacyRedirectFrom: ['/registrar-panel'],
-    layout: layout({ hideSidebar: true, pageTitle: 'Registrar Panel' }),
+    layout: layout({ sidebarPreset: 'registrar', activeSidebarItem: 'registrar-home', pageTitle: 'Registrar Panel' }),
   },
   // Strategic Direction 3: canonical nested routes for registrar views.
   // These replace the legacy ?view= query param pattern. Backward compat
@@ -1023,7 +1031,7 @@ export const ROUTE_REGISTRY = [
     title: 'Registrar — Welcome Dashboard',
     owner: 'clinical.registrar',
     component: 'RegistrarPanel',
-    layout: layout({ hideSidebar: true, pageTitle: 'Registrar — Welcome' }),
+    layout: layout({ sidebarPreset: 'registrar', activeSidebarItem: 'registrar-home', pageTitle: 'Registrar — Welcome' }),
   },
   {
     id: 'registrar-queue',
@@ -1039,7 +1047,7 @@ export const ROUTE_REGISTRY = [
     title: 'Registrar — Online Queue',
     owner: 'clinical.registrar',
     component: 'RegistrarPanel',
-    layout: layout({ hideSidebar: true, pageTitle: 'Registrar — Queue' }),
+    layout: layout({ sidebarPreset: 'registrar', activeSidebarItem: 'registrar-queue', pageTitle: 'Registrar — Queue' }),
   },
   {
     id: 'doctor-home',
