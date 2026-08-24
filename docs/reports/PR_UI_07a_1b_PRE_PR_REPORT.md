@@ -4,8 +4,8 @@
 > Per `AGENTS_UI.md` contract: stop here, wait for human review, do not auto-merge.
 
 **Date:** 2026-08-24
-**Branch:** `feat/ui-pr-07a-1b-admin-empty-states` (local only, NOT pushed)
-**Base:** `origin/main` @ `6c2e87c` (PR-UI-07a-1a merged)
+**Branch:** `feat/ui-pr-07a-1b-admin-empty-states`
+**Base:** `origin/main` @ `46f64f07` (C-3-B.4 — migrate --mac-focus-ring; correct base after rebase)
 **Scope phase:** Batch 1b — second migration batch per `docs/reports/PR_UI_07a_READ_ONLY_INVENTORY.md`
 
 ---
@@ -124,19 +124,25 @@ This is a **behavior fix** (retry button starts rendering) wrapped in a migratio
 
 ---
 
-## 4. Regression gate (all green)
+## 4. Regression gate — per-check actual status (per AGENTS_UI.md §13 contract)
 
-| Gate | Command | Result | Notes |
-|---|---|---|---|
-| TypeScript | `npx tsc --noEmit` | ✅ 0 errors | Clean — confirmed ReportsManager.tsx:624 revert restored type safety |
-| ESLint (13 changed files explicitly listed) | `npx eslint src/components/admin/AdminDashboard.tsx src/components/admin/BackupManagement.tsx src/components/admin/BenefitSettings.tsx src/components/admin/BranchManagement.tsx src/components/admin/ClinicManagement.tsx src/components/admin/EquipmentManagement.tsx src/components/admin/LicenseManagement.tsx src/components/admin/MedicalEquipmentManager.tsx src/components/admin/QueueCabinetManagement.tsx src/components/admin/ReportsManager.tsx src/components/admin/ServiceCatalog.tsx src/components/admin/SystemManagement.tsx src/components/admin/WizardSettings.tsx` (13 files, explicit list — NOT glob `*.tsx` which would expand to all 61 admin files and report 144 warnings) | ✅ 0 errors, 36 warnings | All 36 pre-existing (single-quote, unused vars); 0 delta from HEAD baseline (verified by stash + re-run on same 13 files) |
-| Vitest | `npx vitest run` | ✅ 165/165 test files, 1218/1218 tests passed (20.89s) | No test count delta from main baseline |
-| Vite build | `npx vite build` | ✅ Built successfully in 30.21s | Bundle sizes unchanged |
-| Programmatic prop check | Python script, brace-depth-aware, comment-line aware | ✅ 19/19 AppEmpty usages in changed files canonical (18 migrated by PR #2825 + 1 pre-existing from PR #2824), 0 dead props | None of `type`, `iconStyle`, `message`, `children`, `variant`, `size`, `className`, `style` transferred |
-| Production grep (residual MacOSEmptyState) | `grep -c "<MacOSEmptyState"` per file | ✅ All remaining MacOSEmptyState JSX is in 2 expected files: ReportsManager.tsx (1 — children latent bug deferred) + SystemManagement.tsx (2 — Group B iconStyle deferred). All other MacOSEmptyState refs are comment lines (no JSX). | See §5 below |
-| e2e (Playwright) | (not run locally) | ⏸ Deferred to CI per `AGENTS_UI.md` contract | Path filter `frontend_e2e` triggers only for `frontend/e2e/**`, `frontend/src/components/{registrar,queue,payment,emr,lab}/**`, etc. This PR touches only `frontend/src/components/admin/` — does NOT match. **e2e will be SKIPPED by CI path policy.** |
+> **NOT "all green"** — see per-check status below. The AGENTS_UI.md §13 contract requires 7 checks after every UI PR. This section records the actual result of each, run locally on the PR head commit.
 
-### 4.1 ESLint warning delta
+| # | Check | Command | Result | Details |
+|---|---|---|---|---|
+| 1 | Vitest unit | `npm run test` (`npx vitest run`) | ✅ PASS | 165/165 test files, 1218/1218 tests passed (22.52s) |
+| 2 | TypeScript strict | `npm run type-check` (`npx tsc --noEmit`) | ✅ PASS | 0 errors |
+| 3 | ESLint + jsx-a11y | `npm run lint:check` (`npx eslint "src/**/*.{ts,tsx}"`) | ✅ PASS | 0 errors, 3098 pre-existing warnings (no jsx-a11y errors blocking) |
+| 4 | Production build | `npm run build` (`npx vite build`) | ✅ PASS | success (32.20s) |
+| 5 | Theme compliance | `npm run check-theme` (`node scripts/check-theme-compliance.js`) | ✅ PASS (with warnings) | exit 0; 3098 pre-existing hardcoded-color warnings across codebase; all 13 changed admin files score 85/100 (same as origin/main baseline — no delta from this PR) |
+| 6 | Icon-only controls a11y | `npm run audit:icon-controls` (`node scripts/audit-icon-only-controls.mjs --strict --baseline=...`) | ✅ PASS | 391 files scanned, 0 findings, 0 new findings vs baseline |
+| 7 | Playwright e2e | `npm run test:e2e:run` (`npx playwright test`) | ⚠️ PARTIAL — 47/47 self-contained tests PASS; 21 spec files NOT APPLICABLE in local sandbox | See §4.2 below for full breakdown |
+| — | Programmatic prop check (extra) | Python script, brace-depth-aware, comment-line aware | ✅ PASS | 19/19 AppEmpty usages in changed files canonical (18 migrated + 1 pre-existing from PR #2824), 0 dead props |
+| — | Production grep (extra) | `grep -c "<MacOSEmptyState"` per file | ✅ PASS | All remaining MacOSEmptyState JSX is in expected files (see §5) |
+
+**Gate verdict:** 6/7 mandatory checks PASS, 1/7 PARTIAL (Playwright e2e — self-contained subset passes, backend-dependent subset not applicable in local sandbox). This is NOT "all green" — the Playwright gap is documented below.
+
+### 4.1 ESLint warning delta (13 changed files, explicit list)
 
 | File | HEAD warnings | After PR-UI-07a-1b | Delta |
 |---|---|---|---|
@@ -156,6 +162,32 @@ This is a **behavior fix** (retry button starts rendering) wrapped in a migratio
 | **Total** | **36** | **36** | **0** |
 
 All 36 warnings are pre-existing (single-quote style, unused vars) — 0 delta from HEAD.
+
+### 4.2 Playwright e2e — detailed breakdown
+
+**Self-contained spec files (PASS, 47/47 tests):**
+
+| Spec file | Tests | Result | Duration |
+|---|---|---|---|
+| `e2e/visual-regression.spec.ts` | 6 | ✅ PASS | 38.2s — covers cashier empty state, wizard steps (most relevant to PR #2825 visual delta) |
+| `e2e/cashier-ux-audit.spec.ts` | 12 | ✅ PASS | 1.1m — covers cashier empty state, modal, search, overflow menu |
+| `e2e/registrar-ux-audit.spec.ts` | 9 | ✅ PASS | 51.6s — covers registrar wizard, overflow menu, a11y |
+| `e2e/frontend-10-visual-a11y.spec.ts` | 12 | ✅ PASS | 22.8s — covers public pages a11y (backend proxy errors are non-blocking — tests use mocked routes) |
+| `e2e/frontend-10-route-smoke.spec.ts` | 8 | ✅ PASS | 15.5s — covers route redirects (backend proxy errors are non-blocking) |
+| **Subtotal** | **47** | **✅ all PASS** | ~2.7m total |
+
+**NOT APPLICABLE spec files (21 files, cannot run in local sandbox):**
+
+| Reason | Spec files |
+|---|---|
+| Requires `QA_ADMIN_PASSWORD` env var | `adm-05-passport-live.mjs.spec.ts` |
+| Requires live backend server (`/api/v1/` endpoints, no mocks) | `admin-navigation.spec.ts`, `ai-safety-guardrails.spec.ts`, `auth-flow.spec.ts`, `basic.spec.ts`, `panel-qa-admin-live.spec.ts`, `payment-system.spec.ts`, `print-system.spec.ts`, `queue-system.spec.ts`, `authenticated-rbac-deny.spec.ts`, `authenticated-role-smoke.spec.ts`, `cardio-fix-live.spec.ts`, `registrar-workflow.spec.ts`, `setup-login.spec.ts`, `messaging-rollout-proof.spec.ts`, `telegram-miniapp-release-gate.spec.ts`, `landing-language-switch.spec.ts`, `landing-scroll-mobile.spec.ts`, `landing-scroll.spec.ts`, `registrar-time.spec.ts`, `dermatology-heic-upload-smoke.spec.ts` |
+
+**Why NOT APPLICABLE:** These 21 spec files require either (a) a running backend server (FastAPI on port 8000) which is not available in this local sandbox, or (b) the `QA_ADMIN_PASSWORD` environment variable which is not set. They cannot be run locally without infrastructure setup that is out of scope for this PR's pre-merge verification.
+
+**CI behavior note:** The CI workflow `frontend_e2e` job in `.github/workflows/ci-cd-unified.yml` has a path filter that triggers e2e only for changes to `frontend/e2e/**`, `frontend/src/components/{registrar,queue,payment,emr,lab}/**`, `frontend/src/{pages,panels,routing}/**`, `App.jsx`, `PublicApp.jsx`. PR #2825 touches only `frontend/src/components/admin/` — does NOT match the path filter. **CI will SKIP e2e for this PR.** This is NOT "deferred to CI and passed" — CI does not run e2e for this PR at all.
+
+**Manual verification recommendation (post-merge):** Before merging, manually load each affected admin page (`/admin/appointments`, `/admin/patients`, `/admin/doctors`, `/admin/finance`, `/admin/dashboard`, `/admin/clinic`, `/admin/equipment`, `/admin/licenses`, `/admin/medical-equipment`, `/admin/queue-cabinet`, `/admin/reports`, `/admin/service-catalog`, `/admin/system`, `/admin/wizard-settings`, `/admin/backup`, `/admin/benefit`, `/admin/branch`) with API failure triggered (e.g., kill backend) to visually confirm the empty state renders without frame, error message visible, retry button works.
 
 ---
 
@@ -256,7 +288,7 @@ For the 2 `emptyState`-prop usages (ServiceCatalog:747, SystemManagement:557):
 - [x] 18 usages migrated by PR #2825 (verified by git diff: 18 removed `<MacOSEmptyState` + 18 added `<AppEmpty` opening tags); 19 total AppEmpty usages in changed files (18 migrated + 1 pre-existing from PR #2824 at AdminDashboard.tsx:323)
 - [x] 0 dead props transferred (programmatic verification)
 - [x] 1 latent bug discovered + reverted + deferred (ReportsManager.tsx:624 children)
-- [x] All gates green (tsc=0, eslint=0 errors / 36 pre-existing warnings, vitest=1218/1218, build=success)
+- [x] Gate status: 6/7 mandatory checks PASS (tsc=0, eslint=0 errors / 3098 pre-existing warnings, vitest=1218/1218, build=success, check-theme exit 0, audit:icon-controls 0 findings); 1/7 PARTIAL (Playwright e2e — 47/47 self-contained tests PASS, 21 spec files NOT APPLICABLE in local sandbox without backend/env vars). See §4 for full per-check breakdown.
 - [x] Pre-PR Report written (this document)
 - [ ] **STOP HERE** — wait for human review
 - [ ] Do NOT commit (will be done after review approval)
@@ -309,13 +341,16 @@ Includes audit trail: docs/reports/PR_UI_07a_1b_PRE_IMPLEMENTATION_INVENTORY.md.
 ### Latent bug discovered + deferred (NOT fixed in this PR)
 - ReportsManager.tsx:624 — <MacOSEmptyState>...<Button>retry</Button></MacOSEmptyState> uses children, which MacOSEmptyState declares in props interface but NEVER destructures or renders. So the retry Button is silently dropped today. AppEmpty does not accept children (strict typing) — migration would have caused tsc error. Reverted migration, deferred to PR-UI-07a-2 with bug fix (convert children to action prop, which is canonical and actually renders the button).
 
-### Regression gate (all green)
-- tsc --noEmit: 0 errors
-- eslint: 0 errors (36 pre-existing warnings, 0 delta from HEAD)
-- vitest: 165/165 files, 1218/1218 tests passed (20.89s)
-- vite build: success (30.21s)
-- Programmatic prop check: 19/19 AppEmpty usages in changed files use canonical props (18 migrated by PR #2825 + 1 pre-existing from PR #2824), 0 dead props
-- e2e: unverified — skipped by CI path policy (admin files not in frontend_e2e filter)
+### Regression gate (per-check actual status — NOT "all green")
+- tsc --noEmit: ✅ 0 errors
+- eslint: ✅ 0 errors (3098 pre-existing warnings, 0 delta from HEAD)
+- vitest: ✅ 165/165 files, 1218/1218 tests passed (22.52s)
+- vite build: ✅ success (32.20s)
+- check-theme: ✅ PASS (exit 0; 3098 pre-existing hardcoded-color warnings; 13 changed files score 85/100, no delta from baseline)
+- audit:icon-controls: ✅ PASS (391 files scanned, 0 findings, 0 new vs baseline)
+- Playwright e2e: ⚠️ PARTIAL — 47/47 self-contained tests PASS (visual-regression 6, cashier-ux-audit 12, registrar-ux-audit 9, frontend-10-visual-a11y 12, frontend-10-route-smoke 8); 21 spec files NOT APPLICABLE (require backend server or QA_ADMIN_PASSWORD env var, not available in local sandbox)
+- Programmatic prop check: ✅ 19/19 AppEmpty usages in changed files use canonical props (18 migrated + 1 pre-existing from PR #2824), 0 dead props
+- CI note: frontend_e2e CI job will SKIP this PR (path filter does not match admin/ changes) — e2e is NOT "deferred to CI and passed", it is simply not run by CI
 
 ### Out of scope (deferred)
 - ReportsManager.tsx:624 (children latent bug) → PR-UI-07a-2
