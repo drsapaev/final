@@ -1,13 +1,13 @@
 {
   "version": 1,
   "description": "UI_AUDIT_PLAN.md Phase 0 baseline. Ratchet: values may only improve (decrease). To move the baseline intentionally run: node scripts/ui-baseline.mjs --write-baseline and justify the change in the PR description.",
-  "generatedAt": "2026-08-24T12:33:13.385Z",
-  "gitCommit": "6ed4183",
+  "generatedAt": "2026-08-24T16:44:35.958Z",
+  "gitCommit": "7a1babd",
   "metrics": {
     "tokenSourceFiles": [
       {
         "file": "src/design-system/tokens.css",
-        "definitions": 237
+        "definitions": 238
       },
       {
         "file": "src/styles/emr-tokens.css",
@@ -48,7 +48,7 @@
       "other": 155,
       "surface": 7,
       "text-legacy": 10,
-      "mac": 122,
+      "mac": 123,
       "bg-legacy": 5,
       "accent-legacy": 13,
       "landing": 3,
@@ -62,8 +62,8 @@
       "theme/tokens-legacy.ts": 1,
       "theme/tokens/ dir": 1
     },
-    "undefinedVarNameCount": 164,
-    "undefinedVarUsages": 343,
+    "undefinedVarNameCount": 163,
+    "undefinedVarUsages": 330,
     "undefinedVarNames": [
       "--accent",
       "--admin-ai",
@@ -177,7 +177,6 @@
       "--mac-font-family",
       "--mac-font-family-mono",
       "--mac-font-mono",
-      "--mac-font-size-md",
       "--mac-font-weight-normal",
       "--mac-glass-bg",
       "--mac-glass-border",
@@ -230,8 +229,8 @@
       "--warning-border",
       "--warning-text"
     ],
-    "varUsagesTotal": 13177,
-    "varUsagesNoFallback": 12001,
+    "varUsagesTotal": 13173,
+    "varUsagesNoFallback": 11997,
     "cssHexOutsideTokens": 746,
     "tsxHex": 373,
     "tsxHexFiles": 64,
@@ -273,8 +272,8 @@
     "macTabImporters": 7,
     "modernTabsImporters": 2,
     "tablistRoles": 5,
-    "macEmptyStateImporters": 26,
-    "appEmptyImporters": 18,
+    "macEmptyStateImporters": 10,
+    "appEmptyImporters": 34,
     "appLoadingImporters": 10,
     "stateWrapperImporters": 2,
     "breakpointsUnique": [
