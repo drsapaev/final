@@ -129,7 +129,7 @@ This is a **behavior fix** (retry button starts rendering) wrapped in a migratio
 | Gate | Command | Result | Notes |
 |---|---|---|---|
 | TypeScript | `npx tsc --noEmit` | ✅ 0 errors | Clean — confirmed ReportsManager.tsx:624 revert restored type safety |
-| ESLint (13 changed files) | `npx eslint src/components/admin/*.tsx` (13 files) | ✅ 0 errors, 36 warnings | All 36 pre-existing (single-quote, unused vars); 0 delta from HEAD baseline (verified by stash + re-run) |
+| ESLint (13 changed files explicitly listed) | `npx eslint src/components/admin/AdminDashboard.tsx src/components/admin/BackupManagement.tsx src/components/admin/BenefitSettings.tsx src/components/admin/BranchManagement.tsx src/components/admin/ClinicManagement.tsx src/components/admin/EquipmentManagement.tsx src/components/admin/LicenseManagement.tsx src/components/admin/MedicalEquipmentManager.tsx src/components/admin/QueueCabinetManagement.tsx src/components/admin/ReportsManager.tsx src/components/admin/ServiceCatalog.tsx src/components/admin/SystemManagement.tsx src/components/admin/WizardSettings.tsx` (13 files, explicit list — NOT glob `*.tsx` which would expand to all 61 admin files and report 144 warnings) | ✅ 0 errors, 36 warnings | All 36 pre-existing (single-quote, unused vars); 0 delta from HEAD baseline (verified by stash + re-run on same 13 files) |
 | Vitest | `npx vitest run` | ✅ 165/165 test files, 1218/1218 tests passed (20.89s) | No test count delta from main baseline |
 | Vite build | `npx vite build` | ✅ Built successfully in 30.21s | Bundle sizes unchanged |
 | Programmatic prop check | Python script, brace-depth-aware, comment-line aware | ✅ 19/19 AppEmpty usages canonical, 0 dead props | None of `type`, `iconStyle`, `message`, `children`, `variant`, `size`, `className`, `style` transferred |
@@ -235,15 +235,18 @@ For the 2 `emptyState`-prop usages (ServiceCatalog:747, SystemManagement:557):
 
 | Metric | Before PR-UI-07a-1b | After PR-UI-07a-1b | Delta |
 |---|---|---|---|
-| Files referencing MacOSEmptyState (production, admin only) | 17 | 12 (5 Group B files + 2 partial files + 5 fully-migrated files where MacOSEmptyState only in comments) | -5 fully migrated |
-| Production JSX usages (admin only) | 33 | 14 (13 Group B + 1 ReportsManager:624 children latent bug) | -19 |
-| Files referencing AppEmpty (admin only) | 5 (from Batch 1a) | 13 (all 13 Batch 1b files now import AppEmpty) | +8 net new (Batch 1a's 5 + 8 new) |
+| Files referencing MacOSEmptyState (production, admin only) | 17 | 6 (4 Group-B-only files: BillingManager, DiscountBenefitsManager, DynamicPricingManager, WebhookManager + 2 partial files: SystemManagement, ReportsManager) | -11 |
+| Production JSX usages (admin only) | 33 | 14 (9 `type` + 4 `iconStyle` + 1 children latent bug) | -19 |
+| Files referencing AppEmpty (admin only) | 5 (from Batch 1a) | 17 (Batch 1a's 5 + 12 new from Batch 1b) | +12 net new |
 
-Wait, let me reconcile: 
-- Batch 1a migrated 5 files (AdminAppointments, AdminPatients, AdminDoctors, AdminFinanceOverview + AdminDashboard:324).
-- Batch 1b migrates 13 files. Of these, AdminDashboard.tsx was already in Batch 1a's file list (partial migration).
-- So total files importing AppEmpty after Batch 1b: 4 (from 1a) + 13 (from 1b, including AdminDashboard which already had AppEmpty from 1a) = **17 admin files import AppEmpty** after Batch 1b.
-- Total admin files still importing MacOSEmptyState after Batch 1b: ReportsManager.tsx + SystemManagement.tsx (both partial — kept for Group B / latent bug) + 5 Group B files (BillingManager, DiscountBenefitsManager, DynamicPricingManager, WebhookManager + SystemManagement already counted) = **5 admin files** still import MacOSEmptyState.
+**Reconciliation:**
+
+- **Batch 1a** migrated 5 admin files: AdminAppointments, AdminPatients, AdminDoctors, AdminFinanceOverview (4 fully-migrated) + AdminDashboard (partial — only line 324 migrated, retained MacOSEmptyState import for 3 deferred usages at lines 366/418/455).
+- **Batch 1b** migrates 13 admin files: 12 new files (BackupManagement, BenefitSettings, BranchManagement, ClinicManagement, EquipmentManagement, LicenseManagement, MedicalEquipmentManager, QueueCabinetManagement, ReportsManager, ServiceCatalog, SystemManagement, WizardSettings) + AdminDashboard (completing its partial migration from 1a — last 3 usages).
+- **After Batch 1b:**
+  - **17 admin files import AppEmpty** (Batch 1a's 5 + 12 new from Batch 1b — AdminDashboard counted once since it was already in 1a).
+  - **6 admin files still import MacOSEmptyState**: 4 Group-B-only files (BillingManager, DiscountBenefitsManager, DynamicPricingManager, WebhookManager — fully Group B, no AppEmpty) + 2 partial files (SystemManagement, ReportsManager — both import AppEmpty for migrated usages AND keep MacOSEmptyState for Group B/latent-bug usages).
+  - **14 MacOSEmptyState JSX usages remain** in admin: 9 with `type` prop (BillingManager 2, DiscountBenefitsManager 4, DynamicPricingManager 3) + 4 with `iconStyle` prop (SystemManagement 2, WebhookManager 2) + 1 with children latent bug (ReportsManager:624).
 
 ---
 
