@@ -17,7 +17,7 @@ import {
   Card as MacOSCard,
   Badge,
   Button,
-  MacOSEmptyState,
+  AppEmpty,
   Input,
   Skeleton,
   Select,
@@ -309,7 +309,7 @@ const AdminFinanceOverview = () => {
           {financeLoading ? (
             <Skeleton type="table" count={5} />
           ) : financeError ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={CreditCard}
               title={t('admin2.fo_error_title')}
               description={t('admin2.fo_error_desc')}
@@ -321,7 +321,7 @@ const AdminFinanceOverview = () => {
               )}
             />
           ) : transactions.length === 0 ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={CreditCard}
               title={t('admin2.fo_empty_title')}
               description={financeSearchTerm || filterType || filterCategory || filterDateRange || financeFilterStatus

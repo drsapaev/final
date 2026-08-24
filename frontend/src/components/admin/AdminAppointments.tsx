@@ -13,7 +13,7 @@ import {
   Button,
   MacOSCard,
   StatCard,
-  MacOSEmptyState,
+  AppEmpty,
   Input,
   Skeleton,
   Select,
@@ -384,7 +384,7 @@ const AdminAppointments = () => {
           {loading ? (
             <Skeleton type="table" count={5} />
           ) : error ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={RefreshCw}
               title={t('admin2.appt_load_error_title')}
               description={t('admin2.appt_load_error_desc')}
@@ -395,7 +395,7 @@ const AdminAppointments = () => {
               }
             />
           ) : appointments.length === 0 ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={Calendar}
               title={t('admin2.appt_empty_title')}
               description={
