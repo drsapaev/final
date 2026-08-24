@@ -29,7 +29,11 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FRONTEND = resolve(__dirname, '..');
+/**
+ * C-3-A.1: UI_BASELINE_ROOT lets tests point the scanner at a fixture
+ * project instead of the real frontend (see uiBaselineScanner.test.ts).
+ */
+const FRONTEND = process.env.UI_BASELINE_ROOT || resolve(__dirname, '..');
 const SRC = join(FRONTEND, 'src');
 const DEFAULT_BASELINE = join(__dirname, 'ui-baseline.json');
 
@@ -83,6 +87,16 @@ function text(f) {
 }
 function stripCssComments(s) {
   return s.replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+/**
+ * C-3-A.1 fix: strip JS/TS comments BEFORE token counting, so commented-out
+ * `var(--foo)` no longer counts as a usage (scanner false-positive class 1).
+ */
+function stripJsComments(s) {
+  return s
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 }
 
 // ─── 1. Token systems ────────────────────────────────────────────────────────
@@ -163,18 +177,35 @@ const VAR_USE = /var\(\s*(--[A-Za-z0-9_-]+)/g;
 const VAR_USE_NO_FALLBACK = /var\(\s*--[A-Za-z0-9_-]+\s*\)/g;
 const SETPROP = /setProperty\(\s*['"](--[A-Za-z0-9_-]+)['"]/g;
 
-const runtimeDefined = new Set();
+/**
+ * C-3-A.1 fix: inline custom-property writers `style={{ '--foo': value }}`
+ * are RUNTIME SLOTS intentionally undefined in CSS (written per-instance),
+ * NOT missing tokens (false-positive class 2: e.g. --admin-col0 in
+ * AdminFinanceOverview.tsx, --doctor-gradient-from/to in DoctorPanel.tsx).
+ */
+const INLINE_PROP_WRITER = /['"`](--[A-Za-z0-9_-]+)['"`]\s*:\s*[^;\n]*[,}]/g;
+const bodyOf = (f) =>
+  extname(f) === '.css' ? stripCssComments(text(f)) : stripJsComments(text(f));
+
+const runtimeDefined = new Set(); // setProperty(...) writers
 for (const f of codeFiles) {
-  const body = text(f);
+  const body = bodyOf(f);
   let m;
   SETPROP.lastIndex = 0;
   while ((m = SETPROP.exec(body)) !== null) runtimeDefined.add(m[1]);
+}
+// inline `{'--foo': ...}` writers (style objects in TSX/TS)
+for (const f of tsxFiles) {
+  const body = bodyOf(f);
+  let m;
+  INLINE_PROP_WRITER.lastIndex = 0;
+  while ((m = INLINE_PROP_WRITER.exec(body)) !== null) runtimeDefined.add(m[1]);
 }
 
 const usedVars = new Set();
 let varUsages = 0;
 for (const f of [...cssFiles, ...codeFiles]) {
-  const body = extname(f) === '.css' ? stripCssComments(text(f)) : text(f);
+  const body = bodyOf(f); // C-3-A.1: JS/TS comments stripped for code files
   let m;
   VAR_USE.lastIndex = 0;
   while ((m = VAR_USE.exec(body)) !== null) {
@@ -184,7 +215,7 @@ for (const f of [...cssFiles, ...codeFiles]) {
 }
 let varUsagesNoFallback = 0;
 for (const f of [...cssFiles, ...codeFiles]) {
-  const body = extname(f) === '.css' ? stripCssComments(text(f)) : text(f);
+  const body = bodyOf(f); // C-3-A.1: same comment-stripping as varUsages
   varUsagesNoFallback += (body.match(VAR_USE_NO_FALLBACK) || []).length;
 }
 const undefinedVarNames = [...usedVars]
@@ -195,7 +226,8 @@ for (const n of undefinedVarNames) {
   const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const re = new RegExp(`var\\(\\s*${esc}[\\s,)]`, 'g');
   for (const f of [...cssFiles, ...codeFiles]) {
-    undefinedVarUsages += (text(f).match(re) || []).length;
+    // C-3-A.1: count on comment-stripped bodies (was raw text)
+    undefinedVarUsages += (bodyOf(f).match(re) || []).length;
   }
 }
 
