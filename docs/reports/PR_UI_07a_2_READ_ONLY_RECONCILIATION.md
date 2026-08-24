@@ -229,9 +229,9 @@ Given the analysis above, PR-UI-07a-2 can be split into 3 sub-batches:
 
 | Sub-batch | Scope | Usages | Files | Risk |
 |---|---|---|---|---|
-| **PR-UI-07a-2a** | Group B-1: drop `type` prop (mechanical) | 9 | 3 (BillingManager, DiscountBenefitsManager, DynamicPricingManager) | LOW — dead prop removal, no visual/behavior change |
-| **PR-UI-07a-2b** | Group B-2: drop `iconStyle` prop (mechanical, no color override) | 4 | 2 (SystemManagement, WebhookManager) | LOW — dead prop removal, no visual/behavior change |
-| **PR-UI-07a-2c** | Group C: ReportsManager:624 children → action (bug fix) | 1 | 1 (ReportsManager) | MEDIUM — behavior fix (retry button starts rendering); visual delta (~8px margin) |
+| **PR-UI-07a-2a** | Group B-1: drop `type` prop (mechanical) | 9 | 3 (BillingManager, DiscountBenefitsManager, DynamicPricingManager) | LOW — dead prop removal (`type` was silently dropped today). Visual delta: AppEmpty forces `variant="minimal"` (transparent bg, no border, no radius) — same framing change as Batch 1a/1b, intentional per Medical Minimalism direction. No behavior change. |
+| **PR-UI-07a-2b** | Group B-2: drop `iconStyle` prop (mechanical, no color override) | 4 | 2 (SystemManagement, WebhookManager) | LOW — dead prop removal (`iconStyle` was silently dropped today due to local variable shadowing). Visual delta: same `variant="minimal"` framing change as 2a. No behavior change. |
+| **PR-UI-07a-2c** | Group C: ReportsManager:624 children → action (bug fix) | 1 | 1 (ReportsManager) | MEDIUM — behavior fix (retry button starts rendering — was silently dropped today because MacOSEmptyState never renders children). Visual delta: `variant="minimal"` framing change + ~8px margin delta from action wrapper. Functional improvement. |
 
 **Total: 14 usages across 5 files (some files appear in multiple sub-batches).**
 
