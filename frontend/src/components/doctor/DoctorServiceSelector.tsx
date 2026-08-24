@@ -386,11 +386,9 @@ const DoctorServiceSelector = ({
                 }}
                 onFocus={(e: React.FocusEvent<HTMLElement>) => {
                   e.currentTarget.style.borderColor = 'var(--mac-accent)';
-                  e.currentTarget.style.boxShadow = 'var(--mac-focus-ring)';
                 }}
                 onBlur={(e: React.FocusEvent<HTMLElement>) => {
                   e.currentTarget.style.borderColor = 'var(--mac-border)';
-                  e.currentTarget.style.boxShadow = 'none';
                 }}
                 min="0" /> :
 

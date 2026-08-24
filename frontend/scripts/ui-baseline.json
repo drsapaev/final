@@ -1,8 +1,8 @@
 {
   "version": 1,
   "description": "UI_AUDIT_PLAN.md Phase 0 baseline. Ratchet: values may only improve (decrease). To move the baseline intentionally run: node scripts/ui-baseline.mjs --write-baseline and justify the change in the PR description.",
-  "generatedAt": "2026-08-24T05:48:57.197Z",
-  "gitCommit": "6ce984c",
+  "generatedAt": "2026-08-24T06:18:39.403Z",
+  "gitCommit": "291fde6",
   "metrics": {
     "tokenSourceFiles": [
       {
@@ -62,8 +62,8 @@
       "theme/tokens-legacy.ts": 1,
       "theme/tokens/ dir": 1
     },
-    "undefinedVarNameCount": 165,
-    "undefinedVarUsages": 363,
+    "undefinedVarNameCount": 164,
+    "undefinedVarUsages": 358,
     "undefinedVarNames": [
       "--accent",
       "--admin-ai",
@@ -174,7 +174,6 @@
       "--mac-danger-bg",
       "--mac-destructive",
       "--mac-fill-quaternary",
-      "--mac-focus-ring",
       "--mac-font-family",
       "--mac-font-family-mono",
       "--mac-font-mono",
@@ -231,8 +230,8 @@
       "--warning-border",
       "--warning-text"
     ],
-    "varUsagesTotal": 13180,
-    "varUsagesNoFallback": 11995,
+    "varUsagesTotal": 13175,
+    "varUsagesNoFallback": 11990,
     "cssHexOutsideTokens": 746,
     "tsxHex": 373,
     "tsxHexFiles": 64,
@@ -274,8 +273,8 @@
     "macTabImporters": 7,
     "modernTabsImporters": 2,
     "tablistRoles": 5,
-    "macEmptyStateImporters": 30,
-    "appEmptyImporters": 13,
+    "macEmptyStateImporters": 26,
+    "appEmptyImporters": 18,
     "appLoadingImporters": 10,
     "stateWrapperImporters": 2,
     "breakpointsUnique": [
