@@ -27,6 +27,7 @@ import {
   Table,
   Input,
   MacOSEmptyState,
+  AppEmpty,
   Select,
   SegmentedControl,
 } from '../ui/macos';
@@ -440,7 +441,7 @@ const ReportsManager = () => {
 
         {files.length === 0 ?
       <div className="admin-flex-center-justify-h-300">
-            <MacOSEmptyState
+            <AppEmpty
           icon={FileX}
           title={t('admin2.rm_empty_files_title')}
           description={t('admin2.rm_empty_files_desc')} />

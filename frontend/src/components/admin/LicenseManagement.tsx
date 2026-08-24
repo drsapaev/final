@@ -28,7 +28,7 @@ import {
   Select,
   Textarea,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
 } from '../ui/macos';
 import { api } from '../../api/client';
@@ -527,7 +527,7 @@ const LicenseManagement = () => {
         )}
         </div> :
       filteredLicenses.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Key}
         title={licenseEmptyTitle}
         description={licenseEmptyDescription}

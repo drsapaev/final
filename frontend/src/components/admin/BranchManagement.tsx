@@ -21,7 +21,7 @@ import {
   Select,
   Checkbox,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
 } from '../ui/macos';
 import { api } from '../../api/client';
@@ -551,7 +551,7 @@ const BranchManagement = () => {
         )}
         </div> :
       filteredBranches.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Building2}
         title={branchEmptyTitle}
         description={branchEmptyDescription}
