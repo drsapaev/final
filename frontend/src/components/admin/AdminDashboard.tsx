@@ -19,6 +19,7 @@ import {
 import {
   Card as MacOSCard,
   Badge,
+  AppEmpty,
   MacOSEmptyState,
   Button,
   Skeleton,
@@ -320,7 +321,7 @@ const AdminDashboard = () => {
             <Skeleton type="card" count={6} />
           </div>
         ) : statsError ? (
-          <MacOSEmptyState
+          <AppEmpty
             icon={AlertCircle}
             title={t('admin2.adm_error_load_stats')}
             description={t('admin2.adm_error_load_stats_desc')}
