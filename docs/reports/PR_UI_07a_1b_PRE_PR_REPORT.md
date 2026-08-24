@@ -134,7 +134,7 @@ This is a **behavior fix** (retry button starts rendering) wrapped in a migratio
 | 2 | TypeScript strict | `npm run type-check` (`npx tsc --noEmit`) | ✅ PASS | 0 errors |
 | 3 | ESLint + jsx-a11y | `npm run lint:check` (`npx eslint "src/**/*.{ts,tsx}"`) | ✅ PASS | 0 errors, 3098 pre-existing warnings (no jsx-a11y errors blocking) |
 | 4 | Production build | `npm run build` (`npx vite build`) | ✅ PASS | success (32.20s) |
-| 5 | Theme compliance | `npm run check-theme` (`node scripts/check-theme-compliance.js`) | ✅ PASS (with warnings) | exit 0; 3098 pre-existing hardcoded-color warnings across codebase; all 13 changed admin files score 85/100 (same as origin/main baseline — no delta from this PR) |
+| 5 | Theme compliance | `npm run check-theme` (`node scripts/check-theme-compliance.js`) | ✅ PASS (with warnings) | exit 0; 182 warning-bearing files, 1372 hardcoded-color occurrences across codebase (all pre-existing); changed admin files: AdminDashboard.tsx=85/100, AdminPatients.tsx=85/100, AdminAppointments.tsx=70/100 (5 hardcoded colors — pre-existing, not from this PR); remaining 10 changed admin files have no warning entry (effectively 100/100). No delta from this PR — same scores as origin/main baseline. |
 | 6 | Icon-only controls a11y | `npm run audit:icon-controls` (`node scripts/audit-icon-only-controls.mjs --strict --baseline=...`) | ✅ PASS | 391 files scanned, 0 findings, 0 new findings vs baseline |
 | 7 | Playwright e2e | `npm run test:e2e:run` (`npx playwright test`) | ⚠️ PARTIAL — 47/47 self-contained tests PASS; 21 spec files NOT APPLICABLE in local sandbox | See §4.2 below for full breakdown |
 | — | Programmatic prop check (extra) | Python script, brace-depth-aware, comment-line aware | ✅ PASS | 19/19 AppEmpty usages in changed files canonical (18 migrated + 1 pre-existing from PR #2824), 0 dead props |
@@ -183,7 +183,7 @@ All 36 warnings are pre-existing (single-quote style, unused vars) — 0 delta f
 | Requires `QA_ADMIN_PASSWORD` env var | `adm-05-passport-live.mjs.spec.ts` |
 | Requires live backend server (`/api/v1/` endpoints, no mocks) | `admin-navigation.spec.ts`, `ai-safety-guardrails.spec.ts`, `auth-flow.spec.ts`, `basic.spec.ts`, `panel-qa-admin-live.spec.ts`, `payment-system.spec.ts`, `print-system.spec.ts`, `queue-system.spec.ts`, `authenticated-rbac-deny.spec.ts`, `authenticated-role-smoke.spec.ts`, `cardio-fix-live.spec.ts`, `registrar-workflow.spec.ts`, `setup-login.spec.ts`, `messaging-rollout-proof.spec.ts`, `telegram-miniapp-release-gate.spec.ts`, `landing-language-switch.spec.ts`, `landing-scroll-mobile.spec.ts`, `landing-scroll.spec.ts`, `registrar-time.spec.ts`, `dermatology-heic-upload-smoke.spec.ts` |
 
-**Why NOT APPLICABLE:** These 21 spec files require either (a) a running backend server (FastAPI on port 8000) which is not available in this local sandbox, or (b) the `QA_ADMIN_PASSWORD` environment variable which is not set. They cannot be run locally without infrastructure setup that is out of scope for this PR's pre-merge verification.
+**Why NOT APPLICABLE:** These 21 spec files require either (a) a running backend server (FastAPI on port 18000, per `frontend/vite.config.ts:37` — `VITE_PROXY_TARGET || BACKEND_URL || "http://localhost:18000"`) which is not available in this local sandbox, or (b) the `QA_ADMIN_PASSWORD` environment variable which is not set. They cannot be run locally without infrastructure setup that is out of scope for this PR's pre-merge verification.
 
 **CI behavior note:** The CI workflow `frontend_e2e` job in `.github/workflows/ci-cd-unified.yml` has a path filter that triggers e2e only for changes to `frontend/e2e/**`, `frontend/src/components/{registrar,queue,payment,emr,lab}/**`, `frontend/src/{pages,panels,routing}/**`, `App.jsx`, `PublicApp.jsx`. PR #2825 touches only `frontend/src/components/admin/` — does NOT match the path filter. **CI will SKIP e2e for this PR.** This is NOT "deferred to CI and passed" — CI does not run e2e for this PR at all.
 
@@ -346,7 +346,7 @@ Includes audit trail: docs/reports/PR_UI_07a_1b_PRE_IMPLEMENTATION_INVENTORY.md.
 - eslint: ✅ 0 errors (3098 pre-existing warnings, 0 delta from HEAD)
 - vitest: ✅ 165/165 files, 1218/1218 tests passed (22.52s)
 - vite build: ✅ success (32.20s)
-- check-theme: ✅ PASS (exit 0; 3098 pre-existing hardcoded-color warnings; 13 changed files score 85/100, no delta from baseline)
+- check-theme: ✅ PASS (exit 0; 182 warning-bearing files, 1372 hardcoded-color occurrences across codebase — all pre-existing; changed admin files: 3 with warnings (AdminDashboard=85/100, AdminPatients=85/100, AdminAppointments=70/100), 10 with no warnings (100/100); no delta from origin/main baseline)
 - audit:icon-controls: ✅ PASS (391 files scanned, 0 findings, 0 new vs baseline)
 - Playwright e2e: ⚠️ PARTIAL — 47/47 self-contained tests PASS (visual-regression 6, cashier-ux-audit 12, registrar-ux-audit 9, frontend-10-visual-a11y 12, frontend-10-route-smoke 8); 21 spec files NOT APPLICABLE (require backend server or QA_ADMIN_PASSWORD env var, not available in local sandbox)
 - Programmatic prop check: ✅ 19/19 AppEmpty usages in changed files use canonical props (18 migrated + 1 pre-existing from PR #2824), 0 dead props
