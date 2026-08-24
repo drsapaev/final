@@ -10,7 +10,7 @@ import {
   Select,
   Textarea,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
 } from '../ui/macos';
 import {
   Plus,
@@ -507,8 +507,7 @@ const DynamicPricingManager = () => {
       {/* Список правил */}
       <div className="admin-grid-gap-16">
         {pricingRules.length === 0 ?
-      <MacOSEmptyState
-        type="rule"
+      <AppEmpty
         title={t('admin2.dp_rules_empty_title')}
         description={t('admin2.dp_rules_empty_desc')}
         action={
@@ -771,8 +770,7 @@ const DynamicPricingManager = () => {
       {/* Список пакетов */}
       <div className="admin-grid-gap-16">
         {servicePackages.length === 0 ?
-      <MacOSEmptyState
-        type="package"
+      <AppEmpty
         title={t('admin2.dp_packages_empty_title')}
         description={t('admin2.dp_packages_empty_desc')}
         action={
@@ -1020,8 +1018,7 @@ const DynamicPricingManager = () => {
           </MacOSCard>
         </div> :
 
-    <MacOSEmptyState
-      type="analytics"
+    <AppEmpty
       title={t('admin2.dp_analytics_empty_title')}
       description={t('admin2.dp_analytics_empty_desc')} />
 
