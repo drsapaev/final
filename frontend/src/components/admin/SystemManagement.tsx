@@ -34,6 +34,7 @@ import {
   Checkbox,
   Table,
   MacOSEmptyState,
+  AppEmpty,
   Select,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
@@ -554,7 +555,7 @@ const SystemManagement = () => {
 
         }))}
         emptyState={
-        <MacOSEmptyState
+        <AppEmpty
           icon={Database}
           title={t('admin2.sm_no_backups')}
           description={t('admin2.sm_no_backups_desc')} />

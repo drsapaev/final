@@ -20,7 +20,7 @@ import {
   Input,
   Checkbox,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
   Badge,
   Modal,
@@ -127,7 +127,7 @@ const BenefitSettings = () => {
               {t('admin2.bs_title')}
             </h2>
           </div>
-          <MacOSEmptyState
+          <AppEmpty
             icon={AlertCircle}
             title={t('admin2.bs_empty_title')}
             description={t('admin2.bs_empty_desc')}

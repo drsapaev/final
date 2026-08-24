@@ -24,7 +24,7 @@ import {
   SegmentedControl,
   StatCard,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
   Badge,
   Modal,
@@ -200,7 +200,7 @@ const ClinicManagement = () => {
         }
           </div> :
 
-      <MacOSEmptyState
+      <AppEmpty
         icon={Activity}
         title={t('admin2.cm_loading_system_status')}
         description={t('admin2.cm_loading_system_status_desc')} />
@@ -248,7 +248,7 @@ const ClinicManagement = () => {
       
         </div> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={BarChart3}
       title={t('admin2.cm_stats_unavailable')}
       description={t('admin2.cm_stats_unavailable_desc')} />
@@ -326,7 +326,7 @@ const ClinicManagement = () => {
               {t('admin2.cm_page_title')}
             </h2>
           </div>
-          <MacOSEmptyState
+          <AppEmpty
             icon={AlertTriangle}
             title={t('admin2.cm_load_data_failed')}
             description={t('admin2.cm_load_data_failed_desc')}

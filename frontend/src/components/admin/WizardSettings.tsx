@@ -6,7 +6,7 @@ import {
   Button,
   Checkbox,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
   Badge,
   Modal,
@@ -114,7 +114,7 @@ const WizardSettings = () => {
               {t('admin2.ws_title')}
             </h2>
           </div>
-          <MacOSEmptyState
+          <AppEmpty
           icon={AlertCircle}
           title={t('admin2.ws_load_error_title')}
           description={t('admin2.ws_load_error_hint')}

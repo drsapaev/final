@@ -20,7 +20,6 @@ import {
   Card as MacOSCard,
   Badge,
   AppEmpty,
-  MacOSEmptyState,
   Button,
   Skeleton,
   StatCard,
@@ -364,7 +363,7 @@ const AdminDashboard = () => {
               </div>
             ) : activityChartError ? (
               <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface } as CSSProperties}>
-                <MacOSEmptyState
+                <AppEmpty
                   icon={AlertTriangle}
                   title={t('admin2.adm_error_load_chart')}
                   description={t('admin2.adm_error_load_chart_desc')}
@@ -416,7 +415,7 @@ const AdminDashboard = () => {
               </div>
             ) : recentActivitiesError ? (
               <div className="p-4">
-                <MacOSEmptyState
+                <AppEmpty
                   icon={AlertTriangle}
                   title={t('admin2.adm_error_load')}
                   description={t('admin2.adm_error_load_recent_actions_desc')}
@@ -453,7 +452,7 @@ const AdminDashboard = () => {
             </div>
           ) : systemAlertsError ? (
             <div className="p-4">
-              <MacOSEmptyState
+              <AppEmpty
                 icon={AlertTriangle}
                 title={t('admin2.adm_error_load')}
                 description={t('admin2.adm_error_load_system_notifications_desc')}

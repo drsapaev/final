@@ -20,7 +20,7 @@ import {
   Badge,
   Button,
   MacOSCard,
-  MacOSEmptyState,
+  AppEmpty,
   Input,
   StatCard,
   Table,
@@ -477,7 +477,7 @@ const QueueCabinetManagement = () => {
           </MacOSCard>
 
           {!loading && queues.length === 0 ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={Building2}
               title={t('admin2.qcm_empty_title')}
               description={t('admin2.qcm_empty_description')}
