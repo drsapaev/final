@@ -120,7 +120,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
       case 'create':
         return 'var(--mac-success)';
       case 'update':
-        return 'var(--mac-info)';
+        return 'var(--mac-accent)';
       case 'delete':
       case 'deactivate':
         return 'var(--mac-error)';

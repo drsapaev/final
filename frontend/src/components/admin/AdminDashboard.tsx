@@ -128,7 +128,7 @@ function getStatusIcon(status: unknown) {
     success: 'var(--mac-success)',
     warning: 'var(--mac-warning)',
     error: 'var(--mac-error)',
-    info: 'var(--mac-info)',
+    info: 'var(--mac-accent)',
     default: 'var(--mac-text-tertiary)',
   };
 

@@ -22,7 +22,7 @@
 .admin-text-purple    { color: var(--mac-accent-purple); }
 .admin-text-orange    { color: var(--mac-accent-orange); }
 .admin-text-on-accent { color: var(--mac-text-on-accent); }
-.admin-text-info      { color: var(--mac-info); }
+.admin-text-info      { color: var(--mac-accent); }
 
 /* ─── Text styles ─── */
 .admin-text-sm    { font-size: var(--mac-font-size-sm); }
@@ -114,7 +114,7 @@
 .admin-stat-number-info-mb-4 {
   font-size: var(--mac-font-size-2xl);
   font-weight: var(--mac-font-weight-bold);
-  color: var(--mac-info);
+  color: var(--mac-accent);
   margin-bottom: 4px;
 }
 .admin-stat-number-xl-bold {
@@ -442,7 +442,7 @@
 .admin-icon-20-warning  { width: 20px; height: 20px; color: var(--mac-warning); }
 .admin-icon-20-error    { width: 20px; height: 20px; color: var(--mac-danger); }
 .admin-icon-20-blue     { width: 20px; height: 20px; color: var(--mac-accent-blue); }
-.admin-icon-24-info     { width: 24px; height: 24px; color: var(--mac-info); }
+.admin-icon-24-info     { width: 24px; height: 24px; color: var(--mac-accent); }
 .admin-icon-24-success  { width: 24px; height: 24px; color: var(--mac-success); }
 .admin-icon-24-warning  { width: 24px; height: 24px; color: var(--mac-warning); }
 .admin-icon-24-danger   { width: 24px; height: 24px; color: var(--mac-danger); }
@@ -515,8 +515,8 @@
 /* ─── Info / success / warning banners ─── */
 .admin-info-banner {
   padding: 16px;
-  background-color: var(--mac-info-bg, rgba(0, 122, 255, 0.12));
-  border: 1px solid var(--mac-info-border, var(--mac-accent-blue));
+  background-color: var(--mac-accent-bg, rgba(0, 122, 255, 0.12));
+  border: 1px solid var(--mac-accent-blue, var(--mac-accent-blue));
 }
 .admin-success-banner {
   padding: 16px;
@@ -1161,8 +1161,8 @@
 /* ─── Stat card banner (p-16 + bg + border) ─── */
 .admin-stat-banner-info {
   padding: 16px;
-  background-color: var(--mac-info-bg, rgba(0, 122, 255, 0.12));
-  border: 1px solid var(--mac-info-border, var(--mac-accent-blue));
+  background-color: var(--mac-accent-bg, rgba(0, 122, 255, 0.12));
+  border: 1px solid var(--mac-accent-blue, var(--mac-accent-blue));
 }
 .admin-stat-banner-success {
   padding: 16px;
@@ -2879,8 +2879,8 @@
 /* Activation: card info bg + border */
 .admin-card-info-bg {
   padding: 24px;
-  background-color: var(--mac-info-bg);
-  border: 1px solid var(--mac-info-border);
+  background-color: var(--mac-accent-bg);
+  border: 1px solid var(--mac-accent-blue);
 }
 
 /* Activation: shield h3 (lg + med + mb-8 + flex center + info color) */
@@ -2890,7 +2890,7 @@
   margin-bottom: 8px;
   display: flex;
   align-items: center;
-  color: var(--mac-info);
+  color: var(--mac-accent);
 }
 
 /* Activation: info list (sm + secondary + col + gap-8) */
@@ -3647,10 +3647,10 @@
 
 .admin-p-16-bg-info-bg-radius-var--mac-radius-md-ta-center-bd-1solidvar-mac-info-border {
   padding: 16px;
-  background-color: var(--mac-info-bg);
+  background-color: var(--mac-accent-bg);
   border-radius: var(--mac-radius-md);
   text-align: center;
-  border: 1px solid var(--mac-info-border);
+  border: 1px solid var(--mac-accent-blue);
 }
 
 .admin-p-16-bg-success-bg-radius-var--mac-radius-md-ta-center-bd-1solidvar-mac-su-76b6ec4f {
@@ -5573,7 +5573,7 @@
   margin-bottom: 8px;
   display: flex;
   align-items: center;
-  color: var(--mac-info);
+  color: var(--mac-accent);
   margin: 0;
 }
 
@@ -5623,7 +5623,7 @@
 
 .admin-med-info-sm-m-008px0 {
   font-weight: var(--mac-font-weight-medium);
-  color: var(--mac-info);
+  color: var(--mac-accent);
   font-size: var(--mac-font-size-sm);
   margin: 0 0 8px 0;
 }
@@ -5738,8 +5738,8 @@
 
 .admin-p-16-bg-info-bg-bd-1solidvar-mac-info-border-radius-var--mac-radius-md {
   padding: 16px;
-  background-color: var(--mac-info-bg);
-  border: 1px solid var(--mac-info-border);
+  background-color: var(--mac-accent-bg);
+  border: 1px solid var(--mac-accent-blue);
   border-radius: var(--mac-radius-md);
 }
 
@@ -5751,8 +5751,8 @@
 
 .admin-p-24-bg-info-bg-bd-1solidvar-mac-info-border {
   padding: 24px;
-  background-color: var(--mac-info-bg);
-  border: 1px solid var(--mac-info-border);
+  background-color: var(--mac-accent-bg);
+  border: 1px solid var(--mac-accent-blue);
 }
 
 .admin-p-24-ta-center {
@@ -5994,7 +5994,7 @@
 
 .admin-xs-info-m-0-pl-16-flex-col-gap-4 {
   font-size: var(--mac-font-size-xs);
-  color: var(--mac-info);
+  color: var(--mac-accent);
   margin: 0;
   padding-left: 16px;
   display: flex;
@@ -8938,7 +8938,7 @@
   font-weight: bold;
   color: var(--mac-text-primary);
   margin-bottom: 4px;
-  color: var(--mac-info, #3B82F6);
+  color: var(--mac-accent, #3B82F6);
 }
 
 .admin-fs-28-fw-bold-primary-mb-4-var-mac-success-10B9 {
@@ -10387,7 +10387,7 @@
 }
 
 .admin-info {
-  color: var(--mac-info);
+  color: var(--mac-accent);
 }
 
 .admin-m-0-fw-med {
@@ -10526,7 +10526,7 @@
 
 .admin-p-8-bgc-var-mac-info-bg-radius-var-mac-radius-md {
   padding: 8px;
-  background-color: var(--mac-info-bg);
+  background-color: var(--mac-accent-bg);
   border-radius: var(--mac-radius-md);
 }
 
@@ -11996,8 +11996,8 @@
 /* ─── Cards (padding / surface variants) ─── */
 .admin-card-info-p-24 {
   padding: 24px;
-  background-color: var(--mac-info-bg, color-mix(in srgb, var(--mac-accent-blue), transparent 84%));
-  border: 1px solid var(--mac-info-border, var(--mac-accent-blue));
+  background-color: var(--mac-accent-bg, color-mix(in srgb, var(--mac-accent-blue), transparent 84%));
+  border: 1px solid var(--mac-accent-blue, var(--mac-accent-blue));
   border-radius: var(--mac-radius-lg);
 }
 
@@ -12085,7 +12085,7 @@
 /* ─── Text blocks (sm/xs + color + flex col + gap) ─── */
 .admin-div-sm-info-flex-col-8 {
   font-size: var(--mac-font-size-sm);
-  color: var(--mac-info, var(--mac-accent));
+  color: var(--mac-accent, var(--mac-accent));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -12205,7 +12205,7 @@
 .admin-h3-lg-semi-info-mb-12-flex {
   font-size: var(--mac-font-size-lg);
   font-weight: var(--mac-font-weight-semibold);
-  color: var(--mac-info, var(--mac-accent));
+  color: var(--mac-accent, var(--mac-accent));
   margin: 0 0 12px 0;
   display: flex;
   align-items: center;
@@ -12579,7 +12579,7 @@ button[class*="admin-btn"]:active:not(:disabled) {
 .admin-stat-success { --admin-stat-color: var(--mac-success); }
 .admin-stat-warning { --admin-stat-color: var(--mac-warning); }
 .admin-stat-error { --admin-stat-color: var(--mac-error); }
-.admin-stat-info { --admin-stat-color: var(--mac-info); }
+.admin-stat-info { --admin-stat-color: var(--mac-accent); }
 .admin-stat-accent { --admin-stat-color: var(--mac-accent); }
 .admin-stat-destructive { --admin-stat-color: var(--mac-destructive); }
 

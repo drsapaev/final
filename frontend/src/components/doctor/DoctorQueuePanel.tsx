@@ -551,7 +551,7 @@ const DoctorQueuePanel = ({
             <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-info)',
+              color: 'var(--mac-accent)',
               marginBottom: 'var(--mac-spacing-1)'
             }}>
               {queueStats.online_entries}

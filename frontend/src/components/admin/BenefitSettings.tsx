@@ -458,7 +458,7 @@ const BenefitSettings = () => {
               icon={CheckCircle}
               color={settings.all_free_auto_approve ? 'orange' : 'blue'}
               trend={settings.all_free_auto_approve ? t('admin2.bs_trend_auto') : t('admin2.bs_trend_manual')}
-              trendColor={settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-info)'}
+              trendColor={settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-accent)'}
             />
           </div>
 

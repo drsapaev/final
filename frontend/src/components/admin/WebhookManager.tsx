@@ -732,7 +732,7 @@ const WebhookManager = () => {
               name: t('admin2.wh_event_name_patient_updated'),
               description: t('admin2.wh_event_desc_patient_updated'),
               icon: Edit,
-              color: 'var(--mac-info)'
+              color: 'var(--mac-accent)'
             },
             {
               type: 'appointment.created',
@@ -746,7 +746,7 @@ const WebhookManager = () => {
               name: t('admin2.wh_event_name_appointment_updated'),
               description: t('admin2.wh_event_desc_appointment_updated'),
               icon: Edit,
-              color: 'var(--mac-info)'
+              color: 'var(--mac-accent)'
             },
             {
               type: 'visit.completed',
