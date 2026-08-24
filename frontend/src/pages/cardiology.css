@@ -107,7 +107,7 @@
 
 /* ─── Form inputs ─── */
 .cardio-input {
-  padding: var(--mac-spacing-2) var(--mac-spacing-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
   border-radius: var(--mac-radius-md);
   color: var(--mac-text-primary);
   font-size: var(--mac-font-size-sm);
@@ -152,7 +152,7 @@
 
 /* ─── Form inputs (dynamic border/bg/color via theme) ─── */
 .cardio-input-themed {
-  padding: var(--mac-spacing-2) var(--mac-spacing-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
   border-radius: 6px;
   font-size: var(--mac-font-size-base);
 }
@@ -254,7 +254,7 @@
 /* ─── Input full width themed ─── */
 .cardio-input-full {
   width: 100%;
-  padding: var(--mac-spacing-2) var(--mac-spacing-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
   border-radius: var(--mac-radius-md);
   font-size: var(--mac-font-size-sm);
   outline: none;
@@ -291,7 +291,7 @@
 .cardio-input-dynamic {
   border-radius: 6px;
   font-size: var(--mac-font-size-base);
-  padding: var(--mac-spacing-2) var(--mac-spacing-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
 }
 
 /* ─── Container with dynamic border/bg ─── */

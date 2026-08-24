@@ -123,20 +123,20 @@
   padding: var(--mac-spacing-xl, 32px);
   text-align: center;
 }
-.doctor-empty-icon { opacity: 0.55; margin-bottom: var(--mac-spacing-md, 12px); }
+.doctor-empty-icon { opacity: 0.55; margin-bottom: var(--mac-spacing-3); }
 .doctor-empty-title { font-size: var(--mac-font-size-md, 16px); font-weight: 600; margin-bottom: var(--mac-spacing-1, 4px); }
 .doctor-empty-text {
   font-size: var(--mac-font-size-sm);
   max-width: 520px;
   margin: 0 auto;
 }
-.doctor-empty-action { margin-top: var(--mac-spacing-md, 12px); }
+.doctor-empty-action { margin-top: var(--mac-spacing-3); }
 
 /* ─── Stat cards (batch 3) ─── */
 .doctor-stat-row {
   display: flex;
   align-items: center;
-  gap: var(--mac-spacing-md, 16px);
+  gap: var(--mac-spacing-4);
 }
 .doctor-stat-icon {
   width: 48px;
@@ -211,7 +211,7 @@
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--mac-spacing-md, 16px);
+  gap: var(--mac-spacing-4);
 }
 .doctor-section-title {
   font-size: 22px;
@@ -221,7 +221,7 @@
 }
 .doctor-section-actions {
   display: flex;
-  gap: var(--mac-spacing-md, 16px);
+  gap: var(--mac-spacing-4);
   align-items: center;
   flex-wrap: wrap;
 }
@@ -273,7 +273,7 @@
 /* ─── Quick actions grid (batch 5) ─── */
 .doctor-actions-grid {
   display: grid;
-  gap: var(--mac-spacing-md, 16px);
+  gap: var(--mac-spacing-4);
 }
 .doctor-actions-grid-1 { grid-template-columns: 1fr; }
 .doctor-actions-grid-2 { grid-template-columns: repeat(2, 1fr); }
