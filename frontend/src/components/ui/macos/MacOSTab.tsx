@@ -109,7 +109,7 @@ const MacOSTab = ({
     border: 'none',
     borderRadius: variant === 'filled' ? 'var(--mac-radius-sm)' : variant === 'pills' ? 'var(--mac-radius-lg)' : '0',
     fontSize: currentSize.fontSize,
-    fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+    fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-regular)',
     color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
     background: variant === 'filled' ? (isActive ? 'var(--mac-bg-primary)' : 'transparent') : 'transparent',
     cursor: 'pointer',

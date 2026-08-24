@@ -248,7 +248,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
               color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-primary)',
               textDecoration: 'none',
               fontSize: 'var(--mac-font-size-base, 13px)',
-              fontWeight: isActive ? 'var(--mac-font-weight-semibold, 600)' : 'var(--mac-font-weight-normal, 400)',
+              fontWeight: isActive ? 'var(--mac-font-weight-semibold, 600)' : 'var(--mac-font-weight-regular, 400)',
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
               cursor: 'pointer',
               transition: 'background-color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease), color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease)',

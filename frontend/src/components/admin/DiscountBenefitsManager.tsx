@@ -986,7 +986,7 @@ const DiscountBenefitsManager = () => {
           style={{
             '--admin-tab-border': activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent',
             '--admin-tab-color': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-            '--admin-tab-weight': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)'
+            '--admin-tab-weight': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-regular)'
           } as CSSProperties}>
           
             {tab.label}

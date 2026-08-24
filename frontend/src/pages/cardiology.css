@@ -27,7 +27,7 @@
   font-size: var(--mac-font-size-sm);
   font-weight: 500;
   color: var(--mac-text-secondary);
-  margin-bottom: var(--mac-spacing-sm);
+  margin-bottom: var(--mac-spacing-2);
 }
 
 /* ─── Icon margins ─── */
@@ -41,7 +41,7 @@
 
 /* ─── Icon colors ─── */
 .cardio-icon-blue {
-  color: var(--mac-blue-500);
+  color: var(--mac-accent-blue-500);
 }
 
 /* ─── Grid layouts ─── */
@@ -107,7 +107,7 @@
 
 /* ─── Form inputs ─── */
 .cardio-input {
-  padding: var(--mac-spacing-sm) var(--mac-spacing-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-md);
   border-radius: var(--mac-radius-md);
   color: var(--mac-text-primary);
   font-size: var(--mac-font-size-sm);
@@ -152,7 +152,7 @@
 
 /* ─── Form inputs (dynamic border/bg/color via theme) ─── */
 .cardio-input-themed {
-  padding: var(--mac-spacing-sm) var(--mac-spacing-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-md);
   border-radius: 6px;
   font-size: var(--mac-font-size-base);
 }
@@ -167,7 +167,7 @@
 .cardio-section-heading-simple {
   font-size: var(--mac-font-size-lg);
   font-weight: 500;
-  margin-bottom: var(--mac-spacing-lg);
+  margin-bottom: var(--mac-spacing-6);
   color: var(--mac-text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
 }
@@ -177,7 +177,7 @@
   display: flex;
   font-size: var(--mac-font-size-lg);
   font-weight: 500;
-  margin-bottom: var(--mac-spacing-lg);
+  margin-bottom: var(--mac-spacing-6);
   color: var(--mac-text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
 }
@@ -254,7 +254,7 @@
 /* ─── Input full width themed ─── */
 .cardio-input-full {
   width: 100%;
-  padding: var(--mac-spacing-sm) var(--mac-spacing-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-md);
   border-radius: var(--mac-radius-md);
   font-size: var(--mac-font-size-sm);
   outline: none;
@@ -275,7 +275,7 @@
 .cardio-heading-lg {
   font-size: var(--mac-font-size-lg);
   font-weight: 500;
-  margin-bottom: var(--mac-spacing-lg);
+  margin-bottom: var(--mac-spacing-6);
   color: var(--mac-text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
 }
@@ -291,7 +291,7 @@
 .cardio-input-dynamic {
   border-radius: 6px;
   font-size: var(--mac-font-size-base);
-  padding: var(--mac-spacing-sm) var(--mac-spacing-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-md);
 }
 
 /* ─── Container with dynamic border/bg ─── */
@@ -303,7 +303,7 @@
 /* ─── Stat label small (fontSize + color + marginBottom) ─── */
 .cardio-stat-label-sm {
   font-size: var(--mac-font-size-sm);
-  margin-bottom: var(--mac-spacing-xs);
+  margin-bottom: var(--mac-spacing-1);
 }
 
 /* ─── Full width visible container ─── */

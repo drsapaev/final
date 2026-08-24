@@ -1,8 +1,8 @@
 {
   "version": 1,
   "description": "UI_AUDIT_PLAN.md Phase 0 baseline. Ratchet: values may only improve (decrease). To move the baseline intentionally run: node scripts/ui-baseline.mjs --write-baseline and justify the change in the PR description.",
-  "generatedAt": "2026-08-24T01:10:09.769Z",
-  "gitCommit": "b7ed3fb",
+  "generatedAt": "2026-08-24T01:31:14.159Z",
+  "gitCommit": "da73064",
   "metrics": {
     "tokenSourceFiles": [
       {
@@ -62,8 +62,8 @@
       "theme/tokens-legacy.ts": 1,
       "theme/tokens/ dir": 1
     },
-    "undefinedVarNameCount": 170,
-    "undefinedVarUsages": 464,
+    "undefinedVarNameCount": 165,
+    "undefinedVarUsages": 402,
     "undefinedVarNames": [
       "--accent",
       "--admin-ai",
@@ -166,7 +166,6 @@
       "--mac-bg-elev-1",
       "--mac-bg-hover",
       "--mac-bg-page",
-      "--mac-blue-500",
       "--mac-blue-600",
       "--mac-border-hover",
       "--mac-border-radius-lg",
@@ -195,7 +194,6 @@
       "--mac-medical-neurology",
       "--mac-medical-orthopedics",
       "--mac-orange",
-      "--mac-primary",
       "--mac-purple",
       "--mac-radius-xs",
       "--mac-red-600",
@@ -204,11 +202,8 @@
       "--mac-shadow-2",
       "--mac-shadow-color",
       "--mac-shadow-xs",
-      "--mac-spacing-lg",
       "--mac-spacing-md",
-      "--mac-spacing-sm",
       "--mac-spacing-xl",
-      "--mac-spacing-xs",
       "--mac-success-light",
       "--mac-surface",
       "--mac-surface-hover",

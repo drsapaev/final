@@ -682,7 +682,7 @@ const LoginFormStyled = () => {
             </span>
             <span style={{
               fontSize: 'var(--mac-font-size-base)',
-              fontWeight: 'var(--mac-font-weight-normal)',
+              fontWeight: 'var(--mac-font-weight-regular)',
               // UX Audit Stage 2 (Login issue 3.3): --mac-text-secondary вместо #86868b
               color: 'var(--mac-text-secondary, #86868b)',
               letterSpacing: '0.1px'

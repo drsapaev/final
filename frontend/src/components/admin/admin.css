@@ -1717,7 +1717,7 @@
   align-items: center;
   gap: 8px;
   font-size: var(--mac-font-size-sm);
-  font-weight: var(--mac-font-weight-normal);
+  font-weight: var(--mac-font-weight-regular);
   color: var(--mac-text-secondary);
   transition: all var(--mac-duration-normal) var(--mac-ease);
   position: relative;
@@ -3202,7 +3202,7 @@
   gap: 8px;
   border-bottom: var(--admin-tab-border, 2px solid transparent);
   color: var(--admin-tab-color, var(--mac-text-secondary));
-  font-weight: var(--admin-tab-weight, var(--mac-font-weight-normal));
+  font-weight: var(--admin-tab-weight, var(--mac-font-weight-regular));
   font-size: var(--mac-font-size-sm);
   transition: all var(--mac-duration-normal) var(--mac-ease);
 }
@@ -8142,7 +8142,7 @@
 .admin-d-flex-jc-end-gap-var-mac-spacing-sm {
   display: flex;
   justify-content: flex-end;
-  gap: var(--mac-spacing-sm);
+  gap: var(--mac-spacing-2);
 }
 
 .admin-d-grid-gtc-1fr-1fr-gap-24 {
@@ -11378,7 +11378,7 @@
 
 .admin-icon-selector-option-selected {
   padding: 12px;
-  border: 2px solid var(--mac-primary);
+  border: 2px solid var(--mac-accent);
   border-radius: var(--mac-radius-md);
   background: var(--mac-bg-secondary);
   cursor: pointer;

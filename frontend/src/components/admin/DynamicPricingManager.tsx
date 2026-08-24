@@ -1112,7 +1112,7 @@ const DynamicPricingManager = () => {
               style={{
                 '--admin-tab-border': isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
                 '--admin-tab-color': isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-                '--admin-tab-weight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)'
+                '--admin-tab-weight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-regular)'
               } as CSSProperties}>
               
               <Icon size={16} />
