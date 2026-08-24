@@ -5,7 +5,7 @@
 
 **Date:** 2026-08-24
 **Branch:** `feat/ui-pr-07a-1b-admin-empty-states`
-**Base:** `origin/main` @ `46f64f07` (C-3-B.4 — migrate --mac-focus-ring; correct base after rebase)
+**Base:** `origin/main` @ `c92acfb5` (C-3-B.5 — migrate --mac-surface partial; correct base after second rebase)
 **Scope phase:** Batch 1b — second migration batch per `docs/reports/PR_UI_07a_READ_ONLY_INVENTORY.md`
 
 ---
