@@ -33,7 +33,6 @@ import {
   Input,
   Checkbox,
   Table,
-  MacOSEmptyState,
   AppEmpty,
   Select,
 } from '../ui/macos';
@@ -388,11 +387,10 @@ const SystemManagement = () => {
         </h3>
         
         {alerts.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={CheckCircle}
         title={t('admin2.sm_no_active_alerts')}
-        description={t('admin2.sm_system_stable')}
-        iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-success)' }} /> :
+        description={t('admin2.sm_system_stable')} /> :
       <>
       {/* UX Audit Admin #4.8: alerts counter + show all button. */}
       {alerts.length > 0 && (
@@ -504,11 +502,10 @@ const SystemManagement = () => {
         </div>
 
         {backups.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Database}
         title={t('admin2.sm_no_backups')}
-        description={t('admin2.sm_no_backups_desc')}
-        iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} /> :
+        description={t('admin2.sm_no_backups_desc')} /> :
 
 
       <Table

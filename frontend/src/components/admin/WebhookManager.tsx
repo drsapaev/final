@@ -34,7 +34,7 @@ import {
   StatCard,
   Input,
   Select,
-  MacOSEmptyState,
+  AppEmpty,
   Skeleton,
   Modal,
 } from '../ui/macos';
@@ -526,7 +526,7 @@ const WebhookManager = () => {
           </div>
 
           {filteredWebhooks.length === 0 &&
-        <MacOSEmptyState
+        <AppEmpty
           icon={Globe}
           title={t('admin2.wh_empty_title')}
           description={
@@ -540,8 +540,7 @@ const WebhookManager = () => {
                   {t('admin2.wh_create_btn')}
                   </Button> :
           null
-          }
-          iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} />
+          } />
 
         }
         </div>
@@ -652,11 +651,10 @@ const WebhookManager = () => {
           </div>
 
           {calls.length === 0 &&
-        <MacOSEmptyState
+        <AppEmpty
           icon={Activity}
           title={t('admin2.wh_calls_empty_title')}
-          description={selectedWebhook ? t('admin2.wh_calls_empty_desc_with_webhook') : t('admin2.wh_calls_empty_desc_no_webhook')}
-          iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} />
+          description={selectedWebhook ? t('admin2.wh_calls_empty_desc_with_webhook') : t('admin2.wh_calls_empty_desc_no_webhook')} />
 
         }
         </div>
