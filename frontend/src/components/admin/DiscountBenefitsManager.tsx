@@ -10,7 +10,7 @@ import {
   Input,
   Textarea,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Select,
   Checkbox } from '../ui/macos';
 import {
@@ -669,8 +669,7 @@ const DiscountBenefitsManager = () => {
 
       <div className="admin-grid-gap-16">
         {discounts.length === 0 ?
-      <MacOSEmptyState
-        type="discount"
+      <AppEmpty
         title={t('admin2.disc_empty_title')}
         description={t('admin2.disc_empty_desc')}
         action={
@@ -742,8 +741,7 @@ const DiscountBenefitsManager = () => {
 
       <div className="admin-grid-gap-16">
         {benefits.length === 0 ?
-      <MacOSEmptyState
-        type="benefit"
+      <AppEmpty
         title={t('admin2.disc_benefits_empty_title')}
         description={t('admin2.disc_benefits_empty_desc')}
         action={
@@ -821,8 +819,7 @@ const DiscountBenefitsManager = () => {
 
       <div className="admin-grid-gap-16">
         {loyaltyPrograms.length === 0 ?
-      <MacOSEmptyState
-        type="loyalty"
+      <AppEmpty
         title={t('admin2.disc_loyalty_empty_title')}
         description={t('admin2.disc_loyalty_empty_desc')}
         action={
@@ -942,8 +939,7 @@ const DiscountBenefitsManager = () => {
       }
         </div> :
 
-    <MacOSEmptyState
-      type="analytics"
+    <AppEmpty
       title={t('admin2.disc_analytics_empty_title')}
       description={t('admin2.disc_analytics_empty_desc')} />
 

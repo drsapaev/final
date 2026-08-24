@@ -7,7 +7,7 @@ import {
   Input,
   Textarea,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Select,
   Checkbox } from '../ui/macos';
 import {
@@ -335,8 +335,7 @@ const BillingManager = () => {
       {/* Список счетов */}
       <div className="admin-d-grid-gap-16">
         {invoices.length === 0 ?
-      <MacOSEmptyState
-        type="invoice"
+      <AppEmpty
         title={t('admin2.bill_empty_invoices_title')}
         description={t('admin2.bill_empty_invoices_desc')}
         action={
@@ -823,8 +822,7 @@ const BillingManager = () => {
           {activeTab === 'payments' && renderPaymentsTab()}
           {activeTab === 'analytics' && renderAnalyticsTab()}
           {activeTab === 'settings' &&
-        <MacOSEmptyState
-          type="settings"
+        <AppEmpty
           title={t('admin2.bill_settings_title')}
           description={t('admin2.bill_settings_desc')} />
 
