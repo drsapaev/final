@@ -2060,7 +2060,7 @@ const CashierPanel = () => {
                       />
                       <RechartsTooltip
                         contentStyle={{
-                          background: 'var(--mac-surface, white)',
+                          background: 'var(--mac-bg-tertiary)',
                           border: '1px solid var(--mac-border, #d8dde8)',
                           borderRadius: '8px',
                           fontSize: '13px',
