@@ -348,7 +348,7 @@
 
 /* ─── Phase 3: table cell styles (replaces thStyle/tdStyle constants) ─── */
 .doctor-th {
-  padding: var(--mac-spacing-md);
+  padding: var(--mac-spacing-3) var(--mac-spacing-4);
   text-align: left;
   font-weight: var(--mac-font-weight-semibold);
   color: var(--mac-text-secondary);
@@ -357,7 +357,7 @@
 }
 
 .doctor-td {
-  padding: var(--mac-spacing-md);
+  padding: var(--mac-spacing-3) var(--mac-spacing-4);
   border-bottom: 1px solid color-mix(in srgb, var(--mac-separator), transparent 30%);
   font-size: var(--mac-font-size-sm);
   color: var(--mac-text-secondary);
