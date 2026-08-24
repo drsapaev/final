@@ -18,7 +18,7 @@ The pre-implementation report (`docs/reports/PR_UI_07a_1b_PRE_IMPLEMENTATION_INV
 
 | Original estimate | Actual after comment-line exclusion |
 |---|---|
-| 20 usages | **19 usages** |
+| 20 usages | **18 usages migrated by PR #2825** (19 total AppEmpty in changed files, including 1 pre-existing from PR #2824 at AdminDashboard.tsx:323) |
 | 13 files | 13 files (unchanged) |
 | ClinicManagement:102 (title-only, real JSX) | **ClinicManagement:102 is a comment line, not real JSX** — `// so the existing <MacOSEmptyState title="Статистика недоступна" /> renders` |
 
@@ -28,7 +28,7 @@ The "title-only MacOSEmptyState usage" mentioned in the comment was already remo
 
 Additionally, during implementation I discovered another stale comment at `MedicalEquipmentManager.tsx:74` (`// on non-existent equipment. Now shows empty list (existing MacOSEmptyState`). This is also a comment, not real JSX. Both comments are left unchanged (out of scope to clean up comments).
 
-### 1.1 Final actual scope: 19 usages across 13 files
+### 1.1 Final actual scope: 18 usages migrated across 13 files (19 total AppEmpty after PR, including 1 pre-existing from PR #2824)
 
 | File | Usages | Lines |
 |---|---|---|
@@ -45,7 +45,7 @@ Additionally, during implementation I discovered another stale comment at `Medic
 | ServiceCatalog.tsx | 1 | 747 |
 | SystemManagement.tsx | 1 (of 3) | 557 (lines 390, 506 EXCLUDED — Group B iconStyle) |
 | WizardSettings.tsx | 1 | 117 |
-| **Total** | **19** | |
+| **Total migrated by PR #2825** | **18** (19 total AppEmpty in changed files, including 1 pre-existing from PR #2824 at AdminDashboard.tsx:323) |
 
 ---
 
@@ -79,14 +79,14 @@ For each file:
 
 ### 2.2 Verified: 0 dead props transferred
 
-Programmatic check (Python with brace-depth-aware JSX parser, comment-line aware) on all 19 `<AppEmpty>` usages confirms:
+Programmatic check (Python with brace-depth-aware JSX parser, comment-line aware) on all 19 `<AppEmpty>` usages in changed files (18 migrated by PR #2825 + 1 pre-existing from PR #2824 at AdminDashboard.tsx:323) confirms:
 
 ```
-Total AppEmpty usages: 19
+Total AppEmpty usages in 13 changed files: 19 (18 migrated by PR #2825 + 1 pre-existing from PR #2824)
 Issues (dead props or non-canonical): 0
 ```
 
-All 19 usages use only canonical props subset `{icon, title, description, action}` — some have all 4, some have 3 (no `action`), some have only 3 (no `action`). None carry `type`, `iconStyle`, `message`, `children`, `variant`, `size`, `className`, or `style`.
+All 19 usages (18 migrated by PR #2825 + 1 pre-existing from PR #2824) use only canonical props subset `{icon, title, description, action}` — some have all 4, some have 3 (no `action`), some have only 3 (no `action`). None carry `type`, `iconStyle`, `message`, `children`, `variant`, `size`, `className`, or `style`.
 
 ---
 
@@ -132,7 +132,7 @@ This is a **behavior fix** (retry button starts rendering) wrapped in a migratio
 | ESLint (13 changed files explicitly listed) | `npx eslint src/components/admin/AdminDashboard.tsx src/components/admin/BackupManagement.tsx src/components/admin/BenefitSettings.tsx src/components/admin/BranchManagement.tsx src/components/admin/ClinicManagement.tsx src/components/admin/EquipmentManagement.tsx src/components/admin/LicenseManagement.tsx src/components/admin/MedicalEquipmentManager.tsx src/components/admin/QueueCabinetManagement.tsx src/components/admin/ReportsManager.tsx src/components/admin/ServiceCatalog.tsx src/components/admin/SystemManagement.tsx src/components/admin/WizardSettings.tsx` (13 files, explicit list — NOT glob `*.tsx` which would expand to all 61 admin files and report 144 warnings) | ✅ 0 errors, 36 warnings | All 36 pre-existing (single-quote, unused vars); 0 delta from HEAD baseline (verified by stash + re-run on same 13 files) |
 | Vitest | `npx vitest run` | ✅ 165/165 test files, 1218/1218 tests passed (20.89s) | No test count delta from main baseline |
 | Vite build | `npx vite build` | ✅ Built successfully in 30.21s | Bundle sizes unchanged |
-| Programmatic prop check | Python script, brace-depth-aware, comment-line aware | ✅ 19/19 AppEmpty usages canonical, 0 dead props | None of `type`, `iconStyle`, `message`, `children`, `variant`, `size`, `className`, `style` transferred |
+| Programmatic prop check | Python script, brace-depth-aware, comment-line aware | ✅ 19/19 AppEmpty usages in changed files canonical (18 migrated by PR #2825 + 1 pre-existing from PR #2824), 0 dead props | None of `type`, `iconStyle`, `message`, `children`, `variant`, `size`, `className`, `style` transferred |
 | Production grep (residual MacOSEmptyState) | `grep -c "<MacOSEmptyState"` per file | ✅ All remaining MacOSEmptyState JSX is in 2 expected files: ReportsManager.tsx (1 — children latent bug deferred) + SystemManagement.tsx (2 — Group B iconStyle deferred). All other MacOSEmptyState refs are comment lines (no JSX). | See §5 below |
 | e2e (Playwright) | (not run locally) | ⏸ Deferred to CI per `AGENTS_UI.md` contract | Path filter `frontend_e2e` triggers only for `frontend/e2e/**`, `frontend/src/components/{registrar,queue,payment,emr,lab}/**`, etc. This PR touches only `frontend/src/components/admin/` — does NOT match. **e2e will be SKIPPED by CI path policy.** |
 
@@ -204,11 +204,11 @@ Plus untracked audit doc: `docs/reports/PR_UI_07a_1b_PRE_IMPLEMENTATION_INVENTOR
 ## 7. Visual behavior delta
 
 Same as Batch 1a:
-- All 19 migrated usages lose `variant="default"` framing (bg-primary, border, radius-lg).
+- All 18 migrated usages lose `variant="default"` framing (bg-primary, border, radius-lg). (The 19th AppEmpty at AdminDashboard.tsx:323 was already migrated in Batch 1a, so it has no new visual delta from PR #2825.)
 - AppEmpty forces `variant="minimal"` (transparent bg, no border, no radius).
 - Outer `<section className="mac-app-empty" aria-label={title}>` wrapper added (cosmetic, additional DOM level).
 - Icon rendering unchanged for component-type icons.
-- Retry/create Button onClick callbacks preserved across all 19 usages.
+- Retry/create Button onClick callbacks preserved across all 18 migrated usages.
 
 For the 2 `emptyState`-prop usages (ServiceCatalog:747, SystemManagement:557):
 - AppEmpty is rendered inside `<tbody>` of `<Table>` via `renderStatusCell(emptyState || 'Нет данных для отображения')`.
@@ -236,7 +236,7 @@ For the 2 `emptyState`-prop usages (ServiceCatalog:747, SystemManagement:557):
 | Metric | Before PR-UI-07a-1b | After PR-UI-07a-1b | Delta |
 |---|---|---|---|
 | Files referencing MacOSEmptyState (production, admin only) | 17 | 6 (4 Group-B-only files: BillingManager, DiscountBenefitsManager, DynamicPricingManager, WebhookManager + 2 partial files: SystemManagement, ReportsManager) | -11 |
-| Production JSX usages (admin only) | 33 | 14 (9 `type` + 4 `iconStyle` + 1 children latent bug) | -19 |
+| Production JSX usages (admin only) | 32 | 14 (9 `type` + 4 `iconStyle` + 1 children latent bug) | -18 |
 | Files referencing AppEmpty (admin only) | 5 (from Batch 1a) | 17 (Batch 1a's 5 + 12 new from Batch 1b) | +12 net new |
 
 **Reconciliation:**
@@ -253,7 +253,7 @@ For the 2 `emptyState`-prop usages (ServiceCatalog:747, SystemManagement:557):
 ## 10. Pre-PR checklist
 
 - [x] 13 production files modified (only the approved 13)
-- [x] 19 usages migrated (verified by grep + programmatic prop check)
+- [x] 18 usages migrated by PR #2825 (verified by git diff: 18 removed `<MacOSEmptyState` + 18 added `<AppEmpty` opening tags); 19 total AppEmpty usages in changed files (18 migrated + 1 pre-existing from PR #2824 at AdminDashboard.tsx:323)
 - [x] 0 dead props transferred (programmatic verification)
 - [x] 1 latent bug discovered + reverted + deferred (ReportsManager.tsx:624 children)
 - [x] All gates green (tsc=0, eslint=0 errors / 36 pre-existing warnings, vitest=1218/1218, build=success)
@@ -274,8 +274,8 @@ For the 2 `emptyState`-prop usages (ServiceCatalog:747, SystemManagement:557):
 Second batch of PR-UI-07a migration per `docs/reports/PR_UI_07a_READ_ONLY_INVENTORY.md` (read-only audit) + `docs/reports/PR_UI_07a_1b_PRE_IMPLEMENTATION_INVENTORY.md` (pre-implementation inventory).
 
 ### What
-- Migrate 19 MacOSEmptyState usages across 13 admin files to canonical AppEmpty.
-- All 19 usages are Group A mechanical drop-in — props subset of {icon, title, description, action}.
+- Migrate 18 MacOSEmptyState usages across 13 admin files to canonical AppEmpty (19 total AppEmpty usages after PR, including 1 pre-existing from PR #2824).
+- All 18 migrated usages are Group A mechanical drop-in — props subset of {icon, title, description, action}.
 - Includes AdminDashboard.tsx last 3 usages (lines 366, 419, 456 — completing the partial migration from Batch 1a).
 - 0 dead props transferred (programmatic verification with brace-depth-aware JSX parser).
 - 1 latent bug discovered (ReportsManager.tsx:624 — children silently dropped by MacOSEmptyState), reverted migration, deferred to PR-UI-07a-2 with bug fix.
@@ -300,11 +300,11 @@ Second batch of PR-UI-07a migration per `docs/reports/PR_UI_07a_READ_ONLY_INVENT
 Includes audit trail: docs/reports/PR_UI_07a_1b_PRE_IMPLEMENTATION_INVENTORY.md.
 
 ### Visual behavior delta (per Medical Minimalism direction)
-- All 19 migrated usages lose variant="default" (bg-primary, border, radius-lg).
+- All 18 migrated usages lose variant="default" (bg-primary, border, radius-lg). (The 19th AppEmpty at AdminDashboard.tsx:323 was already migrated in Batch 1a, so it has no new visual delta from PR #2825.)
 - AppEmpty forces variant="minimal" (transparent bg, no border, no radius).
 - Outer <section className="mac-app-empty" aria-label={title}> wrapper added.
 - Icon rendering unchanged for component-type icons.
-- Retry/create Button onClick callbacks preserved across all 19 usages.
+- Retry/create Button onClick callbacks preserved across all 18 migrated usages.
 
 ### Latent bug discovered + deferred (NOT fixed in this PR)
 - ReportsManager.tsx:624 — <MacOSEmptyState>...<Button>retry</Button></MacOSEmptyState> uses children, which MacOSEmptyState declares in props interface but NEVER destructures or renders. So the retry Button is silently dropped today. AppEmpty does not accept children (strict typing) — migration would have caused tsc error. Reverted migration, deferred to PR-UI-07a-2 with bug fix (convert children to action prop, which is canonical and actually renders the button).
@@ -314,7 +314,7 @@ Includes audit trail: docs/reports/PR_UI_07a_1b_PRE_IMPLEMENTATION_INVENTORY.md.
 - eslint: 0 errors (36 pre-existing warnings, 0 delta from HEAD)
 - vitest: 165/165 files, 1218/1218 tests passed (20.89s)
 - vite build: success (30.21s)
-- Programmatic prop check: 19/19 AppEmpty usages use canonical props, 0 dead props
+- Programmatic prop check: 19/19 AppEmpty usages in changed files use canonical props (18 migrated by PR #2825 + 1 pre-existing from PR #2824), 0 dead props
 - e2e: unverified — skipped by CI path policy (admin files not in frontend_e2e filter)
 
 ### Out of scope (deferred)
