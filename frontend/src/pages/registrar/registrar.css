@@ -82,8 +82,6 @@
   border: 1px solid var(--mac-separator);
   border-radius: var(--mac-radius-lg);
   padding: var(--mac-spacing-5);
-  backdrop-filter: var(--mac-blur-light);
-  -webkit-backdrop-filter: var(--mac-blur-light);
 }
 
 /* ─── Text utilities (DEPRECATED — see R-4.5 notice above) ─── */
@@ -347,8 +345,6 @@
   background-color: var(--mac-bg-toolbar);
   border: 1px solid var(--mac-separator);
   border-radius: var(--mac-radius-lg);
-  backdrop-filter: var(--mac-blur-medium);
-  -webkit-backdrop-filter: var(--mac-blur-medium);
 }
 
 /* Welcome card header */
@@ -666,7 +662,6 @@
    Background + borders + shadow are theme-aware via data-theme attribute
    (set automatically by ThemeContext on <html>). */
 .registrar-table-container {
-  backdrop-filter: blur(20px);
   color: var(--mac-text-primary);
   border-left: 1px solid var(--mac-separator);
   border-right: 1px solid var(--mac-separator);

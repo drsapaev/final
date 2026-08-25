@@ -641,6 +641,54 @@
   }
 }
 
+/* macOS Entrance Animations — compatibility primitives (PR-UI-08)
+   Canonicalized from legacy demo fadeIn* (animations.css). Values are
+   byte-identical to legacy to preserve MediLabDemo visual behavior; not
+   part of the general canonical animation API (UI_REMEDIATION_PLAN §PR-08, D4 ruling). */
+.mac-entrance-up {
+  animation: mac-entrance-up 0.6s ease-out;
+}
+
+.mac-entrance-left {
+  animation: mac-entrance-left 0.6s ease-out;
+}
+
+.mac-entrance-right {
+  animation: mac-entrance-right 0.6s ease-out;
+}
+
+.mac-entrance-scale {
+  animation: mac-entrance-scale 0.4s ease-out;
+}
+
+@keyframes mac-entrance-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mac-entrance-left {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes mac-entrance-right {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes mac-entrance-scale {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* macOS animation delay utilities (PR-UI-08) — orthogonal, semantically
+   preserved from legacy .animate-delay-*. Use with any .mac-* animation class. */
+.mac-delay-100 { animation-delay: 0.1s; }
+.mac-delay-200 { animation-delay: 0.2s; }
+.mac-delay-300 { animation-delay: 0.3s; }
+.mac-delay-400 { animation-delay: 0.4s; }
+.mac-delay-500 { animation-delay: 0.5s; }
+
 /* macOS Responsive Design */
 @media (prefers-reduced-motion: reduce) {
   .mac-control,
@@ -652,7 +700,11 @@
 
   .mac-fade-in,
   .mac-slide-up,
-  .mac-slide-down {
+  .mac-slide-down,
+  .mac-entrance-up,
+  .mac-entrance-left,
+  .mac-entrance-right,
+  .mac-entrance-scale {
     animation: none;
   }
 }

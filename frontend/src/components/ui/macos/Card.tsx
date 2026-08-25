@@ -80,9 +80,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(({
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
       position: 'relative',
       overflow: 'hidden',
-      transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-      backdropFilter: 'var(--mac-blur-light)',
-      WebkitBackdropFilter: 'var(--mac-blur-light)'
+      transition: 'all var(--mac-duration-normal) var(--mac-ease)'
     };
 
     const paddingStyles: Record<CardPadding, CSSProperties> = {

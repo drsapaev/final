@@ -34,7 +34,6 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }: ThemeTogglePro
     color: 'var(--mac-text-primary)',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    backdropFilter: 'blur(10px)',
     ...style
   };
 

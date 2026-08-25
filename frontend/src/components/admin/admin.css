@@ -5144,8 +5144,6 @@
   padding: 12px;
   display: grid;
   gap: 10px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .admin-radius-16-p-14-grid-gap-12-bd-filter-blur14px-wbd-filter-blur14px {
@@ -5153,8 +5151,6 @@
   padding: 14px;
   display: grid;
   gap: 12px;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 .admin-secondary-base-m-4px000 {
@@ -8843,8 +8839,6 @@
   border: 1px solid var(--mac-main-shell-border);
   border-radius: 24px;
   box-shadow: none;
-  backdrop-filter: var(--mac-blur-light);
-  -webkit-backdrop-filter: var(--mac-blur-light);
   padding: 0;
 }
 
@@ -8853,8 +8847,6 @@
   border: 1px solid var(--mac-main-shell-border);
   border-radius: 24px;
   box-shadow: none;
-  backdrop-filter: var(--mac-blur-light);
-  -webkit-backdrop-filter: var(--mac-blur-light);
   padding: 0;
 }
 
@@ -8863,8 +8855,6 @@
   border: 1px solid var(--mac-main-shell-border);
   border-radius: 24px;
   box-shadow: none;
-  backdrop-filter: var(--mac-blur-light);
-  -webkit-backdrop-filter: var(--mac-blur-light);
   padding: 0;
   margin-top: 24px;
 }
@@ -8874,8 +8864,6 @@
   border: 1px solid var(--mac-main-shell-border);
   border-radius: 24px;
   box-shadow: none;
-  backdrop-filter: var(--mac-blur-light);
-  -webkit-backdrop-filter: var(--mac-blur-light);
   padding: 24px;
 }
 
