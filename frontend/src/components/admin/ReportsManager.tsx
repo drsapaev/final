@@ -26,7 +26,6 @@ import {
   StatCard,
   Table,
   Input,
-  MacOSEmptyState,
   AppEmpty,
   Select,
   SegmentedControl,
@@ -621,16 +620,16 @@ const ReportsManager = () => {
     <div className="flex flex-col gap-6">
       {error ?
       <MacOSCard className="admin-card-p-48-flex-justify-center">
-          <MacOSEmptyState
+          <AppEmpty
           icon={AlertCircle}
           title={t('admin2.rm_error_title')}
-          description={t('admin2.rm_error_desc')}>
-
+          description={t('admin2.rm_error_desc')}
+          action={
             <Button onClick={handleRetry} className="mt-4">
               <RefreshCw className="w-4 h-4 mr-2" />
               {t('admin2.rm_retry_btn')}
             </Button>
-          </MacOSEmptyState>
+          } />
         </MacOSCard> :
 
       <>
