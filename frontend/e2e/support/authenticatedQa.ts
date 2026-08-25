@@ -70,8 +70,11 @@ export const AUTHENTICATED_ROLE_QA_ROUTES: RoleQaRoute[] = [
   {
     key: 'patient',
     role: 'Patient',
-    path: '/patient/payments',
-    routeId: 'patient-payment-entry',
+    // PR-QA-02: was /patient/payments (routeId patient-payment-entry) — that
+    // route is NOT in the registry (routeSelectors falls back to the
+    // non-existent path → 404). The canonical patient surface is /patient.
+    path: '/patient',
+    routeId: 'patient-home',
   },
 ];
 
@@ -79,24 +82,27 @@ export const AUTHENTICATED_SPECIALTY_QA_ROUTES: SpecialtyQaRoute[] = [
   {
     key: 'doctor-cardiology',
     role: 'Doctor',
-    path: '/doctor/cardiology',
+    // PR-QA-02: Phase 4+ reduced the sidebar and merged the appointments tab
+    // into 'patients'; ?tab=appointments remains a supported back-compat
+    // deep link that renders AppointmentsTab with its SummaryBar.
+    path: '/doctor/cardiology?tab=appointments',
     routeId: 'doctor-cardiology',
     summaryLabel: 'Сводка записей кардиолога',
   },
   {
     key: 'doctor-dermatology',
     role: 'Doctor',
-    path: '/doctor/dermatology',
+    path: '/doctor/dermatology?tab=appointments',
     routeId: 'doctor-dermatology',
     summaryLabel: 'Сводка записей дерматолога',
   },
-  {
-    key: 'doctor-dentistry',
-    role: 'Doctor',
-    path: '/doctor/dentistry',
-    routeId: 'doctor-dentistry',
-    summaryLabel: 'Сводка записей стоматолога',
-  },
+  // PR-QA-02: doctor-dentistry EXCLUDED — appointments assertion is obsolete.
+  // Phase 4+ dentistry switch(activeTab) has no 'appointments' case:
+  // renderAppointments() (with the Сводка записей стоматолога SummaryBar) is
+  // dead code, and ?tab=appointments falls through to the dashboard tab.
+  // DentalPatientsTab is a DIFFERENT UI — swapping the anchor would silently
+  // change the test's meaning. Replacement acceptance requires a product
+  // decision (tracked in the QA audit). Not a Tier-1 candidate until then.
 ];
 
 export const AUTHENTICATED_UI_QA_ROUTES: Array<RoleQaRoute | SpecialtyQaRoute> = [
