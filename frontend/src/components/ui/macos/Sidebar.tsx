@@ -125,8 +125,6 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
     display: 'flex',
     flexDirection: 'column',
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-    backdropFilter: 'var(--mac-blur-light)',
-    WebkitBackdropFilter: 'var(--mac-blur-light)',
     position: 'relative',
     ...style
   };

@@ -12,8 +12,6 @@
 
 .qj-glass-card {
   background: var(--mac-card-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border-radius: var(--mac-radius-xl);
   box-shadow: var(--mac-main-shell-shadow);
   border: 1px solid var(--mac-card-border);

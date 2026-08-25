@@ -63,9 +63,7 @@ const LoginFormStyled = () => {
     borderRadius: 'var(--mac-radius-lg)',
     fontWeight: 'var(--mac-font-weight-semibold)',
     letterSpacing: '0.01em',
-    boxShadow: 'none',
-    WebkitBackdropFilter: 'none',
-    backdropFilter: 'none',
+    boxShadow: 'none'
   };
   const authSecondaryButtonStyles = {
     backgroundColor: isDark
@@ -439,8 +437,6 @@ const LoginFormStyled = () => {
           background: isDark
             ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-text-primary)), transparent 26%) 100%)'
             : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), transparent 26%) 100%)',
-          backdropFilter: 'blur(26px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(26px) saturate(140%)',
           border: '1px solid var(--mac-card-border, rgba(255, 255, 255, 0.42))',
           boxShadow: `
             0 18px 48px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 82%),
@@ -484,8 +480,6 @@ const LoginFormStyled = () => {
           background: isDark
             ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-text-primary)), transparent 26%) 100%)'
             : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), transparent 26%) 100%)',
-          backdropFilter: 'blur(26px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(26px) saturate(140%)',
           border: '1px solid var(--mac-card-border, rgba(255, 255, 255, 0.42))',
           boxShadow: `
             0 18px 48px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 82%),
@@ -602,8 +596,6 @@ const LoginFormStyled = () => {
           // UX Audit Stage 2 (Login issue 3.3): используем --mac-bg-primary
           // вместо хардкода #1d1d1f. Теперь фон следует за темой приложения.
           background: 'var(--mac-bg-primary, #1d1d1f)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -631,8 +623,6 @@ const LoginFormStyled = () => {
         // Раньше login был всегда тёмный, независимо от темы приложения.
         // Теперь фон следует за light/dark темой.
         background: 'var(--mac-bg-primary, #1d1d1f)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -648,8 +638,6 @@ const LoginFormStyled = () => {
       background: isDark
         ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-text-primary)), transparent 26%) 100%)'
         : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), transparent 26%) 100%)',
-        backdropFilter: 'blur(26px) saturate(140%)',
-        WebkitBackdropFilter: 'blur(26px) saturate(140%)',
         border: '1px solid var(--mac-card-border, rgba(255, 255, 255, 0.42))',
         boxShadow: `
           0 18px 48px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 82%),
@@ -872,11 +860,6 @@ const LoginFormStyled = () => {
 
           .login-form-auth .mac-button:hover {
             box-shadow: 0 10px 18px color-mix(in srgb, var(--mac-text-primary, #0f172a) 8%, transparent) !important;
-            transform: translateY(-1px);
-          }
-
-          .login-form-auth .mac-button:active {
-            transform: translateY(0) scale(0.99);
           }
 
           .login-form-auth .mac-button[disabled] {

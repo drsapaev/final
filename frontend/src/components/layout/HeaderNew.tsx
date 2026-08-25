@@ -134,8 +134,6 @@ export default function HeaderNew() {
     isGradientTheme || isVibrantTheme ?
     '1px solid var(--mac-separator)' :
     theme === 'dark' ? '1px solid rgba(255,255,255,0.12)' : '1px solid var(--mac-separator)',
-    backdropFilter: 'var(--mac-blur-light)',
-    WebkitBackdropFilter: 'var(--mac-blur-light)',
     boxShadow: isGlassTheme ?
     '0 2px 10px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1)' :
     isGradientTheme || isVibrantTheme ?

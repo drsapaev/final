@@ -430,8 +430,6 @@ const ModernStatistics = ({
                 border: '2px solid var(--mac-separator)',
                 borderRadius: 'var(--mac-radius-lg)',
                 boxShadow: 'var(--mac-shadow-md)',
-                backdropFilter: 'var(--mac-blur-light)',
-                WebkitBackdropFilter: 'var(--mac-blur-light)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 'var(--mac-spacing-4)'

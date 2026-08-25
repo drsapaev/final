@@ -110,9 +110,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
         backgroundColor: 'var(--mac-accent-blue)',
         color: 'white',
         border: '1px solid #007aff',
-        boxShadow: '0 2px 8px rgba(0, 122, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.12)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)'
+        boxShadow: '0 2px 8px rgba(0, 122, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.12)'
       },
       secondary: {
         backgroundColor: 'rgba(0, 0, 0, 0.05)',
@@ -122,16 +120,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
       ghost: {
         backgroundColor: 'transparent',
         color: 'var(--mac-text-primary)',
-        border: '1px solid transparent',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)'
+        border: '1px solid transparent'
       },
       outline: {
         backgroundColor: 'transparent',
         color: 'var(--mac-text-primary)',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)'
+        border: '1px solid rgba(255, 255, 255, 0.3)'
       },
       danger: {
         backgroundColor: 'var(--mac-error)',

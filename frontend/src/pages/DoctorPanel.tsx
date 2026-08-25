@@ -485,7 +485,6 @@ const DoctorPanel = () => {
     borderRadius: 'var(--mac-radius-xl)',
     padding: getSpacing('lg'),
     boxShadow: getShadow('lg'),
-    backdropFilter: 'blur(20px)',
     border: `1px solid ${panelBorder}`,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     cursor: 'default'  /* UX Audit Doctor M-33: stat cards not clickable */
@@ -501,7 +500,6 @@ const DoctorPanel = () => {
     borderRadius: 'var(--mac-radius-xl)',
     overflow: 'hidden',
     boxShadow: getShadow('lg'),
-    backdropFilter: 'blur(20px)',
     border: `1px solid ${panelBorder}`
   };
 
