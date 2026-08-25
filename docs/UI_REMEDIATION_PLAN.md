@@ -270,6 +270,23 @@ interface ThemeContextValue {
 
 **Прогресс на 25.08.2026 (main `ec3c3afbb`):** выполнено 7 из 18 PR — 30/98 SP (PR-UI-01–05, 07; PR-UI-06 — ⚠️ PARTIAL). Поддерживающие коммиты: Phase 0 ratchet, C-1, C-5, P1a (Button variants). Серия PR-UI-07a (12 sub-PR, #2824–#2836) завершена физическим decommission MacOSEmptyState (#2836). Остаток: 68 SP; следующий по плану — PR-UI-08. Установленная дисциплина исполнения: inventory → decision gate → baseline → implementation → proof → Tier-1 → E2E → PR → STOP → explicit merge approval → post-merge verification.
 
+### 4.1.1 Handoff от параллельного QA/UI-audit трека (25.08.2026, верифицировано на main `434cf34`)
+
+> Источник: consolidated codex-findings audit (39 замечаний, PR #2806–2827) + ре-верификация grep/import-сканом на `434cf34`. Не входит в PR-UI-нумерацию; зафиксировано, чтобы находки не потерялись при смене трека. Дальнейшую работу по этому плану ведёт соседний агент; QA/UI-audit трек переходит exclusively на `UI_AUDIT_PLAN.md` (корень репо).
+
+**Закрыто параллельным треком (перепроверено на `434cf34`, действий не требуется):**
+
+- **P1a Button variants** — 32/32 non-canonical usages мигрированы (`aebe29d`); ре-скан на `434cf34` (import-verified, только файлы с `Button` из `ui/macos`): **0 non-canonical**. Сырые rg-попадания `variant="success|warning|outlined|contained"` по src/ (≈63) — это Badge/Card/Alert/custom-компоненты, canonical для них.
+- **P0 Playwright gate policy** — Tier-1 48/47 blocking в CI (`EXPECTED_COUNT=47`, retries=0) + two-tier deferral protocol в AGENTS_UI §13.
+- **MacOSEmptyState decommission** — подтверждён: 0 runtime-упоминаний (6 остаточных вхождений — комментарии и имя legacy-теста).
+
+**Открыто — кандидаты на включение в этот план:**
+
+1. **P1b AppEmpty framing (product decision, не трекается планом):** AppEmpty internalized `variant="minimal"` verbatim (#2835) — transparent/без рамки vs прежний default framed card (bg + border + radius). Runtime-доказано в codex-audit: 26+ мигрированных empty states потеряли framed look; осознанно исполнителем (`PR_UI_07a_1b_PRE_PR_REPORT.md:190`), но продукт решение не подтверждал. Варианты: принять minimal как canonical ИЛИ добавить `framed` prop.
+2. **`ButtonVariant | string` escape (Button.tsx:8) — enforcement-ready:** на HEAD 0 non-canonical usages → escape можно убрать, получив compiler-защиту; canonical-тип уже зафиксирован этим планом (см. §PR-UI-05: `type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger' | 'link'`). Микро-PR при ближайшем касании Button.
+3. **P2-гигиена:** (a) API contract всё ещё рекламирует vibrant/glass/gradient (5 refs в `src/types/generated/api.ts` + backend `user_management.py:44-46`) при frontend silent→`auto` — нужен backend-фикс + regen; (b) exec-bit `100755` на 870 src/-файлах; (c) `ComponentType<any>` — RoleGuard.tsx:78, RequireAuth.tsx:157, PWAInstallPrompt.tsx:110; (d) DESIGN_SYSTEM.md:207 запрещает `design-system/tokens.css`, а :35 числит его canonical-источником — противоречие в одном доке.
+4. **Координация с Tier-1 expansion:** QA-трек готовит expansion invariant 47→67 (+20 authenticated-маршрутов: role ×6, specialty ×2, action ×5, rbac-deny ×4, admin family ×3 — users/webhooks/telegram). После приземления UI-PRы на этих поверхностях получают blocking e2e-защиту; rbac-deny уже на crash-capture parity (PR-QA-04, `434cf34`).
+
 ### 4.2. Порядок миграции ролей (обновлено)
 
 Миграция ролей в Sprint 5 (PR-UI-13/14/15) выполняется в порядке: **Admin → Registrar → Doctor → Cashier → Lab → Specialties**.
