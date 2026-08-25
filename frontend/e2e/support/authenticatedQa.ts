@@ -296,13 +296,19 @@ export async function installAuthenticatedQaHarness(
   });
 
   await page.addInitScript(({ authToken, authProfile }) => {
+    // Clear pre-existing session state BEFORE seeding the QA session.
+    // Order matters: a sessionStorage.clear() after the setItem calls
+    // would wipe the auth_token/auth_profile we just installed, the auth
+    // guard would redirect to /login, and every authenticated QA test
+    // would fail with expect(page).not.toHaveURL(/\/login$/) (28 failures
+    // observed before this fix).
+    window.sessionStorage.clear();
+    window.localStorage.removeItem('clinic_api_rate_limit_until');
     window.sessionStorage.setItem('auth_token', authToken);
     window.sessionStorage.setItem('auth_profile', JSON.stringify(authProfile));
     window.sessionStorage.setItem('user', JSON.stringify(authProfile));
     window.localStorage.setItem('theme', 'light');
     window.localStorage.setItem('language', 'ru');
-    window.localStorage.removeItem('clinic_api_rate_limit_until');
-    window.sessionStorage.clear();
   }, { authToken: token, authProfile: profile });
 
   return { token, profile };
