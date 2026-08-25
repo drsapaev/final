@@ -3,7 +3,7 @@
 > **Документ-источник правды для миграции UI репозитория `drsapaev/final`.**
 > Сопровождается жёстким контрактом `AGENTS_UI.md` — прочитать ПЕРЕД началом работы.
 
-**Версия:** 1.0 · **Дата:** август 2026 · **Основано на:** UI-аудите от 18.08.2026 + cross-check с актуальным main от 21.08.2026.
+**Версия:** 1.1 · **Дата:** 25.08.2026 · **Основано на:** UI-аудите от 18.08.2026 + cross-check с актуальным main от 21.08.2026; статусы PR синхронизированы с main `ec3c3afbb` (progress snapshot — исполнение правила №7 AGENTS_UI).
 
 ---
 
@@ -124,12 +124,12 @@ interface ThemeContextValue {
 | Файл | LOC | Действие | Причина | PR |
 |---|---|---|---|---|
 | `src/contexts/ThemeContext.tsx` | 661 | **MIGRATE** | Оставить как canonical ThemeProvider. Удалить логику синхронизации с MacOSThemeProvider (строки 333-336 dispatch `colorSchemeChanged`). Упростить: только `theme: 'light'\|'dark'`, `setTheme(t)`, `toggleTheme()`. Remote sync с `/users/me/preferences` оставить. | PR-UI-01 |
-| `src/theme/macosTheme.tsx` | 177 | **DELETE** | Дублирует ThemeProvider. Accent-picker (8 accent names) — удалить; `--mac-accent-blue` canonical в tokens.css. `useMacOSTheme` используется только в `AccentPicker.tsx` и `ColorSchemeSelector.tsx` — оба мигрировать. | PR-UI-01 |
-| `src/theme/colorScheme.ts` | 450 | **MIGRATE** | Удалить определения `vibrant`, `glass`, `gradient` из `COLOR_SCHEME_DEFINITIONS` (строки 102, 153, 214). Оставить только `light`, `dark`, `auto`. Функции `applyColorSchemeToDom`, `persistColorSchemeLocally`, `resolveThemeMode` — оставить. | PR-UI-01 |
-| `src/theme/macos-tokens.css` | 677 | **MIGRATE** → `src/design-system/tokens.css` | Переименовать + убрать `[data-color-scheme="vibrant"]`, `[data-color-scheme="glass"]`, `[data-color-scheme="gradient"]` секции (строки 25-95 в `styles/macos.css`). Light/Dark только. | PR-UI-02 |
-| `src/theme/tokens-legacy.ts` | — | **DELETE** | Используется только в ThemeContext.getColor/getSpacing. После миграции ThemeContext на прямое чтение CSS-переменных — удалить. | PR-UI-02 |
+| `src/theme/macosTheme.tsx` | 177 | **DELETE** ✅ #2812 | Дублирует ThemeProvider. Accent-picker (8 accent names) — удалить; `--mac-accent-blue` canonical в tokens.css. `useMacOSTheme` используется только в `AccentPicker.tsx` и `ColorSchemeSelector.tsx` — оба мигрировать. | PR-UI-01 ✅ |
+| `src/theme/colorScheme.ts` | 450 | **MIGRATE** ✅ #2814 | Удалить определения `vibrant`, `glass`, `gradient` из `COLOR_SCHEME_DEFINITIONS` (строки 102, 153, 214). Оставить только `light`, `dark`, `auto`. Функции `applyColorSchemeToDom`, `persistColorSchemeLocally`, `resolveThemeMode` — оставить. Выполнено + добавлена migration-логика (normalizeColorScheme для legacy-значений). | PR-UI-01 ✅ |
+| `src/theme/macos-tokens.css` | 677 | **MIGRATE** ✅ #2814 → `src/design-system/tokens.css` | Переименовать + убрать `[data-color-scheme="vibrant"]`, `[data-color-scheme="glass"]`, `[data-color-scheme="gradient"]` секции (строки 25-95 в `styles/macos.css`). Light/Dark только. | PR-UI-02 ✅ |
+| `src/theme/tokens-legacy.ts` | — | **DELETE** ⬜ | Используется только в ThemeContext.getColor/getSpacing. После миграции ThemeContext на прямое чтение CSS-переменных — удалить. **Ownership-фикс (25.08.2026):** удаление перенесено из PR-UI-02 в PR-UI-17 — файл жив, единственный импортёр `ThemeContext.tsx`. | PR-UI-02 → **PR-UI-17** |
 | `src/theme/colorUtils.ts` | — | **KEEP** | Утилиты `mixColors`, `toRgbaString` используются в ThemeContext. Оставить как есть. | — |
-| `src/styles/macos.css` | 840 | **MIGRATE** | Удалить секции vibrant/glass/gradient (строки 25-95, ~70 LOC). Оставить остальное. После PR-UI-02 переименовать в `design-system/styles.css`. | PR-UI-02 |
+| `src/styles/macos.css` | 840 | **MIGRATE** ✅ #2814 (частично) | Удалить секции vibrant/glass/gradient (строки 25-95, ~70 LOC) — выполнено (~259 LOC удалено). Оставить остальное. После PR-UI-02 переименовать в `design-system/styles.css`. | PR-UI-02 ✅ |
 | `src/styles/theme.css` | 578 | **MIGRATE** | Аудит и консолидация с `tokens.css`. Дублирующие `:root`-определения — удалить. | PR-UI-02 |
 | `src/styles/dark-theme-visibility-fix.css` | 164 | **KEEP** | Полезные dark-mode патчи. Оставить. | — |
 | `src/styles/global-fixes.css` | 232 | **KEEP** | Полезные global fixes. Оставить. | — |
@@ -141,14 +141,14 @@ interface ThemeContextValue {
 | `src/App.tsx` | 494 | **MIGRATE** | AppShell — упростить. Удалить двойную логику compact-sidebar для mobile (строки 246-322). Использовать стандартный overlay-drawer pattern. | PR-UI-04 |
 | `src/components/layout/HeaderNew.tsx` | 705 | **MIGRATE** | Удалить хардкод navigational buttons для registrar/cashier (после PR-UI-04 они не нужны). Сократить до ~300 LOC. Оставить: brand, GlobalSearchBar, NotificationCenter, profile menu, LanguageSwitcher, theme toggle. | PR-UI-04 |
 | `src/components/ui/macos/Sidebar.tsx` | 649 | **MIGRATE** | Оставить как canonical sidebar. Удалить эффекты (text-shadow, transform, backdrop-filter) из активного пункта. Hover = background tint + font-weight emphasis только. | PR-UI-04 |
-| `src/components/layout/UnifiedSidebar.tsx` | 498 | **DELETE** | Используется только в `MediLabDemo.tsx` (demo-only). Содержит 5 проблем: локальный `useState('en')` (строка 31), toggle без i18next (строка 74), 5 event-listeners для color scheme sync (строки 33-64), `auth.clearToken()` без redirect (строка 482), визуальные эффекты (text-shadow, box-shadow, transform, backdrop-filter). Все проблемы уйдут с удалением файла. | PR-UI-03 |
-| `src/components/layout/UnifiedLayout.tsx` | 123 | **DELETE** | Используется только в `MediLabDemo.tsx`. После удаления UnifiedSidebar — не нужен. | PR-UI-17 |
+| `src/components/layout/UnifiedSidebar.tsx` | 498 | **DELETE** ✅ #2810 | Используется только в `MediLabDemo.tsx` (demo-only). Содержит 5 проблем: локальный `useState('en')` (строка 31), toggle без i18next (строка 74), 5 event-listeners для color scheme sync (строки 33-64), `auth.clearToken()` без redirect (строка 482), визуальные эффекты (text-shadow, box-shadow, transform, backdrop-filter). Все проблемы ушли с удалением файла. | PR-UI-03 ✅ |
+| `src/components/layout/UnifiedLayout.tsx` | 123 | **DELETE** ✅ #2810 | Используется только в `MediLabDemo.tsx`. После удаления UnifiedSidebar — не нужен. **Ownership-фикс (25.08.2026):** фактически удалён в PR-UI-03 (раньше плана — матрица относила к PR-17). | PR-UI-17 → **PR-UI-03** (факт) |
 | `src/components/layout/Nav.tsx` | 102 | **DELETE** | Используется только в `Activation.tsx` (онбординг). Мигрировать Activation на AppShell, удалить Nav. | PR-UI-17 |
-| `src/components/layout/ModernCard.tsx` | 176 | **DELETE** | 0 импортов в `src/`. Мёртвый код. | PR-UI-06 |
+| `src/components/layout/ModernCard.tsx` | 176 | **DELETE** ✅ #2820 | 0 импортов в `src/`. Мёртвый код. | PR-UI-06 ✅ |
 | `src/components/layout/ModernContainer.tsx` | 76 | **DELETE** | 0 импортов. Мёртвый код. | PR-UI-17 |
 | `src/components/layout/ModernFlex.tsx` | 93 | **DELETE** | 0 импортов. Мёртвый код. | PR-UI-17 |
 | `src/components/layout/ModernGrid.tsx` | 105 | **DELETE** | 0 импортов. Мёртвый код. | PR-UI-17 |
-| `src/components/navigation/ModernTabs.tsx` | — | **MIGRATE** | Используется как content-tabs (внутри страниц), НЕ как навигация. Оставить, но переименовать в `Tabs.tsx` для ясности. | PR-UI-04 |
+| `src/components/navigation/ModernTabs.tsx` | — | **MIGRATE** ⬜ | Используется как content-tabs (внутри страниц), НЕ как навигация (33 потребителя). Оставить, но переименовать в `Tabs.tsx` для ясности. **Ownership-фикс (25.08.2026):** rename отложен из PR-UI-04 в PR-UI-17. | PR-UI-04 → **PR-UI-17** |
 | `src/pages/MediLabDemo.tsx` | 779 | **MIGRATE** | Демо-страница (доступна только Admin при `VITE_ENABLE_INTERNAL_DEMO=1`). После удаления UnifiedLayout — мигрировать на AppShell с пометкой `data-demo="true"`. Альтернативно: удалить полностью, если демо не нужно. | PR-UI-17 |
 | `src/pages/MacOSDemoPage.tsx` | 19 | **KEEP** | Минимальная демо-страница. Оставить. | — |
 
@@ -164,25 +164,25 @@ interface ThemeContextValue {
 
 | Файл | LOC | Действие | Причина | PR |
 |---|---|---|---|---|
-| `src/components/ui/macos/Card.tsx` | 394 | **MIGRATE** → canonical `Card` | Оставить как canonical. Алиас `MacOSCard` удалить. | PR-UI-06 |
-| `src/components/ui/macos/MacOSStatCard.tsx` | 291 | **MIGRATE** → `StatCard` | Объединить с `MetricCard`. Стать canonical `StatCard`. | PR-UI-06 |
-| `src/components/ui/macos/MacOSMetricCard.tsx` | 302 | **DELETE** | Дубликат `MacOSStatCard`. Мигрировать 33 потребителя на `StatCard`. | PR-UI-06 |
+| `src/components/ui/macos/Card.tsx` | 394 | **MIGRATE** ⚠️ PARTIAL | Оставить как canonical. Алиас `MacOSCard` удалить. **Факт (25.08.2026):** canonical `Card` подтверждён (#2820), НО алиас `MacOSCard` жив в 329 JSX — миграция consumers перенесена в PR-UI-11 (см. статус PR-06). | PR-UI-06 → **PR-UI-11** |
+| `src/components/ui/macos/MacOSStatCard.tsx` | 291 | **MIGRATE** ✅ #2820 → `StatCard` | Объединить с `MetricCard`. Стать canonical `StatCard`. Выполнено: файл переименован в `StatCard.tsx`, 40 JSX consumers мигрированы. | PR-UI-06 ✅ |
+| `src/components/ui/macos/MacOSMetricCard.tsx` | 302 | **DELETE** ✅ #2820 | Дубликат `MacOSStatCard`. Мигрировать 33 потребителя на `StatCard`. | PR-UI-06 ✅ |
 | `src/components/medical/MedicalCard.tsx` | 73 | **DELETE** | Используется только в `MediLabDemo.tsx`. Мёртвый код в реальном приложении. | PR-UI-17 |
 | `src/components/medical/MetricCard.tsx` | 124 | **DELETE** | Используется только в `MediLabDemo.tsx`. Мёртвый. | PR-UI-17 |
 | `src/components/medical/PatientCard.tsx` | 237 | **DELETE** | Используется только в `MediLabDemo.tsx`. Мёртвый. | PR-UI-17 |
 | `src/components/medical/MedicalTable.tsx` | — | **DELETE** | Используется только в `MediLabDemo.tsx`. Мёртвый. | PR-UI-17 |
 | `src/components/medical/index.ts` | — | **DELETE** | Barrel-file для мёртвого каталога. | PR-UI-17 |
-| `src/components/layout/ModernCard.tsx` | 176 | **DELETE** | 0 импортов. Мёртвый. | PR-UI-06 |
-| (новый) `src/components/ui/DataCard.tsx` | — | **CREATE** | Новый canonical DataCard для очередей/appointments/lab results. ~150 LOC. | PR-UI-06 |
+| `src/components/layout/ModernCard.tsx` | 176 | **DELETE** ✅ #2820 | 0 импортов. Мёртвый. | PR-UI-06 ✅ |
+| (новый) `src/components/ui/DataCard.tsx` | — | **CREATE** ⬜ | Новый canonical DataCard для очередей/appointments/lab results. ~150 LOC. **Факт (25.08.2026):** не создан в PR-UI-06; введение перенесено в PR-UI-11 (canonical card strategy, см. статус PR-06). | PR-UI-06 → **PR-UI-11** |
 
 ### 3.5. Table components
 
 | Файл | LOC | Действие | Причина | PR |
 |---|---|---|---|---|
 | `src/components/ui/macos/Table.tsx` | 576 | **MIGRATE** → canonical `DataTable` | Базовый Table. Расширить: sticky header, sort, filter, pagination, selection, keyboard nav, density, skeleton, error state. ~700 LOC после миграции. | PR-UI-09 |
-| `src/components/tables/EnhancedAppointmentsTable.tsx` | 2 279 | **MIGRATE** | God-компонент. После canonical DataTable — мигрировать все consumers на прямое использование DataTable с column-config. Файл сократить до ~400 LOC (только column definitions + actions). | PR-UI-09 |
+| `src/components/tables/EnhancedAppointmentsTable.tsx` | 2 279 (факт: 2 282) | **MIGRATE** ⬜ | God-компонент. После canonical DataTable — мигрировать все consumers на прямое использование DataTable с column-config. Файл сократить до ~400 LOC (только column definitions + actions). | PR-UI-09 |
 | `src/components/common/Table.tsx` | 504 | **DELETE** | Дубликат `macos/Table.tsx`. Мигрировать 9 потребителей на canonical DataTable. | PR-UI-09 |
-| `src/components/ResponsiveTable.tsx` | 468 | **DELETE** | 0 импортов. Мёртвый. | PR-UI-17 |
+| `src/components/ResponsiveTable.tsx` | 468 | **DELETE** ⬜ | 0 импортов. Мёртвый. **Ownership-фикс (25.08.2026):** матрица ранее ошибочно относила к PR-17; canonical-владелец — PR-UI-09 (datatable migration territory, не dead-code cleanup). | PR-UI-17 → **PR-UI-09** |
 | `src/components/cashier/RefundRequestsTable.tsx` | 430 | **MIGRATE** | Переписать на canonical DataTable. Сократить до ~150 LOC (columns + actions). | PR-UI-09 |
 | `src/components/queue/QueueTable.tsx` | 239 | **MIGRATE** | Переписать на canonical DataTable. Сократить до ~100 LOC. | PR-UI-09 |
 
@@ -213,8 +213,8 @@ interface ThemeContextValue {
 
 | Файл | LOC | Действие | Причина | PR |
 |---|---|---|---|---|
-| `src/components/ui/macos/AppState.tsx` | 240 | **MIGRATE** → canonical `AppState` | Оставить `AppLoading`, `AppEmpty`, `AppError`. Удалить импорт `MacOSEmptyState` (строка 3). | PR-UI-07 |
-| `src/components/ui/macos/MacOSEmptyState.tsx` | 191 | **DELETE** | Дубликат `AppEmpty`. 33 потребителя мигрировать на `AppEmpty`. | PR-UI-07 |
+| `src/components/ui/macos/AppState.tsx` | 240 | **MIGRATE** ✅ #2835 (07a-8a) → canonical `AppState` | Оставить `AppLoading`, `AppEmpty`, `AppError`. Удалить импорт `MacOSEmptyState` (строка 3). Выполнено: рендеринг internalized (inline md+minimal), зависимость от MacOSEmptyState устранена. | PR-UI-07 ✅ |
+| `src/components/ui/macos/MacOSEmptyState.tsx` | 191 | **DELETE** ✅ #2836 (07a-8b) | Дубликат `AppEmpty`. 33 потребителя мигрировать на `AppEmpty`. Выполнено полностью: файл + barrel-export + legacy-тест удалены (−335 LOC); runtime-упоминаний 0. | PR-UI-07 ✅ |
 | `src/components/ui/macos/Skeleton.tsx` | 188 | **KEEP** | Canonical skeleton. 34 потребителя. Оставить. | — |
 | `src/components/ui/macos/Alert.tsx` | — | **KEEP** | Canonical alert. Оставить. | — |
 
@@ -222,15 +222,15 @@ interface ThemeContextValue {
 
 | Файл | LOC | Действие | Причина | PR |
 |---|---|---|---|---|
-| `src/components/ui/macos/Button.tsx` | 257 | **MIGRATE** | Canonical. Сократить variants с 11 до 6 (default → `secondary`, primary, ghost, outline, danger, link). Удалить `success`, `warning`, `destructive`, `error` (дубликаты). Тип `variant` → literal-union (tsc-error на unknown). | PR-UI-05 |
+| `src/components/ui/macos/Button.tsx` | 257 | **MIGRATE** ✅ #2819 + P1a | Canonical. Сократить variants с 11 до 6 (default → `secondary`, primary, ghost, outline, danger, link). Удалить `success`, `warning`, `destructive`, `error` (дубликаты). Тип `variant` → literal-union (tsc-error на unknown). Дополнено P1a (25.08.2026): ещё 32 non-canonical варианта мигрированы. | PR-UI-05 ✅ |
 | `src/components/admin/IconButton.tsx` | — | **MIGRATE** | Оставить как специализированный admin-компонент, но наследовать от canonical Button. | — |
 
 ### 3.10. CSS files (cleanup)
 
 | Файл | LOC | Действие | Причина | PR |
 |---|---|---|---|---|
-| `src/styles/cursor-effects.css` | 520 | **DELETE** | Мёртвый CSS. Импортируется только в `MediLabDemo.tsx` + `UnifiedSidebar.tsx` (оба — demo-only). Содержит ripple/lift/transform эффекты, которые user явно запретил. | PR-UI-08 |
-| `src/styles/sidebar-buttons.css` | 75 | **DELETE** | Мёртвый CSS. Импортируется только в `UnifiedSidebar.tsx`. Содержит `transform: translateY(-3px) !important`. | PR-UI-08 |
+| `src/styles/cursor-effects.css` | 520 | **DELETE** ⬜ | Мёртвый CSS. Содержит ripple/lift/transform эффекты, которые user явно запретил. **Ownership-фикс (25.08.2026):** владелец удаления — PR-UI-17 (решение Codex review #2810: 9 interaction-классов ещё потребляются MediLabDemo; PR-08 не должен совмещать glass/animation canonicalization с legacy-decommission). Импортёр на срез — только `MediLabDemo.tsx`. | PR-UI-08 → **PR-UI-17** |
+| `src/styles/sidebar-buttons.css` | 75 | **DELETE** ✅ #2810 | Мёртвый CSS. Импортировался только в `UnifiedSidebar.tsx`. Содержал `transform: translateY(-3px) !important`. **Факт:** удалён в PR-UI-03 (раньше плана — матрица относила к PR-08). | PR-UI-08 → **PR-UI-03** (факт) |
 | `src/styles/accessibility.css` | 266 | **KEEP** | Сильная сторона проекта. WCAG 2.1 AA compliance. | — |
 | `src/styles/animations.css` | 380 | **MIGRATE** | Удалить keyframes с transform/translateY. Оставить fade-in/slide-down (без transform). Применить `@media (prefers-reduced-motion: reduce)` ко всем. | PR-UI-08 |
 | `src/styles/admin-styles.css` | 379 | **MIGRATE** | Аудит. Удалить дубликаты с tokens.css. | PR-UI-02 |
@@ -238,17 +238,17 @@ interface ThemeContextValue {
 | `src/styles/header-new.css` | 202 | **KEEP** | Стили для HeaderNew. После PR-UI-04 — обновить. | — |
 | `src/styles/full-width.css` | 32 | **KEEP** | Полезная утилита. | — |
 | `src/styles/emr-tokens.css` | 327 | **KEEP** | EMR-специфичные токены. Оставить. | — |
-| `src/styles/unified-sidebar.css` | 302 | **DELETE** | Стили для удалённого UnifiedSidebar. | PR-UI-17 |
+| `src/styles/unified-sidebar.css` | 302 | **DELETE** ✅ #2810 | Стили для удалённого UnifiedSidebar. **Факт:** удалён в PR-UI-03 (раньше плана — матрица относила к PR-17). | PR-UI-17 → **PR-UI-03** (факт) |
 
 ### 3.11. Brand & landing
 
 | Файл | LOC | Действие | Причина | PR |
 |---|---|---|---|---|
-| `src/config/brand.ts` | 62 | **MIGRATE** | Унифицировать `name` и `shortName` на "Clinic OS". Удалить "MediClinic Pro" (36 упоминаний в landingContent.ts). Указать реальные пути к logo. | PR-UI-10 |
+| `src/config/brand.ts` | 62 | **MIGRATE** ⬜ | Унифицировать `name` и `shortName` на "Clinic OS". Удалить "MediClinic Pro". Указать реальные пути к logo. **Факт (срез 25.08.2026):** `name` всё ещё 'MediClinic Pro'; `public/brand/` не существует. | PR-UI-10 |
 | `public/brand/logo.svg` | — | **CREATE** | Новый SVG-логотип. Медицинский teal + белый. Минималистичный. | PR-UI-10 |
 | `public/brand/logo-mark.svg` | — | **CREATE** | Монограмма 32×32 для favicon. | PR-UI-10 |
 | `public/favicon.ico` | — | **REPLACE** | Заменить текущий (по умолчанию Vite) на logo-mark. | PR-UI-10 |
-| `src/pages/landingContent.ts` | — | **MIGRATE** | Удалить "MediClinic Pro" → "Clinic OS" (36 упоминаний). | PR-UI-10 |
+| `src/pages/landingContent.ts` | — | **MIGRATE** ⬜ | Удалить "MediClinic Pro" → "Clinic OS". **Факт (срез 25.08.2026):** осталось 20 упоминаний в src (план исходил из 36). | PR-UI-10 |
 | `src/pages/Landing.tsx` | 806 | **MIGRATE** | Полный редизайн. Hero с реальным screenshot. Workflow diagram. Убрать FEATURE_VISUALS icon-grids. | PR-UI-16 |
 
 ---
@@ -257,16 +257,18 @@ interface ThemeContextValue {
 
 ![Sprint Plan](./assets/sprint_plan.png)
 
-| Sprint | Недели | PR | Тема | Story Points |
-|---|---|---|---|---|
-| **1. Foundation** | 1-2 | PR-UI-01, 02, 03 | Единый ThemeProvider + token source + language fix | 9 SP |
-| **2. App Shell** | 3-4 | PR-UI-04, 05, 06 | Единый AppShell + Button + Card primitives | 16 SP |
-| **3. State patterns** | 5-6 | PR-UI-07, 08, 09 | Loading/Empty/Error + убрать glass + DataTable | 17 SP |
-| **4. Branding** | 7-8 | PR-UI-10, 11, 12 | Branding + Dashboard + EMR/Queue/Table UX | 16 SP |
-| **5. Migration** | 9-10 | PR-UI-13, 14, 15 | RegistrarPanel + Doctor + Cashier (порядок обновлён) | 24 SP |
-| **6. Polish** | 11-12 | PR-UI-16, 17, 18 | Landing + cleanup + visual regression | 16 SP |
+| Sprint | Недели | PR | Тема | Story Points | Статус (срез 25.08.2026) |
+|---|---|---|---|---|---|
+| **1. Foundation** | 1-2 | PR-UI-01, 02, 03 | Единый ThemeProvider + token source + language fix | 9 SP | ✅ DONE (02 — with legacy follow-up → PR-17) |
+| **2. App Shell** | 3-4 | PR-UI-04, 05, 06 | Единый AppShell + Button + Card primitives | 16 SP | 04 ✅ · 05 ✅ · 06 ⚠️ PARTIAL (хвост → PR-11) |
+| **3. State patterns** | 5-6 | PR-UI-07, 08, 09 | Loading/Empty/Error + убрать glass + DataTable | 17 SP | 07 ✅ (+серия 07a) · 08 ⬜ · 09 ⬜ |
+| **4. Branding** | 7-8 | PR-UI-10, 11, 12 | Branding + Dashboard + EMR/Queue/Table UX | 16 SP | ⬜ не начат |
+| **5. Migration** | 9-10 | PR-UI-13, 14, 15 | RegistrarPanel + Doctor + Cashier (порядок обновлён) | 24 SP | ⬜ не начат |
+| **6. Polish** | 11-12 | PR-UI-16, 17, 18 | Landing + cleanup + visual regression | 16 SP | ⬜ не начаты |
 
 **Итого:** 18 PR · 98 story points · ~12 недель (3 месяца) при 1 разработчике.
+
+**Прогресс на 25.08.2026 (main `ec3c3afbb`):** выполнено 7 из 18 PR — 30/98 SP (PR-UI-01–05, 07; PR-UI-06 — ⚠️ PARTIAL). Поддерживающие коммиты: Phase 0 ratchet, C-1, C-5, P1a (Button variants). Серия PR-UI-07a (12 sub-PR, #2824–#2836) завершена физическим decommission MacOSEmptyState (#2836). Остаток: 68 SP; следующий по плану — PR-UI-08. Установленная дисциплина исполнения: inventory → decision gate → baseline → implementation → proof → Tier-1 → E2E → PR → STOP → explicit merge approval → post-merge verification.
 
 ### 4.2. Порядок миграции ролей (обновлено)
 
@@ -288,6 +290,8 @@ interface ThemeContextValue {
 > ⚠️ **Уточнение порядка (обновлено):** PR-UI-03 (Language switcher fix) можно запускать **до** PR-UI-01. Это изолированный 1 SP PR без dependencies — быстрое тестирование regression-gate workflow перед большой миграцией ThemeProvider. Рекомендуемый порядок запуска: **PR-UI-03 → PR-UI-01 → PR-UI-02 → PR-UI-04**.
 
 ### PR-UI-01 — Единый ThemeProvider
+
+> **Статус: ✅ DONE — merged #2812 (23.08.2026).** `macosTheme.tsx` + `AccentPicker` удалены; runtime-ссылок 0 (остаточные grep-матчи — provenance-комментарии). Codex review: 3 итерации, все issues resolved.
 
 **Приоритет:** P0 · **Effort:** 5 SP · **Dependencies:** — · **Sprint:** 1
 
@@ -365,6 +369,8 @@ export default function App() {
 
 ### PR-UI-02 — Единый design-token source
 
+> **PR-UI-02 — ✅ with legacy follow-up** — required token cleanup completed (#2814, 23.08.2026) except `tokens-legacy.ts`, whose remaining importer (ThemeContext.tsx) is explicitly deferred to PR-17 (см. §3.1).
+
 **Приоритет:** P0 · **Effort:** 3 SP · **Dependencies:** PR-UI-01 · **Sprint:** 1
 
 **Проблема:** Документация `frontend/DESIGN_SYSTEM.md` называет `unifiedTheme.js` единым источником, тогда как `frontend/DESIGN_SYSTEM_ENFORCEMENT.md` называет каноническим `components/ui/macos`. При этом фактически:
@@ -421,6 +427,8 @@ export default function App() {
 ---
 
 ### PR-UI-03 — Фикс Language Switcher в UnifiedSidebar
+
+> **Статус: ✅ DONE — merged #2810 + #2813 (23.08.2026).** UnifiedSidebar + UnifiedLayout + `unified-sidebar.css` + `sidebar-buttons.css` удалены ЗДЕСЬ (опережение плана: матрица относила UnifiedLayout/CSS к PR-08/PR-17). Deletion `cursor-effects.css` отложено на PR-17 (решение Codex review в #2810: 9 interaction-классов ещё потребляются MediLabDemo). Чеклист 10/10 пройден.
 
 **Приоритет:** P0 · **Effort:** 1 SP · **Dependencies:** — · **Sprint:** 1
 
@@ -507,6 +515,8 @@ const handleLanguageToggle = () => {
 ---
 
 ### PR-UI-04 — Единый AppShell + Navigation
+
+> **PR-UI-04 — ✅ with legacy naming follow-up** — AppShell work completed (#2815 + 04a #2816 + 04b #2817, 23.08.2026); `ModernTabs → Tabs` rename remains deferred to PR-17 (см. §3.2).
 
 **Приоритет:** P0 · **Effort:** 8 SP · **Dependencies:** PR-UI-01, PR-UI-02 · **Sprint:** 2
 
@@ -604,6 +614,8 @@ cashier: {
 
 ### PR-UI-05 — Унификация Button primitive
 
+> **Статус: ✅ DONE — merged #2819 (23.08.2026) + supplemental P1a (25.08.2026).** Variants 11→6 завершены; P1a дополнительно мигрировал 32 non-canonical варианта на canonical API.
+
 **Приоритет:** P1 · **Effort:** 3 SP · **Dependencies:** PR-UI-02 · **Sprint:** 2
 
 **Проблема:** `src/components/ui/macos/Button.tsx:4` определяет variant как `string`, что позволяет 11+ значений:
@@ -653,6 +665,11 @@ type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger' | 
 ---
 
 ### PR-UI-06 — 3 типа Card вместо 8
+
+> **PR-UI-06 — ⚠️ PARTIAL / acceptance incomplete**
+> Completed: `MacOSMetricCard`/`ModernCard` removal and `StatCard` migration (#2820, 23.08.2026).
+> Remaining live legacy surface: `MacOSCard` (329 JSX consumers); canonical `DataCard` has not been introduced.
+> Follow-up ownership: PR-UI-11 Dashboard. Do not classify as completed until the canonical card strategy is resolved.
 
 **Приоритет:** P1 · **Effort:** 5 SP · **Dependencies:** PR-UI-02 · **Sprint:** 2
 
@@ -704,6 +721,10 @@ interface DataCardProps {
 ---
 
 ### PR-UI-07 — Loading / Empty / Error unified
+
+> **Статус: ✅ DONE — #2823 (24.08.2026, phase 1: dead loading primitives) + серия 07a из 12 sub-PR (#2824–#2836, 24–25.08.2026).** Финал 8b (#2836): MacOSEmptyState физически декомиссионирован (файл + barrel-export + legacy-тест, −335 LOC). Runtime-упоминаний 0; 11 residual — комментарии (задокументированы).
+>
+> **Ledger серии PR-UI-07a:** 1a #2824 admin error states · 1b #2825 admin empty states · 2a #2826 admin type-prop · 2b #2827 admin iconStyle · 2c #2828 ReportsManager children→action (behavior fix) · 3a #2830 cardiology · 3b #2831 DoctorQueuePanel · 3c #2832 analytics · 3d #2833 dermatology · 4 #2834 StateWrapper (behavior fix) · 8a #2835 AppEmpty internalization · 8b #2836 decommission. Proof-of-safety: sandbox-симуляция dependency-graph перед 8b; tree identity head↔squash верифицирована при merge.
 
 **Приоритет:** P1 · **Effort:** 5 SP · **Dependencies:** PR-UI-06 · **Sprint:** 3
 
@@ -760,15 +781,17 @@ interface DataCardProps {
 
 ### PR-UI-08 — Убрать glass + лишние animation effects
 
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026, main `ec3c3afbb`).** Актуальная картина: `cursor-effects.css` 520 LOC жив; `backdropFilter` ~30 употреблений в TSX; `translateY+scale` ~35. **Ownership-фикс:** удаление `cursor-effects.css` — зона ответственности PR-17, НЕ этого PR (см. ниже и §3.10). Этот PR — canonicalization существующего visual behavior, не legacy-decommission.
+
 **Приоритет:** P1 · **Effort:** 4 SP · **Dependencies:** PR-UI-04 · **Sprint:** 3
 
 **Проблема:** `backdrop-filter` используется 32 раза в CSS + 30 раз в TSX — везде как «стекло». Hover-эффекты с `translateY(-2px) scale(1.02)` создают «прыгающий» UI, неприемлемый для медицинской системы.
 
 **Решение:**
 
-1. **Удалить** `src/styles/cursor-effects.css` (520 LOC) — мёртвый CSS с ripple/lift/transform эффектами
-2. **Удалить** `src/styles/sidebar-buttons.css` (75 LOC) — мёртвый CSS с `transform: translateY(-3px) !important`
-3. **Удалить** импорты этих файлов из `MediLabDemo.tsx:13` и `UnifiedSidebar.tsx:8,9` (после PR-UI-03 UnifiedSidebar уже удалён)
+1. ~~**Удалить** `src/styles/cursor-effects.css` (520 LOC)~~ — **ownership перенесён в PR-UI-17** (решение Codex review #2810: 9 interaction-классов ещё потребляются MediLabDemo; PR-08 не совмещает glass/animation canonicalization с legacy-decommission)
+2. ~~**Удалить** `src/styles/sidebar-buttons.css` (75 LOC)~~ — ✅ уже удалён в PR-UI-03 (#2810)
+3. ~~**Удалить** импорты этих файлов из `MediLabDemo.tsx:13` и `UnifiedSidebar.tsx:8,9`~~ — импорт в UnifiedSidebar ушёл вместе с файлом; импорт `cursor-effects.css` в `MediLabDemo.tsx` остаётся до PR-UI-17
 
 4. **Мигрировать** `backdrop-filter` использования:
 
@@ -821,7 +844,7 @@ interface DataCardProps {
 **Acceptance criteria:**
 - ✅ `grep -rn "backdrop-filter\|backdropFilter" src/components --include="*.tsx" | wc -l` ≤ 10 (только в modal/dialog/command-palette/notifications)
 - ✅ `grep -rn "translateY.*scale\|scale.*translateY" src/` — 0 результатов в компонентах
-- ✅ `grep -rn "cursor-effects\|sidebar-buttons" src/` — 0 результатов (файлы удалены)
+- ✅ `grep -rn "cursor-effects\|sidebar-buttons" src/` — 0 результатов (sidebar-buttons.css уже удалён в PR-UI-03; cursor-effects.css — зона ответственности PR-UI-17)
 - ✅ Hover на sidebar item = только background tint + font-weight change
 - ✅ `prefers-reduced-motion: reduce` отключает все animations
 - ✅ Visual regression: UI выглядит «спокойнее», без прыжков
@@ -829,6 +852,8 @@ interface DataCardProps {
 ---
 
 ### PR-UI-09 — DataTable canonical
+
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026).** Все 6 таблиц живы. Фактический LOC: EnhancedAppointmentsTable **2 282** (план — 2 279), macos/Table 576, common/Table 504, ResponsiveTable 468, RefundRequestsTable 431, QueueTable 239. **Ownership-фикс:** `ResponsiveTable` удаляется ЗДЕСЬ (§3.5 ранее ошибочно относила его к PR-17).
 
 **Приоритет:** P1 · **Effort:** 8 SP · **Dependencies:** PR-UI-06, PR-UI-07 · **Sprint:** 3
 
@@ -869,6 +894,8 @@ interface DataCardProps {
 ## 7. P2: migration & branding (6 PR)
 
 ### PR-UI-10 — Branding + Logo + Favicon
+
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026).** `public/brand/` не существует; `brand.ts` → name = 'MediClinic Pro'; упоминаний «MediClinic Pro» в src — **20** (план исходил из 36).
 
 **Приоритет:** P2 · **Effort:** 3 SP · **Dependencies:** — · **Sprint:** 4
 
@@ -913,7 +940,11 @@ export const BRAND = {
 
 ### PR-UI-11 — Dashboard redesign (data-first)
 
-**Приоритет:** P2 · **Effort:** 5 SP · **Dependencies:** PR-UI-06, PR-UI-09 · **Sprint:** 4
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026).** AdminDashboard.tsx — 488 LOC в старом стиле.
+>
+> **⚠️ Legacy debt от PR-UI-06 (PARTIAL):** canonical card strategy разрешается ЗДЕСЬ — миграция живых `MacOSCard` consumers (329 JSX) на canonical `Card` и введение `DataCard` (см. §3.4). PR-UI-06 не классифицируется как completed до выполнения этого пункта. Не переносить этот хвост в PR-17: это живые consumers, а не доказанно dead code.
+
+**Приоритет:** P2 · **Effort:** 5 SP · **Dependencies:** PR-UI-09 (+ закрытие legacy-хвоста PR-UI-06: миграция `MacOSCard` → canonical `Card`, создание `DataCard`) · **Sprint:** 4
 
 **Проблема:** Текущий `AdminDashboard.tsx` (488 LOC) использует 6 glass-карточек с градиентами + большими иконками. Это landing-page стиль, не data-first.
 
@@ -942,6 +973,8 @@ export const BRAND = {
 
 ### PR-UI-12 — EMR + Queue + Table UX
 
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026).**
+
 **Приоритет:** P2 · **Effort:** 8 SP · **Dependencies:** PR-UI-07, PR-UI-09 · **Sprint:** 4
 
 **Решение:**
@@ -960,6 +993,8 @@ export const BRAND = {
 ---
 
 ### PR-UI-13 — Migration: RegistrarPanel
+
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026).** RegistrarPanel — фактически 2 240 LOC (соответствует плану).
 
 **Приоритет:** P2 · **Effort:** 8 SP · **Dependencies:** PR-UI-04, PR-UI-09 · **Sprint:** 5
 
@@ -989,6 +1024,8 @@ export const BRAND = {
 
 ### PR-UI-14 — Migration: CashierPanel
 
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026).** CashierPanel — фактически 2 125 LOC (соответствует плану).
+
 **Приоритет:** P2 · **Effort:** 6 SP · **Dependencies:** PR-UI-04, PR-UI-09 · **Sprint:** 5
 
 **Проблема:** `CashierPanel.tsx` — 2 125 LOC, 38 useState.
@@ -1008,6 +1045,8 @@ export const BRAND = {
 ---
 
 ### PR-UI-15 — Migration: Doctor + Dentist
+
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026).** DoctorPanel — 1 330 LOC; DentistPanelUnified — фактически **2 148 LOC** (план указывал 2 419; drift −271).
 
 **Приоритет:** P2 · **Effort:** 10 SP · **Dependencies:** PR-UI-12, PR-UI-13 · **Sprint:** 5
 
@@ -1033,6 +1072,8 @@ export const BRAND = {
 
 ### PR-UI-16 — Landing redesign
 
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026).**
+
 **Приоритет:** P3 · **Effort:** 8 SP · **Dependencies:** PR-UI-10, PR-UI-11 · **Sprint:** 6
 
 **Решение:**
@@ -1053,19 +1094,23 @@ export const BRAND = {
 
 ### PR-UI-17 — Cleanup: dead code removal
 
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026).** **Ownership-сводка:** этот PR — владелец удаления `cursor-effects.css` (перенос из PR-08), `tokens-legacy.ts` (перенос из PR-02) и rename `ModernTabs → Tabs` (перенос из PR-04). `sidebar-buttons.css` + `unified-sidebar.css` + `UnifiedLayout` уже удалены в PR-UI-03 — в списке ниже отмечены.
+
 **Приоритет:** P3 · **Effort:** 3 SP · **Dependencies:** PR-UI-15 · **Sprint:** 6
 
 **Решение:**
 
 1. **Удалить** `src/components/medical/` (4 файла, 1 097 LOC)
 2. **Удалить** `src/components/forms/Modern*` (4 файла, 705 LOC)
-3. **Удалить** `src/components/layout/UnifiedSidebar.tsx`, `UnifiedLayout.tsx`, `ModernCard.tsx`, `ModernContainer.tsx`, `ModernFlex.tsx`, `ModernGrid.tsx`, `Nav.tsx`
-4. **Удалить** `src/styles/cursor-effects.css`, `sidebar-buttons.css`, `unified-sidebar.css`
+3. **Удалить** в `src/components/layout/`: ~~`UnifiedSidebar.tsx`, `UnifiedLayout.tsx`~~ (✅ уже удалены в PR-UI-03 #2810), ~~`ModernCard.tsx`~~ (✅ уже удалён в PR-UI-06 #2820), `ModernContainer.tsx`, `ModernFlex.tsx`, `ModernGrid.tsx`, `Nav.tsx`
+4. **Удалить** `src/styles/cursor-effects.css` (520 LOC; владелец — этот PR, перенос из PR-08 по решению Codex review #2810). ~~`sidebar-buttons.css`, `unified-sidebar.css`~~ — ✅ уже удалены в PR-UI-03 (#2810)
 5. **Удалить** `src/components/Icon.tsx` + `src/assets/iconsMap.ts`
-6. **Удалить** `src/components/ResponsiveTable.tsx`, `src/components/common/Table.tsx`, `src/components/common/Modal.tsx`
+6. **Удалить** `src/components/common/Table.tsx`, `src/components/common/Modal.tsx` (~~`src/components/ResponsiveTable.tsx`~~ — ownership перенесён в PR-UI-09, см. §3.5)
 7. **Удалить** `src/components/ui/macos/Icon.tsx` (если все потребители мигрированы на lucide-react)
 8. **Добавить** stylelint-правило `declaration-property-value-allowed-list` для spacing
 9. **Добавить** ESLint-правило для forbidden imports
+10. **Удалить** `src/theme/tokens-legacy.ts` — после устранения единственного живого импортёра (`ThemeContext.tsx`); ownership перенесён из PR-UI-02 (см. §3.1)
+11. **Переименовать** `src/components/navigation/ModernTabs.tsx` → `Tabs.tsx` — mechanical rename, отложен из PR-UI-04 (33 потребителя)
 
 **Acceptance criteria:**
 - ✅ Все перечисленные файлы удалены
@@ -1078,6 +1123,8 @@ export const BRAND = {
 ---
 
 ### PR-UI-18 — Visual regression suite
+
+> **Статус: ⬜ NOT STARTED (срез 25.08.2026).**
 
 **Приоритет:** P3 · **Effort:** 5 SP · **Dependencies:** all · **Sprint:** 6
 
