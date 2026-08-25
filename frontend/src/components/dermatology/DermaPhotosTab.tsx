@@ -4,7 +4,7 @@ import logger from '../../utils/logger';
  * DermaPhotosTab — R-15: extracted from DermatologistPanelUnified.
  * Renders the "Фото" tab: PhotoUploader + SkinAnalysis + PhotoComparison.
  */
-import { MacOSCard, MacOSEmptyState, Button } from '../ui/macos';
+import { MacOSCard, AppEmpty, Button } from '../ui/macos';
 import React from 'react';
 import { Camera } from 'lucide-react';
 import PhotoUploader from './PhotoUploader';
@@ -49,7 +49,7 @@ export function DermaPhotosTab({
   const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   if (!hasPatient) {
     return (
-      <MacOSEmptyState
+      <AppEmpty
         icon={Camera}
         title={t('derma.derma_photos_select_patient_title')}
         description={t('derma.derma_photos_select_patient_desc')}
