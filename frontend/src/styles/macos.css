@@ -1,26 +1,12 @@
 /* P0 fix: :root overrides removed — canonical tokens are in src/design-system/tokens.css.
    This block was overriding --mac-bg-primary, --mac-border, --mac-radius-* etc.
    Removed 32 lines of duplicate/conflicting token definitions.
-   PR-UI-02: vibrant/glass/gradient CSS blocks removed (custom schemes deleted). */
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b0c0f;
-    --text: #eef2f7;
-    --surface: rgba(25, 28, 34, 0.6);
-    --glass-stroke: color-mix(in srgb, white, transparent 92%);
-    --shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
-
-    /* C-4 fix (UI_AUDIT_PLAN.md): canonical --mac-* dark overrides removed.
-       This :root block loaded after design-system/tokens.css (main.tsx:11-12),
-       so its (0,1,0) specificity tied with the explicit theme classes in
-       tokens.css and won by source order — OS dark beat the explicit user
-       theme choice, and with NON-canonical values (#16171a vs canonical #1c1c1e).
-       Canonical dark tokens: tokens.css @media :root (line ~172) + dark theme class.
-       Legacy vars above (--bg/--text/--surface/--glass-stroke/--shadow) are kept:
-       they are not part of the canonical token system. */
-  }
-}
+   PR-UI-02: vibrant/glass/gradient CSS blocks removed (custom schemes deleted).
+   C-4 (UI_AUDIT_PLAN Phase 1.4): the prefers-color-scheme dark :root block removed —
+   themes resolve exclusively via the explicit light-theme / dark-theme classes
+   (theme/colorScheme.ts); legacy vars (--bg/--text/--surface/--glass-stroke/--shadow)
+   deleted along with their last consumer (.glass) after migration of html background
+   to --mac-bg-primary. */
 
 /* 💡 Яркая тема - матовая версия */
 
@@ -114,7 +100,7 @@ html, body, #root {
 }
 
 html {
-  background-color: var(--bg);
+  background-color: var(--mac-bg-primary);
   background-image: var(--mac-gradient-window);
   background-repeat: no-repeat;
   background-size: cover;
@@ -556,14 +542,6 @@ html .enhanced-table > div:first-of-type > div {
   background-color: inherit !important;
   color: inherit !important;
   border-color: inherit !important;
-}
-
-.glass {
-  background: var(--surface);
-  backdrop-filter: var(--mac-blur-light);
-  -webkit-backdrop-filter: var(--mac-blur-light);
-  border: 1px solid var(--glass-stroke);
-  box-shadow: var(--shadow);
 }
 
 .accent-ring {
