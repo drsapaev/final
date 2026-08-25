@@ -753,7 +753,8 @@ const DoctorQueuePanel = ({
 
                         {canComplete &&
                       <Button
-                        variant="success"
+                        variant="secondary"
+                        color="success"
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.stopPropagation();
                           handleCompleteVisit(entry.id);

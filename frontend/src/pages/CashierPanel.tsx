@@ -1400,7 +1400,7 @@ const CashierPanel = () => {
             <div className="cashier-toolbar-actions">
               <Button
                 size="small"
-                variant="outlined"
+                variant="outline"
                 onClick={handleRefresh}
                 title={tI18n('cashier.refresh_title')}>
 
@@ -1408,7 +1408,7 @@ const CashierPanel = () => {
               </Button>
               <Button
                 size="small"
-                variant="outlined"
+                variant="outline"
                 onClick={exportToCSV}
                 title={tI18n('cashier.export_title')}>
 
@@ -1416,7 +1416,7 @@ const CashierPanel = () => {
               </Button>
               <Button
                 size="small"
-                variant="outlined"
+                variant="outline"
                 onClick={loadHourlyStats}
                 title={tI18n('cashier.hourly_stats_title')}>
 
@@ -1564,7 +1564,7 @@ const CashierPanel = () => {
                               <div className="cashier-refresh-row">
                                 <Button
                             size="small"
-                            variant="outlined"
+                            variant="outline"
                             onClick={() => openPaymentWidget(appointment)}
                             disabled={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)}
                             aria-label={tI18n('cashier.start_online_payment_aria')}
@@ -1597,7 +1597,7 @@ const CashierPanel = () => {
                 <div className="cashier-pagination">
                         <Button
                     size="small"
-                    variant="outlined"
+                    variant="outline"
                     disabled={pendingPage === 1 || pendingLoading}
                     onClick={() => setPendingPage((p) => Math.max(1, p - 1))}>
 
@@ -1608,7 +1608,7 @@ const CashierPanel = () => {
                         </span>
                         <Button
                     size="small"
-                    variant="outlined"
+                    variant="outline"
                     disabled={pendingPage === pendingTotalPages || pendingLoading}
                     onClick={() => setPendingPage((p) => Math.min(pendingTotalPages, p + 1))}>
 
@@ -1728,7 +1728,7 @@ const CashierPanel = () => {
                                     в overflow menu через нативный <details>. */}
                                 <Button
                                   size="small"
-                                  variant="success"
+                                  variant="primary"
                                   onClick={() => confirmPayment(row.id)}
                                   disabled={!hasBackendPaymentAction(row, 'confirm') || processingAction?.id === row.id}
                                   aria-label={tI18n('cashier.confirm_payment_aria')}>
@@ -1795,7 +1795,7 @@ const CashierPanel = () => {
                 <div className="cashier-pagination">
                         <Button
                     size="small"
-                    variant="outlined"
+                    variant="outline"
                     disabled={currentPage === 1 || historyLoading}
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
 
@@ -1806,7 +1806,7 @@ const CashierPanel = () => {
                         </span>
                         <Button
                     size="small"
-                    variant="outlined"
+                    variant="outline"
                     disabled={currentPage === totalPages || historyLoading}
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
 

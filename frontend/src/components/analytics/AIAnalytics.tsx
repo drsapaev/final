@@ -380,7 +380,7 @@ const AIAnalytics = () => {
           <Button
           onClick={() => generateTrainingDataset('diagnostic_patterns')}
           disabled={loading}
-          variant="success"
+          variant="secondary"
           className="ai-analytics-action-btn">
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Database style={{ width: '16px', height: '16px' }} />}
             {t('misc.aia_generate_diagnostic_dataset')}
@@ -398,7 +398,7 @@ const AIAnalytics = () => {
           <Button
           onClick={loadModelComparison}
           disabled={loading}
-          variant="warning"
+          variant="secondary"
           className="ai-analytics-action-btn">
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <BarChart3 style={{ width: '16px', height: '16px' }} />}
             {t('misc.aia_compare_models_btn')}

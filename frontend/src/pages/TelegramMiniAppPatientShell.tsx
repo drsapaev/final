@@ -1113,7 +1113,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
             <div style={miniAppActionRowStyle}>
               <Button
                 type="button"
-                variant="outlined"
+                variant="outline"
                 size="small"
                 aria-label={t('onboardingRetry')}
                 onClick={handleMiniAppRetry}
@@ -1141,7 +1141,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
             <div style={miniAppActionRowStyle}>
               <Button
                 type="button"
-                variant="outlined"
+                variant="outline"
                 size="small"
                 aria-label={t('onboardingRetry')}
                 onClick={handleMiniAppRetry}

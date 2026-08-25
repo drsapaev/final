@@ -1013,7 +1013,8 @@ const DepartmentManagement = () => {
                             </Button>
 
                             <Button
-              variant="success"
+              variant="secondary"
+              color="success"
               size="small"
               onClick={() => handleBulkActivate(true)}>
               
@@ -1022,7 +1023,8 @@ const DepartmentManagement = () => {
                             </Button>
 
                             <Button
-              variant="warning"
+              variant="secondary"
+              color="warning"
               size="small"
               onClick={() => handleBulkActivate(false)}>
               

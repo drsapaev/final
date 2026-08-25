@@ -223,7 +223,8 @@ const IntegrationDemo = () => {
             </Button>
             
             <Button 
-              variant="warning"
+              variant="secondary"
+              color="warning"
               onClick={() => actions.setUsers([])}
               disabled={users.length === 0}
             >
