@@ -79,8 +79,31 @@ If no user-facing panel or frontend data flow changed, replace this section with
 
 ## Validation
 
-- Targeted tests or smoke run:
-- Result:
-- Not checked:
+Per `docs/AGENTS_UI.md` §13 (two-tier gate). Tier 1 is blocking for every UI PR; Tier 2 requires backend infrastructure and may be explicitly deferred.
+
+### Tier 1 — blocking (must all be green before merge)
+
+- [ ] `npm run test` (Vitest unit)
+- [ ] `npm run type-check` (tsc strict)
+- [ ] `npm run lint:check` (ESLint + jsx-a11y)
+- [ ] `npm run check-theme` (token compliance)
+- [ ] `npm run audit:icon-controls` (a11y)
+- [ ] `npm run build`
+- [ ] Self-contained Playwright suite (48 tests / 6 specs, chromium; dev server only, no backend/credentials)
+
+### Tier 2 — backend-dependent E2E
+
+- Status (pick one): [ ] RUN — all passed / [ ] RUN — partial (list failures below) / [ ] NOT RUN
+- If NOT RUN — reason:
+- If NOT RUN — skipped specs:
+- If NOT RUN — deferral acknowledged by reviewer: [ ]
+
+### Snapshot updates (if any visual baseline changed)
+
+- Snapshot files updated in this PR:
+- Intentional visual delta explanation:
+- Causality proof (A/B or pixel-diff): [ ] provided
+
+Do not use "all green" / "safe to merge" / "fully verified" wording when Tier 2 is deferred. Correct form: "Tier 1 PASS; Tier 2 NOT RUN — <reason>".
 
 See `docs/runbooks/PR_REVIEW_QUALITY_GATES.md` for the review checklist behind this template.

@@ -100,10 +100,33 @@
   Между миграциями — полный regression-gate (Playwright visual + functional + a11y + load).
 - ❌ **DON'T:** Мигрировать все роли параллельно. Это создаёт комбинаторный взрыв тестирования и почти гарантирует регрессии.
 
-### 13. Visual + functional regression gate после КАЖДОГО PR
+### 13. Visual + functional regression gate после КАЖДОГО PR (двухуровневая модель)
 
-- ✅ **DO:** После каждого PR запускать: `npm run test` (Vitest unit), `npm run test:e2e:run` (Playwright), `npm run type-check` (tsc strict), `npm run lint:check` (ESLint + jsx-a11y), `npm run check-theme` (token compliance), `npm run audit:icon-controls` (a11y). Все должно быть зелёным перед merge.
+Гейт делится на два уровня. Tier 1 обязателен всегда и полностью самодостаточен; Tier 2 требует backend-инфраструктуры и допускает явный deferral.
+
+**TIER 1 — обязателен для каждого UI PR (blocking, без исключений):**
+
+- ✅ **DO:** Запускать ВСЕ перечисленное и получать зелёное перед merge:
+  - `npm run test` (Vitest unit)
+  - `npm run type-check` (tsc strict)
+  - `npm run lint:check` (ESLint + jsx-a11y)
+  - `npm run check-theme` (token compliance)
+  - `npm run audit:icon-controls` (a11y)
+  - `npm run build` (production build)
+  - Self-contained Playwright набор (48 тестов / 6 spec-файлов: `registrar-time`, `registrar-ux-audit`, `cashier-ux-audit`, `visual-regression`, `frontend-10-route-smoke`, `frontend-10-visual-a11y`; проект `chromium`). Доказанно запускается без backend и без credentials — нужен только Vite dev server (auto-start через `webServer` в playwright.config.ts), ~3 минуты. CI хард-гейтит этот набор в job `frontend-e2e` с count-invariant 47 (+1 registrar-time в отдельном шаге).
 - ❌ **DON'T:** Мерджить PR с красными тестами «потому что это только UI-рефакторинг». UI-регрессии сложнее ловить в продакшене — каждый сломанный flow = потерянный пациент в клинике.
+
+**TIER 2 — backend-dependent E2E (запуск при доступной инфраструктуре):**
+
+- ✅ **DO:** Если инфраструктура доступна (live backend на порту 18000, QA-credentials), запускать backend-dependent спеки (`auth-flow`, `payment-system`, `queue-system`, `admin-navigation`, `panel-qa-admin-live` и др.).
+- ✅ **DO при недоступной инфраструктуре:** Явно записать в PR: `TIER 2 NOT RUN — <конкретная причина>` + перечислить невыполненные спеки. Deferral фиксируется ревьюером чекбоксом в PR template.
+- ❌ **DON'T:** При deferred Tier 2 использовать формулировки «all green», «safe to merge», «fully verified», «все проверки пройдены». Корректная формулировка: «Tier 1 PASS; Tier 2 NOT RUN — <reason>».
+
+**Snapshot policy (visual regression baseline):**
+
+- ✅ **DO:** Если PR намеренно меняет визуальный output — обновить затронутые snapshot-базлайны В ТОМ ЖЕ PR, с кратким объяснением ожидаемого visual delta в описании PR.
+- ✅ **DO:** Перед обновлением snapshot доказать причинность: минимальный A/B (старый код + старый snapshot = PASS; новый код + старый snapshot = FAIL) и/или pixel-diff bbox, подтверждающий, что регион изменения соответствует заявленному интенту.
+- ❌ **DON'T:** Обновлять snapshot только для превращения failing-теста в PASS без доказанной причинности. Сломанный тест — сначала расследование, потом решение о baseline-обновлении.
 
 ### 14. UnifiedSidebar deletion checklist (обязателен перед удалением в PR-UI-03)
 
