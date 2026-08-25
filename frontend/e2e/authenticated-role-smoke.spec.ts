@@ -4,6 +4,7 @@ import type { Page, TestInfo } from '@playwright/test';
 import {
   AUTHENTICATED_ROLE_QA_ROUTES,
   AUTHENTICATED_SPECIALTY_QA_ROUTES,
+  attachRuntimeErrorCapture,
   installAuthenticatedQaHarness,
 } from './support/authenticatedQa';
 import type { RoleQaRoute, SpecialtyQaRoute } from './support/authenticatedQa';
@@ -166,39 +167,6 @@ async function expectVisibleRouteHeading(page: Page, route: AdminRouteFamilyQaRo
   await expect(heading, `${route.key} should expose a browser-visible heading`).toBeVisible({
     timeout: 15_000,
   });
-}
-
-// PR-QA-02: React render errors surface as console.error (NOT pageerror)
-// when caught by an ErrorBoundary. Collect CRASH-signature console errors
-// so a masked crash fails the test even if a fallback screen renders.
-// Deliberately narrow: handled data-load errors are inevitable in the
-// backend-less mock environment (components log them and recover with
-// empty states) — those are PR-QA-03 payload-completeness work, not
-// crashes. Crash signatures we trap:
-//   - 'ErrorBoundary caught'      — logged by ErrorBoundary.tsx itself
-//   - 'not valid as a React child'— the StatCard-class render crash
-//   - 'The above error occurred'  — React's render-error report
-//   - 'Uncaught' TypeError/Error prefixes from the browser
-function attachRuntimeErrorCapture(page: Page): { pageErrors: string[]; consoleErrors: string[] } {
-  const pageErrors: string[] = [];
-  const consoleErrors: string[] = [];
-  const CRASH_SIGNATURES = [
-    'ErrorBoundary caught',
-    'not valid as a React child',
-    'The above error occurred',
-    'Uncaught TypeError',
-    'Uncaught Error',
-  ];
-  page.on('pageerror', (error) => {
-    pageErrors.push(error.message);
-  });
-  page.on('console', (msg) => {
-    if (msg.type() !== 'error') return;
-    const text = msg.text();
-    if (!CRASH_SIGNATURES.some((sig) => text.includes(sig))) return;
-    consoleErrors.push(text.slice(0, 300));
-  });
-  return { pageErrors, consoleErrors };
 }
 
 async function runAuthenticatedRouteSmoke(page: Page, testInfo: TestInfo, route: RoleQaRoute | SpecialtyQaRoute) {
