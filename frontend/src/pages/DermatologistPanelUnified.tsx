@@ -5,7 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 // S-M-2 fix: lucide-direct replaced with macos <Icon>
 import {
-  Button, MacOSCard, Badge, Input, MacOSEmptyState,
+  Button, MacOSCard, Badge, Input, AppEmpty,
   Icon } from '../components/ui/macos';
 
 import { useTheme } from '../contexts/ThemeContext';
@@ -1739,7 +1739,7 @@ const DermatologistPanelUnified = () => {
 
           {activeTab === 'visit' && !currentAppointment && !selectedPatient &&
           <MacOSCard className="derma-p-48">
-              <MacOSEmptyState
+              <AppEmpty
               icon="calendar"
               title={t('derma.derma_panel_select_visit_title')}
               description={t('derma.derma_panel_select_visit_desc')}
