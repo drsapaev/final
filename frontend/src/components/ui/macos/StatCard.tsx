@@ -246,8 +246,18 @@ const MacOSStatCard = ({
     <>
       <div style={headerStyle}>
         <h3 style={titleStyle}>{title}</h3>
-        {Icon && typeof Icon === 'function' && <Icon style={iconStyle} />}
-        {Icon && typeof Icon !== 'function' && <span>{Icon}</span>}
+        {/* PR-QA-01: render icon as a component (canonical pattern, same as
+            TrendIcon below and Input.tsx). The old two-branch render passed
+            lucide forwardRef objects into <span>{Icon}</span> — an object as
+            a React child — crashing every StatCard consumer that passes an
+            icon component (31 live usages, 7 admin surfaces). No consumer
+            passes a JSX element, so component rendering is safe repo-wide.
+            Local cast only (MacOSEmptyState.tsx:160 pattern) — the props
+            type stays `React.ElementType | ReactNode`. */}
+        {(() => {
+          const IconComponent = Icon as React.ElementType;
+          return Icon ? <IconComponent style={iconStyle} /> : null;
+        })()}
       </div>
       
       <div style={valueStyle}>{value}</div>
