@@ -13,7 +13,7 @@
  */
 
 import { Calendar, Eye, Download, FileText } from 'lucide-react';
-import { Button, Badge, MacOSCard, MacOSEmptyState } from '../ui/macos';
+import { Button, Badge, MacOSCard, AppEmpty } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
@@ -175,8 +175,7 @@ export function HistoryTab({
 
         {/* History entries */}
         {filteredHistoryEntries.length === 0 ? (
-          <MacOSEmptyState
-            type="calendar"
+          <AppEmpty
             title={t('cardio.cardio_hist_filter_empty_title')}
             description={t('cardio.cardio_hist_filter_empty_desc')}
           />
