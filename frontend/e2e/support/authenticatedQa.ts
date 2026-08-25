@@ -279,6 +279,16 @@ function buildQaApiPayload(pathname: string, profile: QaProfile, method: string)
     return { ...collectionPayload() };
   }
 
+  // PR-QA-03: lab catalog endpoints return DIRECT ARRAYS per the generated
+  // API contract (LabCatalogUnitOut[] / LabCatalogAnalyteOut[] /
+  // LabCatalogReferenceRangeOut[] — all GET-only, no other /lab/catalog/*
+  // paths exist), and their only consumer (LabTemplateWorkbench.loadCatalog)
+  // casts the response raw with no envelope normalizer. The generic envelope
+  // below crashed it with `catalogAnalytes.map is not a function`.
+  if (lowerPath.startsWith('/lab/catalog/')) {
+    return [];
+  }
+
   return collectionPayload();
 }
 
