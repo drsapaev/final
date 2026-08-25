@@ -7,7 +7,7 @@ import {
   Input,
   MacOSTab,
   StatCard,
-  MacOSEmptyState,
+  AppEmpty,
   Skeleton,
 } from '../ui/macos';
 import {
@@ -335,7 +335,7 @@ const WaitTimeAnalytics = () => {
           </div>
 
           {Object.keys(realTimeEstimates.queues || {}).length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Clock}
         title={t('misc.wta_empty_queues_title')}
         description={t('misc.wta_empty_queues_desc')} /> :
@@ -506,7 +506,7 @@ const WaitTimeAnalytics = () => {
       }
         </> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={BarChart3}
       title={t('misc.wta_empty_detailed_title')}
       description={t('misc.wta_empty_detailed_desc')} />
@@ -594,7 +594,7 @@ const WaitTimeAnalytics = () => {
           </div>
         </MacOSCard> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={Users}
       title={t('misc.wta_empty_services_title')}
       description={t('misc.wta_empty_services_desc')} />
@@ -677,7 +677,7 @@ const WaitTimeAnalytics = () => {
       }
         </MacOSCard> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={Calendar}
       title={t('misc.wta_empty_heatmap_title')}
       description={t('misc.wta_empty_heatmap_desc')} />
