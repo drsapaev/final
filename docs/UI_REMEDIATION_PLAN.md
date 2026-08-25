@@ -3,7 +3,7 @@
 > **Документ-источник правды для миграции UI репозитория `drsapaev/final`.**
 > Сопровождается жёстким контрактом `AGENTS_UI.md` — прочитать ПЕРЕД началом работы.
 
-**Версия:** 1.1 · **Дата:** 25.08.2026 · **Основано на:** UI-аудите от 18.08.2026 + cross-check с актуальным main от 21.08.2026; статусы PR синхронизированы с main `ec3c3afbb` (progress snapshot — исполнение правила №7 AGENTS_UI).
+**Версия:** 1.2 · **Дата:** 26.08.2026 · **Основано на:** UI-аудите от 18.08.2026 + cross-check с актуальным main от 21.08.2026; статусы PR синхронизированы с main `ae7236cb6` (progress snapshot — исполнение правила №7 AGENTS_UI).
 
 ---
 
@@ -126,10 +126,10 @@ interface ThemeContextValue {
 | `src/contexts/ThemeContext.tsx` | 661 | **MIGRATE** | Оставить как canonical ThemeProvider. Удалить логику синхронизации с MacOSThemeProvider (строки 333-336 dispatch `colorSchemeChanged`). Упростить: только `theme: 'light'\|'dark'`, `setTheme(t)`, `toggleTheme()`. Remote sync с `/users/me/preferences` оставить. | PR-UI-01 |
 | `src/theme/macosTheme.tsx` | 177 | **DELETE** ✅ #2812 | Дублирует ThemeProvider. Accent-picker (8 accent names) — удалить; `--mac-accent-blue` canonical в tokens.css. `useMacOSTheme` используется только в `AccentPicker.tsx` и `ColorSchemeSelector.tsx` — оба мигрировать. | PR-UI-01 ✅ |
 | `src/theme/colorScheme.ts` | 450 | **MIGRATE** ✅ #2814 | Удалить определения `vibrant`, `glass`, `gradient` из `COLOR_SCHEME_DEFINITIONS` (строки 102, 153, 214). Оставить только `light`, `dark`, `auto`. Функции `applyColorSchemeToDom`, `persistColorSchemeLocally`, `resolveThemeMode` — оставить. Выполнено + добавлена migration-логика (normalizeColorScheme для legacy-значений). | PR-UI-01 ✅ |
-| `src/theme/macos-tokens.css` | 677 | **MIGRATE** ✅ #2814 → `src/design-system/tokens.css` | Переименовать + убрать `[data-color-scheme="vibrant"]`, `[data-color-scheme="glass"]`, `[data-color-scheme="gradient"]` секции (строки 25-95 в `styles/macos.css`). Light/Dark только. | PR-UI-02 ✅ |
+| `src/theme/macos-tokens.css` | 677 | **MIGRATE** ✅ #2814 → `src/design-system/tokens.css` | Переименовать + убрать `[data-color-scheme="vibrant"]`, `[data-color-scheme="glass"]`, `[data-color-scheme="gradient"]` секции (строки 25-95 в `styles/macos.css`). Light/Dark только. **PR-08 (#2838, 25.08.2026) D4 primitives:** +54 LOC canonical entrance-семейство добавлено в `tokens.css` (4 `@keyframes` mac-entrance-up/left/right/scale + 4 utility classes `.mac-entrance-up/left/right` 0.6s ease-out + `.mac-entrance-scale` 0.4s ease-out + 5 `.mac-delay-100..500` + reduced-motion block update). Values byte-identical legacy `fadeInUp/Left/Right/Scale` (equivalence-by-construction); 15 MediLabDemo legacy refs migrated. | PR-UI-02 ✅ (+ PR-UI-08 D4) |
 | `src/theme/tokens-legacy.ts` | — | **DELETE** ⬜ | Используется только в ThemeContext.getColor/getSpacing. После миграции ThemeContext на прямое чтение CSS-переменных — удалить. **Ownership-фикс (25.08.2026):** удаление перенесено из PR-UI-02 в PR-UI-17 — файл жив, единственный импортёр `ThemeContext.tsx`. | PR-UI-02 → **PR-UI-17** |
 | `src/theme/colorUtils.ts` | — | **KEEP** | Утилиты `mixColors`, `toRgbaString` используются в ThemeContext. Оставить как есть. | — |
-| `src/styles/macos.css` | 840 | **MIGRATE** ✅ #2814 (частично) | Удалить секции vibrant/glass/gradient (строки 25-95, ~70 LOC) — выполнено (~259 LOC удалено). Оставить остальное. После PR-UI-02 переименовать в `design-system/styles.css`. | PR-UI-02 ✅ |
+| `src/styles/macos.css` | 840 | **MIGRATE** ✅ #2814 (частично) | Удалить секции vibrant/glass/gradient (строки 25-95, ~70 LOC) — выполнено (~259 LOC удалено). Оставить остальное. После PR-UI-02 переименовать в `design-system/styles.css`. **UI-audit track C-4 (commit `c9ea39edd`, 25.08.2026, ОТДЕЛЬНЫЙ pre-PR-08 commit, НЕ часть PR-UI-08):** дополнительная очистка — `@media (prefers-color-scheme: dark) :root` block (5 legacy vars: `--bg`/`--text`/`--surface`/`--glass-stroke`/`--shadow`) + dead `.glass` rule (last consumer of legacy vars) removed; canonical `--mac-bg-primary` replacement for `html { background-color }`. C-4 attributed to UI-audit track, не к PR-UI-08. | PR-UI-02 ✅ (+ C-4 follow-up) |
 | `src/styles/theme.css` | 578 | **MIGRATE** | Аудит и консолидация с `tokens.css`. Дублирующие `:root`-определения — удалить. | PR-UI-02 |
 | `src/styles/dark-theme-visibility-fix.css` | 164 | **KEEP** | Полезные dark-mode патчи. Оставить. | — |
 | `src/styles/global-fixes.css` | 232 | **KEEP** | Полезные global fixes. Оставить. | — |
@@ -229,10 +229,10 @@ interface ThemeContextValue {
 
 | Файл | LOC | Действие | Причина | PR |
 |---|---|---|---|---|
-| `src/styles/cursor-effects.css` | 520 | **DELETE** ⬜ | Мёртвый CSS. Содержит ripple/lift/transform эффекты, которые user явно запретил. **Ownership-фикс (25.08.2026):** владелец удаления — PR-UI-17 (решение Codex review #2810: 9 interaction-классов ещё потребляются MediLabDemo; PR-08 не должен совмещать glass/animation canonicalization с legacy-decommission). Импортёр на срез — только `MediLabDemo.tsx`. | PR-UI-08 → **PR-UI-17** |
+| `src/styles/cursor-effects.css` | 520 | **DELETE** ⬜ | Мёртвый CSS. Содержит ripple/lift/transform эффекты, которые user явно запретил. **Ownership-фикс (25.08.2026):** владелец удаления — PR-UI-17 (решение Codex review #2810: 9 interaction-классов ещё потребляются MediLabDemo; PR-08 не должен совмещать glass/animation canonicalization с legacy-decommission). **PR-08 verification (#2838, 25.08.2026, main `ae7236cb6`):** runtime-dead подтверждён — **0 runtime CSS imports anywhere in `src/`** (AC3a ✓; ранее матрица заявляла «Импортёр на срез — только `MediLabDemo.tsx`» — **коррекция**: проверка на `ae7236cb6` показала 0 импортов в `MediLabDemo.tsx` и нигде в `src/`). **4 stale audit-manifest entries** в `frontend/src/utils/frontendAudit.tsx` (lines 309, 330, 762, 765 — object keys + array elements, NOT runtime imports; AC3b, PR-17 owned cleanup). Файл 520 LOC жив как физический артефакт, runtime-dead. | PR-UI-17 (intact) |
 | `src/styles/sidebar-buttons.css` | 75 | **DELETE** ✅ #2810 | Мёртвый CSS. Импортировался только в `UnifiedSidebar.tsx`. Содержал `transform: translateY(-3px) !important`. **Факт:** удалён в PR-UI-03 (раньше плана — матрица относила к PR-08). | PR-UI-08 → **PR-UI-03** (факт) |
 | `src/styles/accessibility.css` | 266 | **KEEP** | Сильная сторона проекта. WCAG 2.1 AA compliance. | — |
-| `src/styles/animations.css` | 380 | **MIGRATE** | Удалить keyframes с transform/translateY. Оставить fade-in/slide-down (без transform). Применить `@media (prefers-reduced-motion: reduce)` ко всем. | PR-UI-08 |
+| `src/styles/animations.css` | 380 (факт на `ae7236cb6`: 76) | **MIGRATE** ✅ #2838 | Удалить keyframes с transform/translateY. Оставить fade-in/slide-down (без transform). Применить `@media (prefers-reduced-motion: reduce)` ко всем. **PR-08 (#2838, 25.08.2026):** выполнено — 380 → 76 LOC (~150 LOC удалено, ~150 LOC 0-consumer утилит+keyframes). Deleted: animate-wave/shimmer/gradient + 3 keyframes, card-enter/-active/-exit + 2 keyframes, modal-enter/-active, notification-enter/-active, button-press, icon-bounce, text-reveal, list-item-enter/-active, table-row-enter/-active, mac-animate-fade-in/slide-in + macFadeIn/macSlideIn, loading-skeleton, hover-rotate, transition-smooth, progress-animate + progress keyframe. KEPT: animate-spin (38 loaders), animate-pulse (4 opacity-only skeletons), hover-lift/hover-scale (demo-perimeter, PR-17 owned). D4: legacy `fadeInUp/Left/Right/Scale` + `.animate-fade-in-*` + `.animate-delay-*` удалены после equivalence-migration в `tokens.css` canonical `mac-entrance-*`/`mac-delay-*` primitives. | PR-UI-08 ✅ |
 | `src/styles/admin-styles.css` | 379 | **MIGRATE** | Аудит. Удалить дубликаты с tokens.css. | PR-UI-02 |
 | `src/styles/responsive.css` | 476 | **KEEP** | Полезные responsive utilities. | — |
 | `src/styles/header-new.css` | 202 | **KEEP** | Стили для HeaderNew. После PR-UI-04 — обновить. | — |
@@ -261,14 +261,14 @@ interface ThemeContextValue {
 |---|---|---|---|---|---|
 | **1. Foundation** | 1-2 | PR-UI-01, 02, 03 | Единый ThemeProvider + token source + language fix | 9 SP | ✅ DONE (02 — with legacy follow-up → PR-17) |
 | **2. App Shell** | 3-4 | PR-UI-04, 05, 06 | Единый AppShell + Button + Card primitives | 16 SP | 04 ✅ · 05 ✅ · 06 ⚠️ PARTIAL (хвост → PR-11) |
-| **3. State patterns** | 5-6 | PR-UI-07, 08, 09 | Loading/Empty/Error + убрать glass + DataTable | 17 SP | 07 ✅ (+серия 07a) · 08 ⬜ · 09 ⬜ |
+| **3. State patterns** | 5-6 | PR-UI-07, 08, 09 | Loading/Empty/Error + убрать glass + DataTable | 17 SP | 07 ✅ (+серия 07a) · 08 ✅ (#2838) · 09 ⬜ |
 | **4. Branding** | 7-8 | PR-UI-10, 11, 12 | Branding + Dashboard + EMR/Queue/Table UX | 16 SP | ⬜ не начат |
 | **5. Migration** | 9-10 | PR-UI-13, 14, 15 | RegistrarPanel + Doctor + Cashier (порядок обновлён) | 24 SP | ⬜ не начат |
 | **6. Polish** | 11-12 | PR-UI-16, 17, 18 | Landing + cleanup + visual regression | 16 SP | ⬜ не начаты |
 
 **Итого:** 18 PR · 98 story points · ~12 недель (3 месяца) при 1 разработчике.
 
-**Прогресс на 25.08.2026 (main `ec3c3afbb`):** выполнено 7 из 18 PR — 30/98 SP (PR-UI-01–05, 07; PR-UI-06 — ⚠️ PARTIAL). Поддерживающие коммиты: Phase 0 ratchet, C-1, C-5, P1a (Button variants). Серия PR-UI-07a (12 sub-PR, #2824–#2836) завершена физическим decommission MacOSEmptyState (#2836). Остаток: 68 SP; следующий по плану — PR-UI-08. Установленная дисциплина исполнения: inventory → decision gate → baseline → implementation → proof → Tier-1 → E2E → PR → STOP → explicit merge approval → post-merge verification.
+**Прогресс на 26.08.2026 (main `ae7236cb6`):** выполнено 8 из 18 PR — 34/98 SP (PR-UI-01–05, 07, 08; PR-UI-06 — ⚠️ PARTIAL). Поддерживающие коммиты: Phase 0 ratchet, C-1, C-4 (macos.css prefers-color-scheme cleanup), C-5, P1a (Button variants). Серия PR-UI-07a (12 sub-PR, #2824–#2836) завершена физическим decommission MacOSEmptyState (#2836). PR-UI-08 (#2838, 25.08.2026) — glass/animation canonicalization, D1–D8 rulings, см. §7 PR-UI-08 + §4.1.2 ledger. Остаток: 64 SP; следующий по плану — PR-UI-09 (DataTable canonical migration). Установленная дисциплина исполнения: inventory → decision gate → baseline → implementation → proof → Tier-1 → E2E → PR → STOP → explicit merge approval → post-merge verification.
 
 ### 4.1.1 Handoff от параллельного QA/UI-audit трека (25.08.2026, верифицировано на main `434cf34`)
 
@@ -286,6 +286,32 @@ interface ThemeContextValue {
 2. **`ButtonVariant | string` escape (Button.tsx:8) — enforcement-ready:** на HEAD 0 non-canonical usages → escape можно убрать, получив compiler-защиту; canonical-тип уже зафиксирован этим планом (см. §PR-UI-05: `type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger' | 'link'`). Микро-PR при ближайшем касании Button.
 3. **P2-гигиена:** (a) API contract всё ещё рекламирует vibrant/glass/gradient (5 refs в `src/types/generated/api.ts` + backend `user_management.py:44-46`) при frontend silent→`auto` — нужен backend-фикс + regen; (b) exec-bit `100755` на 870 src/-файлах; (c) `ComponentType<any>` — RoleGuard.tsx:78, RequireAuth.tsx:157, PWAInstallPrompt.tsx:110; (d) DESIGN_SYSTEM.md:207 запрещает `design-system/tokens.css`, а :35 числит его canonical-источником — противоречие в одном доке.
 4. **Координация с Tier-1 expansion:** QA-трек готовит expansion invariant 47→67 (+20 authenticated-маршрутов: role ×6, specialty ×2, action ×5, rbac-deny ×4, admin family ×3 — users/webhooks/telegram). После приземления UI-PRы на этих поверхностях получают blocking e2e-защиту; rbac-deny уже на crash-capture parity (PR-QA-04, `434cf34`).
+
+### 4.1.2 PR-UI-08 Completion Ledger (#2838, 25.08.2026)
+
+> Источник: post-merge verification PR #2838 (squash `ae7236cb6`, parent `c9ea39edd`, merged by explicit user approval 25.08.2026). Зафиксировано, чтобы SSOT оставался актуальным после PR-08 (rule #7 AGENTS_UI). Не входит в PR-UI-нумерацию; ownership follow-ups перенаправлены в их назначенные PR.
+
+**Закрыто PR-08 (D1–D8 rulings, all applied):**
+- **Glass/animation canonicalization:** 23 файла, +85/−720. Backdrop migration (AC1: 27→7 ≤10 ✓); hover/transform unification (AC2: 7→0+D3 exception ✓); animations.css cleanup (380→76 LOC, ~150 LOC 0-consumer утилит+keyframes удалено); D4 migration (15/15 MediLabDemo refs migrated to canonical `mac-entrance-*`/`mac-delay-*` primitives in `tokens.css` +54 LOC; equivalence-by-construction, byte-identical legacy values).
+- **D7 orphan:** `components/AnimatedTransition.tsx` (314 LOC, NOT `MacOSEmptyState`) физически удалён. 4-proof: (1) 0 importers via grep, (2) 0 dynamic/string imports sweep, (3) tsc --noEmit exit 0 post-deletion, (4) canonical `ui/macos/AnimatedTransition` covers production consumers (DoctorPanel:15, QueueView:22, WelcomeView:58 via barrel).
+- **D8 InteractivePanel:** hover transform удалён, calm shadow+border feedback only.
+- **D6 documented CSS exceptions:** `.mac-modal-backdrop` (`tokens.css:495`) + `.clinic-ops-nav-bar` (`macos.css:386`) backdrop KEPT (sticky-overlay semantics).
+- **D3 documented exception:** `mac-modal-slide-up` keyframe (Modal.tsx inline) KEPT — Modal entrance animation.
+
+**Ratchet:** PASS — 8 improvements, 0 regressions (см. §7 PR-UI-08 banner для детального списка).
+
+**Tier-1 + CI:** local tsc/vitest/build/lint/check-theme/icon-controls + авторитативный CI на merged SHA `ae7236cb6` (33 runs = 25 success / 8 skipped / 0 failures).
+
+**Follow-ups (не part of PR-08, ownership intact):**
+1. `cursor-effects.css` decommission — **PR-UI-17 owned** (Codex review #2810 ruling intact). PR-08 verified runtime-dead (520 LOC, 0 runtime imports — AC3a ✓; 4 stale audit-manifest refs in `frontendAudit.tsx` — AC3b, PR-17 cleanup).
+2. `colorScheme.ts` ROOT_STYLE_PROPERTIES vestigial refs (PR-02 glass-scheme removal residual) — **PR-17 owned** candidate.
+3. `HeaderNew.tsx` vestigial glass refs — minor follow-up, не blocking.
+4. Additional CSS backdrop surfaces (AIChatWindow/ModernDialog/EMRContainerV2/ModernToast/ModernFilters/DoctorTemplatesPanel/AppointmentWizardV2/MacOSDemo) — **separate cleanup track**, не blocking.
+5. UI-audit track C-4 (`c9ea39edd`, 25.08.2026) — separate commit BEFORE PR-08 (parent of `ae7236cb6`); removed `.glass` rule + legacy `prefers-color-scheme` vars from `macos.css`. Attributed to C-4 UI-audit track, NOT to PR-08.
+6. BS-44 local environmental false-positive — pre-existing (verified on clean main, CI green).
+7. lifecycle-label drift (`decision:possible-duplicate` bot false-positive as in #2836) — not blocking.
+
+**Verification artifacts:** `/home/z/my-project/scripts/merge_pr_2838.sh` (squash-merge script), `/home/z/my-project/worklog.md` Task 34 (post-merge verification entry, 10/10 verification points PASS).
 
 ### 4.2. Порядок миграции ролей (обновлено)
 
@@ -798,7 +824,43 @@ interface DataCardProps {
 
 ### PR-UI-08 — Убрать glass + лишние animation effects
 
-> **Статус: ⬜ NOT STARTED (срез 25.08.2026, main `ec3c3afbb`).** Актуальная картина: `cursor-effects.css` 520 LOC жив; `backdropFilter` ~30 употреблений в TSX; `translateY+scale` ~35. **Ownership-фикс:** удаление `cursor-effects.css` — зона ответственности PR-17, НЕ этого PR (см. ниже и §3.10). Этот PR — canonicalization существующего visual behavior, не legacy-decommission.
+> **Статус: ✅ DONE — merged #2838 (25.08.2026, squash `ae7236cb6`, parent `c9ea39edd`). 23 files, +85/−720.**
+>
+> **D1–D8 rulings (all applied):**
+> - **D1** — `--mac-card-bg` translucent (rgba 0.88 light / 0.86 dark) KEPT; 118 consumers not perturbed. (Plan original "solid #FFFFFF/#1C1C1E" not applied — D1 ruling: do not change global token.)
+> - **D2** — `Tooltip.tsx:177` backdrop no-op removed (was a dead `backdropFilter: 'blur(0px)'` style with no visual effect).
+> - **D3** — `mac-modal-slide-up` keyframe (`Modal.tsx` inline `@keyframes` block, 4 transform refs at lines 328/332/339/343) KEPT as documented exception — Modal entrance animation, canonical animation pattern.
+> - **D4** — 15/15 MediLabDemo legacy refs migrated to canonical `mac-entrance-*`/`mac-delay-*`; 4 new `@keyframes` + 4 utility classes (`.mac-entrance-up/left/right` 0.6s ease-out + `.mac-entrance-scale` 0.4s ease-out) + 5 `.mac-delay-100..500` utilities + reduced-motion block update added to tokens.css (+54 LOC). Values byte-identical to legacy `fadeInUp/Left/Right/Scale` (equivalence-by-construction). Legacy keyframes/classes/utilities deleted from animations.css post-migration (0 consumers).
+> - **D5** — `landingContent.buildGlassStyle` DEFERRED → PR-16 (Landing redesign).
+> - **D6** — `.mac-modal-backdrop` (`tokens.css:495`) + `.clinic-ops-nav-bar` (`macos.css:386`) backdrop KEPT as documented CSS exceptions (sticky-overlay semantics, not component-level glass).
+> - **D7** — orphan `components/AnimatedTransition.tsx` (314 LOC, NOT `MacOSEmptyState` — `MacOSEmptyState` was decommissioned earlier in PR #2836 / PR-UI-07a-8b) physically DELETED; 4-proof: (1) 0 importers via grep, (2) 0 dynamic/string imports via `import(`/`require(`/`lazy(` sweep, (3) tsc --noEmit exit 0 post-deletion, (4) canonical `ui/macos/AnimatedTransition` covers production consumers (DoctorPanel:15, QueueView:22, WelcomeView:58 via barrel; InteractivePanel:7 uses local hooks/useAnimation:248).
+> - **D8** — `InteractivePanel:38` hover transform removed; calm shadow+border feedback only (no movement).
+>
+> **AC results (machine-verified on main `ae7236cb6`):**
+> - **AC1** — backdrop в components tsx: 27 → **7 ≤10** ✓ (KEEP: Modal, Dialog, CommandPalette, ResponsiveModal, PriceOverrideManager, PWAInstallPrompt, ConnectionStatus).
+> - **AC2** — translateY+scale в components: 7 → **0 + D3 documented exception** ✓ (4 transform refs in Modal keyframes — D3).
+> - **AC3a** — runtime cursor-effects/sidebar-buttons imports: **0** ✓ (verified: 0 CSS `@import` or TS `import` statements anywhere in `src/`).
+> - **AC3b** — stale audit-manifest refs in `frontend/src/utils/frontendAudit.tsx`: **4** (lines 309, 330, 762, 765 — manifest entries listing files as "expected", NOT runtime imports; PR-17 owned follow-up).
+> - **AC4** — Sidebar hover = tint+fontWeight only (PR-04 work, already compliant) ✓.
+> - **AC5** — prefers-reduced-motion universal block + 8 file-level guards maintained ✓.
+>
+> **Drift facts recorded in PR #2838 body:**
+> 1. `cursor-effects.css` runtime-dead (520 LOC, sole surviving references are 4 audit-manifest entries in `frontendAudit.tsx`, NOT runtime imports) — decommission owned by PR-17.
+> 2. Old AC3 (`grep cursor-effects|sidebar-buttons src/` == 0) not a valid runtime test post-PR-08; replaced with AC3a (0 runtime imports) + AC3b (4 stale audit-manifest refs, PR-17 owned).
+> 3. transform-keyframes: 0 production consumers (15 all in MediLabDemo demo-only) — corrected from earlier estimate.
+> 4. Canonical `mac-*` primitives existed in tokens.css with 0 consumers before PR-08.
+> 5. `--mac-card-bg` translucent (rgba 0.88 light / 0.86 dark) vs plan original "solid" — D1 KEEP ruling.
+> 6. `.glass` utility dead; glass-scheme removed in PR-02 (vestigial refs in `colorScheme.ts` ROOT_STYLE_PROPERTIES + `HeaderNew.tsx` — follow-up note, not blocking).
+> 7. UI-audit track C-4 (commit `c9ea39edd`, 25.08.2026, SEPARATE pre-PR-08 commit, NOT part of #2838) removed `.glass` rule from macos.css pre-PR-08 rebase → PR-08 macos.css deletion became no-op (goal achieved by C-4, not PR-08).
+> 8. BS-44 local environmental false-positive — pre-existing (verified on clean main, CI green).
+>
+> **Ratchet:** PASS — 8 improvements, 0 regressions: `varUsagesNoFallback` 12003→11931 (−72), `cssHexOutsideTokens` 746→738 (−8), `tsxHex` 373→371 (−2), `tsxHexFiles` 64→63 (−1), `duplicateKeyframesNameCount` 10→8 (−2), `unreferencedFileCount` 124→123 (−1), `prefersSchemeRootBlocks` 3→2 (−1, from C-4), `unreferencedFiles` length 124→123.
+>
+> **Tier-1 + CI on merged SHA `ae7236cb6`:** tsc --noEmit exit 0; vitest 165 files / 1224 tests PASS (20.9s); vite build success (30.3s); lint:check 0 errors / 3090 warnings; check-theme PASS; audit:icon-controls PASS. CI on `ae7236cb6`: 33 check runs = 25 success / 8 skipped (path policy) / 0 failures.
+>
+> **Scope boundaries respected:** cursor-effects.css, tokens-legacy.ts, ModernTabs rename, MacOSCard/DataCard, landingContent, additional CSS backdrop surfaces (AIChatWindow/ModernDialog/EMRContainerV2/ModernToast/ModernFilters/DoctorTemplatesPanel/AppointmentWizardV2/MacOSDemo) — all owned by their assigned PRs in plan v1.1; not touched in PR-08.
+>
+> **Original Problem/Solution/AC text below preserved as historical record.** AC3 wording in original AC list below reflects the v1.0/v1.1 contract intent; actual verification post-PR-08 used the AC3a/3b split (see banner above).
 
 **Приоритет:** P1 · **Effort:** 4 SP · **Dependencies:** PR-UI-04 · **Sprint:** 3
 
@@ -862,6 +924,8 @@ interface DataCardProps {
 - ✅ `grep -rn "backdrop-filter\|backdropFilter" src/components --include="*.tsx" | wc -l` ≤ 10 (только в modal/dialog/command-palette/notifications)
 - ✅ `grep -rn "translateY.*scale\|scale.*translateY" src/` — 0 результатов в компонентах
 - ✅ `grep -rn "cursor-effects\|sidebar-buttons" src/` — 0 результатов (sidebar-buttons.css уже удалён в PR-UI-03; cursor-effects.css — зона ответственности PR-UI-17)
+
+> **AC3 post-PR-08 verification note (26.08.2026, main `ae7236cb6`):** The original AC3 grep would return **non-zero** (4 stale refs in `frontend/src/utils/frontendAudit.tsx` audit-manifest). Actual verification used the **AC3a/3b split**: AC3a = 0 runtime imports (✓ verified — 0 `@import` or `import` statements anywhere in `src/`); AC3b = 4 stale audit-manifest entries in `frontendAudit.tsx` (PR-17 owned follow-up, NOT runtime concern). The original AC3 wording is preserved above as historical contract intent.
 - ✅ Hover на sidebar item = только background tint + font-weight change
 - ✅ `prefers-reduced-motion: reduce` отключает все animations
 - ✅ Visual regression: UI выглядит «спокойнее», без прыжков
@@ -1111,7 +1175,7 @@ export const BRAND = {
 
 ### PR-UI-17 — Cleanup: dead code removal
 
-> **Статус: ⬜ NOT STARTED (срез 25.08.2026).** **Ownership-сводка:** этот PR — владелец удаления `cursor-effects.css` (перенос из PR-08), `tokens-legacy.ts` (перенос из PR-02) и rename `ModernTabs → Tabs` (перенос из PR-04). `sidebar-buttons.css` + `unified-sidebar.css` + `UnifiedLayout` уже удалены в PR-UI-03 — в списке ниже отмечены.
+> **Статус: ⬜ NOT STARTED (срез 26.08.2026, main `ae7236cb6`).** **Ownership-сводка:** этот PR — владелец удаления `cursor-effects.css` (перенос из PR-08; PR-08 verification в #2838 confirmed runtime-dead: 0 runtime imports — AC3a ✓; 4 stale audit-manifest refs in `frontendAudit.tsx` — AC3b, этого PR owned cleanup), `tokens-legacy.ts` (перенос из PR-02) и rename `ModernTabs → Tabs` (перенос из PR-04). `sidebar-buttons.css` + `unified-sidebar.css` + `UnifiedLayout` уже удалены в PR-UI-03 — в списке ниже отмечены. **Additional follow-ups discovered during PR-08 (26.08.2026, не blocking):** (a) `colorScheme.ts` ROOT_STYLE_PROPERTIES vestigial refs (PR-02 glass-scheme removal residual); (b) `HeaderNew.tsx` vestigial glass refs; (c) additional CSS backdrop surfaces (AIChatWindow/ModernDialog/EMRContainerV2/ModernToast/ModernFilters/DoctorTemplatesPanel/AppointmentWizardV2/MacOSDemo) — minor cleanup candidates, candidates for этого PR или отдельный cleanup track.
 
 **Приоритет:** P3 · **Effort:** 3 SP · **Dependencies:** PR-UI-15 · **Sprint:** 6
 
