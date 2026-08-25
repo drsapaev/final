@@ -8,7 +8,7 @@ import {
   Select,
   MacOSTab,
   Table,
-  MacOSEmptyState,
+  AppEmpty,
 } from '../ui/macos';
 import type { SelectChangeEvent } from '../ui/macos/Select';
 import {
@@ -787,7 +787,7 @@ const AIAnalytics = () => {
             reliability: `${data.reliability ?? 0}%`
           }))}
           emptyState={
-          <MacOSEmptyState
+          <AppEmpty
             icon={Cpu}
             title={t('misc.aia_empty_models_title')}
             description={t('misc.aia_empty_models_desc')} />
