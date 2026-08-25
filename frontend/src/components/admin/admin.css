@@ -2694,7 +2694,7 @@
   font-size: var(--mac-font-size-xs);
   background-color: var(--mac-surface-secondary);
   padding: 8px;
-  border-radius: var(--mac-border-radius-md);
+  border-radius: var(--mac-border-radius);
   margin-top: 4px;
   overflow: auto;
   color: var(--mac-text-primary);
@@ -9742,7 +9742,7 @@
 
 .admin-p-16-radius-var-mac-border-radiu-bg-bg-secondary-bd-1px-solid-var-mac-bo-d-flex-fd-column-gap-8 {
   padding: 16px;
-  border-radius: var(--mac-border-radius-lg);
+  border-radius: var(--mac-radius-lg);
   background: var(--mac-bg-secondary);
   border: 1px solid var(--mac-border);
   display: flex;
@@ -12569,7 +12569,7 @@ button[class*="admin-btn"]:active:not(:disabled) {
 .admin-stat-error { --admin-stat-color: var(--mac-error); }
 .admin-stat-info { --admin-stat-color: var(--mac-accent); }
 .admin-stat-accent { --admin-stat-color: var(--mac-accent); }
-.admin-stat-destructive { --admin-stat-color: var(--mac-destructive); }
+.admin-stat-destructive { --admin-stat-color: var(--mac-danger); }
 
 /* ─── Phase 3: ActivationSystem extend dialog ─── */
 /* Replaces 3 static inline style blocks in the extend activation dialog. */

@@ -232,7 +232,7 @@
 
 .demo-tab-btn-1-inactive {
   color: var(--mac-text-secondary);
-  font-weight: var(--mac-font-weight-normal);
+  font-weight: var(--mac-font-weight-regular);
   border-bottom: 2px solid transparent;
 }
 
@@ -261,7 +261,7 @@
 
 .demo-tab-btn-2-inactive {
   color: var(--mac-text-secondary);
-  font-weight: var(--mac-font-weight-normal);
+  font-weight: var(--mac-font-weight-regular);
 }
 
 .demo-tab-btn-2-inactive:hover {
@@ -300,7 +300,7 @@
 .demo-tab-btn-3-inactive {
   background: transparent;
   color: var(--mac-text-secondary);
-  font-weight: var(--mac-font-weight-normal);
+  font-weight: var(--mac-font-weight-regular);
 }
 
 .demo-tab-btn-3-inactive:hover {

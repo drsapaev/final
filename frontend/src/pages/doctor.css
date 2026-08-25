@@ -120,7 +120,7 @@
 
 /* ─── Empty state (batch 2) ─── */
 .doctor-empty {
-  padding: var(--mac-spacing-xl, 32px);
+  padding: var(--mac-spacing-8, 32px);
   text-align: center;
 }
 .doctor-empty-icon { opacity: 0.55; margin-bottom: var(--mac-spacing-3); }
@@ -266,7 +266,7 @@
   color: var(--mac-text-secondary);
 }
 .doctor-card-pad-0 { padding: 0; }
-.doctor-card-mb-xl { margin-bottom: var(--mac-spacing-xl, 32px); }
+.doctor-card-mb-xl { margin-bottom: var(--mac-spacing-8, 32px); }
 .doctor-badge-ml { margin-left: 4px; font-size: 10px; }
 .doctor-ml-4 { margin-left: 4px; }
 
