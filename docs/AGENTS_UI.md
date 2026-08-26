@@ -128,6 +128,20 @@
 - ✅ **DO:** Перед обновлением snapshot доказать причинность: минимальный A/B (старый код + старый snapshot = PASS; новый код + старый snapshot = FAIL) и/или pixel-diff bbox, подтверждающий, что регион изменения соответствует заявленному интенту.
 - ❌ **DON'T:** Обновлять snapshot только для превращения failing-теста в PASS без доказанной причинности. Сломанный тест — сначала расследование, потом решение о baseline-обновлении.
 
+**DEFERRED — first-class acceptance result:**
+
+DEFERRED — это не «частично сделано» и не «провалено». Это самостоятельный результат, который требует формальной записи и не может учитываться как completed coverage в headline-метриках плана.
+
+- ✅ **DO:** При deferral любого требования (Tier 2 E2E, AC-пункт, метрика, scope) зафиксировать в PR-описании и worklog:
+  1. **Original requirement** — что именно было заявлено (точная формулировка AC или spec).
+  2. **Reason** — почему не выполнено в текущем PR (блокер, infra, dependency, scope decision).
+  3. **Evidence** — что проверено, а что нет (какие gates запущены / skipped / FAILED).
+  4. **Owner / workstream** — кто владеет deferred-пунктом и кто выполнит resume.
+  5. **Resume condition** — какое условие должно выполниться, чтобы работа возобновилась.
+  6. **Impact on headline completion %** — какой % completion-plana не учитывается из-за этого deferral.
+
+- ❌ **DON'T:** Включать DEFERRED items в headline completion % как completed coverage. Запрещены формулировки «all green», «safe to merge», «fully verified» при наличии DEFERRED без явного перечисления. Корректная формулировка: `Tier 1 PASS; Tier 2 DEFERRED — <reason>, owner=<workstream>, resume condition=<condition>, headline impact=<%>`. **STOP invariant:** отсутствие любого из 6 полей (1–6) → metric/acceptance claim отклоняется.
+
 ### 14. UnifiedSidebar deletion checklist (обязателен перед удалением в PR-UI-03)
 
 Перед удалением `src/components/layout/UnifiedSidebar.tsx` убедиться, что canonical `Sidebar` (из `src/components/ui/macos/Sidebar.tsx`) покрывает ВСЕ 10 функций UnifiedSidebar. Если хотя бы одна не покрыта — НЕ удалять UnifiedSidebar, пока не добавлена в canonical.
@@ -155,6 +169,61 @@
 - ✅ **DO:** Если PR-UI-03 выполняется после PR-UI-01 — убедиться, что новый canonical ThemeProvider не зависит от UnifiedSidebar (он не должен, но проверить grep'ом `useTheme\|ThemeContext` в UnifiedSidebar.tsx).
 - ❌ **DON'T:** Чинить UnifiedSidebar «на месте» (минимальный фикс `useState('en')` → `useTranslation().language`) — это оставит мёртвый код. Лучше удалить файл целиком, поскольку он используется только в MediLabDemo, и мигрировать MediLabDemo на canonical AppShell + Sidebar.
 
+### 16. VERIFIED ≠ MERGED — post-merge verification
+
+`merged=true` на PR — это факт попадания в `main`, но **не доказательство готовности**. VERIFIED — отдельный, более сильный статус с проверяемыми invariant'ами. После merge требуется отдельная post-merge verification на merged tree, не на PR-head.
+
+- ✅ **DO:** Перед объявлением VERIFIED проверить все 5 invariants на merged tree (не на PR-head):
+  1. **Merged SHA на origin/main подтверждён:** `git rev-parse origin/main` возвращает squash-commit SHA, идентичный SHA из API-ответа merge.
+  2. **AC re-checked на merged tree:** все acceptance criteria, заявленные в PR, проверены на merged tree, не на PR-head. Если AC проверялся только на PR-head — повторить на merged tree.
+  3. **Regression gates на merged main прошли:** Tier 1 (rule 13) перезапущен на merged main; если Tier 2 был RUN — также перезапущен. Failure на merged tree, не присутствовавший на PR-head → блокер.
+  4. **Scope expansion отсуствует:** `git show --stat <squash-sha>` показывает тот же набор файлов и тот же byte-delta, что и approved PR diff. Любое расхождение → расследование.
+  5. **Неразрешённые отклонения отсуствуют:** DEFERRED items (см. §13 above) зафиксированы с owner + resume condition; metric integrity (§17) соблюдена; SSOT hierarchy (§18) согласована.
+
+- ❌ **DON'T:** Использовать формулировки «fully verified», «system verified», «it works» без подтверждения всех 5 invariants. Корректная формулировка после merge: `MERGED; VERIFIED — invariants 1-5 passed on merged main at <SHA>` либо `MERGED; NOT VERIFIED — invariant #N failed: <reason>`. **STOP invariant:** если хотя бы один из 5 invariants не подтверждён → статус NOT VERIFIED, требуется decision по каждому failure (fix PR / DEFERRED entry / user decision).
+
+### 17. Metric Integrity — preservation original/revised
+
+Переписывание уже опубликованной метрики как «нового первоначального значения» — запрещено. Это разрушает audit trail и мешает понять, что именно изменилось: реальная работа или методология подсчёта.
+
+- ✅ **DO:** При изменении методологии подсчёта или корректировке метрики сохранить полную цепочку:
+  1. **Original metric** — первоначально заявленное значение (например, `47 invariant / 48 job-total`).
+  2. **Revised metric** — новое значение после изменения методологии (например, `48 total`).
+  3. **Counting methodology** — что именно считается (например, «47 Playwright specs в CI + 1 в отдельном шаге» vs «48 specs в одном шаге»).
+  4. **Reason** — почему методология изменилась (CI split, gate ratchet, scope change).
+
+- ❌ **DON'T:** Переписывать историческое значение так, будто оно было первоначальным. Нельзя ретроактивно переписать «47 invariant / 48 total» в «48» без упоминания, что 47+1 когда-то считалось canonical. **STOP invariant:** при обновлении метрики запись `original → revised → methodology → reason` обязательна. Если хотя бы одно из 4 полей отсутствует — metric-claim отклоняется.
+
+### 18. SSOT Hierarchy — repo vs plan
+
+> **Git/main + machine-verified evidence = actual state.**
+> **Plan + explicit user decisions = intended state.**
+> **Worklog = audit trail connecting the two.**
+
+Репозиторий (`main` branch + machine-verified CI/build/test evidence) — единственный авторитетный источник для **actual state**. План (`docs/UI_REMEDIATION_PLAN.md`, sprint plan, ADR) — авторитетный источник для **intended state** и project decisions. Worklog — audit trail, связывающий фактическое и задуманное.
+
+- ✅ **DO:** При расхождении plan vs repo — НЕ молча исправлять ни одно, ни другое. Классифицировать расхождение:
+  - **impl drift** — код реализован иначе, чем в plan; plan корректен, repo нуждается в fix.
+  - **docs drift** — plan устарел; repo корректен, plan нуждается в update.
+  - **scope change** — решение изменить scope; требует user decision.
+  - **stale plan** — plan не обновлялся после завершённой работы; plan нуждается в sync.
+  - **incomplete impl** — реализация не завершена; repo нуждается в continuation.
+  - **measurement discrepancy** — метрика посчитана по-разному; см. §17.
+
+- ❌ **DON'T:** Тихо править метрику в плане «под факт», не зафиксировав расхождение в worklog. **STOP invariant:** при обнаружении plan↔repo divergence — сначала classify (одна из 6 категорий выше), затем явно зафиксировать в worklog, затем получить требуемое decision (для scope change — user approval; для docs drift — PR update; для impl drift — bugfix PR).
+
+### 19. No concurrent direct push during active PR review
+
+> **Direct push на `main` во время активного PR-review запрещён как default coordination behavior, даже если сам код легитимен.** Emergency/owner exception должен быть явно зафиксирован и не должен обходить merge-race verification.
+
+Если существует открытый PR с approved/verified head, другой workstream НЕ ДОЛЖЕН напрямую менять `main` до merge этого PR, пока не пройдёт отдельный coordination gate.
+
+- ✅ **DO:** При необходимости срочного изменения `main` во время активного PR-review:
+  1. **Coordination gate** — до push'а: (a) announceить new upstream commit владельцу открытого PR; (b) PR owner инспектирует overlap; (c) если overlap есть — PR rebases на новый main; (d) affected gates перезапускаются; (e) pre-merge SHA invariant (Rule 1, §Workflow step 8) повторяется.
+  2. **Явное exception-логирование** — direct push вне coordination gate допустим только при emergency с explicit owner override. Формат записи в worklog: `EMERGENCY DIRECT PUSH — owner=<workstream>, reason=<reason>, bypassed PRs=<list>, coordination gate=<passed | skipped with rationale>`.
+
+- ❌ **DON'T:** Тактически оправдывать direct push тем, что «код легитимен» — это не аргумент. Конфликт возникает не из-за кода, а из-за координации: активный PR был создан на одном main, после merge его squash-parent будет уже другим. **STOP invariant:** если есть открытый PR с approved head, и workstream собирается прямо push'ить на `main` — coordination gate обязателен. Его пропуск = process violation, даже если сам код проходит.
+
 ---
 
 1. **Прочитать `docs/UI_REMEDIATION_PLAN.md`** полностью (большой документ с file-level матрицей).
@@ -163,7 +232,10 @@
 4. **Реализовать изменения** строго по spec из плана. Если spec противоречит AGENTS_UI — написать в PR description, какой пункт конфликта, и предложить решение.
 5. **Прогнать regression gate** локально (см. правило 13).
 6. **Открыть PR** с описанием: что изменено, какие файлы удалены/добавлены, какие тесты добавлены, какие regression-риски.
-7. **После merge:** обновить `docs/UI_REMEDIATION_PLAN.md` — отметить PR как выполненный, обновить file matrix если появились новые зависимости.
+7. **Итерация по review-комментариям** (Rule 8 — обязательна). После открытия PR — мониторить PR-комментарии и review feedback до merge. Адресовать все blocking comments. Зафиксировать количество итераций в worklog. **STOP invariant:** отсутствие unresolved review threads перед merge. Если существует unresolved blocking review comment → STOP, не merge. Корректная формулировка перед merge: `Review threads: 0 unresolved / N total; iteration count: K`.
+8. **Pre-merge SHA invariant** (Rules 1+2 — обязательна). Непосредственно перед merge: повторно получить `origin/main` (`git fetch origin main && git rev-parse origin/main`). Сравнить с `approved_base_sha` (SHA, верифицированный в момент локального audit). **STOP invariant:** `current_origin_main == approved_base_sha`. При расхождении → STOP, не merge. **`mergeable=true` не является доказательством отсутствия race с main** — GitHub может silently auto-rebase docs-only/no-conflict diffs. При расхождении: (a) `git log approved_base_sha..origin/main` — классифицировать incoming commits; (b) определить overlap со своим PR; (c) rebase при overlap; (d) перезапустить затронутые gates; (e) повторить invariant.
+9. **После merge:** обновить `docs/UI_REMEDIATION_PLAN.md` — отметить PR как выполненный, обновить file matrix если появились новые зависимости.
+10. **Post-merge VERIFIED ≠ MERGED verification** (Rule 3 — обязательна). См. §16. Merge сам по себе не означает VERIFIED — выполнить все 5 post-merge invariants на merged tree, не на PR-head.
 
 ---
 
