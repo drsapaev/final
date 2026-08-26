@@ -3,7 +3,7 @@
 > **Документ-источник правды для миграции UI репозитория `drsapaev/final`.**
 > Сопровождается жёстким контрактом `AGENTS_UI.md` — прочитать ПЕРЕД началом работы.
 
-**Версия:** 1.3 · **Дата:** 26.08.2026 · **Основано на:** UI-аудите от 18.08.2026 + cross-check с актуальным main от 21.08.2026; статусы PR синхронизированы с main `e16f3b0c` (progress snapshot — исполнение правила №7 AGENTS_UI); Phase 2C info-family definition-only remediation VERIFIED на `e16f3b0c`.
+**Версия:** 1.4 · **Дата:** 26.08.2026 · **Основано на:** UI-аудите от 18.08.2026 + cross-check с актуальным main от 21.08.2026; статусы PR синхронизированы с main `9b1ef5d` (progress snapshot — исполнение правила №7 AGENTS_UI); Phase 2C info-family definition-only remediation VERIFIED на `e16f3b0c`; Phase 2A `--mac-text-muted` consumer migration VERIFIED на `9b1ef5d`.
 
 ---
 
@@ -268,7 +268,7 @@ interface ThemeContextValue {
 
 **Итого:** 18 PR · 98 story points · ~12 недель (3 месяца) при 1 разработчике.
 
-**Прогресс на 26.08.2026 (main `e16f3b0c`):** выполнено 8 из 18 PR — 34/98 SP (PR-UI-01–05, 07, 08; PR-UI-06 — ⚠️ PARTIAL). Поддерживающие коммиты: Phase 0 ratchet, C-1, C-4 (macos.css prefers-color-scheme cleanup), C-5, P1a (Button variants). Серия PR-UI-07a (12 sub-PR, #2824–#2836) завершена физическим decommission MacOSEmptyState (#2836). PR-UI-08 (#2838, 25.08.2026) — glass/animation canonicalization, D1–D8 rulings, см. §7 PR-UI-08 + §4.1.2 ledger. **Phase 2C info-family definition-only remediation (commit `e16f3b0c`, 26.08.2026): VERIFIED — CI 30/30 terminal, 22 success + 8 expected skipped + 0 failures; ratchet 155/301 PASS; см. §4.1.3 ledger.** Остаток: 64 SP; следующий по плану — PR-UI-09 (DataTable canonical migration). Установленная дисциплина исполнения: inventory → decision gate → baseline → implementation → proof → Tier-1 → E2E → PR → STOP → explicit merge approval → post-merge verification.
+**Прогресс на 26.08.2026 (main `9b1ef5d`):** выполнено 8 из 18 PR — 34/98 SP (PR-UI-01–05, 07, 08; PR-UI-06 — ⚠️ PARTIAL). Поддерживающие коммиты: Phase 0 ratchet, C-1, C-4 (macos.css prefers-color-scheme cleanup), C-5, P1a (Button variants). Серия PR-UI-07a (12 sub-PR, #2824–#2836) завершена физическим decommission MacOSEmptyState (#2836). PR-UI-08 (#2838, 25.08.2026) — glass/animation canonicalization, D1–D8 rulings, см. §7 PR-UI-08 + §4.1.2 ledger. **Phase 2C info-family definition-only remediation (commit `e16f3b0c`, 26.08.2026): VERIFIED — CI 30/30 terminal, 22 success + 8 expected skipped + 0 failures; ratchet 155/301 PASS; см. §4.1.3 ledger.** **Phase 2A `--mac-text-muted` consumer migration (commit `9b1ef5d`, 26.08.2026): VERIFIED — CI 33/33 terminal, 25 success + 8 expected skipped + 0 failures (Regression Audit Gate ✅, Frontend e2e ✅); ratchet 154/280 PASS; см. §4.1.4 ledger.** Остаток: 64 SP; следующий по плану — PR-UI-09 (DataTable canonical migration). Установленная дисциплина исполнения: inventory → decision gate → baseline → implementation → proof → Tier-1 → E2E → PR → STOP → explicit merge approval → post-merge verification.
 
 ### 4.1.1 Handoff от параллельного QA/UI-audit трека (25.08.2026, верифицировано на main `434cf34`)
 
@@ -358,13 +358,57 @@ interface ThemeContextValue {
 2. **Dark-mode values**: `.dark-theme` selector в tokens.css НЕ определяет `--mac-info` / `--mac-info-bg` / `--mac-info-border`. Light-mode definitions наследуются в dark mode (`#5ac8fa` cyan рендерится well on dark). Acceptable, не theme-optimized. Deferred.
 3. **Admin utility class names**: 4 generated utility classes в admin.css имеют `var-mac-info-bg` / `var-mac-info-border` в ИМЕНАХ классов (CSS bodies уже мигрированы в C-3-B.3). Class-name cleanup — отдельная задача. Deferred.
 4. **Dead-code consumers** (6 usages в `AIAnalytics.css` / `WaitTimeAnalytics.css`): direct `var(--mac-info-bg)` / `var(--mac-info-border)` references. Сейчас resolve correctly (cyan 14% bg + solid cyan border), но components остаются unrendered dead code. Dead-code cleanup — отдельная задача. Deferred.
-5. **`--mac-text-muted`** (21 usage): per-usage semantic audit — НЕ remediation. Token используется в разных ролях (caption, hint, separator/icon, button label, disabled/future state). Нельзя заменить одним global `--mac-text-secondary`. Требуется таблица: Usage | File:line | Semantic role | Current property | Secondary? | Tertiary? | Evidence | Confidence. Отдельный read-only decision gate.
+5. **`--mac-text-muted`** (21 usage): per-usage semantic audit — НЕ remediation. Token используется в разных ролях (caption, hint, separator/icon, button label, disabled/future state). Нельзя заменить одним global `--mac-text-secondary`. Требуется таблица: Usage | File:line | Semantic role | Current property | Secondary? | Tertiary? | Evidence | Confidence. Отдельный read-only decision gate. **[RESOLVED 26.08.2026 → §4.1.4: audit выполнен (21/21 → tertiary), remediation VERIFIED на `9b1ef5d`.]**
 6. **`--mac-spacing-md`** (cardiology.css): per-usage semantic inspection. Отдельный LOW-risk PR (2 изменения). Deferred.
 7. **Plan-SSOT/governance update** (этот раздел) выполнен; further governance updates — отдельные stage transitions per user approval.
 
 **Verification artifacts:** `/home/z/my-project/worklog.md` Task IDs `2C-bg-border`, `2C-B`, `2C-post-cleanup`, `2C-commit-push-ci` (audit trail).
 
 **STOP-AFTER-VERIFIED:** Phase 2C закрыта как VERIFIED. Следующий технический read-only этап (`--mac-text-muted` per-usage semantic audit) НЕ запускается автоматически — требует отдельной команды пользователя.
+
+### 4.1.4 Phase 2A — `--mac-text-muted` Consumer Migration (commit `9b1ef5d`, 26.08.2026)
+
+> Источник: Phase 2A undefined-token consumer remediation (commit `9b1ef5d47c77891fcc3c258e951f362b040fece0`, direct push to main as fast-forward from `69bdc9a9`, 26.08.2026). **Status: VERIFIED (not merely MERGED)** — post-push SHA + full CI terminal (33/33, 0 failures). Scope: ровно 21 consumer replacement в 5 файлах, строго +21/−21; НОВЫХ tokens НЕ создано; значения `--mac-text-secondary` / `--mac-text-tertiary` НЕ изменены; `.ltw-text-muted` НЕ удалён; hover НЕ добавлен; baseline/snapshots НЕ обновлены.
+
+**Закрыто Phase 2A (21 usage `var(--mac-text-muted)` → `var(--mac-text-tertiary)`):**
+
+- `--mac-text-muted` НЕ БЫЛ определён ни в canonical tokens.css, ни в legacy macos-tokens.css (git-history: 0 коммитов с определением). Все 21 usage молча наследовали цвет родителя (обычно `--mac-text-primary`) — задуманная muted-де-эмфаза терялась в runtime (silent UI bug; доказан computed-style fixture: light → rgb(0,0,0), dark → rgb(255,255,255)).
+- Per-usage semantic audit (read-only, base `69bdc9a9`): 21/21 → существующий canonical tertiary tier (#5d6f84 light / #636366 dark); 20/21 HIGH confidence, 1/21 MEDIUM (lab.css:662 disabled/future state). Semantic split не потребовался: все роли (caption, hint, separator/icon, button label, disabled) разделяют один visual intent де-эмфазы; tertiary = canonical muted tier. Закрывает §4.1.3 follow-up #5.
+
+**Diff scope (exact):** 5 файлов, +21/−21, единственное изменение на строку — `var(--mac-text-muted)` → `var(--mac-text-tertiary)` (программно верифицировано: каждая строка diff отличается только именем токена):
+
+- `frontend/src/pages/lab.css` ×6 (314, 342, 384, 396, 528, 662)
+- `frontend/src/pages/patient.css` ×6 (303, 420, 542, 563, 573, 623)
+- `frontend/src/components/admin/AdminSecurityDashboard.tsx` ×5 (153, 224, 247, 294, 325)
+- `frontend/src/components/laboratory/LabTemplateWorkbench.css` ×3 (220, 324, 519)
+- `frontend/src/components/patient/WebAuthnRegistration.tsx` ×1 (138)
+
+Residual `var(--mac-text-muted)` в `frontend/src/`: 0.
+
+**Metrics (ratchet --check, delta этого PR изолирована против base `69bdc9a9`):**
+- `undefinedVarNameCount`: 155 → **154** (−1; `--mac-text-muted` покинул undefined-список)
+- `undefinedVarUsages`: 301 → **280** (−21)
+- `varUsagesNoFallback`: 11933 → 11933 (0; оба варианта без fallback)
+- Historical baseline (f837bc966 → now): names 163→154 (−9: −8 прошлые фазы, −1 этот PR), usages 330→280 (−50: −29 прошлые фазы, −21 этот PR)
+- Предсказание аудита (154/280) совпало бит-в-бит. Drift = 0. PASS.
+
+**Gates (pre-commit):** tsc 0 errors; Vitest 165 файлов / 1224/1224; vite build exit 0; runtime computed-style fixture 84/84 (light+dark: pre-fix inheritance-баг доказан, post-fix canonical resolution #5d6f84/#636366 доказана); Tier-1 Playwright chromium 48/48 (6 спеков, visual snapshots чисты); production bundle: 0 вхождений `mac-text-muted`, все 3 определения tertiary в главном CSS-бандле.
+
+**Reachability (нахождение этапа):** 14/21 LIVE (lab.css ×6, patient.css ×6, LabTemplateWorkbench.css ×2 — каждый класс имеет TSX-потребителя, компоненты в ROUTE_COMPONENTS/бандле); 7/21 DEAD (AdminSecurityDashboard.tsx — 0 importers, вне бандла; WebAuthnRegistration.tsx — 0 importers, в бандле только i18n-строки; `.ltw-text-muted` — 0 потребителей). Визуально изменятся 14 элементов (light: 18.84:1 inherited → 4.63:1 tertiary; dark: 17.01:1 → 2.84:1) — восстановление задуманной muted-иерархии. Ratchet-дельта не зависит от reachability (сканер читает исходники).
+
+**Known follow-up (зафиксирован пользователем как отдельные решения, НЕ часть этого PR):**
+
+1. **Dark-mode `--mac-text-tertiary` contrast = 2.84:1** на `--mac-bg-primary-dark` (#636366 на #1c1c1e), 2.33:1 на bg-secondary-dark — ниже WCAG AA 4.5:1. Этот PR приводит 21 consumer к существующему canonical tier (консистентность с каноном; все существующие tertiary-consumers рендерятся так же), но НЕ изменяет значение самого токена. Dark tertiary contrast improvement — **отдельный будущий design-system decision** (референс: dark-secondary #8e8e93 = 5.22:1).
+2. **Dead-code cleanup**: AdminSecurityDashboard.tsx, WebAuthnRegistration.tsx (dead components, 0 importers) и `.ltw-text-muted` (dead utility class) — отдельная cleanup-задача.
+3. **Hover-state UX decision** для 3 interactive usages (аудит рекомендовал `&:hover { color: var(--mac-text-secondary); }`) — UX modification, вне canonical-token remediation scope.
+
+**Process note — integrity incident & recovery:** между сессиями локальный клон оказался откатут к checkpoint (HEAD=e16f3b0c, 21 замена исчезла из worktree, локальные refs устарели). Remote подтверждён нетронутым на `69bdc9a9` (ls-remote + GitHub API). Recovery: discard байт-идентичной дубль-модификации plan-doc → чистый ff до `69bdc9a9` → повторное применение 21 замены → программное доказательство байт-идентичности diff → полный re-run gates (ratchet pre-edit 155/301 + post-edit 154/280, tsc, Vitest 1224/1224, build, bundle-check 0 residual). Задокументировано в worklog Task `2A-commit-gate`.
+
+**CI verification (commit `9b1ef5d` на `origin/main`):** 33 check-runs, все terminal: 25 success + 8 skipped (expected для direct-main push: Load Tests k6, Staging readiness, PR Required Gate, Notify-on-failure ×2, Telegram Mini App Release Gate, DAST ZAP, Sentry source maps) + 0 failures. Regression Audit Gate ✅, Frontend e2e ✅, Frontend unit ✅, Frontend build ✅, Frontend lint ✅.
+
+**Verification artifacts:** `/home/z/my-project/worklog.md` Task IDs `2A-text-muted-audit`, `2A-text-muted-remediation`, `2A-commit-gate`, `2A-push-ci`; evidence pack `/home/z/my-project/download/phase-2a-remediation-evidence-pack.md`; runtime proof `/home/z/my-project/download/phase-2a-runtime-proof.png`.
+
+**STOP-AFTER-VERIFIED:** Phase 2A закрыта как VERIFIED. Phase 2B (`--mac-spacing-md` read-only semantic audit) НЕ запускается автоматически — требует отдельной команды пользователя.
 
 ### 4.2. Порядок миграции ролей (обновлено)
 
