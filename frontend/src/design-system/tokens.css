@@ -80,6 +80,7 @@
   --mac-danger: #ff453a;
   --mac-danger-hover: #ff3b30;
   --mac-error: var(--mac-danger);
+  --mac-info: #5ac8fa;
   --mac-success-bg: color-mix(in srgb, var(--mac-success), transparent 86%);
   --mac-success-bg-light: color-mix(in srgb, var(--mac-success), white 80%);
   --mac-success-border: color-mix(in srgb, var(--mac-success), transparent 72%);
@@ -89,6 +90,8 @@
   --mac-error-bg: color-mix(in srgb, var(--mac-error), transparent 86%);
   --mac-error-bg-light: color-mix(in srgb, var(--mac-error), white 80%);
   --mac-error-border: color-mix(in srgb, var(--mac-error), transparent 72%);
+  --mac-info-bg: color-mix(in srgb, var(--mac-info), transparent 86%);
+  --mac-info-border: var(--mac-info);
 
   --mac-separator: #e5e5ea;
 
