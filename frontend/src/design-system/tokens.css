@@ -543,6 +543,197 @@
   border-bottom: none;
 }
 
+/* === PR-UI-09a canonical table-state primitives ===
+   Added by remediation re-do (closed #2842 forensic predecessor).
+   These classes replace inline-style attributes in:
+   - ui/DataTable-features/TableEmpty.tsx
+   - ui/DataTable-features/TableError.tsx
+   - ui/DataTable-features/TablePagination.tsx
+   - ui/DataTable-features/TableSkeleton.tsx
+   Zero-delta against canonical BASE baseline (inlineStyles=2619/inlineStyleFiles=231).
+   NOTE: does NOT touch --mac-info* family (drift commit e16f3b0c6, L80-92). */
+
+/* --- Empty state --- */
+.mac-table-empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-base);
+}
+
+.mac-table-empty-icon {
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.mac-table-empty-description {
+  margin-top: 4px;
+  font-size: var(--mac-font-size-sm);
+  opacity: 0.8;
+}
+
+.mac-table-empty-action {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+/* --- Error state --- */
+.mac-table-error {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-base);
+}
+
+.mac-table-error-icon {
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.mac-table-error-description {
+  margin-top: 4px;
+  font-size: var(--mac-font-size-sm);
+  opacity: 0.8;
+}
+
+.mac-table-error-action {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.mac-table-error-retry {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  padding: 6px 14px;
+  color: var(--mac-text-primary);
+  cursor: pointer;
+  font-size: var(--mac-font-size-sm);
+  font-family: inherit;
+}
+
+/* --- Pagination footer --- */
+.mac-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--mac-table-header-bg);
+  border-top: 1px solid var(--mac-border);
+  border-bottom: 1px solid var(--mac-border);
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+}
+
+.mac-table-pagination-summary {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+.mac-table-pagination-pages {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.mac-table-pagination-button {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  padding: 4px 10px;
+  color: var(--mac-text-primary);
+  cursor: pointer;
+  font-size: var(--mac-font-size-sm);
+  font-family: inherit;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+.mac-table-pagination-button--active {
+  background: var(--mac-bg-blue);
+  color: var(--mac-text-on-accent, white);
+  border-color: var(--mac-bg-blue);
+  cursor: default;
+}
+
+.mac-table-pagination-button--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mac-table-pagination-ellipsis {
+  padding: 0 4px;
+  color: var(--mac-text-secondary);
+}
+
+/* --- Skeleton loading state --- */
+.mac-table-skeleton-row {
+  height: 48px;
+}
+
+.mac-table-skeleton-cell {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--mac-border);
+  border-right: 1px solid var(--mac-border);
+}
+
+.mac-table-skeleton-cell--last {
+  border-right: none;
+}
+
+.mac-table-skeleton-bar {
+  height: 14px;
+  width: 70%;
+  border-radius: var(--mac-radius-sm);
+  background: var(--mac-bg-secondary);
+  opacity: 0.55;
+  animation-name: mac-table-skeleton-pulse;
+  animation-duration: var(--mac-duration-normal);
+  animation-timing-function: var(--mac-ease);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  display: block;
+}
+
+@keyframes mac-table-skeleton-pulse {
+  0% { opacity: 0.35; }
+  100% { opacity: 0.7; }
+}
+
+/* --- DataTable chrome (filter input, scroll wrapper, sort icon) --- */
+.mac-table-scroll-wrapper {
+  overflow-x: auto;
+}
+
+.mac-table-filter-input {
+  width: 100%;
+  padding: 4px 6px;
+  font-size: var(--mac-font-size-xs);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  box-sizing: border-box;
+}
+
+.mac-table-sort-icon {
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.mac-table-sort-icon--inactive {
+  opacity: 0.3;
+}
+
 /* macOS Chat Styles */
 .mac-chat-bubble {
   background: var(--mac-bg-secondary);
