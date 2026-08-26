@@ -300,7 +300,7 @@
 
 .pp-empty-state-icon {
   margin: 0 auto 12px;
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
 }
 
 .pp-empty-state-title {
@@ -417,7 +417,7 @@
 
 .pp-info-hint {
   margin-top: 8px;
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
 }
 
 /* ─── Reports section ─── */
@@ -539,7 +539,7 @@
 }
 
 .pp-forms-progress-separator {
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
 }
 
 .pp-badges-row {
@@ -560,7 +560,7 @@
 
 .pp-form-timestamp {
   font-size: var(--mac-font-size-xs);
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
 }
 
 /* L-M-1 fix: autosave indicators */
@@ -570,7 +570,7 @@
   align-items: center;
   gap: 4px;
   font-size: var(--mac-font-size-xs);
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
 }
 
 .pp-form-autosave-indicator {
@@ -620,7 +620,7 @@
 }
 
 .pp-breadcrumb-separator {
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
 }
 
 .pp-breadcrumb-current {

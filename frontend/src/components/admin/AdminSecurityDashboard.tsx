@@ -150,7 +150,7 @@ function DashboardTab({ data }: { data: Record<string, unknown> }) {
             {failed_logins.slice(0, 10).map((entry) => (
               <div key={String(entry.id)} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--mac-border)' }}>
                 <span>{String(entry.ip_address || 'N/A')} · {String(entry.actor_role || 'unknown')}</span>
-                <span style={{ color: 'var(--mac-text-muted)', fontSize: '12px' }}>
+                <span style={{ color: 'var(--mac-text-tertiary)', fontSize: '12px' }}>
                   {entry.timestamp ? new Date(entry.timestamp as string).toLocaleString('ru-RU') : ''}
                 </span>
               </div>
@@ -221,7 +221,7 @@ function ComplianceTab({ data }: { data: Record<string, unknown> }) {
             <Icon name={check.passed ? 'checkmark.circle.fill' : 'exclamationmark.triangle'} size={16} />
             <div>
               <div style={{ fontWeight: 500, color: 'var(--mac-text-primary)' }}>{String(check.label)}</div>
-              <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{String(check.details)}</div>
+              <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>{String(check.details)}</div>
             </div>
           </div>
         ))}
@@ -244,7 +244,7 @@ function SecretsTab({ data }: { data: Record<string, unknown> }) {
           <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
             <div>
               <div style={{ fontWeight: 500 }}>{name}</div>
-              <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>
                 {status.last_rotated ? t('admin2.asd_secrets_rotation', { date: new Date(status.last_rotated as string).toLocaleDateString('ru-RU') }) : t('admin2.asd_secrets_never_rotated')}
                 {status.days_since_rotation != null ? t('admin2.asd_secrets_days_ago', { days: status.days_since_rotation }) : ''}
               </div>
@@ -291,7 +291,7 @@ function BackupTab({ data, onVerify }: { data: Record<string, unknown>; onVerify
             <div style={{ fontWeight: 500 }}>
               {t('admin2.asd_backup_last', { date: last_backup_at ? new Date(last_backup_at).toLocaleString('ru-RU') : t('admin2.asd_backup_never') })}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>
               {hours_since_last_backup != null ? t('admin2.asd_backup_hours_ago', { hours: hours_since_last_backup }) : ''}
               {t('admin2.asd_backup_interval', { hours: expected_interval_hours })}
             </div>
@@ -322,7 +322,7 @@ function SummaryCard({ label, value, variant }: Record<string, unknown>) {
       border: '1px solid var(--mac-border)',
       background: 'var(--mac-bg-tertiary)',
     }}>
-      <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{String(label)}</div>
+      <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>{String(label)}</div>
       <div style={{ fontSize: '24px', fontWeight: 600, color: colors[variant as keyof typeof colors] || colors.default }}>
         {String(value)}
       </div>

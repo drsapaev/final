@@ -135,7 +135,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
                   <div style={{ fontWeight: 500, color: 'var(--mac-text-primary)' }}>
                     {cred.name || t('patient.pat_web_no_name')}
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>
                     {cred.device_type || t('patient.pat_web_device_default')}
                     {cred.last_used_at ? ` · ${t('patient.pat_web_last_used', { date: new Date(cred.last_used_at).toLocaleDateString('ru-RU') })}` : ''}
                   </div>

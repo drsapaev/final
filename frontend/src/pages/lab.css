@@ -311,7 +311,7 @@
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
   pointer-events: none;
 }
 
@@ -339,7 +339,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
   padding: var(--mac-spacing-1);
   font-size: var(--mac-font-size-lg);
   line-height: 1;
@@ -381,7 +381,7 @@
 
 .lqw-sort-label {
   font-size: var(--mac-font-size-xs);
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
 }
 
 .lqw-sort-select {
@@ -393,7 +393,7 @@
 .lqw-filter-count {
   margin-top: var(--mac-spacing-2);
   font-size: var(--mac-font-size-xs);
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
 }
 
 /* Skeleton loading (L-H-4 + L-M-4 fix: prefers-reduced-motion) */
@@ -525,7 +525,7 @@
 .lqw-pii-summary {
   display: inline-block;
   cursor: pointer;
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
   list-style: none;
 }
 
@@ -659,7 +659,7 @@
 
 .lab-status-step-future {
   background: var(--mac-bg-tertiary);
-  color: var(--mac-text-muted);
+  color: var(--mac-text-tertiary);
   border: 1px solid var(--mac-border);
 }
 
