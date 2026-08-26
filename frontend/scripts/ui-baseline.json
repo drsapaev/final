@@ -1,8 +1,8 @@
 {
   "version": 1,
   "description": "UI_AUDIT_PLAN.md Phase 0 baseline. Ratchet: values may only improve (decrease). To move the baseline intentionally run: node scripts/ui-baseline.mjs --write-baseline and justify the change in the PR description.",
-  "generatedAt": "2026-08-25T08:16:08.139Z",
-  "gitCommit": "f837bc966",
+  "generatedAt": "2026-08-26T04:26:44.266Z",
+  "gitCommit": "a1d47f17d",
   "metrics": {
     "tokenSourceFiles": [
       {
@@ -45,7 +45,7 @@
     "tokenSourceFileCount": 9,
     "tokenFamilies": {
       "admin": 1,
-      "other": 155,
+      "other": 150,
       "surface": 7,
       "text-legacy": 10,
       "mac": 123,
@@ -62,8 +62,8 @@
       "theme/tokens-legacy.ts": 1,
       "theme/tokens/ dir": 1
     },
-    "undefinedVarNameCount": 163,
-    "undefinedVarUsages": 330,
+    "undefinedVarNameCount": 158,
+    "undefinedVarUsages": 321,
     "undefinedVarNames": [
       "--accent",
       "--admin-ai",
@@ -168,16 +168,12 @@
       "--mac-bg-page",
       "--mac-blue-600",
       "--mac-border-hover",
-      "--mac-border-radius-lg",
-      "--mac-border-radius-md",
       "--mac-danger-600",
       "--mac-danger-bg",
-      "--mac-destructive",
       "--mac-fill-quaternary",
       "--mac-font-family",
       "--mac-font-family-mono",
       "--mac-font-mono",
-      "--mac-font-weight-normal",
       "--mac-glass-bg",
       "--mac-glass-border",
       "--mac-gradient-subtle",
@@ -201,7 +197,6 @@
       "--mac-shadow-color",
       "--mac-shadow-xs",
       "--mac-spacing-md",
-      "--mac-spacing-xl",
       "--mac-success-light",
       "--mac-surface",
       "--mac-surface-hover",
@@ -229,13 +224,13 @@
       "--warning-border",
       "--warning-text"
     ],
-    "varUsagesTotal": 13179,
-    "varUsagesNoFallback": 12003,
-    "cssHexOutsideTokens": 746,
-    "tsxHex": 373,
+    "varUsagesTotal": 13147,
+    "varUsagesNoFallback": 11970,
+    "cssHexOutsideTokens": 738,
+    "tsxHex": 372,
     "tsxHexFiles": 64,
-    "inlineStyles": 2619,
-    "inlineStyleFiles": 231,
+    "inlineStyles": 2635,
+    "inlineStyleFiles": 235,
     "cssImportant": 349,
     "tsxImportant": 80,
     "modalFilesOutsideKit": [
@@ -313,23 +308,15 @@
         "files": 6
       },
       {
-        "name": "shimmer",
-        "files": 3
-      },
-      {
         "name": "slideIn",
         "files": 3
       },
       {
-        "name": "fadeInUp",
-        "files": 2
-      },
-      {
-        "name": "macSlideIn",
-        "files": 2
-      },
-      {
         "name": "scaleIn",
+        "files": 2
+      },
+      {
+        "name": "shimmer",
         "files": 2
       },
       {
@@ -337,11 +324,10 @@
         "files": 2
       }
     ],
-    "duplicateKeyframesNameCount": 10,
+    "duplicateKeyframesNameCount": 8,
     "unreferencedFiles": [
       "src/PublicApp.tsx",
       "src/api/registrarBatch.ts",
-      "src/components/AnimatedTransition.tsx",
       "src/components/LanguageTest.tsx",
       "src/components/PWAInstallPrompt.tsx",
       "src/components/ResponsiveModal.tsx",
@@ -412,6 +398,10 @@
       "src/components/statistics/ModernStatisticsSimple.tsx",
       "src/components/telegram/TelegramManager.tsx",
       "src/components/test/ComponentTest.tsx",
+      "src/components/ui/DataTable-features/TableEmpty.tsx",
+      "src/components/ui/DataTable-features/TableError.tsx",
+      "src/components/ui/DataTable-features/TableSkeleton.tsx",
+      "src/components/ui/DataTable-features/index.ts",
       "src/constants/a11yTokens.ts",
       "src/hooks/uiAnimations.ts",
       "src/hooks/useAI.tsx",
@@ -464,11 +454,11 @@
       "src/utils/websocketAuth.ts",
       "src/utils/wizardTester.ts"
     ],
-    "unreferencedFileCount": 124,
+    "unreferencedFileCount": 127,
     "navCyrillicLabels": 67,
     "a11yCssImported": false,
     "cssFilesWithDarkSelectors": 13,
-    "prefersSchemeRootBlocks": 3,
+    "prefersSchemeRootBlocks": 2,
     "isDarkBranches": 170,
     "inlineStyleAttributePatches": 58
   }
