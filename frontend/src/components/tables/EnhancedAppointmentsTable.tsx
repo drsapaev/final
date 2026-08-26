@@ -1,5 +1,10 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
+// PR-UI-01: useTheme imported to keep this table's data-color-scheme attribute
+// synchronized with in-page theme changes (storage event does not fire in the
+// same document that changed localStorage). Reading colorScheme from useTheme()
+// ensures the table re-applies the scheme when HeaderNew switches it.
+import { useTheme } from '../../contexts/ThemeContext';
 import {
   Search,
 
@@ -186,33 +191,31 @@ const EnhancedAppointmentsTable = ({
   const isDark = theme === 'dark';
   const isDoctorView = String(view).toLowerCase() === 'doctor';
 
+  // PR-UI-01: read colorScheme from useTheme() and apply it directly to the
+  // table container. Previously the effect read from localStorage, but the
+  // parent ThemeProvider's passive effect (ThemeContext.tsx:330-337) persists
+  // to localStorage AFTER child effects run - so reading localStorage gave
+  // stale values on the same render cycle. Using the context value directly
+  // eliminates the race condition (per Codex review feedback).
+  const { colorScheme: themeColorScheme } = useTheme();
+
   // Локально дублируем активную схему на контейнер таблицы, чтобы CSS [data-color-scheme]
   // сработал даже при временной потере атрибута на <html>
   useEffect(() => {
-    const applyLocalScheme = () => {
-      try {
-        const customScheme = localStorage.getItem('customColorScheme');
-        const schemeId = localStorage.getItem('activeColorSchemeId');
-        const el = containerRef.current;
-        if (!el) return;
-        if (customScheme === 'true' && schemeId) {
-          el.setAttribute('data-color-scheme', schemeId);
-        } else {
-          el.removeAttribute('data-color-scheme');
-        }
-      } catch {
+    const el = containerRef.current;
+    if (!el) return;
+    // PR-UI-01: derive attribute directly from context value (not localStorage).
+    // Custom schemes are vibrant/glass/gradient (kind === 'custom' in colorScheme.ts).
+    // Standard schemes are light/dark/auto - no data-color-scheme attribute needed
+    // (CSS :root handles them via prefers-color-scheme media queries).
+    const customSchemes = ['vibrant', 'glass', 'gradient'];
+    if (customSchemes.includes(themeColorScheme)) {
+      el.setAttribute('data-color-scheme', themeColorScheme);
+    } else {
+      el.removeAttribute('data-color-scheme');
+    }
+  }, [themeColorScheme]);
 
-
-
-
-
-
-        // ignore
-      }};applyLocalScheme();const handler = () => applyLocalScheme();window.addEventListener('colorSchemeChanged', handler);window.addEventListener('storage', handler);return () => {
-      window.removeEventListener('colorSchemeChanged', handler);
-      window.removeEventListener('storage', handler);
-    };
-  }, []);
 
   // Вспомогательная функция для добавления прозрачности к CSS переменной
   const withOpacity = useCallback((cssVar: string, opacity: number) => {

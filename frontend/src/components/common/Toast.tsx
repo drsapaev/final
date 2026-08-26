@@ -144,23 +144,23 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
     const typeStyles = {
       success: {
         backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        borderLeft: '4px solid var(--color-success)',
-        color: 'var(--color-success)'
+        borderLeft: '4px solid var(--mac-success)',
+        color: 'var(--mac-success)'
       },
       error: {
         backgroundColor: 'var(--mac-error-bg)',
-        borderLeft: '4px solid var(--color-danger)',
-        color: 'var(--color-danger)'
+        borderLeft: '4px solid var(--mac-error)',
+        color: 'var(--mac-error)'
       },
       warning: {
         backgroundColor: 'rgba(245, 158, 11, 0.1)',
-        borderLeft: '4px solid var(--color-warning)',
-        color: 'var(--color-warning)'
+        borderLeft: '4px solid var(--mac-warning)',
+        color: 'var(--mac-warning)'
       },
       info: {
         backgroundColor: 'rgba(6, 182, 212, 0.1)',
-        borderLeft: '4px solid var(--color-info)',
-        color: 'var(--color-info)'
+        borderLeft: '4px solid var(--mac-accent)',
+        color: 'var(--mac-accent)'
       }
     };
 
@@ -196,7 +196,7 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
   };
 
   const messageStyle = {
-    color: 'var(--color-text-secondary)'
+    color: 'var(--mac-text-secondary)'
   };
 
   const closeButtonStyle = {
@@ -216,10 +216,10 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
     bottom: 0,
     left: 0,
     height: '3px',
-    backgroundColor: toast.type === 'success' ? 'var(--color-success)' :
-    toast.type === 'error' ? 'var(--color-danger)' :
-    toast.type === 'warning' ? 'var(--color-warning)' :
-    'var(--color-info)',
+    backgroundColor: toast.type === 'success' ? 'var(--mac-success)' :
+    toast.type === 'error' ? 'var(--mac-error)' :
+    toast.type === 'warning' ? 'var(--mac-warning)' :
+    'var(--mac-accent)',
     width: '100%',
     transform: 'scaleX(1)',
     transformOrigin: 'left',

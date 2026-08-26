@@ -2773,7 +2773,7 @@ const AppointmentWizardV2 = ({
     justifyContent: 'center',
     flexShrink: 0,
     background: 'var(--mac-bg-secondary)',
-    color: 'var(--mac-primary)',
+    color: 'var(--mac-accent)',
     border: '1px solid var(--mac-border)',
     boxShadow: 'var(--mac-shadow-sm)'
   };
@@ -2889,7 +2889,7 @@ const AppointmentWizardV2 = ({
           background: activeServiceCategory === cat.id ?
           'color-mix(in srgb, var(--mac-accent), transparent 90%)' :
           'var(--mac-bg-secondary)',
-          color: activeServiceCategory === cat.id ? 'var(--mac-primary)' : 'var(--mac-text-primary)',
+          color: activeServiceCategory === cat.id ? 'var(--mac-accent)' : 'var(--mac-text-primary)',
           fontWeight: activeServiceCategory === cat.id ? '600' : '500',
           transform: activeServiceCategory === cat.id ? 'translateY(-1px)' : 'translateY(0)',
           boxShadow: activeServiceCategory === cat.id ? '0 6px 14px rgba(59, 130, 246, 0.08)' : 'var(--mac-shadow-sm)'
@@ -2951,8 +2951,8 @@ const AppointmentWizardV2 = ({
         onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
           if (!isReloadingServices) {
             e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
-            e.currentTarget.style.borderColor = 'var(--mac-primary)';
-            e.currentTarget.style.color = 'var(--mac-primary)';
+            e.currentTarget.style.borderColor = 'var(--mac-accent)';
+            e.currentTarget.style.color = 'var(--mac-accent)';
           }
         }}
         onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {

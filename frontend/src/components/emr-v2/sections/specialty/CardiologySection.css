@@ -26,8 +26,8 @@
 }
 
 .cardiology-tab.active {
-    color: var(--mac-blue-500);
-    border-bottom-color: var(--mac-blue-500);
+    color: var(--mac-accent-blue-500);
+    border-bottom-color: var(--mac-accent-blue-500);
 }
 
 .cardiology-tab:disabled {
@@ -50,7 +50,7 @@
     padding: 12px;
     background: var(--mac-bg-secondary);
     border-radius: var(--mac-radius-md);
-    border-left: 3px solid var(--mac-blue-500);
+    border-left: 3px solid var(--mac-accent-blue-500);
 }
 
 .cardiology-interpretation h4 {
@@ -133,7 +133,7 @@
 
 .cardiology-select:focus {
     outline: none;
-    border-color: var(--mac-blue-500);
+    border-color: var(--mac-accent-blue-500);
 }
 
 .cardiology-select:disabled {

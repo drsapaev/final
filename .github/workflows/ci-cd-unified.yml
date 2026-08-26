@@ -102,18 +102,21 @@ jobs:
             - 'frontend/src/**/emr/**'
             - 'frontend/src/**/lab/**'
           frontend_e2e:
+            # P0 gate policy: broad self-maintaining coverage instead of
+            # hand-enumerated component dirs (which rotted: App.jsx vs App.tsx,
+            # panels/** never existed, components/emr vs emr-v2, lab vs
+            # laboratory, components/admin was never listed). Covers
+            # components/ui/** canonical primitives and components/admin/**
+            # (PR-UI-07a series previously skipped e2e entirely).
+            # Workflow self-path: PRs changing this CI config get the e2e gate
+            # with the new invariant applied (push events already run all jobs
+            # unconditionally via the scope-resolution else-branch).
             - 'frontend/e2e/**'
             - 'frontend/playwright.config.*'
-            - 'frontend/src/App.jsx'
-            - 'frontend/src/PublicApp.jsx'
-            - 'frontend/src/routing/**'
-            - 'frontend/src/pages/**'
-            - 'frontend/src/panels/**'
-            - 'frontend/src/components/registrar/**'
-            - 'frontend/src/components/queue/**'
-            - 'frontend/src/components/payment/**'
-            - 'frontend/src/components/emr/**'
-            - 'frontend/src/components/lab/**'
+            - 'frontend/src/**'
+            - 'frontend/index.html'
+            - 'frontend/vite.config.*'
+            - '.github/workflows/ci-cd-unified.yml'
           telegram_release_gate:
             - 'backend/app/api/v1/endpoints/telegram_webhook.py'
             - 'backend/app/api/v1/endpoints/telemetry.py'
@@ -806,7 +809,10 @@ jobs:
         # on the FIRST attempt — retries would mask flaky tests. The
         # e2e-coverage-invariant.mjs gate enforces this.
         # Output is tee'd to a file so the next step can verify the test count.
-        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts --project=chromium --retries=0 2>&1 | tee ux-audit-output.txt
+        # P0 gate policy: frontend-10-route-smoke + frontend-10-visual-a11y
+        # are self-contained (mocked/no API, dev server only) and were
+        # previously never run in CI.
+        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts --project=chromium --retries=0 2>&1 | tee ux-audit-output.txt
       # E2E root-cause fix: removed continue-on-error. All non-fixme tests
       # must pass. Tests marked test.fixme have documented root causes and
       # are tracked for follow-up. See PR description for details.
@@ -818,11 +824,17 @@ jobs:
         # This catches the failure mode where tests are silently skipped via
         # test.fixme/test.skip (the e2e-coverage-invariant.mjs gate catches
         # the source-level patterns, but this catches the runtime-level
-        # reality: if the count drops below 27, something was skipped).
+        # reality: if the count drops below the expected number, something
+        # was skipped).
         #
-        # Expected: 27 passed, 0 skipped, 0 failed (12 cashier + 9 registrar + 6 visual).
+        # Expected: 47 passed, 0 skipped, 0 failed
+        # (12 cashier + 9 registrar + 6 visual + 8 route-smoke + 12 visual-a11y).
+        # Reconciliation note: registrar-time.spec.ts (1 test) runs in its own
+        # step above and is intentionally NOT counted here — the total
+        # hard-gated Tier 1 suite is 48 tests. Empirically verified locally:
+        # 48/48 pass in ~3.0m with dev server only, no backend/credentials.
         # If a test is intentionally added/removed, update EXPECTED_COUNT below.
-        EXPECTED_COUNT=27
+        EXPECTED_COUNT=47
         if [ ! -f ux-audit-output.txt ]; then
           echo "ERROR: ux-audit-output.txt not found. The UX Audit step may not have run."
           exit 1

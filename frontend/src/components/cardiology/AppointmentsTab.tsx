@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { Calendar } from 'lucide-react';
-import { MacOSCard, Skeleton, MacOSEmptyState } from '../ui/macos';
+import { MacOSCard, Skeleton, AppEmpty } from '../ui/macos';
 import AppointmentSummaryBar from '../doctor/AppointmentSummaryBar';
 import EnhancedAppointmentsTable from '../tables/EnhancedAppointmentsTable';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -57,7 +57,7 @@ export function AppointmentsTab({
         {appointmentsLoading ? (
           <Skeleton type="table" count={5} />
         ) : appointments.length === 0 ? (
-          <MacOSEmptyState type="calendar" title={t('cardio.cardio_appt_empty_title')} description={t('cardio.cardio_appt_empty_desc')} />
+          <AppEmpty title={t('cardio.cardio_appt_empty_title')} description={t('cardio.cardio_appt_empty_desc')} />
         ) : (
           <EnhancedAppointmentsTable
             data={appointments as never[]}

@@ -31,10 +31,10 @@ import {
   Button,
   Badge,
   SegmentedControl,
-  MacOSStatCard,
+  StatCard,
   Input,
   Select,
-  MacOSEmptyState,
+  AppEmpty,
   Skeleton,
   Modal,
 } from '../ui/macos';
@@ -289,28 +289,28 @@ const WebhookManager = () => {
       {/* Статистика */}
       {stats &&
       <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_total')}
           value={String((stats as Record<string, unknown>)?.total_webhooks ?? "")}
           icon={Globe}
           color="blue" />
 
           
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_active')}
           value={String((stats as Record<string, unknown>)?.active_webhooks ?? "")}
           icon={CheckCircle}
           color="green" />
 
           
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_calls_24h')}
           value={String(((stats as Record<string, unknown>)?.recent_24h as Record<string, unknown>)?.total_calls ?? "")}
           icon={Activity}
           color="orange" />
 
           
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_success_rate')}
           value={`${Number(((stats as Record<string, unknown>)?.recent_24h as Record<string, unknown>)?.success_rate ?? 0).toFixed(1) ?? '0'}%`}
           icon={Zap}
@@ -526,7 +526,7 @@ const WebhookManager = () => {
           </div>
 
           {filteredWebhooks.length === 0 &&
-        <MacOSEmptyState
+        <AppEmpty
           icon={Globe}
           title={t('admin2.wh_empty_title')}
           description={
@@ -540,8 +540,7 @@ const WebhookManager = () => {
                   {t('admin2.wh_create_btn')}
                   </Button> :
           null
-          }
-          iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} />
+          } />
 
         }
         </div>
@@ -652,11 +651,10 @@ const WebhookManager = () => {
           </div>
 
           {calls.length === 0 &&
-        <MacOSEmptyState
+        <AppEmpty
           icon={Activity}
           title={t('admin2.wh_calls_empty_title')}
-          description={selectedWebhook ? t('admin2.wh_calls_empty_desc_with_webhook') : t('admin2.wh_calls_empty_desc_no_webhook')}
-          iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} />
+          description={selectedWebhook ? t('admin2.wh_calls_empty_desc_with_webhook') : t('admin2.wh_calls_empty_desc_no_webhook')} />
 
         }
         </div>
@@ -683,28 +681,28 @@ const WebhookManager = () => {
 
           {/* Статистика событий */}
           <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_event_types_total')}
             value={new Set(webhooks.flatMap((w) => w.events)).size}
             icon={Clock}
             color="blue" />
 
             
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_active_events')}
             value={webhooks.filter((w) => w.is_active).flatMap((w) => w.events).length}
             icon={CheckCircle}
             color="green" />
 
             
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_patient_events')}
             value={webhooks.flatMap((w) => w.events ?? []).filter((e) => e.includes('patient')).length}
             icon={Users}
             color="orange" />
 
             
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_payment_events')}
             value={webhooks.flatMap((w) => w.events ?? []).filter((e) => e.includes('payment')).length}
             icon={CreditCard}
@@ -732,7 +730,7 @@ const WebhookManager = () => {
               name: t('admin2.wh_event_name_patient_updated'),
               description: t('admin2.wh_event_desc_patient_updated'),
               icon: Edit,
-              color: 'var(--mac-info)'
+              color: 'var(--mac-accent)'
             },
             {
               type: 'appointment.created',
@@ -746,7 +744,7 @@ const WebhookManager = () => {
               name: t('admin2.wh_event_name_appointment_updated'),
               description: t('admin2.wh_event_desc_appointment_updated'),
               icon: Edit,
-              color: 'var(--mac-info)'
+              color: 'var(--mac-accent)'
             },
             {
               type: 'visit.completed',

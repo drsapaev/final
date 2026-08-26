@@ -8,11 +8,10 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
-import './theme/macos-tokens.css';
+import './design-system/tokens.css';
 import './styles/macos.css';
 import './styles/header-new.css';
 import 'react-toastify/dist/ReactToastify.css';
-import { MacOSThemeProvider } from './theme/macosTheme';
 import { bootstrapStoredColorScheme } from './theme/colorScheme';
 import {
   Sidebar,
@@ -448,23 +447,21 @@ function AppContent() {
 
 export default function App() {
   return (
-    <MacOSThemeProvider>
-      <ThemeProvider>
-        <AppProviders>
-          <AppContent />
-          <ToastContainer
-            position="bottom-right"
-            autoClose={4000}
-            newestOnTop
-            closeOnClick
-            pauseOnHover
-            draggable
-            theme="colored"
-          />
-          <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
-        </AppProviders>
-      </ThemeProvider>
-    </MacOSThemeProvider>
+    <ThemeProvider>
+      <AppProviders>
+        <AppContent />
+        <ToastContainer
+          position="bottom-right"
+          autoClose={4000}
+          newestOnTop
+          closeOnClick
+          pauseOnHover
+          draggable
+          theme="colored"
+        />
+        <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
+      </AppProviders>
+    </ThemeProvider>
   );
 }
 

@@ -6,7 +6,6 @@ import { api } from '../api/client';
 import { useTheme } from '../contexts/ThemeContext';
 import TwoFactorManager from '../components/security/TwoFactorManager';
 import ColorSchemeSelector from '../components/admin/ColorSchemeSelector';
-import { AccentPicker } from '../components/ui/macos';
 
 import PhoneVerification from '../components/auth/PhoneVerification';
 
@@ -314,16 +313,6 @@ export default function Settings() {void
           {tab === 'appearance' &&
           <div className="settings-tab-content">
               <ColorSchemeSelector />
-
-              <div className="settings-card">
-                <div className="settings-card-title">Accent color</div>
-                <div className="settings-card-body">
-                  <AccentPicker />
-                  <div className="settings-hint">
-                    {t('misc.settings_accent_hint')}
-                  </div>
-                </div>
-              </div>
 
               <div className="settings-card">
                 <div className="settings-card-title">{t('misc.settings_use_together_title')}</div>

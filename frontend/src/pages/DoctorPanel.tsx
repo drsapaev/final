@@ -485,7 +485,6 @@ const DoctorPanel = () => {
     borderRadius: 'var(--mac-radius-xl)',
     padding: getSpacing('lg'),
     boxShadow: getShadow('lg'),
-    backdropFilter: 'blur(20px)',
     border: `1px solid ${panelBorder}`,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     cursor: 'default'  /* UX Audit Doctor M-33: stat cards not clickable */
@@ -501,7 +500,6 @@ const DoctorPanel = () => {
     borderRadius: 'var(--mac-radius-xl)',
     overflow: 'hidden',
     boxShadow: getShadow('lg'),
-    backdropFilter: 'blur(20px)',
     border: `1px solid ${panelBorder}`
   };
 
@@ -1199,15 +1197,15 @@ const DoctorPanel = () => {
                     <Calendar size={20} />
                     Отчет по записям
                   </Button>
-                  <Button variant="success" fullWidth disabled title={t("doctor.feature_in_development")}>
+                  <Button variant="secondary" color="success" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Activity size={20} />
                     Статистика работы
                   </Button>
-                  <Button variant="warning" fullWidth disabled title={t("doctor.feature_in_development")}>
+                  <Button variant="secondary" color="warning" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Pill size={20} />
                     Отчет по лекарствам
                   </Button>
-                  <Button variant="info" fullWidth disabled title={t("doctor.feature_in_development")}>
+                  <Button variant="secondary" color="info" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Heart size={20} />
                     Медицинская статистика
                   </Button>

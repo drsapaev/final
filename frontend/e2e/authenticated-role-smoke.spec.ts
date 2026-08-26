@@ -4,6 +4,7 @@ import type { Page, TestInfo } from '@playwright/test';
 import {
   AUTHENTICATED_ROLE_QA_ROUTES,
   AUTHENTICATED_SPECIALTY_QA_ROUTES,
+  attachRuntimeErrorCapture,
   installAuthenticatedQaHarness,
 } from './support/authenticatedQa';
 import type { RoleQaRoute, SpecialtyQaRoute } from './support/authenticatedQa';
@@ -115,12 +116,18 @@ const AUTHENTICATED_ADMIN_ACTION_QA_ROUTES: AdminActionQaRoute[] = [
   },
 ];
 
+// PR-QA-02 assertion hardening: route-level screens must be REAL, not
+// ErrorBoundary/404 fallbacks. Previously the heading/body checks accepted
+// the ErrorBoundary h1 ("Что-то пошло не так") as a successful screen —
+// admin-overview-dashboard passed on a live StatCard crash this way.
+const ERROR_BOUNDARY_HEADING = 'Что-то пошло не так';
+
 async function expectRenderedRolePanel(
   page: Page,
   route: RoleQaRoute | AdminRouteFamilyQaRoute | AdminActionQaRoute
 ) {
   await expect(page).not.toHaveURL(/\/login$/);
-  await expect(page).not.toHaveURL(/\/(?:forbidden|unauthorized)$/);
+  await expect(page).not.toHaveURL(/\/(?:forbidden|unauthorized|not-found)$/);
   await expect(page.locator(`.app-shell[data-route-id="${route.routeId}"]`)).toBeVisible({
     timeout: 15_000,
   });
@@ -128,6 +135,12 @@ async function expectRenderedRolePanel(
     async () => (await page.locator('body').innerText()).trim().length,
     { message: `${route.key} panel should render non-empty body text` }
   ).toBeGreaterThan(0);
+  // Anti-ErrorBoundary: the route shell renders even when the panel inside
+  // crashes (React render errors are caught by ErrorBoundary and do NOT
+  // surface as pageerror), so the fallback heading must be explicitly absent.
+  await expect(
+    page.getByRole('heading', { name: ERROR_BOUNDARY_HEADING })
+  ).toHaveCount(0, { timeout: 15_000 });
 }
 
 async function expectNoHorizontalOverflow(
@@ -157,15 +170,16 @@ async function expectVisibleRouteHeading(page: Page, route: AdminRouteFamilyQaRo
 }
 
 async function runAuthenticatedRouteSmoke(page: Page, testInfo: TestInfo, route: RoleQaRoute | SpecialtyQaRoute) {
-  const pageErrors: string[] = [];
-  page.on('pageerror', (error) => {
-    pageErrors.push(error.message);
-  });
+  const { pageErrors, consoleErrors } = attachRuntimeErrorCapture(page);
 
   await installAuthenticatedQaHarness(page, { role: route.role });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(route.path, { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle').catch(() => undefined);
+  // PR-QA-02: bounded networkidle wait — pages with polling (WebhookManager)
+  // never reach networkidle and an unbounded wait burns the whole test
+  // timeout. The assertions below (routeId / anti-ErrorBoundary / heading,
+  // each with 15s timeouts) are the real deterministic gates.
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
 
   await expectRenderedRolePanel(page, route);
   await expectNoHorizontalOverflow(page, route);
@@ -178,19 +192,21 @@ async function runAuthenticatedRouteSmoke(page: Page, testInfo: TestInfo, route:
     contentType: 'image/png',
   });
 
-  expect(pageErrors).toEqual([]);
+  expect(pageErrors, `${route.key} unexpected pageerror`).toEqual([]);
+  expect(consoleErrors, `${route.key} unexpected console.error (possible masked crash)`).toEqual([]);
 }
 
 async function runAdminRouteFamilyHeadingSmoke(page: Page, testInfo: TestInfo, route: AdminRouteFamilyQaRoute) {
-  const pageErrors: string[] = [];
-  page.on('pageerror', (error) => {
-    pageErrors.push(error.message);
-  });
+  const { pageErrors, consoleErrors } = attachRuntimeErrorCapture(page);
 
   await installAuthenticatedQaHarness(page, { role: 'Admin' });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(route.path, { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle').catch(() => undefined);
+  // PR-QA-02: bounded networkidle wait — pages with polling (WebhookManager)
+  // never reach networkidle and an unbounded wait burns the whole test
+  // timeout. The assertions below (routeId / anti-ErrorBoundary / heading,
+  // each with 15s timeouts) are the real deterministic gates.
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
 
   await expectRenderedRolePanel(page, route);
   await expectVisibleRouteHeading(page, route);
@@ -204,7 +220,8 @@ async function runAdminRouteFamilyHeadingSmoke(page: Page, testInfo: TestInfo, r
     contentType: 'image/png',
   });
 
-  expect(pageErrors).toEqual([]);
+  expect(pageErrors, `${route.key} unexpected pageerror`).toEqual([]);
+  expect(consoleErrors, `${route.key} unexpected console.error (possible masked crash)`).toEqual([]);
 }
 
 async function expectVisibleButtonsHaveNames(page: Page, route: AdminActionQaRoute) {
@@ -230,15 +247,16 @@ async function expectVisibleButtonsHaveNames(page: Page, route: AdminActionQaRou
 }
 
 async function runAdminRouteActionSmoke(page: Page, testInfo: TestInfo, route: AdminActionQaRoute) {
-  const pageErrors: string[] = [];
-  page.on('pageerror', (error) => {
-    pageErrors.push(error.message);
-  });
+  const { pageErrors, consoleErrors } = attachRuntimeErrorCapture(page);
 
   await installAuthenticatedQaHarness(page, { role: 'Admin' });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(route.path, { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle').catch(() => undefined);
+  // PR-QA-02: bounded networkidle wait — pages with polling (WebhookManager)
+  // never reach networkidle and an unbounded wait burns the whole test
+  // timeout. The assertions below (routeId / anti-ErrorBoundary / heading,
+  // each with 15s timeouts) are the real deterministic gates.
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
 
   await expectRenderedRolePanel(page, route);
   await expectVisibleRouteHeading(page, route);
@@ -267,7 +285,8 @@ async function runAdminRouteActionSmoke(page: Page, testInfo: TestInfo, route: A
     contentType: 'image/png',
   });
 
-  expect(pageErrors).toEqual([]);
+  expect(pageErrors, `${route.key} unexpected pageerror`).toEqual([]);
+  expect(consoleErrors, `${route.key} unexpected console.error (possible masked crash)`).toEqual([]);
 }
 
 test.describe('Authenticated role UI QA harness', () => {

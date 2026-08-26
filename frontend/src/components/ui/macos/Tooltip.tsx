@@ -173,9 +173,7 @@ const Tooltip = ({
     wordWrap: 'break-word',
     whiteSpace: 'normal',
     boxShadow: 'var(--mac-shadow-md)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)'
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
   };
 
   const getPositionedStyles = (): CSSProperties => {

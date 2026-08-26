@@ -25,7 +25,7 @@ import {
   Select,
   Textarea,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
 } from '../ui/macos';
 import { api } from '../../api/client';
@@ -570,7 +570,7 @@ const EquipmentManagement = () => {
         )}
         </div> :
       filteredEquipment.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Wrench}
         title={equipmentEmptyTitle}
         description={equipmentEmptyDescription}

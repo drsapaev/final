@@ -35,7 +35,7 @@ import {
   Input,
   Select,
   Table,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
   Checkbox,
 } from '../ui/macos';
@@ -744,7 +744,7 @@ const ServiceCatalog = () => {
             };
           })}
           emptyState={
-          <MacOSEmptyState
+          <AppEmpty
                 icon={Package}
                 title={t('admin2.sc_empty_title')}
                 description={searchTerm || selectedCategory !== 'all' || selectedSpecialty !== 'all' || selectedDepartment !== 'all' ?

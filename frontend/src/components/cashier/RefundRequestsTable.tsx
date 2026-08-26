@@ -256,7 +256,8 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
         <div className="refund-action-cluster">
           {canApprove && (
             <Button
-              variant="success"
+              variant="secondary"
+              color="success"
               size="md"
               onClick={() => handleApprove(request.id)}
               title={t('misc.rrt_odobrit')}

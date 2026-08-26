@@ -6,8 +6,8 @@ import {
   Badge,
   Input,
   MacOSTab,
-  MacOSStatCard,
-  MacOSEmptyState,
+  StatCard,
+  AppEmpty,
   Skeleton,
 } from '../ui/macos';
 import {
@@ -269,28 +269,28 @@ const WaitTimeAnalytics = () => {
           </div>
 
           <div className="wta-stat-grid">
-            <MacOSStatCard
+            <StatCard
           title={t('misc.wta_stat_avg_wait_time')}
           value={formatTime(Number(summary.average_wait_time_minutes ?? 0))}
           icon={Clock}
           color="var(--mac-info)" />
         
 
-            <MacOSStatCard
+            <StatCard
           title={t('misc.wta_stat_median_time')}
           value={formatTime(Number(summary.median_wait_time_minutes ?? 0))}
           icon={Activity}
           color="var(--mac-success)" />
         
 
-            <MacOSStatCard
+            <StatCard
           title={t('misc.wta_stat_analyzed_entries')}
           value={String(summary.total_analyzed_entries ?? 0)}
           icon={BarChart3}
           color="var(--mac-accent-purple)" />
         
 
-            <MacOSStatCard
+            <StatCard
           title={t('misc.wta_stat_trend')}
           value={`${Math.abs(summary.trend_change_percent ?? 0)}%`}
           icon={(summary.trend_change_percent ?? 0) > 0 ? TrendingUp : TrendingDown}
@@ -335,7 +335,7 @@ const WaitTimeAnalytics = () => {
           </div>
 
           {Object.keys(realTimeEstimates.queues || {}).length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Clock}
         title={t('misc.wta_empty_queues_title')}
         description={t('misc.wta_empty_queues_desc')} /> :
@@ -412,35 +412,35 @@ const WaitTimeAnalytics = () => {
             </h3>
 
             <div className="wta-stat-grid-sm">
-              <MacOSStatCard
+              <StatCard
             title={t('misc.wta_stat_average')}
             value={formatTime(analytics.overall_stats?.average_minutes ?? 0)}
             icon={Clock}
             color="var(--mac-info)" />
           
 
-              <MacOSStatCard
+              <StatCard
             title={t('misc.wta_stat_median')}
             value={formatTime(analytics.overall_stats?.median_minutes ?? 0)}
             icon={Activity}
             color="var(--mac-success)" />
           
 
-              <MacOSStatCard
+              <StatCard
             title={t('misc.wta_stat_min')}
             value={formatTime(analytics.overall_stats?.min_minutes ?? 0)}
             icon={TrendingDown}
             color="var(--mac-warning)" />
           
 
-              <MacOSStatCard
+              <StatCard
             title={t('misc.wta_stat_max')}
             value={formatTime(analytics.overall_stats?.max_minutes ?? 0)}
             icon={TrendingUp}
             color="var(--mac-error)" />
           
 
-              <MacOSStatCard
+              <StatCard
             title={t('misc.wta_stat_90th_percentile')}
             value={formatTime(analytics.overall_stats?.percentile_90 ?? 0)}
             icon={BarChart3}
@@ -506,7 +506,7 @@ const WaitTimeAnalytics = () => {
       }
         </> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={BarChart3}
       title={t('misc.wta_empty_detailed_title')}
       description={t('misc.wta_empty_detailed_desc')} />
@@ -564,7 +564,7 @@ const WaitTimeAnalytics = () => {
                 
                 {data.wait_time_stats &&
           <div className="wta-stat-grid-xs">
-                    <MacOSStatCard
+                    <StatCard
               title={t('misc.wta_stat_average')}
               value={formatTime(data.wait_time_stats.average_minutes ?? 0)}
               icon={Clock}
@@ -572,7 +572,7 @@ const WaitTimeAnalytics = () => {
               size="small" />
             
 
-                    <MacOSStatCard
+                    <StatCard
               title={t('misc.wta_stat_median')}
               value={formatTime(data.wait_time_stats.median_minutes ?? 0)}
               icon={Activity}
@@ -580,7 +580,7 @@ const WaitTimeAnalytics = () => {
               size="small" />
             
 
-                    <MacOSStatCard
+                    <StatCard
               title={t('misc.wta_stat_analysis')}
               value={String(data.analyzed_visits ?? 0)}
               icon={BarChart3}
@@ -594,7 +594,7 @@ const WaitTimeAnalytics = () => {
           </div>
         </MacOSCard> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={Users}
       title={t('misc.wta_empty_services_title')}
       description={t('misc.wta_empty_services_desc')} />
@@ -677,7 +677,7 @@ const WaitTimeAnalytics = () => {
       }
         </MacOSCard> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={Calendar}
       title={t('misc.wta_empty_heatmap_title')}
       description={t('misc.wta_empty_heatmap_desc')} />

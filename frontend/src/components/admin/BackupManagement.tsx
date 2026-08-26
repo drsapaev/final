@@ -21,7 +21,7 @@ import {
   Textarea,
   Checkbox,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
 } from '../ui/macos';
 import { api } from '../../api/client';
@@ -508,7 +508,7 @@ const BackupManagement = () => {
         )}
         </div> :
       filteredBackups.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={HardDrive}
         title={backupEmptyTitle}
         description={backupEmptyDescription}

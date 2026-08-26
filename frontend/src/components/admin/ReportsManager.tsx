@@ -23,10 +23,10 @@ import {
 'lucide-react';
 import { MacOSCard, Button, Badge } from '../ui/macos';
 import {
-  MacOSStatCard,
+  StatCard,
   Table,
   Input,
-  MacOSEmptyState,
+  AppEmpty,
   Select,
   SegmentedControl,
 } from '../ui/macos';
@@ -345,7 +345,7 @@ const ReportsManager = () => {
         </h3>
 
         <div className="admin-grid-auto-240-16">
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.rm_today_stat_title')}
           value={quickReports.daily?.summary?.total_patients_served || 0}
           subtitle={`${quickReports.daily?.summary?.total_revenue || 0} ${t('admin2.rm_currency')}`}
@@ -440,7 +440,7 @@ const ReportsManager = () => {
 
         {files.length === 0 ?
       <div className="admin-flex-center-justify-h-300">
-            <MacOSEmptyState
+            <AppEmpty
           icon={FileX}
           title={t('admin2.rm_empty_files_title')}
           description={t('admin2.rm_empty_files_desc')} />
@@ -620,16 +620,16 @@ const ReportsManager = () => {
     <div className="flex flex-col gap-6">
       {error ?
       <MacOSCard className="admin-card-p-48-flex-justify-center">
-          <MacOSEmptyState
+          <AppEmpty
           icon={AlertCircle}
           title={t('admin2.rm_error_title')}
-          description={t('admin2.rm_error_desc')}>
-
+          description={t('admin2.rm_error_desc')}
+          action={
             <Button onClick={handleRetry} className="mt-4">
               <RefreshCw className="w-4 h-4 mr-2" />
               {t('admin2.rm_retry_btn')}
             </Button>
-          </MacOSEmptyState>
+          } />
         </MacOSCard> :
 
       <>

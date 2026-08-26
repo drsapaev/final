@@ -500,7 +500,7 @@ const FCMManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="admin-p-12px-20px-bd-none-bg-transparent-cur-pointer-d-flex-ai-center-gap-8-fs-sm-tr-all-var-mac-duration-pos-relative-mb-n1-col-dyn-fw-dyn" style={{ '--admin-col0': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fw1': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}
+              className="admin-p-12px-20px-bd-none-bg-transparent-cur-pointer-d-flex-ai-center-gap-8-fs-sm-tr-all-var-mac-duration-pos-relative-mb-n1-col-dyn-fw-dyn" style={{ '--admin-col0': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fw1': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-regular)' } as CSSProperties}
               onMouseEnter={(e) => {
                 if (!isActive) {
                   e.currentTarget.style.color = 'var(--mac-text-primary)';

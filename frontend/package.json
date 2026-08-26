@@ -25,6 +25,8 @@
     "audit:icon-controls": "node scripts/audit-icon-only-controls.mjs --strict --baseline=scripts/a11y/icon-only-controls-baseline.json",
     "audit:icon-controls:components": "node scripts/audit-icon-only-controls.mjs --include-components --strict --baseline=scripts/a11y/icon-only-component-controls-baseline.json",
     "audit:icon-controls:strict": "node scripts/audit-icon-only-controls.mjs --strict",
+    "audit:ui-baseline": "node scripts/ui-baseline.mjs",
+    "audit:ui-ratchet": "node scripts/ui-baseline.mjs --check",
     "audit:icon-controls:update-baseline": "node scripts/audit-icon-only-controls.mjs --write-baseline=scripts/a11y/icon-only-controls-baseline.json",
     "audit:icon-controls:components:update-baseline": "node scripts/audit-icon-only-controls.mjs --include-components --write-baseline=scripts/a11y/icon-only-component-controls-baseline.json",
     "storybook": "storybook dev -p 6006",

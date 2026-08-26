@@ -261,7 +261,7 @@ const DoctorServiceSelector = ({
               <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-info)'
+              color: 'var(--mac-accent)'
             }}>{getTotalDuration()}</div>
               <div style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -386,11 +386,9 @@ const DoctorServiceSelector = ({
                 }}
                 onFocus={(e: React.FocusEvent<HTMLElement>) => {
                   e.currentTarget.style.borderColor = 'var(--mac-accent)';
-                  e.currentTarget.style.boxShadow = 'var(--mac-focus-ring)';
                 }}
                 onBlur={(e: React.FocusEvent<HTMLElement>) => {
                   e.currentTarget.style.borderColor = 'var(--mac-border)';
-                  e.currentTarget.style.boxShadow = 'none';
                 }}
                 min="0" /> :
 
@@ -440,7 +438,7 @@ const DoctorServiceSelector = ({
                 alignItems: 'center',
                 color: 'var(--mac-text-primary)'
               }}>
-                <CategoryIcon size={20} style={{ marginRight: 'var(--mac-spacing-2)', color: 'var(--mac-info)' }} />
+                <CategoryIcon size={20} style={{ marginRight: 'var(--mac-spacing-2)', color: 'var(--mac-accent)' }} />
                 {categoryName}
               </h3>
 
@@ -459,8 +457,8 @@ const DoctorServiceSelector = ({
                         justifyContent: 'space-between',
                         padding: 'var(--mac-spacing-3)',
                         borderRadius: 'var(--mac-radius-lg)',
-                        border: `1px solid ${isSelected ? 'var(--mac-info-border)' : 'var(--mac-border)'}`,
-                        backgroundColor: isSelected ? 'var(--mac-info-bg)' : 'var(--mac-bg-secondary)',
+                        border: `1px solid ${isSelected ? 'var(--mac-accent-blue)' : 'var(--mac-border)'}`,
+                        backgroundColor: isSelected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-secondary)',
                         cursor: 'pointer',
                         transition: 'all var(--mac-duration-normal) var(--mac-ease)'
                       }}
@@ -483,7 +481,7 @@ const DoctorServiceSelector = ({
                       
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         {isSelected ?
-                        <CheckCircle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-info)' }} /> :
+                        <CheckCircle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-accent)' }} /> :
 
                         <Circle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-text-tertiary)' }} />
                         }

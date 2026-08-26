@@ -1,6 +1,6 @@
 /**
  * EMRSection CSS - Single Sheet Integration (Theme-aware)
- * Uses CSS variables from macos-tokens.css for proper dark/light theme support
+ * Uses CSS variables from design-system/tokens.css for proper dark/light theme support
  */
 
 .emr-section {

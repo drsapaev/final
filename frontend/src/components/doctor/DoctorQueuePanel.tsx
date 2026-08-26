@@ -22,7 +22,7 @@ import {
   Button,
   Badge,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
 } from '../ui/macos';
 import {
@@ -417,8 +417,7 @@ const DoctorQueuePanel = ({
 
   if (!queueData || !queueData.queue_exists) {
     return (
-      <MacOSEmptyState
-        type="users"
+      <AppEmpty
         title={t('misc.dqp_ochered_ne_sozdana')}
         description={t('misc.dqp_ochered_budet_sozdana_kogda_')} />);
 
@@ -551,7 +550,7 @@ const DoctorQueuePanel = ({
             <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-info)',
+              color: 'var(--mac-accent)',
               marginBottom: 'var(--mac-spacing-1)'
             }}>
               {queueStats.online_entries}
@@ -595,8 +594,7 @@ const DoctorQueuePanel = ({
 
         <div style={{ borderTop: '1px solid var(--mac-border)' }}>
           {queueEntries.length === 0 ?
-          <MacOSEmptyState
-            type="users"
+          <AppEmpty
             title={t('misc.dqp_patsientov_v_ocheredi_net')}
             description={t('misc.dqp_ozhidayte_postupleniya_novyh')} /> :
 
@@ -753,7 +751,8 @@ const DoctorQueuePanel = ({
 
                         {canComplete &&
                       <Button
-                        variant="success"
+                        variant="secondary"
+                        color="success"
                         onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.stopPropagation();
                           handleCompleteVisit(entry.id);

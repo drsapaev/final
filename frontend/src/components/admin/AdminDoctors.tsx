@@ -14,7 +14,7 @@ import {
   Badge,
   Button,
   MacOSCard,
-  MacOSEmptyState,
+  AppEmpty,
   Input,
   Skeleton,
   Select,
@@ -245,7 +245,7 @@ const AdminDoctors = () => {
           {loading ? (
             <Skeleton type="table" count={5} />
           ) : error ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={RefreshCw}
               title={t('admin2.ad_error_load_title')}
               description={t('admin2.ad_error_load_description')}
@@ -256,7 +256,7 @@ const AdminDoctors = () => {
               }
             />
           ) : doctors.length === 0 ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={Stethoscope}
               title={t('admin2.ad_empty_title')}
               description={

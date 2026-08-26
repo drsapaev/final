@@ -32,7 +32,7 @@ Related audit: [Frontend Function Classification Audit](./FRONTEND_FUNCTION_CLAS
 For role dashboards, clinic operations pages, forms, tables, payment result pages, empty/loading/error states, navigation, sidebar, and app-shell work, use:
 
 - `frontend/src/components/ui/macos`
-- `frontend/src/theme/macos-tokens.css`
+- `frontend/src/design-system/tokens.css`
 - `frontend/src/theme/macosTheme.jsx`
 - `frontend/src/styles/macos.css`
 - existing macOS app shell/sidebar/header patterns
@@ -204,7 +204,7 @@ export function MyButton() {
 - ✅ All design tokens defined in `/theme/unifiedTheme.js`
 - ✅ CSS custom properties in `/styles/unified.css`
 - ❌ NO hardcoded colors, spacing, or radii anywhere in components
-- ❌ NO separate theme files (`theme.css`, `macos-tokens.css`, etc.)
+- ❌ NO separate theme files (`theme.css`, `design-system/tokens.css`, etc.)
 
 ### 2. **Semantic Over Literal**
 - ✅ Use `colors.status.success` instead of `#10b981`
@@ -787,7 +787,7 @@ color: red !important;
 ```jsx
 // ❌ Using old theme files alongside new one
 import from '/styles/theme.css'         // ❌ OLD
-import from '/theme/macos-tokens.css'   // ❌ OLD
+import from '/design-system/tokens.css'   // ❌ OLD
 import from '/design-system/styles/global.css'  // ❌ OLD
 
 // ✅ USE ONLY THE UNIFIED SYSTEM
@@ -805,9 +805,9 @@ import '/styles/unified.css'
 - [ ] Update `App.jsx` to use unified theme provider
 - [ ] Delete old theme files:
   - [ ] `/styles/theme.css`
-  - [ ] `/theme/macos-tokens.css`
   - [ ] `/design-system/styles/global.css`
   - [ ] Any other competing theme files
+  - [ ] NOTE: `/design-system/tokens.css` is CANONICAL — do NOT delete (PR-UI-02)
 
 ### Phase 2: Component Migration (Week 2-3)
 **Start with highest-impact components:**

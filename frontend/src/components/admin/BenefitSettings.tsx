@@ -20,11 +20,11 @@ import {
   Input,
   Checkbox,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
   Badge,
   Modal,
-  MacOSStatCard,
+  StatCard,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
 // ADR-0015: use useAdminSettings hook instead of importing api/adminSettings directly.
@@ -127,7 +127,7 @@ const BenefitSettings = () => {
               {t('admin2.bs_title')}
             </h2>
           </div>
-          <MacOSEmptyState
+          <AppEmpty
             icon={AlertCircle}
             title={t('admin2.bs_empty_title')}
             description={t('admin2.bs_empty_desc')}
@@ -425,7 +425,7 @@ const BenefitSettings = () => {
 
           {/* Статистика настроек */}
           <div className="admin-grid-auto-200">
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.bs_stat_repeat_window_title')}
               value={`${settings.repeat_visit_days} ${t('admin2.bs_unit_days')}`}
               icon={Calendar}
@@ -434,7 +434,7 @@ const BenefitSettings = () => {
               trendColor={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-text-secondary)'}
             />
 
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.bs_stat_discount_title')}
               value={`${settings.repeat_visit_discount}%`}
               icon={Percent}
@@ -443,7 +443,7 @@ const BenefitSettings = () => {
               trendColor={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
 
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.bs_stat_benefit_title')}
               value={settings.benefit_consultation_free ? t('admin2.bs_status_free') : t('admin2.bs_status_paid')}
               icon={Shield}
@@ -452,13 +452,13 @@ const BenefitSettings = () => {
               trendColor={settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
 
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.bs_stat_auto_approve_title')}
               value={settings.all_free_auto_approve ? t('admin2.bs_status_enabled') : t('admin2.bs_status_disabled')}
               icon={CheckCircle}
               color={settings.all_free_auto_approve ? 'orange' : 'blue'}
               trend={settings.all_free_auto_approve ? t('admin2.bs_trend_auto') : t('admin2.bs_trend_manual')}
-              trendColor={settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-info)'}
+              trendColor={settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-accent)'}
             />
           </div>
 

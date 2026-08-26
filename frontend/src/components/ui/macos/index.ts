@@ -22,20 +22,16 @@ export { default as MacOSPagination } from './MacOSPagination';
 
 // Data Display Components
 export { default as Table } from './Table';
-export { default as MacOSStatCard } from './MacOSStatCard';
-export { default as MacOSMetricCard } from './MacOSMetricCard';
+// PR-UI-06: StatCard is canonical name. MacOSStatCard kept as backward-compat alias.
+export { default as StatCard } from './StatCard';
+export { default as MacOSStatCard } from './StatCard';
 export { default as List } from './List';
 
 // Utility Components
 export { AppLoading, AppEmpty, AppError } from './AppState';
-export { default as MacOSEmptyState } from './MacOSEmptyState';
 export { default as Skeleton } from './Skeleton';
 export { default as Alert } from './Alert';
 export { default as Modal } from './Modal';
-// UX Audit Registrar #1: AccentPicker — экспортируем из macos index,
-// чтобы `import { AccentPicker } from '../components/ui/macos'` работал.
-// Раньше файл существовал, но не был в barrel-export, из-за чего production-build падал.
-export { default as AccentPicker } from './AccentPicker';
 // UX Audit Registrar #1: AnimatedTransition — экспортируем из macos index.
 // Используется в DoctorPanel и др. До этого build падал на этом импорте.
 export { default as AnimatedTransition } from './AnimatedTransition';

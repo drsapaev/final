@@ -153,7 +153,7 @@ import { Button as MacButton } from '../ui/macos';
 
 ### 1. Import macOS Theme
 ```javascript
-import '../theme/macos-tokens.css';
+import '../design-system/tokens.css';
 ```
 
 ### 2. Use macOS Components

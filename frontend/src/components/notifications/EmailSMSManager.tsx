@@ -602,7 +602,7 @@ const EmailSMSManager = () => {
           placeholder={t('misc.esm_placeholder_sms_message')}
         />
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
-          <Button variant="success" onClick={sendTestSMS} disabled={loading || !smsForm.phone} loading={loading && activeTab === 'sms'}>
+          <Button variant="secondary" color="success" onClick={sendTestSMS} disabled={loading || !smsForm.phone} loading={loading && activeTab === 'sms'}>
             {loading && activeTab === 'sms' ? t('misc.esm_sending') : t('misc.esm_send_test')}
           </Button>
           <Button variant="secondary" onClick={clearSMSForm}>

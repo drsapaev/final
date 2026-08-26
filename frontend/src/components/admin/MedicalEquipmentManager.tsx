@@ -8,7 +8,7 @@ import {
   Select,
   SegmentedControl,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
 } from '../ui/macos';
 import {
   Activity,
@@ -511,7 +511,7 @@ const MedicalEquipmentManager = () => {
       </div>
 
       {filteredDevices.length === 0 && !loading &&
-    <MacOSEmptyState
+    <AppEmpty
       icon={Stethoscope}
       title={devicesEmptyTitle}
       description={devicesEmptyDescription} />
@@ -586,7 +586,7 @@ const MedicalEquipmentManager = () => {
             </div>
 
             {devices.filter((d) => d.status === 'online').length === 0 &&
-          <MacOSEmptyState
+          <AppEmpty
             icon={WifiOff}
             title={t('admin2.equip_no_available_devices_title')}
             description={t('admin2.equip_no_available_devices_desc')} />

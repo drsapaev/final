@@ -6,11 +6,11 @@ import {
   Button,
   Checkbox,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
   Badge,
   Modal,
-  MacOSStatCard,
+  StatCard,
 } from '../ui/macos';
 import { Settings, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -114,7 +114,7 @@ const WizardSettings = () => {
               {t('admin2.ws_title')}
             </h2>
           </div>
-          <MacOSEmptyState
+          <AppEmpty
           icon={AlertCircle}
           title={t('admin2.ws_load_error_title')}
           description={t('admin2.ws_load_error_hint')}
@@ -177,7 +177,7 @@ const WizardSettings = () => {
 
           {/* Статистика использования */}
           <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.ws_stat_usage_title')}
               value={settings.use_new_wizard ? '100%' : '0%'}
               icon={settings.use_new_wizard ? CheckCircle : AlertCircle}
@@ -186,7 +186,7 @@ const WizardSettings = () => {
               trendColor={settings.use_new_wizard ? 'var(--mac-success)' : 'var(--mac-warning)'} />
 
             
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.ws_stat_updated_title')}
               value={settings.updated_at ? new Date(settings.updated_at).toLocaleDateString('ru-RU') : t('admin2.ws_unknown')}
               icon={RefreshCw}

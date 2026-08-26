@@ -19,10 +19,10 @@ import {
 import {
   Card as MacOSCard,
   Badge,
-  MacOSEmptyState,
+  AppEmpty,
   Button,
   Skeleton,
-  MacOSStatCard,
+  StatCard,
 } from '../ui/macos';
 import useAdminData from '../../hooks/useAdminData';
 import AdminRouteSwitcher from './AdminRouteSwitcher';
@@ -127,7 +127,7 @@ function getStatusIcon(status: unknown) {
     success: 'var(--mac-success)',
     warning: 'var(--mac-warning)',
     error: 'var(--mac-error)',
-    info: 'var(--mac-info)',
+    info: 'var(--mac-accent)',
     default: 'var(--mac-text-tertiary)',
   };
 
@@ -320,7 +320,7 @@ const AdminDashboard = () => {
             <Skeleton type="card" count={6} />
           </div>
         ) : statsError ? (
-          <MacOSEmptyState
+          <AppEmpty
             icon={AlertCircle}
             title={t('admin2.adm_error_load_stats')}
             description={t('admin2.adm_error_load_stats_desc')}
@@ -335,7 +335,7 @@ const AdminDashboard = () => {
           <div className="admin-kpi-grid" role="list" aria-label={t('admin2.adm_kpi_list_aria')}>
             {dashboardKpis.map((kpi) => (
               <div key={kpi.key} role="listitem">
-                <MacOSStatCard
+                <StatCard
                   title={kpi.title}
                   value={kpi.value}
                   icon={kpi.icon}
@@ -363,7 +363,7 @@ const AdminDashboard = () => {
               </div>
             ) : activityChartError ? (
               <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface } as CSSProperties}>
-                <MacOSEmptyState
+                <AppEmpty
                   icon={AlertTriangle}
                   title={t('admin2.adm_error_load_chart')}
                   description={t('admin2.adm_error_load_chart_desc')}
@@ -415,7 +415,7 @@ const AdminDashboard = () => {
               </div>
             ) : recentActivitiesError ? (
               <div className="p-4">
-                <MacOSEmptyState
+                <AppEmpty
                   icon={AlertTriangle}
                   title={t('admin2.adm_error_load')}
                   description={t('admin2.adm_error_load_recent_actions_desc')}
@@ -452,7 +452,7 @@ const AdminDashboard = () => {
             </div>
           ) : systemAlertsError ? (
             <div className="p-4">
-              <MacOSEmptyState
+              <AppEmpty
                 icon={AlertTriangle}
                 title={t('admin2.adm_error_load')}
                 description={t('admin2.adm_error_load_system_notifications_desc')}

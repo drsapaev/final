@@ -22,9 +22,9 @@ import {
   MacOSCard,
   Button,
   SegmentedControl,
-  MacOSStatCard,
+  StatCard,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
   Badge,
   Modal,
@@ -200,7 +200,7 @@ const ClinicManagement = () => {
         }
           </div> :
 
-      <MacOSEmptyState
+      <AppEmpty
         icon={Activity}
         title={t('admin2.cm_loading_system_status')}
         description={t('admin2.cm_loading_system_status_desc')} />
@@ -211,7 +211,7 @@ const ClinicManagement = () => {
       {/* Статистика */}
       {stats ?
     <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24">
-          <MacOSStatCard
+          <StatCard
         title={t('admin2.cm_stat_branches')}
         value={stats.total_branches}
         subtitle={t('admin2.cm_stat_branches_active', { count: stats.active_branches })}
@@ -220,7 +220,7 @@ const ClinicManagement = () => {
         trend="positive" />
       
 
-          <MacOSStatCard
+          <StatCard
         title={t('admin2.cm_stat_equipment')}
         value={stats.total_equipment}
         subtitle={t('admin2.cm_stat_equipment_active', { count: stats.active_equipment })}
@@ -229,7 +229,7 @@ const ClinicManagement = () => {
         trend="positive" />
       
 
-          <MacOSStatCard
+          <StatCard
         title={t('admin2.cm_stat_licenses')}
         value={stats.total_licenses}
         subtitle={t('admin2.cm_stat_licenses_active', { count: stats.active_licenses })}
@@ -238,7 +238,7 @@ const ClinicManagement = () => {
         trend="positive" />
       
 
-          <MacOSStatCard
+          <StatCard
         title={t('admin2.cm_stat_backups')}
         value={stats.total_backups}
         subtitle={t('admin2.cm_stat_backups_recent', { count: stats.recent_backups })}
@@ -248,7 +248,7 @@ const ClinicManagement = () => {
       
         </div> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={BarChart3}
       title={t('admin2.cm_stats_unavailable')}
       description={t('admin2.cm_stats_unavailable_desc')} />
@@ -326,7 +326,7 @@ const ClinicManagement = () => {
               {t('admin2.cm_page_title')}
             </h2>
           </div>
-          <MacOSEmptyState
+          <AppEmpty
             icon={AlertTriangle}
             title={t('admin2.cm_load_data_failed')}
             description={t('admin2.cm_load_data_failed_desc')}
