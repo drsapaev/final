@@ -61,7 +61,7 @@
 .cardio-flex-col {
   display: flex;
   flex-direction: column;
-  gap: var(--mac-spacing-md);
+  gap: var(--mac-spacing-4);
 }
 
 .cardio-flex-col-scroll {
