@@ -54,9 +54,21 @@ async def a_get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
 
 
 def get_user_by_phone(db: Session, phone: str) -> User | None:
-    """Получить пользователя по номеру телефона"""
-    stmt = select(User).where(User.phone == phone)
-    return db.execute(stmt).scalar_one_or_none()
+    """Получить пользователя по номеру телефона.
+
+    У модели User НЕТ колонки phone — номер живёт в UserProfile.phone
+    (user_profiles). Прежний фильтр User.phone поднимал AttributeError,
+    и ветка сброса пароля по телефону падала 500 на каждый запрос.
+    """
+    from app.models.user_profile import UserProfile  # noqa: PLC0415
+
+    stmt = (
+        select(User)
+        .join(UserProfile, UserProfile.user_id == User.id)
+        .where(UserProfile.phone == phone)
+        .limit(1)
+    )
+    return db.execute(stmt).scalars().first()
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
@@ -227,7 +239,12 @@ def search_users(db: Session, query: str, limit: int = 10) -> list[User]:
                 User.full_name.ilike(search_pattern),
                 User.username.ilike(search_pattern),
                 User.email.ilike(search_pattern),
-                User.phone.ilike(search_pattern),
+                # Телефон ищем в профиле: у users нет колонки phone.
+                User.id.in_(
+                    select(UserProfile.user_id).where(
+                        UserProfile.phone.ilike(search_pattern)
+                    )
+                ),
             )
         )
         .limit(limit)
