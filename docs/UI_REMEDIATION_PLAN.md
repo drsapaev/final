@@ -3,7 +3,7 @@
 > **Документ-источник правды для миграции UI репозитория `drsapaev/final`.**
 > Сопровождается жёстким контрактом `AGENTS_UI.md` — прочитать ПЕРЕД началом работы.
 
-**Версия:** 1.2 · **Дата:** 26.08.2026 · **Основано на:** UI-аудите от 18.08.2026 + cross-check с актуальным main от 21.08.2026; статусы PR синхронизированы с main `ae7236cb6` (progress snapshot — исполнение правила №7 AGENTS_UI).
+**Версия:** 1.3 · **Дата:** 26.08.2026 · **Основано на:** UI-аудите от 18.08.2026 + cross-check с актуальным main от 21.08.2026; статусы PR синхронизированы с main `e16f3b0c` (progress snapshot — исполнение правила №7 AGENTS_UI); Phase 2C info-family definition-only remediation VERIFIED на `e16f3b0c`.
 
 ---
 
@@ -268,7 +268,7 @@ interface ThemeContextValue {
 
 **Итого:** 18 PR · 98 story points · ~12 недель (3 месяца) при 1 разработчике.
 
-**Прогресс на 26.08.2026 (main `ae7236cb6`):** выполнено 8 из 18 PR — 34/98 SP (PR-UI-01–05, 07, 08; PR-UI-06 — ⚠️ PARTIAL). Поддерживающие коммиты: Phase 0 ratchet, C-1, C-4 (macos.css prefers-color-scheme cleanup), C-5, P1a (Button variants). Серия PR-UI-07a (12 sub-PR, #2824–#2836) завершена физическим decommission MacOSEmptyState (#2836). PR-UI-08 (#2838, 25.08.2026) — glass/animation canonicalization, D1–D8 rulings, см. §7 PR-UI-08 + §4.1.2 ledger. Остаток: 64 SP; следующий по плану — PR-UI-09 (DataTable canonical migration). Установленная дисциплина исполнения: inventory → decision gate → baseline → implementation → proof → Tier-1 → E2E → PR → STOP → explicit merge approval → post-merge verification.
+**Прогресс на 26.08.2026 (main `e16f3b0c`):** выполнено 8 из 18 PR — 34/98 SP (PR-UI-01–05, 07, 08; PR-UI-06 — ⚠️ PARTIAL). Поддерживающие коммиты: Phase 0 ratchet, C-1, C-4 (macos.css prefers-color-scheme cleanup), C-5, P1a (Button variants). Серия PR-UI-07a (12 sub-PR, #2824–#2836) завершена физическим decommission MacOSEmptyState (#2836). PR-UI-08 (#2838, 25.08.2026) — glass/animation canonicalization, D1–D8 rulings, см. §7 PR-UI-08 + §4.1.2 ledger. **Phase 2C info-family definition-only remediation (commit `e16f3b0c`, 26.08.2026): VERIFIED — CI 30/30 terminal, 22 success + 8 expected skipped + 0 failures; ratchet 155/301 PASS; см. §4.1.3 ledger.** Остаток: 64 SP; следующий по плану — PR-UI-09 (DataTable canonical migration). Установленная дисциплина исполнения: inventory → decision gate → baseline → implementation → proof → Tier-1 → E2E → PR → STOP → explicit merge approval → post-merge verification.
 
 ### 4.1.1 Handoff от параллельного QA/UI-audit трека (25.08.2026, верифицировано на main `434cf34`)
 
@@ -312,6 +312,59 @@ interface ThemeContextValue {
 7. lifecycle-label drift (`decision:possible-duplicate` bot false-positive as in #2836) — not blocking.
 
 **Verification artifacts:** `/home/z/my-project/scripts/merge_pr_2838.sh` (squash-merge script), `/home/z/my-project/worklog.md` Task 34 (post-merge verification entry, 10/10 verification points PASS).
+
+### 4.1.3 Phase 2C — Info-Family Definition-Only Remediation (commit `e16f3b0c`, 26.08.2026)
+
+> Источник: C-3 Phase 2C info-family remediation (commit `e16f3b0c656ba05d1e0de0a6bfd7cae256483aef`, direct push to main as fast-forward from `a1d47f17`, 26.08.2026). **Status: VERIFIED (not merely MERGED)** — post-push SHA + full CI terminal + ratchet PASS. Definition-only scope: tokens.css only, +3/-0, no consumer migration, no admin.css, no dark-mode, no baseline/snapshot updates.
+
+**Закрыто Phase 2C (3 canonical info-family token definitions added to `src/design-system/tokens.css`):**
+
+```
+--mac-info: #5ac8fa;
+--mac-info-bg: color-mix(in srgb, var(--mac-info), transparent 86%);
+--mac-info-border: var(--mac-info);  /* SOLID */
+```
+
+- **Value provenance — `--mac-info = #5ac8fa`**: единственный cyan reference в кодовой базе — `AnimatedLoader.tsx:10` fallback `info: 'var(--mac-info, #5ac8fa)'`.
+- **Value provenance — `--mac-info-bg`**: family pattern (success/warning/error all use `color-mix(... transparent 86%)`); C-3-B.3 mapping to `--mac-accent-bg`; admin.css live fallback `rgba(0,122,255,0.12) ≈ 12% alpha` — все 3 источника согласованы → 14% alpha cyan.
+- **Value provenance — `--mac-info-border = var(--mac-info)` SOLID**: C-3-B.3 audit — 3/8 original consumers имели explicit SOLID `--mac-accent-blue` fallback; 0/8 имели `--mac-accent-border` fallback; commit rationale прямо цитирует SOLID fallbacks.
+
+**Diff scope (exact):** `1 file changed, 3 insertions(+)`. Файл: `frontend/src/design-system/tokens.css`. 0 deletions, 0 inline-комментариев (initial inline comment on `--mac-info-border` removed surgically pre-commit per user instruction — historical intent уже в worklog).
+
+**Metrics (ratchet --check, baseline `f837bc966` → current `e16f3b0c`):**
+- `undefinedVarNameCount`: 163 → **155** (-8 total, -3 от этого edit)
+- `undefinedVarUsages`:    330 → **301** (-29 total, -18 от этого edit)
+- Все остальные 9 improvements (varUsagesNoFallback -70, cssHexOutsideTokens -8, tsxHex -2, duplicateKeyframesNameCount -2, unreferencedFileCount -1, prefersSchemeRootBlocks -1, и др.) — от upstream commits между baseline и HEAD, не от этого edit.
+- Ratchet PASS: 0 регрессий. drift = 0.
+
+**Beneficial side-effect (not in-scope, accepted as-is):**
+- `ServiceCatalog.tsx:202` stomatology category color был ранее broken (`var(--mac-info)` был undefined → background-color invalid → transparent). После этого commit он resolves в `#5ac8fa` cyan — визуально distinct от physiotherapy's `#007aff` blue. Strict improvement, не regression. C-3-B.3 ранее откладывал это как UX decision; теперь resolved favorably.
+
+**CI verification (commit `e16f3b0c` на `origin/main`):**
+- Total check-runs: 30 (30 terminal).
+- 22 success: Frontend unit/e2e/build/lint, Backend тесты, Gate D (PostgreSQL + concurrency), Frontend-Backend Parity, Интеграционные тесты, role-system-check, CI Scope, Context Boundary Integrity, Metadata checks, Scan for leaked secrets, Security сканирование (x2), Supabase Preview, Production readiness report, Docker сборка, Генерация документации, Качество кода, **Regression Audit Gate**, Vercel deployment.
+- 8 skipped (expected для direct-main push, не PR/release): Load Tests (k6), Staging readiness report, PR Required Gate, Notify-on-failure (x2), Telegram Mini App Release Gate, DAST ZAP (Nightly), Build + upload source maps to Sentry.
+- 0 failures. Combined state: success.
+- Особое внимание (per user emphasis): Regression Audit Gate ✅, Frontend e2e ✅.
+
+**Process note — fast-forward sync pre-commit:**
+- Local HEAD был 2 commits позади origin/main (`f26902f8` vs `a1d47f17`); upstream 2 commits — оба docs-only (`docs/AGENTS_UI.md +74`, `docs/UI_REMEDIATION_PLAN.md +82`), `tokens.css` UNCHANGED между ними.
+- User-approved Option A: `git stash` (3-line edit) → `git merge --ff-only origin/main` (clean FF, NO rebase, NO merge commit) → `git stash pop` (clean apply, 0 conflicts) → re-verify diff = +3/-0 → commit → push.
+- Post-push: `local HEAD == origin/main == e16f3b0c`, behind=0, ahead=0.
+
+**Follow-ups (DEFERRED, требуют отдельного user approval):**
+
+1. **`--info-color` legacy alias** (`tokens.css:26 = --info-color: var(--mac-accent);`): сейчас aliases info → accent (blue `#007aff`), что теперь КОНТРАДИКТ-прежнему новому `--mac-info` (cyan `#5ac8fa`). Migration deferred.
+2. **Dark-mode values**: `.dark-theme` selector в tokens.css НЕ определяет `--mac-info` / `--mac-info-bg` / `--mac-info-border`. Light-mode definitions наследуются в dark mode (`#5ac8fa` cyan рендерится well on dark). Acceptable, не theme-optimized. Deferred.
+3. **Admin utility class names**: 4 generated utility classes в admin.css имеют `var-mac-info-bg` / `var-mac-info-border` в ИМЕНАХ классов (CSS bodies уже мигрированы в C-3-B.3). Class-name cleanup — отдельная задача. Deferred.
+4. **Dead-code consumers** (6 usages в `AIAnalytics.css` / `WaitTimeAnalytics.css`): direct `var(--mac-info-bg)` / `var(--mac-info-border)` references. Сейчас resolve correctly (cyan 14% bg + solid cyan border), но components остаются unrendered dead code. Dead-code cleanup — отдельная задача. Deferred.
+5. **`--mac-text-muted`** (21 usage): per-usage semantic audit — НЕ remediation. Token используется в разных ролях (caption, hint, separator/icon, button label, disabled/future state). Нельзя заменить одним global `--mac-text-secondary`. Требуется таблица: Usage | File:line | Semantic role | Current property | Secondary? | Tertiary? | Evidence | Confidence. Отдельный read-only decision gate.
+6. **`--mac-spacing-md`** (cardiology.css): per-usage semantic inspection. Отдельный LOW-risk PR (2 изменения). Deferred.
+7. **Plan-SSOT/governance update** (этот раздел) выполнен; further governance updates — отдельные stage transitions per user approval.
+
+**Verification artifacts:** `/home/z/my-project/worklog.md` Task IDs `2C-bg-border`, `2C-B`, `2C-post-cleanup`, `2C-commit-push-ci` (audit trail).
+
+**STOP-AFTER-VERIFIED:** Phase 2C закрыта как VERIFIED. Следующий технический read-only этап (`--mac-text-muted` per-usage semantic audit) НЕ запускается автоматически — требует отдельной команды пользователя.
 
 ### 4.2. Порядок миграции ролей (обновлено)
 
