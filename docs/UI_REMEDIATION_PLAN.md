@@ -437,7 +437,7 @@ Residual `var(--mac-text-muted)` в `frontend/src/`: 0.
 - `frontend/src/components/ui/DataTable-features/` ×5: TableEmpty 82, TableError 105, TablePagination 155, TableSkeleton 85, index 22
 - `frontend/src/components/ui/__tests__/DataTable.test.tsx` +251
 - `frontend/src/design-system/tokens.css` +191 — новые `mac-table-*` utility-классы
-- `frontend/e2e/visual-regression.spec.ts` +169 + 2 новых snapshot PNG (registrar-eat-desktop, registrar-eat-mobile-scroll)
+- `frontend/e2e/visual-regression.spec.ts` +166 / −3 + 2 новых snapshot PNG (registrar-eat-desktop, registrar-eat-mobile-scroll)
 
 **Post-merge состояние таблиц (@ `8143a361`):** canonical `DataTable.tsx` 891 LOC; `macos/Table.tsx` 61 LOC alias. Живые consumers НЕ мигрированы (09c–09e): EnhancedAppointmentsTable 2282, common/Table 504, ResponsiveTable 468, RefundRequestsTable 431, QueueTable 239.
 
