@@ -36,6 +36,40 @@ interface UserModalProps {
   loading?: boolean;
 }
 
+// Форм-обёртки вынесены на уровень модуля: компоненты, определённые ВНУТРИ
+// UserModal, пересоздавали свой тип на каждом рендере — React размонтировал
+// поддерево вместе с <input>, и после первой же введённой буквы пропадал
+// фокус/каретка (приходилось кликать в поле заново на каждый символ).
+interface FormFieldProps {
+  label?: React.ReactNode;
+  required?: boolean;
+  icon?: React.ComponentType<{ className?: string }>;
+  error?: string;
+  children?: React.ReactNode;
+}
+
+const ErrorMessage = ({ message }: { message?: React.ReactNode }) => (
+  <div className="admin-field-error-xs">
+    <AlertCircle className="admin-icon-12" />
+    {message}
+  </div>
+);
+
+const FormField = ({ label, required, icon: Icon, error, children }: FormFieldProps) => (
+  <div className="admin-mb-16">
+    <label className="admin-usermodal-label">
+      {label} {required && <span className="admin-required-asterisk">*</span>}
+    </label>
+    <div className="admin-pos-relative">
+      {Icon && (
+        <Icon className="admin-usermodal-field-icon" />
+      )}
+      {children}
+    </div>
+    {error && <ErrorMessage message={error} />}
+  </div>
+);
+
 const UserModal = ({
   isOpen,
   onClose,
@@ -167,39 +201,10 @@ const UserModal = ({
     }
   };
 
-  // Error message component
-  const ErrorMessage = ({ message }: { message?: React.ReactNode }) => (
-    <div className="admin-field-error-xs">
-      <AlertCircle className="admin-icon-12" />
-      {message}
-    </div>
-  );
 
 
   // audit/strict: removed self-referencing propTypes spread
 
-  // Form field wrapper with icon
-  interface FormFieldProps {
-    label?: React.ReactNode;
-    required?: boolean;
-    icon?: React.ComponentType<{ className?: string }>;
-    error?: string;
-    children?: React.ReactNode;
-  }
-  const FormField = ({ label, required, icon: Icon, error, children }: FormFieldProps) => (
-    <div className="admin-mb-16">
-      <label className="admin-usermodal-label">
-        {label} {required && <span className="admin-required-asterisk">*</span>}
-      </label>
-      <div className="admin-pos-relative">
-        {Icon && (
-          <Icon className="admin-usermodal-field-icon" />
-        )}
-        {children}
-      </div>
-      {error && <ErrorMessage message={error} />}
-    </div>
-  );
 
 
 // audit/strict: removed self-referencing propTypes spread
