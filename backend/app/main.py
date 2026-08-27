@@ -537,16 +537,20 @@ async def _startup_tasks() -> None:
         import asyncio
 
         from app.db.session import SessionLocal
-        from app.services.lab_notification_service import LabNotificationService
+        from app.services.lab_notification_service import run_lab_notifications
 
         async def _run_lab_notifications_periodically():
             while True:
+                # run_all_notifications не существует с рефакторинга сервиса
+                # (#1933 ввёл вызов, поздний рефакторинг переименовал метод);
+                # канонический путь — модульный оркестратор run_lab_notifications.
+                lab_db = SessionLocal()
                 try:
-                    lab_db = SessionLocal()
-                    LabNotificationService(lab_db).run_all_notifications()
-                    lab_db.close()
+                    await run_lab_notifications(lab_db)
                 except Exception as exc:
                     log.warning("Lab notification scheduler error: %s", exc)
+                finally:
+                    lab_db.close()
                 await asyncio.sleep(300)  # 5 minutes
 
         asyncio.create_task(_run_lab_notifications_periodically())
