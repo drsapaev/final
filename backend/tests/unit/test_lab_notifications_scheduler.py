@@ -53,6 +53,15 @@ async def test_run_lab_notifications_calls_all_three_checks(monkeypatch):
     }
 
 
+@pytest.mark.asyncio
+async def test_follow_up_reminders_skip_without_data_layer():
+    """follow_up_date не существует в модели/БД — метод обязан явно
+    возвращать skipped и НЕ бросать исключение (Sentry-регрессия)."""
+    result = await mod.LabNotificationService(object()).send_follow_up_reminders()
+
+    assert result == {"skipped": "LabOrder.follow_up_date column does not exist"}
+
+
 def test_scheduler_module_exposes_orchestrator_not_the_ghost_method():
     # Защита от регрессии вызова: оркестратор существует, «призрак» — нет.
     assert hasattr(mod, "run_lab_notifications")
