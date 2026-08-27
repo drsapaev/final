@@ -68,8 +68,12 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
   const t = rawT;
   // All state at the top (UX Audit #15 — was scattered)
   const [step, setStep] = useState('method');
-  const [method, setMethod] = useState('phone');
-  const [contact, setContact] = useState(UZ_PHONE_PREFIX);
+  // #2775 decision: SMS recovery is NOT IMPLEMENTED (no provider, no
+  // delivery proof), so the UI must not offer the phone channel.
+  // Re-enable both defaults together with the phone option below
+  // only after the full SMS chain is VERIFIED end-to-end.
+  const [method, setMethod] = useState('email');
+  const [contact, setContact] = useState('');
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -330,9 +334,10 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordPr
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--mac-spacing-4)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--mac-spacing-4)' }}>
+          {/* #2775: phone option hidden — channel not implemented;
+              restore the entry alongside the defaults above. */}
           {[
-            { key: 'phone', icon: Phone, label: t('final.fp_method_phone') },
             { key: 'email', icon: Mail, label: t('final.fp_method_email') },
           ].map(({ key, icon: Icon, label }) => (
             <button

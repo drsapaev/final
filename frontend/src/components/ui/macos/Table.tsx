@@ -15,7 +15,7 @@
  *   6 admin/* surfaces, FileManager, plus MacOSTable.test.tsx).
  * - 09b–09e (future sub-PRs): consumers are migrated one-by-one to import
  *   directly from `../ui/DataTable`. After the last consumer is migrated,
- *   this alias is removed in a final cleanup PR (per established post-#2841
+ *   this alias is removed in a final cleanup PR (per established post-2841
  *   practice — see AGENTS_UI Rule 12 "sequential migration").
  *
  * ## Zero-delta verification
