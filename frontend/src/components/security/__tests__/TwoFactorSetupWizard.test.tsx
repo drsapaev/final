@@ -58,7 +58,7 @@ describe('TwoFactorSetupWizard', () => {
     fireEvent.click(screen.getByText('misc.tfsw_next'));
 
     await waitFor(() => {
-      expect(apiPostMock).toHaveBeenCalledWith('/2fa/setup', { recovery_email: null });
+      expect(apiPostMock).toHaveBeenCalledWith('/2fa/setup', { recovery_email: null, recovery_phone: null });
     });
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'misc.tfsw2_step2_title' })).toBeTruthy();
@@ -133,5 +133,41 @@ describe('TwoFactorSetupWizard', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toContain('boom');
     });
+  });
+});
+
+
+describe('step 1 recovery phone (wizard phone field)', () => {
+  it('renders the phone field next to recovery email', () => {
+    render(<TwoFactorSetupWizard />);
+    expect(screen.getByLabelText('2FA recovery phone')).toBeTruthy();
+  });
+
+  it('sends canonical +998 number as recovery_phone when filled', async () => {
+    apiPostMock.mockResolvedValue(axiosOk(setupPayload));
+    render(<TwoFactorSetupWizard />);
+
+    const phone = screen.getByLabelText('2FA recovery phone');
+    fireEvent.change(phone, { target: { value: '+998901234567' } });
+    fireEvent.click(screen.getByText('misc.tfsw_next'));
+    await waitFor(() =>
+      expect(apiPostMock).toHaveBeenCalledWith(
+        '/2fa/setup',
+        expect.objectContaining({ recovery_phone: '+998901234567' }),
+      ),
+    );
+  });
+
+  it('sends recovery_phone: null when left empty', async () => {
+    apiPostMock.mockResolvedValue(axiosOk(setupPayload));
+    render(<TwoFactorSetupWizard />);
+
+    fireEvent.click(screen.getByText('misc.tfsw_next'));
+    await waitFor(() =>
+      expect(apiPostMock).toHaveBeenCalledWith(
+        '/2fa/setup',
+        expect.objectContaining({ recovery_phone: null }),
+      ),
+    );
   });
 });
