@@ -124,6 +124,30 @@ def _validate_database_url(url: str) -> None:
         )
 
 
+def _resolve_pg_tool(tool: str) -> str:
+    """Resolve pg_dump/pg_restore even when absent from PATH.
+
+    On the production Windows box only the PostgreSQL/17 client install
+    exists and it is not on PATH, so bare "pg_dump" raised FileNotFoundError
+    and every nightly backup silently produced nothing (#2772 checkpoint).
+    """
+    import os
+    import shutil
+
+    found = shutil.which(tool)
+    if found:
+        return found
+    for base in (
+        "C:/Program Files/PostgreSQL/17/bin",
+        "C:/Program Files/PostgreSQL/16/bin",
+        "C:/Program Files/PostgreSQL/15/bin",
+    ):
+        candidate = os.path.join(base, tool + ".exe")
+        if os.path.isfile(candidate):
+            return candidate
+    return tool
+
+
 def _get_database_url() -> str:
     from app.core.config import settings
 
@@ -200,7 +224,7 @@ class BackupService:
                 env["PGPASSWORD"] = parsed.password or ""
 
                 cmd = [
-                    "pg_dump",
+                    _resolve_pg_tool("pg_dump"),
                     "-h", pg_host,
                     "-p", str(pg_port),
                     "-U", pg_user,
@@ -389,7 +413,7 @@ class BackupService:
                 env["PGPASSWORD"] = parsed.password or ""
 
                 cmd = [
-                    "pg_restore",
+                    _resolve_pg_tool("pg_restore"),
                     "-h", pg_host,
                     "-p", str(pg_port),
                     "-U", pg_user,
