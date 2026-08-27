@@ -34,7 +34,9 @@ def _env() -> dict[str, str]:
 
 def _http_request(req: urllib.request.Request, timeout: int = 60):
     """Injection seam for tests."""
-    return urllib.request.urlopen(req, timeout=timeout)
+    # nosec B310 - scheme https hardcoded; host = R2 endpoint built from
+    # validated server-side env (R2_ACCOUNT_ID), never user input.
+    return urllib.request.urlopen(req, timeout=timeout)  # nosec B310 - https hardcoded; host from validated server env
 
 
 def _sign_headers(
