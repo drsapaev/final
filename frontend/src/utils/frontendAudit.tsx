@@ -132,14 +132,7 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     recommendedLocation: 'src/components/common/',
     status: 'correct'
   },
-  
-  'src/components/common/Table.jsx': {
-    purpose: 'Система таблиц',
-    currentLocation: 'src/components/common/',
-    recommendedLocation: 'src/components/common/',
-    status: 'correct'
-  },
-  
+
   'src/components/common/RoleGuard.jsx': {
     purpose: 'Ролевые ограничения доступа',
     currentLocation: 'src/components/common/',
