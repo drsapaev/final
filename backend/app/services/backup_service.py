@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy.orm import Session
+from app.services import r2_uploader
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +271,29 @@ class BackupService:
             }
 
             logger.info(f"✅ Backup created: {backup_path.name} ({backup_info['size_mb']} MB)")
+
+            # Offsite (#2772): после успешного gzip. Никогда не валим
+            # локальный бэкап из-за сети и никогда не удаляем предыдущую
+            # копию до успешной загрузки новой (код uploader'а не содержит
+            # Delete/List вовсе).
+            backup_info["offsite"] = {"status": "skipped",
+                                      "reason": "R2_* not configured"}
+            if r2_uploader.r2_configured():
+                try:
+                    uploaded = r2_uploader.upload_file(
+                        key=f"daily/{backup_path.name}",
+                        filepath=str(backup_path),
+                    )
+                    backup_info["offsite"] = {"status": "ok", **uploaded}
+                except Exception as off_err:  # noqa: BLE001 — сигнал, не сбой
+                    backup_info["offsite"] = {
+                        "status": "error",
+                        "error": str(off_err)[:200],
+                    }
+                    logger.warning(
+                        "Offsite R2 upload failed: %s",
+                        backup_info["offsite"]["error"],
+                    )
 
             # Cleanup old backups
             self._cleanup_old_backups()
