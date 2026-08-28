@@ -1914,7 +1914,11 @@ const EnhancedAppointmentsTable = ({
             columns={columns}
             data={paginatedData}
             getRowId={(row: AppointmentRow, index: number) => getEnhancedAppointmentRowKey(row as unknown as Appointment, index)}
-            onRowClick={(row: AppointmentRow) => onRowClick?.(row as unknown as AppointmentRow)}
+            // Codex P2 fix (09c-4): only wire row activation when the consumer
+            // supplied onRowClick — a truthy no-op wrapper would give every row
+            // tabIndex=0 + Enter/Space activation (misleading keyboard focus
+            // stops for consumers like Appointments.tsx that pass no handler).
+            onRowClick={onRowClick ? (row: AppointmentRow) => onRowClick(row as unknown as AppointmentRow) : undefined}
             onSort={(key: string) => handleSort(key)}
             emptyState={t('misc.eat_no_data')}
             striped
