@@ -29,11 +29,11 @@ import {
   CardHeader,
   CardTitle,
   Input,
-  Table,
   SegmentedControl,
   Select,
   Textarea,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
@@ -876,7 +876,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }: TemplateColumnPr
         {templates.length === 0 ? (
           <AppEmpty title={t('misc.esm_templates_empty_title')} description={t('misc.esm_templates_empty_desc')} />
         ) : (
-          <Table columns={columns} data={templates as unknown as Array<Record<string, unknown>>} sortable={false} />
+          <DataTable columns={columns} data={templates as unknown as Array<Record<string, unknown>>} sortable={false} />
         )}
       </CardContent>
     </Card>

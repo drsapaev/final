@@ -22,9 +22,9 @@ import {
   Loader2 } from
 'lucide-react';
 import { MacOSCard, Button, Badge } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import {
   StatCard,
-  Table,
   Input,
   AppEmpty,
   Select,
@@ -362,7 +362,7 @@ const ReportsManager = () => {
       {reports.length > 0 &&
     <MacOSCard className="p-6">
           <h3 className="admin-h4-lg-semi-primary-mb-16">{t('admin2.rm_recent_reports_title')}</h3>
-          <Table
+          <DataTable
         columns={[
         {
           key: 'type',
@@ -447,7 +447,7 @@ const ReportsManager = () => {
 
           </div> :
 
-      <Table
+      <DataTable
         columns={[
         {
           key: 'filename',
