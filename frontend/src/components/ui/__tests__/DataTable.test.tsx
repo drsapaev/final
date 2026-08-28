@@ -333,6 +333,19 @@ describe('DataTable — row virtualization (DT-13..15, PR-UI-09e-1)', () => {
     const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
     expect(wrapper.style.overflowY).toBe('auto');
     expect(wrapper.style.maxHeight).toBe(`${VIEWPORT}px`);
+
+    // Codex P2-1 (PR #2872): cells are clamped to rowHeight with hidden
+    // overflow so taller content cannot expand a row and break the geometry.
+    const firstDataRow = dataRows[0];
+    const firstCell = firstDataRow.querySelector('td') as HTMLElement;
+    expect(firstCell.style.height).toBe('32px');
+    expect(firstCell.style.overflow).toBe('hidden');
+    expect((firstDataRow as HTMLElement).style.height).toBe('32px');
+
+    // Codex P2-2 (PR #2872): table-layout is fixed while virtualized so
+    // column widths cannot shift when a later window renders wider content.
+    const table = container.querySelector('table') as HTMLElement;
+    expect(table.style.tableLayout).toBe('fixed');
   });
 
   it('DT-14: scrolling the viewport shifts the rendered window near the end of the dataset', () => {
@@ -376,5 +389,13 @@ describe('DataTable — row virtualization (DT-13..15, PR-UI-09e-1)', () => {
     const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
     expect(wrapper.style.overflowY).toBe('');
     expect(wrapper.style.maxHeight).toBe('');
+
+    // Plain path keeps auto layout and unclamped cells (no fixed-geometry
+    // contract outside virtualized mode).
+    const table = container.querySelector('table') as HTMLElement;
+    expect(table.style.tableLayout).toBe('');
+    const firstCell = container.querySelector('tbody tr td') as HTMLElement;
+    expect(firstCell.style.height).toBe('');
+    expect(firstCell.style.overflow).toBe('');
   });
 });
