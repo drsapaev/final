@@ -41,6 +41,7 @@ RATE_LIMITS: dict[str, str] = {
     "login": "5/5minutes",
     "refresh": "10/5minutes",
     "password_reset": "3/hour",
+    "password_reset_token": "30/5minutes",
     "2fa_verify": "5/5minutes",
 
     # Patient endpoints
