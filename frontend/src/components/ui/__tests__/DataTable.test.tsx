@@ -251,3 +251,130 @@ describe('DataTable — canonical features (DT-7..12)', () => {
     expect(alertCell).toHaveTextContent('Ошибка 500');
   });
 });
+
+describe('DataTable — row virtualization (DT-13..15, PR-UI-09e-1)', () => {
+  type VRow = { id: number; name: string };
+  const columns: DataTableColumn<VRow>[] = [
+    { key: 'name', title: 'Name', sortable: false },
+  ];
+  const makeRows = (count: number): VRow[] =>
+    Array.from({ length: count }, (_, i) => ({ id: i, name: `Row ${i}` }));
+
+  // jsdom performs no layout, so every element reports offsetHeight 0 and
+  // @tanstack/react-virtual would compute an empty window. Give the (single)
+  // scroll wrapper a synthetic 320px viewport — matching the maxHeight used
+  // by the tests — scoped strictly to this describe block and restored after.
+  const VIEWPORT = 320;
+  const offsetHeightDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'offsetHeight'
+  );
+  const offsetWidthDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'offsetWidth'
+  );
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      value: VIEWPORT,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+      configurable: true,
+      value: 800,
+    });
+  });
+  afterEach(() => {
+    if (offsetHeightDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeightDescriptor);
+    }
+    if (offsetWidthDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidthDescriptor);
+    }
+  });
+
+  it('DT-13: virtualized=true + maxHeight renders a windowed subset of 1000 rows with spacer geometry', () => {
+    const rows = makeRows(1000);
+    const { container } = render(
+      <DataTable<VRow> columns={columns} data={rows} virtualized rowHeight={32} maxHeight={VIEWPORT} />
+    );
+
+    const tbody = container.querySelector('tbody');
+    expect(tbody).not.toBeNull();
+
+    const allRows = tbody!.querySelectorAll('tr');
+    // Windowed rendering: DOM rows (window + overscan + spacers) must be a
+    // small subset of 1000 — this is the AC4 "1000 rows without lag" proof.
+    expect(allRows.length).toBeLessThan(100);
+    expect(allRows.length).toBeGreaterThan(0);
+
+    const dataRows = Array.from(allRows).filter(
+      (tr) => tr.getAttribute('aria-hidden') !== 'true'
+    );
+    expect(dataRows.length).toBeGreaterThan(0);
+    expect(dataRows.length).toBeLessThan(100);
+
+    // Spacer geometry: paddingTop + rendered*rowHeight + paddingBottom must
+    // reconstruct the full virtual height (1000 × 32 = 32000).
+    const spacers = Array.from(allRows).filter(
+      (tr) => tr.getAttribute('aria-hidden') === 'true'
+    );
+    const spacerHeights = spacers.map((tr) =>
+      Number((tr as HTMLElement).style.height.replace('px', ''))
+    );
+    const renderedHeight = dataRows.length * 32;
+    const total =
+      spacerHeights.reduce((acc, h) => acc + h, 0) + renderedHeight;
+    expect(total).toBe(1000 * 32);
+
+    // Rendered rows are the initial window (row 0 first).
+    expect(dataRows[0]).toHaveTextContent('Row 0');
+
+    // The scroll wrapper is the bounded vertical viewport.
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toBe(`${VIEWPORT}px`);
+  });
+
+  it('DT-14: scrolling the viewport shifts the rendered window near the end of the dataset', () => {
+    const rows = makeRows(1000);
+    const { container } = render(
+      <DataTable<VRow> columns={columns} data={rows} virtualized rowHeight={32} maxHeight={320} />
+    );
+
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    // Simulate scrolling to the bottom of the 32000px virtual height.
+    // jsdom stores scrollTop assignments without layout; react-virtual's
+    // scroll listener re-ranges the window off the stored offset.
+    wrapper.scrollTop = 1000 * 32 - VIEWPORT;
+    fireEvent.scroll(wrapper);
+
+    const dataRows = Array.from(container.querySelectorAll('tbody tr')).filter(
+      (tr) => tr.getAttribute('aria-hidden') !== 'true'
+    );
+    // The window now sits at the tail of the dataset: last rendered row is
+    // Row 999 (± overscan window math), and early rows are gone from the DOM.
+    const names = dataRows.map((tr) => tr.textContent ?? '');
+    expect(names[names.length - 1]).toContain('Row 999');
+    expect(names).not.toContain('Row 0');
+    expect(names).not.toContain('Row 1');
+  });
+
+  it('DT-15: virtualized=true without maxHeight stays on the plain path (explicit activation rule)', () => {
+    const rows = makeRows(50);
+    const { container } = render(
+      <DataTable<VRow> columns={columns} data={rows} virtualized rowHeight={32} />
+    );
+
+    // No maxHeight → no bounded viewport → virtualization must NOT activate:
+    // all 50 rows render, no spacers, wrapper has no inline viewport style.
+    const allRows = container.querySelectorAll('tbody tr');
+    expect(allRows.length).toBe(50);
+    const spacers = Array.from(allRows).filter(
+      (tr) => tr.getAttribute('aria-hidden') === 'true'
+    );
+    expect(spacers.length).toBe(0);
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    expect(wrapper.style.overflowY).toBe('');
+    expect(wrapper.style.maxHeight).toBe('');
+  });
+});
