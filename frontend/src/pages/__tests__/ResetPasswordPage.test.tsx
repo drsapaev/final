@@ -62,6 +62,25 @@ describe('ResetPasswordPage', () => {
     expect(await screen.findByText('final.fp_success')).toBeTruthy();
   });
 
+  it('surfaces the server detail reason on 400 confirm', async () => {
+    apiMock
+      .mockResolvedValueOnce(ok({ valid: true }))
+      .mockRejectedValueOnce({
+        response: { status: 400, data: { detail: 'Новый пароль должен отличаться от текущего' } },
+      });
+
+    renderAt('?token=GOODTOKEN');
+    const pass = await screen.findByLabelText('final.fp_new_password');
+    const conf = screen.getByLabelText('final.fp_confirm_password');
+    fireEvent.change(pass, { target: { value: 'BrandNewPass1' } });
+    fireEvent.change(conf, { target: { value: 'BrandNewPass1' } });
+    fireEvent.click(screen.getByText('final.fp_reset_password'));
+
+    expect(
+      await screen.findByText('Новый пароль должен отличаться от текущего'),
+    ).toBeTruthy();
+  });
+
   it('shows invalid-link screen when token is expired/unknown', async () => {
     apiMock.mockRejectedValueOnce(new Error('404'));
     renderAt('?token=BAD');

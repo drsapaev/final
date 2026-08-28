@@ -87,8 +87,14 @@ const ResetPasswordPage = () => {
       } else {
         setError(t('final.fp_reset_error'));
       }
-    } catch {
-      setError(t('final.fp_reset_error'));
+    } catch (err) {
+      // Сервер возвращает осмысленные причины (совпадение с текущим паролем,
+      // состояние токена) — показываем их владельцу ссылки вместо общего
+      // «Ошибка сброса пароля». Fallback — generic.
+      const detail = (
+        err as { response?: { data?: { detail?: string } } }
+      )?.response?.data?.detail;
+      setError(detail || t('final.fp_reset_error'));
     } finally {
       setLoading(false);
     }
