@@ -27,6 +27,10 @@ export { default as MacOSPagination } from './MacOSPagination';
 export { default as StatCard } from './StatCard';
 export { default as MacOSStatCard } from './StatCard';
 export { default as List } from './List';
+// PR-UI-11-1: DataCard is canonical for titled data panels (lists / timelines /
+// activity feeds / queue summaries). New canonical primitive, not an alias.
+export { default as DataCard } from '../DataCard';
+export type { DataCardProps, DataCardVariant, DataCardDensity } from '../DataCard';
 
 // Utility Components
 export { AppLoading, AppEmpty, AppError } from './AppState';
