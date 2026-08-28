@@ -456,7 +456,7 @@ Residual `var(--mac-text-muted)` в `frontend/src/`: 0.
 
 ### 4.1.7 PR-UI-09b — Decommission Dead Table Implementations (PR #2848, merge `11b423990`, 27.08.2026)
 
-> Источник: PR #2848 «refactor(ui): PR-UI-09b — decommission dead Table implementations (responsive, common, ComponentTest) [Task 58 / PR-UI-09b]», head `24b548d9` (branch `feat/ui-pr-09b-decommission-dead-tables`), base `4b527766`; SQUASH merge `11b423990` (single-parent, subject `(#2848)`), 27.08.2026 14:39:03Z, merged by drsapaev. **Status: MERGED-VERIFIED (post-merge audit: VERIFIED WITH DEFERRED ITEMS — Codex review не выполнялся, см. ниже).**
+> Источник: PR #2848 «refactor(ui): PR-UI-09b — decommission dead Table implementations (responsive, common, ComponentTest) [Task 58 / PR-UI-09b]», head `24b548d9` (branch `feat/ui-pr-09b-decommission-dead-tables`), base `4b527766`; SQUASH merge `11b423990` (single-parent, subject `(#2848)`), 27.08.2026 14:39:03Z, merged by drsapaev. **Status: MERGED-VERIFIED (per §16: MERGED; VERIFIED — invariants 1–5 passed on merged main at `11b423990`; единственный DEFERRED — Codex review на #2848, 6-польная запись ниже, headline impact 0%).**
 
 **Diff scope (exact): 6 файлов, +1/−1267 (3 DELETED, 3 modified):**
 
@@ -473,9 +473,16 @@ Residual `var(--mac-text-muted)` в `frontend/src/`: 0.
 
 **CI merge commit `11b423990`:** 35 checks, все terminal: 26 success + 9 skipped, 0 failures (Regression Audit Gate ✅, Frontend e2e ✅, Frontend unit tests ✅). На head `24b548d9` PR Review Quality Gate имеет 2 исторических FAIL-прогона (02:06Z, 02:11Z — до исправления PR body) и финальный SUCCESS-прогон (02:15Z); финальное состояние CI на head чистое.
 
-**Codex:** review НЕ выполнялся на PR #2848 (Codex usage limit reached в момент PR; 0 reviews) — DEFERRED как governance note; independent post-merge audit (v1.6 pre-flight) дефектов не выявил.
+**Codex — DEFERRED (6-польная запись per AGENTS_UI.md §13):**
 
-**Main-advance attribution (срез v1.5 `1329342f` → срез v1.6 `b1ab98fa`):** `cded11b2` (#2853/#2854, backend — disjoint) → `11b423990` (PR-UI-09b, этот ledger) → `97e7fa52` (#2855 auth ForgotPassword fix + comment-only правка `macos/Table.tsx` «post-#2841 → post-2841», LOC 61 без изменений; #2856 ops runbook — оба disjoint к UI-audit) → `cbfbaf970` (Plan-SSOT v1.5 sync, PR #2852, docs-only) → `b1ab98fa` (#2858 backend backup retention — disjoint). Ratchet на каждом post-#2848 anchor (`97e7fa52`, `cbfbaf970`, `b1ab98fa`) = 154/281/11917 (перемерено; backend/docs-drift ratchet не меняет).
+1. **Original requirement:** Codex review на PR #2848 в рамках стандартного review-gate workstream (прецеденты: #2843, #2852, #2857, #2859).
+2. **Reason:** Codex usage limit reached в момент PR (27.08.2026); review не запускался — 0 reviews (подтверждено fresh API: v1.6 pre-flight PHASE 4, v1.6 sync STEP 5).
+3. **Evidence:** проверено — merge CI @ `11b423990`: 35 checks = 26 PASS + 9 SKIP, 0 FAIL (Regression Audit Gate ✅, Frontend e2e ✅, Frontend unit tests ✅); independent post-merge audit на merged tree (v1.6 pre-flight, fresh API + git): diff ровно 6 файлов +1/−1267, ratchet 11973 → 11917 (−56), 0 живых ссылок на удалённые файлы, baseline/snapshots не тронуты — дефектов не выявлено. НЕ проверено — Codex-ревью как таковое (не выполнялось).
+4. **Owner / workstream:** Plan-SSOT governance — UI-audit workstream (оркестратор).
+5. **Resume condition:** повторный вызов Codex review на #2848 (head `24b548d9`) после восстановления quota ЛИБО явное user-решение «Codex на #2848 не требуется».
+6. **Impact on headline completion %:** 0% — deferral процессный (review coverage), не code-AC; все code-AC PR-UI-09b верифицированы независимо на merged tree (CI + post-merge audit).
+
+**Main-advance attribution (срез v1.5 `1329342f` → срез v1.6 `b1ab98fa`; каждый PR приписан фактическому merge-коммиту):** `893b8179` (#2853 backend pg_dump/pg_restore PATH fix — disjoint) → `cded11b2` (#2854 backend R2 offsite backup — disjoint) → `11b423990` (PR-UI-09b, этот ledger) → `ce32bbf5` (#2855 auth ForgotPassword fix + comment-only правка `macos/Table.tsx` «post-#2841 → post-2841», LOC 61 без изменений — disjoint к UI-audit) → `97e7fa52` (#2856 ops runbook — disjoint к UI-audit) → `cbfbaf970` (Plan-SSOT v1.5 sync, PR #2852, docs-only) → `b1ab98fa` (#2858 backend backup retention — disjoint). Ratchet на каждом post-#2848 anchor (`ce32bbf5`, `97e7fa52`, `cbfbaf970`, `b1ab98fa`) = 154/281/11917 (перемерено, включая `ce32bbf5` в fix-цикле v1.6; backend/docs-drift ratchet не меняет).
 
 **Known follow-ups (deferred, отдельные решения пользователя, НЕ часть PR #2848):**
 
