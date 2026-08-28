@@ -1,11 +1,11 @@
 {
   "name": "Clinic OS",
   "short_name": "Clinic OS",
-  "description": "EMR, очередь и платежи в одном контуре — регистратура, врачи, QR-очередь, касса, лаборатория, Telegram и отчеты.",
+  "description": "Система управления клиникой - регистратура, врачи, касса, лаборатория",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#0d9488",
+  "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
   "categories": [
     "medical",
@@ -14,8 +14,8 @@
   ],
   "lang": "ru",
   "scope": "/",
-  "id": "clinic-os",
-  "version": "2.0.0",
+  "id": "clinic-management-system",
+  "version": "1.0.0",
   "dir": "ltr",
   "display_override": [
     "window-controls-overlay",
