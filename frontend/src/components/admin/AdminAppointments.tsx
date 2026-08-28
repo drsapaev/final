@@ -11,7 +11,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import {
   Badge,
   Button,
-  MacOSCard,
+  Card,
   StatCard,
   AppEmpty,
   Input,
@@ -284,7 +284,7 @@ const AdminAppointments = () => {
         <StatCard title={t('admin2.appt_stat_pending')} value={statusStats.pending || 0} icon={Clock} color="orange" />
       </div>
 
-      <MacOSCard
+      <Card
         variant="default"
         shadow="none"
         className="admin-bg-bg-primary-bd-1px-solid-var-mac-bo-p-24"
@@ -560,7 +560,7 @@ const AdminAppointments = () => {
           </div>
           )}
         </div>
-      </MacOSCard>
+      </Card>
 
       <AppointmentModal
         isOpen={appointmentModal.isOpen}
