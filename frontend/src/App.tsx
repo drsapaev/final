@@ -27,6 +27,7 @@ import Setup from './pages/Setup';
 import { useSetupStatus } from './hooks/useSetupStatus';
 import { useBreakpoint } from './hooks/useEnhancedMediaQuery';
 import auth from './stores/auth';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import { ROUTE_REGISTRY } from './routing/routeRegistry';
 import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards';
 import { getRouteChromeState, type RouteProfile } from './routing/routeSelectors';
@@ -94,6 +95,7 @@ const IntegrationDemo = lazy(() => import('./components/integration/IntegrationD
 
 const ROUTE_COMPONENTS = {
   Landing,
+  ResetPasswordPage,
   LoginFormStyled,
   ChangePasswordRequired,
   Health,
