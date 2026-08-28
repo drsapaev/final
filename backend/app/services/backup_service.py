@@ -187,7 +187,12 @@ class BackupService:
             db_url = _get_database_url()
 
             timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-            backup_filename = f"backup_{backup_type}_{timestamp}.db"
+            # CodeQL py/path-injection: normalize caller-supplied type so the
+            # filename flow carries only allowlisted characters.
+            import re as _re
+
+            safe_type = _re.sub(r"[^a-z0-9_]", "", (backup_type or "").lower())[:40]
+            backup_filename = f"backup_{safe_type or 'manual'}_{timestamp}.db"
             # Atomic write: pg_dump targets .tmp; final name appears only
             # after success - a failed dump no longer leaves zero-byte files.
             backup_path = self.backup_dir / (backup_filename + ".tmp")
