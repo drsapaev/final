@@ -33,7 +33,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         self.rate_limits: dict[str, dict[str, int]] = {
             "login": {"requests": 5, "window": 300},  # 5 попыток за 5 минут
             "2fa_verify": {"requests": 10, "window": 300},  # 10 попыток за 5 минут
-            "password_reset": {"requests": 3, "window": 3600},  # 3 попытки за час
+            # #2772 live-finding: один бакет 3/hour на ВСЁ /password-reset/*
+            # (initiate + F5 validate-token + confirm) запирал восстановление
+            # для владельца. Разводим: initiate (письмо = деньги) — 3/hour,
+            # token-операции (validate/confirm; секрет — сам одноразовый
+            # токен) — щедро, чтобы опечатки пароля не блокировали юзера.
+            "password_reset": {"requests": 3, "window": 3600},  # initiate: письмо
+            "password_reset_token": {"requests": 30, "window": 300},  # validate/confirm
             "password_change": {"requests": 5, "window": 3600},  # 5 попыток за час
             "session": {"requests": 600, "window": 3600},  # auth/session checks
         }
@@ -99,6 +105,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             return "login"
         elif "/2fa/verify" in path_lower or (path_lower.endswith("/verify") and "/2fa" in path_lower):
             return "2fa_verify"
+        elif "/password-reset/initiate" in path_lower:
+            return "password_reset"
+        elif (
+            "/password-reset/validate-token" in path_lower
+            or "/password-reset/confirm" in path_lower
+        ):
+            return "password_reset_token"
         elif "/authentication/password-reset" in path_lower or "/password-reset" in path_lower:
             return "password_reset"
         elif "/password-change" in path_lower or "/change-password" in path_lower:
