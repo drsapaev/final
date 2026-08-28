@@ -89,6 +89,26 @@ const sampleHistoryPayment = {
   can_cancel: true, can_refund: true, can_print_receipt: true,
 };
 
+// PR-UI-09c-1: sample refund request for the new refunds-surface visual
+// regression baseline. The shape mirrors `RefundRequest` (RefundRequestsTable.tsx)
+// — fields are intentionally optional. `available_actions` + can_* flags are
+// backend-provided per the contract test, so the snapshot locks the canonical
+// "render refund commands only from backend-provided availability" invariant.
+const sampleRefundRequest = {
+  id: 4001,
+  patient_id: 101,
+  patient_name: 'Иванов Иван Иванович',
+  amount: 50000,
+  refund_type: 'card',
+  reason: 'Дубликат оплаты',
+  status: 'pending',
+  created_at: '2025-08-20T10:00:00.000Z',
+  available_actions: ['approve', 'reject'],
+  can_approve: true,
+  can_reject: true,
+  can_complete: false,
+};
+
 test.describe('Visual regression — cashier panel', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(({ token, profile }: { token: string; profile: typeof cashierProfile }) => {
@@ -185,6 +205,34 @@ test.describe('Visual regression — cashier panel', () => {
     await page.locator('.cashier-overflow-menu summary').first().click();
     await page.waitForTimeout(500);
     await expect(page.locator('.cashier-overflow-popover')).toHaveScreenshot('cashier-overflow-menu.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  // PR-UI-09c-1: NEW visual regression baseline for the refunds surface.
+  //
+  // The refunds tab previously had no visual snapshot — only pending/history
+  // surfaces were locked. This test captures the canonical RefundRequestsTable
+  // (now migrated to canonical DataTable) so any future visual drift on this
+  // surface is caught by Rule 13 (snapshot policy).
+  //
+  // The baseline PNG is captured ONCE on the 09c-1 state via
+  // `npx playwright test --update-snapshots --grep "cashier refunds tab"`.
+  // Subsequent runs MUST pass zero-delta unless proven causality + intentional.
+  test('cashier refunds tab with refund requests', async ({ page }) => {
+    // Mock the refund-requests endpoint (lives outside /api/v1/ — under
+    // /force-majeure/ — so it needs its own route registration).
+    await page.route('**/force-majeure/refund-requests**', async (route) => {
+      await route.fulfill(jsonResponse([sampleRefundRequest]));
+    });
+    await page.goto('/cashier');
+    await page.waitForTimeout(2000);
+    // Switch to refunds tab (label = t('cashier.tab_refunds') = "Возвраты" in ru).
+    await page.locator('button').filter({ hasText: /Возвраты/i }).first().click();
+    await page.waitForTimeout(2000);
+    // Snapshot the refunds surface — RefundRequestsTable's root <section>.
+    await expect(page.locator('section[aria-labelledby="refund-requests-title"]')).toHaveScreenshot('cashier-refunds-tab.png', {
       maxDiffPixelRatio: 0.01,
       animations: 'disabled',
     });
