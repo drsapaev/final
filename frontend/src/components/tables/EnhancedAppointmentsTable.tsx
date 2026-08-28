@@ -36,6 +36,8 @@ import {
   Badge,
   Select,
   Checkbox } from '../ui/macos';
+// PR-UI-09c-4: canonical DataTable (replaces the bespoke native <table> rendering).
+import { DataTable, type DataTableColumn } from '../ui/DataTable';
 import type { SelectChangeEvent } from '../ui/macos/Select';
 import './EnhancedAppointmentsTable.css';
 
@@ -230,15 +232,19 @@ const EnhancedAppointmentsTable = ({
     return parseRegistrarTimestamp(dateStr);
   }, []);
 
-  const getSessionColor = useCallback((sessionId: string) => {
-    if (!sessionId) return null;
+  // PR-UI-09c-4: hash -> stable SESSION_COLORS index. The color VALUE lives in
+  // EnhancedAppointmentsTable.css (.eat-session-N rules) because the canonical
+  // DataTable has no row-level style/className prop (CSS :has() marker
+  // technique, same as QueueTable 09c-2 / PR #2860).
+  const getSessionColorIndex = useCallback((sessionId: string) => {
+    if (!sessionId) return -1;
     // Simple hash to get consistent color for same session_id
     let hash = 0;
     for (let i = 0; i < sessionId.length; i++) {
       hash = (hash << 5) - hash + sessionId.charCodeAt(i);
       hash = hash & hash; // Convert to 32bit integer
     }
-    return SESSION_COLORS[Math.abs(hash) % SESSION_COLORS.length];
+    return Math.abs(hash) % SESSION_COLORS.length;
   }, []);
 
   // ⭐ SSOT: Display helper for services with queue numbers
@@ -1150,6 +1156,679 @@ const EnhancedAppointmentsTable = ({
     </div>;
 
 
+  // PR-UI-09c-4: canonical DataTable column config — internal refactor of the
+  // bespoke native <table> onto ui/DataTable (Rule 1: ONE design system).
+  // Public props / behavior contract unchanged for all 6 consumers.
+  // Layout note: canonical DataTable (09a foundation) does not yet apply
+  // per-column width/align to its generated th/td — the legacy 13-column
+  // registrar layout is approximated via minWidth wrappers in column titles
+  // and content wrappers in renderers. The visual delta is intentional and
+  // re-baselined per Rule 13 step A-D (visual-regression.spec.ts 09d/09c-4 note).
+  const columns: DataTableColumn<AppointmentRow>[] = [];
+
+  if (showCheckboxes) {
+    columns.push({
+      key: 'select',
+      sortable: false,
+      title: (
+        <Checkbox
+          aria-label={t('misc.eat_select_all')}
+          checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
+          onChange={(checked: boolean) => handleSelectAll(checked)} />
+      ),
+      render: (_value: unknown, row: AppointmentRow) => (
+        <Checkbox
+          aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`}
+          checked={selectedRows.has(row.id)}
+          onChange={(checked: boolean) => {
+            handleRowSelect(row.id ?? '', checked);
+          }} />
+      )
+    });
+  }
+
+  // № — sortable; first content cell carries the session-color and
+  // selected-row markers driving the CSS :has() row styling (canonical
+  // DataTable has no row-level className/style prop — same CSS-only
+  // technique as QueueTable 09c-2, PR #2860).
+  columns.push({
+    key: 'queue_number',
+    sortable: true,
+    title: <div className="eat-th-content" style={{ minWidth: '60px' }}>{t('misc.eat_number')}</div>,
+    render: (_value: unknown, row: AppointmentRow) => {
+      const sessionIdx = getSessionColorIndex(row.session_id ?? '');
+      return (
+        <span
+          className="eat-cell eat-cell--center eat-cell--secondary"
+          title={row.session_id ? t('misc.eat_session_label', { sessionId: row.session_id }) : undefined}>
+          {sessionIdx >= 0 && <span className={`eat-session-marker eat-session-${sessionIdx}`} aria-hidden="true" />}
+          {selectedRows.has(row.id) && <span className="eat-row-selected-marker" aria-hidden="true" />}
+          {renderQueueNumbers(row as unknown as Appointment)}
+        </span>
+      );
+    }
+  });
+
+  // Пациент
+  columns.push({
+    key: 'patient_fio',
+    sortable: true,
+    title: <div className="eat-th-content" style={{ minWidth: isDoctorView ? '15%' : '200px' }}>{t('misc.eat_patient')}</div>,
+    render: (_value: unknown, row: AppointmentRow) => (
+      <div
+        className="eat-cell eat-cell--patient eat-cell--nowrap"
+        style={{ minWidth: isDoctorView ? '15%' : '200px' }}
+        title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone ?? '')}\n🏠 ${row.address || '—'}` : undefined}>
+        <div>
+          <div className="eat-td-flex">
+            <span>{row.patient_fio || '—'}</span>
+            {/* SSOT: source='online' → QR badge */}
+            {row.source === 'online' &&
+              <span
+                style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  padding: '2px 6px',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  background: 'linear-gradient(135deg, var(--mac-accent-purple) 0%, var(--mac-accent-purple) 100%)',
+                  color: 'white',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  whiteSpace: 'nowrap'
+                }}
+                title={t('misc.eat_qr_priority_title')}>
+                QR
+              </span>
+            }
+            {row.source === 'desk' &&
+              <span
+                style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  padding: '2px 6px',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  background: 'var(--mac-separator)',
+                  color: 'var(--mac-text-secondary)',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  whiteSpace: 'nowrap'
+                }}>
+                Manual
+              </span>
+            }
+          </div>
+          {typeof row.patient_birth_year === 'number' && row.patient_birth_year > 0 &&
+            <div className="eat-patient-age">
+              {t('misc.eat_years_old', { count: new Date().getFullYear() - row.patient_birth_year })}
+            </div>
+          }
+        </div>
+      </div>
+    )
+  });
+
+  // Телефон (только registrar view)
+  if (!isDoctorView) {
+    columns.push({
+      key: 'patient_phone',
+      sortable: false,
+      title: <div className="eat-th-content" style={{ minWidth: '170px' }}>{t('misc.eat_phone')}</div>,
+      render: (_value: unknown, row: AppointmentRow) => (
+        <div className="eat-cell eat-cell--primary eat-cell--nowrap" style={{ minWidth: '170px' }}>
+          <div className="eat-phone-cell">
+            <Phone size={18} className="eat-phone-icon" />
+            {formatPhoneNumber(row.patient_phone ?? '')}
+          </div>
+        </div>
+      )
+    });
+  }
+
+  // Год рождения
+  columns.push({
+    key: 'patient_birth_year',
+    sortable: true,
+    title: <div className="eat-th-content eat-cell--center" style={{ minWidth: '60px' }}>{t('misc.eat_birth_year')}</div>,
+    render: (_value: unknown, row: AppointmentRow) => (
+      <span className="eat-cell eat-cell--center eat-cell--primary">
+        {String(row.patient_birth_year ?? '—')}
+      </span>
+    )
+  });
+
+  // Адрес (только registrar view, скрыт на mobile)
+  if (!isDoctorView) {
+    columns.push({
+      key: 'patient_address',
+      sortable: false,
+      title: <div className="eat-th-content hide-on-mobile" style={{ minWidth: '140px' }}>{t('misc.eat_address')}</div>,
+      render: (_value: unknown, row: AppointmentRow) => (
+        <div
+          className="eat-cell eat-cell--primary hide-on-mobile"
+          style={{ minWidth: '140px', whiteSpace: 'normal', lineHeight: '1.4' }}
+          title={String(row.address ?? '')}>
+          {row.address ?
+            <div className="eat-phone-cell">
+              <Home size={18} style={{
+                color: 'var(--mac-accent-blue)',
+                fontWeight: 'var(--mac-font-weight-bold)',
+                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
+                flexShrink: 0
+              }} />
+              <span className="eat-address-text">
+                {String(row.address ?? '')}
+              </span>
+            </div> :
+            '—'}
+        </div>
+      )
+    });
+  }
+
+  // Тип визита
+  columns.push({
+    key: 'visit_type',
+    sortable: false,
+    title: <div className="eat-th-content eat-cell--center" style={{ minWidth: isDoctorView ? '70px' : '80px' }}>{t('misc.eat_visit_type')}</div>,
+    render: (_value: unknown, row: AppointmentRow) => (
+      <span className="eat-cell eat-cell--center" style={{ minWidth: isDoctorView ? '70px' : '80px' }}>
+        {renderVisitType((() => {
+          // Проверяем и discount_mode, и approval_status для all_free
+          const discountMode = row.discount_mode;
+          if (discountMode === 'mixed') return 'mixed';
+          const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
+          if (discountMode === 'benefit') return 'free';
+          if (discountMode === 'repeat') return 'repeat';
+          if (isAllFreeApproved || discountMode === 'all_free') return 'allfree';
+          return 'paid';
+        })())}
+      </span>
+    )
+  });
+
+  // Услуги
+  columns.push({
+    key: 'services',
+    sortable: false,
+    title: <div className="eat-th-content" style={{ minWidth: isDoctorView ? '12%' : '180px' }}>{t('misc.eat_services')}</div>,
+    render: (_value: unknown, row: AppointmentRow) => (
+      <div className="eat-cell" style={{ minWidth: isDoctorView ? '12%' : '180px' }}>
+        {/* Fallback-цепочка: services → service_name → queue_numbers[0].service_name → specialty */}
+        {renderServices(
+          (() => {
+            if (row.services && (Array.isArray(row.services) ? row.services.length > 0 : true)) {
+              return row.services;
+            }
+            if (row.service_name) {
+              return [row.service_name];
+            }
+            if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].service_name) {
+              return [row.queue_numbers[0].service_name];
+            }
+            if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].specialty) {
+              return [row.queue_numbers[0].specialty];
+            }
+            return row.services;
+          })(),
+          (Array.isArray(row.all_patient_services) ? row.all_patient_services : null)
+        )}
+      </div>
+    )
+  });
+
+  // Тип оплаты (+ lab report badge — в 09c-4 свёрнута в эту ячейку:
+  // условный построчный <td> в legacy-разметке смещал колонки)
+  columns.push({
+    key: 'payment_type',
+    sortable: false,
+    title: <div className="eat-th-content eat-cell--center" style={{ minWidth: isDoctorView ? '8%' : '100px' }}>{t('misc.eat_payment_type')}</div>,
+    render: (_value: unknown, row: AppointmentRow) => (
+      <div className="eat-cell eat-cell--center" style={{ minWidth: isDoctorView ? '8%' : '100px' }}>
+        {renderPaymentType(
+          String((() => {
+            if (row.payment_type === 'mixed_payment') {
+              return 'mixed_payment';
+            }
+            if (row.payment_type === 'approval_pending') {
+              return 'approval_pending';
+            }
+            if (row.payment_type === 'free') {
+              return 'free';
+            }
+            const discountMode = row.discount_mode;
+            const paymentStatus = (String(row.payment_status || '')).toLowerCase();
+            const amount = getDisplayAmount(row as unknown as Appointment);
+            const isApprovedAllFree = discountMode === 'all_free' && row.approval_status === 'approved';
+            const isPendingAllFree = discountMode === 'all_free' && row.approval_status !== 'approved';
+            const isZeroCostDiscount = ['repeat', 'benefit'].includes(String(discountMode)) && amount <= 0 && paymentStatus !== 'paid';
+
+            if (isPendingAllFree) {
+              return 'approval_pending';
+            }
+            if (isApprovedAllFree || isZeroCostDiscount) {
+              return 'free';
+            }
+            return row.payment_type || (paymentStatus === 'paid' ? 'unknown_payment' : 'pending_payment');
+          })()),
+          String(row.payment_status ?? '')
+        )}
+        {Boolean(row.latest_lab_report) && (() => {
+          const labReport = row.latest_lab_report as { status?: string; flagged_findings_count?: number; template_name?: string; [k: string]: unknown } | undefined;
+          const labStatus = labReport?.status || '';
+          const isReady = labStatus === 'FINALIZED' || labStatus === 'PRINTED';
+          const flagCount = labReport?.flagged_findings_count || 0;
+          return (
+            <span
+              title={`${labReport?.template_name || t('misc.eat_lab_report_default')} — ${isReady ? t('misc.eat_lab_ready') : t('misc.eat_lab_in_progress')}${flagCount > 0 ? t('misc.eat_lab_flagged', { count: flagCount }) : ''}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                marginTop: '2px',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                background: isReady ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 149, 0, 0.12)',
+                color: isReady ? 'var(--mac-success)' : 'var(--mac-warning)',
+              }}>
+              {isReady ? t('misc.eat_lab_ready_badge') : t('misc.eat_lab_in_progress_badge')}
+              {flagCount > 0 && ` ⚠${flagCount}`}
+            </span>
+          );
+        })()}
+      </div>
+    )
+  });
+
+  // Дата / время
+  columns.push({
+    key: 'appointment_date',
+    sortable: true,
+    title: <div className="eat-th-content eat-cell--center" style={{ minWidth: isDoctorView ? '9%' : '100px' }}>{t('misc.eat_date')}</div>,
+    render: (_value: unknown, row: AppointmentRow) => (
+      <div className="eat-cell eat-cell--center" style={{ minWidth: isDoctorView ? '9%' : '100px' }}>
+        {/* SSOT FIX: ONLY use queue_time. Compute earliest from all patient entries if needed. */}
+        {(() => {
+          // SSOT: use row.queue_time directly — no aggregation
+          const timeDisplay = getRegistrarTimestampDisplay(row as unknown as RegistrarTimestampRecord);
+
+          if (timeDisplay.primaryDate || timeDisplay.primaryTime) {
+            return (
+              <div title={t('misc.eat_timezone_label', { timeZone: timeDisplay.timeZone })}>
+                <div className="eat-time-label">
+                  {timeDisplay.primaryLabel}
+                </div>
+                <div className="eat-th-content">
+                  <Calendar size={12} className="eat-calendar-icon" />
+                  {timeDisplay.primaryDate}
+                </div>
+                <div className="eat-time-row">
+                  <Clock size={10} />
+                  {timeDisplay.primaryTime}
+                </div>
+                {timeDisplay.showChanged &&
+                  <div className="eat-time-changed">
+                    {timeDisplay.changedLabel}: {timeDisplay.changedDate} {timeDisplay.changedTime}
+                  </div>
+                }
+              </div>);
+          }
+
+          // Fallback: use appointment_date/time for legacy records without queue_time
+          if (row.appointment_date || row.appointment_time) {
+            return (
+              <div>
+                <div className="eat-th-content">
+                  <Calendar size={12} className="eat-calendar-icon" />
+                  {row.appointment_date || '—'}
+                </div>
+                {row.appointment_time &&
+                  <div className="eat-time-row">
+                    <Clock size={10} />
+                    {String(row.appointment_time ?? '')}
+                  </div>
+                }
+              </div>);
+          }
+
+          return '-';
+        })()}
+      </div>
+    )
+  });
+
+  // Статус (+ payment sub-badge)
+  columns.push({
+    key: 'status',
+    sortable: true,
+    title: <div className="eat-th-content eat-cell--center" style={{ minWidth: isDoctorView ? '7%' : '80px' }}>{t('misc.eat_status')}</div>,
+    render: (_value: unknown, row: AppointmentRow) => (
+      <div className="eat-cell eat-cell--center eat-cell--nowrap" style={{ minWidth: isDoctorView ? '7%' : '80px' }}>
+        {/* UX Audit R-4.4: visit status (основной) + payment badge (если есть). */}
+        {renderStatus(String(row.status ?? ''))}
+        {row.payment_status && row.payment_status !== 'paid' && (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '2px',
+            marginTop: '2px',
+            padding: '1px 4px',
+            borderRadius: 'var(--mac-radius-sm)',
+            backgroundColor: 'var(--mac-accent-orange-soft, rgba(255, 149, 0, 0.12))',
+            color: 'var(--mac-accent-orange, #ff9500)',
+            fontSize: '9px',
+            fontWeight: 'var(--mac-font-weight-medium)',
+          }}>
+            💰 {row.payment_status === 'paid_pending' ? t('misc.eat_pending_payment') : String(row.payment_status ?? '')}
+          </div>
+        )}
+      </div>
+    )
+  });
+
+  // Стоимость
+  columns.push({
+    key: 'cost',
+    sortable: true,
+    title: <div className="eat-th-content eat-cell--end" style={{ minWidth: isDoctorView ? '8%' : '90px' }}>{t('misc.eat_cost')}</div>,
+    render: (_value: unknown, row: AppointmentRow) => (
+      <span
+        className="eat-cell eat-cell--end"
+        style={{
+          minWidth: isDoctorView ? '8%' : '90px',
+          color: (() => {
+            if (row.cost_display === 'free') return 'var(--mac-warning)';
+            const discountMode = row.discount_mode;
+            const amount = getDisplayAmount(row as unknown as Appointment);
+            const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(discountMode)) && amount <= 0;
+            if (isZeroCostRegistration) return 'var(--mac-warning)';
+            return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
+          })(),
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
+        }}>
+        {(() => {
+          if (row.cost_display === 'free') {
+            return t('misc.eat_payment_free');
+          }
+          const discountMode = row.discount_mode;
+          const amount = getDisplayAmount(row as unknown as Appointment);
+          const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(discountMode)) && amount <= 0;
+          if (isZeroCostRegistration) {
+            return t('misc.eat_payment_free');
+          }
+          return amount > 0 ? t('misc.eat_amount_with_currency', { amount: amount.toLocaleString() }) : '—';
+        })()}
+      </span>
+    )
+  });
+
+  // Действия
+  columns.push({
+    key: 'actions',
+    sortable: false,
+    title: <div className="eat-th-content eat-cell--center" style={{ minWidth: isDoctorView ? '15%' : '200px' }}>{t('misc.eat_actions')}</div>,
+    render: (_value: unknown, row: AppointmentRow) => {
+      const rowRecord = row as Record<string, unknown>;
+      const backendCanPay = getBackendActionAvailability(rowRecord, 'payment', 'can_mark_paid');
+      const backendCanCall = getBackendActionAvailability(rowRecord, 'call', 'can_start_visit');
+      const backendCanPrint = getBackendActionAvailability(rowRecord, 'print', 'can_print_ticket');
+      const backendCanComplete = getBackendActionAvailability(rowRecord, 'complete', 'can_complete');
+      const backendCanViewEmr = getBackendActionAvailability(rowRecord, 'view_emr', 'can_view_emr');
+      const backendCanScheduleNext = getBackendActionAvailability(rowRecord, 'schedule_next', 'can_schedule_next');
+      const canPay = !isDoctorView && backendCanPay === true;
+      const canCall = isDoctorView && backendCanCall === true;
+      const canPrint = backendCanPrint === true;
+      const canComplete = isDoctorView && backendCanComplete === true;
+      const canViewEmr = isDoctorView && backendCanViewEmr === true;
+      const canScheduleNext = isDoctorView && backendCanScheduleNext === true;
+      // UX Audit Registrar #4: inline кнопки Cancel и Reschedule для registrar view.
+      // Раньше были доступны только через context menu (правый клик),
+      // что не работало на touch-устройствах (планшеты в регистратуре).
+      const canCancel = !isDoctorView && (
+        row?.status === 'waiting' ||
+        row?.status === 'called' ||
+        row?.status === 'pending' ||
+        row?.status === 'confirmed'
+      );
+      const canReschedule = !isDoctorView && (
+        row?.status === 'waiting' ||
+        row?.status === 'pending' ||
+        row?.status === 'confirmed'
+      );
+      return (
+        <div
+          className="eat-actions-cell"
+          role="presentation"
+          onClick={(e: React.MouseEvent<HTMLElement>) => {
+            // Блокируем клик на строку при клике в ячейке действий
+            e?.stopPropagation();
+          }}
+          onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+            // Блокируем mousedown на строку при клике в ячейке действий
+            e?.stopPropagation();
+          }}
+          onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+            // Клавиатурная активность кнопок не должна активировать строку
+            e.stopPropagation();
+          }}>
+          {canPay ? (
+            <button
+              className="action-button action-button--success"
+              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+              }}
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+                onActionClick?.('payment', row as unknown as AppointmentRow, e);
+              }}
+              title={t('misc.eat_payment')}>
+              {t('misc.eat_payment')}
+            </button>
+          ) : null}
+
+          {canCall ? (
+            <button
+              className="action-button action-button--primary"
+              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+              }}
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+                onActionClick?.('call', row as unknown as AppointmentRow, e);
+              }}
+              title={t('misc.eat_call_action')}>
+              {t('misc.eat_call_action')}
+            </button>
+          ) : null}
+
+          {canPrint ? (
+            <button
+              className="action-button"
+              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+              }}
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+                onActionClick?.('print', row as unknown as AppointmentRow, e);
+              }}
+              title={t('misc.eat_print')}
+              aria-label={t('misc.eat_print')}>
+              <FileText size={14} />
+            </button>
+          ) : null}
+
+          {canComplete ? (
+            <button
+              className="action-button"
+              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+              }}
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+                onActionClick?.('complete', row as unknown as AppointmentRow, e);
+              }}
+              title={t('misc.eat_complete')}>
+              {t('misc.eat_complete')}
+            </button>
+          ) : null}
+
+          {/* Doctor view: очередь — queue action buttons */}
+          {isDoctorView && row.queue_entry_id ? (
+            <QueueActionButtons
+              entry={{
+                queue_entry_id: row.queue_entry_id,
+                status: row.status,
+                queue_status: row.queue_status,
+                available_actions: row.available_actions,
+                can_no_show: row.can_no_show,
+                can_send_to_diagnostics: row.can_send_to_diagnostics,
+                can_notify_diagnostics_return: row.can_notify_diagnostics_return,
+                can_restore_next: row.can_restore_next,
+                can_incomplete: row.can_incomplete,
+                can_complete: getBackendActionAvailability(row as Record<string, unknown>, 'complete', 'can_complete')
+              }}
+              onStatusChange={(action, entry, result) => {
+                logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);
+                // Передаём событие наружу для обновления списка
+                onActionClick?.(`queue_${action}`, row as unknown as AppointmentRow, null);
+              }}
+              compact={true} />
+          ) : null}
+
+          <button
+            className="action-button"
+            onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+              e.preventDefault();
+              e?.stopPropagation();
+              logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
+            }}
+            onClick={(e: React.MouseEvent<HTMLElement>) => {
+              e.preventDefault();
+              e?.stopPropagation();
+              onActionClick?.('view', row as unknown as AppointmentRow, e);
+            }}
+            title={t('misc.eat_view')}
+            aria-label={t('misc.eat_view')}>
+            <Eye size={14} />
+          </button>
+
+          <button
+            className="action-button"
+            onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+              e.preventDefault();
+              e?.stopPropagation();
+              logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
+            }}
+            onClick={(e: React.MouseEvent<HTMLElement>) => {
+              e.preventDefault();
+              e?.stopPropagation();
+              onActionClick?.('edit', row as unknown as AppointmentRow, e);
+            }}
+            title={t('misc.eat_edit')}
+            aria-label={t('misc.eat_edit')}>
+            <Edit size={14} />
+          </button>
+
+          {/* EMR (doctor view) */}
+          {canViewEmr ? (
+            <button
+              className="action-button action-button--primary"
+              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+              }}
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+                onActionClick?.('view_emr', row as unknown as AppointmentRow, e);
+              }}
+              title={t('misc.eat_view_emr')}
+              aria-label={t('misc.eat_view_emr')}>
+              <FileText size={14} />
+            </button>
+          ) : null}
+
+          {/* UX Audit Registrar #4: inline кнопки Cancel и Reschedule.
+              Раньше только через context menu — недоступно на touch-устройствах. */}
+          {canReschedule ? (
+            <button
+              className="action-button"
+              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+              }}
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+                onActionClick?.('reschedule', row as unknown as AppointmentRow, e);
+              }}
+              title={t('misc.eat_reschedule')}
+              aria-label={t('misc.eat_reschedule_aria')}>
+              <CalendarClock size={14} />
+            </button>
+          ) : null}
+
+          {canCancel ? (
+            <button
+              className="action-button"
+              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+              }}
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+                onActionClick?.('cancel', row as unknown as AppointmentRow, e);
+              }}
+              title={t('misc.eat_cancel')}
+              aria-label={t('misc.eat_cancel_aria')}>
+              <X size={14} />
+            </button>
+          ) : null}
+
+          <button
+            className="action-button"
+            onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+              e.preventDefault();
+              e?.stopPropagation();
+            }}
+            onClick={(e: React.MouseEvent<HTMLElement>) => {
+              e.preventDefault();
+              e?.stopPropagation();
+              onActionClick?.('more', row as unknown as AppointmentRow, e);
+            }}
+            title={t('misc.eat_more')}
+            aria-label={t('misc.eat_more')}>
+            <MoreHorizontal size={14} />
+          </button>
+
+          {canScheduleNext ? (
+            <button
+              className="action-button action-button--primary"
+              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+              }}
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+                onActionClick?.('schedule_next', row as unknown as AppointmentRow, e);
+              }}
+              title={t('misc.eat_schedule_next_title')}>
+              {t('misc.eat_schedule_next')}
+            </button>
+          ) : null}
+        </div>
+      );
+    }
+  });
+
   return (
     <div
       ref={containerRef}
@@ -1215,997 +1894,26 @@ const EnhancedAppointmentsTable = ({
       {loading ? loaderNode : null}
       <div className="eat-table-scroll">
         <div className="admin-table-wrapper">
-<table className="eat-table-container" style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          tableLayout: 'auto',
-          minWidth: isDoctorView ? '100%' : '1400px',
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: '100%',
-          boxSizing: 'border-box'
-        }}>
-          <thead>
-            <tr>
-              
-              {showCheckboxes &&
-              <th className="eat-th" style={{
-                padding: '12px 8px',
-                textAlign: 'left',
-                borderBottom: '1px solid var(--mac-border)',
-                width: '40px',
-                color: 'var(--mac-text-primary)'
-              }}
-              aria-label={t('misc.eat_select_all')}>
-                  <Checkbox aria-label={t('misc.eat_select_all')} checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
-                  onChange={(checked: boolean) => handleSelectAll(checked)}
-                  />
-
-                </th>
-              }
-
-              
-              <th
-                onClick={() => handleSort('queue_number')}
-                style={{
-                  padding: '12px 8px',
-                  textAlign: 'center',
-                  borderBottom: '1px solid var(--mac-border)',
-                  color: 'var(--mac-text-primary)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  fontSize: 'var(--mac-font-size-base)',
-                  width: '60px',
-                  cursor: 'pointer',
-                  userSelect: 'none'
-                }}>
-
-                <div className="eat-th-content">
-                  {t('misc.eat_number')}
-                  {sortConfig.key === 'queue_number' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
-                  }
-                </div>
-              </th>
-
-              
-              <th
-                onClick={() => handleSort('patient_fio')}
-                style={{
-                  padding: '12px 8px',
-                  textAlign: 'left',
-                  borderBottom: '1px solid var(--mac-border)',
-                  color: 'var(--mac-text-primary)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  fontSize: 'var(--mac-font-size-base)',
-                  cursor: 'pointer',
-                  minWidth: isDoctorView ? '15%' : '200px',
-                  width: isDoctorView ? '15%' : 'auto'
-                }}>
-
-                <div className="eat-th-content">
-                  {t('misc.eat_patient')}
-                  {sortConfig.key === 'patient_fio' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
-                  }
-                </div>
-              </th>
-
-              {/* -   doctor view */}
-              {!isDoctorView &&
-              <th className="eat-th" style={{
-                padding: '12px 8px',
-                textAlign: 'left',
-                borderBottom: '1px solid var(--mac-border)',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                fontSize: 'var(--mac-font-size-base)',
-                minWidth: '170px'
-              }}>
-                  {t('misc.eat_phone')}
-                </th>
-              }
-
-              
-              <th
-                onClick={() => handleSort('patient_birth_year')}
-                style={{
-                  padding: '12px 8px',
-                  textAlign: 'center',
-                  borderBottom: '1px solid var(--mac-border)',
-                  color: 'var(--mac-text-primary)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  fontSize: 'var(--mac-font-size-base)',
-                  cursor: 'pointer',
-                  width: isDoctorView ? '5%' : '60px',
-                  minWidth: isDoctorView ? '5%' : '60px'
-                }}>
-
-                <div className="eat-th-content">
-                  {t('misc.eat_birth_year')}
-                  {sortConfig.key === 'patient_birth_year' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
-                  }
-                </div>
-              </th>
-
-              {/* -   doctor view */}
-              {!isDoctorView &&
-              <th className="eat-th hide-on-mobile" style={{
-                padding: '12px 8px',
-                textAlign: 'left',
-                borderBottom: '1px solid var(--mac-border)',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                fontSize: 'var(--mac-font-size-base)',
-                minWidth: '140px'
-              }}>
-
-                  {t('misc.eat_address')}
-                </th>
-              }
-
-              
-              <th className="eat-th" style={{
-                padding: '12px 8px',
-                textAlign: 'center',
-                borderBottom: '1px solid var(--mac-border)',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                fontSize: 'var(--mac-font-size-base)',
-                minWidth: isDoctorView ? '70px' : '80px',
-                width: isDoctorView ? '70px' : 'auto'
-              }}>
-                {t('misc.eat_visit_type')}
-              </th>
-
-              
-              <th className="eat-th" style={{
-                padding: '12px 8px',
-                textAlign: 'left',
-                borderBottom: '1px solid var(--mac-border)',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                fontSize: 'var(--mac-font-size-base)',
-                minWidth: isDoctorView ? '12%' : '180px',
-                width: isDoctorView ? '12%' : 'auto'
-              }}>
-                {t('misc.eat_services')}
-              </th>
-
-              
-              <th className="eat-th" style={{
-                padding: '12px 8px',
-                textAlign: 'center',
-                borderBottom: '1px solid var(--mac-border)',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                fontSize: 'var(--mac-font-size-base)',
-                minWidth: isDoctorView ? '8%' : '100px',
-                width: isDoctorView ? '8%' : 'auto'
-              }}>
-                {t('misc.eat_payment_type')}
-              </th>
-
-              
-              <th
-                onClick={() => handleSort('appointment_date')}
-                style={{
-                  padding: '12px 8px',
-                  textAlign: 'center',
-                  borderBottom: '1px solid var(--mac-border)',
-                  color: 'var(--mac-text-primary)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  fontSize: 'var(--mac-font-size-base)',
-                  cursor: 'pointer',
-                  minWidth: isDoctorView ? '9%' : '100px',
-                  width: isDoctorView ? '9%' : 'auto'
-                }}>
-
-                <div className="eat-th-content">
-                  {t('misc.eat_date')}
-                  {sortConfig.key === 'appointment_date' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
-                  }
-                </div>
-              </th>
-
-              
-              <th
-                onClick={() => handleSort('status')}
-                style={{
-                  padding: '12px 8px',
-                  textAlign: 'center',
-                  borderBottom: '1px solid var(--mac-border)',
-                  color: 'var(--mac-text-primary)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  fontSize: 'var(--mac-font-size-base)',
-                  cursor: 'pointer',
-                  minWidth: isDoctorView ? '7%' : '80px',
-                  width: isDoctorView ? '7%' : 'auto'
-                }}>
-
-                <div className="eat-th-content">
-                  {t('misc.eat_status')}
-                  {sortConfig.key === 'status' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
-                  }
-                </div>
-              </th>
-
-
-              
-              <th
-                onClick={() => handleSort('cost')}
-                style={{
-                  padding: '12px 8px',
-                  textAlign: 'right',
-                  borderBottom: '1px solid var(--mac-border)',
-                  color: 'var(--mac-text-primary)',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  fontSize: 'var(--mac-font-size-base)',
-                  cursor: 'pointer',
-                  minWidth: isDoctorView ? '8%' : '90px',
-                  width: isDoctorView ? '8%' : 'auto'
-                }}>
-
-                <div className="eat-th-content--end">
-                  {t('misc.eat_cost')}
-                  {sortConfig.key === 'cost' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
-                  }
-                </div>
-              </th>
-
-              
-              <th className="eat-th" style={{
-                padding: '12px 8px',
-                textAlign: 'center',
-                borderBottom: '1px solid var(--mac-border)',
-                color: 'var(--mac-text-primary)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                fontSize: 'var(--mac-font-size-base)',
-                width: isDoctorView ? '15%' : 'auto',
-                minWidth: isDoctorView ? '15%' : '200px'
-              }}>
-                {t('misc.eat_actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedData.length === 0 ?
-            <tr>
-                <td
-                colSpan={10}
-                className="eat-empty-row">
-
-                  {t('misc.eat_no_data')}
-                </td>
-              </tr> :
-
-            paginatedData.map((row: AppointmentRow, index: number): React.ReactElement => {
-              // ⭐ SSOT: Get session color for visual grouping (presentation only)
-              const sessionColor = getSessionColor(row.session_id ?? '');
-              const statusBadge: React.ReactNode = renderStatus(String(row.status ?? ""));
-              const rowRecord = row as Record<string, unknown>;
-              const backendCanPay = getBackendActionAvailability(rowRecord, 'payment', 'can_mark_paid');
-              const backendCanCall = getBackendActionAvailability(rowRecord, 'call', 'can_start_visit');
-              const backendCanPrint = getBackendActionAvailability(rowRecord, 'print', 'can_print_ticket');
-              const backendCanComplete = getBackendActionAvailability(rowRecord, 'complete', 'can_complete');
-              const backendCanViewEmr = getBackendActionAvailability(rowRecord, 'view_emr', 'can_view_emr');
-              const backendCanScheduleNext = getBackendActionAvailability(rowRecord, 'schedule_next', 'can_schedule_next');
-              const canPay = !isDoctorView && backendCanPay === true;
-              const canCall = isDoctorView && backendCanCall === true;
-              const canPrint = backendCanPrint === true;
-              const canComplete = isDoctorView && backendCanComplete === true;
-              const canViewEmr = isDoctorView && backendCanViewEmr === true;
-              const canScheduleNext = isDoctorView && backendCanScheduleNext === true;
-              // UX Audit Registrar #4: inline кнопки Cancel и Reschedule для registrar view.
-              // Раньше были доступны только через context menu (правый клик),
-              // что не работало на touch-устройствах (планшеты в регистратуре).
-              const canCancel = !isDoctorView && (
-                row?.status === 'waiting' ||
-                row?.status === 'called' ||
-                row?.status === 'pending' ||
-                row?.status === 'confirmed'
-              );
-              const canReschedule = !isDoctorView && (
-                row?.status === 'waiting' ||
-                row?.status === 'pending' ||
-                row?.status === 'confirmed'
-              );
-
-              return (
-                <tr
-                  key={getEnhancedAppointmentRowKey(row as unknown as Appointment, index)}
-                  className="enhanced-table-row"
-                  style={{
-                    backgroundColor: selectedRows.has(row.id) ?
-                    withOpacity('var(--mac-accent-blue)', 0.06) :
-                    index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)',
-                    borderBottom: '1px solid var(--mac-border)',
-                    cursor: 'pointer',
-                    // ⭐ SSOT: Visual session grouping indicator
-                    borderLeft: sessionColor ? `4px solid ${sessionColor}` : 'none',
-                    position: 'relative'
-                  }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
-                    if (!selectedRows.has(row.id)) {
-                      const tr = (e.target as HTMLElement).closest('tr');
-                      if (tr) {
-                        tr.style.backgroundColor = 'var(--mac-bg-secondary)';
-                      }
-                    }
-                  }}
-                  onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
-                    if (!selectedRows.has(row.id)) {
-                      // Восстанавливаем фон на основе индекса (для полосатой таблицы)
-                      const tr = (e.target as HTMLElement).closest('tr');
-                      if (tr) {
-                        tr.style.backgroundColor = index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)';
-                      }
-                    }
-                  }}
-                  onClick={() => onRowClick?.(row as unknown as AppointmentRow)}
-                  title={row.session_id ? t('misc.eat_session_label', { sessionId: row.session_id }) : undefined}>
-
-                    
-                    {showCheckboxes &&
-                  <td
-                    className="eat-td-base"
-                    aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`}>
-                        <Checkbox aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(checked: boolean) => {
-                        handleRowSelect(row.id ?? '', checked);
-                      }}
-                      />
-
-                      </td>
-                  }
-
-                    
-                    <td className="eat-td" style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    color: 'var(--mac-text-secondary)',
-                    fontSize: 'var(--mac-font-size-base)'
-                  }}>
-                      {renderQueueNumbers(row as unknown as Appointment)}
-                    </td>
-
-                    
-                    <td className="eat-td" style={{
-                    padding: '12px 8px',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)',
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    minWidth: isDoctorView ? '15%' : '200px',
-                    width: isDoctorView ? '15%' : 'auto',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                  title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone ?? '')}\n🏠 ${row.address || '—'}` : undefined}>
-
-                      <div>
-                        <div className="eat-td-flex">
-                          <span>{row.patient_fio || '—'}</span>
-                          {/* / */}
-                          {/* SSOT:  source='online'  QR badge */}
-                          {row.source === 'online' &&
-                        <span
-                          style={{
-                            fontSize: 'var(--mac-font-size-xs)',
-                            padding: '2px 6px',
-                            borderRadius: 'var(--mac-radius-sm)',
-                            background: 'linear-gradient(135deg, var(--mac-accent-purple) 0%, var(--mac-accent-purple) 100%)',
-                            color: 'white',
-                            fontWeight: 'var(--mac-font-weight-semibold)',
-                            whiteSpace: 'nowrap'
-                          }}
-                          title={t('misc.eat_qr_priority_title')}>
-
-                              QR
-                            </span>
-                        }
-                          {row.source === 'desk' &&
-                        <span
-                          style={{
-                            fontSize: 'var(--mac-font-size-xs)',
-                            padding: '2px 6px',
-                            borderRadius: 'var(--mac-radius-sm)',
-                            background: 'var(--mac-separator)',
-                            color: 'var(--mac-text-secondary)',
-                            fontWeight: 'var(--mac-font-weight-semibold)',
-                            whiteSpace: 'nowrap'
-                          }}>
-
-                              Manual
-                            </span>
-                        }
-                        </div>
-                        {typeof row.patient_birth_year === 'number' && row.patient_birth_year > 0 &&
-                      <div className="eat-patient-age">
-                            {t('misc.eat_years_old', { count: new Date().getFullYear() - row.patient_birth_year })}
-                          </div>
-                      }
-                      </div>
-                    </td>
-
-                    {/* -   doctor view */}
-                    {!isDoctorView &&
-                  <td className="eat-td" style={{
-                    padding: '12px 8px',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)',
-                    minWidth: '170px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                        <div className="eat-phone-cell">
-                          <Phone size={18} className="eat-phone-icon" />
-                          {formatPhoneNumber(row.patient_phone ?? '')}
-                        </div>
-                      </td>
-                  }
-
-                    <td className="eat-td" style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)',
-                    width: isDoctorView ? '50px' : '60px',
-                    minWidth: isDoctorView ? '50px' : '60px',
-                    maxWidth: isDoctorView ? '50px' : '60px'
-                  } as CSSProperties}>
-                      {String(row.patient_birth_year ?? '—')}
-                    </td>
-
-                    {/* -   doctor view */}
-                    {!isDoctorView &&
-                  <td className="eat-td hide-on-mobile" style={{
-                    padding: '12px 8px',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)',
-                    minWidth: '140px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'normal',
-                    lineHeight: '1.4'
-                  }}
-                  title={String(row.address ?? '')}>
-
-                        {row.address ?
-                    <div className="eat-phone-cell">
-                            <Home size={18} style={{
-                        color: 'var(--mac-accent-blue)',
-                        fontWeight: 'var(--mac-font-weight-bold)',
-                        filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
-                        flexShrink: 0
-                      }} />
-                            <span className="eat-address-text">
-                              {String(row.address ?? '')}
-                            </span>
-                          </div> :
-                    '—'}
-                      </td>
-                  }
-
-                    
-                    <td className="eat-td" style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    minWidth: '80px'
-                  }}>
-                      {renderVisitType((() => {
-                      // ✅ ИСПРАВЛЕНО: Проверяем и discount_mode, и approval_status для all_free
-                      const discountMode = row.discount_mode;
-                      if (discountMode === 'mixed') return 'mixed';
-                      const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
-
-                      if (discountMode === 'benefit') return 'free';
-                      if (discountMode === 'repeat') return 'repeat';
-                      // ✅ ИСПРАВЛЕНО: Для AllFree возвращаем 'allfree' вместо 'free'
-                      if (isAllFreeApproved || discountMode === 'all_free') return 'allfree';
-                      return 'paid';
-                    })())}
-                    </td>
-
-                    
-                    <td className="eat-td" style={{
-                    padding: '12px 8px',
-                    minWidth: '180px'
-                  }}>
-                      {/* : Fallback  QR- ( service_name  queue_numbers) */}
-                      {renderServices(
-                      (() => {
-                        // Если есть services, используем их
-                        if (row.services && (Array.isArray(row.services) ? row.services.length > 0 : true)) {
-                          return row.services;
-                        }
-                        // Fallback 1: service_name из записи
-                        if (row.service_name) {
-                          return [row.service_name];
-                        }
-                        // Fallback 2: service_name из queue_numbers
-                        if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].service_name) {
-                          return [row.queue_numbers[0].service_name];
-                        }
-                        // Fallback 3: specialty из queue_numbers (для совместимости)
-                        if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].specialty) {
-                          return [row.queue_numbers[0].specialty];
-                        }
-                        return row.services;
-                      })(),
-                      (Array.isArray(row.all_patient_services) ? row.all_patient_services : null)
-                    )}
-                    </td>
-
-                    
-                    <td className="eat-td" style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    minWidth: '100px'
-                  }}>
-                      {renderPaymentType(
-                      String((() => {
-                        if (row.payment_type === 'mixed_payment') {
-                          return 'mixed_payment';
-                        }
-                        if (row.payment_type === 'approval_pending') {
-                          return 'approval_pending';
-                        }
-                        if (row.payment_type === 'free') {
-                          return 'free';
-                        }
-                        const discountMode = row.discount_mode;
-                        const paymentStatus = (String(row.payment_status || '')).toLowerCase();
-                        const amount = getDisplayAmount(row as unknown as Appointment);
-                        const isApprovedAllFree = discountMode === 'all_free' && row.approval_status === 'approved';
-                        const isPendingAllFree = discountMode === 'all_free' && row.approval_status !== 'approved';
-                        const isZeroCostDiscount = ['repeat', 'benefit'].includes(String(discountMode)) && amount <= 0 && paymentStatus !== 'paid';
-
-                        if (isPendingAllFree) {
-                          return 'approval_pending';
-                        }
-                        if (isApprovedAllFree || isZeroCostDiscount) {
-                          return 'free';
-                        }
-                        return row.payment_type || (paymentStatus === 'paid' ? 'unknown_payment' : 'pending_payment');
-                      })()),
-                      String(row.payment_status ?? "")
-                    )}
-                    </td>
-
-                    {/* P1 fix: Lab results badge  shows if lab results are ready */}
-                    {Boolean(row.latest_lab_report) && (
-                      <td className="eat-td" style={{
-                        padding: '12px 8px',
-                        textAlign: 'center',
-                        fontSize: '12px',
-                      }}>
-                        {(() => {
-                          const labReport = row.latest_lab_report as { status?: string; flagged_findings_count?: number; template_name?: string; [k: string]: unknown } | undefined;
-                          const labStatus = labReport?.status || '';
-                          const isReady = labStatus === 'FINALIZED' || labStatus === 'PRINTED';
-                          const flagCount = labReport?.flagged_findings_count || 0;
-                          return (
-                            <span
-                              title={`${labReport?.template_name || t('misc.eat_lab_report_default')} — ${isReady ? t('misc.eat_lab_ready') : t('misc.eat_lab_in_progress')}${flagCount > 0 ? t('misc.eat_lab_flagged', { count: flagCount }) : ''}`}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '2px 8px',
-                                borderRadius: '10px',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                background: isReady ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 149, 0, 0.12)',
-                                color: isReady ? 'var(--mac-success)' : 'var(--mac-warning)',
-                              }}>
-                              {isReady ? t('misc.eat_lab_ready_badge') : t('misc.eat_lab_in_progress_badge')}
-                              {flagCount > 0 && ` ⚠${flagCount}`}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                    )}
-
-                    
-                    <td className="eat-td" style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)',
-                    minWidth: '100px'
-                  }}>
-                      <div>
-                        
-                        {/* SSOT FIX: ONLY use queue_time. Compute earliest from all patient entries if needed. */}
-                        {(() => {
-                        // ⭐ SSOT: Use row.queue_time directly - no aggregation
-                        const timeDisplay = getRegistrarTimestampDisplay(row as unknown as RegistrarTimestampRecord);
-
-                        if (timeDisplay.primaryDate || timeDisplay.primaryTime) {
-                          return (
-                            <div title={t('misc.eat_timezone_label', { timeZone: timeDisplay.timeZone })}>
-                                <div className="eat-time-label">
-                                  {timeDisplay.primaryLabel}
-                                </div>
-                                <div className="eat-th-content">
-                                  <Calendar size={12} className="eat-calendar-icon" />
-                                  {timeDisplay.primaryDate}
-                                </div>
-                                <div className="eat-time-row">
-                                  <Clock size={10} />
-                                  {timeDisplay.primaryTime}
-                                </div>
-                                {timeDisplay.showChanged &&
-                              <div className="eat-time-changed">
-                                    {timeDisplay.changedLabel}: {timeDisplay.changedDate} {timeDisplay.changedTime}
-                                  </div>
-                              }
-                              </div>);
-
-                        }
-
-                        // Fallback: use appointment_date/time for legacy records without queue_time
-                        if (row.appointment_date || row.appointment_time) {
-                          return (
-                            <div>
-                                <div className="eat-th-content">
-                                  <Calendar size={12} className="eat-calendar-icon" />
-                                  {row.appointment_date || '—'}
-                                </div>
-                                {row.appointment_time &&
-                              <div className="eat-time-row">
-                                    <Clock size={10} />
-                                    {String(row.appointment_time ?? '')}
-                                  </div>
-                              }
-                              </div>);
-
-                        }
-
-                        return '-';
-                      })()}
-                      </div>
-                    </td>
-
-                    
-                    <td className="eat-td" style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    minWidth: '80px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                      {/* UX Audit R-4.4: показываем visit status + payment status.
-                          Раньше: 15 статусов в одной колонке, включая paid_pending/payment_paid.
-                          Теперь: visit status (основной) + payment badge (если есть). */}
-                      {statusBadge}
-                      {row.payment_status && row.payment_status !== 'paid' && (
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px',
-                          marginTop: '2px',
-                          padding: '1px 4px',
-                          borderRadius: 'var(--mac-radius-sm)',
-                          backgroundColor: 'var(--mac-accent-orange-soft, rgba(255, 149, 0, 0.12))',
-                          color: 'var(--mac-accent-orange, #ff9500)',
-                          fontSize: '9px',
-                          fontWeight: 'var(--mac-font-weight-medium)',
-                        }}>
-                          💰 {row.payment_status === 'paid_pending' ? t('misc.eat_pending_payment') : String(row.payment_status ?? '')}
-                        </div>
-                      )}
-                    </td>
-
-
-                    
-                    <td className="eat-td" style={{
-                    padding: '12px 8px',
-                    textAlign: 'right',
-                    color: (() => {
-                      if (row.cost_display === 'free') return 'var(--mac-warning)';
-                      const discountMode = row.discount_mode;
-                      const amount = getDisplayAmount(row as unknown as Appointment);
-                      const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(discountMode)) && amount <= 0;
-                      if (isZeroCostRegistration) return 'var(--mac-warning)';
-
-                      return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
-                    })(),
-                    fontSize: 'var(--mac-font-size-base)',
-                    fontWeight: 'var(--mac-font-weight-semibold)',
-                    minWidth: '90px'
-                  }}>
-                      {(() => {
-                      if (row.cost_display === 'free') {
-                        return t('misc.eat_payment_free');
-                      }
-                      const discountMode = row.discount_mode;
-                      const amount = getDisplayAmount(row as unknown as Appointment);
-                      const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(String(discountMode)) && amount <= 0;
-                      if (isZeroCostRegistration) {
-                        return t('misc.eat_payment_free');
-                      }
-                      return amount > 0 ? t('misc.eat_amount_with_currency', { amount: amount.toLocaleString() }) : '—';
-                    })()}
-                    </td>
-
-                    
-                    <td
-                    style={{
-                      padding: '12px 8px',
-                      textAlign: 'center',
-                      width: '200px',
-                      minWidth: '200px',
-                      maxWidth: '200px',
-                      position: 'relative',
-                      zIndex: 100
-                    }}
-                    onClick={(e: React.MouseEvent<HTMLElement>) => {
-                      // Блокируем клик на строку при клике в ячейке действий
-                      e?.stopPropagation();
-                    }}
-                    onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                      // Блокируем mousedown на строку при клике в ячейке действий
-                      e?.stopPropagation();
-                    }}>
-
-                      <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 'var(--mac-spacing-1)',
-                        flexWrap: 'wrap',
-                        position: 'relative',
-                        zIndex: 100
-                      }}>
-
-                        
-                        {canPay ? (
-                      <button
-                        className="action-button action-button--success"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('payment', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_payment')}>
-
-                              {t('misc.eat_payment')}
-                            </button>
-                        ) : null}
-
-                        
-                        {canCall ? (
-                      <button
-                        className="action-button action-button--primary"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('call', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_call_action')}>
-
-                            {t('misc.eat_call_action')}
-                          </button>
-                        ) : null}
-
-                        {canPrint ? (
-                      <button
-                        className="action-button"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('print', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_print')}
-                        aria-label={t('misc.eat_print')}>
-
-                            <FileText size={14} />
-                          </button>
-                      ) : null}
-
-                        
-                        {canComplete ? (
-                      <button
-                        className="action-button"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('complete', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_complete')}>
-
-                            {t('misc.eat_complete')}
-                          </button>
-                        ) : null}
-
-                        {/* :     (  ) */}
-                          {isDoctorView && row.queue_entry_id ? (
-                        <QueueActionButtons
-                          entry={{
-                            queue_entry_id: row.queue_entry_id,
-                            status: row.status,
-                            queue_status: row.queue_status,
-                            available_actions: row.available_actions,
-                            can_no_show: row.can_no_show,
-                            can_send_to_diagnostics: row.can_send_to_diagnostics,
-                            can_notify_diagnostics_return: row.can_notify_diagnostics_return,
-                            can_restore_next: row.can_restore_next,
-                            can_incomplete: row.can_incomplete,
-                            can_complete: getBackendActionAvailability(row as Record<string, unknown>, 'complete', 'can_complete')
-                          }}
-                          onStatusChange={(action, entry, result) => {
-                            logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);
-                            // Передаём событие наружу для обновления списка
-                            onActionClick?.(`queue_${action}`, row as unknown as AppointmentRow, null);
-                          }}
-                          compact={true} />
-
-                        ) : null}
-
-                        
-                        <button
-                        className="action-button"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('view', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_view')}
-                        aria-label={t('misc.eat_view')}>
-
-                          <Eye size={14} />
-                        </button>
-
-                        
-                        <button
-                        className="action-button"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('edit', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_edit')}
-                        aria-label={t('misc.eat_edit')}>
-
-                          <Edit size={14} />
-                        </button>
-
-                        {/* EMR (   ) */}
-                        {canViewEmr ? (
-                        <button
-                        className="action-button action-button--primary"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('view_emr', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_view_emr')}
-                        aria-label={t('misc.eat_view_emr')}>
-
-                              <FileText size={14} />
-                            </button>
-                        ) : null}
-
-                        {/* UX Audit Registrar #4: inline кнопки Cancel и Reschedule.
-                            Раньше только через context menu — недоступно на touch-устройствах. */}
-                        {canReschedule ? (
-                      <button
-                        className="action-button"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('reschedule', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_reschedule')}
-                        aria-label={t('misc.eat_reschedule_aria')}>
-                          <CalendarClock size={14} />
-                        </button>
-                        ) : null}
-
-                        {canCancel ? (
-                      <button
-                        className="action-button"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('cancel', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_cancel')}
-                        aria-label={t('misc.eat_cancel_aria')}>
-                          <X size={14} />
-                        </button>
-                        ) : null}
-
-                        
-                      <button
-                        className="action-button"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('more', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_more')}
-                        aria-label={t('misc.eat_more')}>
-
-                          <MoreHorizontal size={14} />
-                        </button>
-
-                        
-                        {canScheduleNext ? (
-                      <button
-                        className="action-button action-button--primary"
-                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                        }}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => {
-                          e.preventDefault();
-                          e?.stopPropagation();
-                          onActionClick?.('schedule_next', row as unknown as AppointmentRow, e);
-                        }}
-                        title={t('misc.eat_schedule_next_title')}>
-
-                            {t('misc.eat_schedule_next')}
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>);
-              // ⭐ End of return statement
-            }) // ⭐ End of paginatedData.map
-            }
-          </tbody>
-        </table>
-</div>
+          {/* PR-UI-09c-4: canonical DataTable replaces the bespoke native <table>.
+              Sorting stays parent-owned: DataTable is a view — it renders rows in
+              the given order and delegates header clicks via onSort, so EAT's
+              sortedData/filteredData/paginatedData memos and handleSort
+              semantics are preserved bit-for-bit. Selection stays explicit via
+              the checkbox column (row click keeps onRowClick semantics). */}
+          <DataTable
+            columns={columns}
+            data={paginatedData}
+            getRowId={(row: AppointmentRow, index: number) => getEnhancedAppointmentRowKey(row as unknown as Appointment, index)}
+            onRowClick={(row: AppointmentRow) => onRowClick?.(row as unknown as AppointmentRow)}
+            onSort={(key: string) => handleSort(key)}
+            emptyState={t('misc.eat_no_data')}
+            striped
+            hoverable
+            variant="minimal"
+            className="eat-table-container"
+            style={{ minWidth: isDoctorView ? '100%' : '1400px', tableLayout: 'auto' }}
+          />
+        </div>
       </div>
 
       
