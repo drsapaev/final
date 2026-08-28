@@ -9,7 +9,7 @@ import notify from '../../services/notify';
 import {
   Badge,
   Button,
-  MacOSCard,
+  Card,
   AppEmpty,
   Input,
   Skeleton,
@@ -194,7 +194,7 @@ const AdminPatients = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <MacOSCard
+      <Card
         variant="default"
         shadow="none"
         className="admin-patients-header-card"
@@ -411,7 +411,7 @@ const AdminPatients = () => {
           </div>
           )}
         </div>
-      </MacOSCard>
+      </Card>
 
       <PatientModal
         isOpen={patientModal.isOpen}

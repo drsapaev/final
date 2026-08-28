@@ -13,7 +13,7 @@ import { useConfirm } from '../common/ConfirmDialog';
 import {
   Badge,
   Button,
-  MacOSCard,
+  Card,
   AppEmpty,
   Input,
   Skeleton,
@@ -170,7 +170,7 @@ const AdminDoctors = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <MacOSCard variant="default" shadow="none" className="admin-patients-header-card">
+      <Card variant="default" shadow="none" className="admin-patients-header-card">
         <div
           className="admin-patients-header-row"
         >
@@ -375,7 +375,7 @@ const AdminDoctors = () => {
           </div>
           )}
         </div>
-      </MacOSCard>
+      </Card>
 
       <DoctorModal
         isOpen={doctorModal.isOpen}
