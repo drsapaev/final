@@ -3,7 +3,7 @@
 > **Документ-источник правды для миграции UI репозитория `drsapaev/final`.**
 > Сопровождается жёстким контрактом `AGENTS_UI.md` — прочитать ПЕРЕД началом работы.
 
-**Версия:** 1.4 · **Дата:** 26.08.2026 · **Основано на:** UI-аудите от 18.08.2026 + cross-check с актуальным main от 21.08.2026; статусы PR синхронизированы с main `9b1ef5d` (progress snapshot — исполнение правила №7 AGENTS_UI); Phase 2C info-family definition-only remediation VERIFIED на `e16f3b0c`; Phase 2A `--mac-text-muted` consumer migration VERIFIED на `9b1ef5d`.
+**Версия:** 1.5 · **Дата:** 27.08.2026 · **Основано на:** UI-аудите от 18.08.2026 + cross-check с актуальным main от 21.08.2026; статусы PR синхронизированы с main `1329342f` (progress snapshot — исполнение правила №7 AGENTS_UI); Phase 2C info-family definition-only remediation VERIFIED на `e16f3b0c`; Phase 2A `--mac-text-muted` consumer migration VERIFIED на `9b1ef5d`; Phase 2B-A `--mac-spacing-md` single-usage remediation VERIFIED на `26410a025`; PR-UI-09a DataTable foundation remediation MERGED-VERIFIED на `8143a361`.
 
 ---
 
@@ -261,14 +261,14 @@ interface ThemeContextValue {
 |---|---|---|---|---|---|
 | **1. Foundation** | 1-2 | PR-UI-01, 02, 03 | Единый ThemeProvider + token source + language fix | 9 SP | ✅ DONE (02 — with legacy follow-up → PR-17) |
 | **2. App Shell** | 3-4 | PR-UI-04, 05, 06 | Единый AppShell + Button + Card primitives | 16 SP | 04 ✅ · 05 ✅ · 06 ⚠️ PARTIAL (хвост → PR-11) |
-| **3. State patterns** | 5-6 | PR-UI-07, 08, 09 | Loading/Empty/Error + убрать glass + DataTable | 17 SP | 07 ✅ (+серия 07a) · 08 ✅ (#2838) · 09 ⬜ |
+| **3. State patterns** | 5-6 | PR-UI-07, 08, 09 | Loading/Empty/Error + убрать glass + DataTable | 17 SP | 07 ✅ (+серия 07a) · 08 ✅ (#2838) · 09 🟡 (09a ✅ #2843 → §4.1.6; 09b — PR #2848 open; 09c–09e ⬜) |
 | **4. Branding** | 7-8 | PR-UI-10, 11, 12 | Branding + Dashboard + EMR/Queue/Table UX | 16 SP | ⬜ не начат |
 | **5. Migration** | 9-10 | PR-UI-13, 14, 15 | RegistrarPanel + Doctor + Cashier (порядок обновлён) | 24 SP | ⬜ не начат |
 | **6. Polish** | 11-12 | PR-UI-16, 17, 18 | Landing + cleanup + visual regression | 16 SP | ⬜ не начаты |
 
 **Итого:** 18 PR · 98 story points · ~12 недель (3 месяца) при 1 разработчике.
 
-**Прогресс на 26.08.2026 (main `9b1ef5d`):** выполнено 8 из 18 PR — 34/98 SP (PR-UI-01–05, 07, 08; PR-UI-06 — ⚠️ PARTIAL). Поддерживающие коммиты: Phase 0 ratchet, C-1, C-4 (macos.css prefers-color-scheme cleanup), C-5, P1a (Button variants). Серия PR-UI-07a (12 sub-PR, #2824–#2836) завершена физическим decommission MacOSEmptyState (#2836). PR-UI-08 (#2838, 25.08.2026) — glass/animation canonicalization, D1–D8 rulings, см. §7 PR-UI-08 + §4.1.2 ledger. **Phase 2C info-family definition-only remediation (commit `e16f3b0c`, 26.08.2026): VERIFIED — CI 30/30 terminal, 22 success + 8 expected skipped + 0 failures; ratchet 155/301 PASS; см. §4.1.3 ledger.** **Phase 2A `--mac-text-muted` consumer migration (commit `9b1ef5d`, 26.08.2026): VERIFIED — CI 33/33 terminal, 25 success + 8 expected skipped + 0 failures (Regression Audit Gate ✅, Frontend e2e ✅); ratchet 154/280 PASS; см. §4.1.4 ledger.** Остаток: 64 SP; следующий по плану — PR-UI-09 (DataTable canonical migration). Установленная дисциплина исполнения: inventory → decision gate → baseline → implementation → proof → Tier-1 → E2E → PR → STOP → explicit merge approval → post-merge verification.
+**Прогресс на 27.08.2026 (main `1329342f`):** выполнено 8 из 18 PR — 34/98 SP (PR-UI-01–05, 07, 08; PR-UI-06 — ⚠️ PARTIAL). Поддерживающие коммиты: Phase 0 ratchet, C-1, C-4 (macos.css prefers-color-scheme cleanup), C-5, P1a (Button variants). Серия PR-UI-07a (12 sub-PR, #2824–#2836) завершена физическим decommission MacOSEmptyState (#2836). PR-UI-08 (#2838, 25.08.2026) — glass/animation canonicalization, D1–D8 rulings, см. §7 PR-UI-08 + §4.1.2 ledger. **Phase 2C info-family definition-only remediation (commit `e16f3b0c`, 26.08.2026): VERIFIED — CI 30/30 terminal, 22 success + 8 expected skipped + 0 failures; ratchet 155/301 PASS; см. §4.1.3 ledger.** **Phase 2A `--mac-text-muted` consumer migration (commit `9b1ef5d`, 26.08.2026): VERIFIED — CI 33/33 terminal, 25 success + 8 expected skipped + 0 failures (Regression Audit Gate ✅, Frontend e2e ✅); ratchet 154/280 PASS; см. §4.1.4 ledger.** **Phase 2B-A `--mac-spacing-md` single-usage remediation (PR #2844, merge `26410a025`, 26.08.2026): VERIFIED — CI merge commit 32/32 terminal, 25 success + 7 skipped + 0 failures; ratchet 154/279 PASS; см. §4.1.5 ledger.** **PR-UI-09a DataTable foundation remediation (PR #2843, squash merge `8143a361`, 26.08.2026): MERGED-VERIFIED — CI 34/34 terminal, 26 success + 8 skipped + 0 failures; ratchet 154/281 PASS; см. §4.1.6 ledger.** Остаток: 64 SP; PR-UI-09 — IN PROGRESS (09a ✅; 09b — открытый PR #2848, NOT MERGED на срез; 09c–09e ⬜). Ratchet на срез: 154/281/11973, gate PASS (noFallback +4 к `8143a361` — внесено PR #2847 (2FA recovery-phone), вне UI-audit workstream). Установленная дисциплина исполнения: inventory → decision gate → baseline → implementation → proof → Tier-1 → E2E → PR → STOP → explicit merge approval → post-merge verification.
 
 ### 4.1.1 Handoff от параллельного QA/UI-audit трека (25.08.2026, верифицировано на main `434cf34`)
 
@@ -359,7 +359,7 @@ interface ThemeContextValue {
 3. **Admin utility class names**: 4 generated utility classes в admin.css имеют `var-mac-info-bg` / `var-mac-info-border` в ИМЕНАХ классов (CSS bodies уже мигрированы в C-3-B.3). Class-name cleanup — отдельная задача. Deferred.
 4. **Dead-code consumers** (6 usages в `AIAnalytics.css` / `WaitTimeAnalytics.css`): direct `var(--mac-info-bg)` / `var(--mac-info-border)` references. Сейчас resolve correctly (cyan 14% bg + solid cyan border), но components остаются unrendered dead code. Dead-code cleanup — отдельная задача. Deferred.
 5. **`--mac-text-muted`** (21 usage): per-usage semantic audit — НЕ remediation. Token используется в разных ролях (caption, hint, separator/icon, button label, disabled/future state). Нельзя заменить одним global `--mac-text-secondary`. Требуется таблица: Usage | File:line | Semantic role | Current property | Secondary? | Tertiary? | Evidence | Confidence. Отдельный read-only decision gate. **[RESOLVED 26.08.2026 → §4.1.4: audit выполнен (21/21 → tertiary), remediation VERIFIED на `9b1ef5d`.]**
-6. **`--mac-spacing-md`** (cardiology.css): per-usage semantic inspection. Отдельный LOW-risk PR (2 изменения). Deferred.
+6. **`--mac-spacing-md`** (cardiology.css): per-usage semantic inspection. Отдельный LOW-risk PR (2 изменения). Deferred. **[PARTIALLY RESOLVED 26.08.2026 → §4.1.5: фактически 7 usage на момент аудита (не 2); Phase 2B-A (PR #2844, merge `26410a025`) закрыл 1 из 7 — cardiology.css:64 → `--mac-spacing-4` (runtime 16px); остаток — 6 usage (cardiology.css:70, 162, 225, 235, 236, 299), deferred.]**
 7. **Plan-SSOT/governance update** (этот раздел) выполнен; further governance updates — отдельные stage transitions per user approval.
 
 **Verification artifacts:** `/home/z/my-project/worklog.md` Task IDs `2C-bg-border`, `2C-B`, `2C-post-cleanup`, `2C-commit-push-ci` (audit trail).
@@ -409,6 +409,50 @@ Residual `var(--mac-text-muted)` в `frontend/src/`: 0.
 **Verification artifacts:** `/home/z/my-project/worklog.md` Task IDs `2A-text-muted-audit`, `2A-text-muted-remediation`, `2A-commit-gate`, `2A-push-ci`; evidence pack `/home/z/my-project/download/phase-2a-remediation-evidence-pack.md`; runtime proof `/home/z/my-project/download/phase-2a-runtime-proof.png`.
 
 **STOP-AFTER-VERIFIED:** Phase 2A закрыта как VERIFIED. Phase 2B (`--mac-spacing-md` read-only semantic audit) НЕ запускается автоматически — требует отдельной команды пользователя.
+
+### 4.1.5 Phase 2B-A — `--mac-spacing-md` Single-Usage Remediation (PR #2844, merge `26410a025`, 26.08.2026)
+
+> Источник: Phase 2B undefined-token remediation, scenario A (user-approved): ровно один usage из 7. Публикация через branch + PR (MAIN INTEGRATION RULE; branch `fix/phase-2b-a-cardio-spacing-md` @ `9f853848`, base `fce3791`). **Status: VERIFIED (not merely MERGED)** — post-merge verification: merge-diff = ровно 1 файл +1/−1; CI merge commit terminal, 0 failures; ratchet prediction совпала бит-в-бит.
+
+**Diff scope (exact):** 1 файл, +1/−1 — `frontend/src/pages/cardiology.css:64`: `gap: var(--mac-spacing-md)` → `gap: var(--mac-spacing-4)` (селектор `.cardio-flex-col`, cardiology settings-popover). Остальные 6 usage не тронуты; tokens.css / baseline / snapshots / Plan-SSOT не тронуты.
+
+**Runtime proof (Playwright chromium, role=Doctor, `/doctor/cardiology?tab=visit`):** pre-fix — `--mac-spacing-md` не определён (var() без fallback → computed-value invalid → collapsed gap); post-fix — `rowGap = columnGap = 16px`; `--mac-spacing-4: 16px` (tokens.css:113) резолвится canonical.
+
+**Metrics (ratchet, base `fce3791` → merge `26410a025`):** `undefinedVarNameCount` 154 → **154** (0); `undefinedVarUsages` 280 → **279** (−1); `varUsagesNoFallback` 11933 → **11933** (0). `--check` PASS (ниже потолков baseline 163/330/12003). Prediction аудита совпала бит-в-бит.
+
+**CI:** branch `9f853848` — Tier-1 terminal: 18 success + 16 skipped, 0 failures (PR Review Quality Gate — после fix-in-PR PR-body по обязательному review-шаблону; код не менялся). Merge commit `26410a025` — 32 checks terminal: 25 success + 7 skipped, 0 failures.
+
+**Остаток Phase 2B (deferred, отдельные команды пользователя):** 6 usage `var(--mac-spacing-md)` в cardiology.css (строки 70, 162, 225, 235, 236, 299).
+
+**STOP-AFTER-VERIFIED:** Phase 2B-A закрыта как VERIFIED. Остаток Phase 2B и dead-code workstream НЕ запускаются автоматически — требуют отдельных команд пользователя.
+
+### 4.1.6 PR-UI-09a — DataTable Foundation Remediation (PR #2843, merge `8143a361`, 26.08.2026)
+
+> Источник: PR #2843 «refactor(ui): PR-UI-09a foundation remediation — canonical DataTable + macos/Table alias (zero-delta, re-do of closed #2842)», head `01a93de7` (branch `feat/ui-pr-09a-remediation-redo`), base `26410a025`; supersedes closed-not-merged #2842. SQUASH merge `8143a361` (single-parent, subject `(#2843)`), 26.08.2026 17:37:18Z, merged by drsapaev. **Status: MERGED-VERIFIED (post-merge audit: VERIFIED WITH DEFERRED ITEMS)** — merge-diff == PR-head diff бит-в-бит; `ui-baseline.json` НЕ тронут.
+
+**Diff scope (exact): 12 файлов, +2006/−576:**
+
+- `frontend/src/components/ui/DataTable.tsx` +891 — canonical DataTable (sticky header, sort, filter, pagination, selection, keyboard nav, density, skeleton/empty/error через features)
+- `frontend/src/components/ui/macos/Table.tsx` +58/−573 → **61 LOC alias** (re-export canonical DataTable; обратная совместимость import-путей)
+- `frontend/src/components/ui/DataTable-features/` ×5: TableEmpty 82, TableError 105, TablePagination 155, TableSkeleton 85, index 22
+- `frontend/src/components/ui/__tests__/DataTable.test.tsx` +251
+- `frontend/src/design-system/tokens.css` +191 — новые `mac-table-*` utility-классы
+- `frontend/e2e/visual-regression.spec.ts` +166 / −3 + 2 новых snapshot PNG (registrar-eat-desktop, registrar-eat-mobile-scroll)
+
+**Post-merge состояние таблиц (@ `8143a361`):** canonical `DataTable.tsx` 891 LOC; `macos/Table.tsx` 61 LOC alias. Живые consumers НЕ мигрированы (09c–09e): EnhancedAppointmentsTable 2282, common/Table 504, ResponsiveTable 468, RefundRequestsTable 431, QueueTable 239.
+
+**Metrics (ratchet, base `26410a025` → merge `8143a361`):** `undefinedVarNameCount` 154 → **154** (0); `undefinedVarUsages` 279 → **281** (+2 — новые usage `var(--mac-bg-blue)` в добавленных `mac-table-*` классах tokens.css; токен уже был в undefined-списке → names не вырос); `varUsagesNoFallback` 11933 → **11969** (+36). `--check` PASS (ниже потолков baseline 163/330/12003).
+
+**CI merge commit `8143a361`:** 34 checks, все terminal: 26 success + 8 skipped, 0 failures (Regression Audit Gate ✅, Frontend e2e ✅).
+
+**Known follow-ups (deferred, отдельные решения пользователя, НЕ часть PR #2843):**
+
+1. **`--mac-bg-blue` ×6 undefined usages** — DataTable.tsx ×4 (388, 393, 440, 450) + tokens.css ×2 (661, 663, `mac-table-*`). До PR #2843 — 4 usage (все в старом macos/Table.tsx); +2 drift от этого merge (см. Metrics). Токен не определён в canonical tokens.css: требуется canonical definition либо consumer-migration.
+2. **PR-UI-09b–09e:** 09b — decommission мёртвых Table-реализаций (ResponsiveTable, common/Table, ComponentTest): открытый PR #2848 (27.08.2026, +1/−1267, 6 файлов; NOT MERGED на срез 27.08.2026); 09c–09e — миграция живых consumers (EnhancedAppointmentsTable, RefundRequestsTable, QueueTable) на canonical DataTable.
+3. **Visual-e2e governance note (историческая, НЕ кодовая регрессия):** registrar-eat-mobile-scroll visual e2e падал на pre-merge head `d1651792` PR #2843 (12328 px / 5%) и на main `f2de831e` (бит-в-бит та же сигнатура). Forensic-анализ (артефакты + рендер-пути): timing-зависимое async-состояние страницы на фиксированной точке capture (test-design fragility: waitForTimeout(3000) + lazy-load отделений + live ws-бейдж); каузальная связь с UI-audit коммитами отсутствует. Committed snapshot обновлён владельцем репо в PR #2847 (27.08.2026, PNG 76174 → 74750 bytes); Frontend e2e зелёный на `4b527766` и на срезе `1329342f` (33 checks, 0 failures).
+4. **Branch hygiene:** `feat/ui-pr-09a-remediation-redo` не удалена на remote после merge.
+
+**STOP-AFTER-VERIFIED:** PR-UI-09a закрыт как MERGED-VERIFIED. PR-UI-09b–09e и follow-ups НЕ запускаются автоматически — требуют отдельных команд пользователя.
 
 ### 4.2. Порядок миграции ролей (обновлено)
 
@@ -1031,7 +1075,7 @@ interface DataCardProps {
 
 ### PR-UI-09 — DataTable canonical
 
-> **Статус: ⬜ NOT STARTED (срез 25.08.2026).** Все 6 таблиц живы. Фактический LOC: EnhancedAppointmentsTable **2 282** (план — 2 279), macos/Table 576, common/Table 504, ResponsiveTable 468, RefundRequestsTable 431, QueueTable 239. **Ownership-фикс:** `ResponsiveTable` удаляется ЗДЕСЬ (§3.5 ранее ошибочно относила его к PR-17).
+> **Статус: 🟡 IN PROGRESS (срез 27.08.2026, main `1329342f`).** 09a ✅ MERGED (PR #2843 → squash `8143a361`): canonical `DataTable.tsx` 891 LOC, `macos/Table.tsx` → 61 LOC alias (re-export), DataTable-features ×4, tokens.css `mac-table-*` классы, visual e2e spec + 2 snapshot (см. §4.1.6 ledger). Актуальный LOC живых немигрированных таблиц: EnhancedAppointmentsTable **2 282** (план — 2 279), common/Table 504, ResponsiveTable 468, RefundRequestsTable 431, QueueTable 239. 09b — decommission мёртвых реализаций (ResponsiveTable, common/Table, ComponentTest): открытый PR #2848 (+1/−1267, 6 файлов), NOT MERGED на срез. **Ownership-фикс:** `ResponsiveTable` удаляется ЗДЕСЬ (§3.5 ранее ошибочно относила его к PR-17).
 
 **Приоритет:** P1 · **Effort:** 8 SP · **Dependencies:** PR-UI-06, PR-UI-07 · **Sprint:** 3
 
