@@ -3,9 +3,9 @@
  *
  * PR-UI-10 (28.08.2026): унификация имени продукта на "Clinic OS" — см.
  * docs/UI_REMEDIATION_PLAN.md §7 PR-UI-10. До этого рефакторинга в проекте
- * использовались 3 разных имени продукта:
+ * использовались 3 разных имени продукта (см. git history для аудита):
  *   - "Система управления клиникой" (README, t('title'))
- *   - "MediClinic Pro" (Landing hero description, footer) ← REMOVED
+ *   - прежнее product name на лендинге (Landing hero description, footer) ← REMOVED
  *   - "Clinic OS" (Landing liveStatus badge)
  * Теперь ВСЕ экраны используют BRAND.name = 'Clinic OS'. Связанные ассеты:
  *   - /public/brand/logo.svg — горизонтальный lockup (mark + "Clinic OS" wordmark)
@@ -22,8 +22,11 @@
  *   - Заменить хардкоженные строки в Landing.jsx, LoginFormStyled.jsx,
  *     EMRContainerV2.jsx, footer и т.д. на BRAND.name / BRAND.shortName.
  *   - LANDING_COPY в landingContent.ts использует BRAND как fallback.
- *   - Все 5 локалей (en/ru/kk/uz-Cyrl/uz-Latn) мигрированы: 'MediClinic Pro'
- *     → 'Clinic OS'.
+ *   - Все 5 локалей (en/ru/kk/uz-Cyrl/uz-Latn) мигрированы на 'Clinic OS'.
+ *
+ * Acceptance criterion (PR-UI-10 §7): `grep -r "прежнее имя" src/` — 0
+ * результатов (историческое имя сохраняется только в git history, не в
+ * текущем исходном коде).
  *
  * @type {object}
  */
