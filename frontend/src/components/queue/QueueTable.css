@@ -122,3 +122,43 @@
 .qt-status-badge-icon {
     margin-right: var(--mac-spacing-1);
 }
+
+/* PR-UI-09c-2: Source badge (QR / Desk) — replaces inline style={{...}} blocks
+ * in the original QueueTable.tsx (UX Audit #3.4 — same pattern as
+ * RefundRequestsTable migration). Uses macos design tokens for full
+ * light/dark theme support. */
+.qt-source-badge {
+    display: inline-block;
+    margin-left: var(--mac-spacing-1);
+    padding: 1px 6px;
+    border-radius: var(--mac-radius-sm, 4px);
+    font-size: var(--mac-font-size-xs, 10px);
+    font-weight: var(--mac-font-weight-semibold, 600);
+    line-height: 1.4;
+}
+
+.qt-source-badge-qr {
+    background: rgba(139, 92, 246, 0.15);
+    color: #7c3aed;
+}
+
+.qt-source-badge-desk {
+    background: rgba(100, 116, 139, 0.15);
+    color: #475569;
+    font-weight: var(--mac-font-weight-medium, 500);
+}
+
+/* PR-UI-09c-2: "called" row highlight — replaces the original
+ * `<tr className="qt-table-row-called">` pattern. Canonical DataTable does
+ * NOT support rowClassName prop, so we target the rendered <tr> via CSS
+ * :has() selector on the .qt-called-marker badge (rendered in the actions
+ * cell when status === 'called'). The :has() selector is supported in
+ * Chromium 105+ (Playwright's target). */
+.qt-table-container tr:has(.qt-called-marker) {
+    background-color: color-mix(in srgb, var(--mac-accent-blue, #007aff) 5%, transparent);
+    transition: background-color var(--mac-duration-normal) var(--mac-ease);
+}
+
+.qt-table-container tr:has(.qt-called-marker):hover {
+    background-color: var(--mac-bg-tertiary);
+}
