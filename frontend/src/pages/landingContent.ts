@@ -14,7 +14,7 @@ const BASE_COPY = {
     eyebrow: 'Clinic OS для современной клиники',
     title: 'Единая система управления клиникой, которая держит EMR, очередь и платежи в одном ритме.',
     description:
-      'MediClinic Pro собирает регистратуру, врача, QR-очередь, платежи, Telegram и отчеты в один workflow без ручных разрывов между командами.',
+      'Clinic OS собирает регистратуру, врача, QR-очередь, платежи, Telegram и отчеты в один workflow без ручных разрывов между командами.',
     primaryCta: 'Открыть демо',
     secondaryCta: 'Посмотреть интерфейс',
     proofChips: ['EMR врача', 'QR-очередь', 'Telegram-уведомления', 'Платежи и отчеты'],
@@ -203,7 +203,7 @@ const BASE_COPY = {
     description:
       'Этот блок помогает быстро показать, что продукт убирает хаос не на словах, а в повседневных процессах.',
     beforeTitle: 'Без системы',
-    afterTitle: 'С MediClinic Pro',
+    afterTitle: 'С Clinic OS',
     beforeItems: [
       'Бумажные карты и разрозненные заметки',
       'Потеря контекста между регистратурой, врачом и кассой',
@@ -358,7 +358,7 @@ const EN_OVERRIDES = {
     eyebrow: 'Clinic OS for modern medical teams',
     title: 'One clinic management system that keeps EMR, queue and payments in the same rhythm.',
     description:
-      'MediClinic Pro brings reception, doctors, QR queue, payments, Telegram and reporting into one workflow with no manual gaps between teams.',
+      'Clinic OS brings reception, doctors, QR queue, payments, Telegram and reporting into one workflow with no manual gaps between teams.',
     primaryCta: 'Open demo',
     secondaryCta: 'View interface',
     proofChips: ['Doctor EMR', 'QR queue', 'Telegram alerts', 'Payments and reports'],
@@ -547,7 +547,7 @@ const EN_OVERRIDES = {
     description:
       'This comparison helps visitors see how the platform removes everyday chaos, not just abstract inefficiency.',
     beforeTitle: 'Without the system',
-    afterTitle: 'With MediClinic Pro',
+    afterTitle: 'With Clinic OS',
     beforeItems: [
       'Paper records and scattered notes',
       'Context loss between reception, doctor and cashier',
@@ -679,7 +679,7 @@ const UZ_OVERRIDES = {
     eyebrow: 'Zamonaviy klinika uchun Clinic OS',
     title: 'EMR, navbat va tolovlarni bitta ritmda ushlab turadigan yagona klinika boshqaruv tizimi.',
     description:
-      'MediClinic Pro registratura, shifokor, QR-navbat, tolovlar, Telegram va hisobotlarni bitta workflow ichida birlashtiradi, jamoalar orasida qol mehnatisiz.',
+      'Clinic OS registratura, shifokor, QR-navbat, tolovlar, Telegram va hisobotlarni bitta workflow ichida birlashtiradi, jamoalar orasida qol mehnatisiz.',
     primaryCta: 'Demo ochish',
     secondaryCta: 'Interfeysni ko\'rish',
     proofChips: ['Shifokor EMR', 'QR-navbat', 'Telegram signal', 'Tolovlar va hisobotlar'],
@@ -868,7 +868,7 @@ const UZ_OVERRIDES = {
     description:
       'Bu blok mahsulot kundalik tartibsizlikni qanday olib tashlashini tezda korsatadi, shunchaki abstrakt samarasizlikni emas.',
     beforeTitle: 'Tizimsiz',
-    afterTitle: 'MediClinic Pro bilan',
+    afterTitle: 'Clinic OS bilan',
     beforeItems: [
       'Qogoz kartalar va tarqoq yozuvlar',
       'Registratura, shifokor va kassa orasida kontekst yoqolishi',
@@ -1000,7 +1000,7 @@ const KK_OVERRIDES = {
     eyebrow: 'Заманауи клиникаға арналған Clinic OS',
     title: 'EMR, кезек және төлемдерді бір ырғақта ұстайтын клиниканы басқарудың бірыңғай жүйесі.',
     description:
-      'MediClinic Pro тіркеуді, дәрігерді, QR-кезекті, төлемдерді, Telegram және есептерді бір workflow ішінде біріктіреді, командалар арасындағы қол еңбегін азайтады.',
+      'Clinic OS тіркеуді, дәрігерді, QR-кезекті, төлемдерді, Telegram және есептерді бір workflow ішінде біріктіреді, командалар арасындағы қол еңбегін азайтады.',
     primaryCta: 'Демоны ашу',
     secondaryCta: 'Интерфейсті қарау',
     proofChips: ['Дәрігер EMR', 'QR-кезек', 'Telegram сигналдары', 'Төлемдер мен есептер'],
@@ -1189,7 +1189,7 @@ const KK_OVERRIDES = {
     description:
       'Бұл блок өнімнің күнделікті ретсіздікті қалай алып тастайтынын тез көрсетеді, жай ғана абстрактілі тиімсіздікті емес.',
     beforeTitle: 'Жүйесіз',
-    afterTitle: 'MediClinic Pro-пен',
+    afterTitle: 'Clinic OS-пен',
     beforeItems: [
       'Қағаз карталар және шашыраңқы жазбалар',
       'Тіркеу, дәрігер және касса арасында контекст жоғалуы',
