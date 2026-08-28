@@ -44,7 +44,7 @@
  *     auto; max-height: maxHeight`) and `<tbody>` renders a top spacer row +
  *     the visible row window (uniform `height: rowHeight`, default 40) + a
  *     bottom spacer row, keeping native `<table>` semantics. While active the
- *     table switches to a FIXED-GEOMETRY contract (Codex P2-1/P2-2, PR #2872):
+ *     table switches to a FIXED-GEOMETRY contract (Codex P2-1/P2-2, PR 2872):
  *     `table-layout: fixed` locks column widths to the header row, and every
  *     cell is clamped to `rowHeight` with `overflow: hidden` — content taller
  *     or wider than its cell clips. Pick `rowHeight` ≥ the natural row height
@@ -54,7 +54,7 @@
  *     KNOWN LIMITATION (Codex P2-3, deferred): keyboard navigation (Tab /
  *     Enter / Space) reaches only rows in the current virtual window; a
  *     roving-focus + scrollToIndex navigation model for off-window rows is
- *     future work (see the DEFERRED entry in PR #2872).
+ *     future work (see the DEFERRED entry in PR 2872).
  *
  * ## Deferred to follow-up sub-PRs (09b–09e per Task 46 §F.2)
  *
@@ -386,7 +386,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     ...style
   };
 
-  // Codex P2-2 (PR #2872): with auto table layout only the rendered virtual
+  // Codex P2-2 (PR 2872): with auto table layout only the rendered virtual
   // window contributes intrinsic column widths — a later window with wider
   // content would shift every column on scroll. `table-layout: fixed` derives
   // widths from the header row only, locking the column geometry while
@@ -438,7 +438,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
 
   // Virtualized row style (PR-UI-09e-1 — uniform fixed height while
   // virtualization is active; identical to rowStyle otherwise).
-  // Codex P2-1 (PR #2872): `height` on <tr> is a MINIMUM in table layout —
+  // Codex P2-1 (PR 2872): `height` on <tr> is a MINIMUM in table layout —
   // cells can still expand the row and diverge from the virtualizer's fixed
   // offsets. The fixed height + clipping is therefore enforced on the CELLS
   // (virtualizedCellStyle below), which makes the row geometry deterministic.
