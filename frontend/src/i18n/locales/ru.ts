@@ -9888,6 +9888,7 @@ const ru = {
     fp_can_login_now: 'Теперь вы можете войти в систему с новым паролем',
     fp_sms_error: 'Ошибка отправки SMS для сброса пароля',
     fp_email_error: 'Ошибка отправки email для сброса пароля',
+    rp_invalid_link: 'Ссылка недействительна или истекла',
     fp_reset_error: 'Ошибка сброса пароля',
     fp_show_password: 'Показать пароль',
     fp_hide_password: 'Скрыть пароль',

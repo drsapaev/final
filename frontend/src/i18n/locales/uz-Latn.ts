@@ -9760,6 +9760,7 @@ const uzLatn = {
     fp_can_login_now: 'Endi yangi parol bilan tizimga kirishingiz mumkin',
     fp_sms_error: 'Parolni tiklash SMS xatosi',
     fp_email_error: 'Parolni tiklash email xatosi',
+    rp_invalid_link: 'Havola yaroqsiz yoki muddati tugagan',
     fp_reset_error: 'Parolni tiklash xatosi',
     fp_show_password: 'Parolni ko\'rsatish',
     fp_hide_password: 'Parolni yashirish',
