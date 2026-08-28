@@ -21,7 +21,8 @@ export { default as MacOSBreadcrumb } from './MacOSBreadcrumb';
 export { default as MacOSPagination } from './MacOSPagination';
 
 // Data Display Components
-export { default as Table } from './Table';
+// PR-UI-09d: `Table` alias removed — canonical DataTable lives at
+// `src/components/ui/DataTable.tsx` (import directly or via the `ui/` barrel).
 // PR-UI-06: StatCard is canonical name. MacOSStatCard kept as backward-compat alias.
 export { default as StatCard } from './StatCard';
 export { default as MacOSStatCard } from './StatCard';

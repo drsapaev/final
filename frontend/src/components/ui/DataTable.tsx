@@ -6,12 +6,12 @@
  *
  * ## Migration path
  *
- * This file is the new canonical home for the `Table` component. The legacy
- * `src/components/ui/macos/Table.tsx` has been converted into a thin
- * compatibility re-export alias (Rule 10 compliance — no `New*`/`Unified*`
- * parallel alternative). Existing consumers that import from
- * `../ui/macos` continue to work unchanged; new code should import from
- * `../ui/DataTable` (or the `ui/` barrel) directly.
+ * This file is the canonical home for the `Table` component. The legacy
+ * `src/components/ui/macos/Table.tsx` was converted into a thin compatibility
+ * re-export alias in PR-UI-09a (Rule 10 compliance — no `New*`/`Unified*`
+ * parallel alternative), all live consumers were migrated to direct imports
+ * in PR-UI-09b–09c, and the alias itself was removed in PR-UI-09d. Import
+ * from `../ui/DataTable` (or the `ui/` barrel) directly.
  *
  * ## Zero-delta guarantee (Task 46 §F.2)
  *

@@ -14,8 +14,10 @@ import type { DataTableColumn, RowId } from '../DataTable';
  * ## Test organization
  *
  * The first 6 tests are ported verbatim from `frontend/src/components/ui/macos/__tests__/MacOSTable.test.tsx`
- * (per Task 46 §B.3 — MacOSTable.test.tsx is DUPLICATED here, with macos/Table.tsx
- * alias pointing to canonical so the old test path still passes too). These 6
+ * (per Task 46 §B.3 — MacOSTable.test.tsx was DUPLICATED here in 09a, with the
+ * macos/Table.tsx alias pointing to canonical so the old test path kept passing
+ * during the 09b–09c migration). PR-UI-09d removed the legacy duplicate and the
+ * alias; these 6 tests are now the sole owners of that contract coverage. These 6
  * tests assert the ZERO-DELTA guarantee — the canonical DataTable must render
  * byte-identically to the legacy macos/Table for the default rendering path.
  *
