@@ -36,20 +36,42 @@
  *   - `density='compact'|'comfortable'|'spacious'` → overrides padding.
  *   - `onRowClick` → enables keyboard navigation (Enter/Space) on rows.
  *   - `error` → renders `role="alert"` status cell instead of `role="status"`.
+ *   - `virtualized=true` + `maxHeight` + `rowHeight` → row virtualization via
+ *     `@tanstack/react-virtual` (PR-UI-09e-1, AC4 "1000 rows without lag").
+ *     Activation rule: BOTH `virtualized` and a numeric `maxHeight` must be
+ *     set — virtualization requires a bounded scroll viewport. When active,
+ *     the scroll wrapper becomes the vertical scroll container (`overflow-y:
+ *     auto; max-height: maxHeight`) and `<tbody>` renders a top spacer row +
+ *     the visible row window + a bottom spacer row, keeping native `<table>`
+ *     semantics. While active the table uses a MEASURED-geometry contract
+ *     (Codex P2-1/P2-4 follow-up, PR 2872): every rendered row is measured
+ *     via the virtualizer (`measureElement` + `data-index`), so spacer and
+ *     scroll geometry follow ACTUAL row heights — `rowHeight` is only the
+ *     initial estimate (default 40; pick a value close to your `size`/`density`
+ *     to avoid re-ranging churn: md ≈ 40px, compact ≈ 30px). Additionally
+ *     `table-layout: fixed` locks column widths to the header row (Codex
+ *     P2-2) so window swaps cannot re-flow columns, and virtualized cells
+ *     clip content at the cell box (Codex P2-7). ARIA row semantics expose
+ *     the virtual structure to assistive technology (Codex P2-6):
+ *     `aria-rowcount` carries the full row count and every data row carries
+ *     its absolute `aria-rowindex` (1-based, header rows included).
+ *     Stable `getRowId` IDs are used as virtualizer item keys (required for
+ *     window correctness under sort/filter — see §C.4 note above).
+ *     KNOWN LIMITATION (Codex P2-3, deferred): keyboard navigation (Tab /
+ *     Enter / Space) reaches only rows in the current virtual window; a
+ *     roving-focus + scrollToIndex navigation model for off-window rows is
+ *     future work (see the DEFERRED entry in PR 2872).
  *
  * ## Deferred to follow-up sub-PRs (09b–09e per Task 46 §F.2)
  *
- *   - `virtualized=true` + `rowHeight` → virtualization via
- *     `@tanstack/react-virtual`. In 09a the props are accepted as type slots
- *     but treated as no-ops (with a console.warn) so the public API surface is
- *     stable for future consumer code.
  *   - `mobileBehavior='cards'` → mobile card layout. In 09a the prop is
  *     accepted but only `'scroll'` (the existing horizontal-scroll behavior
  *     per ruling P7) is wired; `'cards'` logs a console.warn and falls back
  *     to `'scroll'`.
  */
 
-import React, { useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
+import React, { useCallback, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import { TablePagination } from './DataTable-features/TablePagination';
@@ -120,9 +142,11 @@ export interface DataTableProps<Row = Record<string, unknown>> {
   hoverable?: boolean;
   stickyHeader?: boolean;
 
-  // Virtualization (09b/09c — type slot only)
+  // Virtualization (PR-UI-09e-1 — wired; see JSDoc "Additive features")
   virtualized?: boolean;
   rowHeight?: number;
+  /** Bounded viewport height (px) — required together with `virtualized` to activate virtualization. */
+  maxHeight?: number;
 
   // Mobile / Responsive (ruling P7 — 'scroll' default)
   mobileBehavior?: 'scroll' | 'cards';
@@ -255,9 +279,10 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   hoverable = true,
   stickyHeader = false,
 
-  // virtualization (09b/09c — type slot only)
+  // virtualization (PR-UI-09e-1 — wired)
   virtualized = false,
   rowHeight,
+  maxHeight,
 
   // mobile (ruling P7 — 'scroll' default)
   mobileBehavior = 'scroll',
@@ -277,16 +302,10 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   const { t } = useTranslation();
   void t;
 
-  // === Virtualization + mobile cards deferred to 09b/09c ===
-  // Type slots exist so the public API surface is stable for future consumer
-  // code. In 09a these are no-ops — see JSDoc above + Task 46 §F.2 AC3 partial.
-  // The runtime warnings are silenced (no-console lint rule) — developers
-  // reading the JSDoc will see the deferred-feature note.
-  void virtualized;
+  // === Mobile cards deferred to follow-up sub-PRs ===
+  // Type slot exists so the public API surface is stable for future consumer
+  // code. Only 'scroll' (ruling P7) is wired; see JSDoc above.
   void mobileBehavior;
-  // rowHeight is reserved for 09b/09c virtualization wiring; reference it to
-  // satisfy the noUnusedLocals / strict TS rule for the type slot.
-  void rowHeight;
   // sortConfig is reserved for future controlled-sort wiring (matches EAT
   // external override pattern); reference it to satisfy strict TS.
   void sortConfig;
@@ -296,6 +315,34 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
 
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  // === Row virtualization (PR-UI-09e-1) ===
+  // Activates ONLY on the main data path when BOTH `virtualized` and a numeric
+  // `maxHeight` are provided (virtualization requires a bounded viewport).
+  // When inactive the rendered output is byte-identical to the pre-09e table.
+  const virtualizationActive = virtualized && typeof maxHeight === 'number';
+  const effectiveRowHeight = rowHeight ?? 40;
+  const scrollWrapperRef = useRef<HTMLDivElement | null>(null);
+  // Codex P2-5 (PR 2872): TanStack includes these callbacks' IDENTITY in its
+  // measurement-cache invalidation — inline closures would be recreated on
+  // every render (each scroll re-range) and force an O(n) measurement rebuild.
+  // useCallback keeps the cache warm while `data` is referentially stable.
+  const getScrollElement = useCallback(() => scrollWrapperRef.current, []);
+  const estimateSize = useCallback(() => effectiveRowHeight, [effectiveRowHeight]);
+  // Stable IDs are REQUIRED for window correctness under sort/filter —
+  // see the defaultGetRowId note (Task 46 §C.4).
+  const getItemKey = useCallback(
+    (index: number) => getRowId(data[index], index) as React.Key,
+    [data, getRowId]
+  );
+  const rowVirtualizer = useVirtualizer({
+    count: data.length,
+    getScrollElement,
+    estimateSize,
+    overscan: 10,
+    enabled: virtualizationActive,
+    getItemKey,
+  });
 
   const sizeStyles: Record<TableSize, TableSizeStyle> = {
     sm: {
@@ -355,6 +402,15 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     ...style
   };
 
+  // Codex P2-2 (PR 2872): with auto table layout only the rendered virtual
+  // window contributes intrinsic column widths — a later window with wider
+  // content would shift every column on scroll. `table-layout: fixed` derives
+  // widths from the header row only, locking the column geometry while
+  // virtualization is active (content wider than its column clips).
+  if (virtualizationActive && tableStyle.tableLayout === undefined) {
+    tableStyle.tableLayout = 'fixed';
+  }
+
   const headerStyle: TableStyleExt = {
     background: currentVariant.headerBackground,
     fontWeight: 'var(--mac-font-weight-semibold)',
@@ -394,6 +450,37 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
     cursor: hoverable ? 'pointer' : 'default'
   });
+
+  // Spacer rows pad <tbody> to the full virtual height so the native table
+  // scrollbar geometry matches the unvirtualized rendering.
+  const spacerStyle = (height: number): CSSProperties => ({ height });
+
+  // Scroll-viewport style applied to the wrapper ONLY while virtualization
+  // is active (otherwise the wrapper carries no inline style, exactly as
+  // before PR-UI-09e-1).
+  const scrollViewportStyle: CSSProperties | undefined = virtualizationActive
+    ? { overflowY: 'auto', maxHeight }
+    : undefined;
+
+  // Codex P2-7 (PR 2872): under `table-layout: fixed` an unbreakable cell
+  // content (long identifier, wide action group) would otherwise paint across
+  // neighboring cells — clip it at the cell box so "wider content clips"
+  // actually holds. Width containment only; no height clamp (rows are
+  // measured — Codex P2-4).
+  const virtualizedCellStyle = (isSelected = false): TableStyleExt =>
+    virtualizationActive
+      ? { ...cellStyle(isSelected), overflow: 'hidden' }
+      : cellStyle(isSelected);
+
+  // Codex P2-6 (PR 2872): expose the full row count and each virtual row's
+  // absolute position to assistive technology — the DOM only contains the
+  // rendered window, so screen readers need aria-rowcount/aria-rowindex to
+  // announce positions correctly as windows change. Row indices are 1-based
+  // and include the header row (plus the filter row when filterable).
+  const headerRowCount = 1 + (filterable ? 1 : 0);
+  const ariaRowCount = virtualizationActive ? headerRowCount + data.length : undefined;
+  const ariaRowIndex = (rowIndex: number): number | undefined =>
+    virtualizationActive ? headerRowCount + rowIndex + 1 : undefined;
 
   const handleSort = (column: DataTableColumn<Row>) => {
     if (!sortable || !column.sortable) return;
@@ -643,38 +730,77 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     );
   }
 
+  // Data-row renderer shared by the plain and virtualized paths (PR-UI-09e-1
+  // extracted it verbatim). In virtualized mode rows additionally carry
+  // `data-index` + the virtualizer's `measureElement` ref (Codex P2-1/P2-4:
+  // measured geometry — actual row heights drive the spacers, so content
+  // taller than the rowHeight estimate cannot desynchronize the scrollbar).
+  const renderDataRow = (row: Row, rowIndex: number) => {
+    const isSelected = isRowSelected(row, rowIndex);
+    const hasRowHandler = Boolean(onRowClick || (selectable && onRowSelect));
+    return (
+      <tr
+        key={getRowId(row, rowIndex) as React.Key}
+        data-index={virtualizationActive ? rowIndex : undefined}
+        aria-rowindex={ariaRowIndex(rowIndex)}
+        ref={virtualizationActive ? rowVirtualizer.measureElement : undefined}
+        style={rowStyle(rowIndex, isSelected)}
+        onClick={() => handleRowClick(row, rowIndex)}
+        onKeyDown={hasRowHandler ? (e) => handleRowKeyDown(e, row, rowIndex) : undefined}
+        tabIndex={hasRowHandler ? 0 : undefined}
+        onMouseEnter={(e) => handleMouseEnter(e, isSelected, false)}
+        onMouseLeave={(e) => handleMouseLeave(e, isSelected, false)}
+      >
+        {columns.map((column, colIndex) => (
+          <td
+            key={column.key || colIndex}
+            style={{
+              ...virtualizedCellStyle(isSelected),
+              borderRight: colIndex === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
+            }}
+          >
+            {renderCell(row, column, rowIndex) as React.ReactNode}
+          </td>
+        ))}
+      </tr>
+    );
+  };
+
+  // Visible window + spacer geometry (PR-UI-09e-1; empty while inactive).
+  const virtualRows = virtualizationActive ? rowVirtualizer.getVirtualItems() : [];
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom = virtualRows.length > 0
+    ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+    : 0;
+
   return (
-    <div className="mac-table-scroll-wrapper" aria-busy={loading}>
-      <table className={className} style={tableStyle} aria-label={ariaLabel}>
+    <div
+      className="mac-table-scroll-wrapper"
+      ref={scrollWrapperRef}
+      style={scrollViewportStyle}
+      aria-busy={loading}
+    >
+      <table
+        className={className}
+        style={tableStyle}
+        aria-label={ariaLabel}
+        aria-rowcount={ariaRowCount}
+      >
         {renderHeaders()}
         <tbody>
-          {data.map((row, rowIndex) => {
-            const isSelected = isRowSelected(row, rowIndex);
-            const hasRowHandler = Boolean(onRowClick || (selectable && onRowSelect));
-            return (
-              <tr
-                key={getRowId(row, rowIndex) as React.Key}
-                style={rowStyle(rowIndex, isSelected)}
-                onClick={() => handleRowClick(row, rowIndex)}
-                onKeyDown={hasRowHandler ? (e) => handleRowKeyDown(e, row, rowIndex) : undefined}
-                tabIndex={hasRowHandler ? 0 : undefined}
-                onMouseEnter={(e) => handleMouseEnter(e, isSelected, false)}
-                onMouseLeave={(e) => handleMouseLeave(e, isSelected, false)}
-              >
-                {columns.map((column, colIndex) => (
-                  <td
-                    key={column.key || colIndex}
-                    style={{
-                      ...cellStyle(isSelected),
-                      borderRight: colIndex === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
-                    }}
-                  >
-                    {renderCell(row, column, rowIndex) as React.ReactNode}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
+          {virtualizationActive ? (
+            <>
+              {paddingTop > 0 && (
+                <tr aria-hidden="true" style={spacerStyle(paddingTop)} />
+              )}
+              {virtualRows.map((virtualRow) => renderDataRow(data[virtualRow.index], virtualRow.index))}
+              {paddingBottom > 0 && (
+                <tr aria-hidden="true" style={spacerStyle(paddingBottom)} />
+              )}
+            </>
+          ) : (
+            data.map((row, rowIndex) => renderDataRow(row, rowIndex))
+          )}
         </tbody>
       </table>
       {pagination && onPageChange && currentPage > 0 ? (

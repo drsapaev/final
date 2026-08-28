@@ -251,3 +251,210 @@ describe('DataTable — canonical features (DT-7..12)', () => {
     expect(alertCell).toHaveTextContent('Ошибка 500');
   });
 });
+
+describe('DataTable — row virtualization (DT-13..16, PR-UI-09e-1)', () => {
+  type VRow = { id: number; name: string };
+  const columns: DataTableColumn<VRow>[] = [
+    { key: 'name', title: 'Name', sortable: false },
+  ];
+  const makeRows = (count: number): VRow[] =>
+    Array.from({ length: count }, (_, i) => ({ id: i, name: `Row ${i}` }));
+
+  // jsdom performs no layout: every element reports offsetHeight 0 and
+  // @tanstack/react-virtual would compute an empty window. The virtualizer
+  // measures the viewport (a <div>) and the rows (<tr>) via offsetHeight, so
+  // tag-specific prototype mocks give a deterministic 320px viewport and a
+  // configurable row height — scoped to this describe block and restored.
+  const VIEWPORT = 320;
+  let mockRowHeight = 32;
+  const trDescriptor = Object.getOwnPropertyDescriptor(HTMLTableRowElement.prototype, 'offsetHeight');
+  const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetHeight');
+  beforeEach(() => {
+    mockRowHeight = 32;
+    Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get: () => mockRowHeight,
+    });
+    Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', {
+      configurable: true,
+      value: VIEWPORT,
+    });
+  });
+  afterEach(() => {
+    // jsdom inherits offsetHeight from HTMLElement.prototype, so the captured
+    // descriptors are undefined (Codex P2-8, PR 2872): restoring would be a
+    // no-op and the mocks would leak into later test files in the shared
+    // single-fork environment. When no own property existed, DELETE the mock
+    // so lookup falls back to the real inherited getter.
+    if (trDescriptor) {
+      Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', trDescriptor);
+    } else {
+      delete (HTMLTableRowElement.prototype as { offsetHeight?: number }).offsetHeight;
+    }
+    if (divDescriptor) {
+      Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', divDescriptor);
+    } else {
+      delete (HTMLDivElement.prototype as { offsetHeight?: number }).offsetHeight;
+    }
+  });
+
+  it('DT-13: virtualized=true + maxHeight renders a windowed subset of 1000 rows with spacer geometry', () => {
+    const rows = makeRows(1000);
+    const { container } = render(
+      <DataTable<VRow> columns={columns} data={rows} virtualized rowHeight={32} maxHeight={VIEWPORT} />
+    );
+
+    const tbody = container.querySelector('tbody');
+    expect(tbody).not.toBeNull();
+
+    const allRows = tbody!.querySelectorAll('tr');
+    // Windowed rendering: DOM rows (window + overscan + spacers) must be a
+    // small subset of 1000 — this is the AC4 "1000 rows without lag" proof.
+    expect(allRows.length).toBeLessThan(100);
+    expect(allRows.length).toBeGreaterThan(0);
+
+    const dataRows = Array.from(allRows).filter(
+      (tr) => tr.getAttribute('aria-hidden') !== 'true'
+    );
+    expect(dataRows.length).toBeGreaterThan(0);
+    expect(dataRows.length).toBeLessThan(100);
+
+    // Spacer geometry: paddingTop + rendered*rowHeight + paddingBottom must
+    // reconstruct the full virtual height (1000 × 32 = 32000).
+    const spacers = Array.from(allRows).filter(
+      (tr) => tr.getAttribute('aria-hidden') === 'true'
+    );
+    const spacerHeights = spacers.map((tr) =>
+      Number((tr as HTMLElement).style.height.replace('px', ''))
+    );
+    const renderedHeight = dataRows.length * 32;
+    const total =
+      spacerHeights.reduce((acc, h) => acc + h, 0) + renderedHeight;
+    expect(total).toBe(1000 * 32);
+
+    // Rendered rows are the initial window (row 0 first) and carry data-index
+    // for the virtualizer's measured geometry (Codex P2-1/P2-4 follow-up).
+    expect(dataRows[0]).toHaveTextContent('Row 0');
+    expect(dataRows[0].getAttribute('data-index')).toBe('0');
+
+    // The scroll wrapper is the bounded vertical viewport.
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toBe(`${VIEWPORT}px`);
+
+    // Codex P2-2 (PR 2872): table-layout is fixed while virtualized so
+    // column widths cannot shift when a later window renders wider content.
+    const table = container.querySelector('table') as HTMLElement;
+    expect(table.style.tableLayout).toBe('fixed');
+
+    // Codex P2-7 (PR 2872): virtualized cells clip content at the cell box
+    // so unbreakable content cannot paint across neighboring columns.
+    const firstCell = dataRows[0].querySelector('td') as HTMLElement;
+    expect(firstCell.style.overflow).toBe('hidden');
+
+    // Codex P2-6 (PR 2872): ARIA row semantics expose the virtual structure
+    // — full row count on the table, absolute 1-based row index on each data
+    // row (row 1 is the header).
+    expect(table.getAttribute('aria-rowcount')).toBe('1001');
+    expect(dataRows[0].getAttribute('aria-rowindex')).toBe('2');
+  });
+
+  it('DT-14: scrolling the viewport shifts the rendered window near the end of the dataset', () => {
+    const rows = makeRows(1000);
+    const { container } = render(
+      <DataTable<VRow> columns={columns} data={rows} virtualized rowHeight={32} maxHeight={VIEWPORT} />
+    );
+
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    // Simulate scrolling to the bottom of the 32000px virtual height.
+    // jsdom stores scrollTop assignments without layout; react-virtual's
+    // scroll listener re-ranges the window off the stored offset.
+    wrapper.scrollTop = 1000 * 32 - VIEWPORT;
+    fireEvent.scroll(wrapper);
+
+    const dataRows = Array.from(container.querySelectorAll('tbody tr')).filter(
+      (tr) => tr.getAttribute('aria-hidden') !== 'true'
+    );
+    // The window now sits at the tail of the dataset: last rendered row is
+    // Row 999 (± overscan window math), and early rows are gone from the DOM.
+    const names = dataRows.map((tr) => tr.textContent ?? '');
+    expect(names[names.length - 1]).toContain('Row 999');
+    expect(names).not.toContain('Row 0');
+    expect(names).not.toContain('Row 1');
+  });
+
+  it('DT-15: virtualized=true without maxHeight stays on the plain path (explicit activation rule)', () => {
+    const rows = makeRows(50);
+    const { container } = render(
+      <DataTable<VRow> columns={columns} data={rows} virtualized rowHeight={32} />
+    );
+
+    // No maxHeight → no bounded viewport → virtualization must NOT activate:
+    // all 50 rows render, no spacers, wrapper has no inline viewport style.
+    const allRows = container.querySelectorAll('tbody tr');
+    expect(allRows.length).toBe(50);
+    const spacers = Array.from(allRows).filter(
+      (tr) => tr.getAttribute('aria-hidden') === 'true'
+    );
+    expect(spacers.length).toBe(0);
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    expect(wrapper.style.overflowY).toBe('');
+    expect(wrapper.style.maxHeight).toBe('');
+
+    // Plain path keeps auto layout, no measurement attributes, no virtual
+    // ARIA semantics, no cell clipping (no measured-geometry contract
+    // outside virtualized mode).
+    const table = container.querySelector('table') as HTMLElement;
+    expect(table.style.tableLayout).toBe('');
+    expect(table.getAttribute('aria-rowcount')).toBeNull();
+    const firstRow = allRows[0];
+    expect(firstRow.getAttribute('data-index')).toBeNull();
+    expect(firstRow.getAttribute('aria-rowindex')).toBeNull();
+    const firstCell = firstRow.querySelector('td') as HTMLElement;
+    expect(firstCell.style.height).toBe('');
+    expect(firstCell.style.overflow).toBe('');
+  });
+
+  it('DT-16: measured geometry — actual row heights override the rowHeight estimate (Codex P2-1/P2-4)', () => {
+    // Rows actually measure 50px while the estimate is 40px: the spacers must
+    // follow the MEASURED heights (1000 × 50 = 50000), proving the geometry
+    // cannot desynchronize when content is taller than the estimate.
+    mockRowHeight = 50;
+    const rows = makeRows(1000);
+    const { container } = render(
+      <DataTable<VRow> columns={columns} data={rows} virtualized rowHeight={40} maxHeight={VIEWPORT} />
+    );
+
+    const allRows = Array.from(container.querySelectorAll('tbody tr'));
+    const dataRows = allRows.filter((tr) => tr.getAttribute('aria-hidden') !== 'true');
+    const spacers = allRows.filter((tr) => tr.getAttribute('aria-hidden') === 'true');
+
+    expect(dataRows.length).toBeGreaterThan(0);
+    expect(dataRows.length).toBeLessThan(100);
+
+    const spacerHeights = spacers.map((tr) =>
+      Number((tr as HTMLElement).style.height.replace('px', ''))
+    );
+    // Hybrid geometry: every RENDERED row contributes its measured 50px; the
+    // unrendered remainder keeps the 40px estimate. If measurement wiring were
+    // broken, rendered rows would contribute 40px each and this equality would
+    // fail — this is the Codex P2-1/P2-4 proof that measured sizes drive the
+    // spacer math instead of a fixed estimate.
+    const spacerSum = spacerHeights.reduce((acc, h) => acc + h, 0);
+    const total = spacerSum + dataRows.length * 50;
+    // Measurement demonstrably moved the geometry STRICTLY above the
+    // pure-estimate baseline (1000 × 40 = 40000): rendered rows were measured
+    // at 50px and their extra height flows into the spacers/totalSize. If the
+    // measureElement wiring were broken, every row would contribute exactly 40
+    // and total would equal 40000.
+    expect(total).toBeGreaterThan(40000);
+    // And strictly below the fully-measured size (1000 × 50 = 50000): only
+    // the rendered window is measured; off-window rows keep the estimate —
+    // consistent virtualizer behavior, not a full-list measurement.
+    expect(total).toBeLessThan(50000);
+    // Every rendered row carries the measurement hook.
+    for (const tr of dataRows) {
+      expect(tr.getAttribute('data-index')).not.toBeNull();
+    }
+  });
+});
