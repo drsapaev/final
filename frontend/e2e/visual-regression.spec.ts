@@ -427,7 +427,19 @@ test.describe('Visual regression — registrar EAT', () => {
   // intentional deltas — re-baseline per Rule 13 step A–D at that time.
   test('Surface 1: registrar EAT — desktop 1280×720', async ({ page }) => {
     await page.goto('/registrar');
-    await page.waitForTimeout(3000);
+    // PR-UI-09c-4: deterministic readiness wait. The previous fixed
+    // waitForTimeout(3000) raced the Vite dev-server cold module transform
+    // (EAT now eagerly imports the canonical DataTable, adding module
+    // requests to the /registrar graph) — on loaded CI runners the
+    // ModernTabs "Загрузка отделений..." state outlived the sleep and the
+    // body fallback captured a transient loading state (12328 px diff).
+    // Wait for the department tabs to finish loading instead; catch() keeps
+    // the original behavior of screenshotting whatever rendered — a real
+    // readiness regression then fails the snapshot assertion itself.
+    await page.locator('.tab-button.all-departments').first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
+    await page.waitForTimeout(300);
     const tableEl = page.locator('table').first();
     // Wait for the table to be present (EAT lazy-renders on data fetch).
     await tableEl.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
@@ -449,7 +461,12 @@ test.describe('Visual regression — registrar EAT', () => {
     // Override the project's default desktop viewport for this test only.
     await page.setViewportSize({ width: 375, height: 720 });
     await page.goto('/registrar');
-    await page.waitForTimeout(3000);
+    // PR-UI-09c-4: deterministic readiness wait (see Surface 1 note) —
+    // replaces the fixed 3000ms sleep that raced ModernTabs loading.
+    await page.locator('.tab-button.all-departments').first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
+    await page.waitForTimeout(300);
     const tableEl = page.locator('table').first();
     await tableEl.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
       // Empty-state fallback — same as desktop variant.

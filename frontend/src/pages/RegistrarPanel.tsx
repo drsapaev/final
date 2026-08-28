@@ -218,6 +218,18 @@ const RegistrarPanel = () => {
   // Used for filtering entries by queue_tags instead of hardcoded mapping
   const [queueProfiles, setQueueProfiles] = useState<QueueProfileItem[]>([]);
 
+  // PR-UI-09c-4 (CI-flake root cause): onProfilesLoaded MUST be referentially
+  // stable. ModernTabs' loadQueueProfiles useCallback depends on it and its
+  // effect re-runs on every identity change — the previous inline arrow got a
+  // new identity on every RegistrarPanel render, so each profiles fetch
+  // triggered a parent re-render that re-triggered the fetch: an infinite
+  // load → loaded → load flicker (and unbounded API refetch loop) on the
+  // registrar page. Stable identity (useState setter is stable) breaks the
+  // cycle; surfaced by the visual-regression Surface 4 timing race.
+  const handleProfilesLoaded = useCallback((profiles: unknown[]) => {
+    setQueueProfiles(profiles as QueueProfileItem[]);
+  }, []);
+
   // Состояния для печати
   const [printDialog, setPrintDialog] = useState<{ open: boolean; type: string; data: Record<string, unknown> | null }>({ open: false, type: 'ticket', data: null });
   const [cancelDialog, setCancelDialog] = useState<{ open: boolean; row: Appointment | null; reason: string }>({ open: false, row: null, reason: '' });
@@ -1486,7 +1498,7 @@ const RegistrarPanel = () => {
           <ModernTabs
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          onProfilesLoaded={(profiles: unknown[]) => setQueueProfiles(profiles as QueueProfileItem[])} // ⭐ SSOT: Store profiles for filtering
+          onProfilesLoaded={handleProfilesLoaded} // ⭐ SSOT: Store profiles for filtering
           departmentStats={departmentStats}
           theme={theme}
           language={legacyLanguage}
