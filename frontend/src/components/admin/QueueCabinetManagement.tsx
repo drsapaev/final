@@ -23,8 +23,8 @@ import {
   AppEmpty,
   Input,
   StatCard,
-  Table,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 
 const INITIAL_FILTERS = {
   day: '',
@@ -491,7 +491,7 @@ const QueueCabinetManagement = () => {
               }
             />
           ) : (
-            <Table
+            <DataTable
               columns={[
                 { key: 'day', title: t('admin2.col_day'), sortable: false },
                 { key: 'specialist_name', title: t('admin2.col_specialist'), sortable: false },

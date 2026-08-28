@@ -20,15 +20,15 @@ import {
   Textarea,
   Grid,
   List,
-  Table,
 } from './ui/macos';
 import {
+  DataTable,
   TableHead,
   TableBody,
   TableRow,
   TableCell,
   TableHeaderCell } from
-'./ui/macos/Table';
+'./ui/DataTable';
 import {
   ListItem,
   ListItemIcon,
@@ -2197,7 +2197,7 @@ const TelegramManager = () => {
                 {t('misc.tg_templates_title')}
               </Typography>
               <div style={{ width: '100%', overflowX: 'auto' }}>
-                <Table style={{ minWidth: 640 }}>
+                <DataTable style={{ minWidth: 640 }}>
                   <TableHead>
                     <TableRow>
                       <TableHeaderCell>{t('misc.tg_col_name')}</TableHeaderCell>
@@ -2251,7 +2251,7 @@ const TelegramManager = () => {
                       </TableRow>
                     )}
                   </TableBody>
-                </Table>
+                </DataTable>
               </div>
             </CardContent>
           </Card>

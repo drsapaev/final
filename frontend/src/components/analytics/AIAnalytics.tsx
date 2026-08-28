@@ -7,9 +7,9 @@ import {
   Input,
   Select,
   MacOSTab,
-  Table,
   AppEmpty,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import type { SelectChangeEvent } from '../ui/macos/Select';
 import {
   Brain,
@@ -769,7 +769,7 @@ const AIAnalytics = () => {
               {t('misc.aia_comparison_for_function', { func: modelComparison.function })}
             </h4>
             
-            <Table
+            <DataTable
           columns={[
           { key: 'model', label: t('misc.aia_col_model'), width: '20%' },
           { key: 'accuracy', label: t('misc.aia_col_accuracy'), width: '15%', align: 'center' },

@@ -34,11 +34,11 @@ import {
   Badge,
   Input,
   Select,
-  Table,
   AppEmpty,
   Alert,
   Checkbox,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import {
   normalizeServiceCode,
   formatServiceCodeInput,
@@ -622,7 +622,7 @@ const ServiceCatalog = () => {
         variant="default"
         className="admin-card-p-0-overflow-hidden">
 
-        <Table
+        <DataTable
           columns={[
           {
             key: 'select',
