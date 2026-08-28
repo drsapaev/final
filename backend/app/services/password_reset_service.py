@@ -330,7 +330,9 @@ class PasswordResetService:
                 }
 
             # Проверяем пользователя
-            user = crud_user.get_user(db, user_id=token_data['user_id'])
+            # get_user is a ghost name (Sentry PYTHON-FASTAPI-10); the
+            # crud.user module exposes get(db, id).
+            user = crud_user.get(db, id=token_data['user_id'])
             if not user:
                 return {
                     "success": False,
@@ -354,18 +356,17 @@ class PasswordResetService:
                     "error_code": "PASSWORD_SAME_AS_OLD",
                 }
 
-            # Обновляем пароль
-            hashed_password = get_password_hash(new_password)
-            user_data = {
-                "hashed_password": hashed_password,
-                "password_changed_at": datetime.now(),
-            }
+            # Пароль меняем ПРЯМО здесь: whitelist update_user не содержит
+            # hashed_password/password_changed_at (и не должен — он для FCM-
+            # профиля), а этот сервис — санкционированный владелец смены
+            # пароля. Иначе update_user молча пропускал поля: success=True
+            # при НЕИЗМЕНЁННОМ пароле.
+            user.hashed_password = get_password_hash(new_password)
+            user.password_changed_at = datetime.now()
+            db.commit()
+            db.refresh(user)
 
-            updated_user = crud_user.update_user(
-                db, user_id=user.id, user_data=user_data
-            )
-
-            if updated_user:
+            if user.id:
                 # Помечаем токен как использованный
                 token_data['used'] = True
                 token_data['used_at'] = datetime.now()
