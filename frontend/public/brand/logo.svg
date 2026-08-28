@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Clinic OS - Full Logo (horizontal lockup)
+
+  PR-UI-10 - Branding + Logo + Favicon
+  - Minimalist medical teal (#0d9488) + white background
+  - Components: logo-mark (32x32 monogram) + "Clinic OS" wordmark
+  - Total canvas: 220x56 (preserves 16:9-ish lockup ratio for header)
+  - Used in: auth pages (login), landing page hero, footer, print templates
+  - For header brand in AppShell (HeaderNew.tsx), use the standalone
+    logo-mark.svg (32x32) + render "Clinic OS" as text via BRAND.name
+
+  Design rationale:
+  - The pulse line inside the "C" signifies a living clinical system
+    (patients, queues, EMR), not a static database.
+  - "Clinic OS" wordmark in semibold teal, with "OS" set in the same teal
+    but lighter weight, to subtly reinforce "operating system" framing.
+  - The "TM" mark is omitted; Clinic OS is the system's primary product
+    name per PR-UI-10 section 1 of UI_REMEDIATION_PLAN.md.
+
+  Color tokens:
+  - #0d9488 (primary medical teal)
+  - #14b8a6 (pulse accent)
+  - #ffffff (mark interior)
+  - #0d9488 / #5d6f84 (wordmark primary + "OS" weight)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 56" width="220" height="56" role="img" aria-label="Clinic OS">
+  <g transform="translate(4, 4) scale(1.5)">
+    <rect x="0" y="0" width="32" height="32" rx="7" ry="7" fill="#0d9488"/>
+    <path d="M 22 9.5 A 9 9 0 1 0 22 22.5" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 21 14 L 23 14 L 24 11 L 26 18 L 27 14 L 29 14" fill="none" stroke="#14b8a6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="64" y="36" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="24" font-weight="600" fill="#0d9488" letter-spacing="-0.3">Clinic</text>
+  <text x="142" y="36" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="24" font-weight="400" fill="#0d9488" letter-spacing="-0.3">OS</text>
+</svg>
