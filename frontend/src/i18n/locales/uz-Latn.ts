@@ -4458,6 +4458,7 @@ const uzLatn = {
     adm_error_load_queue: 'Navbat xulosasini yuklashda xatolik',
     adm_error_load_queue_desc: 'Navbat statistikasini yuklab boʻlmadi',
     adm_no_departments: 'Boʻlimlar sozlanmagan',
+    adm_queue_partial_note: 'Navbat maʼlumot manbai: SSOT DailyQueue + OnlineQueueEntry. Holat boʻyicha qatʼiy hisob (faqat kutmoqdalar / faqat qabulda / faqat yakunlangan) qoʻshimcha backend agregatsiyasini talab qiladi — keyingchilikka qoldirilgan.',
     adm_schedule_time_label: 'Vaqt',
     adm_schedule_patient_label: 'Bemor',
     adm_schedule_department_label: 'Boʻlim',

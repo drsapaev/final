@@ -4464,6 +4464,7 @@ const uzCyrl = {
     adm_error_load_queue: 'Навбат хулосасини юклашда хатолик',
     adm_error_load_queue_desc: 'Навбат статистикасини юклаб бўлмади',
     adm_no_departments: 'Бўлимлар созланмаган',
+    adm_queue_partial_note: 'Навбат маълумот манбаси: SSOT DailyQueue + OnlineQueueEntry. Ҳолат бўйича қатъий ҳисоб (фақат кутмоқдалар / фақат қабулда / фақат якунланган) қўшимча backend агрегациясини талаб қилади — кейинчиликка қолдирилган.',
     adm_schedule_time_label: 'Вақт',
     adm_schedule_patient_label: 'Бемор',
     adm_schedule_department_label: 'Бўлим',

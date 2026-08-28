@@ -4457,6 +4457,7 @@ const en = {
     adm_error_load_queue: 'Failed to load queue summary',
     adm_error_load_queue_desc: 'Could not load queue stats',
     adm_no_departments: 'No departments configured',
+    adm_queue_partial_note: 'Queue data source: SSOT DailyQueue + OnlineQueueEntry. Strict per-status counts (only-waiting / only-in-consultation / only-done) require additional backend aggregation — deferred follow-up.',
     adm_schedule_time_label: 'Time',
     adm_schedule_patient_label: 'Patient',
     adm_schedule_department_label: 'Department',

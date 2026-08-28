@@ -304,7 +304,7 @@ function getScheduleStatusLabel(status: unknown, t: AdminTranslationFn): string 
 }
 
 const AdminDashboard = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as AdminTranslationFn;
+  const { t: rawT, i18n } = useTranslation(); const t = rawT as AdminTranslationFn;
   const {
     data: statsDataRaw,
     loading: statsLoading,
@@ -493,12 +493,26 @@ const AdminDashboard = () => {
                   color: 'var(--mac-text-secondary)',
                 }}
               >
-                {new Date().toLocaleDateString('ru-RU', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
+                {(() => {
+                  // PR-UI-11-1 (Codex P2 #5): format the dashboard header date
+                  // in the active locale, not hardcoded `ru-RU`. Map the 5
+                  // supported i18n codes to their BCP 47 equivalents.
+                  const lang = (i18n as { language?: string }).language || 'ru';
+                  const bcp47Map: Record<string, string> = {
+                    'ru': 'ru-RU',
+                    'en': 'en-US',
+                    'uz-Latn': 'uz-Latn-UZ',
+                    'uz-Cyrl': 'uz-Cyrl-UZ',
+                    'kk': 'kk-KZ',
+                  };
+                  const bcp47 = bcp47Map[lang] || 'ru-RU';
+                  return new Date().toLocaleDateString(bcp47, {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  });
+                })()}
               </p>
             </div>
             <RefreshCw
@@ -561,6 +575,7 @@ const AdminDashboard = () => {
             loadingSkeleton={<Skeleton type="list" count={4} />}
             error={scheduleError ? t('admin2.adm_error_load_schedule') : null}
             onRetry={refreshSchedule}
+            retryLabel={t('admin2.adm_retry')}
             empty={scheduleItems.length === 0 ? t('admin2.adm_schedule_empty') : null}
           >
             <ol
@@ -636,13 +651,15 @@ const AdminDashboard = () => {
           {/* PR-UI-11-1: queue summary panel — 3 mini stat tiles. */}
           <DataCard
             title={t('admin2.adm_queue_summary')}
+            description={queueSummary.partial ? t('admin2.adm_queue_partial_note') : undefined}
             icon={<Clock size={18} aria-hidden="true" />}
             ariaLabel={t('admin2.adm_queue_summary')}
             loading={queueLoading}
             loadingSkeleton={<Skeleton type="card" count={3} />}
             error={queueError ? t('admin2.adm_error_load_queue') : null}
             onRetry={refreshQueue}
-            empty={(!queueLoading && !queueError && queueSummary.departmentCount === 0) ? t('admin2.adm_no_departments') : null}
+            retryLabel={t('admin2.adm_retry')}
+            empty={(!queueLoading && !queueError && queueSummary.queuesCount === 0) ? t('admin2.adm_no_departments') : null}
           >
             <div
               role="list"
@@ -712,6 +729,8 @@ const AdminDashboard = () => {
             loading={activityChartLoading}
             loadingSkeleton={<Skeleton type="text" count={3} />}
             error={activityChartError ? t('admin2.adm_error_load_chart') : null}
+            onRetry={refreshStats}
+            retryLabel={t('admin2.adm_retry')}
             empty={(!activityChartLoading && !activityChartError && (!activityChartData?.data || activityChartData.data.length === 0)) ? t('admin2.adm_no_data_period') : null}
           >
             <div style={{ height: 256, padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -763,6 +782,7 @@ const AdminDashboard = () => {
             loading={recentActivitiesLoading}
             loadingSkeleton={<Skeleton type="text" count={4} />}
             error={recentActivitiesError ? t('admin2.adm_error_load') : null}
+            retryLabel={t('admin2.adm_retry')}
             empty={(!recentActivitiesLoading && !recentActivitiesError && recentActivities.length === 0) ? t('admin2.adm_no_recent_actions') : null}
           >
             <div className="flex flex-col gap-4">
@@ -800,6 +820,7 @@ const AdminDashboard = () => {
           loading={systemAlertsLoading}
           loadingSkeleton={<Skeleton type="text" count={3} />}
           error={systemAlertsError ? t('admin2.adm_error_load') : null}
+          retryLabel={t('admin2.adm_retry')}
           empty={(!systemAlertsLoading && !systemAlertsError && systemAlerts.length === 0) ? t('admin2.adm_no_system_notifications') : null}
         >
           <div className="flex flex-col gap-4">

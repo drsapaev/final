@@ -4457,6 +4457,7 @@ const kk = {
     adm_error_load_queue: 'Кезек қорытындысын жүктеу қатесі',
     adm_error_load_queue_desc: 'Кезек статистикасын жүктеу мүмкін болмады',
     adm_no_departments: 'Бөлімдер бапталмаған',
+    adm_queue_partial_note: 'Кезектің мәлімет көзі: SSOT DailyQueue + OnlineQueueEntry. Күй бойынша қатаң есеп (тек күтуде / тек қабылдауда / тек аяқталған) қосымша backend агрегациясын талап етеді — кейінгілікке кейінге қалдырылған.',
     adm_schedule_time_label: 'Уақыт',
     adm_schedule_patient_label: 'Науқас',
     adm_schedule_department_label: 'Бөлім',

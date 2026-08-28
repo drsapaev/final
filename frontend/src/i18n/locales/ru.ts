@@ -4581,6 +4581,7 @@ const ru = {
     adm_error_load_queue: 'Ошибка загрузки очереди',
     adm_error_load_queue_desc: 'Не удалось загрузить сводку очереди',
     adm_no_departments: 'Отделения не настроены',
+    adm_queue_partial_note: 'Источник данных очереди: SSOT DailyQueue + OnlineQueueEntry. Строгий подсчёт по статусам (только ожидающие / только на приёме / только завершено) требует дополнительной агрегации на бэкенде — это отложенный follow-up.',
     adm_schedule_time_label: 'Время',
     adm_schedule_patient_label: 'Пациент',
     adm_schedule_department_label: 'Отделение',
