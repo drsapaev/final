@@ -8,13 +8,13 @@ import {
   Button,
   Input,
   Select,
-  Table,
   Badge,
   Modal,
   Alert,
   Box,
   Typography,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import {
   Plus,
   Edit,
@@ -583,7 +583,7 @@ const UserManagement = () => {
 
       {/* Table */}
       <MacOSCard>
-        <Table
+        <DataTable
           columns={columns}
           data={filteredUsers}
           loading={loading}

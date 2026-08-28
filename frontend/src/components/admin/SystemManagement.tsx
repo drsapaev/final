@@ -32,10 +32,10 @@ import {
   Badge,
   Input,
   Checkbox,
-  Table,
   AppEmpty,
   Select,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -508,7 +508,7 @@ const SystemManagement = () => {
         description={t('admin2.sm_no_backups_desc')} /> :
 
 
-      <Table
+      <DataTable
         columns={[
         { key: 'name', label: t('admin2.sm_col_name') },
         { key: 'type', label: t('admin2.sm_col_type') },

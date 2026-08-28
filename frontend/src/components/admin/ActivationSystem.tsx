@@ -23,8 +23,9 @@ import {
 
 'lucide-react';
 import {
-  AppError, AppLoading, MacOSCard, Button, Badge, Input, Table, Checkbox, Select,
+  AppError, AppLoading, MacOSCard, Button, Badge, Input, Checkbox, Select,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import type { SelectChangeEvent } from '../ui/macos/Select';
 // UX Audit: ModernDialog для extend-activation диалога (вместо window.prompt).
 import ModernDialog from '../dialogs/ModernDialog';
@@ -422,7 +423,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
       {/* Таблица активаций */}
       <MacOSCard className="admin-card-p-0-overflow-hidden">
         <div className="p-4">
-          <Table
+          <DataTable
             columns={[
             {
               key: 'key',
