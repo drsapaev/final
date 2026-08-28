@@ -281,11 +281,20 @@ describe('DataTable — row virtualization (DT-13..16, PR-UI-09e-1)', () => {
     });
   });
   afterEach(() => {
+    // jsdom inherits offsetHeight from HTMLElement.prototype, so the captured
+    // descriptors are undefined (Codex P2-8, PR 2872): restoring would be a
+    // no-op and the mocks would leak into later test files in the shared
+    // single-fork environment. When no own property existed, DELETE the mock
+    // so lookup falls back to the real inherited getter.
     if (trDescriptor) {
       Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', trDescriptor);
+    } else {
+      delete (HTMLTableRowElement.prototype as { offsetHeight?: number }).offsetHeight;
     }
     if (divDescriptor) {
       Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', divDescriptor);
+    } else {
+      delete (HTMLDivElement.prototype as { offsetHeight?: number }).offsetHeight;
     }
   });
 
