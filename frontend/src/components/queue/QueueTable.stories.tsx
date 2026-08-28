@@ -5,9 +5,10 @@
  * Shows states: empty queue, with entries (QR + Desk sources).
  *
  * PII policy (AGENTS.md §PII fields L377/L388): first_name / last_name are PII
- * and must NEVER appear in plaintext in committed test fixtures. The fixtures
- * below use a clearly-synthetic surname ("Тестов" = "Testov" — derived from
- * "test") + initial placeholders, so the stories are policy-compliant.
+ * and must NEVER appear in plaintext in committed test fixtures — must use
+ * INITIALS ONLY (e.g., `I.I.` per AGENTS.md example). The fixtures below use
+ * Cyrillic initials only (no full surnames, no full given names), so the
+ * stories are policy-compliant.
  */
 import QueueTable from './QueueTable';
 
@@ -42,25 +43,25 @@ export const EmptyQueue = {
   },
 };
 
-// Queue with mixed sources — fixtures anonymized per AGENTS.md §PII L377/L388
+// Queue with mixed sources — fixtures use initials only per AGENTS.md §PII L377/L388
 export const MixedSources = {
   args: {
     entries: [
-      { id: 1, patient_name: 'Тестов Т. Т.', queue_number: 'A001', source: 'online', status: 'waiting', created_at: new Date().toISOString() },
-      { id: 2, patient_name: 'Тестова Т. Т.', queue_number: 'A002', source: 'desk', status: 'called', created_at: new Date().toISOString() },
-      { id: 3, patient_name: 'Тест Т. Т.', queue_number: 'A003', source: 'online', status: 'waiting', created_at: new Date().toISOString() },
+      { id: 1, patient_name: 'А. А.', queue_number: 'A001', source: 'online', status: 'waiting', created_at: new Date().toISOString() },
+      { id: 2, patient_name: 'Б. Б.', queue_number: 'A002', source: 'desk', status: 'called', created_at: new Date().toISOString() },
+      { id: 3, patient_name: 'В. В.', queue_number: 'A003', source: 'online', status: 'waiting', created_at: new Date().toISOString() },
     ],
     onCallPatient: () => {},
     onRemoveEntry: () => {},
   },
 };
 
-// Queue with all called — fixtures anonymized per AGENTS.md §PII L377/L388
+// Queue with all called — fixtures use initials only per AGENTS.md §PII L377/L388
 export const AllCalled = {
   args: {
     entries: [
-      { id: 1, patient_name: 'Тестов Т. Т.', queue_number: 'A001', source: 'online', status: 'called', created_at: new Date().toISOString() },
-      { id: 2, patient_name: 'Тестова Т. Т.', queue_number: 'A002', source: 'desk', status: 'called', created_at: new Date().toISOString() },
+      { id: 1, patient_name: 'А. А.', queue_number: 'A001', source: 'online', status: 'called', created_at: new Date().toISOString() },
+      { id: 2, patient_name: 'Б. Б.', queue_number: 'A002', source: 'desk', status: 'called', created_at: new Date().toISOString() },
     ],
     onCallPatient: () => {},
     onRemoveEntry: () => {},
