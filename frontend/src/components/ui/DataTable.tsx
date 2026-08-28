@@ -42,13 +42,15 @@
  *     set — virtualization requires a bounded scroll viewport. When active,
  *     the scroll wrapper becomes the vertical scroll container (`overflow-y:
  *     auto; max-height: maxHeight`) and `<tbody>` renders a top spacer row +
- *     the visible row window (uniform `height: rowHeight`, default 40) + a
- *     bottom spacer row, keeping native `<table>` semantics. While active the
- *     table switches to a FIXED-GEOMETRY contract (Codex P2-1/P2-2, PR 2872):
- *     `table-layout: fixed` locks column widths to the header row, and every
- *     cell is clamped to `rowHeight` with `overflow: hidden` — content taller
- *     or wider than its cell clips. Pick `rowHeight` ≥ the natural row height
- *     for your `size`/`density` (md ≈ 40px, compact ≈ 30px).
+ *     the visible row window + a bottom spacer row, keeping native `<table>`
+ *     semantics. While active the table uses a MEASURED-geometry contract
+ *     (Codex P2-1/P2-4 follow-up, PR 2872): every rendered row is measured
+ *     via the virtualizer (`measureElement` + `data-index`), so spacer and
+ *     scroll geometry follow ACTUAL row heights — `rowHeight` is only the
+ *     initial estimate (default 40; pick a value close to your `size`/`density`
+ *     to avoid re-ranging churn: md ≈ 40px, compact ≈ 30px). Additionally
+ *     `table-layout: fixed` locks column widths to the header row (Codex
+ *     P2-2) so window swaps cannot re-flow columns.
  *     Stable `getRowId` IDs are used as virtualizer item keys (required for
  *     window correctness under sort/filter — see §C.4 note above).
  *     KNOWN LIMITATION (Codex P2-3, deferred): keyboard navigation (Tab /
@@ -64,7 +66,7 @@
  *     to `'scroll'`.
  */
 
-import React, { useRef, useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
+import React, { useCallback, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -317,15 +319,25 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   const virtualizationActive = virtualized && typeof maxHeight === 'number';
   const effectiveRowHeight = rowHeight ?? 40;
   const scrollWrapperRef = useRef<HTMLDivElement | null>(null);
+  // Codex P2-5 (PR 2872): TanStack includes these callbacks' IDENTITY in its
+  // measurement-cache invalidation — inline closures would be recreated on
+  // every render (each scroll re-range) and force an O(n) measurement rebuild.
+  // useCallback keeps the cache warm while `data` is referentially stable.
+  const getScrollElement = useCallback(() => scrollWrapperRef.current, []);
+  const estimateSize = useCallback(() => effectiveRowHeight, [effectiveRowHeight]);
+  // Stable IDs are REQUIRED for window correctness under sort/filter —
+  // see the defaultGetRowId note (Task 46 §C.4).
+  const getItemKey = useCallback(
+    (index: number) => getRowId(data[index], index) as React.Key,
+    [data, getRowId]
+  );
   const rowVirtualizer = useVirtualizer({
     count: data.length,
-    getScrollElement: () => scrollWrapperRef.current,
-    estimateSize: () => effectiveRowHeight,
+    getScrollElement,
+    estimateSize,
     overscan: 10,
     enabled: virtualizationActive,
-    // Stable IDs are REQUIRED for window correctness under sort/filter —
-    // see the defaultGetRowId note (Task 46 §C.4).
-    getItemKey: (index: number) => getRowId(data[index], index) as React.Key,
+    getItemKey,
   });
 
   const sizeStyles: Record<TableSize, TableSizeStyle> = {
@@ -390,8 +402,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // window contributes intrinsic column widths — a later window with wider
   // content would shift every column on scroll. `table-layout: fixed` derives
   // widths from the header row only, locking the column geometry while
-  // virtualization is active (content wider than its column clips, per the
-  // fixed-geometry contract documented in the JSDoc).
+  // virtualization is active (content wider than its column clips).
   if (virtualizationActive && tableStyle.tableLayout === undefined) {
     tableStyle.tableLayout = 'fixed';
   }
@@ -435,25 +446,6 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
     cursor: hoverable ? 'pointer' : 'default'
   });
-
-  // Virtualized row style (PR-UI-09e-1 — uniform fixed height while
-  // virtualization is active; identical to rowStyle otherwise).
-  // Codex P2-1 (PR 2872): `height` on <tr> is a MINIMUM in table layout —
-  // cells can still expand the row and diverge from the virtualizer's fixed
-  // offsets. The fixed height + clipping is therefore enforced on the CELLS
-  // (virtualizedCellStyle below), which makes the row geometry deterministic.
-  const virtualizedRowStyle = (index: number, isSelected = false): TableStyleExt =>
-    virtualizationActive
-      ? { ...rowStyle(index, isSelected), height: effectiveRowHeight, overflow: 'hidden' }
-      : rowStyle(index, isSelected);
-
-  // Virtualized cell style (Codex P2-1): clamp each cell to the uniform row
-  // height so cell content taller than rowHeight clips instead of expanding
-  // the row and breaking the spacer geometry.
-  const virtualizedCellStyle = (isSelected = false): TableStyleExt =>
-    virtualizationActive
-      ? { ...cellStyle(isSelected), height: effectiveRowHeight, overflow: 'hidden' }
-      : cellStyle(isSelected);
 
   // Spacer rows pad <tbody> to the full virtual height so the native table
   // scrollbar geometry matches the unvirtualized rendering.
@@ -715,15 +707,19 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   }
 
   // Data-row renderer shared by the plain and virtualized paths (PR-UI-09e-1
-  // extracted it verbatim; `style` switches to the fixed-height variant only
-  // while virtualization is active).
+  // extracted it verbatim). In virtualized mode rows additionally carry
+  // `data-index` + the virtualizer's `measureElement` ref (Codex P2-1/P2-4:
+  // measured geometry — actual row heights drive the spacers, so content
+  // taller than the rowHeight estimate cannot desynchronize the scrollbar).
   const renderDataRow = (row: Row, rowIndex: number) => {
     const isSelected = isRowSelected(row, rowIndex);
     const hasRowHandler = Boolean(onRowClick || (selectable && onRowSelect));
     return (
       <tr
         key={getRowId(row, rowIndex) as React.Key}
-        style={virtualizedRowStyle(rowIndex, isSelected)}
+        data-index={virtualizationActive ? rowIndex : undefined}
+        ref={virtualizationActive ? rowVirtualizer.measureElement : undefined}
+        style={rowStyle(rowIndex, isSelected)}
         onClick={() => handleRowClick(row, rowIndex)}
         onKeyDown={hasRowHandler ? (e) => handleRowKeyDown(e, row, rowIndex) : undefined}
         tabIndex={hasRowHandler ? 0 : undefined}
@@ -734,7 +730,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
           <td
             key={column.key || colIndex}
             style={{
-              ...virtualizedCellStyle(isSelected),
+              ...cellStyle(isSelected),
               borderRight: colIndex === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
             }}
           >

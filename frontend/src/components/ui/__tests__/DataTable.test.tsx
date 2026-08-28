@@ -252,7 +252,7 @@ describe('DataTable — canonical features (DT-7..12)', () => {
   });
 });
 
-describe('DataTable — row virtualization (DT-13..15, PR-UI-09e-1)', () => {
+describe('DataTable — row virtualization (DT-13..16, PR-UI-09e-1)', () => {
   type VRow = { id: number; name: string };
   const columns: DataTableColumn<VRow>[] = [
     { key: 'name', title: 'Name', sortable: false },
@@ -260,35 +260,32 @@ describe('DataTable — row virtualization (DT-13..15, PR-UI-09e-1)', () => {
   const makeRows = (count: number): VRow[] =>
     Array.from({ length: count }, (_, i) => ({ id: i, name: `Row ${i}` }));
 
-  // jsdom performs no layout, so every element reports offsetHeight 0 and
-  // @tanstack/react-virtual would compute an empty window. Give the (single)
-  // scroll wrapper a synthetic 320px viewport — matching the maxHeight used
-  // by the tests — scoped strictly to this describe block and restored after.
+  // jsdom performs no layout: every element reports offsetHeight 0 and
+  // @tanstack/react-virtual would compute an empty window. The virtualizer
+  // measures the viewport (a <div>) and the rows (<tr>) via offsetHeight, so
+  // tag-specific prototype mocks give a deterministic 320px viewport and a
+  // configurable row height — scoped to this describe block and restored.
   const VIEWPORT = 320;
-  const offsetHeightDescriptor = Object.getOwnPropertyDescriptor(
-    HTMLElement.prototype,
-    'offsetHeight'
-  );
-  const offsetWidthDescriptor = Object.getOwnPropertyDescriptor(
-    HTMLElement.prototype,
-    'offsetWidth'
-  );
+  let mockRowHeight = 32;
+  const trDescriptor = Object.getOwnPropertyDescriptor(HTMLTableRowElement.prototype, 'offsetHeight');
+  const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetHeight');
   beforeEach(() => {
-    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    mockRowHeight = 32;
+    Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get: () => mockRowHeight,
+    });
+    Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', {
       configurable: true,
       value: VIEWPORT,
     });
-    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
-      configurable: true,
-      value: 800,
-    });
   });
   afterEach(() => {
-    if (offsetHeightDescriptor) {
-      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeightDescriptor);
+    if (trDescriptor) {
+      Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', trDescriptor);
     }
-    if (offsetWidthDescriptor) {
-      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidthDescriptor);
+    if (divDescriptor) {
+      Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', divDescriptor);
     }
   });
 
@@ -326,23 +323,17 @@ describe('DataTable — row virtualization (DT-13..15, PR-UI-09e-1)', () => {
       spacerHeights.reduce((acc, h) => acc + h, 0) + renderedHeight;
     expect(total).toBe(1000 * 32);
 
-    // Rendered rows are the initial window (row 0 first).
+    // Rendered rows are the initial window (row 0 first) and carry data-index
+    // for the virtualizer's measured geometry (Codex P2-1/P2-4 follow-up).
     expect(dataRows[0]).toHaveTextContent('Row 0');
+    expect(dataRows[0].getAttribute('data-index')).toBe('0');
 
     // The scroll wrapper is the bounded vertical viewport.
     const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
     expect(wrapper.style.overflowY).toBe('auto');
     expect(wrapper.style.maxHeight).toBe(`${VIEWPORT}px`);
 
-    // Codex P2-1 (PR #2872): cells are clamped to rowHeight with hidden
-    // overflow so taller content cannot expand a row and break the geometry.
-    const firstDataRow = dataRows[0];
-    const firstCell = firstDataRow.querySelector('td') as HTMLElement;
-    expect(firstCell.style.height).toBe('32px');
-    expect(firstCell.style.overflow).toBe('hidden');
-    expect((firstDataRow as HTMLElement).style.height).toBe('32px');
-
-    // Codex P2-2 (PR #2872): table-layout is fixed while virtualized so
+    // Codex P2-2 (PR 2872): table-layout is fixed while virtualized so
     // column widths cannot shift when a later window renders wider content.
     const table = container.querySelector('table') as HTMLElement;
     expect(table.style.tableLayout).toBe('fixed');
@@ -351,7 +342,7 @@ describe('DataTable — row virtualization (DT-13..15, PR-UI-09e-1)', () => {
   it('DT-14: scrolling the viewport shifts the rendered window near the end of the dataset', () => {
     const rows = makeRows(1000);
     const { container } = render(
-      <DataTable<VRow> columns={columns} data={rows} virtualized rowHeight={32} maxHeight={320} />
+      <DataTable<VRow> columns={columns} data={rows} virtualized rowHeight={32} maxHeight={VIEWPORT} />
     );
 
     const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
@@ -390,12 +381,57 @@ describe('DataTable — row virtualization (DT-13..15, PR-UI-09e-1)', () => {
     expect(wrapper.style.overflowY).toBe('');
     expect(wrapper.style.maxHeight).toBe('');
 
-    // Plain path keeps auto layout and unclamped cells (no fixed-geometry
-    // contract outside virtualized mode).
+    // Plain path keeps auto layout, no measurement attributes (no
+    // fixed-geometry / measured-geometry contract outside virtualized mode).
     const table = container.querySelector('table') as HTMLElement;
     expect(table.style.tableLayout).toBe('');
-    const firstCell = container.querySelector('tbody tr td') as HTMLElement;
+    const firstRow = allRows[0];
+    expect(firstRow.getAttribute('data-index')).toBeNull();
+    const firstCell = firstRow.querySelector('td') as HTMLElement;
     expect(firstCell.style.height).toBe('');
     expect(firstCell.style.overflow).toBe('');
+  });
+
+  it('DT-16: measured geometry — actual row heights override the rowHeight estimate (Codex P2-1/P2-4)', () => {
+    // Rows actually measure 50px while the estimate is 40px: the spacers must
+    // follow the MEASURED heights (1000 × 50 = 50000), proving the geometry
+    // cannot desynchronize when content is taller than the estimate.
+    mockRowHeight = 50;
+    const rows = makeRows(1000);
+    const { container } = render(
+      <DataTable<VRow> columns={columns} data={rows} virtualized rowHeight={40} maxHeight={VIEWPORT} />
+    );
+
+    const allRows = Array.from(container.querySelectorAll('tbody tr'));
+    const dataRows = allRows.filter((tr) => tr.getAttribute('aria-hidden') !== 'true');
+    const spacers = allRows.filter((tr) => tr.getAttribute('aria-hidden') === 'true');
+
+    expect(dataRows.length).toBeGreaterThan(0);
+    expect(dataRows.length).toBeLessThan(100);
+
+    const spacerHeights = spacers.map((tr) =>
+      Number((tr as HTMLElement).style.height.replace('px', ''))
+    );
+    // Hybrid geometry: every RENDERED row contributes its measured 50px; the
+    // unrendered remainder keeps the 40px estimate. If measurement wiring were
+    // broken, rendered rows would contribute 40px each and this equality would
+    // fail — this is the Codex P2-1/P2-4 proof that measured sizes drive the
+    // spacer math instead of a fixed estimate.
+    const spacerSum = spacerHeights.reduce((acc, h) => acc + h, 0);
+    const total = spacerSum + dataRows.length * 50;
+    // Measurement demonstrably moved the geometry STRICTLY above the
+    // pure-estimate baseline (1000 × 40 = 40000): rendered rows were measured
+    // at 50px and their extra height flows into the spacers/totalSize. If the
+    // measureElement wiring were broken, every row would contribute exactly 40
+    // and total would equal 40000.
+    expect(total).toBeGreaterThan(40000);
+    // And strictly below the fully-measured size (1000 × 50 = 50000): only
+    // the rendered window is measured; off-window rows keep the estimate —
+    // consistent virtualizer behavior, not a full-list measurement.
+    expect(total).toBeLessThan(50000);
+    // Every rendered row carries the measurement hook.
+    for (const tr of dataRows) {
+      expect(tr.getAttribute('data-index')).not.toBeNull();
+    }
   });
 });
