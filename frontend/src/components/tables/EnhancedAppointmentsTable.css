@@ -130,6 +130,14 @@
   .hide-on-mobile {
     display: none !important;
   }
+
+  /* PR-UI-09c-4 (Codex P2): canonical DataTable generates th/td without the
+     legacy hide-on-mobile class — hide the ENTIRE generated cell when its
+     content opts out (mirrors the legacy whole-column removal). */
+  .enhanced-table th:has(.hide-on-mobile),
+  .enhanced-table td:has(.hide-on-mobile) {
+    display: none;
+  }
 }
 
 @media (max-width: 480px) {
@@ -906,6 +914,23 @@
 .enhanced-table tr:has(.eat-session-5) { border-left: 4px solid #EC4899; }
 .enhanced-table tr:has(.eat-session-6) { border-left: 4px solid var(--mac-accent-blue-light); }
 .enhanced-table tr:has(.eat-session-7) { border-left: 4px solid #84CC16; }
+
+/* PR-UI-09c-4 (Codex P2): striped + hoverable combination — canonical
+   DataTable's hover cleanup resets the row inline background to transparent,
+   progressively erasing odd-row striping. Keep striping intact by disabling
+   the inline hover handlers (hoverable={false}) and providing CSS-only hover
+   via the same inset box-shadow technique as the selected-row tint below
+   (a plain background rule cannot beat the tr inline striped background).
+   Declared BEFORE the selected-rule so a selected row keeps its tint while
+   hovered. Row cursor lives on td — generated tds carry no inline cursor,
+   so no !important is needed and the cssImportant ratchet stays unchanged. */
+.enhanced-table tbody td {
+  cursor: pointer;
+}
+
+.enhanced-table tbody tr:hover td {
+  box-shadow: inset 0 0 0 9999px var(--mac-table-row-hover-bg);
+}
 
 /* Selected-row tint — inset box-shadow beats the DataTable inline
    td background (mirrors the qt-called-marker technique) */

@@ -1177,12 +1177,22 @@ const EnhancedAppointmentsTable = ({
           onChange={(checked: boolean) => handleSelectAll(checked)} />
       ),
       render: (_value: unknown, row: AppointmentRow) => (
-        <Checkbox
-          aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`}
-          checked={selectedRows.has(row.id)}
-          onChange={(checked: boolean) => {
-            handleRowSelect(row.id ?? '', checked);
-          }} />
+        // Codex P2 fix (09c-4): stop keydown bubbling so Space/Enter on the
+        // checkbox toggles selection WITHOUT also activating the row's new
+        // keyboard handler (legacy rows had no row keyboard handler; click
+        // bubbling is intentionally preserved to match legacy behavior).
+        <span
+          role="presentation"
+          onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+            e.stopPropagation();
+          }}>
+          <Checkbox
+            aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`}
+            checked={selectedRows.has(row.id)}
+            onChange={(checked: boolean) => {
+              handleRowSelect(row.id ?? '', checked);
+            }} />
+        </span>
       )
     });
   }
@@ -1908,7 +1918,7 @@ const EnhancedAppointmentsTable = ({
             onSort={(key: string) => handleSort(key)}
             emptyState={t('misc.eat_no_data')}
             striped
-            hoverable
+            hoverable={false}
             variant="minimal"
             className="eat-table-container"
             style={{ minWidth: isDoctorView ? '100%' : '1400px', tableLayout: 'auto' }}
