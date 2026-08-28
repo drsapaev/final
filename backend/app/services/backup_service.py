@@ -188,7 +188,9 @@ class BackupService:
 
             timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             backup_filename = f"backup_{backup_type}_{timestamp}.db"
-            backup_path = self.backup_dir / backup_filename
+            # Atomic write: pg_dump targets .tmp; final name appears only
+            # after success - a failed dump no longer leaves zero-byte files.
+            backup_path = self.backup_dir / (backup_filename + ".tmp")
 
             # Create backup based on database type
             if db_url.startswith("sqlite"):
@@ -248,6 +250,11 @@ class BackupService:
             else:
                 raise ValueError(f"Unsupported database type: {db_url}")
 
+            # Dump succeeded - atomically publish the final name.
+            final_path = self.backup_dir / backup_filename
+            os.replace(backup_path, final_path)
+            backup_path = final_path
+
             # Get backup size
             backup_size = backup_path.stat().st_size
 
@@ -301,6 +308,12 @@ class BackupService:
             return backup_info
 
         except Exception as e:
+            # remove .tmp leftovers from a failed dump
+            for stray in self.backup_dir.glob("*.tmp"):
+                try:
+                    stray.unlink()
+                except OSError:
+                    pass
             logger.error(f"❌ Backup failed: {e}")
             raise
 
@@ -334,7 +347,9 @@ class BackupService:
             removed_count = 0
 
             for backup in backups:
-                backup_time = datetime.fromtimestamp(backup.stat().st_mtime)
+                # aware-UTC: naive fromtimestamp vs aware cutoff raised
+                # TypeError and killed retention cleanup (Sentry P0 2026-08-28).
+                backup_time = datetime.fromtimestamp(backup.stat().st_mtime, tz=UTC)
                 if backup_time < cutoff_date:
                     backup.unlink()
                     removed_count += 1
