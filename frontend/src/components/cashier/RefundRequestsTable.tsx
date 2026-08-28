@@ -20,8 +20,9 @@ import {
   CreditCard
 } from 'lucide-react';
 import {
-  AppEmpty, AppError, AppLoading, Badge, Button, Table, Select,
+  AppEmpty, AppError, AppLoading, Badge, Button, Select,
 } from '../ui/macos';
+import { DataTable, type DataTableColumn } from '../ui/DataTable';
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -295,7 +296,7 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
     return <span className="refund-cell-muted">—</span>;
   };
 
-  const columns = [
+  const columns: DataTableColumn<RefundRequest>[] = [
     {
       key: 'id',
       title: 'ID',
@@ -414,7 +415,7 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
       )}
 
       {!loading && requests.length > 0 && (
-        <Table
+        <DataTable
           columns={columns}
           data={requests}
           sortable={false}
