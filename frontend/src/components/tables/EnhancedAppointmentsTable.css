@@ -895,7 +895,7 @@
    th/td without per-column style hooks, so the legacy row-level
    visuals (session-color indicator, selected-row tint) are
    reproduced via CSS :has() markers rendered inside the first
-   content cell — same technique as QueueTable 09c-2 (PR #2860).
+   content cell — same technique as QueueTable 09c-2 (PR-2860).
    Session color VALUES mirror the SESSION_COLORS palette in
    EnhancedAppointmentsTable.tsx.
    ============================================================ */

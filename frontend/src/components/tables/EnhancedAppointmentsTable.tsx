@@ -235,7 +235,7 @@ const EnhancedAppointmentsTable = ({
   // PR-UI-09c-4: hash -> stable SESSION_COLORS index. The color VALUE lives in
   // EnhancedAppointmentsTable.css (.eat-session-N rules) because the canonical
   // DataTable has no row-level style/className prop (CSS :has() marker
-  // technique, same as QueueTable 09c-2 / PR #2860).
+  // technique, same as QueueTable 09c-2 / PR-2860).
   const getSessionColorIndex = useCallback((sessionId: string) => {
     if (!sessionId) return -1;
     // Simple hash to get consistent color for same session_id
@@ -1200,7 +1200,7 @@ const EnhancedAppointmentsTable = ({
   // № — sortable; first content cell carries the session-color and
   // selected-row markers driving the CSS :has() row styling (canonical
   // DataTable has no row-level className/style prop — same CSS-only
-  // technique as QueueTable 09c-2, PR #2860).
+  // technique as QueueTable 09c-2, PR-2860).
   columns.push({
     key: 'queue_number',
     sortable: true,
