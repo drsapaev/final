@@ -339,6 +339,7 @@ const AdminDashboard = () => {
     data: activityChartDataRaw,
     loading: activityChartLoading,
     error: activityChartError,
+    refresh: refreshActivityChart,
   } = useAdminData('/admin/activity-chart?days=7', {
     refreshInterval: 0,
     enabled: true,
@@ -729,7 +730,7 @@ const AdminDashboard = () => {
             loading={activityChartLoading}
             loadingSkeleton={<Skeleton type="text" count={3} />}
             error={activityChartError ? t('admin2.adm_error_load_chart') : null}
-            onRetry={refreshStats}
+            onRetry={refreshActivityChart}
             retryLabel={t('admin2.adm_retry')}
             empty={(!activityChartLoading && !activityChartError && (!activityChartData?.data || activityChartData.data.length === 0)) ? t('admin2.adm_no_data_period') : null}
           >
