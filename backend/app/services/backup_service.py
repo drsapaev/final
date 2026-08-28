@@ -97,9 +97,16 @@ def _validate_pg_component(value: str | None, kind: str) -> str:
         )
     patterns = {"hostname": _PG_HOST_RE, "username": _PG_USER_RE, "database": _PG_DB_RE}
     pattern = patterns.get(kind)
-    if pattern and not pattern.match(value):
-        raise BackupSecurityError(f"Invalid {kind}: contains forbidden characters: {value!r}")
-    return value
+    if pattern is None:
+        return value
+    # Use the captured group: CodeQL models fullmatch-group capture as a
+    # taint barrier for flows into the pg argv.
+    matched = pattern.fullmatch(value)
+    if matched is None:
+        raise BackupSecurityError(
+            f"Invalid {kind}: contains forbidden characters: {value!r}"
+        )
+    return matched.group(0)
 
 
 def _is_sqlite_url(url: str) -> bool:
@@ -187,8 +194,19 @@ class BackupService:
             db_url = _get_database_url()
 
             timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-            backup_filename = f"backup_{backup_type}_{timestamp}.db"
-            backup_path = self.backup_dir / backup_filename
+            # CodeQL py/path-injection: normalize caller-supplied type so the
+            # filename flow carries only allowlisted characters.
+            import re as _re
+
+            safe_type = _re.sub(r"[^a-z0-9_]", "", (backup_type or "").lower())[:40]
+            # fullmatch-group capture = CodeQL taint barrier (same model as
+            # the pg component validator above).
+            _m = _re.fullmatch(r"[a-z0-9_]{0,40}", safe_type)
+            safe_type = _m.group(0) if _m else "manual"
+            backup_filename = f"backup_{safe_type or 'manual'}_{timestamp}.db"
+            # Atomic write: pg_dump targets .tmp; final name appears only
+            # after success - a failed dump no longer leaves zero-byte files.
+            backup_path = self.backup_dir / (backup_filename + ".tmp")
 
             # Create backup based on database type
             if db_url.startswith("sqlite"):
@@ -248,6 +266,11 @@ class BackupService:
             else:
                 raise ValueError(f"Unsupported database type: {db_url}")
 
+            # Dump succeeded - atomically publish the final name.
+            final_path = self.backup_dir / backup_filename
+            os.replace(backup_path, final_path)
+            backup_path = final_path
+
             # Get backup size
             backup_size = backup_path.stat().st_size
 
@@ -301,6 +324,12 @@ class BackupService:
             return backup_info
 
         except Exception as e:
+            # remove .tmp leftovers from a failed dump
+            for stray in self.backup_dir.glob("*.tmp"):
+                try:
+                    stray.unlink()
+                except OSError:
+                    pass
             logger.error(f"❌ Backup failed: {e}")
             raise
 
@@ -334,7 +363,9 @@ class BackupService:
             removed_count = 0
 
             for backup in backups:
-                backup_time = datetime.fromtimestamp(backup.stat().st_mtime)
+                # aware-UTC: naive fromtimestamp vs aware cutoff raised
+                # TypeError and killed retention cleanup (Sentry P0 2026-08-28).
+                backup_time = datetime.fromtimestamp(backup.stat().st_mtime, tz=UTC)
                 if backup_time < cutoff_date:
                     backup.unlink()
                     removed_count += 1
