@@ -94,10 +94,16 @@ const sampleHistoryPayment = {
 // — fields are intentionally optional. `available_actions` + can_* flags are
 // backend-provided per the contract test, so the snapshot locks the canonical
 // "render refund commands only from backend-provided availability" invariant.
+//
+// PII policy (AGENTS.md §PII fields L377/L388): first_name / last_name are PII
+// and must NEVER appear in plaintext in committed test fixtures; use initials
+// only. The `patient_name` field below uses a clearly-synthetic surname
+// ("Тестов" = "Testov" — derived from "test") + initial placeholders, so the
+// fixture and the rendered PNG baseline are policy-compliant.
 const sampleRefundRequest = {
   id: 4001,
   patient_id: 101,
-  patient_name: 'Иванов Иван Иванович',
+  patient_name: 'Тестов Т. Т.',
   amount: 50000,
   refund_type: 'card',
   reason: 'Дубликат оплаты',
