@@ -185,11 +185,11 @@ export const ROUTE_REGISTRY = [
     roles: [],
     entry: 'menu',
     nav: false,
-    title: 'Clinic Management System',
+    title: 'Clinic OS',
     owner: 'marketing.landing',
     component: 'Landing',
     legacyRedirectFrom: [],
-    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Clinic Management System' }),
+    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Clinic OS' }),
   },
   {
     id: 'reset-password',

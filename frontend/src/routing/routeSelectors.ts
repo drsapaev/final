@@ -475,7 +475,7 @@ export function getRouteChromeState(
 
   return {
     route,
-    pageTitle: (route?.layout?.pageTitle as string) || route?.title || 'Clinic Management System',
+    pageTitle: (route?.layout?.pageTitle as string) || route?.title || 'Clinic OS',
     hideHeader: Boolean(routeLayout.hideHeader),
     hideSidebar: Boolean(routeLayout.hideSidebar || !sidebarPreset),
     fullscreen: Boolean(routeLayout.fullscreen),
