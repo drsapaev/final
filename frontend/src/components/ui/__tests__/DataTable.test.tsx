@@ -337,6 +337,17 @@ describe('DataTable — row virtualization (DT-13..16, PR-UI-09e-1)', () => {
     // column widths cannot shift when a later window renders wider content.
     const table = container.querySelector('table') as HTMLElement;
     expect(table.style.tableLayout).toBe('fixed');
+
+    // Codex P2-7 (PR 2872): virtualized cells clip content at the cell box
+    // so unbreakable content cannot paint across neighboring columns.
+    const firstCell = dataRows[0].querySelector('td') as HTMLElement;
+    expect(firstCell.style.overflow).toBe('hidden');
+
+    // Codex P2-6 (PR 2872): ARIA row semantics expose the virtual structure
+    // — full row count on the table, absolute 1-based row index on each data
+    // row (row 1 is the header).
+    expect(table.getAttribute('aria-rowcount')).toBe('1001');
+    expect(dataRows[0].getAttribute('aria-rowindex')).toBe('2');
   });
 
   it('DT-14: scrolling the viewport shifts the rendered window near the end of the dataset', () => {
@@ -381,12 +392,15 @@ describe('DataTable — row virtualization (DT-13..16, PR-UI-09e-1)', () => {
     expect(wrapper.style.overflowY).toBe('');
     expect(wrapper.style.maxHeight).toBe('');
 
-    // Plain path keeps auto layout, no measurement attributes (no
-    // fixed-geometry / measured-geometry contract outside virtualized mode).
+    // Plain path keeps auto layout, no measurement attributes, no virtual
+    // ARIA semantics, no cell clipping (no measured-geometry contract
+    // outside virtualized mode).
     const table = container.querySelector('table') as HTMLElement;
     expect(table.style.tableLayout).toBe('');
+    expect(table.getAttribute('aria-rowcount')).toBeNull();
     const firstRow = allRows[0];
     expect(firstRow.getAttribute('data-index')).toBeNull();
+    expect(firstRow.getAttribute('aria-rowindex')).toBeNull();
     const firstCell = firstRow.querySelector('td') as HTMLElement;
     expect(firstCell.style.height).toBe('');
     expect(firstCell.style.overflow).toBe('');

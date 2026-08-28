@@ -50,7 +50,11 @@
  *     initial estimate (default 40; pick a value close to your `size`/`density`
  *     to avoid re-ranging churn: md ≈ 40px, compact ≈ 30px). Additionally
  *     `table-layout: fixed` locks column widths to the header row (Codex
- *     P2-2) so window swaps cannot re-flow columns.
+ *     P2-2) so window swaps cannot re-flow columns, and virtualized cells
+ *     clip content at the cell box (Codex P2-7). ARIA row semantics expose
+ *     the virtual structure to assistive technology (Codex P2-6):
+ *     `aria-rowcount` carries the full row count and every data row carries
+ *     its absolute `aria-rowindex` (1-based, header rows included).
  *     Stable `getRowId` IDs are used as virtualizer item keys (required for
  *     window correctness under sort/filter — see §C.4 note above).
  *     KNOWN LIMITATION (Codex P2-3, deferred): keyboard navigation (Tab /
@@ -458,6 +462,26 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     ? { overflowY: 'auto', maxHeight }
     : undefined;
 
+  // Codex P2-7 (PR 2872): under `table-layout: fixed` an unbreakable cell
+  // content (long identifier, wide action group) would otherwise paint across
+  // neighboring cells — clip it at the cell box so "wider content clips"
+  // actually holds. Width containment only; no height clamp (rows are
+  // measured — Codex P2-4).
+  const virtualizedCellStyle = (isSelected = false): TableStyleExt =>
+    virtualizationActive
+      ? { ...cellStyle(isSelected), overflow: 'hidden' }
+      : cellStyle(isSelected);
+
+  // Codex P2-6 (PR 2872): expose the full row count and each virtual row's
+  // absolute position to assistive technology — the DOM only contains the
+  // rendered window, so screen readers need aria-rowcount/aria-rowindex to
+  // announce positions correctly as windows change. Row indices are 1-based
+  // and include the header row (plus the filter row when filterable).
+  const headerRowCount = 1 + (filterable ? 1 : 0);
+  const ariaRowCount = virtualizationActive ? headerRowCount + data.length : undefined;
+  const ariaRowIndex = (rowIndex: number): number | undefined =>
+    virtualizationActive ? headerRowCount + rowIndex + 1 : undefined;
+
   const handleSort = (column: DataTableColumn<Row>) => {
     if (!sortable || !column.sortable) return;
 
@@ -718,6 +742,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
       <tr
         key={getRowId(row, rowIndex) as React.Key}
         data-index={virtualizationActive ? rowIndex : undefined}
+        aria-rowindex={ariaRowIndex(rowIndex)}
         ref={virtualizationActive ? rowVirtualizer.measureElement : undefined}
         style={rowStyle(rowIndex, isSelected)}
         onClick={() => handleRowClick(row, rowIndex)}
@@ -730,7 +755,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
           <td
             key={column.key || colIndex}
             style={{
-              ...cellStyle(isSelected),
+              ...virtualizedCellStyle(isSelected),
               borderRight: colIndex === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
             }}
           >
@@ -755,7 +780,12 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
       style={scrollViewportStyle}
       aria-busy={loading}
     >
-      <table className={className} style={tableStyle} aria-label={ariaLabel}>
+      <table
+        className={className}
+        style={tableStyle}
+        aria-label={ariaLabel}
+        aria-rowcount={ariaRowCount}
+      >
         {renderHeaders()}
         <tbody>
           {virtualizationActive ? (
