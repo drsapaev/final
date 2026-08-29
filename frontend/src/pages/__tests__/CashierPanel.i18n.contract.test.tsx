@@ -21,6 +21,13 @@ const sessionWarningSource = fs.readFileSync(
   'utf8'
 );
 
+// PR-UI-14-4: the confirm-dialog + notify call sites moved verbatim to
+// pages/cashier/useCashierActions.ts — same STRAT#31 contract, new boundary.
+const actionsSource = fs.readFileSync(
+  path.join(ROOT, 'pages/cashier/useCashierActions.ts'),
+  'utf8'
+);
+
 const translationsSource = fs.readFileSync(
   path.join(ROOT, 'i18n/locales/ru.ts'),
   'utf8'
@@ -38,22 +45,25 @@ describe('CashierPanel STRAT#31 — i18n migration', () => {
   });
 
   it('uses tI18n() for confirm dialog', () => {
-    expect(source).toContain("tI18n('cashier.confirm_payment_title')");
-    expect(source).toContain("tI18n('cashier.confirm_payment_message')");
-    expect(source).toContain("tI18n('cashier.confirm_payment_description')");
-    expect(source).toContain("tI18n('cashier.confirm_payment_confirm')");
-    expect(source).toContain("tI18n('cashier.cancel')");
+    // PR-UI-14-4: confirm() call site lives in useCashierActions.
+    expect(actionsSource).toContain("tI18n('cashier.confirm_payment_title')");
+    expect(actionsSource).toContain("tI18n('cashier.confirm_payment_message')");
+    expect(actionsSource).toContain("tI18n('cashier.confirm_payment_description')");
+    expect(actionsSource).toContain("tI18n('cashier.confirm_payment_confirm')");
+    expect(actionsSource).toContain("tI18n('cashier.cancel')");
   });
 
   it('uses tI18n() for all notify messages', () => {
     // session_expired lives in the extracted session-warning hook (PR-UI-14-3).
     expect(sessionWarningSource).toContain("tI18n('cashier.session_expired')");
-    expect(source).toContain("tI18n('cashier.cancel_reason_required')");
-    expect(source).toContain("tI18n('cashier.payment_cancelled')");
-    expect(source).toContain("tI18n('cashier.refund_fields_required')");
-    expect(source).toContain("tI18n('cashier.no_payment_for_receipt')");
-    expect(source).toContain("tI18n('cashier.print_dialog_opened')");
-    expect(source).toContain("tI18n('cashier.print_dialog_failed')");
+    // Action-handler notify calls live in useCashierActions (PR-UI-14-4).
+    expect(actionsSource).toContain("tI18n('cashier.cancel_reason_required')");
+    expect(actionsSource).toContain("tI18n('cashier.payment_cancelled')");
+    expect(actionsSource).toContain("tI18n('cashier.refund_fields_required')");
+    expect(actionsSource).toContain("tI18n('cashier.no_payment_for_receipt')");
+    expect(actionsSource).toContain("tI18n('cashier.print_dialog_opened')");
+    expect(actionsSource).toContain("tI18n('cashier.print_dialog_failed')");
+    // session_extending stays in the panel (session-warning dialog button).
     expect(source).toContain("tI18n('cashier.session_extending')");
   });
 

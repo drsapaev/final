@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import './cashier.css';
 import { useLocation } from 'react-router-dom';
 import { CreditCard, Calendar, Search, CheckCircle, DollarSign, RefreshCw, XCircle, Undo2, Receipt, MoreVertical, Loader2 } from 'lucide-react';
@@ -17,13 +17,10 @@ import Input from '../components/ui/macos/Input';
 import useModal from '../hooks/useModal';
 import { usePayments } from '../hooks/usePayments';
 import { useDebouncedValue } from '../hooks/useDebouncedCallback';
-import { useHotkeys } from '../hooks/useHotkeys';
 import { getPatient as fetchPatientById } from '../api/patients';
 import type { Patient } from '../types/domain/clinic';
-import { printPanelReceiptInBrowser } from '../services/panelPrint';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
-import { getErrorMessage } from '../utils/errorHandler';
 import { formatRegistrarDate, formatRegistrarTime } from '../utils/dateUtils';
 import notify from '../services/notify';
 // STRAT#31: useTranslation adapter for confirm/notify i18n.
@@ -60,20 +57,13 @@ import RefundRequestsTable from '../components/cashier/RefundRequestsTable';
 import {
   getLocalDateString,
   DATE_PRESETS,
-  buildPaymentMethodLabels,
-  resolvePaymentId,
-  buildReceiptPrintPayload,
   getPaymentStatusMeta,
   getPaymentStatusLabel,
   resolveSingleCashierVisitId,
   isBackendGroupedCashierPayment,
   canCreateDirectCashierPayment,
   canCreateCashierPayment,
-  createGroupedCashierPayment,
   hasBackendPaymentAction,
-  type CashierPaymentRow,
-  type CashierPaymentRowOrId,
-  type CashierPaymentData,
 } from './cashier/cashierPaymentContracts';
 import { useCashierWorklistData } from './cashier/useCashierWorklistData';
 import {
@@ -84,6 +74,7 @@ import {
 } from './cashier/cashierPaymentRows';
 import { useCashierDialogs } from './cashier/useCashierDialogs';
 import { useCashierSessionWarning } from './cashier/useCashierSessionWarning';
+import { useCashierActions } from './cashier/useCashierActions';
 
 
 const CashierPanel = () => {
@@ -98,10 +89,6 @@ const CashierPanel = () => {
   const { getStats, getPendingPayments, getPayments, ...paymentsHook } = usePayments();
   // ✅ v2.1: isLoading теперь вычисляется из отдельных loading состояний (см. ниже)
 
-  // STRAT#31 i18n: localized helpers (reactive to language changes via tI18n).
-  // paymentMethodLabels — replaces module-level PAYMENT_METHOD_LABELS constant.
-  // datePresets — DATE_PRESETS with localized labels; uses stable `id` for option matching.
-  const paymentMethodLabels = buildPaymentMethodLabels(tI18n);
   const datePresets = DATE_PRESETS.map((p) => ({
     ...p,
     label: tI18n(`cashier.range_${p.id}`),
@@ -200,9 +187,6 @@ const CashierPanel = () => {
   const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
 
 
-  // UX Audit #4.5: anti-double-click state для action-кнопок.
-  // Хранит {type, id} текущего action; пока не null — все action-кнопки disabled.
-  const [processingAction, setProcessingAction] = useState<{ type?: string; id?: string | number } | null>(null);
 
   // UX Audit #4.2: client-side sort state для таба «История платежей».
   // Сортировка применяется к уже загруженным filteredPayments (после groupPaymentsByPatientAndTime).
@@ -214,29 +198,36 @@ const CashierPanel = () => {
   const paymentModal = useModal();
   const paymentWidget = useModal();
 
-  // MEDIUM #15: CashierPanel hotkeys — focus search (Ctrl+F), refresh (F5 / Ctrl+R), export (Ctrl+E).
-  // Only triggers when not focused in input/textarea to avoid hijacking text entry.
-  // Note: handlers use lazy references via refs because some callbacks (exportToCSV)
-  // are defined further down in the component body.
-  const handlersRef = useRef({} as { refresh?: () => void; export?: () => void });
-  useHotkeys({
-    'ctrl+f': (e) => {
-      e.preventDefault();
-      const node = document.getElementById('cashier-search-input');
-      if (node) node.focus();
+  // PR-UI-14-4: business-action handlers + hotkeys + anti-double-click guard
+  // moved verbatim to ./cashier/useCashierActions (13-5 deps-object precedent).
+  const {
+    processingAction,
+    handlePaymentSuccess, handlePaymentError, handlePaymentCancel,
+    openPaymentWidget, processPayment,
+    confirmPayment, openCancelDialog, handleCancelPayment,
+    exportToCSV, handleRefresh,
+    openRefundDialog, handleRefund,
+    handlePrintReceipt, loadHourlyStats,
+  } = useCashierActions({
+    confirm,
+    tI18n,
+    paymentsApi: paymentsHook,
+    worklist: { getDateParams, setPendingPage, bumpRefreshKey, triggerDataReload },
+    dialogs: {
+      setPaymentSuccess, setPaymentError, clearPaymentFeedback,
+      openCancelDialog: openCancelDialogAction,
+      resetCancelDialog,
+      openRefundDialog: openRefundDialogAction,
+      resetRefundDialog,
+      showHourlyStats,
     },
-    'f5': (e) => {
-      e.preventDefault();
-      handlersRef.current.refresh?.();
+    dialogValues: {
+      cancelPaymentContext, cancelReason,
+      refundPaymentId, refundAmount, refundReason,
     },
-    'ctrl+r': (e) => {
-      e.preventDefault();
-      handlersRef.current.refresh?.();
-    },
-    'ctrl+e': (e) => {
-      e.preventDefault();
-      handlersRef.current.export?.();
-    },
+    paymentModal,
+    paymentWidget,
+    selectedDate,
   });
 
   // UX Audit #2.3: используем единый formatUZS из utils/formatCurrency.js.
@@ -244,266 +235,6 @@ const CashierPanel = () => {
   // что приводило к расхождениям с CashPaymentModal (formatCurrency → «UZS»)
   // и RefundRequestsTable (toLocaleString + «сум»).
   const format = formatUZS;
-
-  // ✅ УЛУЧШЕНИЕ: Обработчики с универсальными хуками
-  const handlePaymentSuccess = (paymentData: unknown) => {
-    setPaymentSuccess(paymentData as Record<string, unknown>);
-    paymentWidget.closeModal();
-    // Force reload to get fresh data after successful payment.
-    triggerDataReload();
-  };
-
-  const handlePaymentError = (error: unknown) => {
-    const message = getErrorMessage(error, tI18n('cashier.payment_process_failed'));
-    setPaymentError(message);
-    logger.error('Ошибка платежа:', error);
-  };
-
-  const handlePaymentCancel = () => {
-    paymentWidget.closeModal();
-  };
-
-  const openPaymentWidget = (appointment: Appointment) => {
-    if (!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)) {
-      const message = tI18n('cashier.online_payment_group_unavailable');
-      setPaymentError(message);
-      notify.error(message);
-      return;
-    }
-    paymentWidget.openModal(appointment as unknown as null);
-    clearPaymentFeedback();
-  };
-
-  // ✅ УЛУЧШЕНИЕ: Функции для работы с оплатами через SSOT hook
-  // Теперь appointment содержит сгруппированные данные пациента (все его неоплаченные визиты)
-  const processPayment = async (appointment: unknown, paymentData: unknown) => {
-    // CashPaymentModal declares `onProcessPayment?: (...args: unknown[]) => Promise<void>`
-    // so the args arrive as `unknown`. Narrow to domain types for the body.
-    const appt = appointment as Appointment;
-    const pData = paymentData as CashierPaymentData;
-    try {
-      const groupedPayment = isBackendGroupedCashierPayment(appt);
-      const visitId = resolveSingleCashierVisitId(appt);
-
-      if (!groupedPayment && !visitId) {
-        throw new Error('Cannot process payment: backend must provide exactly one visit_id or a backend-owned allocation contract.');
-      }
-
-      if (groupedPayment) {
-        await createGroupedCashierPayment(appt, pData);
-      } else {
-        const result = await paymentsHook.createPayment({
-          visit_id: visitId,
-          amount: pData.amount,
-          method: pData.method,
-          note: pData.note || tI18n('cashier.payment_note_default')
-        });
-
-        if (!(result as { success?: boolean }).success) {
-          throw new Error(tI18n('cashier.payment_visit_failed', { visitId, error: (result as { error?: string }).error }));
-        }
-      }
-
-      notify.success(tI18n('cashier.payment_success', { amount: format(pData.amount) }));
-      paymentModal.closeModal();
-      setPendingPage(1);
-      bumpRefreshKey(); // Принудительное обновление списка
-
-    } catch (error: unknown) {
-      logger.error('Ошибка обработки платежа:', error);
-      const message = getErrorMessage(error, tI18n('cashier.payment_process_failed'));
-      setPaymentError(message);
-      notify.error(message);
-    }
-  };
-
-  // ✅ УЛУЧШЕНИЕ: Функции для работы с кнопками в истории платежей
-  const confirmPayment = async (paymentId: string | number | undefined) => {
-    if (paymentId === undefined) {
-      notify.error(tI18n('cashier.no_payment_for_receipt'));
-      return;
-    }
-    // P-013 fix: replaced window.confirm() with shared useConfirm hook.
-    // The new dialog names the specific action and uses primary intent
-    // (Confirm is a constructive action, not destructive).
-    const ok = await confirm({
-      title: tI18n('cashier.confirm_payment_title'),
-      message: tI18n('cashier.confirm_payment_message'),
-      description: tI18n('cashier.confirm_payment_description'),
-      confirmLabel: tI18n('cashier.confirm_payment_confirm'),
-      cancelLabel: tI18n('cashier.cancel'),
-      intent: 'primary',
-    });
-    if (!ok) {
-      return;
-    }
-
-    try {
-      // UX Audit #4.5: anti-double-click protection.
-      setProcessingAction({ type: 'confirm', id: paymentId });
-      await paymentsHook.confirmPayment(paymentId);
-      bumpRefreshKey(); // Обновляем данные
-    } catch (err) {
-      logger.error('Error confirming payment:', err);
-      notify.error(getErrorMessage(err, tI18n('cashier.payment_confirm_failed')));
-    } finally {
-      setProcessingAction(null);
-    }
-  };
-
-  const openCancelDialog = (payment: CashierPaymentRowOrId) => {
-    // UX Audit #2.1: принимаем объект payment целиком, чтобы показать контекст.
-    // Раньше принимали только paymentId, и в диалоге было видно только #{id}.
-    const paymentRow = typeof payment === 'object' && payment !== null ? payment : null;
-    const paymentId: string | number | undefined = paymentRow
-      ? (paymentRow.id || paymentRow.payment_id)
-      : (typeof payment === 'string' || typeof payment === 'number' ? payment : undefined);
-    const patient = paymentRow
-      ? (paymentRow.patient || paymentRow.patient_name || tI18n('cashier.patient_with_id', { id: paymentRow.patient_id }))
-      : null;
-    const amount = paymentRow
-      ? Number(paymentRow.total_amount || paymentRow.amount || 0)
-      : 0;
-    openCancelDialogAction({ id: paymentId, patient, amount });
-  };
-
-  const handleCancelPayment = async () => {
-    if (!cancelPaymentContext?.id) return;
-    // UX Audit #2.1: обязательная причина отмены (минимум 10 символов).
-    // Раньше textarea была помечена «необязательно» — аудит-лог пустовал.
-    if (!cancelReason || cancelReason.trim().length < 10) {
-      notify.warning(tI18n('cashier.cancel_reason_required'));
-      return;
-    }
-
-    try {
-      // UX Audit #4.5: anti-double-click protection.
-      setProcessingAction({ type: 'cancel', id: cancelPaymentContext.id });
-      const result = await paymentsHook.cancelPayment(cancelPaymentContext.id, cancelReason.trim());
-      if ((result as { success?: boolean }).success) {
-        resetCancelDialog();
-        notify.info(tI18n('cashier.payment_cancelled'));
-        triggerDataReload();
-      } else {
-        notify.error(getErrorMessage((result as { error?: string }).error, tI18n('cashier.refund_failed')));
-      }
-    } catch (error: unknown) {
-      notify.error(getErrorMessage(error, tI18n('cashier.cancel_failed')));
-    } finally {
-      setProcessingAction(null);
-    }
-  };
-
-  // ✅ УЛУЧШЕНИЕ: Экспорт в CSV через серверный endpoint
-  const exportToCSV = async () => {
-    const { date_from, date_to } = getDateParams();
-    const result = await paymentsHook.exportPayments({
-      date_from: date_from || undefined,
-      date_to: date_to || undefined
-    });
-
-      if (!(result as { success?: boolean }).success) {
-        notify.error(
-          getErrorMessage(
-            (result as { error?: string }).error,
-            tI18n('cashier.export_failed')
-          )
-        );
-      }
-  };
-
-  // ✅ УЛУЧШЕНИЕ: Кнопка обновления данных
-  const handleRefresh = () => {
-    triggerDataReload();
-  };
-
-  // Sync hotkey handlers ref (MEDIUM #15)
-  handlersRef.current.refresh = handleRefresh;
-  handlersRef.current.export = exportToCSV;
-
-
-  // ✅ v2.0: Обработчик открытия диалога возврата
-  const openRefundDialog = (payment: CashierPaymentRow) => {
-    openRefundDialogAction(payment);
-  };
-
-  // ✅ v2.0: Обработчик возврата
-  const handleRefund = async () => {
-    if (!refundAmount || !refundReason || refundReason.length < 3) {
-      notify.warning(tI18n('cashier.refund_fields_required'));
-      return;
-    }
-    try {
-      // UX Audit #4.5: anti-double-click protection.
-      setProcessingAction({ type: 'refund', id: refundPaymentId ?? undefined });
-      const result = await paymentsHook.refundPayment(refundPaymentId ?? 0, {
-        amount: parseFloat(refundAmount),
-        reason: refundReason
-      });
-      if ((result as { success?: boolean }).success) {
-        resetRefundDialog();
-        notify.success(tI18n('cashier.refund_success_amount', { amount: ((result as { data?: { refunded_amount?: number } }).data?.refunded_amount) }));
-        triggerDataReload();
-      } else {
-        notify.error(getErrorMessage((result as { error?: string }).error, tI18n('cashier.refund_create_failed')));
-      }
-    } catch (error: unknown) {
-      notify.error(getErrorMessage(error, tI18n('cashier.refund_failed')));
-    } finally {
-      setProcessingAction(null);
-    }
-  };
-
-  // ✅ v2.0: Обработчик печати чека
-  const handlePrintReceipt = async (paymentRowOrId: CashierPaymentRowOrId) => {
-    const paymentId = resolvePaymentId(paymentRowOrId);
-
-    if (!paymentId) {
-      notify.error(tI18n('cashier.no_payment_for_receipt'));
-      return;
-    }
-
-    // UX Audit #4.5: anti-double-click protection.
-    setProcessingAction({ type: 'print_receipt', id: paymentId });
-    try {
-      if (paymentRowOrId && typeof paymentRowOrId === 'object') {
-        try {
-          const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId, paymentMethodLabels, tI18n('cashier.default_patient')));
-          if (opened) {
-            notify.success(tI18n('cashier.print_dialog_opened'));
-            return;
-          }
-
-          logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
-            paymentId
-          });
-        } catch (error: unknown) {
-          logger.error('[Cashier] Unexpected browser receipt print error:', error);
-        }
-      }
-
-      const result = await paymentsHook.getReceipt(paymentId);
-      if (!(result as { success?: boolean }).success) {
-        notify.error(getErrorMessage((result as { error?: string }).error, tI18n('cashier.receipt_load_failed')));
-        return;
-      }
-
-      notify.warning(tI18n('cashier.print_dialog_failed'));
-    } finally {
-      setProcessingAction(null);
-    }
-  };
-
-
-  // ✅ v2.0: Загрузка почасовой статистики
-  const loadHourlyStats = async () => {
-    const result = await paymentsHook.getHourlyStats({ target_date: selectedDate });
-    if ((result as { success?: boolean }).success) {
-      showHourlyStats(((result as { data?: unknown }).data as unknown[]) || []);
-    } else {
-      notify.error(getErrorMessage((result as { error?: string }).error, tI18n('cashier.stats_load_failed')));
-    }
-  };
 
   // ✅ ОТОБРАЖЕНИЕ УСЛУГ: Рендерим коды услуг с бейджами и tooltip (как в RegistrarPanel)
   const renderServiceBadges = (serviceCodes: unknown, serviceNames: unknown) => {

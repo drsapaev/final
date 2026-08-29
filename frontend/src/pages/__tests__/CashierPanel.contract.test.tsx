@@ -12,9 +12,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // boundary updates): helper contracts → contracts module; render contracts → panel.
 const cashierPanelPath = path.resolve(__dirname, '../CashierPanel.tsx');
 const cashierContractsPath = path.resolve(__dirname, '../cashier/cashierPaymentContracts.ts');
+// PR-UI-14-4: the processPayment action handler moved verbatim to
+// ./cashier/useCashierActions.ts — contract re-pinned to the new boundary.
+const cashierActionsPath = path.resolve(__dirname, '../cashier/useCashierActions.ts');
 
 const readCashierPanelSource = () => fs.readFileSync(cashierPanelPath, 'utf8');
 const readCashierContractsSource = () => fs.readFileSync(cashierContractsPath, 'utf8');
+const readCashierActionsSource = () => fs.readFileSync(cashierActionsPath, 'utf8');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
@@ -80,7 +84,7 @@ describe('CashierPanel payment action contract', () => {
       'const PAYMENT_ACTION_CAN_FIELD = {',
     );
     const processPaymentBlock = extractSourceBlock(
-      panelSource,
+      readCashierActionsSource(),
       'const processPayment = async (appointment: unknown, paymentData: unknown) => {',
       'const confirmPayment = async (paymentId: string | number | undefined) => {',
     );
@@ -90,7 +94,8 @@ describe('CashierPanel payment action contract', () => {
     expect(groupedContractBlock).toContain('visit_ids: visitIds');
     expect(processPaymentBlock).toContain('const groupedPayment = isBackendGroupedCashierPayment(appt);');
     expect(processPaymentBlock).toContain('await createGroupedCashierPayment(appt, pData);');
-    expect(processPaymentBlock).toContain('paymentsHook.createPayment');
+    // PR-UI-14-4: paymentsHook.* renamed paymentsApi.* in useCashierActions deps.
+    expect(processPaymentBlock).toContain('paymentsApi.createPayment');
     expect(processPaymentBlock).not.toContain('remaining_amount -');
     expect(processPaymentBlock).not.toContain('remainingAmount');
     expect(processPaymentBlock).not.toContain('Math.min');
