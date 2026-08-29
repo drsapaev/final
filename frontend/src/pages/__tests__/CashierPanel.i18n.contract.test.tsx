@@ -28,6 +28,13 @@ const actionsSource = fs.readFileSync(
   'utf8'
 );
 
+// PR-UI-14-5: the session-warning dialog JSX (incl. the session_extending
+// notify) moved verbatim to pages/cashier/views/CashierDialogsLayer.tsx.
+const dialogsLayerSource = fs.readFileSync(
+  path.join(ROOT, 'pages/cashier/views/CashierDialogsLayer.tsx'),
+  'utf8'
+);
+
 const translationsSource = fs.readFileSync(
   path.join(ROOT, 'i18n/locales/ru.ts'),
   'utf8'
@@ -63,8 +70,8 @@ describe('CashierPanel STRAT#31 — i18n migration', () => {
     expect(actionsSource).toContain("tI18n('cashier.no_payment_for_receipt')");
     expect(actionsSource).toContain("tI18n('cashier.print_dialog_opened')");
     expect(actionsSource).toContain("tI18n('cashier.print_dialog_failed')");
-    // session_extending stays in the panel (session-warning dialog button).
-    expect(source).toContain("tI18n('cashier.session_extending')");
+    // session_extending lives in the dialogs-layer view (PR-UI-14-5).
+    expect(dialogsLayerSource).toContain("tI18n('cashier.session_extending')");
   });
 
   it('does not contain hardcoded Russian strings in confirm() calls anymore', () => {
