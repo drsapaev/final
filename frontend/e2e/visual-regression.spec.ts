@@ -658,6 +658,17 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
   // → EAT behind the "Расширенная таблица" toggle). 15 rows exceed the 560px
   // viewport bound → internal scroll under a sticky header.
   test('PR-UI-12-4 appointments screen — EAT sticky header under bounded viewport', async ({ page }) => {
+    // PR-UI-14-3 CI fix (pre-existing date-rollover flake, root-caused):
+    // EAT renders queue-number badges ONLY for rows whose appointment_date
+    // equals getLocalDateString() (Asia/Tashkent frame). The mock below
+    // hardcodes '2026-08-29' — the day the baseline was captured — so with
+    // a real clock the test flips red after every UTC+5 midnight rollover
+    // (badges disappear, 0.02 pixel diff > 0.01 tolerance). Installing the
+    // fake clock at the baseline-capture instant keeps the rendered surface
+    // byte-identical to the committed baseline on any future run date.
+    // Time keeps RUNNING from this instant (clock.install, not setFixedTime)
+    // so page timers (debounces, auto-refresh) keep firing normally.
+    await page.clock.install({ time: new Date('2026-08-29T12:00:00+05:00') });
     await installAuth(page, appointmentsProfile);
     await page.route('**/api/v1/**', async (route) => {
       const url = new URL(route.request().url());
