@@ -24,7 +24,7 @@ import {
   Edit } from
 'lucide-react';
 import {
-  MacOSCard, Button, Select,
+  Card, Button, Select,
   type SelectChangeEvent,
   Input,
   Checkbox } from '../ui/macos';
@@ -211,18 +211,18 @@ const DisplayBoardSettings = () => {
 
   if (loading) {
     return (
-      <MacOSCard className="p-8">
+      <Card className="p-8">
         <div className="flex items-center justify-center">
           <RefreshCw className="animate-spin mr-2" size={20} />
           <span>{t('admin2.db_loading')}</span>
         </div>
-      </MacOSCard>);
+      </Card>);
 
   }
 
   if (!selectedBoard) {
     return (
-      <MacOSCard className="p-8">
+      <Card className="p-8">
         <div className="text-center">
           <Monitor size={48} className="mx-auto text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
@@ -230,7 +230,7 @@ const DisplayBoardSettings = () => {
           </h3>
           <p className="text-gray-500">{t('admin2.db_no_boards_desc')}</p>
         </div>
-      </MacOSCard>);
+      </Card>);
 
   }
 
@@ -280,27 +280,27 @@ const DisplayBoardSettings = () => {
 
       {/* Статистика */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MacOSCard className="p-4 text-center">
+        <Card className="p-4 text-center">
           <div className="text-2xl font-bold text-blue-600">{Number(stats.total_boards ?? 0)}</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_total_boards')}</div>
-        </MacOSCard>
-        <MacOSCard className="p-4 text-center">
+        </Card>
+        <Card className="p-4 text-center">
           <div className="text-2xl font-bold text-green-600">{Number(stats.total_calls_today ?? 0)}</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_calls_today')}</div>
-        </MacOSCard>
-        <MacOSCard className="p-4 text-center">
+        </Card>
+        <Card className="p-4 text-center">
           <div className="text-2xl font-bold text-orange-600">{Number(stats.total_announcements ?? 0)}</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_announcements')}</div>
-        </MacOSCard>
-        <MacOSCard className="p-4 text-center">
+        </Card>
+        <Card className="p-4 text-center">
           <div className="text-2xl font-bold text-purple-600">{Math.round(Number(stats.uptime_percentage ?? 0))}%</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_uptime')}</div>
-        </MacOSCard>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Основные настройки */}
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <h3 className="text-lg font-medium mb-4 flex items-center">
             <Monitor size={20} className="mr-2 text-blue-600" />
             {selectedBoard.display_name}
@@ -405,10 +405,10 @@ const DisplayBoardSettings = () => {
               </label>
             </div>
           </div>
-        </MacOSCard>
+        </Card>
 
         {/* Настройки звука */}
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <h3 className="text-lg font-medium mb-4 flex items-center">
             <Volume2 size={20} className="mr-2 text-green-600" />
             {t('admin2.db_sound_settings')}
@@ -480,11 +480,11 @@ const DisplayBoardSettings = () => {
               </>
             }
           </div>
-        </MacOSCard>
+        </Card>
       </div>
 
       {/* Тестирование */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="text-lg font-medium mb-4 flex items-center">
           <TestTube size={20} className="mr-2 text-purple-600" />
           {t('admin2.db_testing')}
@@ -546,12 +546,12 @@ const DisplayBoardSettings = () => {
             </div>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Управление контентом */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Баннеры */}
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium flex items-center">
               <Image size={20} className="mr-2 text-orange-600" />
@@ -607,10 +607,10 @@ const DisplayBoardSettings = () => {
             )
             }
           </div>
-        </MacOSCard>
+        </Card>
 
         {/* Объявления */}
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium flex items-center">
               <MessageCircle size={20} className="mr-2 text-green-600" />
@@ -628,11 +628,11 @@ const DisplayBoardSettings = () => {
               <p>{t('admin2.db_announcements_empty')}</p>
             </div>
           </div>
-        </MacOSCard>
+        </Card>
       </div>
 
       {/* Информация */}
-      <MacOSCard className="p-6 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700">
+      <Card className="p-6 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700">
         <h3 className="text-lg font-medium mb-2 flex items-center text-blue-800 dark:text-blue-400">
           <Monitor size={20} className="mr-2" />
           {t('admin2.db_info_title')}
@@ -644,7 +644,7 @@ const DisplayBoardSettings = () => {
           <p>{t('admin2.db_info_privacy')}</p>
           <p>{t('admin2.db_info_voice')}</p>
         </div>
-      </MacOSCard>
+      </Card>
     </div>);
 
 };
