@@ -140,7 +140,8 @@ describe('worklistDataReducer (PR-UI-13-1)', () => {
       const state = withState({ appointments: rows });
       const next = worklistDataReducer(state, {
         type: 'APPOINTMENTS_UPDATER',
-        updater: (prev) => prev.filter((a) => a.id !== 1),
+        // AppointmentId is a branded string type — compare via String() to stay type-safe.
+        updater: (prev) => prev.filter((a) => String(a.id) !== '1'),
       });
       expect(next.appointments).toEqual([{ id: 2 }]);
     });
