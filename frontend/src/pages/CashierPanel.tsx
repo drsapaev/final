@@ -18,7 +18,6 @@ import useModal from '../hooks/useModal';
 import { usePayments } from '../hooks/usePayments';
 import { useDebouncedValue } from '../hooks/useDebouncedCallback';
 import { useHotkeys } from '../hooks/useHotkeys';
-import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { getPatient as fetchPatientById } from '../api/patients';
 import type { Patient } from '../types/domain/clinic';
 import { printPanelReceiptInBrowser } from '../services/panelPrint';
@@ -83,6 +82,8 @@ import {
   type CashierSortField,
   type CashierSortDir,
 } from './cashier/cashierPaymentRows';
+import { useCashierDialogs } from './cashier/useCashierDialogs';
+import { useCashierSessionWarning } from './cashier/useCashierSessionWarning';
 
 
 const CashierPanel = () => {
@@ -148,8 +149,31 @@ const CashierPanel = () => {
   }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [status, setStatus] = useState('all');
-  const [paymentSuccess, setPaymentSuccess] = useState<Record<string, unknown> | null>(null);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // PR-UI-14-3: dialog state machines moved verbatim to
+  // ./cashier/useCashierDialogs (12 useState -> 1 useReducer) and
+  // ./cashier/useCashierSessionWarning (warning + countdown + redirect).
+  const {
+    state: dialogs,
+    setPaymentSuccess, setPaymentError, clearPaymentFeedback,
+    openCancelDialog: openCancelDialogAction,
+    closeCancelDialog, resetCancelDialog, setCancelReason,
+    openRefundDialog: openRefundDialogAction,
+    closeRefundDialog, resetRefundDialog, setRefundAmount, setRefundReason,
+    showHourlyStats, closeHourlyChart,
+  } = useCashierDialogs();
+  const {
+    sessionWarning, sessionSecondsLeft, dismissSessionWarning,
+  } = useCashierSessionWarning();
+
+  // PR-UI-14-3: flattened dialog state bindings (verbatim names, so every
+  // handler/JSX reference below keeps reading exactly like before).
+  const {
+    paymentSuccess, paymentError,
+    cancelPaymentContext, cancelDialogOpen, cancelReason,
+    refundDialogOpen, refundPaymentId, refundPaymentAmount, refundAmount, refundReason,
+    hourlyStats, showHourlyChart,
+  } = dialogs;
 
   // Состояния для календаря
   const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
@@ -175,12 +199,6 @@ const CashierPanel = () => {
   // Состояние для вкладок
   const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
 
-  // ✅ УЛУЧШЕНИЕ: Новые состояния для отмены платежа
-  // UX Audit #2.1: контекст отменяемого платежа (id + patient + amount) —
-  // показывается в диалоге, чтобы кассир видел, ЧТО именно он отменяет.
-  const [cancelPaymentContext, setCancelPaymentContext] = useState<{ id?: string | number; [k: string]: unknown } | null>(null);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
 
   // UX Audit #4.5: anti-double-click state для action-кнопок.
   // Хранит {type, id} текущего action; пока не null — все action-кнопки disabled.
@@ -221,40 +239,6 @@ const CashierPanel = () => {
     },
   });
 
-  // Deferred #1: session timeout warning — prevents silent JWT expiry while
-  // cashier is processing a payment. Mirrors all other clinical panels.
-  const [sessionWarning, setSessionWarning] = useState<{ active: boolean; expiresAt?: number } | null>(null);
-  // UX Audit #2.5: счётчик секунд до истечения сессии.
-  const [sessionSecondsLeft, setSessionSecondsLeft] = useState<number | null>(null);
-  useSessionTimeoutWarning({
-    onWarning: (expiresAt) => {
-      // UX Audit #2.5: сохраняем expiresAt для счётчика обратного отсчёта.
-      const ms = expiresAt ? (Number(expiresAt) - Date.now()) : 60 * 1000;
-      setSessionWarning({ active: true, expiresAt: expiresAt ? Number(expiresAt) : undefined });
-      setSessionSecondsLeft(Math.max(0, Math.floor(ms / 1000)));
-    },
-    onExpired: () => {
-      setSessionWarning(null);
-      setSessionSecondsLeft(null);
-      notify.error(tI18n('cashier.session_expired'));
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
-    },
-  });
-
-  // UX Audit #2.5: тикаем каждую секунду, пока показано предупреждение.
-  useEffect(() => {
-    if (!sessionWarning?.active || !sessionWarning.expiresAt) return undefined;
-    const tick = () => {
-      const ms = (sessionWarning.expiresAt ?? 0) - Date.now();
-      setSessionSecondsLeft(Math.max(0, Math.floor(ms / 1000)));
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [sessionWarning]);
-
   // UX Audit #2.3: используем единый formatUZS из utils/formatCurrency.js.
   // Раньше тут было inline-определение new Intl.NumberFormat('ru-RU').format(n) + ' сум',
   // что приводило к расхождениям с CashPaymentModal (formatCurrency → «UZS»)
@@ -287,8 +271,7 @@ const CashierPanel = () => {
       return;
     }
     paymentWidget.openModal(appointment as unknown as null);
-    setPaymentError(null);
-    setPaymentSuccess(null);
+    clearPaymentFeedback();
   };
 
   // ✅ УЛУЧШЕНИЕ: Функции для работы с оплатами через SSOT hook
@@ -381,9 +364,7 @@ const CashierPanel = () => {
     const amount = paymentRow
       ? Number(paymentRow.total_amount || paymentRow.amount || 0)
       : 0;
-    setCancelPaymentContext({ id: paymentId, patient, amount });
-    setCancelDialogOpen(true);
-    setCancelReason('');
+    openCancelDialogAction({ id: paymentId, patient, amount });
   };
 
   const handleCancelPayment = async () => {
@@ -400,9 +381,7 @@ const CashierPanel = () => {
       setProcessingAction({ type: 'cancel', id: cancelPaymentContext.id });
       const result = await paymentsHook.cancelPayment(cancelPaymentContext.id, cancelReason.trim());
       if ((result as { success?: boolean }).success) {
-        setCancelDialogOpen(false);
-        setCancelPaymentContext(null);
-        setCancelReason('');
+        resetCancelDialog();
         notify.info(tI18n('cashier.payment_cancelled'));
         triggerDataReload();
       } else {
@@ -442,20 +421,10 @@ const CashierPanel = () => {
   handlersRef.current.refresh = handleRefresh;
   handlersRef.current.export = exportToCSV;
 
-  // ✅ v2.0: Состояние для возврата
-  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
-  const [refundPaymentId, setRefundPaymentId] = useState<string | number | null>(null);
-  const [refundPaymentAmount, setRefundPaymentAmount] = useState(0);
-  const [refundAmount, setRefundAmount] = useState('');
-  const [refundReason, setRefundReason] = useState('');
 
   // ✅ v2.0: Обработчик открытия диалога возврата
   const openRefundDialog = (payment: CashierPaymentRow) => {
-    setRefundPaymentId(payment.id ?? null);
-    setRefundPaymentAmount(Number(payment.amount ?? 0));
-    setRefundAmount(String(Number(payment.amount ?? 0) - Number(payment.refunded_amount ?? 0)));
-    setRefundReason('');
-    setRefundDialogOpen(true);
+    openRefundDialogAction(payment);
   };
 
   // ✅ v2.0: Обработчик возврата
@@ -472,10 +441,7 @@ const CashierPanel = () => {
         reason: refundReason
       });
       if ((result as { success?: boolean }).success) {
-        setRefundDialogOpen(false);
-        setRefundPaymentId(null);
-        setRefundReason('');
-        setRefundAmount('');
+        resetRefundDialog();
         notify.success(tI18n('cashier.refund_success_amount', { amount: ((result as { data?: { refunded_amount?: number } }).data?.refunded_amount) }));
         triggerDataReload();
       } else {
@@ -528,16 +494,12 @@ const CashierPanel = () => {
     }
   };
 
-  // ✅ v2.0: Состояние для почасовой статистики
-  const [hourlyStats, setHourlyStats] = useState<unknown[]>([]);
-  const [showHourlyChart, setShowHourlyChart] = useState(false);
 
   // ✅ v2.0: Загрузка почасовой статистики
   const loadHourlyStats = async () => {
     const result = await paymentsHook.getHourlyStats({ target_date: selectedDate });
     if ((result as { success?: boolean }).success) {
-      setHourlyStats(((result as { data?: unknown }).data as unknown[]) || []);
-      setShowHourlyChart(true);
+      showHourlyStats(((result as { data?: unknown }).data as unknown[]) || []);
     } else {
       notify.error(getErrorMessage((result as { error?: string }).error, tI18n('cashier.stats_load_failed')));
     }
@@ -1272,7 +1234,7 @@ const CashierPanel = () => {
           {/* UX Audit #2.1: показываем контекст платежа + обязательная причина (min 10 chars). */}
           <Dialog
             open={cancelDialogOpen}
-            onClose={() => setCancelDialogOpen(false)}
+            onClose={closeCancelDialog}
             maxWidth="sm"
             fullWidth>
 
@@ -1311,7 +1273,7 @@ const CashierPanel = () => {
               </Typography>
             </DialogContent>
             <DialogActions>
-              <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+              <Button variant="outline" onClick={closeCancelDialog}>
                 {tI18n('cashier.close_btn')}
               </Button>
               <Button
@@ -1426,7 +1388,7 @@ const CashierPanel = () => {
           </Dialog>
 
           {/* ✅ v2.0: Диалог возврата */}
-          <Dialog open={refundDialogOpen} onClose={() => setRefundDialogOpen(false)}>
+          <Dialog open={refundDialogOpen} onClose={closeRefundDialog}>
             <DialogTitle>
               <Box display="flex" alignItems="center">
                 {tI18n('cashier.refund_title')}
@@ -1463,7 +1425,7 @@ const CashierPanel = () => {
               </Box>
             </DialogContent>
             <DialogActions>
-              <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
+              <Button variant="outline" onClick={closeRefundDialog}>
                 {tI18n('cashier.cancel')}
               </Button>
               <Button variant="danger" onClick={handleRefund} disabled={processingAction?.type === 'refund'}>
@@ -1477,7 +1439,7 @@ const CashierPanel = () => {
           {/* UX Audit #4.6: Recharts вместо inline-баров на Box sx={{...}}.
               Раньше: примитивный bar chart без осей, без интерактива, без tooltip.
               Теперь: полноценный BarChart с XAxis/YAxis/Tooltip/CartesianGrid. */}
-          <Dialog open={showHourlyChart} onClose={() => setShowHourlyChart(false)}>
+          <Dialog open={showHourlyChart} onClose={closeHourlyChart}>
             <DialogTitle>
               {tI18n('cashier.hourly_stats_dialog_title', { date: selectedDate })}
             </DialogTitle>
@@ -1521,7 +1483,7 @@ const CashierPanel = () => {
               )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setShowHourlyChart(false)}>{tI18n('cashier.close_btn')}</Button>
+              <Button onClick={closeHourlyChart}>{tI18n('cashier.close_btn')}</Button>
             </DialogActions>
           </Dialog>
         </div>
@@ -1542,13 +1504,13 @@ const CashierPanel = () => {
             <div className="cashier-session-warning-actions">
               <button
                 type="button"
-                onClick={() => setSessionWarning(null)}
+                onClick={dismissSessionWarning}
                 className="cashier-session-warning-btn cashier-session-warning-btn--secondary">
                 {tI18n('cashier.session_warning_dismiss')}
               </button>
               <button
                 type="button"
-                onClick={() => { setSessionWarning(null); notify.info(tI18n('cashier.session_extending')); }}
+                onClick={() => { dismissSessionWarning(); notify.info(tI18n('cashier.session_extending')); }}
                 className="cashier-session-warning-btn cashier-session-warning-btn--primary">
                 {tI18n('cashier.session_warning_extend')}
               </button>
