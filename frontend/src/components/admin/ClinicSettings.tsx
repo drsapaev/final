@@ -25,7 +25,7 @@ import {
   Image
 } from 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Input,
   Select,
@@ -216,21 +216,21 @@ const ClinicSettings = () => {
   if (loading) {
     return (
       <div className="admin-p-0-bg-bg-primary">
-        <MacOSCard className="admin-p-24-ta-center">
+        <Card className="admin-p-24-ta-center">
           <div className="admin-flex-ai-center-jc-center-gap-12">
             <RefreshCw className="admin-w-32-h-32-blue-anim-spin1slinearinfinite" />
             <span className="admin-lg-secondary-med">
               {t('admin2.cset_loading')}
             </span>
           </div>
-        </MacOSCard>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="admin-p-0-bg-bg-primary">
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         {/* Заголовок */}
         <div className="admin-flex-ai-center-jc-between-mb-24-pb-24-borderbottom-0a48a6">
           <div>
@@ -270,7 +270,7 @@ const ClinicSettings = () => {
 
         {/* Сообщения */}
         {message.text && (
-          <MacOSCard className="admin-p-16-mb-24" style={{ '--admin-backgroundColor': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' } as CSSProperties}>
+          <Card className="admin-p-16-mb-24" style={{ '--admin-backgroundColor': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' } as CSSProperties}>
             <div className="flex items-center justify-center gap-2">
               {message.type === 'success' ? (
                 <CheckCircle className="admin-w-20-h-20-success" />
@@ -281,12 +281,12 @@ const ClinicSettings = () => {
                 {message.text}
               </span>
             </div>
-          </MacOSCard>
+          </Card>
         )}
 
         <div className="admin-grid-gtc-rauto-fitcminmax400pxc1fr-gap-24-mb-24">
           {/* Основная информация */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <h3 className="admin-lg-semi-primary-mb-16-flex-ai-center-gap-8">
               <Building2 className="admin-w-20-h-20-blue" />
               {t('admin2.cset_h_basic')}
@@ -348,10 +348,10 @@ const ClinicSettings = () => {
                 />
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Системные настройки */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <h3 className="admin-lg-semi-primary-mb-16-flex-ai-center-gap-8">
               <Globe className="admin-w-20-h-20-success" />
               {t('admin2.cset_h_system')}
@@ -436,10 +436,10 @@ const ClinicSettings = () => {
                 </p>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
         </div>
 
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="admin-flex-ai-center-jc-between-gap-16-mb-20-pb-20-borderbottom-0a48a6">
             <div>
               <h3 className="admin-lg-semi-primary-m-008px0-flex-ai-center-gap-8">
@@ -480,7 +480,7 @@ const ClinicSettings = () => {
           </div>
 
           {ticketPrintMessage.text && (
-            <MacOSCard className="admin-p-16-mb-20" style={{ '--admin-backgroundColor': ticketPrintMessage.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': ticketPrintMessage.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' } as CSSProperties}>
+            <Card className="admin-p-16-mb-20" style={{ '--admin-backgroundColor': ticketPrintMessage.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': ticketPrintMessage.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' } as CSSProperties}>
               <div className="flex items-center justify-center gap-2">
                 {ticketPrintMessage.type === 'success' ? (
                   <CheckCircle className="admin-w-20-h-20-success" />
@@ -491,7 +491,7 @@ const ClinicSettings = () => {
                   {ticketPrintMessage.text}
                 </span>
               </div>
-            </MacOSCard>
+            </Card>
           )}
 
           {ticketPrintLoading ? (
@@ -518,8 +518,8 @@ const ClinicSettings = () => {
               ))}
             </div>
           )}
-        </MacOSCard>
-      </MacOSCard>
+        </Card>
+      </Card>
     </div>
   );
 };

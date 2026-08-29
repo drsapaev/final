@@ -19,7 +19,7 @@ import {
 
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   SegmentedControl,
   StatCard,
@@ -155,7 +155,7 @@ const ClinicManagement = () => {
   const renderOverview = () =>
   <div className="flex flex-col gap-6">
       {/* Состояние системы */}
-      <MacOSCard className="p-4">
+      <Card className="p-4">
           <div className="admin-d-flex-ai-center-jc-between-mb-16">
           <h3 className="admin-fs-lg-fw-semi-primary-m-0-2">
             {t('admin2.cm_system_status_title')}
@@ -206,7 +206,7 @@ const ClinicManagement = () => {
         description={t('admin2.cm_loading_system_status_desc')} />
 
       }
-      </MacOSCard>
+      </Card>
 
       {/* Статистика */}
       {stats ?
@@ -262,7 +262,7 @@ const ClinicManagement = () => {
 
       {/* Системная информация */}
       {/* UX Audit Admin #2.5: динамические данные из systemHealth вместо hardcoded. */}
-      <MacOSCard className="p-4">
+      <Card className="p-4">
           <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
             {t('admin2.cm_system_info')}
           </h3>
@@ -293,7 +293,7 @@ const ClinicManagement = () => {
             </div>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
@@ -302,7 +302,7 @@ const ClinicManagement = () => {
   if (loading) {
     return (
       <div className="admin-p-0-bgc-bg-primary-2">
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="admin-d-flex-ai-center-gap-12-mb-24-1">
             <Building2 className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0-1">
@@ -310,7 +310,7 @@ const ClinicManagement = () => {
             </h2>
           </div>
           <Skeleton height="600px" />
-        </MacOSCard>
+        </Card>
       </div>);
 
   }
@@ -319,7 +319,7 @@ const ClinicManagement = () => {
   if (error && !stats) {
     return (
       <div className="admin-p-0-bgc-bg-primary-1">
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="admin-d-flex-ai-center-gap-12-mb-24">
             <Building2 className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
@@ -337,14 +337,14 @@ const ClinicManagement = () => {
               </Button>
             } />
           
-        </MacOSCard>
+        </Card>
       </div>);
 
   }
 
   return (
     <div className="admin-p-0-bgc-bg-primary">
-      <MacOSCard className="admin-p-0-ov-hidden">
+      <Card className="admin-p-0-ov-hidden">
         <div className="admin-p-16-ov-hidden">
           {/* Заголовок */}
           <div className="admin-d-flex-jc-between-ai-center-mb-24-pb-24-bd-b-1px-solid-var-mac-bo">
@@ -409,7 +409,7 @@ const ClinicManagement = () => {
         {activeTab === 'backups' && <BackupManagement />}
         {activeTab === 'settings' && <ClinicSettings />}
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* UX Audit Admin #3.1: dead Modal removed — was never opened. */}
     </div>);

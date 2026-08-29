@@ -18,7 +18,7 @@ import {
   Bell } from
 'lucide-react';
 import {
-  MacOSCard, Badge, Button, Select,
+  Card, Badge, Button, Select,
 } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
@@ -199,7 +199,7 @@ const AllFreeApproval = () => {
   reduce((sum, req) => sum + Number(req.total_original_amount || 0), 0);
 
   return (
-    <MacOSCard
+    <Card
       variant="default"
       padding="default">
       
@@ -253,7 +253,7 @@ const AllFreeApproval = () => {
 
         {/* Статистика */}
         <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
-          <MacOSCard
+          <Card
             variant="default"
             padding="default">
             
@@ -270,9 +270,9 @@ const AllFreeApproval = () => {
                 </p>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
           
-          <MacOSCard
+          <Card
             variant="default"
             padding="default">
             
@@ -289,9 +289,9 @@ const AllFreeApproval = () => {
                 </p>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
           
-          <MacOSCard
+          <Card
             variant="default"
             padding="default">
             
@@ -308,9 +308,9 @@ const AllFreeApproval = () => {
                 </p>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
           
-          <MacOSCard
+          <Card
             variant="default"
             padding="default">
             
@@ -327,7 +327,7 @@ const AllFreeApproval = () => {
                 </p>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
         </div>
 
         {/* Список заявок */}
@@ -344,7 +344,7 @@ const AllFreeApproval = () => {
 
         <div className="grid gap-4">
             {allFreeRequests.map((request) =>
-          <MacOSCard
+          <Card
             key={request.id}
             className="p-6 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
             
@@ -482,7 +482,7 @@ const AllFreeApproval = () => {
               }
                   </div>
             }
-              </MacOSCard>
+              </Card>
           )}
           </div>
         }
@@ -552,7 +552,7 @@ const AllFreeApproval = () => {
           </div>
         }
       </div>
-    </MacOSCard>);
+    </Card>);
 
 };
 
