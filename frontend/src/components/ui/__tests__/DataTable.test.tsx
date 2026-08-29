@@ -739,6 +739,87 @@ describe('DataTable — PR-UI-12 features (DT-17..27)', () => {
     expect(container.firstElementChild?.className).toContain('mac-table-scroll-wrapper');
   });
 
+  // --- DT-29..31: Codex review fixes (PR 2885) ---
+
+  it('DT-29: key events from embedded controls do not trigger row navigation (Codex P1)', () => {
+    const onRowClick = vi.fn();
+    render(
+      <DataTable
+        columns={[
+          ...columns,
+          {
+            key: 'action',
+            title: 'Action',
+            render: () => (
+              <button type="button" onClick={() => undefined}>
+                Go
+              </button>
+            )
+          }
+        ]}
+        data={rows}
+        keyboardNavigation
+        onRowClick={onRowClick}
+      />
+    );
+
+    const first = getRowByName('Alice');
+    first.focus();
+    // The render fn places the button in every row; take the one inside row 1.
+    const embeddedButton = screen.getAllByText('Go')[0];
+
+    // ArrowDown bubbled from the embedded button: the row must NOT navigate
+    // (roving tabindex unchanged, focus not moved) — the control keeps its keys.
+    fireEvent.keyDown(embeddedButton, { key: 'ArrowDown', bubbles: true });
+    expect(first).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Bob')).toHaveAttribute('tabIndex', '-1');
+
+    // Enter bubbled from the embedded button: no row action fires (the
+    // control's native activation is preserved, no double-activation).
+    fireEvent.keyDown(embeddedButton, { key: 'Enter', bubbles: true });
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('DT-30: Escape inside the column menu restores focus to the toggle button (Codex P2)', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: /Колонки|Columns/ });
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    // Keyboard user tabs into a menu checkbox, presses Escape.
+    const ageCheckbox = screen.getByLabelText('Age') as HTMLInputElement;
+    ageCheckbox.focus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+  });
+
+  it('DT-31: an externally supplied all-hidden visibility map falls back to visible columns (Codex P2)', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        columnVisibility={{ name: false, age: false, city: false }}
+      />
+    );
+
+    // Degenerate map is normalized at the DataTable boundary: all statically
+    // visible columns render (no headerless colSpan=0 table).
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.getByText('City')).toBeInTheDocument();
+  });
+
   it('DT-27b: toolbar props wrap the table in .mac-table-shell above the scroll wrapper', () => {
     const { container } = render(
       <DataTable

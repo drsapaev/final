@@ -91,8 +91,13 @@ export const TableToolbar = ({
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRootRef = useRef<HTMLDivElement | null>(null);
+  // Codex P2 (PR 2885): Escape must return keyboard focus to the toggle
+  // button — the menu unmounts, so focus would otherwise fall back to the
+  // document body and the user loses their place.
+  const toggleButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  // Close the open menu on outside pointerdown and on Escape.
+  // Close the open menu on outside pointerdown and on Escape (Escape also
+  // restores focus to the toggle button).
   useEffect(() => {
     if (!menuOpen) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -102,7 +107,10 @@ export const TableToolbar = ({
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenuOpen(false);
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+        toggleButtonRef.current?.focus();
+      }
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -129,6 +137,7 @@ export const TableToolbar = ({
       {showColumnToggle && (
         <div className="mac-table-toolbar__columns" ref={menuRootRef}>
           <button
+            ref={toggleButtonRef}
             type="button"
             className="mac-table-toolbar__button"
             aria-haspopup="true"

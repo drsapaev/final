@@ -365,9 +365,19 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // `hidden` flag (inert in macos/Table — 0 consumers) is honored as well.
   // With neither set the list is content-identical to `columns` — zero-delta
   // for every existing consumer.
-  const visibleColumns = columns.filter(
+  //
+  // Codex P2 (PR 2885): an externally supplied map that hides EVERY column
+  // (persisted preferences, a changed column set) would render a headerless
+  // table with colSpan=0 status cells. Normalize at this boundary: fall back
+  // to all statically-visible columns. The toolbar's last-column guard
+  // prevents users from REACHING the all-hidden state via the menu; this
+  // protects maps supplied programmatically.
+  const rawVisibleColumns = columns.filter(
     (column) => column.hidden !== true && columnVisibility?.[column.key] !== false
   );
+  const visibleColumns = rawVisibleColumns.length > 0
+    ? rawVisibleColumns
+    : columns.filter((column) => column.hidden !== true);
 
   // === Roving keyboard row navigation (PR-UI-12) ===
   // Off by default (zero-delta): existing consumers keep the per-row
@@ -652,6 +662,13 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // unchanged). Without the flag, arrow keys do nothing — byte-identical to
   // the pre-PR-UI-12 behavior for existing consumers.
   const handleRowKeyDown = (e: KeyboardEvent<HTMLTableRowElement>, row: Row, index: number) => {
+    // Codex P1 (PR 2885): key events originating from EMBEDDED controls
+    // (inputs, buttons, selects rendered inside cells) must not trigger row
+    // navigation — Enter/Space would cancel the control's native activation
+    // and arrows would steal its focus. Handle the row only when the row
+    // itself is the event target. (This also fixes the latent double-activation
+    // where a bubbled Enter/Space from a focused cell control fired onRowClick.)
+    if (e.target !== e.currentTarget) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleRowClick(row, index);
