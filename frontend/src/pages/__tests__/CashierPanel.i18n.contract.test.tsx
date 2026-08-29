@@ -13,6 +13,14 @@ const source = fs.readFileSync(
   'utf8'
 );
 
+// PR-UI-14-3: the session-timeout notify moved verbatim to
+// pages/cashier/useCashierSessionWarning.ts — same STRAT#31 i18n contract,
+// new file boundary (13-1..13-4 precedent).
+const sessionWarningSource = fs.readFileSync(
+  path.join(ROOT, 'pages/cashier/useCashierSessionWarning.ts'),
+  'utf8'
+);
+
 const translationsSource = fs.readFileSync(
   path.join(ROOT, 'i18n/locales/ru.ts'),
   'utf8'
@@ -38,7 +46,8 @@ describe('CashierPanel STRAT#31 — i18n migration', () => {
   });
 
   it('uses tI18n() for all notify messages', () => {
-    expect(source).toContain("tI18n('cashier.session_expired')");
+    // session_expired lives in the extracted session-warning hook (PR-UI-14-3).
+    expect(sessionWarningSource).toContain("tI18n('cashier.session_expired')");
     expect(source).toContain("tI18n('cashier.cancel_reason_required')");
     expect(source).toContain("tI18n('cashier.payment_cancelled')");
     expect(source).toContain("tI18n('cashier.refund_fields_required')");
