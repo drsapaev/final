@@ -15,10 +15,18 @@ const cashierContractsPath = path.resolve(__dirname, '../cashier/cashierPaymentC
 // PR-UI-14-4: the processPayment action handler moved verbatim to
 // ./cashier/useCashierActions.ts — contract re-pinned to the new boundary.
 const cashierActionsPath = path.resolve(__dirname, '../cashier/useCashierActions.ts');
+// PR-UI-14-5: table/dialog JSX moved verbatim to ./cashier/views/* —
+// render contracts re-pinned to the view files.
+const cashierHistoryTablePath = path.resolve(__dirname, '../cashier/views/CashierHistoryTable.tsx');
+const cashierPendingTablePath = path.resolve(__dirname, '../cashier/views/CashierPendingTable.tsx');
+const cashierDialogsLayerPath = path.resolve(__dirname, '../cashier/views/CashierDialogsLayer.tsx');
 
 const readCashierPanelSource = () => fs.readFileSync(cashierPanelPath, 'utf8');
 const readCashierContractsSource = () => fs.readFileSync(cashierContractsPath, 'utf8');
 const readCashierActionsSource = () => fs.readFileSync(cashierActionsPath, 'utf8');
+const readCashierHistoryTableSource = () => fs.readFileSync(cashierHistoryTablePath, 'utf8');
+const readCashierPendingTableSource = () => fs.readFileSync(cashierPendingTablePath, 'utf8');
+const readCashierDialogsLayerSource = () => fs.readFileSync(cashierDialogsLayerPath, 'utf8');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
@@ -44,9 +52,8 @@ describe('CashierPanel payment action contract', () => {
   });
 
   it('renders all payment history commands from backend-provided actions or can flags', () => {
-    const source = readCashierPanelSource();
     const actionCellBlock = extractSourceBlock(
-      source,
+      readCashierHistoryTableSource(),
       'onClick={() => confirmPayment(row.id)}',
       '<td colSpan={7}',
     );
@@ -102,16 +109,15 @@ describe('CashierPanel payment action contract', () => {
   });
 
   it('does not route grouped cashier rows through the single-visit online widget', () => {
-    const source = readCashierPanelSource();
     // P-018 fix: aria-labels were localized to Russian (PHI removed).
     // i18n-unification: aria-labels now use tI18n('cashier.cash_payment_aria')
     const onlineActionBlock = extractSourceBlock(
-      source,
+      readCashierPendingTableSource(),
       'onClick={() => openPaymentWidget(appointment)}',
       "aria-label={tI18n('cashier.cash_payment_aria')}",
     );
     const paymentWidgetBlock = extractSourceBlock(
-      source,
+      readCashierDialogsLayerSource(),
       '<PaymentWidget',
       'amount={Number((paymentWidget.selectedItem as unknown as Appointment).remaining_amount',
     );
