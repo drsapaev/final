@@ -4,7 +4,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry';
-import { getRouteChromeState } from '../routeSelectors';
+import { getAdminNavRoutes, getRouteChromeState } from '../routeSelectors';
 import ru from '../../i18n/locales/ru';
 import en from '../../i18n/locales/en';
 import kk from '../../i18n/locales/kk';
@@ -131,6 +131,26 @@ describe('PR-UI-19 (C-6): navigation i18n contract', () => {
         `${locale} misses nav.${key} (emitted by ${origin})`
       ).toBe(true);
     }
+  });
+
+  it('admin nav sort preserves the section grouping order via sectionKey (Codex round 2 regression guard)', () => {
+    // getAdminNavRoutes sorts by ADMIN_SECTION_ORDER.indexOf(nav.sectionKey).
+    // Regression fixed in Codex round 2: the comparator briefly read the removed
+    // `nav.section` field, sending every index to -1 and interleaving sections.
+    const profile = { role: 'admin', is_admin: true } as never;
+    const routes = getAdminNavRoutes(profile, { internalDemoEnabled: false });
+    expect(routes.length).toBeGreaterThan(5);
+    const ORDER = ['nav.overview', 'nav.section_patients_booking', 'nav.finance', 'nav.section_clinic_queue', 'nav.section_communications', 'nav.system'];
+    const indices = routes.map((route) => {
+      const nav = typeof route.nav === 'object' ? (route.nav as { sectionKey?: string }) : null;
+      const idx = ORDER.indexOf(nav?.sectionKey || '');
+      return idx === -1 ? ORDER.length : idx;
+    });
+    for (let i = 1; i < indices.length; i += 1) {
+      expect(indices[i], 'admin nav sections must be non-decreasing per ADMIN_SECTION_ORDER').toBeGreaterThanOrEqual(indices[i - 1]);
+    }
+    // The dashboard (overview section) must sort first, exactly as before the migration.
+    expect(routes[0].id).toBe('admin-dashboard');
   });
 
   it('ru nav values are byte-identical to pre-PR-UI-19 labels (zero-delta for ru)', () => {

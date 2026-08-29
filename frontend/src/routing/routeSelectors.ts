@@ -8,7 +8,11 @@ import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } fro
 // user-select) so an administrator can discover them from the sidebar instead
 // of having to guess URLs. Section placed last so it appears at the bottom of
 // the admin sidebar — predictable location for "low-frequency configuration".
-const ADMIN_SECTION_ORDER = ['Обзор', 'Пациенты и запись', 'Финансы', 'Клиника и очередь', 'Коммуникации', 'Система'];
+// PR-UI-19 (C-6): section order keyed by nav.sectionKey (was raw Russian section text;
+// identical ordering — 'Обзор'→nav.overview, 'Пациенты и запись'→nav.section_patients_booking,
+// 'Финансы'→nav.finance, 'Клиника и очередь'→nav.section_clinic_queue,
+// 'Коммуникации'→nav.section_communications, 'Система'→nav.system).
+const ADMIN_SECTION_ORDER = ['nav.overview', 'nav.section_patients_booking', 'nav.finance', 'nav.section_clinic_queue', 'nav.section_communications', 'nav.system'];
 export const PROTECTED_PATIENT_PAYMENT_ENTRY_ROUTE_ID = 'patient-payment-entry';
 export const PROTECTED_PATIENT_BOOKING_ENTRY_ROUTE_ID = 'patient-booking-entry';
 export const PROTECTED_PATIENT_FORMS_ENTRY_ROUTE_ID = 'patient-forms-entry';
@@ -362,8 +366,8 @@ export function getAdminNavRoutes(
     .sort((left, right) => {
       const leftNav = typeof left.nav === 'object' ? left.nav : null;
       const rightNav = typeof right.nav === 'object' ? right.nav : null;
-      const leftSectionIndex = ADMIN_SECTION_ORDER.indexOf(leftNav?.section || '');
-      const rightSectionIndex = ADMIN_SECTION_ORDER.indexOf(rightNav?.section || '');
+      const leftSectionIndex = ADMIN_SECTION_ORDER.indexOf(leftNav?.sectionKey || '');
+      const rightSectionIndex = ADMIN_SECTION_ORDER.indexOf(rightNav?.sectionKey || '');
       if (leftSectionIndex !== rightSectionIndex) {
         return (leftSectionIndex === -1 ? ADMIN_SECTION_ORDER.length : leftSectionIndex) -
           (rightSectionIndex === -1 ? ADMIN_SECTION_ORDER.length : rightSectionIndex);
