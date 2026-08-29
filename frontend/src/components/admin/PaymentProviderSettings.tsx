@@ -18,7 +18,7 @@ import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { usePaymentProviderSettings } from '../../hooks/usePaymentProviderSettings';
 import type { PaymentProviderSettings as PaymentProviderSettingsType } from '../../hooks/usePaymentProviderSettings';
 import {
-  MacOSCard,
+  Card,
   Button,
   Input,
   Checkbox,
@@ -165,7 +165,7 @@ const PaymentProviderSettings = () => {
     const testResult = testResults[providerName];
 
     return (
-      <MacOSCard key={providerName} className="admin-p-20-bd-1px-solid-var-mac-bo">
+      <Card key={providerName} className="admin-p-20-bd-1px-solid-var-mac-bo">
         <div className="admin-d-flex-jc-between-ai-center-mb-16-pb-16-bd-b-1px-solid-var-mac-bo">
           <div className="admin-flex-center-12">
             <CreditCard className="admin-w-24-h-24-blue" />
@@ -195,7 +195,7 @@ const PaymentProviderSettings = () => {
         </div>
 
         {testResult && (
-          <MacOSCard className="admin-p-12-mb-16-bgc-dyn-bd-dyn" style={{ '--admin-bgc0': testResult.success ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-bd1': testResult.success ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' } as CSSProperties}>
+          <Card className="admin-p-12-mb-16-bgc-dyn-bd-dyn" style={{ '--admin-bgc0': testResult.success ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-bd1': testResult.success ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' } as CSSProperties}>
             <div className="admin-flex-center-8">
               {testResult.success ? (
                 <CheckCircle className="admin-w-16-h-16-success" />
@@ -209,7 +209,7 @@ const PaymentProviderSettings = () => {
                 {testResult.timestamp}
               </small>
             </div>
-          </MacOSCard>
+          </Card>
         )}
 
         {providerConfig.enabled && (
@@ -369,13 +369,13 @@ const PaymentProviderSettings = () => {
             )}
           </div>
         )}
-      </MacOSCard>
+      </Card>
     );
   };
 
   return (
     <div className="admin-p-0-bgc-bg-primary-minh-100vh">
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         {/* Заголовок */}
         <div className="admin-d-flex-jc-between-ai-center-mb-24-pb-24-bd-b-1px-solid-var-mac-bo">
           <div className="admin-flex-center-12">
@@ -397,7 +397,7 @@ const PaymentProviderSettings = () => {
 
         <div className="admin-flex-col-24">
           {/* Общие настройки */}
-          <MacOSCard className="admin-p-24">
+          <Card className="admin-p-24">
             <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
               {t('admin2.pps_general_section')}
             </h3>
@@ -419,7 +419,7 @@ const PaymentProviderSettings = () => {
                 />
               </div>
 
-              <MacOSCard className="admin-p-16-bgc-var-mac-warning-bg-bd-1px-solid-var-mac-wa">
+              <Card className="admin-p-16-bgc-var-mac-warning-bg-bd-1px-solid-var-mac-wa">
                 <div className="admin-d-flex-ai-start-gap-12">
                   <AlertTriangle className="admin-w-20-h-20-warning-mt-2-fsk-0" />
                   <div>
@@ -434,12 +434,12 @@ const PaymentProviderSettings = () => {
                     </ul>
                   </div>
                 </div>
-              </MacOSCard>
+              </Card>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Настройки провайдеров */}
-          <MacOSCard className="admin-p-24">
+          <Card className="admin-p-24">
             <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
               {t('admin2.pps_providers_section')}
             </h3>
@@ -452,9 +452,9 @@ const PaymentProviderSettings = () => {
                 return null;
               })}
             </div>
-          </MacOSCard>
+          </Card>
         </div>
-      </MacOSCard>
+      </Card>
     </div>
   );
 };
