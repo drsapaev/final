@@ -18,7 +18,7 @@ import {
   Activity } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Skeleton,
@@ -409,9 +409,9 @@ const DoctorQueuePanel = ({
 
   if (loading && !queueData) {
     return (
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-6)' }}>
         <Skeleton type="card" count={3} />
-      </MacOSCard>);
+      </Card>);
 
   }
 
@@ -441,7 +441,7 @@ const DoctorQueuePanel = ({
       }
 
       {/* Информация о враче и очереди */}
-      <MacOSCard style={{ padding: 'var(--mac-spacing-4)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-4)' }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -563,10 +563,10 @@ const DoctorQueuePanel = ({
             </div>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Список пациентов в очереди */}
-      <MacOSCard style={{ overflow: 'hidden' }}>
+      <Card style={{ overflow: 'hidden' }}>
         <div style={{
           padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-bg-secondary)',
@@ -770,11 +770,11 @@ const DoctorQueuePanel = ({
           })
           }
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Информация о настройках очереди */}
       {doctorInfo &&
-      <MacOSCard style={{
+      <Card style={{
         padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-accent)',
         border: '1px solid var(--mac-accent)'
@@ -804,7 +804,7 @@ const DoctorQueuePanel = ({
           <div>Кабинет: {doctorInfo.doctor.cabinet}</div>
           }
           </div>
-        </MacOSCard>
+        </Card>
       }
     </div>);
 

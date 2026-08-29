@@ -18,7 +18,7 @@ import {
   AlertCircle } from
 'lucide-react';
 import {
-  MacOSCard, Button, Skeleton,
+  Card, Button, Skeleton,
   Input } from '../ui/macos';
 
 import logger from '../../utils/logger';
@@ -216,18 +216,18 @@ const DoctorServiceSelector = ({
 
   if (loading) {
     return (
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-6)' }}>
         <Skeleton />
-      </MacOSCard>);
+      </Card>);
 
   }
 
   if (error) {
     return (
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)', display: 'flex', alignItems: 'center', color: 'var(--mac-red-600)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-6)', display: 'flex', alignItems: 'center', color: 'var(--mac-red-600)' }}>
         <AlertCircle size={20} style={{ marginRight: 'var(--mac-spacing-2)' }} />
         <span>{error}</span>
-      </MacOSCard>);
+      </Card>);
 
   }
 
@@ -235,7 +235,7 @@ const DoctorServiceSelector = ({
     <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
       {/* Итоговая информация */}
       {selectedServices.length > 0 &&
-      <MacOSCard style={{
+      <Card style={{
         padding: 'var(--mac-spacing-4)',
         background: 'linear-gradient(135deg, var(--mac-success-bg) 0%, var(--mac-success-bg-light) 100%)',
         border: '1px solid var(--mac-success-border)'
@@ -282,12 +282,12 @@ const DoctorServiceSelector = ({
             }}>{t('misc.dss_stoimost')}</div>
             </div>
           </div>
-        </MacOSCard>
+        </Card>
       }
 
       {/* Выбранные услуги */}
       {selectedServices.length > 0 &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-4)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-4)' }}>
           <h3 style={{
           fontSize: 'var(--mac-font-size-lg)',
           fontWeight: 'var(--mac-font-weight-medium)',
@@ -419,7 +419,7 @@ const DoctorServiceSelector = ({
               </div>
           )}
           </div>
-        </MacOSCard>
+        </Card>
       }
 
       {/* Доступные услуги */}
@@ -429,7 +429,7 @@ const DoctorServiceSelector = ({
           const categoryName = categoryNames[categoryCode] || categoryData.category.name_ru;
 
           return (
-            <MacOSCard key={categoryCode} style={{ padding: 'var(--mac-spacing-4)' }}>
+            <Card key={categoryCode} style={{ padding: 'var(--mac-spacing-4)' }}>
               <h3 style={{
                 fontSize: 'var(--mac-font-size-lg)',
                 fontWeight: 'var(--mac-font-weight-medium)',
@@ -527,13 +527,13 @@ const DoctorServiceSelector = ({
 
                 })}
               </div>
-            </MacOSCard>);
+            </Card>);
 
         })}
       </div>
 
       {Object.keys(services).length === 0 &&
-      <MacOSCard style={{ padding: '32px', textAlign: 'center' }}>
+      <Card style={{ padding: '32px', textAlign: 'center' }}>
           <Package size={48} style={{
           margin: '0 auto 16px auto',
           color: 'var(--mac-text-tertiary)'
@@ -551,7 +551,7 @@ const DoctorServiceSelector = ({
         }}>
             Добавьте услуги для специальности «{specialty}» в админ панели
           </p>
-        </MacOSCard>
+        </Card>
       }
     </div>);
 
