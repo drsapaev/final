@@ -872,10 +872,14 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // a nonempty `filterConfig` entry would keep constraining rows invisibly.
   // Clear the filter for every column transitioning visible → hidden via the
   // existing `onFilter` contract.
+  // Codex P2 #8 (PR 2885 round 6): compare against the EFFECTIVE (post-
+  // normalization) visibility — under an all-false normalized map every column
+  // is VISIBLE, so unchecking one must clear its filter even though the raw
+  // map carries `false` for it.
   const handleColumnVisibilityChange = (next: Record<string, boolean>): void => {
     if (onFilter && filterConfig) {
       for (const [key, visible] of Object.entries(next)) {
-        if (!visible && columnVisibility?.[key] !== false && filterConfig[key]) {
+        if (!visible && effectiveColumnVisibility?.[key] !== false && filterConfig[key]) {
           onFilter(key, '');
         }
       }
@@ -970,14 +974,35 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // `data-index` + the virtualizer's `measureElement` ref (Codex P2-1/P2-4:
   // measured geometry — actual row heights drive the spacers, so content
   // taller than the rowHeight estimate cannot desynchronize the scrollbar).
+  // Visible window + spacer geometry (PR-UI-09e-1; empty while inactive).
+  // Declared before renderDataRow: the roving tab-stop computation below
+  // reads the rendered window bounds.
+  const virtualRows = virtualizationActive ? rowVirtualizer.getVirtualItems() : [];
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom = virtualRows.length > 0
+    ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+    : 0;
+
   // PR-UI-12: when `keyboardNavigation` is on, rows carry a roving tabindex
   // (active row `0`, others `-1`) + `data-row-index` for focus targeting.
+  // Codex P2 #9 (PR 2885 round 6): under virtualization, manually scrolling
+  // far enough unmounts the ACTIVE row — every mounted row would then carry
+  // `tabIndex=-1` and the window would have no tab stop. When the active row
+  // is outside the rendered window, the FIRST rendered virtual row serves as
+  // the tab stop (arrowing from it resumes roving movement normally).
+  const virtualWindowStart = virtualRows.length > 0 ? virtualRows[0].index : -1;
+  const virtualWindowEnd = virtualRows.length > 0 ? virtualRows[virtualRows.length - 1].index : -1;
+  const activeRowInWindow = !virtualizationActive
+    || (safeActiveRowIndex >= virtualWindowStart && safeActiveRowIndex <= virtualWindowEnd);
+  const effectiveActiveRowIndex = activeRowInWindow
+    ? safeActiveRowIndex
+    : Math.max(0, virtualWindowStart);
   const renderDataRow = (row: Row, rowIndex: number) => {
     const isSelected = isRowSelected(row, rowIndex);
     const hasRowHandler = Boolean(onRowClick || (selectable && onRowSelect));
     const rowKeyDownEnabled = hasRowHandler || rovingFocusEnabled;
     const rowTabIndex = rovingFocusEnabled
-      ? (rowIndex === safeActiveRowIndex ? 0 : -1)
+      ? (rowIndex === effectiveActiveRowIndex ? 0 : -1)
       : (hasRowHandler ? 0 : undefined);
     return (
       <tr
@@ -1007,13 +1032,6 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
       </tr>
     );
   };
-
-  // Visible window + spacer geometry (PR-UI-09e-1; empty while inactive).
-  const virtualRows = virtualizationActive ? rowVirtualizer.getVirtualItems() : [];
-  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
-  const paddingBottom = virtualRows.length > 0
-    ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
-    : 0;
 
   return wrapWithToolbar(
     <div

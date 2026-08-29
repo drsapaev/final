@@ -1032,6 +1032,105 @@ describe('DataTable — PR-UI-12 features (DT-17..27)', () => {
     expect(onColumnVisibilityChange).toHaveBeenCalledWith({ name: false });
   });
 
+  it('DT-41: virtualized window keeps a tab stop when the active row is off-window (Codex P2 round 6)', async () => {
+    // jsdom performs no layout — mock the geometry (same pattern as DT-13..16;
+    // scrollToIndex cannot drive the window here, so the window is moved by a
+    // manual scrollTop assignment like DT-14).
+    const trDescriptor = Object.getOwnPropertyDescriptor(HTMLTableRowElement.prototype, 'offsetHeight');
+    const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetHeight');
+    Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get: () => 20
+    });
+    Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', {
+      configurable: true,
+      value: 200
+    });
+    try {
+      const bigData = Array.from({ length: 200 }, (_, i) => ({
+        id: `r${i}`,
+        name: `Name ${i}`,
+        age: 20 + i,
+        city: `City ${i}`
+      }));
+      const { container } = render(
+        <DataTable
+          columns={columns}
+          data={bigData}
+          keyboardNavigation
+          virtualized
+          maxHeight={200}
+          rowHeight={20}
+        />
+      );
+
+      // Initial window at the top: the active row (0) is mounted and holds
+      // the tab stop.
+      const firstRow = screen.getByText('Name 0').closest('tr') as HTMLElement;
+      expect(firstRow.getAttribute('tabIndex')).toBe('0');
+
+      // Manually scroll to the tail: the active row (0) unmounts — every
+      // mounted row must NOT end up with tabIndex=-1.
+      const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+      wrapper.scrollTop = 200 * 20 - 200;
+      fireEvent.scroll(wrapper);
+      await waitFor(() => {
+        expect(screen.getByText('Name 199').closest('tr')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Name 0')).toBeNull();
+
+      // Exactly ONE mounted row carries tabIndex=0 — the window keeps a tab
+      // stop while the active row is off-window. The stop is the FIRST row
+      // of the rendered virtual window (overscan included).
+      const mountedRows = Array.from(
+        container.querySelectorAll('tbody tr[data-row-index]')
+      ) as HTMLElement[];
+      expect(mountedRows.length).toBeGreaterThan(0);
+      const tabStops = mountedRows.filter((tr) => tr.getAttribute('tabIndex') === '0');
+      expect(tabStops.length).toBe(1);
+      expect(tabStops[0]).toBe(mountedRows[0]);
+    } finally {
+      // The DT-13..16 block restores/deletes these descriptors in its own
+      // afterEach — they may be absent here, so restore only when defined.
+      if (trDescriptor) {
+        Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', trDescriptor);
+      } else {
+        Reflect.deleteProperty(HTMLTableRowElement.prototype, 'offsetHeight');
+      }
+      if (divDescriptor) {
+        Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', divDescriptor);
+      } else {
+        Reflect.deleteProperty(HTMLDivElement.prototype, 'offsetHeight');
+      }
+    }
+  });
+
+  it('DT-42: filter clearing compares against EFFECTIVE visibility (normalized map) (Codex P2 round 6)', () => {
+    const onFilter = vi.fn();
+    const onColumnVisibilityChange = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        filterable
+        filterConfig={{ name: 'Bo' }}
+        onFilter={onFilter}
+        showColumnToggle
+        // All-false map: normalized to all-visible.
+        columnVisibility={{ name: false, age: false, city: false }}
+        onColumnVisibilityChange={onColumnVisibilityChange}
+      />
+    );
+
+    // Uncheck 'name' (rendered visible via normalization, filter active).
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+    fireEvent.click(screen.getByLabelText('Name'));
+
+    // The filter IS cleared: the comparison uses the effective map, not the
+    // raw all-false one.
+    expect(onFilter).toHaveBeenCalledWith('name', '');
+  });
+
 });
 
 describe('DataTable — PR-UI-12 toolbar i18n contract (DT-28)', () => {
