@@ -1043,8 +1043,23 @@ const RegistrarPanel = () => {
       <ErrorBoundary
         onError={(error, errorInfo) => {
           logger.error('[RegistrarPanel] AppointmentWizardV2 crashed:', error, errorInfo);
+          // Codex P2-1 (PR-UI-13-4): reset the wizard-open state from the crash
+          // path — otherwise showWizard stays true while the boundary holds
+          // hasError, the auto-refresh effect keeps treating the wizard as an
+          // open dialog, and the wizard cannot be reopened normally.
+          setWizardEditMode(false);
+          setWizardInitialData(null);
+          setShowWizard(false);
         }}
-        theme={{ theme }}>
+        theme={{
+          // Codex P2-2 (PR-UI-13-4): ErrorBoundary's fallback styles read the
+          // theme helper functions — passing only the mode string left the
+          // recovery screen with unstyled raw fallback values.
+          theme,
+          getColor,
+          getSpacing,
+          getFontSize,
+        }}>
         <AppointmentWizardV2
         isOpen={showWizard}
         editMode={wizardEditMode} // ✨ НОВОЕ: Передаем режим
