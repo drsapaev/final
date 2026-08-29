@@ -249,6 +249,20 @@ const QueueTable = ({
                 hoverable={true}
                 size="md"
                 variant="default"
+                // PR-UI-12-2 (plan §PR-UI-12 item 2): roving keyboard navigation
+                // — ArrowUp/ArrowDown/Home/End move focus between queue rows so
+                // keyboard and screen-reader users can review the queue without
+                // a pointer.
+                //
+                // Contract reconciliation (AGENTS_UI workflow step 4 / §18):
+                // the plan's original wording "Enter для вызова пациента" (a
+                // per-row call action) is superseded by the repo invariant in
+                // QueueManager.contract.test.tsx — "keeps registrar queue
+                // call-next as a backend-owned command, not a row command".
+                // Queue calling stays strictly ordered through the manager's
+                // call-next button (already keyboard-accessible via Tab+Enter);
+                // rows expose focus movement only, no row-level actions.
+                keyboardNavigation
                 getRowId={(row: QueueTableEntry, index: number) => row.id ?? `qt-row-${index}`}
             />
         </div>
