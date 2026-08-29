@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Skeleton,
@@ -183,7 +183,7 @@ const FCMManager = () => {
   const renderOverview = () =>
   <div className="admin-flex-col-24">
       {/* Статус FCM */}
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8-3">
           <Activity className="admin-icon-20" />
           {t('admin2.fcm_heading_status')}
@@ -237,10 +237,10 @@ const FCMManager = () => {
             <Smartphone className="admin-w-24-h-24-blue" />
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Быстрые действия */}
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8-2">
           <Zap className="admin-icon-20" />
           {t('admin2.fcm_heading_quick_actions')}
@@ -274,13 +274,13 @@ const FCMManager = () => {
             {t('admin2.fcm_btn_send_notification')}
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderNotifications = () =>
   <div className="admin-flex-col-24">
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8-1">
           <Send className="admin-icon-20" />
           {t('admin2.fcm_heading_send')}
@@ -393,13 +393,13 @@ const FCMManager = () => {
             {loading ? t('admin2.fcm_btn_sending') : t('admin2.fcm_btn_send')}
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderUsers = () =>
   <div className="admin-flex-col-24">
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8">
           <Users className="admin-icon-20" />
           {t('admin2.fcm_heading_users', { count: usersWithTokens.length })}
@@ -449,7 +449,7 @@ const FCMManager = () => {
             </div>
         }
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
