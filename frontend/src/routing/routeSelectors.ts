@@ -8,7 +8,11 @@ import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } fro
 // user-select) so an administrator can discover them from the sidebar instead
 // of having to guess URLs. Section placed last so it appears at the bottom of
 // the admin sidebar — predictable location for "low-frequency configuration".
-const ADMIN_SECTION_ORDER = ['Обзор', 'Пациенты и запись', 'Финансы', 'Клиника и очередь', 'Коммуникации', 'Система'];
+// PR-UI-19 (C-6): section order keyed by nav.sectionKey (was raw Russian section text;
+// identical ordering — 'Обзор'→nav.overview, 'Пациенты и запись'→nav.section_patients_booking,
+// 'Финансы'→nav.finance, 'Клиника и очередь'→nav.section_clinic_queue,
+// 'Коммуникации'→nav.section_communications, 'Система'→nav.system).
+const ADMIN_SECTION_ORDER = ['nav.overview', 'nav.section_patients_booking', 'nav.finance', 'nav.section_clinic_queue', 'nav.section_communications', 'nav.system'];
 export const PROTECTED_PATIENT_PAYMENT_ENTRY_ROUTE_ID = 'patient-payment-entry';
 export const PROTECTED_PATIENT_BOOKING_ENTRY_ROUTE_ID = 'patient-booking-entry';
 export const PROTECTED_PATIENT_FORMS_ENTRY_ROUTE_ID = 'patient-forms-entry';
@@ -16,7 +20,15 @@ export const PROTECTED_PATIENT_FORMS_ENTRY_ROUTE_ID = 'patient-forms-entry';
 // Route registry is defined in routeRegistry.ts which is currently implicit-any.
 // We model the canonical surface we read here and access fields defensively.
 interface RouteNavMeta {
+  // PR-UI-19 (C-6): nav labels are i18n keys now (nav.* in all 5 locales).
+  // `label` is kept optional for the legacy Nav.tsx consumer (PR-UI-17 owns its
+  // deletion); no registry entry emits it anymore.
   label?: string;
+  labelKey?: string;
+  badgeKey?: string;
+  tooltipKey?: string;
+  ariaLabelKey?: string;
+  sectionKey?: string;
   icon?: string;
   badge?: string;
   tooltip?: string;
@@ -74,7 +86,13 @@ export interface RouteProfile {
 interface SidebarItem {
   id: string;
   to: string;
-  label: string;
+  /** PR-UI-19 (C-6): i18n keys (nav.*); resolved by Sidebar via useTranslation. */
+  labelKey?: string;
+  badgeKey?: string;
+  tooltipKey?: string;
+  ariaLabelKey?: string;
+  /** Fallback text (route title) when labelKey is absent or missing everywhere. */
+  label?: string;
   icon: string;
   badge?: string;
   tooltip?: string;
@@ -83,6 +101,8 @@ interface SidebarItem {
 }
 
 interface SidebarSection {
+  /** PR-UI-19 (C-6): i18n key for the section heading (nav.*), resolved in Sidebar. */
+  titleKey?: string;
   title: string;
   items: SidebarItem[];
 }
@@ -346,8 +366,8 @@ export function getAdminNavRoutes(
     .sort((left, right) => {
       const leftNav = typeof left.nav === 'object' ? left.nav : null;
       const rightNav = typeof right.nav === 'object' ? right.nav : null;
-      const leftSectionIndex = ADMIN_SECTION_ORDER.indexOf(leftNav?.section || '');
-      const rightSectionIndex = ADMIN_SECTION_ORDER.indexOf(rightNav?.section || '');
+      const leftSectionIndex = ADMIN_SECTION_ORDER.indexOf(leftNav?.sectionKey || '');
+      const rightSectionIndex = ADMIN_SECTION_ORDER.indexOf(rightNav?.sectionKey || '');
       if (leftSectionIndex !== rightSectionIndex) {
         return (leftSectionIndex === -1 ? ADMIN_SECTION_ORDER.length : leftSectionIndex) -
           (rightSectionIndex === -1 ? ADMIN_SECTION_ORDER.length : rightSectionIndex);
@@ -362,12 +382,16 @@ export function getAdminNavSections(
 ): SidebarSection[] {
   return getAdminNavRoutes(profile, options).reduce<SidebarSection[]>((sections, route) => {
     const routeNav = typeof route.nav === 'object' ? route.nav : null;
-    const sectionName = routeNav?.section || 'General';
-    const existingSection = sections.find((section) => section.title === sectionName);
+    const sectionName = routeNav?.sectionKey || 'General';
+    const existingSection = sections.find((section) => (section.titleKey || section.title) === sectionName);
     const item: SidebarItem = {
       id: route.id,
       to: route.path,
+      labelKey: routeNav?.labelKey,
       label: routeNav?.label || route.title,
+      badgeKey: routeNav?.badgeKey,
+      tooltipKey: routeNav?.tooltipKey,
+      ariaLabelKey: routeNav?.ariaLabelKey,
       icon: routeNav?.icon || 'circle',
       badge: routeNav?.badge,
       tooltip: routeNav?.tooltip,
@@ -444,11 +468,15 @@ export function getRouteChromeState(
       const navMeta = typeof navRoute.nav === 'object' ? navRoute.nav : null;
       return {
         id: navRoute.id,
+        labelKey: navMeta?.labelKey,
         label: navMeta?.label || navRoute.title,
         icon: navMeta?.icon || 'circle',
         badge: navMeta?.badge,
+        badgeKey: navMeta?.badgeKey,
         tooltip: navMeta?.tooltip,
+        tooltipKey: navMeta?.tooltipKey,
         ariaLabel: navMeta?.ariaLabel,
+        ariaLabelKey: navMeta?.ariaLabelKey,
         to: navRoute.path,
       };
     });
@@ -458,11 +486,15 @@ export function getRouteChromeState(
       const navMeta = typeof navRoute.nav === 'object' ? navRoute.nav : null;
       return {
         id: navRoute.id,
+        labelKey: navMeta?.labelKey,
         label: navMeta?.label || navRoute.title,
         icon: navMeta?.icon || 'circle',
         badge: navMeta?.badge,
+        badgeKey: navMeta?.badgeKey,
         tooltip: navMeta?.tooltip,
+        tooltipKey: navMeta?.tooltipKey,
         ariaLabel: navMeta?.ariaLabel,
+        ariaLabelKey: navMeta?.ariaLabelKey,
         to: navRoute.path,
       };
     });
