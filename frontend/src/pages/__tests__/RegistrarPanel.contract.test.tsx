@@ -13,6 +13,9 @@ const registrarPanelPath = path.resolve(__dirname, '../RegistrarPanel.tsx');
 // Decomp step 3: reschedule helpers extracted to ./registrar/useRegistrarReschedule.js.
 // Decomp step 4: data-loading functions extracted to ./registrar/useRegistrarData.js.
 // Decomp step 5: record action handlers extracted to ./registrar/useRegistrarActions.js.
+// PR-UI-13-1 (Decomp 8): queue entry adapter + worklist data lifecycle hook.
+const registrarQueueAdapterPath = path.resolve(__dirname, '../registrar/registrarQueueAdapter.ts');
+const useRegistrarWorklistDataPath = path.resolve(__dirname, '../registrar/useRegistrarWorklistData.ts');
 // Contract tests must read all files because they verify that certain
 // functions exist in the registrar panel source tree (not necessarily
 // in the orchestrator file itself).
@@ -36,6 +39,10 @@ const readRegistrarSourceTree = () => [
   normalizeSource(fs.readFileSync(useRegistrarDataPath, 'utf8')),
   '// ─── useRegistrarActions.js ───',
   normalizeSource(fs.readFileSync(useRegistrarActionsPath, 'utf8')),
+  '// ─── registrarQueueAdapter.js (PR-UI-13-1) ───',
+  normalizeSource(fs.readFileSync(registrarQueueAdapterPath, 'utf8')),
+  '// ─── useRegistrarWorklistData.js (PR-UI-13-1) ───',
+  normalizeSource(fs.readFileSync(useRegistrarWorklistDataPath, 'utf8')),
 ].join('\n\n');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
@@ -304,6 +311,24 @@ describe('RegistrarPanel command contract', () => {
     expect(source).toContain('return sortRegistrarRowsForPresentation(searched)');
     expect(source).toContain('const sortedAggregated = sortRegistrarRowsForPresentation(aggregatedPatients)');
     expect(source).toContain('return sortRegistrarRowsForPresentation(appointments');
+  });
+
+  it('delegates the worklist data lifecycle to useRegistrarWorklistData (PR-UI-13-1)', () => {
+    // Decomposition boundary contract: the orchestrator must consume the
+    // extracted hook, and the fetch + refresh machinery must live ONLY in the
+    // hook (no duplicate inline copy left behind in the panel).
+    const panelSource = readRegistrarPanelSource();
+    const hookSource = normalizeSource(fs.readFileSync(useRegistrarWorklistDataPath, 'utf8'));
+
+    expect(panelSource).toContain('useRegistrarWorklistData({');
+    expect(panelSource).not.toContain("api.get('/registrar/queues/today'");
+    expect(hookSource).toContain("api.get('/registrar/queues/today'");
+    // Reducer state machine (plan §PR-UI-13): state slice owned by useReducer.
+    expect(hookSource).toContain('useReducer(worklistDataReducer');
+    // Refresh lifecycle ports (window-event listeners + interval).
+    expect(hookSource).toContain("window.addEventListener('queueUpdated'");
+    expect(hookSource).toContain("window.addEventListener('departments:updated'");
+    expect(hookSource).toContain('setInterval');
   });
 
   it('does not use appointment or queue ids as visit ids for reschedule commands', () => {
