@@ -15,7 +15,7 @@
 - [ ] Brevo account (SMTP — see policy below)
 - [ ] Sentry account (backend + frontend projects)
 - [ ] Vercel account (frontend hosting)
-- [ ] Windows host with Python 3.11+, PostgreSQL 17 client tools
+- [ ] Windows host with Python 3.11+. PostgreSQL 17 client tools must be installed; application resolves pg_dump/pg_restore through the repository resolver (`_resolve_pg_tool`). PATH presence is not required
 
 ## Brevo Policy
 
@@ -29,7 +29,7 @@ Two valid options — **record which one is chosen**:
 ## ENCRYPTION_KEY — Critical
 
 ```text
-ENCRYPTION_KEY → encrypts backups → backup without key = unusable
+ENCRYPTION_KEY → encrypts .dump.enc artifacts (external Task Scheduler backup)
 ```
 
 - Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
@@ -39,6 +39,8 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 - Restoration procedure: key + `.enc` file → decrypt → pg_restore
 - **Verify restore with this key** before declaring deployment complete
 
+> **Important**: R2 `.db.gz` artifacts created by `BackupService.create_backup()` are gzip-compressed but NOT encrypted with `ENCRYPTION_KEY`. They are protected by R2 bucket access controls. The `.dump.enc` artifacts from the external Task Scheduler script ARE encrypted. These are two separate artifact types with different protection models.
+
 ## Step-by-Step Procedure
 
 ### Phase 1: Supabase
@@ -46,9 +48,9 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | Step | Action | Verification |
 |---|---|---|
 | 1.1 | Create Supabase project | Dashboard shows project active |
-| 1.2 | Copy DATABASE_URL (session pooler :5432) | `.env` DATABASE_URL set |
+| 1.2 | Copy `DATABASE_URL` — use canonical Supabase session-pooler URI (`:5432`, db `postgres`). Verify: `SELECT current_database(), current_user` | `.env` DATABASE_URL set |
 | 1.3 | Run `alembic upgrade head` | 171 tables created, no errors |
-| 1.4 | Enable RLS policies | Supabase dashboard → RLS enabled |
+| 1.4 | Enable RLS (deny-all baseline) on all application tables via Alembic migration. Do not invent ad-hoc Supabase policies. Verify anon/authenticated roles cannot read PHI through Data API. Application authorization enforced by FastAPI/RBAC | RLS enabled, Data API returns 0 rows for anon |
 | 1.5 | Verify: `SELECT count(*) FROM users` → 0 | Clean schema |
 
 **Failure handling**: if alembic fails, check DATABASE_URL. Do NOT proceed without clean migration.
@@ -78,7 +80,7 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | 3.1 | `cloudflared tunnel create <clinic-name>` | Credentials file created |
 | 3.2 | DNS CNAME: `<subdomain>` → `<tunnel-id>.cfargotunnel.com` | DNS resolves |
 | 3.3 | `config.yml`: ingress → `http://localhost:18000` | Config valid |
-| 3.4 | Set `protocol: http2` in config.yml | QUIC unreliable on home ISP |
+| 3.4 | Set `protocol: http2` in config.yml. Prefer HTTP/2 for this deployment unless QUIC has been explicitly validated on target ISP | Tunnel connects via HTTP/2 |
 | 3.5 | `cloudflared tunnel run <clinic-name>` | `curl https://api.<domain>/api/v1/health` → 200 |
 | 3.6 | Autostart script in Startup folder | Survives reboot |
 
@@ -89,7 +91,7 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | Step | Action | Verification |
 |---|---|---|
 | 4.1 | Create bucket `<clinic-name>-db-backups` | Dashboard shows bucket |
-| 4.2 | Create API token (Object Read & Write, scoped to this bucket) | 3 values obtained |
+| 4.2 | Create **backup-writer** token (Object Read & Write, scoped to this bucket) and **restore-reader** token (Object Read Only, same bucket). Production restore uses restore-reader; writer used for restore only as documented exception | 3+3 values obtained |
 | 4.3 | Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` in `.env` | Present |
 | 4.4 | Set lifecycle: `daily/` ×30d, `weekly/` ×84d | Dashboard shows rules |
 | 4.5 | Test upload: run manual backup, verify in R2 | Object in `daily/` |
@@ -104,7 +106,7 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | 5.3 | Verify domain in Brevo | All checks green |
 | 5.4 | Create SMTP key → `SMTP_PASSWORD` in `.env` | Key works |
 | 5.5 | Set `SMTP_FROM=no-reply@<clinic-domain>` | In `.env` |
-| 5.6 | **Disable IP blocking** for SMTP keys (dynamic ISP IP) | Security → IP blocking → Deactivated |
+| 5.6 | SMTP IP restriction must match the actual egress model. Disable only when the origin has no stable allowlisted IP (e.g. dynamic ISP). On VPS/static IP, keep IP allowlisting enabled | Security → IP blocking → matches egress model |
 | 5.7 | Send test email via password-reset flow | Email delivered, link works |
 
 ### Phase 6: Sentry
@@ -125,14 +127,24 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | 7.3 | Set env: `VITE_SENTRY_DSN` | Set |
 | 7.4 | Assign domain `<clinic-domain>` | HTTPS working |
 
-### Phase 8: Task Scheduler (External Backup)
+### Phase 8: External Encrypted Backup (Task Scheduler)
+
+> This phase creates a SEPARATE, ENCRYPTED backup pipeline that is independent
+> from the internal `BackupService.create_backup()` R2 backups. The two systems
+> produce different artifact types:
+> - **R2 `.db.gz`** (internal scheduler): gzip-compressed, NOT encrypted with ENCRYPTION_KEY, protected by R2 access controls
+> - **`.dump.enc`** (external Task Scheduler): Fernet-encrypted with ENCRYPTION_KEY, stored locally
+
+The external backup script (`backups/backup_supabase.py`) is **gitignored** and must be manually deployed to the host. It is not part of the git repository.
 
 | Step | Action | Verification |
 |---|---|---|
-| 8.1 | Copy `backups/backup_supabase.py` to host | File exists |
-| 8.2 | Create Task Scheduler job: daily 03:00, runs `python backup_supabase.py` | Task exists |
-| 8.3 | Run manually → verify `.dump.enc` file created (non-zero) | File present |
+| 8.1 | Copy `backups/backup_supabase.py` to host (path: `C:\final\backups\`) | File exists, `ENCRYPTION_KEY` present in `backend/.env` |
+| 8.2 | Create Task Scheduler job: daily 03:00, runs `python backup_supabase.py` (cwd = `C:\final\backups`) | Task exists, last result = 0 |
+| 8.3 | Run manually → verify `.dump.enc` file created (non-zero) | File present, SHA256 recorded |
 | 8.4 | Verify ENCRYPTION_KEY: decrypt test file → pg_restore succeeds | Round-trip OK |
+
+**Failure handling**: if pg_dump not found, ensure PostgreSQL 17 client tools installed (application resolver handles path; Task Scheduler context may differ from uvicorn). If `EMAXCONNSESSION`, wait for backend connection to release and retry.
 
 ### Phase 9: First Admin + Smoke Test
 
@@ -147,17 +159,23 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | 9.7 | WebSocket chat → connect + message | WS works |
 | 9.8 | Sentry: trigger test error → verify in dashboard + email | Alerting works |
 | 9.9 | Backup: run manual → verify R2 object | Backup works |
-| 9.10 | Reboot machine → wait 60s → health 200 | Autostart works |
+| 9.10 | Reboot machine → wait → verify: uvicorn process = 1, cloudflared process = 1, tunnel registered (shared log), public API = 200, WS handshake OK | Full autostart + API chain works |
 
 ### Final Acceptance
 
 ```text
-ALL boxes above checked
+ALL boxes in Phases 1–9 checked
+         ↓
+STAGING_VALIDATION.md checklist passed
+         ↓
+scripts/smoke_test_staging.sh passed
          ↓
 DEPLOYMENT VERIFIED ✅
 ```
 
 **Any unchecked box = deployment NOT complete.**
+
+> **STAGING_VALIDATION.md** covers: AI safety contract, arq worker, PII scrubbing, DR drill, unit/build tests, Sentry smoke, pre-commit hooks, Telegram bot. The automated smoke test (`scripts/smoke_test_staging.sh`) covers the critical path. Neither may be skipped.
 
 ---
 
