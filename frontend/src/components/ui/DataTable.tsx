@@ -845,6 +845,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // otherwise every return path below renders the exact pre-PR-UI-12 DOM
   // (single `.mac-table-scroll-wrapper` root, no wrapper element).
   const toolbarEnabled = Boolean(showColumnToggle || showDensityToggle);
+  // Main-path toolbar (all non-children branches).
   const toolbarNode = toolbarEnabled ? (
     <TableToolbar
       columns={columns}
@@ -856,8 +857,12 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
       showDensityToggle={showDensityToggle}
     />
   ) : null;
-  const wrapWithToolbar = (node: ReactNode): ReactNode =>
-    toolbarEnabled ? <div className="mac-table-shell">{toolbarNode}{node}</div> : node;
+  // Codex P2 (PR 2885 round 4): on the `children` composition path the
+  // consumer renders thead/tbody verbatim — neither columnVisibility nor
+  // density can reach into consumer-supplied cells, so the toolbar would
+  // advertise controls that do nothing. Suppress it entirely there.
+  const wrapWithToolbar = (node: ReactNode, toolbar: ReactNode = toolbarNode): ReactNode =>
+    toolbar ? <div className="mac-table-shell">{toolbar}{node}</div> : node;
 
   // Error state takes precedence over loading/empty (NEW — when `error` prop provided).
   if (error) {
@@ -887,6 +892,10 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   }
 
   if (children) {
+    // Composition path (e.g. TelegramManager.tsx:2200): children render
+    // verbatim — zero-delta. Toolbar suppressed: columnVisibility/density
+    // apply to the MAIN data path this component renders, not to consumer
+    // cells (Codex P2, PR 2885 round 4).
     return wrapWithToolbar(
       <div className="mac-table-scroll-wrapper" aria-busy={loading}>
         <table className={className} style={tableStyle} aria-label={ariaLabel}>
@@ -901,7 +910,8 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
             onPageChange={onPageChange}
           />
         ) : null}
-      </div>
+      </div>,
+      null
     );
   }
 

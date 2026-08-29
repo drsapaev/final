@@ -948,6 +948,50 @@ describe('DataTable — PR-UI-12 features (DT-17..27)', () => {
     expect(screen.queryByText('B')).toBeNull();
   });
 
+  it('DT-37: children composition path suppresses the toolbar entirely (Codex P2 round 4)', () => {
+    const { container } = render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        showDensityToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+        onDensityChange={vi.fn()}
+      >
+        <tbody>
+          <tr>
+            <td>composed</td>
+          </tr>
+        </tbody>
+      </DataTable>
+    );
+
+    // Composition mode: no toolbar shell, no toolbar — columnVisibility and
+    // density cannot reach consumer-supplied children, so the controls must
+    // not be advertised. Children render verbatim (zero-delta root).
+    expect(container.querySelector('.mac-table-shell')).toBeNull();
+    expect(container.querySelector('.mac-table-toolbar')).toBeNull();
+    expect(container.querySelector('.mac-table-scroll-wrapper')).not.toBeNull();
+    expect(screen.getByText('composed')).toBeInTheDocument();
+  });
+
+  it('DT-38: non-children paths keep the toolbar with both controls enabled', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        showDensityToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+        onDensityChange={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('button', { name: /Колонки|Columns/ })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /Плотность|density/i })).toBeInTheDocument();
+  });
+
 });
 
 describe('DataTable — PR-UI-12 toolbar i18n contract (DT-28)', () => {

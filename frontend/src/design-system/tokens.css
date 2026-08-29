@@ -1029,6 +1029,17 @@
   .mac-nav-item:hover {
     background: var(--mac-bg-secondary);
   }
+
+  /* PR-UI-12 (Codex P2, round 4): toolbar controls are ~24px tall at the
+   * 11px xs font size — below the 44px comfortable-touch target. Enlarge
+   * them for coarse pointers; the layout keeps its compact desktop metrics.
+   */
+  .mac-table-toolbar__button,
+  .mac-table-toolbar__density-option {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: var(--mac-font-size-sm, 12px);
+  }
 }
 
 /* macOS High Contrast Support */
