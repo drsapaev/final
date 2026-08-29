@@ -29,7 +29,7 @@ Two valid options — **record which one is chosen**:
 ## ENCRYPTION_KEY — Critical
 
 ```text
-ENCRYPTION_KEY → encrypts backups → backup without key = unusable
+ENCRYPTION_KEY → encrypts .dump.enc artifacts (external Task Scheduler backup)
 ```
 
 - Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
@@ -38,6 +38,8 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 - **Backup outside production host** (printed on paper / password manager)
 - Restoration procedure: key + `.enc` file → decrypt → pg_restore
 - **Verify restore with this key** before declaring deployment complete
+
+> **Important**: R2 `.db.gz` artifacts created by `BackupService.create_backup()` are gzip-compressed but NOT encrypted with `ENCRYPTION_KEY`. They are protected by R2 bucket access controls. The `.dump.enc` artifacts from the external Task Scheduler script ARE encrypted. These are two separate artifact types with different protection models.
 
 ## Step-by-Step Procedure
 
@@ -78,7 +80,7 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | 3.1 | `cloudflared tunnel create <clinic-name>` | Credentials file created |
 | 3.2 | DNS CNAME: `<subdomain>` → `<tunnel-id>.cfargotunnel.com` | DNS resolves |
 | 3.3 | `config.yml`: ingress → `http://localhost:18000` | Config valid |
-| 3.4 | Set `protocol: http2` in config.yml | QUIC unreliable on home ISP |
+| 3.4 | Set `protocol: http2` in config.yml. Prefer HTTP/2 for this deployment unless QUIC has been explicitly validated on target ISP | Tunnel connects via HTTP/2 |
 | 3.5 | `cloudflared tunnel run <clinic-name>` | `curl https://api.<domain>/api/v1/health` → 200 |
 | 3.6 | Autostart script in Startup folder | Survives reboot |
 
@@ -125,14 +127,24 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | 7.3 | Set env: `VITE_SENTRY_DSN` | Set |
 | 7.4 | Assign domain `<clinic-domain>` | HTTPS working |
 
-### Phase 8: Task Scheduler (External Backup)
+### Phase 8: External Encrypted Backup (Task Scheduler)
+
+> This phase creates a SEPARATE, ENCRYPTED backup pipeline that is independent
+> from the internal `BackupService.create_backup()` R2 backups. The two systems
+> produce different artifact types:
+> - **R2 `.db.gz`** (internal scheduler): gzip-compressed, NOT encrypted with ENCRYPTION_KEY, protected by R2 access controls
+> - **`.dump.enc`** (external Task Scheduler): Fernet-encrypted with ENCRYPTION_KEY, stored locally
+
+The external backup script (`backups/backup_supabase.py`) is **gitignored** and must be manually deployed to the host. It is not part of the git repository.
 
 | Step | Action | Verification |
 |---|---|---|
-| 8.1 | Copy `backups/backup_supabase.py` to host | File exists |
-| 8.2 | Create Task Scheduler job: daily 03:00, runs `python backup_supabase.py` | Task exists |
-| 8.3 | Run manually → verify `.dump.enc` file created (non-zero) | File present |
+| 8.1 | Copy `backups/backup_supabase.py` to host (path: `C:\final\backups\`) | File exists, `ENCRYPTION_KEY` present in `backend/.env` |
+| 8.2 | Create Task Scheduler job: daily 03:00, runs `python backup_supabase.py` (cwd = `C:\final\backups`) | Task exists, last result = 0 |
+| 8.3 | Run manually → verify `.dump.enc` file created (non-zero) | File present, SHA256 recorded |
 | 8.4 | Verify ENCRYPTION_KEY: decrypt test file → pg_restore succeeds | Round-trip OK |
+
+**Failure handling**: if pg_dump not found, ensure PostgreSQL 17 client tools installed (application resolver handles path; Task Scheduler context may differ from uvicorn). If `EMAXCONNSESSION`, wait for backend connection to release and retry.
 
 ### Phase 9: First Admin + Smoke Test
 
@@ -152,12 +164,18 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 ### Final Acceptance
 
 ```text
-ALL boxes above checked
+ALL boxes in Phases 1–9 checked
+         ↓
+STAGING_VALIDATION.md checklist passed
+         ↓
+scripts/smoke_test_staging.sh passed
          ↓
 DEPLOYMENT VERIFIED ✅
 ```
 
 **Any unchecked box = deployment NOT complete.**
+
+> **STAGING_VALIDATION.md** covers: AI safety contract, arq worker, PII scrubbing, DR drill, unit/build tests, Sentry smoke, pre-commit hooks, Telegram bot. The automated smoke test (`scripts/smoke_test_staging.sh`) covers the critical path. Neither may be skipped.
 
 ---
 
