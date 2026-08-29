@@ -23,7 +23,7 @@ Supabase (single)
 
 | Concern | Why isolated |
 |---|---|
-| PHI isolation | No cross-clinic data leakage even under bug/attack |
+| PHI isolation | Clinic data isolated at the deployment/database boundary, reducing cross-clinic blast radius |
 | Backup/restore | Restore Clinic A never touches Clinic B |
 | Clinic decommission | Delete entire Supabase project + R2 bucket — done |
 | Compliance | Each clinic's data residency can differ |
@@ -39,7 +39,7 @@ Vercel (frontend, React SPA)
        ↓ API calls
 api.<clinic-domain>
        ↓
-Cloudflare Tunnel (HTTP/2, per-clinic)
+Cloudflare Tunnel (per-clinic; prefer HTTP/2 unless QUIC explicitly validated on target ISP)
        ↓ localhost:18000
 Windows Host (uvicorn, FastAPI)
        ↓
