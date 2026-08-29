@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Check, X, ArrowLeft, AlertTriangle } from 'lucide-react';
 import {
-  Button, MacOSCard,
+  Button, Card,
   Input,
   Checkbox } from '../components/ui/macos';
 import { initializeSetup } from '../api/setup';
@@ -416,7 +416,7 @@ export default function Setup() {
 
   return (
     <div className="setup-wrap">
-      <MacOSCard className="setup-card">
+      <Card className="setup-card">
         <div className="setup-hero">
           <span className="setup-badge">First-Run Setup</span>
           <h1 className="setup-heading">{t('misc.setup_heading')}</h1>
@@ -824,7 +824,7 @@ export default function Setup() {
             </div>
           </div>
         </form>
-      </MacOSCard>
+      </Card>
     </div>
   );
 }
