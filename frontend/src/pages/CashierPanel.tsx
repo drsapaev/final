@@ -19,8 +19,6 @@ import { usePayments } from '../hooks/usePayments';
 import { useDebouncedValue } from '../hooks/useDebouncedCallback';
 import { useHotkeys } from '../hooks/useHotkeys';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
-import { getApiOrigin } from '../api/runtime';
-import { api } from '../api/client';  // PR-53: replace raw fetch with axios
 import { getPatient as fetchPatientById } from '../api/patients';
 import type { Patient } from '../types/domain/clinic';
 import { printPanelReceiptInBrowser } from '../services/panelPrint';
@@ -58,358 +56,28 @@ import {
 // ✅ Компоненты для возвратов
 import RefundRequestsTable from '../components/cashier/RefundRequestsTable';
 
-// Функция для получения даты в формате YYYY-MM-DD
-const getLocalDateString = (date = new Date()) => {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+// PR-UI-14-1: module-scope payment contracts & pure helpers moved verbatim
+// to ./cashier/cashierPaymentContracts.ts (behavior-preserving decomposition).
+import {
+  getLocalDateString,
+  DATE_PRESETS,
+  buildPaymentMethodLabels,
+  resolvePaymentId,
+  buildReceiptPrintPayload,
+  getPaymentStatusMeta,
+  getPaymentStatusLabel,
+  resolveSingleCashierVisitId,
+  isBackendGroupedCashierPayment,
+  canCreateDirectCashierPayment,
+  canCreateCashierPayment,
+  createGroupedCashierPayment,
+  hasBackendPaymentAction,
+  type CashierPaymentRow,
+  type CashierPaymentRowOrId,
+  type CashierPaymentData,
+} from './cashier/cashierPaymentContracts';
+import { useCashierWorklistData } from './cashier/useCashierWorklistData';
 
-// STRAT#31 i18n: minimal translation fn signature accepted by the helpers below.
-// The real `t` from useTranslation accepts (key, params?) and returns string;
-// this loose signature keeps the helpers decoupled from the i18n adapter.
-export type CashierTranslationFn = (key: string, params?: Record<string, unknown>) => string;
-
-// Shape of a payment row surfaced by the cashier/payments endpoints.
-// All fields are optional because the backend returns different shapes for
-// grouped vs. direct payments, and the panel must tolerate both.
-export interface CashierPaymentRow {
-  id?: string | number;
-  payment_id?: string | number;
-  grouped_payments?: unknown[];
-  paid_at?: string;
-  created_at?: string;
-  date?: string;
-  time?: string;
-  currency?: string;
-  services_names?: unknown[];
-  services?: unknown[];
-  service?: unknown;
-  total_amount?: number | string;
-  amount?: number | string;
-  method?: string;
-  change_due?: number;
-  change?: number;
-  received_amount?: number;
-  receipt_no?: string;
-  status?: string;
-  patient?: unknown;
-  patient_name?: unknown;
-  patient_phone?: string;
-  patient_id?: string | number;
-  refunded_amount?: number;
-  available_actions?: unknown[];
-  can_cancel?: boolean;
-  can_refund?: boolean;
-  can_print_receipt?: boolean;
-  can_confirm?: boolean;
-  [key: string]: unknown;
-}
-
-// A payment identifier may be passed either as a primitive or as the row object.
-// `null` / `undefined` are permitted so helpers can be called from optional chains.
-export type CashierPaymentRowOrId = string | number | CashierPaymentRow | null | undefined;
-
-// Payment payload sent from PaymentWidget/CashPaymentModal to the panel handlers.
-export interface CashierPaymentData {
-  amount: number | string;
-  method: string;
-  note?: string;
-}
-
-// UX Audit #1.4: Quick date presets for typical financial reporting ranges.
-// Replaces single "Сегодня" button with a 4-option segmented control.
-// Saves cashier clicks when reconciling shifts (typical: «Вчера» / «Неделя»).
-const shiftDay = (days: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return getLocalDateString(d);
-};
-
-// STRAT#31 i18n: DATE_PRESETS uses stable `id` for option value matching.
-// The user-visible label is computed inside the component via tI18n('cashier.range_<id>').
-const DATE_PRESETS = [
-  { id: 'today',   getRange: () => ({ from: getLocalDateString(), to: getLocalDateString() }) },
-  { id: 'yesterday', getRange: () => ({ from: shiftDay(-1), to: shiftDay(-1) }) },
-  { id: 'week',    getRange: () => ({ from: shiftDay(-6), to: getLocalDateString() }) },
-  { id: 'month',   getRange: () => ({ from: shiftDay(-29), to: getLocalDateString() }) },
-];
-
-// Вспомогательная функция для создания прозрачного цвета была удалена (MEDIUM #14 dead code cleanup)
-// STRAT#31 i18n: PAYMENT_METHOD_LABELS converted to a factory that takes `t` (the unified
-// useTranslation t function) so that cash/card labels are reactive to language changes.
-const buildPaymentMethodLabels = (t: CashierTranslationFn) => ({
-  cash: t('cashier.method_cash'),
-  card: t('cashier.method_card'),
-  payme: 'PayMe',
-  click: 'Click',
-});
-
-const resolvePaymentId = (paymentRowOrId: CashierPaymentRowOrId): string | number | null => {
-  if (typeof paymentRowOrId === 'number' || typeof paymentRowOrId === 'string') {
-    return paymentRowOrId;
-  }
-
-  const fromArray = paymentRowOrId?.grouped_payments?.[0];
-  if (typeof fromArray === 'string' || typeof fromArray === 'number') {
-    return fromArray;
-  }
-
-  return (
-    paymentRowOrId?.id ||
-    paymentRowOrId?.payment_id ||
-    null
-  );
-};
-
-const resolvePaymentMethodCode = (method: string | undefined) => {
-  const normalizedMethod = String(method || '').trim().toLowerCase();
-
-  if (!normalizedMethod) return 'cash';
-  if (normalizedMethod === 'наличные') return 'cash';
-  if (normalizedMethod === 'карта') return 'card';
-
-  return normalizedMethod;
-};
-
-const resolvePaymentMethodLabel = (method: unknown, labels: Record<string, string>): string => {
-  const methodCode = resolvePaymentMethodCode(String(method ?? ''));
-  return labels[methodCode] || String(method || labels.cash);
-};
-
-const extractReceiptDateTime = (paymentRow: CashierPaymentRow | null | undefined) => {
-  const sourceTimestamp = paymentRow?.paid_at || paymentRow?.created_at || null;
-  const parsedDate = sourceTimestamp ? parseRegistrarTimestamp(sourceTimestamp) : null;
-  const hasValidDate = parsedDate && !Number.isNaN(parsedDate.getTime());
-
-  return {
-    date: paymentRow?.date || (hasValidDate ? formatRegistrarDate(parsedDate) : ''),
-    time: paymentRow?.time || (
-      hasValidDate
-        ? formatRegistrarTime(parsedDate)
-        : ''
-    )
-  };
-};
-
-const buildReceiptServices = (
-  paymentRow: CashierPaymentRow | null | undefined,
-  totalAmount: number
-): Array<{ name: string; quantity: number; price: number; total: number; currency: string }> => {
-  const currency = String(paymentRow?.currency || 'UZS');
-  const namedServices = Array.isArray(paymentRow?.services_names) ? paymentRow.services_names : [];
-
-  if (namedServices.length > 0) {
-    return namedServices
-      .filter(Boolean)
-      .map((serviceName: unknown) => ({
-      name: String(serviceName ?? ''),
-      quantity: 1,
-      price: totalAmount,
-      total: totalAmount,
-      currency
-      }));
-  }
-
-  if (Array.isArray(paymentRow?.services) && paymentRow.services.length > 0) {
-    return paymentRow.services.flatMap((serviceItem: unknown) => {
-      if (typeof serviceItem === 'object' && serviceItem !== null) {
-        const svc = serviceItem as { name?: string; code?: string; quantity?: number; price?: number; total?: number; currency?: string };
-        const displayName = svc.name || svc.code || null;
-        if (!displayName) {
-          return [];
-        }
-        const quantity = Number(svc.quantity || 1);
-        const price = Number(svc.price || totalAmount);
-        return {
-          name: displayName,
-          quantity,
-          price,
-          total: Number(svc.total || price * quantity),
-          currency: svc.currency || currency
-        };
-      }
-
-      if (!serviceItem) {
-        return [];
-      }
-
-      return {
-        name: String(serviceItem),
-        quantity: 1,
-        price: totalAmount,
-        total: totalAmount,
-        currency
-      };
-    });
-  }
-
-  return [];
-};
-
-const buildReceiptPrintPayload = (
-  paymentRow: CashierPaymentRow | null | undefined,
-  labels: Record<string, string>,
-  defaultPatientLabel: string
-) => {
-  const paymentId = resolvePaymentId(paymentRow);
-  const totalAmount = Number(paymentRow?.total_amount || paymentRow?.amount || 0);
-  const services = buildReceiptServices(paymentRow, totalAmount);
-  const { date, time } = extractReceiptDateTime(paymentRow);
-  const methodCode = resolvePaymentMethodCode(paymentRow?.method);
-  // HIGH #9 fix: use real change_due if provided by CashPaymentModal, otherwise 0.
-  const changeDue = Number(paymentRow?.change_due || paymentRow?.change || 0);
-  const receivedAmount = Number(paymentRow?.received_amount || totalAmount);
-
-  return {
-    payment: {
-      number: paymentRow?.receipt_no || `PAY-${paymentId}`,
-      date,
-      time,
-      services,
-      subtotal: totalAmount,
-      discount: 0,
-      total: totalAmount,
-      method: methodCode,
-      method_name: resolvePaymentMethodLabel(paymentRow?.method, labels),
-      status: paymentRow?.status ?? null,
-      paid_amount: receivedAmount,
-      change: changeDue
-    },
-    patient: {
-      full_name: paymentRow?.patient || paymentRow?.patient_name || defaultPatientLabel,
-      phone: paymentRow?.patient_phone || null
-    },
-    services,
-    clinic: null
-  };
-};
-
-const getPaymentStatusMeta = (status: unknown, t: CashierTranslationFn) => {
-  const normalizedStatus = String(status || '').trim().toLowerCase();
-  const statusMap = {
-    paid: { variant: 'success', ariaLabel: t('cashier.status_paid_aria') },
-    partial: { variant: 'info', ariaLabel: t('cashier.status_partial_aria') },
-    cancelled: { variant: 'danger', ariaLabel: t('cashier.status_cancelled_aria') },
-    refunded: { variant: 'danger', ariaLabel: t('cashier.status_refunded_aria') },
-    pending: { variant: 'warning', ariaLabel: t('cashier.status_pending_aria') },
-    unknown: { variant: 'secondary', ariaLabel: t('cashier.status_unknown_aria') },
-  };
-
-  return statusMap[normalizedStatus as keyof typeof statusMap] || statusMap.unknown;
-};
-
-const getPaymentStatusLabel = (status: unknown, t: CashierTranslationFn): string => {
-  const normalizedStatus = String(status || '').trim().toLowerCase();
-  const statusMap = {
-    paid: t('cashier.status_paid'),
-    partial: t('cashier.status_partial'),
-    cancelled: t('cashier.status_cancelled'),
-    refunded: t('cashier.status_refunded'),
-    pending: t('cashier.status_pending'),
-    unknown: t('cashier.status_unknown'),
-  };
-
-  return statusMap[normalizedStatus as keyof typeof statusMap] || statusMap.unknown;
-};
-
-// P-018 fix: getPaymentActionContext / getAppointmentPaymentActionContext helpers
-// were removed — they leaked patient names (PHI) into aria-labels, and after
-// localization all action buttons now use static Russian aria-labels instead.
-
-const resolveCashierVisitIds = (appointment: Appointment) => {
-  const paymentVisitIds = Array.isArray(appointment?.payment_visit_ids)
-    ? appointment.payment_visit_ids.filter((visitId) => visitId !== null && visitId !== undefined)
-    : [];
-
-  if (paymentVisitIds.length > 0) {
-    return [...new Set(paymentVisitIds)];
-  }
-
-  if (appointment?.payment_visit_id !== null && appointment?.payment_visit_id !== undefined) {
-    return [appointment.payment_visit_id];
-  }
-
-  const groupedVisitIds = Array.isArray(appointment?.visit_ids)
-    ? appointment.visit_ids.filter((visitId) => visitId !== null && visitId !== undefined)
-    : [];
-
-  if (groupedVisitIds.length > 0) {
-    return [...new Set(groupedVisitIds)];
-  }
-
-  return appointment?.visit_id !== null && appointment?.visit_id !== undefined
-    ? [appointment.visit_id]
-    : [];
-};
-
-const resolveSingleCashierVisitId = (appointment: Appointment) => {
-  const visitIds = resolveCashierVisitIds(appointment);
-  return visitIds.length === 1 ? visitIds[0] : null;
-};
-
-const isBackendGroupedCashierPayment = (appointment: Appointment) =>
-  appointment?.payment_contract === 'grouped_visits' ||
-  appointment?.can_create_grouped_payment === true;
-
-const canCreateDirectCashierPayment = (appointment: Appointment) => {
-  return appointment?.can_create_direct_payment === true;
-};
-
-const canCreateCashierPayment = (appointment: Appointment) =>
-  canCreateDirectCashierPayment(appointment) || appointment?.can_create_grouped_payment === true;
-
-const createGroupedCashierPayment = async (appointment: Appointment, paymentData: CashierPaymentData) => {
-  // PR-53: migrated from raw fetch() to axios client
-  const token = tokenManager.getAccessToken();
-  if (!token) {
-    throw new Error('Missing access token for grouped cashier payment.');
-  }
-
-  const visitIds = resolveCashierVisitIds(appointment);
-  if (visitIds.length === 0 || appointment?.can_create_grouped_payment !== true) {
-    throw new Error('Backend did not provide a grouped cashier payment contract for this row.');
-  }
-
-  const response = await api.post('/cashier/payments/grouped', {
-    patient_id: appointment?.patient_id ?? null,
-    visit_ids: visitIds,
-    amount: paymentData.amount,
-    method: paymentData.method,
-    note: paymentData.note || 'Grouped cashier payment'
-  }) as import('axios').AxiosResponse<Record<string, unknown>>;
-
-  return response.data;
-};
-
-const PAYMENT_ACTION_CAN_FIELD = {
-  cancel: 'can_cancel',
-  refund: 'can_refund',
-  print_receipt: 'can_print_receipt',
-  confirm: 'can_confirm'
-};
-
-const hasBackendPaymentAction = (paymentRow: CashierPaymentRow | null | undefined, action: string): boolean => {
-  const normalizedAction = String(action || '').trim().toLowerCase();
-  if (!normalizedAction) {
-    return false;
-  }
-
-  if (Array.isArray(paymentRow?.available_actions)) {
-    return paymentRow.available_actions.some(
-      (availableAction: unknown) => String(availableAction || '').trim().toLowerCase() === normalizedAction
-    );
-  }
-
-  const canField = PAYMENT_ACTION_CAN_FIELD[normalizedAction as keyof typeof PAYMENT_ACTION_CAN_FIELD];
-  if (canField && paymentRow && Object.prototype.hasOwnProperty.call(paymentRow, canField)) {
-    return Boolean(paymentRow[canField]);
-  }
-
-  return false;
-};
 
 const CashierPanel = () => {
   // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
@@ -474,8 +142,6 @@ const CashierPanel = () => {
   }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [status, setStatus] = useState('all');
-  const [payments, setPayments] = useState<Record<string, unknown>[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [paymentSuccess, setPaymentSuccess] = useState<Record<string, unknown> | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -484,6 +150,21 @@ const CashierPanel = () => {
   const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
   const [dateFrom, setDateFrom] = useState(() => getLocalDateString());
   const [dateTo, setDateTo] = useState(() => getLocalDateString());
+
+  // PR-UI-14-1: data lifecycle (stats/pending/history fetch + pagination +
+  // refresh lifecycle) moved verbatim to ./cashier/useCashierWorklistData.
+  const {
+    payments, appointments, stats,
+    pendingLoading, historyLoading,
+    currentPage, setCurrentPage, totalPages, totalItems,
+    pendingPage, setPendingPage, pendingTotalPages, pendingTotalItems,
+    getDateParams, triggerDataReload, bumpRefreshKey,
+  } = useCashierWorklistData({
+    search: debouncedQuery,
+    status,
+    dateMode, selectedDate, dateFrom, dateTo,
+    paymentsApi: { getStats, getPendingPayments, getPayments },
+  });
 
   // Состояние для вкладок
   const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
@@ -505,187 +186,9 @@ const CashierPanel = () => {
   const [sortField, setSortField] = useState('date');
   const [sortDir, setSortDir] = useState('desc'); // 'asc' | 'desc'
 
-  // ✅ УЛУЧШЕНИЕ: Пагинация для истории платежей (Server-side)
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const itemsPerPage = 20;
-
-  // ✅ v2.0: Пагинация для ожидающих оплаты
-  const [pendingPage, setPendingPage] = useState(1);
-  const [pendingTotalPages, setPendingTotalPages] = useState(1);
-  const [pendingTotalItems, setPendingTotalItems] = useState(0);
-
-  // ✅ УЛУЧШЕНИЕ: Ключ для принудительного обновления данных
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  // ✅ УЛУЧШЕНИЕ: Статистика из API
-  const [stats, setStats] = useState<{
-    total_amount: number;
-    cash_amount: number;
-    card_amount: number;
-    pending_count: number;
-    pending_amount: number;
-    paid_count: number;
-    cancelled_count: number;
-    [k: string]: unknown;
-  }>({
-    total_amount: 0,
-    cash_amount: 0,
-    card_amount: 0,
-    pending_count: 0,
-    pending_amount: 0,
-    paid_count: 0,
-    cancelled_count: 0
-  });
-
   // ✅ УЛУЧШЕНИЕ: Универсальные хуки вместо дублированных состояний
   const paymentModal = useModal();
   const paymentWidget = useModal();
-
-  // Вычисляем параметры даты для запроса
-  const getDateParams = useCallback(() => {
-    if (dateMode === 'single') {
-      return {
-        date_from: selectedDate,
-        date_to: selectedDate
-      };
-    } else {
-      return {
-        date_from: dateFrom,
-        date_to: dateTo
-      };
-    }
-  }, [dateMode, selectedDate, dateFrom, dateTo]);
-
-  // Load Data Effect
-  // ✅ v2.1: Отдельные loading состояния для каждой секции
-  const [pendingLoading, setPendingLoading] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
-
-  // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка статистики (только при изменении дат)
-  useEffect(() => {
-    const loadStats = async () => {
-      const { date_from, date_to } = getDateParams();
-      logger.log('Loading stats with params:', { date_from, date_to });
-
-      try {
-        const statsResult = await getStats({
-          date_from: date_from || undefined,
-          date_to: date_to || undefined
-        });
-        if ((statsResult as { success?: boolean }).success && (statsResult as { data?: Record<string, unknown> }).data) {
-          setStats((statsResult as { data?: Record<string, unknown> }).data as typeof stats);
-        }
-      } catch (error: unknown) {
-        logger.error('Error loading stats:', error);
-        setStats({
-          total_amount: 0,
-          cash_amount: 0,
-          card_amount: 0,
-          pending_count: 0,
-          pending_amount: 0,
-          paid_count: 0,
-          cancelled_count: 0
-        });
-      }
-    };
-
-    loadStats();
-  }, [getDateParams, refreshKey, getStats]);
-
-  // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка pending payments (только при изменении pendingPage)
-  useEffect(() => {
-    const loadPending = async () => {
-      const { date_from, date_to } = getDateParams();
-      logger.info('Loading pending payments:', { date_from, date_to, page: pendingPage });
-
-      setPendingLoading(true);
-      try {
-        const pendingResult = await getPendingPayments({
-          date_from: date_from || undefined,
-          date_to: date_to || undefined,
-          search: debouncedQuery || undefined,
-          page: pendingPage,
-          size: itemsPerPage
-        });
-
-        if (pendingResult.success) {
-          const appointmentsData = Array.isArray(pendingResult.data) ? pendingResult.data : [];
-          setAppointments(appointmentsData as Appointment[]);
-
-          if (pendingResult.pagination) {
-            setPendingTotalPages(pendingResult.pagination.pages);
-            setPendingTotalItems(pendingResult.pagination.total);
-          }
-        } else {
-          logger.warn('Error loading pending payments:', pendingResult.error);
-          setAppointments([]);
-        }
-      } catch (error: unknown) {
-        logger.error('Error loading pending payments:', error);
-        setAppointments([]);
-      }
-      setPendingLoading(false);
-    };
-
-    loadPending();
-  }, [pendingPage, debouncedQuery, getDateParams, refreshKey, getPendingPayments]);
-
-  // ✅ v2.1: ОПТИМИЗАЦИЯ - Загрузка истории платежей (только при изменении currentPage)
-  useEffect(() => {
-    const loadHistory = async () => {
-      const { date_from, date_to } = getDateParams();
-      logger.info('Loading payment history:', { date_from, date_to, page: currentPage, status });
-
-      setHistoryLoading(true);
-      try {
-        const paymentsResult = await getPayments({
-          date_from: date_from || undefined,
-          date_to: date_to || undefined,
-          search: debouncedQuery || undefined,
-          status: status !== 'all' ? status : undefined,
-          page: currentPage,
-          size: itemsPerPage
-        });
-
-        if (paymentsResult.success) {
-          const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
-          setPayments(paymentsData as Record<string, unknown>[]);
-
-          if (paymentsResult.pagination) {
-            setTotalPages(paymentsResult.pagination.pages);
-            setTotalItems(paymentsResult.pagination.total);
-          } else {
-            setTotalPages(1);
-            setTotalItems(paymentsData.length);
-          }
-        } else {
-          logger.warn('Error loading payment history:', paymentsResult.error);
-          setPayments([]);
-          setTotalPages(1);
-        }
-      } catch (error: unknown) {
-        logger.error('Error loading payment history:', error);
-        setPayments([]);
-      }
-      setHistoryLoading(false);
-    };
-
-    loadHistory();
-  }, [currentPage, debouncedQuery, status, getDateParams, refreshKey, getPayments]);
-
-  // Reset page when date or search changes
-  useEffect(() => {
-    setCurrentPage(1);
-    setPendingPage(1);
-  }, [dateMode, selectedDate, dateFrom, dateTo, debouncedQuery]);
-
-  const triggerDataReload = useCallback(() => {
-    setCurrentPage(1);
-    setPendingPage(1);
-    setRefreshKey((prev) => prev + 1);
-  }, []);
 
   // MEDIUM #15: CashierPanel hotkeys — focus search (Ctrl+F), refresh (F5 / Ctrl+R), export (Ctrl+E).
   // Only triggers when not focused in input/textarea to avoid hijacking text entry.
@@ -815,7 +318,7 @@ const CashierPanel = () => {
       notify.success(tI18n('cashier.payment_success', { amount: format(pData.amount) }));
       paymentModal.closeModal();
       setPendingPage(1);
-      setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
+      bumpRefreshKey(); // Принудительное обновление списка
 
     } catch (error: unknown) {
       logger.error('Ошибка обработки платежа:', error);
@@ -850,7 +353,7 @@ const CashierPanel = () => {
       // UX Audit #4.5: anti-double-click protection.
       setProcessingAction({ type: 'confirm', id: paymentId });
       await paymentsHook.confirmPayment(paymentId);
-      setRefreshKey((prev) => prev + 1); // Обновляем данные
+      bumpRefreshKey(); // Обновляем данные
     } catch (err) {
       logger.error('Error confirming payment:', err);
       notify.error(getErrorMessage(err, tI18n('cashier.payment_confirm_failed')));
