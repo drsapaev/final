@@ -4,7 +4,7 @@
  * Renders the "История" tab: skin examinations + cosmetic procedures history.
  */
 import { Calendar } from 'lucide-react';
-import { MacOSCard, Badge } from '../ui/macos';
+import { Card, Badge } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface SkinExam {
@@ -36,7 +36,7 @@ export function DermaHistoryTab({
 }: DermaHistoryTabProps) {
   return (
     <div className="derma-flex-col-24">
-      <MacOSCard className="derma-p-8">
+      <Card className="derma-p-8">
         <h3 className="derma-flex-center">
           <Calendar size={20} className="derma-icon-mr derma-text-secondary" />
           История приемов и процедур
@@ -95,7 +95,7 @@ export function DermaHistoryTab({
             )}
           </div>
         </div>
-      </MacOSCard>
+      </Card>
     </div>
   );
 }
