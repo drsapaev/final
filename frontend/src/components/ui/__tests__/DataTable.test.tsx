@@ -1131,6 +1131,53 @@ describe('DataTable — PR-UI-12 features (DT-17..27)', () => {
     expect(onFilter).toHaveBeenCalledWith('name', '');
   });
 
+  it('DT-43: normalization preserves visibility entries for ABSENT columns (Codex P2 round 7)', () => {
+    const onColumnVisibilityChange = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        // All current columns false (normalizes to all-visible) + a stale
+        // entry for a temporarily-absent column ('legacy_col').
+        columnVisibility={{ name: false, age: false, city: false, legacy_col: false }}
+        onColumnVisibilityChange={onColumnVisibilityChange}
+      />
+    );
+
+    // Current columns render (normalization) and the menu reflects them.
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+
+    // Unchecking a column emits a map that STILL carries the absent column's
+    // entry — its persisted state is not silently discarded.
+    fireEvent.click(screen.getByLabelText('Name'));
+    expect(onColumnVisibilityChange).toHaveBeenCalledWith(
+      expect.objectContaining({ legacy_col: false, name: false })
+    );
+  });
+
+  it('DT-44: focusing a non-active row syncs the roving index (Codex P2 round 7)', async () => {
+    render(<DataTable columns={columns} data={rows} keyboardNavigation />);
+
+    // Direct focus on the LAST row (pointer/programmatic focus path).
+    const last = getRowByName('Carol');
+    last.focus();
+    await waitFor(() => expect(getRowByName('Carol')).toHaveAttribute('tabIndex', '0'));
+    await waitFor(() => expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '-1'));
+
+    // ArrowDown moves relative to the FOCUSED row — clamped at the last row,
+    // NOT jumping from the old active row 0.
+    fireEvent.keyDown(last, { key: 'ArrowDown' });
+    expect(getRowByName('Carol')).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '-1');
+
+    // ArrowUp from the focused last row goes to row 1 (not row 0→1 semantics
+    // of a stale index): the roving index followed the actual focus.
+    fireEvent.keyDown(last, { key: 'ArrowUp' });
+    expect(getRowByName('Bob')).toHaveAttribute('tabIndex', '0');
+  });
+
 });
 
 describe('DataTable — PR-UI-12 toolbar i18n contract (DT-28)', () => {

@@ -391,8 +391,15 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     (column) => columnVisibility?.[column.key] !== false
   );
   const allHiddenExternally = rawVisibleColumns.length === 0;
+  // Codex P2 #10 (PR 2885 round 7): preserve entries for ABSENT columns when
+  // normalizing — a persisted map may carry state for columns not currently
+  // mounted (dynamic column sets); replacing the whole map would silently
+  // drop their visibility for when they return.
   const effectiveColumnVisibility: Record<string, boolean> | undefined = allHiddenExternally
-    ? (Object.fromEntries(normalizerColumns.map((column) => [column.key, true])) as Record<string, boolean>)
+    ? ({
+      ...columnVisibility,
+      ...Object.fromEntries(normalizerColumns.map((column) => [column.key, true]))
+    } as Record<string, boolean>)
     : columnVisibility;
   const visibleColumns = allHiddenExternally ? normalizerColumns : rawVisibleColumns;
 
@@ -1015,6 +1022,11 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
         onClick={() => handleRowClick(row, rowIndex)}
         onKeyDown={rowKeyDownEnabled ? (e) => handleRowKeyDown(e, row, rowIndex) : undefined}
         tabIndex={rowTabIndex}
+        // Codex P2 #11 (PR 2885 round 7): direct focus on a non-active row
+        // (pointer focus on tabindex elements, programmatic focus, screen
+        // readers) must sync the roving index — otherwise the next arrow key
+        // would move focus relative to the OLD active row and visually jump.
+        onFocus={rovingFocusEnabled ? () => setActiveRowIndex(rowIndex) : undefined}
         onMouseEnter={(e) => handleMouseEnter(e, isSelected, false)}
         onMouseLeave={(e) => handleMouseLeave(e, isSelected, false)}
       >
