@@ -19,6 +19,11 @@ const useRegistrarWorklistDataPath = path.resolve(__dirname, '../registrar/useRe
 // PR-UI-13-2 (Decomp 9): view-model row computation + service filtering.
 const registrarWorklistRowsPath = path.resolve(__dirname, '../registrar/registrarWorklistRows.ts');
 const registrarServiceFilterPath = path.resolve(__dirname, '../registrar/registrarServiceFilter.ts');
+// PR-UI-13-3 (Decomp 10): dialog + wizard state machines + extracted dialogs.
+const useRegistrarDialogsPath = path.resolve(__dirname, '../registrar/useRegistrarDialogs.ts');
+const useRegistrarWizardPath = path.resolve(__dirname, '../registrar/useRegistrarWizard.ts');
+const RecordPreviewViewPath = path.resolve(__dirname, '../registrar/views/RecordPreview.tsx');
+const RescheduleSlotsViewPath = path.resolve(__dirname, '../registrar/views/RescheduleSlots.tsx');
 // Contract tests must read all files because they verify that certain
 // functions exist in the registrar panel source tree (not necessarily
 // in the orchestrator file itself).
@@ -50,6 +55,14 @@ const readRegistrarSourceTree = () => [
   normalizeSource(fs.readFileSync(registrarWorklistRowsPath, 'utf8')),
   '// ─── registrarServiceFilter.js (PR-UI-13-2) ───',
   normalizeSource(fs.readFileSync(registrarServiceFilterPath, 'utf8')),
+  '// ─── useRegistrarDialogs.js (PR-UI-13-3) ───',
+  normalizeSource(fs.readFileSync(useRegistrarDialogsPath, 'utf8')),
+  '// ─── useRegistrarWizard.js (PR-UI-13-3) ───',
+  normalizeSource(fs.readFileSync(useRegistrarWizardPath, 'utf8')),
+  '// ─── RecordPreview.jsx (PR-UI-13-3) ───',
+  normalizeSource(fs.readFileSync(RecordPreviewViewPath, 'utf8')),
+  '// ─── RescheduleSlots.jsx (PR-UI-13-3) ───',
+  normalizeSource(fs.readFileSync(RescheduleSlotsViewPath, 'utf8')),
 ].join('\n\n');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
