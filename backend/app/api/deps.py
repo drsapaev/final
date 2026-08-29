@@ -207,12 +207,17 @@ async def get_current_user(
 ) -> User:
     """
     Dependency that returns the current authenticated User.
-    Works with either async or sync DB sessions returned by get_db().
+    Works with either async or sync SQLAlchemy sessions returned by get_db().
     Raises 401 on invalid token or missing user.
+
+    Perf (#2772): numeric-ID path uses a single CTE query (user + blacklist
+    в одном roundtrip вместо 3-х последовательных). Text-username path —
+    fallback, без изменений.
     """
     # Пытаемся декодировать токен и поддержать оба варианта: username или числовой sub (user_id)
     username = _username_from_token(token)
     user: User | None = None
+    _skip_blacklist = False
 
     try:
         if username:
@@ -223,7 +228,56 @@ async def get_current_user(
             # Если username содержит только цифры, то это ID
             if username.isdigit():
                 logger.debug("get_current_user: primary subject is numeric")
-                user = await _get_user_by_id(db, int(username))
+                # ── CTE fast path (#2772 perf) ────────────────────────────
+                # 1 SQL вместо 3 последовательных (user + blacklist × 2).
+                payload = jwt.decode(
+                    token,
+                    settings.SECRET_KEY,
+                    algorithms=[getattr(settings, "ALGORITHM", "HS256")],
+                )
+                jti = payload.get("jti") or ""
+                cutoff = datetime.now(UTC)
+                uid = int(username)
+
+                auth_row = db.execute(
+                    text(
+                        "SELECT u.id, u.username, u.full_name, u.email,"
+                        " u.hashed_password, u.role, u.is_active,"
+                        " u.is_superuser, u.must_change_password,"
+                        " u.device_token, u.device_type, u.device_info,"
+                        " u.push_notifications_enabled,"
+                        " u.created_at, u.updated_at,"
+                        " EXISTS(SELECT 1 FROM token_blacklist tb"
+                        "   WHERE tb.jti = :jti) AS jti_bl,"
+                        " EXISTS(SELECT 1 FROM token_blacklist tb"
+                        "   WHERE tb.user_id = u.id"
+                        "   AND tb.reason LIKE 'all_user_tokens:%'"
+                        "   AND tb.expires_at > :cutoff) AS sentinel_bl"
+                        " FROM users u WHERE u.id = :uid"
+                    ),
+                    {"jti": jti, "uid": uid, "cutoff": cutoff},
+                ).mappings().first()
+
+                if auth_row is None:
+                    logger.debug("get_current_user: CTE — user not found")
+                    user = None
+                elif auth_row["jti_bl"] or auth_row["sentinel_bl"]:
+                    logger.warning(
+                        "get_current_user: CTE — token blacklisted"
+                        " (jti_bl=%s sentinel_bl=%s)",
+                        auth_row["jti_bl"], auth_row["sentinel_bl"],
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token has been revoked",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+                else:
+                    user = User(**{
+                        k: v for k, v in auth_row.items()
+                        if hasattr(User, k)
+                    })
+                    _skip_blacklist = True
             else:
                 logger.debug("get_current_user: primary subject is text")
                 user = await _get_user_by_username(db, username)
@@ -264,6 +318,8 @@ async def get_current_user(
                     type(jwt_error).__name__,
                 )
                 user = None
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning(
             "get_current_user: validation failed (%s)",
@@ -285,41 +341,43 @@ async def get_current_user(
         )
 
     # Check token blacklist (jti-based revocation)
-    try:
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[getattr(settings, "ALGORITHM", "HS256")],
-        )
-        jti = payload.get("jti")
-        # sub может быть числовым user_id или username; извлекаем user_id если возможно
-        sub = payload.get("sub")
-        token_user_id: int | None = None
-        if isinstance(sub, str) and sub.isdigit():
-            token_user_id = int(sub)
-        elif isinstance(sub, int):
-            token_user_id = sub
-        elif user is not None:
-            token_user_id = getattr(user, "id", None)
-        if jti:
-            from app.services.token_blacklist_service import TokenBlacklistService
-            if TokenBlacklistService.is_token_blacklisted(db, jti, user_id=token_user_id):
-                logger.warning(
-                    "[deps.get_current_user] token jti=%s is blacklisted (revoked)",
-                    jti,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token has been revoked",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-    except HTTPException:
-        raise
-    except Exception as blacklist_err:
-        logger.warning(
-            "[deps.get_current_user] blacklist check failed (non-blocking): %s",
-            blacklist_err,
-        )
+    # P0 (#2772): CTE fast path already verified blacklist via _skip_blacklist
+    if not _skip_blacklist:
+        try:
+            payload = jwt.decode(
+                token,
+                settings.SECRET_KEY,
+                algorithms=[getattr(settings, "ALGORITHM", "HS256")],
+            )
+            jti = payload.get("jti")
+            # sub может быть числовым user_id или username; извлекаем user_id если возможно
+            sub = payload.get("sub")
+            token_user_id: int | None = None
+            if isinstance(sub, str) and sub.isdigit():
+                token_user_id = int(sub)
+            elif isinstance(sub, int):
+                token_user_id = sub
+            elif user is not None:
+                token_user_id = getattr(user, "id", None)
+            if jti:
+                from app.services.token_blacklist_service import TokenBlacklistService
+                if TokenBlacklistService.is_token_blacklisted(db, jti, user_id=token_user_id):
+                    logger.warning(
+                        "[deps.get_current_user] token jti=%s is blacklisted (revoked)",
+                        jti,
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token has been revoked",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+        except HTTPException:
+            raise
+        except Exception as blacklist_err:
+            logger.warning(
+                "[deps.get_current_user] blacklist check failed (non-blocking): %s",
+                blacklist_err,
+            )
 
     logger.debug(
         "[deps.get_current_user] authenticated user resolved role=%s active=%s",
