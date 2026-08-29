@@ -32,7 +32,7 @@
  *     inline styles, no new token files (AGENTS_UI rule 1).
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Columns3 } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import type { TableDensity } from '../DataTable';
@@ -95,6 +95,11 @@ export const TableToolbar = ({
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRootRef = useRef<HTMLDivElement | null>(null);
+  // Codex P2 (PR 2885 round 3): the popup is a `role="group"` of native
+  // checkboxes, NOT a menu — `aria-haspopup` would announce the wrong
+  // interaction model. Use the disclosure pattern instead: aria-expanded +
+  // aria-controls linking the button to the group it toggles.
+  const menuId = useId();
   // Codex P2 (PR 2885): Escape must return keyboard focus to the toggle
   // button — the menu unmounts, so focus would otherwise fall back to the
   // document body and the user loses their place.
@@ -144,15 +149,15 @@ export const TableToolbar = ({
             ref={toggleButtonRef}
             type="button"
             className="mac-table-toolbar__button"
-            aria-haspopup="true"
             aria-expanded={menuOpen}
+            aria-controls={menuId}
             onClick={() => setMenuOpen((open) => !open)}
           >
             <Columns3 size={14} aria-hidden="true" />
             <span>{t('table.columns')}</span>
           </button>
           {menuOpen && (
-            <div className="mac-table-toolbar__menu" role="group" aria-label={t('table.columns_menu')}>
+            <div id={menuId} className="mac-table-toolbar__menu" role="group" aria-label={t('table.columns_menu')}>
               {togglableColumns.map((column) => {
                 const checked = isColumnVisible(column.key);
                 // The last visible column cannot be hidden (a table needs ≥1 column).

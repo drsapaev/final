@@ -89,7 +89,7 @@
  *     to `'scroll'`.
  */
 
-import React, { useCallback, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -373,20 +373,28 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // prevents users from REACHING the all-hidden state via the menu; this
   // protects maps supplied programmatically.
   //
-  // Codex P2 #3 (PR 2885): the NORMALIZED state must drive BOTH the renderer
-  // and the toolbar — otherwise the menu would show every checkbox unchecked
-  // while every column renders, and the next toggle would emit a map that
-  // hides all-but-one column at once. `effectiveColumnVisibility` is the
-  // single post-normalization truth handed to both.
+  // Codex P2 #3 (PR 2885 round 3): the NORMALIZED state must drive BOTH the
+  // renderer and the toolbar — otherwise the menu would show every checkbox
+  // unchecked while every column renders, and the next toggle would emit a
+  // map that hides all-but-one column at once. `effectiveColumnVisibility`
+  // is the single post-normalization truth handed to both.
+  //
+  // Codex P2 #5 (PR 2885 round 3): a nonempty column set with EVERY column
+  // statically `hidden` (author config error) would still produce zero
+  // visible columns. Fall back to the FIRST column so the ≥1-column
+  // invariant holds on every degenerate path.
   const staticallyVisibleColumns = columns.filter((column) => column.hidden !== true);
-  const rawVisibleColumns = staticallyVisibleColumns.filter(
+  const normalizerColumns = staticallyVisibleColumns.length > 0
+    ? staticallyVisibleColumns
+    : columns.slice(0, 1);
+  const rawVisibleColumns = normalizerColumns.filter(
     (column) => columnVisibility?.[column.key] !== false
   );
   const allHiddenExternally = rawVisibleColumns.length === 0;
   const effectiveColumnVisibility: Record<string, boolean> | undefined = allHiddenExternally
-    ? (Object.fromEntries(staticallyVisibleColumns.map((column) => [column.key, true])) as Record<string, boolean>)
+    ? (Object.fromEntries(normalizerColumns.map((column) => [column.key, true])) as Record<string, boolean>)
     : columnVisibility;
-  const visibleColumns = allHiddenExternally ? staticallyVisibleColumns : rawVisibleColumns;
+  const visibleColumns = allHiddenExternally ? normalizerColumns : rawVisibleColumns;
 
   // === Roving keyboard row navigation (PR-UI-12) ===
   // Off by default (zero-delta): existing consumers keep the per-row
@@ -400,6 +408,14 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   const [activeRowIndex, setActiveRowIndex] = useState(0);
   // Clamp when the dataset shrinks (pagination / filter / refresh).
   const safeActiveRowIndex = Math.min(activeRowIndex, Math.max(0, data.length - 1));
+  // Codex P2 #4 (PR 2885 round 3): persist the clamp — a derived-only clamp
+  // leaves `activeRowIndex` stale, so a later dataset GROWTH would snap the
+  // tab stop back to the old index (and a focused clamped row could suddenly
+  // carry tabIndex=-1). Sync the source of truth whenever the row count
+  // changes; the derived clamp above stays as belt-and-suspenders.
+  useEffect(() => {
+    setActiveRowIndex((prev) => Math.min(prev, Math.max(0, data.length - 1)));
+  }, [data.length]);
   const focusDataRow = useCallback((index: number) => {
     const row = tableRef.current?.querySelector<HTMLTableRowElement>(
       `tr[data-row-index="${index}"]`

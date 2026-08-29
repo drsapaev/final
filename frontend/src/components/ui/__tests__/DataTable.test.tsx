@@ -886,6 +886,68 @@ describe('DataTable — PR-UI-12 features (DT-17..27)', () => {
     expect(screen.getByText('select')).toBeInTheDocument();
   });
 
+  it('DT-34: dataset shrink persists the roving-index clamp; regrowth does not snap back (Codex P2 #4)', () => {
+    const { rerender } = render(<DataTable columns={columns} data={rows} keyboardNavigation />);
+
+    // Move the roving tab stop to the last row (index 2).
+    const first = getRowByName('Alice');
+    fireEvent.keyDown(first, { key: 'End' });
+    expect(getRowByName('Carol')).toHaveAttribute('tabIndex', '0');
+
+    // Dataset shrinks to 1 row (filter/page/refresh): clamp persists.
+    rerender(<DataTable columns={columns} data={[rows[0]]} keyboardNavigation />);
+    expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '0');
+
+    // Dataset grows back: the tab stay stays clamped at 0 — it does NOT snap
+    // back to the stale index 2.
+    rerender(<DataTable columns={columns} data={rows} keyboardNavigation />);
+    expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Bob')).toHaveAttribute('tabIndex', '-1');
+  });
+
+  it('DT-35: toolbar toggle uses the disclosure pattern (aria-expanded + aria-controls, no aria-haspopup) (Codex P2)', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: /Колонки|Columns/ });
+    // The popup is a checkbox GROUP, not a menu — no aria-haspopup.
+    expect(toggle).not.toHaveAttribute('aria-haspopup');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const controlsId = toggle.getAttribute('aria-controls');
+    expect(controlsId).toBeTruthy();
+
+    // Opening mounts the controlled group with the matching id.
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const controlled = document.getElementById(controlsId as string);
+    expect(controlled).not.toBeNull();
+    expect(controlled).toHaveAttribute('role', 'group');
+  });
+
+  it('DT-36: every column statically hidden still renders one column (Codex P2 #5)', () => {
+    render(
+      <DataTable
+        columns={[
+          { key: 'a', title: 'A', hidden: true },
+          { key: 'b', title: 'B', hidden: true }
+        ]}
+        data={rows}
+      />
+    );
+
+    // Author-error guard: the first column renders so the ≥1-column invariant
+    // holds (no headerless colSpan=0 table).
+    expect(screen.getByText('A')).toBeInTheDocument();
+    expect(screen.queryByText('B')).toBeNull();
+  });
+
 });
 
 describe('DataTable — PR-UI-12 toolbar i18n contract (DT-28)', () => {
