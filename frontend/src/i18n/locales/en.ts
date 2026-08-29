@@ -61,6 +61,16 @@ const en = {
     push_notifications: 'Push Notifications',
     ai_tools: 'AI Tools',
   },
+  // PR-UI-12: canonical DataTable toolbar (TableToolbar.tsx — column
+  // visibility menu + density segmented control).
+  table: {
+    columns: 'Columns',
+    columns_menu: 'Column visibility',
+    density: 'Row density',
+    density_compact: 'Compact',
+    density_comfortable: 'Comfortable',
+    density_spacious: 'Spacious',
+  },
   common: {
     save: 'Сохранить',
     save_draft: 'Сохранить черновик',

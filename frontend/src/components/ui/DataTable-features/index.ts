@@ -20,3 +20,6 @@ export type { TableErrorProps } from './TableError';
 
 export { TablePagination } from './TablePagination';
 export type { TablePaginationProps } from './TablePagination';
+
+export { TableToolbar } from './TableToolbar';
+export type { TableToolbarProps } from './TableToolbar';

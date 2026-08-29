@@ -39,11 +39,30 @@
  *   - `virtualized=true` + `maxHeight` + `rowHeight` → row virtualization via
  *     `@tanstack/react-virtual` (PR-UI-09e-1, AC4 "1000 rows without lag").
  *     Activation rule: BOTH `virtualized` and a numeric `maxHeight` must be
- *     set — virtualization requires a bounded scroll viewport. When active,
- *     the scroll wrapper becomes the vertical scroll container (`overflow-y:
- *     auto; max-height: maxHeight`) and `<tbody>` renders a top spacer row +
- *     the visible row window + a bottom spacer row, keeping native `<table>`
- *     semantics. While active the table uses a MEASURED-geometry contract
+ *     set — virtualization requires a bounded scroll viewport.
+ *   - `columnVisibility` + `onColumnVisibilityChange` (+ `showColumnToggle`)
+ *     → controlled column visibility with an opt-in toolbar menu (PR-UI-12).
+ *   - `showDensityToggle` + `onDensityChange` → opt-in toolbar density
+ *     segmented control (compact/comfortable/spacious) driving `density`
+ *     (PR-UI-12).
+ *   - `keyboardNavigation=true` → roving row focus: ArrowUp/ArrowDown move
+ *     focus between rows, Home/End jump to first/last, Enter/Space still
+ *     activate `onRowClick` when present (PR-UI-12). Off by default — existing
+ *     consumers keep the per-row tabIndex behavior byte-identical.
+ *
+ * ## Sticky filters (PR-UI-12)
+ *
+ * When BOTH `stickyHeader` and `filterable` are on, the filter row sticks
+ * BELOW the header row (measured offset). Previously both rows carried
+ * `top: 0` and overlapped on scroll — there are no live consumers of the
+ * combination today, so the fix ships with zero live-surface delta.
+ *
+ * ## Virtualization detail (PR-UI-09e-1)
+ *
+ * When active, the scroll wrapper becomes the vertical scroll container
+ * (`overflow-y: auto; max-height: maxHeight`) and `<tbody>` renders a top
+ * spacer row + the visible row window + a bottom spacer row, keeping native
+ * `<table>` semantics. While active the table uses a MEASURED-geometry contract
  *     (Codex P2-1/P2-4 follow-up, PR 2872): every rendered row is measured
  *     via the virtualizer (`measureElement` + `data-index`), so spacer and
  *     scroll geometry follow ACTUAL row heights — `rowHeight` is only the
@@ -70,11 +89,12 @@
  *     to `'scroll'`.
  */
 
-import React, { useCallback, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import { TablePagination } from './DataTable-features/TablePagination';
+import { TableToolbar } from './DataTable-features/TableToolbar';
 
 // === CANONICAL TYPES (Task 46 §B.1) ===
 
@@ -157,6 +177,22 @@ export interface DataTableProps<Row = Record<string, unknown>> {
 
   // Row click (NEW — enables keyboard nav on rows)
   onRowClick?: (row: Row, index: number) => void;
+
+  // Column visibility (PR-UI-12 — additive, off by default)
+  /** Controlled column visibility map: `columnVisibility[key] === false` hides the column. Undefined key = visible. */
+  columnVisibility?: Record<string, boolean>;
+  /** Fires with the full next visibility map when the toolbar menu toggles a column. */
+  onColumnVisibilityChange?: (visibility: Record<string, boolean>) => void;
+  /** Renders the toolbar column-visibility menu (additive — off by default). */
+  showColumnToggle?: boolean;
+  /** Renders the toolbar density segmented control (additive — off by default). */
+  showDensityToggle?: boolean;
+  /** Fires when the toolbar density control picks a new density (state stays controlled via `density`). */
+  onDensityChange?: (density: TableDensity) => void;
+
+  // Keyboard navigation (PR-UI-12 — roving row focus, off by default)
+  /** ArrowUp/ArrowDown move focus between rows, Home/End jump to first/last; Enter/Space activate `onRowClick` when present. */
+  keyboardNavigation?: boolean;
 
   // Pass-through
   className?: string;
@@ -294,6 +330,14 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // row click (NEW)
   onRowClick,
 
+  // column visibility + density toggle + keyboard navigation (PR-UI-12)
+  columnVisibility,
+  onColumnVisibilityChange,
+  showColumnToggle = false,
+  showDensityToggle = false,
+  onDensityChange,
+  keyboardNavigation = false,
+
   // pass-through
   className,
   style,
@@ -315,6 +359,34 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
 
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  // === Column visibility (PR-UI-12) ===
+  // `columnVisibility?.[key] === false` hides a column; the static per-column
+  // `hidden` flag (inert in macos/Table — 0 consumers) is honored as well.
+  // With neither set the list is content-identical to `columns` — zero-delta
+  // for every existing consumer.
+  const visibleColumns = columns.filter(
+    (column) => column.hidden !== true && columnVisibility?.[column.key] !== false
+  );
+
+  // === Roving keyboard row navigation (PR-UI-12) ===
+  // Off by default (zero-delta): existing consumers keep the per-row
+  // `tabIndex={0}` behavior that ships with `onRowClick`/selection. When
+  // `keyboardNavigation` is on, exactly ONE row (the active one) carries
+  // `tabIndex={0}` and the rest carry `-1`; ArrowUp/ArrowDown/Home/End move
+  // the active row and DOM focus; Enter/Space keep their existing
+  // activation semantics.
+  const rovingFocusEnabled = Boolean(keyboardNavigation);
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [activeRowIndex, setActiveRowIndex] = useState(0);
+  // Clamp when the dataset shrinks (pagination / filter / refresh).
+  const safeActiveRowIndex = Math.min(activeRowIndex, Math.max(0, data.length - 1));
+  const focusDataRow = useCallback((index: number) => {
+    const row = tableRef.current?.querySelector<HTMLTableRowElement>(
+      `tr[data-row-index="${index}"]`
+    );
+    row?.focus();
+  }, []);
 
   // === Row virtualization (PR-UI-09e-1) ===
   // Activates ONLY on the main data path when BOTH `virtualized` and a numeric
@@ -435,6 +507,34 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     }
     : headerStyle;
 
+  // === Sticky filter row (PR-UI-12) ===
+  // When BOTH `stickyHeader` and `filterable` are on, the filter row sticks
+  // BELOW the header row (measured offset) instead of overlapping it at
+  // `top: 0`. The header row height is measured via useLayoutEffect +
+  // ResizeObserver (when available — jsdom has neither, so tests assert the
+  // sticky position only).
+  const headerRowRef = useRef<HTMLTableRowElement | null>(null);
+  const [headerRowHeight, setHeaderRowHeight] = useState(0);
+  useLayoutEffect(() => {
+    if (!stickyHeader || !filterable) return;
+    const row = headerRowRef.current;
+    if (!row) return;
+    const update = () => setHeaderRowHeight(row.offsetHeight);
+    update();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(update);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [stickyHeader, filterable]);
+  const filterStyleFinal: TableStyleExt = stickyHeader
+    ? {
+      ...headerStyle,
+      position: 'sticky',
+      top: headerRowHeight,
+      zIndex: 1,
+    }
+    : headerStyle;
+
   const cellStyle = (isSelected = false): TableStyleExt => ({
     padding: effectiveSize.padding,
     fontSize: effectiveSize.fontSize,
@@ -547,10 +647,35 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
 
   // Row keyboard nav (NEW — only when row click handler is wired). Matches
   // AGENTS_UI §2 expectation: keyboard navigation reaches interactive rows.
+  // PR-UI-12: when `keyboardNavigation` is on, ArrowUp/ArrowDown/Home/End
+  // additionally move roving focus between rows (Enter/Space semantics are
+  // unchanged). Without the flag, arrow keys do nothing — byte-identical to
+  // the pre-PR-UI-12 behavior for existing consumers.
   const handleRowKeyDown = (e: KeyboardEvent<HTMLTableRowElement>, row: Row, index: number) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleRowClick(row, index);
+      return;
+    }
+    if (!rovingFocusEnabled) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      const lastIndex = data.length - 1;
+      if (lastIndex < 0) return;
+      let next = index;
+      if (e.key === 'ArrowDown') next = Math.min(index + 1, lastIndex);
+      else if (e.key === 'ArrowUp') next = Math.max(index - 1, 0);
+      else if (e.key === 'Home') next = 0;
+      else next = lastIndex;
+      if (next === index) return;
+      setActiveRowIndex(next);
+      if (virtualizationActive) {
+        rowVirtualizer.scrollToIndex(next);
+      }
+      // Focus after paint — under virtualization the target row may not be
+      // mounted yet (scrollToIndex re-ranges the window on the next frame);
+      // in the plain path the row is already in the DOM.
+      requestAnimationFrame(() => focusDataRow(next));
     }
   };
 
@@ -583,7 +708,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   const renderStatusCell = (content: ReactNode, isError = false) => (
     <tr>
       <td
-        colSpan={columns.length}
+        colSpan={visibleColumns.length}
         role={isError ? 'alert' : 'status'}
         aria-live={isError ? 'assertive' : 'polite'}
         className={isError ? 'mac-table-error' : 'mac-table-empty'}
@@ -594,20 +719,22 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   );
 
   // Filter row (NEW — only rendered when filterable=true).
+  // PR-UI-12: cells use `filterStyleFinal` so the row sticks BELOW the header
+  // row when stickyHeader is on (was: both rows sticky at `top: 0`, overlapping).
   const renderFilterRow = () => {
     if (!filterable) return null;
     return (
       <tr>
-        {columns.map((column, index) => {
+        {visibleColumns.map((column, index) => {
           // Skip filter input for non-filterable columns
           if (column.filterable === false) {
             return (
               <th
                 key={`filter-${column.key || index}`}
                 style={{
-                  ...headerStyleFinal,
+                  ...filterStyleFinal,
                   cursor: 'default',
-                  borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)',
+                  borderRight: index === visibleColumns.length - 1 ? 'none' : '1px solid var(--mac-border)',
                   padding: '4px 8px',
                 }}
               >
@@ -620,9 +747,9 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
             <th
               key={`filter-${column.key || index}`}
               style={{
-                ...headerStyleFinal,
+                ...filterStyleFinal,
                 cursor: 'default',
-                borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)',
+                borderRight: index === visibleColumns.length - 1 ? 'none' : '1px solid var(--mac-border)',
                 padding: '4px 8px',
               }}
             >
@@ -643,8 +770,8 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
 
   const renderHeaders = () => (
     <thead>
-      <tr>
-        {columns.map((column, index) => {
+      <tr ref={headerRowRef}>
+        {visibleColumns.map((column, index) => {
           const isSortable = sortable && column.sortable;
           const isSorted = sortColumn === column.key;
           return (
@@ -652,7 +779,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
               key={column.key || index}
               style={{
                 ...headerStyleFinal,
-                borderRight: index === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
+                borderRight: index === visibleColumns.length - 1 ? 'none' : '1px solid var(--mac-border)'
               }}
               onClick={() => handleSort(column)}
               onKeyDown={(e) => handleHeaderKeyDown(e, column)}
@@ -671,9 +798,28 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     </thead>
   );
 
+  // === Toolbar wiring (PR-UI-12 — additive) ===
+  // The toolbar renders ONLY when at least one control is explicitly enabled;
+  // otherwise every return path below renders the exact pre-PR-UI-12 DOM
+  // (single `.mac-table-scroll-wrapper` root, no wrapper element).
+  const toolbarEnabled = Boolean(showColumnToggle || showDensityToggle);
+  const toolbarNode = toolbarEnabled ? (
+    <TableToolbar
+      columns={columns}
+      columnVisibility={columnVisibility}
+      onColumnVisibilityChange={onColumnVisibilityChange}
+      showColumnToggle={showColumnToggle}
+      density={density}
+      onDensityChange={onDensityChange}
+      showDensityToggle={showDensityToggle}
+    />
+  ) : null;
+  const wrapWithToolbar = (node: ReactNode): ReactNode =>
+    toolbarEnabled ? <div className="mac-table-shell">{toolbarNode}{node}</div> : node;
+
   // Error state takes precedence over loading/empty (NEW — when `error` prop provided).
   if (error) {
-    return (
+    return wrapWithToolbar(
       <div className="mac-table-scroll-wrapper" aria-busy={loading}>
         <table className={className} style={tableStyle} aria-label={ariaLabel}>
           {renderHeaders()}
@@ -686,7 +832,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   }
 
   if (loading) {
-    return (
+    return wrapWithToolbar(
       <div className="mac-table-scroll-wrapper" aria-busy="true">
         <table className={className} style={tableStyle} aria-label={ariaLabel}>
           {renderHeaders()}
@@ -699,7 +845,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   }
 
   if (children) {
-    return (
+    return wrapWithToolbar(
       <div className="mac-table-scroll-wrapper" aria-busy={loading}>
         <table className={className} style={tableStyle} aria-label={ariaLabel}>
           {children}
@@ -718,7 +864,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   }
 
   if (!data || data.length === 0) {
-    return (
+    return wrapWithToolbar(
       <div className="mac-table-scroll-wrapper" aria-busy={loading}>
         <table className={className} style={tableStyle} aria-label={ariaLabel}>
           {renderHeaders()}
@@ -735,28 +881,35 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // `data-index` + the virtualizer's `measureElement` ref (Codex P2-1/P2-4:
   // measured geometry — actual row heights drive the spacers, so content
   // taller than the rowHeight estimate cannot desynchronize the scrollbar).
+  // PR-UI-12: when `keyboardNavigation` is on, rows carry a roving tabindex
+  // (active row `0`, others `-1`) + `data-row-index` for focus targeting.
   const renderDataRow = (row: Row, rowIndex: number) => {
     const isSelected = isRowSelected(row, rowIndex);
     const hasRowHandler = Boolean(onRowClick || (selectable && onRowSelect));
+    const rowKeyDownEnabled = hasRowHandler || rovingFocusEnabled;
+    const rowTabIndex = rovingFocusEnabled
+      ? (rowIndex === safeActiveRowIndex ? 0 : -1)
+      : (hasRowHandler ? 0 : undefined);
     return (
       <tr
         key={getRowId(row, rowIndex) as React.Key}
         data-index={virtualizationActive ? rowIndex : undefined}
+        data-row-index={rovingFocusEnabled ? rowIndex : undefined}
         aria-rowindex={ariaRowIndex(rowIndex)}
         ref={virtualizationActive ? rowVirtualizer.measureElement : undefined}
         style={rowStyle(rowIndex, isSelected)}
         onClick={() => handleRowClick(row, rowIndex)}
-        onKeyDown={hasRowHandler ? (e) => handleRowKeyDown(e, row, rowIndex) : undefined}
-        tabIndex={hasRowHandler ? 0 : undefined}
+        onKeyDown={rowKeyDownEnabled ? (e) => handleRowKeyDown(e, row, rowIndex) : undefined}
+        tabIndex={rowTabIndex}
         onMouseEnter={(e) => handleMouseEnter(e, isSelected, false)}
         onMouseLeave={(e) => handleMouseLeave(e, isSelected, false)}
       >
-        {columns.map((column, colIndex) => (
+        {visibleColumns.map((column, colIndex) => (
           <td
             key={column.key || colIndex}
             style={{
               ...virtualizedCellStyle(isSelected),
-              borderRight: colIndex === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
+              borderRight: colIndex === visibleColumns.length - 1 ? 'none' : '1px solid var(--mac-border)'
             }}
           >
             {renderCell(row, column, rowIndex) as React.ReactNode}
@@ -773,7 +926,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
     : 0;
 
-  return (
+  return wrapWithToolbar(
     <div
       className="mac-table-scroll-wrapper"
       ref={scrollWrapperRef}
@@ -781,6 +934,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
       aria-busy={loading}
     >
       <table
+        ref={tableRef}
         className={className}
         style={tableStyle}
         aria-label={ariaLabel}
@@ -1015,3 +1169,6 @@ export { TableSkeleton } from './DataTable-features/TableSkeleton';
 export type { TableSkeletonProps } from './DataTable-features/TableSkeleton';
 export { TablePagination } from './DataTable-features/TablePagination';
 export type { TablePaginationProps } from './DataTable-features/TablePagination';
+// PR-UI-12: opt-in toolbar (column visibility menu + density segmented control).
+export { TableToolbar } from './DataTable-features/TableToolbar';
+export type { TableToolbarProps } from './DataTable-features/TableToolbar';
