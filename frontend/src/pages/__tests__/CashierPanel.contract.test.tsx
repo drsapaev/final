@@ -6,8 +6,12 @@ import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const cashierPanelPath = path.resolve(__dirname, '../CashierPanel.tsx');
+// PR-UI-14-1: payment-contract helpers moved verbatim to pages/cashier/cashierPaymentContract.ts.
+// Source-pin tests follow the moved markers (registrar read-list pattern).
+const cashierContractPath = path.resolve(__dirname, '../cashier/cashierPaymentContract.ts');
 
 const readCashierPanelSource = () => fs.readFileSync(cashierPanelPath, 'utf8');
+const readCashierContractSource = () => fs.readFileSync(cashierContractPath, 'utf8');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
@@ -17,13 +21,18 @@ const extractSourceBlock = (source: string, startMarker: string, endMarker: stri
   return source.slice(start, end);
 };
 
+const extractSourceBlockToEnd = (source: string, startMarker: string) => {
+  const start = source.indexOf(startMarker);
+  expect(start).toBeGreaterThanOrEqual(0);
+  return source.slice(start);
+};
+
 describe('CashierPanel payment action contract', () => {
   it('fails closed when backend payment action fields are missing', () => {
-    const source = readCashierPanelSource();
-    const helperBlock = extractSourceBlock(
+    const source = readCashierContractSource();
+    const helperBlock = extractSourceBlockToEnd(
       source,
       'const hasBackendPaymentAction = (paymentRow: CashierPaymentRow | null | undefined, action: string): boolean => {',
-      'const CashierPanel = () => {',
     );
 
     expect(helperBlock).toContain('paymentRow?.available_actions');
@@ -51,7 +60,7 @@ describe('CashierPanel payment action contract', () => {
   });
 
   it('does not invent a paid status in receipt print payloads', () => {
-    const source = readCashierPanelSource();
+    const source = readCashierContractSource();
     // i18n-unification: buildReceiptPrintPayload now takes (paymentRow, labels, defaultPatientLabel)
     // Strict:true migration: signature gained param types + return type (multi-line).
     const receiptBlock = extractSourceBlock(
@@ -65,14 +74,15 @@ describe('CashierPanel payment action contract', () => {
   });
 
   it('delegates grouped cashier payment allocation to the backend contract', () => {
-    const source = readCashierPanelSource();
+    const contractSource = readCashierContractSource();
+    const panelSource = readCashierPanelSource();
     const groupedContractBlock = extractSourceBlock(
-      source,
+      contractSource,
       'const createGroupedCashierPayment = async (appointment: Appointment, paymentData: CashierPaymentData) => {',
       'const PAYMENT_ACTION_CAN_FIELD = {',
     );
     const processPaymentBlock = extractSourceBlock(
-      source,
+      panelSource,
       'const processPayment = async (appointment: unknown, paymentData: unknown) => {',
       'const confirmPayment = async (paymentId: string | number | undefined) => {',
     );
@@ -95,7 +105,7 @@ describe('CashierPanel payment action contract', () => {
     const onlineActionBlock = extractSourceBlock(
       source,
       'onClick={() => openPaymentWidget(appointment)}',
-      "aria-label={tI18n('cashier.cash_payment_aria')}",
+      'aria-label={tI18n(\'cashier.cash_payment_aria\')}',
     );
     const paymentWidgetBlock = extractSourceBlock(
       source,
@@ -109,7 +119,7 @@ describe('CashierPanel payment action contract', () => {
   });
 
   it('does not infer direct cashier payment availability from visit ids', () => {
-    const source = readCashierPanelSource();
+    const source = readCashierContractSource();
     const helperBlock = extractSourceBlock(
       source,
       'const canCreateDirectCashierPayment = (appointment: Appointment) => {',
@@ -120,5 +130,25 @@ describe('CashierPanel payment action contract', () => {
     expect(helperBlock).not.toContain('resolveSingleCashierVisitId');
     expect(helperBlock).not.toContain('visit_id');
     expect(helperBlock).not.toContain('visit_ids');
+  });
+
+  // PR-UI-14-1: decomposition boundary — the panel consumes the extracted
+  // payment-contract module and the extracted worklist data-lifecycle hook
+  // instead of owning them inline (registrar PR-UI-13 pattern).
+  it('consumes the extracted payment contract module and worklist data hook', () => {
+    const panelSource = readCashierPanelSource();
+    const contractSource = readCashierContractSource();
+
+    expect(panelSource).toContain('from \'./cashier/cashierPaymentContract\'');
+    expect(panelSource).toContain('from \'./cashier/useCashierWorklistData\'');
+    expect(panelSource).toContain('useCashierWorklistData()');
+    // The panel must NOT re-define the moved contract helpers inline.
+    expect(panelSource).not.toContain('const hasBackendPaymentAction =');
+    expect(panelSource).not.toContain('const createGroupedCashierPayment =');
+    expect(panelSource).not.toContain('const buildReceiptPrintPayload =');
+    expect(panelSource).not.toContain('const resolveCashierVisitIds =');
+    // The fail-closed action gate stays exported from the contract module.
+    expect(contractSource).toContain('export const hasBackendPaymentAction =');
+    expect(contractSource).toContain('export const createGroupedCashierPayment =');
   });
 });
