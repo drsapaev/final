@@ -27,7 +27,7 @@ import {
   Info } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
@@ -258,7 +258,7 @@ const SystemManagement = () => {
   const renderMonitoringTab = () =>
   <div className="flex flex-col gap-6">
       {/* Общее состояние системы */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <div className="admin-flex-between-mb-16">
           <h3 className="admin-h3-icon-m0">
             <Activity className="w-5 h-5" />
@@ -301,13 +301,13 @@ const SystemManagement = () => {
         })}
           </div>
       }
-      </MacOSCard>
+      </Card>
 
       {/* Системные метрики */}
       {systemMetrics &&
     <div className="admin-grid-auto-300-24">
           {/* CPU */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
                 <Cpu className="w-4 h-4" />
@@ -327,10 +327,10 @@ const SystemManagement = () => {
                 </div>
           }
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Память */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
                 <MemoryStick className="w-4 h-4" />
@@ -351,10 +351,10 @@ const SystemManagement = () => {
                 {t('admin2.sm_available')} {formatBytes((systemMetrics.memory as { available?: number })?.available || 0)}
             </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Диск */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
                 <HardDrive className="w-4 h-4" />
@@ -375,12 +375,12 @@ const SystemManagement = () => {
                 {t('admin2.sm_free')} {formatBytes((systemMetrics.disk as { free?: number })?.free || 0)}
             </div>
             </div>
-          </MacOSCard>
+          </Card>
         </div>
     }
 
       {/* Алерты */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-h3-icon-mb-16">
           <AlertTriangle className="w-5 h-5" />
           {t('admin2.sm_recent_alerts')}
@@ -425,14 +425,14 @@ const SystemManagement = () => {
           </div>
       </>
       }
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderBackupsTab = () =>
   <div className="flex flex-col gap-6">
       {/* Создание бэкапа */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-h3-icon-mb-16">
           <Database className="w-5 h-5" />
           {t('admin2.sm_create_backup_title')}
@@ -482,10 +482,10 @@ const SystemManagement = () => {
             </Button>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Список бэкапов */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <div className="admin-flex-between-mb-16">
           <h3 className="admin-h3-icon-m0">
             <Shield className="w-5 h-5" />
@@ -560,13 +560,13 @@ const SystemManagement = () => {
         } />
 
       }
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderSettingsTab = () =>
   <div className="flex flex-col gap-6">
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-h3-icon-mb-16">
           <Settings className="w-5 h-5" />
           {t('admin2.sm_monitoring_settings')}
@@ -661,7 +661,7 @@ const SystemManagement = () => {
             {t('admin2.sm_save_settings')}
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
