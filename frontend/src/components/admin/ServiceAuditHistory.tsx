@@ -21,7 +21,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   AppEmpty,
@@ -183,7 +183,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
 
   if (loading) {
     return (
-      <MacOSCard
+      <Card
         variant="default"
         role="region"
         aria-label={historyRegionLabel}
@@ -195,13 +195,13 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
           ariaLabel={historyRegionLabel}
           className="admin-minh-200"
         />
-      </MacOSCard>
+      </Card>
     );
   }
 
   if (errorMessage) {
     return (
-      <MacOSCard
+      <Card
         variant="default"
         role="region"
         aria-label={historyRegionLabel}
@@ -222,13 +222,13 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
             </Button>
           }
         />
-      </MacOSCard>
+      </Card>
     );
   }
 
   if (history.length === 0) {
     return (
-      <MacOSCard
+      <Card
         variant="default"
         role="region"
         aria-label={historyRegionLabel}
@@ -239,12 +239,12 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
           title={t('admin2.sah_empty_title')}
           description={t('admin2.sah_empty_desc')}
         />
-      </MacOSCard>
+      </Card>
     );
   }
 
   return (
-    <MacOSCard
+    <Card
       variant="default"
       role="region"
       aria-labelledby={historyTitleId}
@@ -378,7 +378,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
           );
         })}
       </div>
-    </MacOSCard>
+    </Card>
   );
 };
 
