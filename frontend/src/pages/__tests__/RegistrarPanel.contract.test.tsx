@@ -16,6 +16,9 @@ const registrarPanelPath = path.resolve(__dirname, '../RegistrarPanel.tsx');
 // PR-UI-13-1 (Decomp 8): queue entry adapter + worklist data lifecycle hook.
 const registrarQueueAdapterPath = path.resolve(__dirname, '../registrar/registrarQueueAdapter.ts');
 const useRegistrarWorklistDataPath = path.resolve(__dirname, '../registrar/useRegistrarWorklistData.ts');
+// PR-UI-13-2 (Decomp 9): view-model row computation + service filtering.
+const registrarWorklistRowsPath = path.resolve(__dirname, '../registrar/registrarWorklistRows.ts');
+const registrarServiceFilterPath = path.resolve(__dirname, '../registrar/registrarServiceFilter.ts');
 // Contract tests must read all files because they verify that certain
 // functions exist in the registrar panel source tree (not necessarily
 // in the orchestrator file itself).
@@ -43,6 +46,10 @@ const readRegistrarSourceTree = () => [
   normalizeSource(fs.readFileSync(registrarQueueAdapterPath, 'utf8')),
   '// ─── useRegistrarWorklistData.js (PR-UI-13-1) ───',
   normalizeSource(fs.readFileSync(useRegistrarWorklistDataPath, 'utf8')),
+  '// ─── registrarWorklistRows.js (PR-UI-13-2) ───',
+  normalizeSource(fs.readFileSync(registrarWorklistRowsPath, 'utf8')),
+  '// ─── registrarServiceFilter.js (PR-UI-13-2) ───',
+  normalizeSource(fs.readFileSync(registrarServiceFilterPath, 'utf8')),
 ].join('\n\n');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
@@ -215,10 +222,13 @@ describe('RegistrarPanel command contract', () => {
 
   it('filters displayed services by backend department metadata before legacy code prefixes', () => {
     const source = readRegistrarSourceTree();
+    // PR-UI-13-2: filterServicesByDepartment moved from RegistrarPanel.tsx
+    // (useCallback closure over services state) to registrarServiceFilter.ts
+    // (pure function, services as parameter). Block markers follow the module.
     const filterBlock = extractSourceBlock(
       source,
-      'const filterServicesByDepartment = useCallback((appointment: Appointment, departmentKey: string | null) => {',
-      'const filteredAppointments = useMemo(() => {',
+      'export const filterServicesByDepartment = (',
+      'export default filterServicesByDepartment;',
     );
 
     expect(source).toContain('service_details: Array.isArray(fullEntry.service_details) ? fullEntry.service_details : []');
@@ -230,8 +240,7 @@ describe('RegistrarPanel command contract', () => {
     expect(filterBlock).toContain('serviceMeta?.department_key ?? serviceMeta?.departmentKey');
     // Contract: filterByBackendDepartment is called BEFORE legacy code-prefix
     // fallback (departmentCodePrefixes) and BEFORE serviceToCodeMap fallback.
-    // Ordering verified via indexOf. The second needle drops the TS annotation
-    // (`: Record<string, string[]>`) which helper Phase 5 strips from the source.
+    // Ordering verified via indexOf.
     expect(filterBlock.indexOf('const backendFilteredServices = filterByBackendDepartment(appointment.services || [])')).toBeLessThan(
       filterBlock.indexOf('const departmentCodePrefixes = {'),
     );
@@ -329,6 +338,24 @@ describe('RegistrarPanel command contract', () => {
     expect(hookSource).toContain("window.addEventListener('queueUpdated'");
     expect(hookSource).toContain("window.addEventListener('departments:updated'");
     expect(hookSource).toContain('setInterval');
+  });
+
+  it('delegates the worklist view-model to registrarWorklistRows (PR-UI-13-2)', () => {
+    // Decomposition boundary contract: the orchestrator consumes the extracted
+    // pure view-model functions; the heavy filtering logic lives ONLY in the
+    // modules (no inline copy left in the panel).
+    const panelSource = readRegistrarPanelSource();
+    const rowsSource = normalizeSource(fs.readFileSync(registrarWorklistRowsPath, 'utf8'));
+
+    expect(panelSource).toContain('computeRegistrarWorklistRows({');
+    expect(panelSource).toContain('computeDepartmentStats(appointments, todayStr, queueProfiles)');
+    // 5 presentation-only sorting call-sites live in the rows module now.
+    expect(rowsSource).toContain('const sorted = sortRegistrarRowsForPresentation(entriesForTab');
+    expect(rowsSource).toContain('const filtered = sortRegistrarRowsForPresentation(appointments.filter');
+    expect(rowsSource).toContain('return sortRegistrarRowsForPresentation(searched)');
+    expect(rowsSource).toContain('const sortedAggregated = sortRegistrarRowsForPresentation(aggregatedPatients)');
+    expect(rowsSource).toContain('return sortRegistrarRowsForPresentation(appointments');
+    expect(rowsSource).toContain('aggregateRegistrarPatients(filtered)');
   });
 
   it('does not use appointment or queue ids as visit ids for reschedule commands', () => {
