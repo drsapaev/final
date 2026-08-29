@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Textarea,
   Alert,
@@ -439,7 +439,7 @@ const GraphQLExplorer = () => {
     }
 
       {/* Примеры запросов */}
-      <MacOSCard style={sectionCardStyle}>
+      <Card style={sectionCardStyle}>
         <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi-1">
           <BookOpen size={20} />
           {t('admin2.gql_heading_examples')}
@@ -457,11 +457,11 @@ const GraphQLExplorer = () => {
             </Button>
         )}
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Редактор запроса */}
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24">
-        <MacOSCard style={sectionCardStyle}>
+        <Card style={sectionCardStyle}>
           <div className="admin-d-flex-fw-wrap-jc-between-ai-center-mb-16-gap-12-1">
             <h3 className="admin-m-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi-1">
               <Code size={20} />
@@ -510,9 +510,9 @@ const GraphQLExplorer = () => {
             className="admin-w-100pct-ff-Monaco-Consolas-Cour-fs-sm-lh-1p5-rz-vertical" />
           
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard style={sectionCardStyle}>
+        <Card style={sectionCardStyle}>
           <div className="admin-d-flex-fw-wrap-jc-between-ai-center-mb-16-gap-12">
             <h3 className="admin-m-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
               <Activity size={20} />
@@ -547,14 +547,14 @@ const GraphQLExplorer = () => {
               </div>
           }
           </div>
-        </MacOSCard>
+        </Card>
       </div>
     </div>;
 
 
   const renderSchemaTab = () =>
   <div className="flex flex-col gap-6">
-      <MacOSCard style={sectionCardStyle}>
+      <Card style={sectionCardStyle}>
         <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
           <Database size={20} />
           {t('admin2.gql_heading_schema')}
@@ -607,7 +607,7 @@ const GraphQLExplorer = () => {
         className="admin-h-200" />
 
       }
-      </MacOSCard>
+      </Card>
     </div>;
 
 
