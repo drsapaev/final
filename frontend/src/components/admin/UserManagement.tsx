@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
-  MacOSCard,
+  Card,
   Button,
   Input,
   Select,
@@ -523,7 +523,7 @@ const UserManagement = () => {
       }
 
       {/* Filters */}
-      <MacOSCard className="admin-mb-24-p-16">
+      <Card className="admin-mb-24-p-16">
         <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-ai-end">
 
           {/* Search */}
@@ -579,10 +579,10 @@ const UserManagement = () => {
             </Button>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Table */}
-      <MacOSCard>
+      <Card>
         <DataTable
           columns={columns}
           data={filteredUsers}
@@ -614,7 +614,7 @@ const UserManagement = () => {
           </div>
         )}
 
-      </MacOSCard>
+      </Card>
 
       {/* Actions Menu */}
       {actionsMenuUser && actionsMenuPosition &&
