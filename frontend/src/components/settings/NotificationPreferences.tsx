@@ -796,7 +796,7 @@ export default function NotificationPreferences() {
   }
 
   if (loading) {
-    return <div style={{ opacity: 0.7 }}>{t('misc.np_loading')}</div>;
+    return <div style={{ opacity: 0.7 }} aria-busy="true">{t('misc.np_loading')}</div>;
   }
 
   if (!draft) {

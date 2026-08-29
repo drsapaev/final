@@ -459,6 +459,7 @@ export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps
         <div
           id={listboxId}
           role="listbox"
+          aria-busy={isLoading}
           aria-label={t('misc.gsb_rezultaty_globalnogo_poiska')}
           style={styles.dropdown as CSSProperties}
           ref={dropdownRef}>
