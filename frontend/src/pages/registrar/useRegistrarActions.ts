@@ -15,10 +15,10 @@
  * - updateAppointmentStatus: maps status string to backend action,
  *   calls runRegistrarRecordAction, reloads appointments.
  *
- * NOT extracted (remain in RegistrarPanel — simple state setters):
- * - openRecordPreview: just calls setRecordPreviewDialog({open: true, row})
- * - openRecordEditor: just calls setWizardEditMode/InitialData/ShowWizard
- * - handleContextMenuAction: switch statement calling the above + setters
+ * PR-UI-13-5: the row-action routers that consume these handlers
+ * (openRecordPreview / openRecordEditor / handleTableAction /
+ * handleContextMenuAction) were subsequently extracted to
+ * useRegistrarRowActions.ts.
  *
  * @param {Object} deps
  * @param {Array} deps.appointments - current appointments array

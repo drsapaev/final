@@ -22,6 +22,9 @@ const registrarServiceFilterPath = path.resolve(__dirname, '../registrar/registr
 // PR-UI-13-3 (Decomp 10): dialog + wizard state machines + extracted dialogs.
 const useRegistrarDialogsPath = path.resolve(__dirname, '../registrar/useRegistrarDialogs.ts');
 const useRegistrarWizardPath = path.resolve(__dirname, '../registrar/useRegistrarWizard.ts');
+// PR-UI-13-5: routing slice + row-action routing hooks.
+const useRegistrarRoutingPath = path.resolve(__dirname, '../registrar/useRegistrarRouting.ts');
+const useRegistrarRowActionsPath = path.resolve(__dirname, '../registrar/useRegistrarRowActions.ts');
 const RecordPreviewViewPath = path.resolve(__dirname, '../registrar/views/RecordPreview.tsx');
 const RescheduleSlotsViewPath = path.resolve(__dirname, '../registrar/views/RescheduleSlots.tsx');
 // Contract tests must read all files because they verify that certain
@@ -59,6 +62,10 @@ const readRegistrarSourceTree = () => [
   normalizeSource(fs.readFileSync(useRegistrarDialogsPath, 'utf8')),
   '// ─── useRegistrarWizard.js (PR-UI-13-3) ───',
   normalizeSource(fs.readFileSync(useRegistrarWizardPath, 'utf8')),
+  '// ─── useRegistrarRouting.js (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(useRegistrarRoutingPath, 'utf8')),
+  '// ─── useRegistrarRowActions.js (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(useRegistrarRowActionsPath, 'utf8')),
   '// ─── RecordPreview.jsx (PR-UI-13-3) ───',
   normalizeSource(fs.readFileSync(RecordPreviewViewPath, 'utf8')),
   '// ─── RescheduleSlots.jsx (PR-UI-13-3) ───',
@@ -385,8 +392,9 @@ describe('RegistrarPanel command contract', () => {
     expect(worklistViewSource).toContain('<EnhancedAppointmentsTable');
     expect(worklistViewSource).toContain('AnimatedLoader.TableSkeleton');
     expect(worklistViewSource).toContain('registrar-load-more-bar');
-    // Row-action routing stays in the panel (handleTableAction) and is passed down.
-    expect(panelSource).toContain('const handleTableAction = useCallback(');
+    // Row-action routing: PR-UI-13-5 moved handleTableAction into
+    // useRegistrarRowActions (see the PR-UI-13-5 test below); the panel still
+    // passes it down to WorklistView.
     expect(panelSource).toContain('onActionClick={handleTableAction}');
     // Plan §PR-UI-13 item 4: local ErrorBoundary around the wizard.
     expect(panelSource).toContain('<ErrorBoundary');
@@ -396,6 +404,37 @@ describe('RegistrarPanel command contract', () => {
     expect(panelSource).not.toContain('const [services, setServices]');
     expect(panelSource).not.toContain('const [dynamicDepartments, setDynamicDepartments]');
     expect(panelSource).toContain('} = useRegistrarData();');
+  });
+
+  it('delegates routing state and row-action routing to extracted hooks (PR-UI-13-5)', () => {
+    // Decomposition boundary contract: the orchestrator consumes the
+    // extracted hooks, and the moved logic lives ONLY in the hooks (no
+    // duplicate inline copy left behind in the panel).
+    const panelSource = readRegistrarPanelSource();
+    const routingSource = normalizeSource(fs.readFileSync(useRegistrarRoutingPath, 'utf8'));
+    const rowActionsSource = normalizeSource(fs.readFileSync(useRegistrarRowActionsPath, 'utf8'));
+
+    // Routing slice boundary (URL state + deep-link effects).
+    expect(panelSource).toContain('} = useRegistrarRouting();');
+    expect(panelSource).not.toContain('getViewFromPath(location.pathname)');
+    expect(panelSource).not.toContain("searchParams.get('patientId')");
+    expect(routingSource).toContain('useSearchParams()');
+    expect(routingSource).toContain('getViewFromPath(location.pathname)');
+    expect(routingSource).toContain("const legacyView = searchParams.get('view')");
+    expect(routingSource).toContain('newParams.set(\'q\', patientName)');
+    expect(routingSource).toContain('navigate(target, { replace: true })');
+
+    // Row-action routing boundary: both routers live in the hook and keep
+    // the confirm-gated branches (UX Audit Registrar #2 / R-1.2).
+    expect(panelSource).toContain('} = useRegistrarRowActions({');
+    expect(panelSource).not.toContain('const handleTableAction = useCallback(');
+    expect(panelSource).not.toContain('const handleContextMenuAction = useCallback(');
+    expect(rowActionsSource).toContain('const handleTableAction = useCallback(');
+    expect(rowActionsSource).toContain('const handleContextMenuAction = useCallback(');
+    expect(rowActionsSource).toContain("tI18n('registrar.send_to_cabinet_title')");
+    expect(rowActionsSource).toContain("tI18n('registrar.complete_visit_title')");
+    // R-24: call_patient keeps the sanitized tel: anchor (digits + plus only).
+    expect(rowActionsSource).toContain('replace(/[^\\d+]/g, \'\')');
   });
 
   it('does not use appointment or queue ids as visit ids for reschedule commands', () => {

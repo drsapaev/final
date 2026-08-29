@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import type { CSSProperties } from 'react';
-import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+// PR-UI-13-5: useSearchParams/useLocation/useNavigate moved to
+// useRegistrarRouting (routing slice extraction).
 // PR-UI-13-4: EnhancedAppointmentsTable import moved to views/WorklistView.tsx.
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
@@ -64,16 +65,21 @@ import { useRegistrarActions } from './registrar/useRegistrarActions';
 import QueueView from './registrar/views/QueueView';
 // Decomp 6b: WelcomeView extracted to component
 import WelcomeView from './registrar/views/WelcomeView';
-// Strategic Direction 3: navigation helpers for canonical nested routes
-import { getViewFromPath } from './registrar/registrarNavigation';
+// PR-UI-13-5: routing slice (URL state + deep-link effects) extracted to
+// useRegistrarRouting hook.
+import { useRegistrarRouting } from './registrar/useRegistrarRouting';
+// PR-UI-13-5: row-action routing (table + context menu) extracted to
+// useRegistrarRowActions hook.
+import { useRegistrarRowActions } from './registrar/useRegistrarRowActions';
 
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
+// PR-UI-13-5: isMultiRecordAggregateRow moved to useRegistrarRowActions
+// (openRecordEditor extraction).
 import {
   // PR-UI-13-3: buildPostWizardPaymentRow moved to useRegistrarWizard;
   // normalizePatientGender + formatPreviewList moved to RecordPreviewDialog.
   REGISTRAR_TAB_LABEL_KEYS,
   REGISTRAR_STATUS_LABEL_KEYS,
-  isMultiRecordAggregateRow,
 } from './registrar/registrarHelpers';
 
 
@@ -113,9 +119,8 @@ import { getErrorMessage } from '../utils/errorHandler';
 // API client
 // PR-UI-13-1: api import moved to useRegistrarWorklistData (loadAppointments
 // extraction — no other panel call-sites existed).
-// UX Audit Registrar #1: getPatient() — централизованный доступ к /patients/{id}.
-// Раньше здесь был raw fetch() с ручным Authorization-хедером.
-import { getPatient } from '../api/patients';
+// PR-UI-13-5: getPatient import moved to useRegistrarRouting (patientId
+// deep-link effect extraction — no other panel call-sites existed).
 // ⭐ BATCH API: Для атомарных операций с записями пациента (см. BATCH_UPDATE_ARCHITECTURE.md)
 
 
@@ -125,8 +130,6 @@ import ForceMajeureModal from '../components/registrar/ForceMajeureModal';
 import DataSourceIndicator from './registrar/DataSourceIndicator';
 import { generateCSV, downloadCSV } from './registrar/registrarCsv';
 
-// ADR-0016: canonical error types from types/errors.ts.
-import type { HttpApiError } from '../types/errors';
 
 // PR-UI-13-2: QueueProfileItem moved to ./registrar/registrarWorklistRows.ts
 
@@ -139,94 +142,21 @@ const RegistrarPanel = () => {
   const { isMobile, isTablet } = useBreakpoint();
 
   // Основные состояния
-  const [searchParams, setSearchParams] = useSearchParams();
-  const location = useLocation();
-  const navigate = useNavigate();
-  // R-02 fix: activeTab синхронизирован с URL (?dept=...).
-  // Раньше был useState(null) — F5 сбрасывал выбранное отделение.
-  const [activeTab, setActiveTabRaw] = useState(() => searchParams.get('dept') || null);
-  const setActiveTab = useCallback((tab: string | null) => {
-    setActiveTabRaw(tab);
-    // R-02: пишем в URL для shareable links + back button
-    const params = new URLSearchParams(window.location.search);
-    if (tab) {
-      params.set('dept', tab);
-    } else {
-      params.delete('dept');
-    }
-    setSearchParams(params, { replace: true });
-  }, [setSearchParams]);
-  const currentView = useMemo(() => {
-    // Phase 3: rely solely on canonical path-derived view.
-    // Legacy ?view= and ?tab= params are auto-redirected to canonical paths
-    // by the Phase 2 redirect useEffect below, so they never need to be
-    // parsed here. The redirect preserves all other query params.
-    return getViewFromPath(location.pathname);
-  }, [location.pathname]);
-
-  // ✅ Phase 2: redirect legacy ?view=welcome|queue to canonical paths
-  // /registrar?view=welcome → /registrar/welcome
-  // /registrar?view=queue   → /registrar/queue
-  // Preserves all other query params (q, status, date, patientId, dept).
-  // The redirect is replace-only (no history pollution) and runs once per
-  // legacy-view occurrence.
-  useEffect(() => {
-    const legacyView = searchParams.get('view');
-    if (legacyView !== 'welcome' && legacyView !== 'queue') return;
-    // Only redirect when on the bare /registrar path (not already on a sub-path)
-    if (location.pathname !== '/registrar') return;
-
-    const params = new URLSearchParams(searchParams);
-    params.delete('view');
-    params.delete('tab');
-    const qs = params.toString();
-    const target = qs ? `/registrar/${legacyView}?${qs}` : `/registrar/${legacyView}`;
-    navigate(target, { replace: true });
-  }, [searchParams, location.pathname, navigate]);
-
-  const searchQuery = useMemo(() => (searchParams.get('q') || '').toLowerCase(), [searchParams]);
-  const statusFilter = useMemo(() => searchParams.get('status'), [searchParams]);
+  // PR-UI-13-5: routing slice extracted to useRegistrarRouting (verbatim
+  // port): activeTab + ?dept= URL sync (R-02), canonical path-derived
+  // currentView (Phase 3), legacy ?view= redirect (Phase 2), searchQuery /
+  // statusFilter memos, patientId deep-link auto-search effect.
+  const {
+    searchParams,
+    setSearchParams,
+    navigate,
+    activeTab,
+    setActiveTab,
+    currentView,
+    searchQuery,
+    statusFilter,
+  } = useRegistrarRouting();
   const todayStr = getLocalDateString();
-
-  // ✅ Получаем patientId из URL для автоматического поиска
-  const patientIdFromUrl = useMemo(() => {
-    const id = searchParams.get('patientId');
-    return id ? parseInt(id, 10) : null;
-  }, [searchParams]);
-
-  // ✅ Эффект для автоматической загрузки пациента из URL
-  useEffect(() => {
-    const loadPatientFromUrl = async () => {
-      if (!patientIdFromUrl) return;
-
-      try {
-        // UX Audit Registrar #1: raw fetch() с ручным Authorization-хедером
-        // заменён на getPatient() из api/patients.
-        // Auth-token добавляется автоматически axios-interceptor'ом в api/client.js.
-        // 401/403 обрабатываются интерсептором (redirect to login или refresh).
-        const patientData = await getPatient(patientIdFromUrl);
-        const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
-
-        // Устанавливаем поисковый запрос с именем пациента
-        setSearchParams((prev) => {
-          const newParams = new URLSearchParams(prev);
-          newParams.set('q', patientName);
-          return newParams;
-        });
-
-        // UX Audit R-3.6: убрано логирование patientName (PII leak).
-        logger.info('[Registrar] Загружен пациент из URL (patientId matched)');
-      } catch (error: unknown) {
-        // 404 — пациент не найден, не логируем как error.
-        const status = (error as HttpApiError)?.response?.status;
-        if (status !== 404) {
-          logger.error('[Registrar] Не удалось загрузить пациента:', error);
-        }
-      }
-    };
-
-    loadPatientFromUrl();
-  }, [patientIdFromUrl, setSearchParams]);
 
   // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: PR-UI-13-4 — reference-data state (doctors,
   // services, dynamicDepartments) is owned by useRegistrarData below.
@@ -545,205 +475,33 @@ const RegistrarPanel = () => {
   // UX Audit Registrar #14: DataSourceIndicator, generateCSV, downloadCSV
   // extracted to ./registrar/DataSourceIndicator.jsx and ./registrar/registrarCsv.js.
 
-  // Обработчик действий контекстного меню
-
-  const openRecordPreview = useCallback((row: unknown) => {
-    setRecordPreviewDialog({ open: true, row: row as Appointment });
-  }, [setRecordPreviewDialog]);
-
-  const openRecordEditor = useCallback((row: unknown) => {
-    const appt = row as Appointment;
-    if (isMultiRecordAggregateRow(appt as Record<string, unknown>)) {
-      logger.info('[RegistrarPanel] Opening edit wizard for aggregate all-departments row', {
-        patient: appt?.patient_fio || appt?.patient_name,
-        groupedRecords: appt?.grouped_records?.length || 0,
-        recordRefs: appt?.grouped_record_refs?.length || 0,
-        aggregatedIds: appt?.aggregated_ids?.length || 0
-      });
-    }
-
-    // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
-    logger.info('[RegistrarPanel] Opening edit wizard for appointment:', appt?.id);
-    setWizardEditMode(true);
-    setWizardInitialData(appt as Record<string, unknown>);
-    setShowWizard(true);
-  }, [setWizardEditMode, setWizardInitialData, setShowWizard]);
-
-  // PR-UI-13-4: table row-action routing extracted from the EAT JSX prop into
-  // a panel-level callback (verbatim switch body) — passed to WorklistView.
-  const handleTableAction = useCallback(async (action: string, row: Record<string, unknown>, event?: unknown) => {
-    switch (action) {
-        case 'view':
-          logger.info('Просмотр записи:', row);
-          openRecordPreview(row as unknown as Appointment);
-          break;
-        case 'edit':
-          // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
-          logger.info('[RegistrarPanel] Открытие мастера редактирования для appointment:', row.id);
-          openRecordEditor(row);
-          break;
-        case 'payment':
-          logger.info('Открытие модального окна оплаты для записи:', row);
-          setPaymentDialog({ open: true, row: row as unknown as Appointment, paid: false, source: 'table' });
-          break;
-        case 'in_cabinet': {
-          // UX Audit Registrar #2: window.confirm() → useConfirm hook.
-          // Раньше: if (!window.confirm(`Отправить пациента "..." в кабинет?`)) break;
-          // Теперь: macOS-style ConfirmDialog через useConfirm.
-          const inCabinetName = row.patient_fio || row.patient_name || '';
-          const inCabinetOk = await confirm({
-            title: tI18n('registrar.send_to_cabinet_title'),
-            message: tI18n('registrar.send_to_cabinet_message', { name: inCabinetName }),
-            confirmLabel: tI18n('registrar.send_to_cabinet_confirm'),
-            cancelLabel: tI18n('registrar.cancel'),
-            intent: 'primary',
-          });
-          if (!inCabinetOk) break;
-          logger.info('Отправка пациента в кабинет:', row);
-          updateAppointmentStatus(row.id, 'in_cabinet', '', row as Record<string, unknown>);
-          break;
-        }
-        case 'call':
-          logger.info('Вызов пациента:', row);
-          handleStartVisit(row as Record<string, unknown>);
-          break;
-        case 'complete': {
-          // UX Audit Registrar #2: window.confirm() → useConfirm hook.
-          const completeName = row.patient_fio || row.patient_name || '';
-          const completeOk = await confirm({
-            title: tI18n('registrar.complete_visit_title'),
-            message: tI18n('registrar.complete_visit_message', { name: completeName }),
-            confirmLabel: tI18n('registrar.complete_visit_confirm'),
-            cancelLabel: tI18n('registrar.cancel'),
-            intent: 'primary',
-          });
-          if (!completeOk) break;
-          logger.info('Завершение приёма:', row);
-          updateAppointmentStatus(row.id, 'done', '', row as Record<string, unknown>);
-          break;
-        }
-        case 'print':
-          logger.info('Печать талона:', row);
-          setPrintDialog({ open: true, type: 'ticket', data: row as Record<string, unknown> });
-          break;
-        // UX Audit Registrar #4: cancel и reschedule теперь доступны
-        // как inline кнопки, а не только через context menu.
-        case 'reschedule':
-          // PR-UI-13-3: former setRescheduleData(row) + setShowSlotsModal(true)
-          // consolidated into one reducer action.
-          openRescheduleDialog(row as Record<string, unknown>);
-          break;
-        case 'cancel':
-          setCancelDialog({ open: true, row: row as unknown as Appointment, reason: '' });
-          break;
-        case 'more':{
-            // Показать контекстное меню с дополнительными действиями
-            const evt = event as { target?: HTMLElement; clientX?: number; clientY?: number } | undefined;
-            const rect = evt?.target?.getBoundingClientRect();
-            setContextMenu({
-              open: true,
-              row,
-              position: {
-                x: rect?.right || evt?.clientX || 0,
-                y: rect?.top || evt?.clientY || 0
-              }
-            });
-            break;
-          }
-        default:
-          break;
-    }
-  }, [openRecordPreview, openRecordEditor, confirm, updateAppointmentStatus, handleStartVisit, setPaymentDialog, setPrintDialog, setCancelDialog, setContextMenu, openRescheduleDialog]);
-
-  const handleContextMenuAction = useCallback(async (action: string, row: Appointment) => {
-    switch (action) {
-      case 'view':
-        openRecordPreview(row as unknown as Appointment);
-        break;
-      case 'edit':
-        openRecordEditor(row);
-        logger.info('Редактирование записи:', row);
-        break;
-      case 'in_cabinet': {
-        // UX Audit R-1.2: добавлен confirm для критичных действий в context menu.
-        // Раньше: handleContextMenuAction вызывал updateAppointmentStatus напрямую,
-        // без подтверждения. В то же время inline onActionClick в таблице требовал
-        // confirm. Это нарушение Nielsen #4 (consistency) + #5 (error prevention).
-        const inCabinetName = row.patient_fio || row.patient_name || '';
-        const inCabinetOk = await confirm({
-          title: tI18n('registrar.send_to_cabinet_title'),
-          message: tI18n('registrar.send_to_cabinet_message', { name: inCabinetName }),
-          confirmLabel: tI18n('registrar.send_to_cabinet_confirm'),
-          cancelLabel: tI18n('registrar.cancel'),
-          intent: 'primary',
-        });
-        if (!inCabinetOk) break;
-        await updateAppointmentStatus(row.id, 'in_cabinet', '', row as Record<string, unknown>);
-        notify.success(tI18n('registrar.sent_to_cabinet'));
-        break;
-      }
-      case 'call':
-        await handleStartVisit(row as Record<string, unknown>);
-        break;
-      case 'complete': {
-        // UX Audit R-1.2: confirm для завершения приёма в context menu.
-        const completeName = row.patient_fio || row.patient_name || '';
-        const completeOk = await confirm({
-          title: tI18n('registrar.complete_visit_title'),
-          message: tI18n('registrar.complete_visit_message', { name: completeName }),
-          confirmLabel: tI18n('registrar.complete_visit_confirm'),
-          cancelLabel: tI18n('registrar.cancel'),
-          intent: 'primary',
-        });
-        if (!completeOk) break;
-        await updateAppointmentStatus(row.id, 'done', '', row as Record<string, unknown>);
-        notify.success(tI18n('registrar.visit_completed'));
-        break;
-      }
-      case 'payment':
-        setPaymentDialog({ open: true, row: row as unknown as Appointment, paid: false, source: 'context' });
-        break;
-      case 'print':
-        setPrintDialog({ open: true, type: 'ticket', data: row as Record<string, unknown> });
-        break;
-      case 'reschedule':
-        // PR-UI-13-3: former setRescheduleData(row) + setShowSlotsModal(true)
-        // consolidated into one reducer action.
-        openRescheduleDialog(row as Record<string, unknown>);
-        break;
-      case 'cancel':
-        setCancelDialog({ open: true, row: row as unknown as Appointment, reason: '' });
-        break;
-      case 'call_patient':
-        if (row.patient_phone) {
-          // R-24 fix: санитизация tel: URL — оставляем только digits и +.
-          // Предотвращает injection через специальные символы в phone field.
-          const sanitizedPhone = String(row.patient_phone).replace(/[^\d+]/g, '');
-          // UX Audit R-2.5: используем нативный <a> anchor вместо window.open().
-          // window.open() может блокироваться браузером как pop-up, т.к. этот
-          // handler вызывается не из прямого user-gesture (через context menu).
-          // Нативный anchor — стандартный паттерн для tel: ссылок.
-          const link = document.createElement('a');
-          link.href = `tel:${sanitizedPhone}`;
-          link.style.display = 'none';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
-        break;
-      case 'force_majeure':
-        // Открываем модальное окно форс-мажора для специалиста
-        setForceMajeureModal({
-          open: true,
-          specialistId: row.doctor_id || row.specialist_id || null,
-          specialistName: row.doctor_name || row.specialist_name || tI18n('registrarPanel.rp_all_specialists')
-        });
-        break;
-      default:
-        logger.info('Неизвестное действие:', action);
-        break;
-    }
-  }, [updateAppointmentStatus, handleStartVisit, openRecordPreview, openRecordEditor, confirm, setPaymentDialog, setPrintDialog, setCancelDialog, setForceMajeureModal, openRescheduleDialog]);
+// Обработчик действий контекстного меню
+  // PR-UI-13-5: row-action routing extracted to useRegistrarRowActions
+  // (verbatim port): openRecordPreview / openRecordEditor /
+  // handleTableAction (EAT onActionClick router, incl. confirm-gated
+  // in_cabinet/complete branches) / handleContextMenuAction (context-menu
+  // router + call_patient tel: link + force-majeure modal).
+  const {
+    openRecordPreview,
+    openRecordEditor,
+    handleTableAction,
+    handleContextMenuAction,
+  } = useRegistrarRowActions({
+    confirm,
+    tI18n,
+    updateAppointmentStatus,
+    handleStartVisit,
+    setRecordPreviewDialog,
+    setPaymentDialog,
+    setPrintDialog,
+    setCancelDialog,
+    setContextMenu,
+    setForceMajeureModal,
+    openRescheduleDialog,
+    setWizardEditMode,
+    setWizardInitialData,
+    setShowWizard,
+  });
 
   return (
     <div

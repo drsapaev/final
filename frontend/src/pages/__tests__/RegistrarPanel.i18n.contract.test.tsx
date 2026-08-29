@@ -34,11 +34,21 @@ const rescheduleDialogSource = fs.readFileSync(
   'utf8'
 );
 
+// PR-UI-13-5: the row-action routing (handleTableAction /
+// handleContextMenuAction confirm + notify keys) moved to
+// pages/registrar/useRegistrarRowActions.ts. It is part of the panel's
+// i18n contract surface.
+const rowActionsSource = fs.readFileSync(
+  path.join(ROOT, 'pages/registrar/useRegistrarRowActions.ts'),
+  'utf8'
+);
+
 const sourceTree = [
   source,
   worklistDataSource,
   wizardSource,
   rescheduleDialogSource,
+  rowActionsSource,
 ].join('\n');
 
 const translationsSource = fs.readFileSync(
@@ -62,23 +72,29 @@ describe('RegistrarPanel STRAT#30 — i18n migration', () => {
   it('uses tI18n() for all confirm dialog titles', () => {
     // PR-UI-13-3: postpone_tomorrow_* / postpone_date_* titles moved to
     // RescheduleSlotsDialog — checked against the tree.
-    expect(source).toContain("tI18n('registrar.send_to_cabinet_title')");
-    expect(source).toContain("tI18n('registrar.complete_visit_title')");
+    // PR-UI-13-5: send_to_cabinet / complete_visit titles moved to
+    // useRegistrarRowActions — checked against the tree.
+    expect(sourceTree).toContain("tI18n('registrar.send_to_cabinet_title')");
+    expect(sourceTree).toContain("tI18n('registrar.complete_visit_title')");
     expect(sourceTree).toContain("tI18n('registrar.postpone_tomorrow_title')");
     expect(sourceTree).toContain("tI18n('registrar.postpone_date_title')");
   });
 
   it('uses tI18n() for confirm dialog confirmLabel and cancelLabel', () => {
-    expect(source).toContain("tI18n('registrar.send_to_cabinet_confirm')");
-    expect(source).toContain("tI18n('registrar.complete_visit_confirm')");
+    // PR-UI-13-5: send_to_cabinet / complete_visit confirm labels moved to
+    // useRegistrarRowActions — checked against the tree.
+    expect(sourceTree).toContain("tI18n('registrar.send_to_cabinet_confirm')");
+    expect(sourceTree).toContain("tI18n('registrar.complete_visit_confirm')");
     expect(sourceTree).toContain("tI18n('registrar.postpone_tomorrow_confirm')");
     expect(sourceTree).toContain("tI18n('registrar.postpone_date_confirm')");
     expect(sourceTree).toContain("tI18n('registrar.cancel')");
   });
 
   it('uses tI18n() with params for confirm dialog messages', () => {
-    expect(source).toContain("tI18n('registrar.send_to_cabinet_message', { name: inCabinetName })");
-    expect(source).toContain("tI18n('registrar.complete_visit_message', { name: completeName })");
+    // PR-UI-13-5: send_to_cabinet / complete_visit messages moved to
+    // useRegistrarRowActions — checked against the tree.
+    expect(sourceTree).toContain("tI18n('registrar.send_to_cabinet_message', { name: inCabinetName })");
+    expect(sourceTree).toContain("tI18n('registrar.complete_visit_message', { name: completeName })");
     expect(sourceTree).toContain("tI18n('registrar.postpone_tomorrow_message')");
   });
 
@@ -87,8 +103,10 @@ describe('RegistrarPanel STRAT#30 — i18n migration', () => {
     // PR-UI-13-3: registrar.appointment_created lives in useRegistrarWizard;
     // the postpone/notify keys live in RescheduleSlotsDialog — checked against
     // the tree.
-    expect(source).toContain("tI18n('registrar.sent_to_cabinet')");
-    expect(source).toContain("tI18n('registrar.visit_completed')");
+    // PR-UI-13-5: sent_to_cabinet / visit_completed moved to
+    // useRegistrarRowActions — checked against the tree.
+    expect(sourceTree).toContain("tI18n('registrar.sent_to_cabinet')");
+    expect(sourceTree).toContain("tI18n('registrar.visit_completed')");
     expect(sourceTree).toContain("tI18n('registrar.appointment_created')");
     expect(sourceTree).toContain("tI18n('registrar.visit_postponed')");
     expect(sourceTree).toContain("tI18n('registrar.no_visit_for_postpone')");
