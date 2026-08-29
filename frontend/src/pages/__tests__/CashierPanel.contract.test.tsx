@@ -5,9 +5,16 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// PR-UI-14-1: module-scope payment contracts & pure helpers moved verbatim to
+// ./cashier/cashierPaymentContracts.ts; JSX action cells stay in the panel.
+// The contract now pins BOTH files (same pattern as PR-UI-13-1..13-4 contract
+// boundary updates): helper contracts → contracts module; render contracts → panel.
 const cashierPanelPath = path.resolve(__dirname, '../CashierPanel.tsx');
+const cashierContractsPath = path.resolve(__dirname, '../cashier/cashierPaymentContracts.ts');
 
 const readCashierPanelSource = () => fs.readFileSync(cashierPanelPath, 'utf8');
+const readCashierContractsSource = () => fs.readFileSync(cashierContractsPath, 'utf8');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
@@ -19,11 +26,11 @@ const extractSourceBlock = (source: string, startMarker: string, endMarker: stri
 
 describe('CashierPanel payment action contract', () => {
   it('fails closed when backend payment action fields are missing', () => {
-    const source = readCashierPanelSource();
+    const source = readCashierContractsSource();
     const helperBlock = extractSourceBlock(
       source,
       'const hasBackendPaymentAction = (paymentRow: CashierPaymentRow | null | undefined, action: string): boolean => {',
-      'const CashierPanel = () => {',
+      '\n};',
     );
 
     expect(helperBlock).toContain('paymentRow?.available_actions');
@@ -51,7 +58,7 @@ describe('CashierPanel payment action contract', () => {
   });
 
   it('does not invent a paid status in receipt print payloads', () => {
-    const source = readCashierPanelSource();
+    const source = readCashierContractsSource();
     // i18n-unification: buildReceiptPrintPayload now takes (paymentRow, labels, defaultPatientLabel)
     // Strict:true migration: signature gained param types + return type (multi-line).
     const receiptBlock = extractSourceBlock(
@@ -65,14 +72,15 @@ describe('CashierPanel payment action contract', () => {
   });
 
   it('delegates grouped cashier payment allocation to the backend contract', () => {
-    const source = readCashierPanelSource();
+    const contractsSource = readCashierContractsSource();
+    const panelSource = readCashierPanelSource();
     const groupedContractBlock = extractSourceBlock(
-      source,
+      contractsSource,
       'const createGroupedCashierPayment = async (appointment: Appointment, paymentData: CashierPaymentData) => {',
       'const PAYMENT_ACTION_CAN_FIELD = {',
     );
     const processPaymentBlock = extractSourceBlock(
-      source,
+      panelSource,
       'const processPayment = async (appointment: unknown, paymentData: unknown) => {',
       'const confirmPayment = async (paymentId: string | number | undefined) => {',
     );
@@ -109,7 +117,7 @@ describe('CashierPanel payment action contract', () => {
   });
 
   it('does not infer direct cashier payment availability from visit ids', () => {
-    const source = readCashierPanelSource();
+    const source = readCashierContractsSource();
     const helperBlock = extractSourceBlock(
       source,
       'const canCreateDirectCashierPayment = (appointment: Appointment) => {',
