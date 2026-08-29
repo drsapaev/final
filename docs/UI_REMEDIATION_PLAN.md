@@ -1484,9 +1484,10 @@ export const BRAND = {
 10. **Удалить** `src/theme/tokens-legacy.ts` — после устранения единственного живого импортёра (`ThemeContext.tsx`); ownership перенесён из PR-UI-02 (см. §3.1)
 11. **Переименовать** `src/components/navigation/ModernTabs.tsx` → `Tabs.tsx` — mechanical rename, отложен из PR-UI-04 (33 потребителя)
 12. **M-8 dead-duplicate decommission + consolidation inventory (ownership присвоен v1.8; audit M-8):**
-    - Удалить мёртвый `src/components/telegram/TelegramManager` (741 LOC — дубликат root-живого `TelegramManager` 2 496 LOC; перед удалением grep-проверка 0 живых импортёров по прецеденту cursor-effects #2838)
+    - Удалить мёртвый `src/components/telegram/TelegramManager` (741 LOC — дубликат root-живого `TelegramManager` 2 496 LOC) **вместе с его единственным импортёром `src/pages/TelegramPage.tsx`** (мёртвая страница: живых импортёров нет — упоминания только как i18n-ключи в 5 локалях, вычистить ключи; иначе tsconfig include `src/**/*.tsx` даёт unresolved import и type-check FAIL — Codex #2875 round 3). Перед удалением grep-проверка 0 живых импортёров по прецеденту cursor-effects #2838
     - Составить consolidation-inventory по: 2FA ×6 файлов, `PWAInstallPrompt` ×3, role-гварды ×4 — per-entity решение (мёртвые дубликаты удаляются здесь; живые консолидации — отдельный инкремент с явным решением, зафиксированным в плане)
-    - Affected paths: `frontend/src/components/telegram/`, 2FA-файлы (список M-8 аудита), `PWAInstallPrompt*`, role-guard helpers
+    - Affected paths: `frontend/src/components/telegram/`, `frontend/src/pages/TelegramPage.tsx`, 2FA-файлы (список M-8 аудита), `PWAInstallPrompt*`, role-guard helpers
+13. **L-5 ownership (v1.8, Codex #2875 round 3):** удалить мёртвую пару `src/PublicApp.tsx` + `src/pages/Login.tsx` (PublicApp не импортируется нигде в src — grep 29.08; Login импортируется только PublicApp'ом); вычистить `legacyRedirectFrom: ['/old-login']` из `routeRegistry.ts` (~строка 225) и связанные i18n-ключи; после удаления — grep-проверка 0 ссылок
 
 **Acceptance criteria:**
 - ✅ Все перечисленные файлы удалены
@@ -1495,7 +1496,8 @@ export const BRAND = {
 - ✅ Stylelint отклоняет нестандартные spacing values
 - ✅ ESLint отклоняет forbidden imports
 - ✅ Bundle size уменьшился на ≥ 50 KB gzip
-- ✅ (M-8, v1.8) Мёртвый `components/telegram/TelegramManager` удалён с доказательством 0 импортёров; consolidation-inventory по 2FA/PWA/role-гвардам зафиксирован в плане; живые дубликаты не тронуты без отдельного решения
+- ✅ (M-8, v1.8) Мёртвый `components/telegram/TelegramManager` удалён вместе с единственным импортёром `pages/TelegramPage.tsx` (0 unresolved imports, type-check PASS); consolidation-inventory по 2FA/PWA/role-гвардам зафиксирован в плане; живые дубликаты не тронуты без отдельного решения
+- ✅ (L-5, v1.8) `PublicApp.tsx` + `pages/Login.tsx` удалены; `legacyRedirectFrom: ['/old-login']` вычищен из routeRegistry; 0 ссылок после удаления
 
 ---
 
@@ -1649,7 +1651,7 @@ npm run build:analyze
 | **L-2** 4 font-family для html + inline-хардкоды шрифтов | `--mac-font-family` canonical | PR-UI-02 + Sprint 5.5 | 🟡 PARTIAL | canonical live; inline-остатки (LoginFormStyled и др.) → 5.5 |
 | **L-3** Дубли .sr-only×2 / scrollbar×2 / --ui-font×2 | sr-only канонизирован; остальное — гигиена | C-5 fix + PR-UI-17 | 🟡 PARTIAL | sr-only canonical (tokens.css:926); scrollbar/--ui-font дубли → PR-UI-17 |
 | **L-4** ToastContainer themed / мёртвые ветки тем HeaderNew | Чистка | PR-UI-17-track | ⬜ PLANNED | PR-08 follow-up (b) зафиксирован: HeaderNew vestigial glass refs |
-| **L-5** /old-login второй вход (PublicApp мёртв) | Удаление | PR-UI-17 (H-9 family) | ⬜ PLANNED | §7 PR-UI-17 |
+| **L-5** /old-login второй вход (PublicApp мёртв) | Удаление | PR-UI-17 (item 13 + AC, v1.8) | ⬜ PLANNED | live grep 29.08: PublicApp 0 импортёров; Login только из PublicApp; legacyRedirectFrom routeRegistry:~225 |
 | **L-6** Доки-призраки без archive-notice | Root UI_AUDIT_PLAN.md заменяет ~91 MD | docs-hygiene | 🟡 PARTIAL | SSOT-документ в репо (7cb58984); разметка архивных доков — отдельный docs-шаг |
 
 **Итог v1.8:** 36 findings → **0 ORPHANED**. Подсчёт по первичному статус-бейджу строки (строки с двойным статусом — C-3, H-1, L-1 — считаются по первичному ✅, вторичный виден в строке): ✅ DONE/ACTIVE — **8** (C-1, C-3, C-4, H-1, H-10, M-2, M-3, L-1); 🟡 PARTIAL с владельцем — **13** (C-5, H-4, H-7, H-12, M-1, M-4, M-5, M-6, M-9, M-12, L-2, L-3, L-6); ⬜ PLANNED/TRACKED в спринтах — **12** (C-2, C-6, H-5, H-8, H-9, H-11, M-7, M-8, M-10, M-11, L-4, L-5); 🔁/📌 DECISION-DIVERGENT — **3** (H-2, H-3 — divergent rulings, H-3 кандидат пересмотра в Sprint 5; H-6 — decision-reversed, канон Modal.tsx). 8+13+12+3 = 36. C-6 — единственная находка, бывшая orphaned с 25.08, закрыта введением PR-UI-19.
