@@ -5,8 +5,8 @@ import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointments
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
 import {
-  Button, Badge, Icon,
-  Input } from '../components/ui/macos';
+  Button, Badge, Icon
+} from '../components/ui/macos';
 import { AnimatedLoader } from '../components/ui';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
@@ -48,6 +48,12 @@ import {
   computeRegistrarWorklistRows,
   type QueueProfileItem,
 } from './registrar/registrarWorklistRows';
+// Decomp 10 (PR-UI-13-3): dialog + wizard state machines.
+import { useRegistrarDialogs } from './registrar/useRegistrarDialogs';
+import { useRegistrarWizard } from './registrar/useRegistrarWizard';
+// Decomp 10 views (PR-UI-13-3): extracted dialog-composition views.
+import RecordPreview from './registrar/views/RecordPreview';
+import RescheduleSlots from './registrar/views/RescheduleSlots';
 // Decomp 5: record action handlers extracted to useRegistrarActions hook
 import { useRegistrarActions } from './registrar/useRegistrarActions';
 // Decomp 6a: QueueView extracted to component
@@ -59,11 +65,10 @@ import { getViewFromPath } from './registrar/registrarNavigation';
 
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js
 import {
+  // PR-UI-13-3: buildPostWizardPaymentRow moved to useRegistrarWizard;
+  // normalizePatientGender + formatPreviewList moved to RecordPreviewDialog.
   REGISTRAR_TAB_LABEL_KEYS,
   REGISTRAR_STATUS_LABEL_KEYS,
-  normalizePatientGender,
-  formatPreviewList,
-  buildPostWizardPaymentRow,
   isMultiRecordAggregateRow,
 } from './registrar/registrarHelpers';
 
@@ -72,7 +77,8 @@ import {
 import PaymentDialog from '../components/dialogs/PaymentDialog';
 import CancelDialog from '../components/dialogs/CancelDialog';
 import PrintDialog from '../components/dialogs/PrintDialog';
-import ModernDialog from '../components/dialogs/ModernDialog';
+// PR-UI-13-3: ModernDialog import moved to RecordPreviewDialog +
+// RescheduleSlotsDialog (both dialog JSX blocks extracted).
 import { printPanelTicketInBrowserAsync } from '../services/panelPrint';
 
 // Современный мастер
@@ -89,7 +95,8 @@ import PaymentManager from '../components/payment/PaymentManager';
 
 // Утилиты для работы с датами
 import { getLocalDateString, formatRegistrarDate } from '../utils/dateUtils';
-import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
+// PR-UI-13-3: rescheduleTomorrow/rescheduleVisit moved to
+// registrar/views/RescheduleSlotsDialog.tsx.
 // Note: formatNetworkErrorMessage + isNetworkFetchError moved to useRegistrarData.js (Decomp 4)
 import { getErrorMessage } from '../utils/errorHandler';
 // PR-UI-13-2: aggregation/sorting imports moved to
@@ -235,44 +242,9 @@ const RegistrarPanel = () => {
     setQueueProfiles(profiles as QueueProfileItem[]);
   }, []);
 
-  // Состояния для печати
-  const [printDialog, setPrintDialog] = useState<{ open: boolean; type: string; data: Record<string, unknown> | null }>({ open: false, type: 'ticket', data: null });
-  const [cancelDialog, setCancelDialog] = useState<{ open: boolean; row: Appointment | null; reason: string }>({ open: false, row: null, reason: '' });
-  const [paymentDialog, setPaymentDialog] = useState<{ open: boolean; row: Appointment | null; paid: boolean; source: string | null }>({ open: false, row: null, paid: false, source: null });
-  const [recordPreviewDialog, setRecordPreviewDialog] = useState<{ open: boolean; row: Appointment | null }>({ open: false, row: null });
-  // ✅ State for rescheduling
-  const [rescheduleData, setRescheduleData] = useState<Record<string, unknown> | null>(null);
-
-  // ✅ State for Force Majeure modal
-  const [forceMajeureModal, setForceMajeureModal] = useState<{ open: boolean; specialistId: string | number | null; specialistName: string }>({ open: false, specialistId: null, specialistName: '' });
-
-  const [contextMenu, setContextMenu] = useState<{ open: boolean; row: Record<string, unknown> | null; position: { x: number; y: number } }>({ open: false, row: null, position: { x: 0, y: 0 } });
-
-  // Состояния для пагинации / данных worklist — PR-UI-13-1: moved to
-  // useRegistrarWorklistData (appointments, dataSource, appointmentsLoading,
-  // paginationInfo now owned by the hook's reducer state machine).
-  // QW-03 fix: demoAppointments useMemo (260 lines) removed.
-  // Production code should never ship demo data. Backend fixtures
-  // are used for tests; error states show proper error UI instead.
-
-  // ✅ Используется только новый мастер (V2)
-  const [showWizard, setShowWizard] = useState(false);
-  const [wizardEditMode, setWizardEditMode] = useState(false); // ✨ НОВОЕ: Режим редактирования
-  const [wizardInitialData, setWizardInitialData] = useState<Record<string, unknown> | null>(null); // ✨ НОВОЕ: Данные для редактирования
-  const [showPaymentManager, setShowPaymentManager] = useState(false); // Для модуля оплаты
-  const [isProcessing, setIsProcessing] = useState(false); // Состояние обработки
-
-  // Отладка состояния мастера удалена - используется AppointmentWizard
-
-  // Отладка состояния загрузки (QW-03: appointmentsLoading effect moved with
-  // the data lifecycle to useRegistrarWorklistData)
-  const [showSlotsModal, setShowSlotsModal] = useState(false);
-  // QW-02 fix: hold the date the user picks in the inline date input inside the
-  // reschedule slots dialog. Replaces the previous window.prompt() call that was
-  // jarring, blocking, and lacked a date picker.
-  const [customRescheduleDate, setCustomRescheduleDate] = useState('');
-  // R-27 fix: optional time picker for reschedule (HH:MM)
-  const [customRescheduleTime, setCustomRescheduleTime] = useState('');
+  // PR-UI-13-3 (Decomp 10): dialog + wizard state (useRegistrarDialogs +
+  // useRegistrarWizard) wired below, after the data hooks they depend on
+  // (loadAppointments / loadIntegratedData / tI18n).
   // PR-UI-13-1: autoRefresh const + reschedule wiring moved below — the
   // reschedule hook consumes setAppointments from useRegistrarWorklistData.
   const [doctors, setDoctors] = useState<Doctor[]>([]);const [services, setServices] = useState<Record<string, unknown>>({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
@@ -317,6 +289,79 @@ const RegistrarPanel = () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────
+  // PR-UI-13-3 (Decomp 10): dialog + wizard state consolidated into
+  // useReducer state machines — useRegistrarDialogs (print/cancel/payment/
+  // preview/force-majeure/context-menu/reschedule/payment-manager slices;
+  // original reset shapes preserved) and useRegistrarWizard (open/editMode/
+  // initialData + completion flow). Setter-compatible shims keep the exact
+  // original call shapes for WelcomeView, QueueView, hotkeys and JSX.
+  // ──────────────────────────────────────────────────────────────────────
+  // Ref indirection for the wizard completion flow (PR-UI-13-3):
+  // useRegistrarWizard needs loadAppointments (owned by
+  // useRegistrarWorklistData below), while the worklist hook needs the
+  // wizard's showWizard flag — a cycle. The ref breaks it with identical
+  // call-time semantics.
+  const loadAppointmentsRef = useRef<(options?: unknown) => Promise<void> | void>(() => {});
+
+  const {
+    printDialog, setPrintDialog,
+    cancelDialog, setCancelDialog,
+    paymentDialog, setPaymentDialog,
+    recordPreviewDialog, setRecordPreviewDialog,
+    forceMajeureModal, setForceMajeureModal,
+    contextMenu, setContextMenu,
+    rescheduleDialog,
+    openRescheduleDialog, closeRescheduleDialog,
+    showPaymentManager, setShowPaymentManager,
+  } = useRegistrarDialogs();
+
+  const {
+    showWizard, wizardEditMode, wizardInitialData,
+    isProcessing, setIsProcessing,
+    setShowWizard, setWizardEditMode, setWizardInitialData,
+    // NOTE: openWizardForCreate/openWizardForEdit/closeWizard helpers exist on
+    // the hook; the panel keeps the original three-setter sequences at call
+    // sites (contract-pinned shapes, identical semantics).
+    handleWizardComplete,
+  } = useRegistrarWizard({
+    setPaymentDialog,
+    setPrintDialog,
+    // Ref indirection breaks the loadAppointments↔showWizard wiring cycle.
+    // Behaviorally identical: React events fire against the latest committed
+    // render, so ref.current at call time IS the closure the original inline
+    // onComplete captured.
+    loadAppointmentsRef,
+    loadIntegratedData,
+    tI18n,
+  });
+
+  // Legacy aliases: the consolidated reschedule slice { open, data } replaces
+  // the former separate showSlotsModal / rescheduleData pair. The open action
+  // is openRescheduleDialog(row) (former setRescheduleData(row) +
+  // setShowSlotsModal(true)); the data-only setter shim handles the legacy
+  // clear-on-success sequence.
+  const showSlotsModal = rescheduleDialog.open;
+  const rescheduleData = rescheduleDialog.data;
+  // Hotkeys adapter: useRegistrarHotkeys only ever calls setShowSlotsModal(false)
+  // (Esc closes the dialog); opening requires row data and goes through
+  // openRescheduleDialog. Adapter preserves the hook's typed contract.
+  const setShowSlotsModal = useCallback((show: boolean) => {
+    if (!show) closeRescheduleDialog();
+  }, [closeRescheduleDialog]);
+
+  const anyDialogOpenRef = useRef(false);
+  anyDialogOpenRef.current = Boolean(
+    paymentDialog.open ||
+    cancelDialog.open ||
+    printDialog.open ||
+    recordPreviewDialog.open ||
+    contextMenu.open ||
+    forceMajeureModal.open ||
+    rescheduleDialog.open ||
+    showPaymentManager
+  );
+
+  // ──────────────────────────────────────────────────────────────────────
   // PR-UI-13-1 (Decomp 8): worklist data lifecycle — appointments fetching,
   // reducer state machine (appointments / dataSource / loading / pagination)
   // and the full refresh lifecycle (initial load, queueUpdated WebSocket
@@ -327,16 +372,6 @@ const RegistrarPanel = () => {
   // showWizard was. The ref is read at effect-run time, exactly like the
   // original closure read them.
   // ──────────────────────────────────────────────────────────────────────
-  const anyDialogOpenRef = useRef(false);
-  anyDialogOpenRef.current = Boolean(
-    paymentDialog.open ||
-    cancelDialog.open ||
-    printDialog.open ||
-    recordPreviewDialog.open ||
-    contextMenu.open ||
-    forceMajeureModal.open ||
-    showSlotsModal
-  );
 
   const {
     appointments,
@@ -357,6 +392,8 @@ const RegistrarPanel = () => {
     loadIntegratedData,
     tI18n,
   });
+  loadAppointmentsRef.current = loadAppointments;
+
 
   // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook.
   // PR-UI-13-1: wired to the worklist hook's setAppointments shim
@@ -389,7 +426,7 @@ const RegistrarPanel = () => {
     return () => {
       window.removeEventListener('openAppointmentWizard', handleOpenWizard);
     };
-  }, []);
+  }, [setShowWizard]);
 
   // P-008 companion: when the user clicks "Новая запись" from another page,
   // HeaderNew navigates to /registrar?action=new. Detect that query param on
@@ -406,7 +443,7 @@ const RegistrarPanel = () => {
     }
     // setSearchParams is a stable identity from useSearchParams — React Router 6.3+
     // guarantees referential stability, so it is safe to omit from deps.
-  }, [searchParams, showWizard]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams, showWizard, setShowWizard]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // UX Audit Registrar #17: Keyboard shortcuts для продуктивности регистратора.
   // Ctrl+N — новая запись (открыть wizard)
@@ -430,7 +467,7 @@ const RegistrarPanel = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showWizard]);
+  }, [showWizard, setShowWizard, setWizardEditMode, setWizardInitialData]);
 
   // UX Audit R-1.7: lastQueueJoin polling (2s) удалён.
   // Раньше: setInterval(checkLastQueueJoin, 2000) проверял localStorage
@@ -504,7 +541,7 @@ const RegistrarPanel = () => {
   // Обработчик действий контекстного меню
   const openRecordPreview = useCallback((row: unknown) => {
     setRecordPreviewDialog({ open: true, row: row as Appointment });
-  }, []);
+  }, [setRecordPreviewDialog]);
 
   const openRecordEditor = useCallback((row: unknown) => {
     const appt = row as Appointment;
@@ -522,7 +559,7 @@ const RegistrarPanel = () => {
     setWizardEditMode(true);
     setWizardInitialData(appt as Record<string, unknown>);
     setShowWizard(true);
-  }, []);
+  }, [setWizardEditMode, setWizardInitialData, setShowWizard]);
 
   const handleContextMenuAction = useCallback(async (action: string, row: Appointment) => {
     switch (action) {
@@ -576,8 +613,9 @@ const RegistrarPanel = () => {
         setPrintDialog({ open: true, type: 'ticket', data: row as Record<string, unknown> });
         break;
       case 'reschedule':
-        setRescheduleData(row as Record<string, unknown>);
-        setShowSlotsModal(true);
+        // PR-UI-13-3: former setRescheduleData(row) + setShowSlotsModal(true)
+        // consolidated into one reducer action.
+        openRescheduleDialog(row as Record<string, unknown>);
         break;
       case 'cancel':
         setCancelDialog({ open: true, row: row as unknown as Appointment, reason: '' });
@@ -611,7 +649,7 @@ const RegistrarPanel = () => {
         logger.info('Неизвестное действие:', action);
         break;
     }
-  }, [updateAppointmentStatus, handleStartVisit, openRecordPreview, openRecordEditor, confirm, setPaymentDialog, setPrintDialog, setCancelDialog, setForceMajeureModal]);
+  }, [updateAppointmentStatus, handleStartVisit, openRecordPreview, openRecordEditor, confirm, setPaymentDialog, setPrintDialog, setCancelDialog, setForceMajeureModal, openRescheduleDialog]);
 
   return (
     <div
@@ -924,8 +962,9 @@ const RegistrarPanel = () => {
                   // UX Audit Registrar #4: cancel и reschedule теперь доступны
                   // как inline кнопки, а не только через context menu.
                   case 'reschedule':
-                    setRescheduleData(row as Record<string, unknown>);
-                    setShowSlotsModal(true);
+                    // PR-UI-13-3: former setRescheduleData(row) + setShowSlotsModal(true)
+                    // consolidated into one reducer action.
+                    openRescheduleDialog(row as Record<string, unknown>);
                     break;
                   case 'cancel':
                     setCancelDialog({ open: true, row: row as unknown as Appointment, reason: '' });
@@ -984,56 +1023,19 @@ const RegistrarPanel = () => {
       {/* Мастер создания записи */}
 
       {/* Современные диалоги */}
-      <ModernDialog
+{/* Decomp 10 (PR-UI-13-3): record preview extracted to
+    registrar/views/RecordPreviewDialog.tsx (state stays in
+    useRegistrarDialogs.recordPreviewDialog). */}
+      <RecordPreview
         isOpen={recordPreviewDialog.open}
+        row={recordPreviewDialog.row}
         onClose={() => setRecordPreviewDialog({ open: false, row: null })}
-        title={tI18n('registrarPanel.rp_preview_title')}
-        maxWidth="36rem"
-        dialogStyle={{
-          backgroundColor: 'var(--mac-bg-primary)'
+        onEdit={(row) => {
+          setRecordPreviewDialog({ open: false, row: null });
+          openRecordEditor(row);
         }}
-        actions={[
-          {
-            label: tI18n('registrarPanel.rp_preview_close'),
-            variant: 'secondary',
-            onClick: () => setRecordPreviewDialog({ open: false, row: null })
-          },
-          {
-            label: tI18n('registrarPanel.rp_preview_edit'),
-            variant: 'primary',
-            onClick: () => {
-              const row = recordPreviewDialog.row;
-              setRecordPreviewDialog({ open: false, row: null });
-              if (row) openRecordEditor(row);
-            }
-          }
-        ]}>
-        {recordPreviewDialog.row && (
-          <div className="registrar-grid-gap-md" style={{ color: 'var(--mac-text-primary)' }}>
-            {[
-              [tI18n('registrarPanel.rp_field_patient'), recordPreviewDialog.row.patient_fio || recordPreviewDialog.row.patient_name],
-              [tI18n('registrarPanel.rp_field_phone'), recordPreviewDialog.row.patient_phone || recordPreviewDialog.row.phone],
-              [tI18n('registrarPanel.rp_field_birth_year'), recordPreviewDialog.row.patient_birth_year || recordPreviewDialog.row.birth_year],
-              [tI18n('registrarPanel.rp_field_gender'), normalizePatientGender(recordPreviewDialog.row as unknown as Parameters<typeof normalizePatientGender>[0] as Record<string, unknown>)],
-              [tI18n('registrarPanel.rp_field_department'), (recordPreviewDialog.row as Record<string, unknown>).queue_name || recordPreviewDialog.row.department || recordPreviewDialog.row.specialty],
-              [tI18n('registrarPanel.rp_field_services'), formatPreviewList(recordPreviewDialog.row.services || recordPreviewDialog.row.service_details)],
-              [tI18n('registrarPanel.rp_field_queue'), formatPreviewList(recordPreviewDialog.row.queue_numbers)],
-              [tI18n('registrarPanel.rp_field_status'), recordPreviewDialog.row.status || recordPreviewDialog.row.canonical_status],
-              [tI18n('registrarPanel.rp_field_payment'), recordPreviewDialog.row.payment_status || recordPreviewDialog.row.payment_type],
-              [tI18n('registrarPanel.rp_field_amount'), recordPreviewDialog.row.cost]
-            ].filter(([, value]) => value !== null && value !== undefined && value !== '').map(([label, value]) => (
-              <div
-                key={String(label)}
-                className="registrar-surface registrar-preview-row">
-                <span className="registrar-preview-label" style={{ color: 'var(--mac-text-secondary)' }}>{String(label)}</span>
-                <span className="registrar-preview-value">
-                  {String(value)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </ModernDialog>
+        tI18n={tI18n}
+      />
 
       <CancelDialog
         isOpen={cancelDialog.open}
@@ -1152,239 +1154,31 @@ const RegistrarPanel = () => {
         }}
         isProcessing={isProcessing}
         setIsProcessing={setIsProcessing}
-        onComplete={async (wizardData) => {
-          logger.info('AppointmentWizardV2 completed successfully:', wizardData);
-          const wasEditMode = wizardEditMode;
-          const wizardDataObj = (wizardData && typeof wizardData === 'object' ? wizardData : {}) as Record<string, unknown>;
-          const postWizardPaymentRow = (!wasEditMode || Number(wizardDataObj.total_amount ?? 0) > 0)
-            ? buildPostWizardPaymentRow(wizardDataObj)
-            : null;
-
-          // Обновляем данные (работает и для создания, и для редактирования)
-          try {
-            // P-004 fix: removed hardcoded 1500ms delay (previously setTimeout(resolve, 1500)).
-            // That dead time was added as a workaround for backend batch operations not
-            // finishing fast enough — it cost registrars ~60 sec/day of pure wait time.
-            // Strategy now: optimistic UI (close wizard + notify success immediately),
-            // then reload appointments with force=true. If the first reload returns stale
-            // data, a single silent retry is attempted after a short debounce.
-            setShowWizard(false);
-            setWizardEditMode(false); // ✨ Сброс режима
-            setWizardInitialData(null); // ✨ Сброс данных
-
-            const message = wasEditMode ?
-              tI18n('registrarPanel.rp_notify_appointment_updated') :
-              tI18n('registrarPanel.rp_notify_appointment_created');
-            notify.success(message);
-
-            // Open payment/print dialog immediately — user can act while data refreshes
-            if (postWizardPaymentRow) {
-              if (Number(postWizardPaymentRow.cost || 0) > 0) {
-                setPaymentDialog({ open: true, row: postWizardPaymentRow as unknown as Appointment | null, paid: false, source: wasEditMode ? 'wizard-edit' : 'wizard-create' });
-              } else {
-                setPrintDialog({ open: true, type: 'ticket', data: postWizardPaymentRow });
-              }
-            }
-
-            // Reload data in the background (does not block UI)
-            try {
-              await Promise.all([
-                loadAppointments({ silent: true, source: 'wizard-complete' } as Record<string, unknown>),
-                loadIntegratedData(),
-              ]);
-            } catch (refreshError) {
-              // Background refresh failed — single silent retry
-              logger.warn('First post-wizard reload failed, retrying once:', refreshError);
-              try {
-                await loadAppointments({ silent: true, source: 'wizard-complete-retry' } as Record<string, unknown>);
-              } catch (retryError) {
-                logger.error('Post-wizard reload retry also failed:', retryError);
-              }
-            }
-          } catch (error: unknown) {
-            logger.error('Error refreshing data after wizard completion:', error);
-            // Не показываем ошибку пользователю, так как запись уже создана
-            setShowWizard(false);
-            notify.success(tI18n('registrar.appointment_created'));
-          }
-        }} />
+        // PR-UI-13-3: completion flow extracted to useRegistrarWizard
+        // (handleWizardComplete — verbatim port: optimistic close + notify +
+        // payment/print handoff, then background reload with one silent retry).
+        onComplete={handleWizardComplete} />
 
 
       {/* Старые диалоги удалены - используются современные компоненты CancelDialog, PaymentDialog, PrintDialog */}
       {/* Встроенное модальное окно оплаты удалено - используется PaymentDialog компонент */}
       {/* Встроенный мастер удален - используется AppointmentWizard компонент */}
 
-      {/* Модальное окно слотов */}
-      <ModernDialog
+{/* Decomp 10 (PR-UI-13-3): reschedule slots dialog extracted to
+      registrar/views/RescheduleSlotsDialog.tsx (QW-02 inline date picker,
+      R-27 optional time, R-43 confirms — ported verbatim; open/close +
+      payload state in useRegistrarDialogs.rescheduleDialog, form fields
+      owned by the component). */}
+      <RescheduleSlots
         isOpen={showSlotsModal}
-        onClose={() => setShowSlotsModal(false)}
-        title={`📅 ${tI18n('registrarPanel.available_slots')}`}
-        maxWidth="32rem"
-        dialogStyle={{
-          backgroundColor: 'var(--mac-bg-primary)'
-        }}
-        actions={[
-          {
-            label: '🌅 ' + tI18n('registrarPanel.tomorrow'),
-            variant: 'primary',
-            onClick: async () => {
-              if (!rescheduleData) return;
-
-              // R-43 fix: confirmation dialog для destructive action.
-              // Перенос записи — необратимое действие (запись меняет день).
-              const ok = await confirm({
-                title: tI18n('registrar.postpone_tomorrow_title'),
-                message: tI18n('registrar.postpone_tomorrow_message'),
-                description: tI18n('registrar.postpone_tomorrow_description'),
-                confirmLabel: tI18n('registrar.postpone_tomorrow_confirm'),
-                cancelLabel: tI18n('registrar.cancel'),
-                intent: 'primary',
-              });
-              if (!ok) return;
-
-              try {
-                setShowSlotsModal(false);
-                const targetVisitId = resolveRescheduleVisitId(rescheduleData);
-                if (!targetVisitId) {
-                  notify.error(tI18n('registrar.no_visit_for_postpone'));
-                  return;
-                }
-                logger.info(`Перенос визита ${targetVisitId} на завтра`);
-                await rescheduleTomorrow(targetVisitId as string | number);
-                notify.success(tI18n('registrar.visit_postponed'));
-                removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
-                setRescheduleData(null);
-                setCustomRescheduleDate('');
-                setCustomRescheduleTime('');
-                loadAppointments({ source: 'reschedule_tomorrow' });
-              } catch (e: unknown) {
-                logger.error('Ошибка переноса на завтра:', e);
-                notify.error(getErrorMessage(e, tI18n('registrarPanel.rp_err_reschedule_failed')));
-              }
-            }
-          },
-          {
-            label: tI18n('registrarPanel.select_date'),
-            variant: 'secondary',
-            // QW-02 fix: previously called window.prompt('Введите дату переноса (YYYY-MM-DD):', currentVal)
-            // — a jarring native browser dialog that blocks the tab, has no date picker,
-            // no min-date guard, and breaks the macOS-style visual language of the app.
-            // Now the date is captured via the inline <Input type="date"> rendered in the
-            // dialog body (see customRescheduleDate state + date input below). This action
-            // validates the captured date and performs the reschedule.
-            onClick: async () => {
-              if (!rescheduleData) return;
-
-              const dateStr = customRescheduleDate || '';
-              const timeStr = (customRescheduleTime || '').trim();
-
-              if (!dateStr) {
-                notify.error(tI18n('registrar.select_postpone_date'));
-                return;
-              }
-
-              if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                notify.error(tI18n('registrar.invalid_date_format'));
-                return;
-              }
-
-              // R-27 fix: validate optional time (HH:MM)
-              if (timeStr && !/^\d{2}:\d{2}$/.test(timeStr)) {
-                notify.error(tI18n('registrar.invalid_time_format'));
-                return;
-              }
-
-              // Optional guard: prevent rescheduling to a past date
-              const today = getLocalDateString();
-              if (dateStr < today) {
-                notify.error(tI18n('registrar.cannot_postpone_past'));
-                return;
-              }
-
-              // R-43 fix: confirmation dialog для destructive action.
-              const ok = await confirm({
-                title: tI18n('registrar.postpone_date_title'),
-                message: timeStr
-                  ? tI18n('registrarPanel.rp_confirm_reschedule_datetime', { date: dateStr, time: timeStr })
-                  : tI18n('registrarPanel.rp_confirm_reschedule_date', { date: dateStr }),
-                confirmLabel: tI18n('registrar.postpone_date_confirm'),
-                cancelLabel: tI18n('registrar.cancel'),
-                intent: 'primary',
-              });
-              if (!ok) return;
-
-              try {
-                setShowSlotsModal(false);
-                const targetVisitId = resolveRescheduleVisitId(rescheduleData);
-                if (!targetVisitId) {
-                  notify.error(tI18n('registrar.no_visit_for_postpone'));
-                  return;
-                }
-                logger.info(`Перенос визита ${targetVisitId} на ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
-                await rescheduleVisit(targetVisitId as string | number, dateStr, timeStr || undefined);
-                notify.success(tI18n('registrar.visit_postponed_date') + ` ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
-                removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
-                setRescheduleData(null);
-                setCustomRescheduleDate('');
-                setCustomRescheduleTime('');
-                loadAppointments({ source: 'reschedule_date' });
-              } catch (e: unknown) {
-                logger.error('Ошибка переноса на дату:', e);
-                notify.error(getErrorMessage(e, tI18n('registrarPanel.rp_err_reschedule_failed')));
-              }
-            }
-          }
-        ]}>
-        <div className="registrar-grid-gap-lg">
-          <div className="registrar-reschedule-card registrar-reschedule-card-accent">
-            <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-              <div className="registrar-reschedule-icon registrar-reschedule-icon-bg" style={{ color: 'var(--mac-accent-blue)' }}>
-                📅
-              </div>
-              <div>
-                <div className="registrar-reschedule-title registrar-reschedule-title-text">
-                  {tI18n('registrarPanel.rp_reschedule_title')}
-                </div>
-                <div className="registrar-reschedule-desc registrar-reschedule-desc-text">
-                  {tI18n('registrarPanel.rp_reschedule_desc')}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* QW-02 fix: inline date picker replacing window.prompt().
-              min=today prevents selecting past dates natively in the picker. */}
-          <div className="registrar-reschedule-card registrar-reschedule-card-neutral">
-            <label htmlFor="reschedule-custom-date" className="registrar-reschedule-label registrar-reschedule-label-text">
-              {tI18n('registrarPanel.rp_reschedule_date_label')}
-            </label>
-            <Input
-              id="reschedule-custom-date"
-              type="date"
-              value={customRescheduleDate}
-              min={getLocalDateString()}
-              aria-label={tI18n('registrarPanel.rp_aria_reschedule_date')}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCustomRescheduleDate(e.target.value)}
-              className="registrar-reschedule-input registrar-reschedule-input-themed"
-            />
-            {/* R-27 fix: optional time picker (HH:MM) */}
-            <label htmlFor="reschedule-custom-time" className="registrar-reschedule-label registrar-reschedule-label-block">
-              {tI18n('registrarPanel.rp_reschedule_time_label')}
-            </label>
-            <Input
-              id="reschedule-custom-time"
-              type="time"
-              value={customRescheduleTime}
-              aria-label={tI18n('registrarPanel.rp_aria_reschedule_time')}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCustomRescheduleTime(e.target.value)}
-              className="registrar-reschedule-input registrar-reschedule-input-themed"
-            />
-            <div className="registrar-reschedule-hint registrar-reschedule-hint-text">
-              {tI18n('registrarPanel.rp_reschedule_hint', { btn: tI18n('registrarPanel.select_date') })}
-            </div>
-          </div>
-        </div>
-      </ModernDialog>
+        rescheduleData={rescheduleData}
+        onClose={closeRescheduleDialog}
+        confirm={confirm}
+        resolveRescheduleVisitId={resolveRescheduleVisitId}
+        removeRescheduledAppointmentFromView={removeRescheduledAppointmentFromView}
+        loadAppointments={loadAppointments}
+        tI18n={tI18n}
+      />
 
       {/* Контекстное меню */}
       {contextMenu.open && contextMenu.row &&
