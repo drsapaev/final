@@ -14,12 +14,12 @@
 |---|---|---|---|---|
 | `SECRET_KEY` | backend/.env | Installer (generated) | Suspected compromise | Encrypted note |
 | `ENCRYPTION_KEY` | backend/.env | Installer (Fernet.generate_key) | Never (unless compromised) | **Paper + password manager** |
-| `DATABASE_URL` (with password) | backend/.env | Supabase creates | Suspected compromise | Password manager |
+| `DATABASE_URL` (contains DB password) | backend/.env | Supabase creates | Suspected compromise | Password manager. **Credential embedded in URL — do not share or log** |
 | `SMTP_PASSWORD` | backend/.env | Brevo (SMTP key) | Suspected compromise | Password manager |
 | `R2_SECRET_ACCESS_KEY` | backend/.env | Cloudflare (API token) | Suspected compromise | Password manager |
 | `SENTRY_DSN` | backend/.env + Vercel | Sentry project (public DSN) | N/A (send-only) | N/A |
 | `TELEGRAM_BOT_TOKEN` | backend/.env | BotFather | Suspected compromise | Password manager |
-| `SENTRY_AUTH_TOKEN` | Sentry dashboard only | Sentry (for API management) | Suspected compromise | Password manager |
+| `SENTRY_AUTH_TOKEN` | Sentry dashboard only | Sentry (for API management) | **Operational secret** (not runtime) — do not include in clinic recovery secret set | Password manager |
 
 ## Brevo SMTP — Key Confusion Prevention
 
@@ -35,7 +35,7 @@
 | Key | Permissions | Scope |
 |---|---|---|
 | backup-writer | Object Read & Write | One bucket only |
-| restore-reader | Object Read Only | Same bucket |
+| restore-reader | Object Read Only | Same bucket. **Production restore uses this credential; writer used for initial drill only as documented exception** |
 | dashboard | Full control | Managed by owner |
 
 R2 does NOT support write-only tokens. Closest minimal model: bucket-scoped Read & Write + lifecycle rules managed by owner.

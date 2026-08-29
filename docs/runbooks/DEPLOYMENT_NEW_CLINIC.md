@@ -15,7 +15,7 @@
 - [ ] Brevo account (SMTP — see policy below)
 - [ ] Sentry account (backend + frontend projects)
 - [ ] Vercel account (frontend hosting)
-- [ ] Windows host with Python 3.11+, PostgreSQL 17 client tools
+- [ ] Windows host with Python 3.11+. PostgreSQL 17 client tools must be installed; application resolves pg_dump/pg_restore through the repository resolver (`_resolve_pg_tool`). PATH presence is not required
 
 ## Brevo Policy
 
@@ -46,9 +46,9 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | Step | Action | Verification |
 |---|---|---|
 | 1.1 | Create Supabase project | Dashboard shows project active |
-| 1.2 | Copy DATABASE_URL (session pooler :5432) | `.env` DATABASE_URL set |
+| 1.2 | Copy `DATABASE_URL` — use the canonical Supabase session-pooler URI (`:5432`, db `postgres`). Verify with `SELECT current_database(), current_user` before proceeding | `.env` DATABASE_URL set |
 | 1.3 | Run `alembic upgrade head` | 171 tables created, no errors |
-| 1.4 | Enable RLS policies | Supabase dashboard → RLS enabled |
+| 1.4 | Enable RLS (deny-all baseline) on all application tables via Alembic migration | Verify: anon/authenticated roles cannot read PHI through Data API. Application authorization enforced by FastAPI/RBAC (not Supabase policies) |
 | 1.5 | Verify: `SELECT count(*) FROM users` → 0 | Clean schema |
 
 **Failure handling**: if alembic fails, check DATABASE_URL. Do NOT proceed without clean migration.
@@ -61,7 +61,7 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | 2.2 | Create `.env` from `.env.example` | All required vars filled |
 | 2.3 | Generate `SECRET_KEY` (32+ chars) | Set in `.env` |
 | 2.4 | Generate `ENCRYPTION_KEY` | Set in `.env` + backup outside host |
-| 2.5 | Set `AUTO_BACKUP_ENABLED=true` | In `.env` |
+| 2.5 | Set `AUTO_BACKUP_ENABLED=true` | In `.env`. **Deployment acceptance requires actual scheduled backup artifact (non-zero, in R2), not just config presence** |
 | 2.6 | Set `BACKUP_HOUR=2` `BACKUP_MINUTE=0` | In `.env` |
 | 2.7 | Start uvicorn :18000 | `curl localhost:18000/api/v1/health` → 200 |
 | 2.8 | Create autostart script | Startup folder: `clinic-api-autostart.cmd` |
@@ -89,7 +89,7 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | Step | Action | Verification |
 |---|---|---|
 | 4.1 | Create bucket `<clinic-name>-db-backups` | Dashboard shows bucket |
-| 4.2 | Create API token (Object Read & Write, scoped to this bucket) | 3 values obtained |
+| 4.2 | Create **backup-writer** token (Object Read & Write, scoped to this bucket) and **restore-reader** token (Object Read Only, same bucket). Production restore uses restore-reader; writer used for restore only as documented exception | 3 values obtained |
 | 4.3 | Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` in `.env` | Present |
 | 4.4 | Set lifecycle: `daily/` ×30d, `weekly/` ×84d | Dashboard shows rules |
 | 4.5 | Test upload: run manual backup, verify in R2 | Object in `daily/` |
@@ -104,7 +104,7 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | 5.3 | Verify domain in Brevo | All checks green |
 | 5.4 | Create SMTP key → `SMTP_PASSWORD` in `.env` | Key works |
 | 5.5 | Set `SMTP_FROM=no-reply@<clinic-domain>` | In `.env` |
-| 5.6 | **Disable IP blocking** for SMTP keys (dynamic ISP IP) | Security → IP blocking → Deactivated |
+| 5.6 | SMTP IP restriction must match the actual egress model. Disable only when the origin has no stable allowlisted IP (e.g. dynamic ISP). On VPS/static IP, keep IP allowlisting enabled | Security → IP blocking → Deactivated |
 | 5.7 | Send test email via password-reset flow | Email delivered, link works |
 
 ### Phase 6: Sentry
@@ -147,7 +147,7 @@ ENCRYPTION_KEY → encrypts backups → backup without key = unusable
 | 9.7 | WebSocket chat → connect + message | WS works |
 | 9.8 | Sentry: trigger test error → verify in dashboard + email | Alerting works |
 | 9.9 | Backup: run manual → verify R2 object | Backup works |
-| 9.10 | Reboot machine → wait 60s → health 200 | Autostart works |
+| 9.10 | Reboot → verify: uvicorn process = 1, cloudflared process = 1, tunnel registered (shared log), public API = 200, WS handshake OK | Full autostart + API chain works |
 
 ### Final Acceptance
 
