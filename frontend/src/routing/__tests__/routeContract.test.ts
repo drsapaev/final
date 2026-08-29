@@ -55,12 +55,12 @@ const ADMIN_CONTEXTUAL_SETTINGS_DIRECT_ROUTE_IDS = [
 ];
 
 const ADMIN_NAV_GROUPING_ROUTE_CONTRACT = {
-  'admin-dashboard': { path: '/admin', owner: 'admin.operations', component: 'AdminDashboard', entry: 'menu', section: 'Обзор' },
-  'admin-analytics': { path: '/admin/analytics', owner: 'admin.analytics', component: 'AnalyticsPage', entry: 'menu', section: 'Обзор' },
-  'admin-reports': { path: '/admin/reports', owner: 'admin.reports', component: 'UnifiedReports', entry: 'direct', section: 'Обзор' },
-  'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'SystemManagement', entry: 'direct', section: 'Система' },
+  'admin-dashboard': { path: '/admin', owner: 'admin.operations', component: 'AdminDashboard', entry: 'menu', sectionKey: 'nav.overview' },
+  'admin-analytics': { path: '/admin/analytics', owner: 'admin.analytics', component: 'AnalyticsPage', entry: 'menu', sectionKey: 'nav.overview' },
+  'admin-reports': { path: '/admin/reports', owner: 'admin.reports', component: 'UnifiedReports', entry: 'direct', sectionKey: 'nav.overview' },
+  'admin-system': { path: '/admin/system', owner: 'admin.system', component: 'SystemManagement', entry: 'direct', sectionKey: 'nav.system' },
   // IA PR-2: 5 integration routes demoted to nav:false (tabs inside UnifiedIntegrations hub)
-  'admin-integrations': { path: '/admin/integrations', owner: 'admin.integrations', component: 'UnifiedIntegrations', entry: 'menu', section: 'Система' },
+  'admin-integrations': { path: '/admin/integrations', owner: 'admin.integrations', component: 'UnifiedIntegrations', entry: 'menu', sectionKey: 'nav.system' },
 };
 
 const ADMIN_ROUTE_CHROME_HEADING_CONTRACT = {

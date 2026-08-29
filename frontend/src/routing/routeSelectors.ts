@@ -21,6 +21,10 @@ interface RouteNavMeta {
   // deletion); no registry entry emits it anymore.
   label?: string;
   labelKey?: string;
+  badgeKey?: string;
+  tooltipKey?: string;
+  ariaLabelKey?: string;
+  sectionKey?: string;
   icon?: string;
   badge?: string;
   tooltip?: string;
@@ -78,8 +82,11 @@ export interface RouteProfile {
 interface SidebarItem {
   id: string;
   to: string;
-  /** PR-UI-19 (C-6): i18n key (nav.*); resolved by Sidebar via useTranslation. */
+  /** PR-UI-19 (C-6): i18n keys (nav.*); resolved by Sidebar via useTranslation. */
   labelKey?: string;
+  badgeKey?: string;
+  tooltipKey?: string;
+  ariaLabelKey?: string;
   /** Fallback text (route title) when labelKey is absent or missing everywhere. */
   label?: string;
   icon: string;
@@ -90,6 +97,8 @@ interface SidebarItem {
 }
 
 interface SidebarSection {
+  /** PR-UI-19 (C-6): i18n key for the section heading (nav.*), resolved in Sidebar. */
+  titleKey?: string;
   title: string;
   items: SidebarItem[];
 }
@@ -369,13 +378,16 @@ export function getAdminNavSections(
 ): SidebarSection[] {
   return getAdminNavRoutes(profile, options).reduce<SidebarSection[]>((sections, route) => {
     const routeNav = typeof route.nav === 'object' ? route.nav : null;
-    const sectionName = routeNav?.section || 'General';
-    const existingSection = sections.find((section) => section.title === sectionName);
+    const sectionName = routeNav?.sectionKey || 'General';
+    const existingSection = sections.find((section) => (section.titleKey || section.title) === sectionName);
     const item: SidebarItem = {
       id: route.id,
       to: route.path,
       labelKey: routeNav?.labelKey,
       label: routeNav?.label || route.title,
+      badgeKey: routeNav?.badgeKey,
+      tooltipKey: routeNav?.tooltipKey,
+      ariaLabelKey: routeNav?.ariaLabelKey,
       icon: routeNav?.icon || 'circle',
       badge: routeNav?.badge,
       tooltip: routeNav?.tooltip,
@@ -456,8 +468,11 @@ export function getRouteChromeState(
         label: navMeta?.label || navRoute.title,
         icon: navMeta?.icon || 'circle',
         badge: navMeta?.badge,
+        badgeKey: navMeta?.badgeKey,
         tooltip: navMeta?.tooltip,
+        tooltipKey: navMeta?.tooltipKey,
         ariaLabel: navMeta?.ariaLabel,
+        ariaLabelKey: navMeta?.ariaLabelKey,
         to: navRoute.path,
       };
     });
@@ -471,8 +486,11 @@ export function getRouteChromeState(
         label: navMeta?.label || navRoute.title,
         icon: navMeta?.icon || 'circle',
         badge: navMeta?.badge,
+        badgeKey: navMeta?.badgeKey,
         tooltip: navMeta?.tooltip,
+        tooltipKey: navMeta?.tooltipKey,
         ariaLabel: navMeta?.ariaLabel,
+        ariaLabelKey: navMeta?.ariaLabelKey,
         to: navRoute.path,
       };
     });

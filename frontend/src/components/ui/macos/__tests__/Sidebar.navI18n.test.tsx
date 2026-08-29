@@ -79,4 +79,46 @@ describe('PR-UI-19 (C-6): Sidebar labelKey i18n resolution', () => {
     render(<Sidebar items={[{ id: 'plain', label: 'Обычный пункт' }]} />);
     expect(screen.getByRole('button', { name: 'Обычный пункт' })).toBeInTheDocument();
   });
+
+  it('localizes the AI disclaimer badge and screen-reader name (Codex round 1)', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('ru');
+    });
+    const aiItem = {
+      id: 'ai',
+      labelKey: 'nav.ai_assistant',
+      icon: 'brain',
+      badgeKey: 'nav.ai_disclaimer_badge',
+      tooltipKey: 'nav.ai_disclaimer_aria',
+      ariaLabelKey: 'nav.ai_disclaimer_aria',
+    };
+    const { unmount } = render(<Sidebar items={[aiItem]} />);
+    const ruButton = screen.getByRole('button', { name: /черновик, не диагноз/i });
+    expect(ruButton).toBeInTheDocument();
+    expect(screen.getByText(/Черновик · не медицинское заключение/i)).toBeInTheDocument();
+    unmount();
+
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
+    render(<Sidebar items={[aiItem]} />);
+    expect(screen.getByRole('button', { name: /draft, not a diagnosis/i })).toBeInTheDocument();
+    expect(screen.getByText(/Draft · not a medical conclusion/i)).toBeInTheDocument();
+  });
+
+  it('localizes section headings through titleKey (Codex round 1)', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('ru');
+    });
+    const sections = [{ titleKey: 'nav.section_clinic_queue', items: [{ id: 'queue', labelKey: 'nav.queue' }] }];
+    const { unmount } = render(<Sidebar sections={sections} />);
+    expect(screen.getByRole('heading', { name: 'Клиника и очередь' })).toBeInTheDocument();
+    unmount();
+
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
+    render(<Sidebar sections={sections} />);
+    expect(screen.getByRole('heading', { name: 'Clinic & Queue' })).toBeInTheDocument();
+  });
 });

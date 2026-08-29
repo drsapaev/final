@@ -9,6 +9,12 @@ const en = {
   // via useTranslation(). ru values are byte-identical to the labels
   // previously hardcoded in routeRegistry (zero-delta for ru).
   nav: {
+    section_clinical: 'Clinical',
+    section_clinic_queue: 'Clinic & Queue',
+    section_communications: 'Communications',
+    section_patients_booking: 'Patients & Booking',
+    ai_disclaimer_badge: 'Draft · not a medical conclusion',
+    ai_disclaimer_aria: 'AI assistant: draft, not a diagnosis, not a medical conclusion',
     overview: 'Overview',
     queue: 'Queue',
     appointments: 'Appointments',

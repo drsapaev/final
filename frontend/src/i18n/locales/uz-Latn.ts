@@ -9,6 +9,12 @@ const uzLatn = {
   // via useTranslation(). ru values are byte-identical to the labels
   // previously hardcoded in routeRegistry (zero-delta for ru).
   nav: {
+    section_clinical: 'Klinik',
+    section_clinic_queue: 'Klinika va navbat',
+    section_communications: 'Komunikatsiyalar',
+    section_patients_booking: 'Bemorlar va yozilish',
+    ai_disclaimer_badge: 'Qoralama · tibbiy xulosa emas',
+    ai_disclaimer_aria: 'AI yordamchi: qoralama, tashxis emas, tibbiy xulosa emas',
     overview: 'Ko\'rik',
     queue: 'Navbat',
     appointments: 'Yozuvlar',

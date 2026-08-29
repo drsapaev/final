@@ -9,6 +9,12 @@ const kk = {
   // via useTranslation(). ru values are byte-identical to the labels
   // previously hardcoded in routeRegistry (zero-delta for ru).
   nav: {
+    section_clinical: 'Клиникалық',
+    section_clinic_queue: 'Клиника және кезек',
+    section_communications: 'Коммуникациялар',
+    section_patients_booking: 'Пациенттер мен жазылым',
+    ai_disclaimer_badge: 'Қаралған · медициналық қорытынды емес',
+    ai_disclaimer_aria: 'AI-көмекші: қаралған, диагноз емес, медициналық қорытынды емес',
     overview: 'Шолу',
     queue: 'Кезек',
     appointments: 'Жазылымдар',

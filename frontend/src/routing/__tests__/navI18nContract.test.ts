@@ -35,26 +35,35 @@ interface NavCarrier {
  * 4. ru values stay byte-identical to the labels hardcoded pre-PR-UI-19
  *    (zero visual delta for the default locale).
  */
-function collectLabelKeys(): NavCarrier[] {
+type CarrierField = 'labelKey' | 'sectionKey' | 'badgeKey' | 'tooltipKey' | 'ariaLabelKey';
+
+function collectNavKeys(field: CarrierField): NavCarrier[] {
   const carriers: NavCarrier[] = [];
   for (const [presetKey, preset] of Object.entries(
-    SIDEBAR_PRESETS as unknown as Record<string, { items?: Array<{ id: string; labelKey?: string }> }>
+    SIDEBAR_PRESETS as unknown as Record<
+      string,
+      { items?: Array<Record<string, unknown> & { id: string }> }
+    >
   )) {
     for (const item of preset.items || []) {
-      if (item.labelKey) {
-        carriers.push({ origin: `preset:${presetKey}:${item.id}`, labelKey: item.labelKey });
+      if (typeof item[field] === 'string') {
+        carriers.push({ origin: `preset:${presetKey}:${item.id}`, labelKey: item[field] as string });
       }
     }
   }
   for (const route of ROUTE_REGISTRY as unknown as Array<{
     id: string;
-    nav?: { labelKey?: string } | boolean;
+    nav?: Record<string, unknown> | boolean;
   }>) {
-    if (typeof route.nav === 'object' && route.nav?.labelKey) {
-      carriers.push({ origin: `route:${route.id}`, labelKey: route.nav.labelKey });
+    if (typeof route.nav === 'object' && typeof route.nav?.[field] === 'string') {
+      carriers.push({ origin: `route:${route.id}`, labelKey: route.nav[field] as string });
     }
   }
   return carriers;
+}
+
+function collectLabelKeys(): NavCarrier[] {
+  return collectNavKeys('labelKey');
 }
 
 describe('PR-UI-19 (C-6): navigation i18n contract', () => {
@@ -67,6 +76,42 @@ describe('PR-UI-19 (C-6): navigation i18n contract', () => {
 
   it('emits labelKeys (non-empty contract surface)', () => {
     expect(carriers.length).toBeGreaterThan(0);
+  });
+
+  it('emits sectionKeys for admin grouping (Codex round 1) — all present in 5 locales', () => {
+    const sectionCarriers = collectNavKeys('sectionKey');
+    expect(sectionCarriers.length).toBeGreaterThan(0);
+    for (const locale of Object.keys(LOCALES)) {
+      const nav = LOCALES[locale].nav as Record<string, unknown> | undefined;
+      expect(nav, `${locale} misses the nav block`).toBeDefined();
+      for (const { origin, labelKey } of sectionCarriers) {
+        const value = nav?.[labelKey.replace(/^nav\./, '')];
+        expect(
+          typeof value === 'string' && value.length > 0,
+          `${locale} misses ${labelKey} (emitted by ${origin})`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('emits AI disclaimer badge/tooltip/ariaLabel keys (Codex round 1) — all present in 5 locales', () => {
+    const badgeCarriers = collectNavKeys('badgeKey');
+    const tooltipCarriers = collectNavKeys('tooltipKey');
+    const ariaCarriers = collectNavKeys('ariaLabelKey');
+    expect(badgeCarriers.length).toBeGreaterThan(0);
+    expect(tooltipCarriers.length).toBeGreaterThan(0);
+    expect(ariaCarriers.length).toBeGreaterThan(0);
+    const all = [...badgeCarriers, ...tooltipCarriers, ...ariaCarriers];
+    for (const locale of Object.keys(LOCALES)) {
+      const nav = LOCALES[locale].nav as Record<string, unknown> | undefined;
+      for (const { origin, labelKey } of all) {
+        const value = nav?.[labelKey.replace(/^nav\./, '')];
+        expect(
+          typeof value === 'string' && value.length > 0,
+          `${locale} misses ${labelKey} (emitted by ${origin})`
+        ).toBe(true);
+      }
+    }
   });
 
   it('every labelKey follows the nav.<snake_case> convention', () => {
