@@ -61,6 +61,18 @@ import { generateCSV, downloadCSV } from '../../pages/registrar/registrarCsv';
 import { useTranslation } from '../../i18n/useTranslation';
 import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
 
+/**
+ * PR-UI-12-4: bounded scroll-viewport height (px) for the EAT table body.
+ *
+ * Layout parameter for the sticky-header viewport (see the DataTable
+ * "Sticky header viewport" doc note) — NOT a sticky offset; the kit measures
+ * header/filter row offsets itself. 560px ≈ 10 visible EAT rows (~52px per
+ * row incl. borders): full 20-row pages scroll internally under the sticky
+ * column header (sort controls stay reachable), while lists that fit within
+ * the bound render pixel-identically to the unbounded table.
+ */
+const EAT_TABLE_VIEWPORT_MAX_HEIGHT = 560;
+
 const SESSION_COLORS = [
   'var(--mac-accent-blue)', // blue
   'var(--mac-success)', // emerald
@@ -1914,6 +1926,16 @@ const EnhancedAppointmentsTable = ({
             columns={columns}
             data={paginatedData}
             getRowId={(row: AppointmentRow, index: number) => getEnhancedAppointmentRowKey(row as unknown as Appointment, index)}
+            // PR-UI-12-4 (plan §PR-UI-12 item 4 "sticky header при скролле"):
+            // sticky header + bounded scroll viewport. Layout parameter only
+            // (NOT a sticky offset — the kit measures header/filter offsets):
+            // 560px ≈ 10 visible EAT rows, so full 20-row pages scroll
+            // internally with the column header (sort controls included)
+            // staying visible, while EAT's own pagination below the viewport
+            // stays reachable without scrolling the whole page. Pages of ~10
+            // rows or fewer render pixel-identically to the unbounded table.
+            stickyHeader
+            maxHeight={EAT_TABLE_VIEWPORT_MAX_HEIGHT}
             // Codex P2 fix (09c-4): only wire row activation when the consumer
             // supplied onRowClick — a truthy no-op wrapper would give every row
             // tabIndex=0 + Enter/Space activation (misleading keyboard focus

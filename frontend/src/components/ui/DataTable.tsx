@@ -33,6 +33,17 @@
  *   - `pagination=true` + `currentPage` + `onPageChange` + `pageSize` →
  *     sticky bottom pagination footer (renders `<TablePagination />`).
  *   - `stickyHeader=true` → `position: sticky; top: 0` on `<th>`.
+ *     PR-UI-12-4: sticky styles only produce a VISIBLE sticky header when the
+ *     table scrolls inside a bounded scroll viewport. Two ways to get one:
+ *     (a) the consumer wraps DataTable in their own `overflow-y` container
+ *     (the `th` then sticks against that container), or (b) pass
+ *     `stickyHeader` + `maxHeight` — the kit then makes its own scroll
+ *     wrapper the bounded viewport (`overflow-y: auto; max-height`), same
+ *     mechanism the virtualized path uses. Without a bounded viewport the
+ *     sticky `top: 0` is inert (no ancestor scrollport ever scrolls
+ *     vertically — the app shell's `.app-shell-grid` is the page-level
+ *     scroll container owner), which is why the prop alone changes nothing
+ *     for existing consumers.
  *   - `density='compact'|'comfortable'|'spacious'` → overrides padding.
  *   - `onRowClick` → enables keyboard navigation (Enter/Space) on rows.
  *   - `error` → renders `role="alert"` status cell instead of `role="status"`.
@@ -56,6 +67,17 @@
  * BELOW the header row (measured offset). Previously both rows carried
  * `top: 0` and overlapped on scroll — there are no live consumers of the
  * combination today, so the fix ships with zero live-surface delta.
+ *
+ * ## Sticky header viewport (PR-UI-12-4)
+ *
+ * `stickyHeader` + a numeric `maxHeight` (without `virtualized`) turns the
+ * scroll wrapper into the bounded vertical viewport so the header row
+ * (and the filter row, when `filterable`) visibly stick while rows scroll
+ * under them. The offset between the two sticky rows is MEASURED
+ * (`useLayoutEffect` + `ResizeObserver` on the header row) — no hardcoded
+ * pixel constants. When content fits inside `maxHeight` the wrapper adds
+ * no scrollbar and the rendering is pixel-identical to the unbounded
+ * state, so short lists keep their exact pre-12-4 appearance.
  *
  * ## Virtualization detail (PR-UI-09e-1)
  *
@@ -165,7 +187,9 @@ export interface DataTableProps<Row = Record<string, unknown>> {
   // Virtualization (PR-UI-09e-1 — wired; see JSDoc "Additive features")
   virtualized?: boolean;
   rowHeight?: number;
-  /** Bounded viewport height (px) — required together with `virtualized` to activate virtualization. */
+  /** Bounded viewport height (px) — activates row virtualization together
+   *  with `virtualized`, or the sticky-header bounded viewport together with
+   *  `stickyHeader` (PR-UI-12-4). */
   maxHeight?: number;
 
   // Mobile / Responsive (ruling P7 — 'scroll' default)
@@ -458,6 +482,19 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // `maxHeight` are provided (virtualization requires a bounded viewport).
   // When inactive the rendered output is byte-identical to the pre-09e table.
   const virtualizationActive = virtualized && typeof maxHeight === 'number';
+  // === Sticky-header bounded viewport (PR-UI-12-4) ===
+  // `stickyHeader` styles alone are inert without a vertically-scrolling
+  // ancestor scrollport (see the header doc note): the page-level scroll
+  // container is `.app-shell-grid`, so a table that just grows with the page
+  // never sticks. When the consumer asks for a sticky header AND provides a
+  // numeric `maxHeight`, the kit's own scroll wrapper becomes the bounded
+  // viewport (`overflow-y: auto; max-height`) and the header/filter rows
+  // stick inside it. Virtualization keeps precedence: when
+  // `virtualizationActive` the wrapper is already the bounded viewport.
+  // Zero-delta: without BOTH flags the wrapper style stays `undefined`, so
+  // every existing consumer renders exactly as before.
+  const stickyViewportActive =
+    !virtualizationActive && stickyHeader && typeof maxHeight === 'number';
   const effectiveRowHeight = rowHeight ?? 40;
   const scrollWrapperRef = useRef<HTMLDivElement | null>(null);
   // Codex P2-5 (PR 2872): TanStack includes these callbacks' IDENTITY in its
@@ -621,11 +658,13 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   const spacerStyle = (height: number): CSSProperties => ({ height });
 
   // Scroll-viewport style applied to the wrapper ONLY while virtualization
-  // is active (otherwise the wrapper carries no inline style, exactly as
+  // (PR-UI-09e-1) or the sticky-header bounded viewport (PR-UI-12-4) is
+  // active (otherwise the wrapper carries no inline style, exactly as
   // before PR-UI-09e-1).
-  const scrollViewportStyle: CSSProperties | undefined = virtualizationActive
-    ? { overflowY: 'auto', maxHeight }
-    : undefined;
+  const scrollViewportStyle: CSSProperties | undefined =
+    virtualizationActive || stickyViewportActive
+      ? { overflowY: 'auto', maxHeight }
+      : undefined;
 
   // Codex P2-7 (PR 2872): under `table-layout: fixed` an unbreakable cell
   // content (long identifier, wide action group) would otherwise paint across

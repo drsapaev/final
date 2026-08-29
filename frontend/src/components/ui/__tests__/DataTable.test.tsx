@@ -1210,3 +1210,139 @@ describe('DataTable — PR-UI-12 toolbar i18n contract (DT-28)', () => {
     }
   });
 });
+
+describe('DataTable — PR-UI-12-4 sticky-header bounded viewport (DT-45..47)', () => {
+  type SRow = { id: number; name: string; nick: string };
+  const columns: DataTableColumn<SRow>[] = [
+    { key: 'name', title: 'Name', sortable: false },
+    { key: 'nick', title: 'Nick', sortable: false },
+  ];
+  const rows: SRow[] = [
+    { id: 1, name: 'Alice', nick: 'ali' },
+    { id: 2, name: 'Bob', nick: 'bobby' },
+    { id: 3, name: 'Carol', nick: 'caro' },
+  ];
+
+  // Sticky `th` styles are inert unless the table lives inside a vertically
+  // scrolling viewport (see the DataTable "Sticky header viewport" doc note).
+  // DT-45 asserts the kit provides that viewport itself when the consumer
+  // passes `stickyHeader` + a numeric `maxHeight` on the plain path.
+  it('DT-45: stickyHeader + maxHeight (plain path) makes the scroll wrapper the bounded viewport', () => {
+    const { container } = render(
+      <DataTable<SRow> columns={columns} data={rows} stickyHeader maxHeight={480} />
+    );
+
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    expect(wrapper).not.toBeNull();
+    // The wrapper becomes the vertical scroll viewport the sticky th sticks to.
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toBe('480px');
+
+    // The header row is sticky against that viewport (top 0, above the data).
+    const headerTh = screen.getByText('Name').closest('th') as HTMLElement;
+    expect(headerTh.style.position).toBe('sticky');
+    expect(headerTh.style.top).toBe('0px');
+  });
+
+  it('DT-45b: stickyHeader WITHOUT maxHeight keeps the unstyled wrapper (zero-delta)', () => {
+    // A consumer providing its own outer scroll container relies on the
+    // wrapper staying style-free — the kit must not assume viewport ownership.
+    const { container } = render(
+      <DataTable<SRow> columns={columns} data={rows} stickyHeader />
+    );
+
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    expect(wrapper).not.toBeNull();
+    expect(wrapper.style.overflowY).toBe('');
+    expect(wrapper.style.maxHeight).toBe('');
+  });
+
+  it('DT-45c: maxHeight WITHOUT stickyHeader keeps the unstyled wrapper (zero-delta)', () => {
+    // maxHeight alone is a virtualization parameter — the bounded viewport
+    // must not activate without either `virtualized` or `stickyHeader`.
+    const { container } = render(
+      <DataTable<SRow> columns={columns} data={rows} maxHeight={480} />
+    );
+
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    expect(wrapper).not.toBeNull();
+    expect(wrapper.style.overflowY).toBe('');
+    expect(wrapper.style.maxHeight).toBe('');
+  });
+
+  it('DT-46: stickyHeader + filterable + maxHeight — viewport bounds BOTH sticky rows; filter offset stays measured', () => {
+    // The full PR-UI-12 interplay: the header row sticks at top 0 of the
+    // bounded viewport, the filter row sticks BELOW it at the MEASURED header
+    // height (jsdom reports 0 — the mechanism, not the pixel value, is under
+    // test here; DT-21 covers the style derivation in depth).
+    const { container } = render(
+      <DataTable<SRow>
+        columns={columns}
+        data={rows}
+        stickyHeader
+        maxHeight={480}
+        filterable
+        onFilter={vi.fn()}
+      />
+    );
+
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    expect(wrapper.style.overflowY).toBe('auto');
+    expect(wrapper.style.maxHeight).toBe('480px');
+
+    const headerTh = screen.getByText('Name').closest('th') as HTMLElement;
+    expect(headerTh.style.position).toBe('sticky');
+    expect(headerTh.style.top).toBe('0px');
+
+    const filterInput = screen.getByLabelText('Фильтр по колонке Name');
+    const filterTh = filterInput.closest('th') as HTMLElement;
+    expect(filterTh.style.position).toBe('sticky');
+    // Both sticky rows live in the same thead, filter strictly after header.
+    const thead = filterTh.closest('thead') as HTMLElement;
+    expect(thead.querySelectorAll('tr').length).toBe(2);
+  });
+
+  it('DT-47: virtualized + stickyHeader + maxHeight — virtualization keeps viewport precedence (single bounded wrapper)', () => {
+    // When both features request the bounded viewport, the virtualization
+    // path owns it (same wrapper, same style) — no conflicting double
+    // activation. Mirrors the DT-13 jsdom geometry mocks so the virtualizer
+    // actually opens a window.
+    const trDescriptor = Object.getOwnPropertyDescriptor(HTMLTableRowElement.prototype, 'offsetHeight');
+    const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetHeight');
+    Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get: () => 32,
+    });
+    Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', {
+      configurable: true,
+      value: 320,
+    });
+    try {
+      const many = Array.from({ length: 100 }, (_, i) => ({ id: i, name: `Row ${i}`, nick: `n${i}` }));
+      const { container } = render(
+        <DataTable<SRow> columns={columns} data={many} virtualized rowHeight={32} maxHeight={320} stickyHeader />
+      );
+
+      const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+      expect(wrapper.style.overflowY).toBe('auto');
+      expect(wrapper.style.maxHeight).toBe('320px');
+      // Windowed rendering active (virtualization took precedence)…
+      const bodyRows = container.querySelectorAll('tbody tr');
+      expect(bodyRows.length).toBeLessThan(100);
+      // …and the header stays sticky inside the shared viewport.
+      const headerTh = screen.getByText('Name').closest('th') as HTMLElement;
+      expect(headerTh.style.position).toBe('sticky');
+    } finally {
+      if (trDescriptor) {
+        Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', trDescriptor);
+      } else {
+        delete (HTMLTableRowElement.prototype as { offsetHeight?: number }).offsetHeight;
+      }
+      if (divDescriptor) {
+        Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', divDescriptor);
+      } else {
+        delete (HTMLDivElement.prototype as { offsetHeight?: number }).offsetHeight;
+      }
+    }
+  });
+});
