@@ -71,12 +71,16 @@ const DENSITY_OPTIONS: Array<{ value: TableDensity; labelKey: string }> = [
   { value: 'spacious', labelKey: 'table.density_spacious' },
 ];
 
-/** Column title for the menu: string titles render as text, ReactNode titles render as-is, key is the fallback. */
-const columnMenuLabel = (column: TableToolbarColumn): React.ReactNode =>
-  column.title ?? column.key;
-
-/** Plain-text label for the checkbox `aria-label` (ReactNode titles fall back to the key). */
-const columnAriaLabel = (column: TableToolbarColumn): string =>
+/**
+ * INERT plain-text label for the column menu (Codex P2, PR 2885).
+ * Column `title` may be an interactive ReactNode — e.g. the select-all
+ * `<Checkbox>` used as a header title by FileManager.tsx / ServiceCatalog.tsx.
+ * Rendering such a live control inside the menu item's `<label>` would inject
+ * a second interactive checkbox that bulk-selects rows and toggles the
+ * surrounding visibility checkbox. The menu therefore renders ONLY string
+ * titles; ReactNode titles fall back to the inert column key.
+ */
+const columnMenuLabel = (column: TableToolbarColumn): string =>
   typeof column.title === 'string' && column.title.length > 0 ? column.title : column.key;
 
 export const TableToolbar = ({
@@ -157,7 +161,7 @@ export const TableToolbar = ({
                   <label key={column.key} className="mac-table-toolbar__menu-item">
                     <input
                       type="checkbox"
-                      aria-label={columnAriaLabel(column)}
+                      aria-label={columnMenuLabel(column)}
                       checked={checked}
                       disabled={disabled}
                       onChange={() => toggleColumn(column.key)}

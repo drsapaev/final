@@ -835,6 +835,57 @@ describe('DataTable — PR-UI-12 features (DT-17..27)', () => {
     expect(shell.querySelector('.mac-table-toolbar')).not.toBeNull();
     expect(shell.querySelector('.mac-table-scroll-wrapper')).not.toBeNull();
   });
+  it('DT-32: all-hidden map + toolbar — checkboxes reflect the NORMALIZED state (Codex P2 #3)', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{ name: false, age: false, city: false }}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+
+    // All columns render (normalization) AND the menu shows every checkbox
+    // CHECKED — renderer and toolbar share the post-normalization truth.
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+    expect((screen.getByLabelText('Name') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Age') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('City') as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('DT-33: interactive ReactNode column title renders as INERT key text in the menu (Codex P2)', () => {
+    render(
+      <DataTable
+        columns={[
+          {
+            key: 'select',
+            // Live control as header title — the FileManager/ServiceCatalog
+            // select-all pattern.
+            title: <input type="checkbox" aria-label="select-all" readOnly />,
+            sortable: false
+          },
+          { key: 'name', title: 'Name', sortable: false }
+        ]}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+    // The menu item is labeled by the INERT column key ('select'), not the
+    // live checkbox node — no second interactive control inside the menu.
+    const menuItem = screen.getByLabelText('select');
+    expect(menuItem).toBeInTheDocument();
+    expect(menuItem.tagName).toBe('INPUT');
+    // Exactly ONE interactive 'select' control exists (the header title), the
+    // menu item text is the plain key.
+    expect(screen.getByText('select')).toBeInTheDocument();
+  });
+
 });
 
 describe('DataTable — PR-UI-12 toolbar i18n contract (DT-28)', () => {

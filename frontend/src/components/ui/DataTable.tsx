@@ -366,18 +366,27 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // With neither set the list is content-identical to `columns` — zero-delta
   // for every existing consumer.
   //
-  // Codex P2 (PR 2885): an externally supplied map that hides EVERY column
+  // Codex P2 #2 (PR 2885): an externally supplied map that hides EVERY column
   // (persisted preferences, a changed column set) would render a headerless
   // table with colSpan=0 status cells. Normalize at this boundary: fall back
   // to all statically-visible columns. The toolbar's last-column guard
   // prevents users from REACHING the all-hidden state via the menu; this
   // protects maps supplied programmatically.
-  const rawVisibleColumns = columns.filter(
-    (column) => column.hidden !== true && columnVisibility?.[column.key] !== false
+  //
+  // Codex P2 #3 (PR 2885): the NORMALIZED state must drive BOTH the renderer
+  // and the toolbar — otherwise the menu would show every checkbox unchecked
+  // while every column renders, and the next toggle would emit a map that
+  // hides all-but-one column at once. `effectiveColumnVisibility` is the
+  // single post-normalization truth handed to both.
+  const staticallyVisibleColumns = columns.filter((column) => column.hidden !== true);
+  const rawVisibleColumns = staticallyVisibleColumns.filter(
+    (column) => columnVisibility?.[column.key] !== false
   );
-  const visibleColumns = rawVisibleColumns.length > 0
-    ? rawVisibleColumns
-    : columns.filter((column) => column.hidden !== true);
+  const allHiddenExternally = rawVisibleColumns.length === 0;
+  const effectiveColumnVisibility: Record<string, boolean> | undefined = allHiddenExternally
+    ? (Object.fromEntries(staticallyVisibleColumns.map((column) => [column.key, true])) as Record<string, boolean>)
+    : columnVisibility;
+  const visibleColumns = allHiddenExternally ? staticallyVisibleColumns : rawVisibleColumns;
 
   // === Roving keyboard row navigation (PR-UI-12) ===
   // Off by default (zero-delta): existing consumers keep the per-row
@@ -823,7 +832,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   const toolbarNode = toolbarEnabled ? (
     <TableToolbar
       columns={columns}
-      columnVisibility={columnVisibility}
+      columnVisibility={effectiveColumnVisibility}
       onColumnVisibilityChange={onColumnVisibilityChange}
       showColumnToggle={showColumnToggle}
       density={density}
