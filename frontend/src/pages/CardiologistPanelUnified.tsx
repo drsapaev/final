@@ -12,7 +12,7 @@ import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useCardiologistHotkeys } from '../hooks/useCardiologistHotkeys';
 // S-M-2 fix: replace lucide-direct with macos <Icon>
 import {
-  MacOSCard,
+  Card,
   Button,
   Checkbox,
   Input,
@@ -1810,7 +1810,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
           {/* C-4 fix: 'Добавить ЭКГ' button now opens a simple ECG entry form.
               Previously setShowForm({type:'ecg'}) was called but no UI rendered. */}
           {showForm.open && showForm.type === 'ecg' && (
-            <MacOSCard className="cardio-p-6">
+            <Card className="cardio-p-6">
               <div className="cardio-flex-between" style={{ marginBottom: 16 }}>
                 <h3 style={{ margin: 0 }}>{tI18n('cardio.cardio_panel_add_ecg_title')}</h3>
                 <Button variant="outline" size="small" onClick={() => setShowForm({ open: false })}>
@@ -1874,7 +1874,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
                 getFontSize={getFontSize}
                 getSpacing={getSpacing}
               />
-            </MacOSCard>
+            </Card>
           )}
 
           {/* Анализы крови — R-15: extracted to BloodTestsTab component */}
@@ -2010,7 +2010,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
           <Icon name="gear" size={18} />
         </button>
         {(activeTab === 'visit' || activeTab === 'blood') && settingsOpen &&
-        <MacOSCard className="cardio-settings-card">
+        <Card className="cardio-settings-card">
             <h3 className="cardio-settings-title">{tI18n('cardio.cardio_panel_settings_title')}</h3>
             <div className="cardio-flex-col">
               <label className="flex items-center cardio-settings-label">
@@ -2042,7 +2042,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
                 setSettingsOpen(false);
               }}><Icon name="square.and.arrow.down" size={16} className="cardio-icon-mr" />{tI18n('cardio.cardio_panel_save')}</Button>
             </div>
-          </MacOSCard>
+          </Card>
         }
       {/* X-13: AIChatWidget removed — AiTab in sidebar provides the same functionality */}
 

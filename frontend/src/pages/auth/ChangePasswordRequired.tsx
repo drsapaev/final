@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import {
-  MacOSCard, Button, Input,
+  Card, Button, Input,
 } from '../../components/ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getErrorMessage } from '../../utils/errorHandler';
@@ -161,7 +161,7 @@ export default function ChangePasswordRequired({ currentPassword }: { currentPas
 
     return (
         <div style={containerStyle}>
-            <MacOSCard style={cardStyle}>
+            <Card style={cardStyle}>
                 <div style={{ textAlign: 'center', marginBottom: 'var(--mac-spacing-5)' }}>
                     <Lock size={48} color={getColor('warning', 500)} style={{ marginBottom: 'var(--mac-spacing-3)' }} />
                     <h1 style={titleStyle}>{t('misc.cpr_smena_parolya')}</h1>
@@ -302,7 +302,7 @@ export default function ChangePasswordRequired({ currentPassword }: { currentPas
                         {loading ? t('misc.cpr_sohranenie') : t('misc.cpr_smenit_parol')}
                     </Button>
                 </form>
-            </MacOSCard>
+            </Card>
         </div>
     );
 }

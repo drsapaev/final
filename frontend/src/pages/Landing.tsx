@@ -2,7 +2,7 @@ import React, { startTransition, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import {
-  Button, MacOSCard,
+  Button, Card,
 } from '../components/ui/macos';
 import {
   Activity,
@@ -76,11 +76,11 @@ function MetricCard({ value, label, detail, style }: {
   style?: React.CSSProperties;
 }) {
   return (
-    <MacOSCard className="landing-metric-card" shadow="large" style={style}>
+    <Card className="landing-metric-card" shadow="large" style={style}>
       <strong>{value}</strong>
       <span>{label}</span>
       <small>{detail}</small>
-    </MacOSCard>
+    </Card>
   );
 }
 
@@ -94,14 +94,14 @@ function FeatureCard({ accent, icon: Icon, badge, title, description }: {
   description?: React.ReactNode;
 }) {
   return (
-    <MacOSCard className="landing-feature-card" shadow="large" style={{ borderColor: `${accent}2f` }}>
+    <Card className="landing-feature-card" shadow="large" style={{ borderColor: `${accent}2f` }}>
       <div className="landing-feature-icon" style={{ background: `${accent}18`, color: accent }}>
         {Icon && <Icon size={20} />}
       </div>
       <SurfaceLabel>{badge}</SurfaceLabel>
       <h3>{title}</h3>
       <p>{description}</p>
-    </MacOSCard>
+    </Card>
   );
 }
 
@@ -115,7 +115,7 @@ function ShowcaseCard({ icon: Icon, label, title, description, style }: {
   style?: React.CSSProperties;
 }) {
   return (
-    <MacOSCard className="landing-showcase-card" shadow="large" style={style}>
+    <Card className="landing-showcase-card" shadow="large" style={style}>
       <div className="landing-showcase-head">
         <div className="landing-showcase-icon">
           {Icon && <Icon size={20} />}
@@ -129,7 +129,7 @@ function ShowcaseCard({ icon: Icon, label, title, description, style }: {
         <span />
         <span />
       </div>
-    </MacOSCard>
+    </Card>
   );
 }
 
@@ -408,7 +408,7 @@ export default function Landing() {
         </header>
 
         <section id="hero" className="landing-hero">
-          <MacOSCard className="landing-hero-card" shadow="large" style={heroCardStyle}>
+          <Card className="landing-hero-card" shadow="large" style={heroCardStyle}>
             <div className="landing-live-badge" role="status" aria-live="polite">
               <Activity size={15} />
               <span>{copy.liveStatus}</span>
@@ -450,11 +450,11 @@ export default function Landing() {
                 <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} style={cardStyle} />
               ))}
             </div>
-          </MacOSCard>
+          </Card>
 
           <div className="landing-hero-visuals">
             {copy.hero.visualPanels.map((panel, index) => (
-              <MacOSCard
+              <Card
                 key={panel.title}
                 className={`landing-console-card landing-console-card--${index + 1}`}
                 shadow="large"
@@ -472,7 +472,7 @@ export default function Landing() {
                     </li>
                   ))}
                 </ul>
-              </MacOSCard>
+              </Card>
             ))}
           </div>
         </section>
@@ -508,7 +508,7 @@ export default function Landing() {
         </section>
 
         <section id="workflow" className="landing-section landing-progressive-section">
-          <MacOSCard className="landing-section-card" shadow="large" style={cardStyle}>
+          <Card className="landing-section-card" shadow="large" style={cardStyle}>
             <SectionHeading eyebrow={copy.workflow.eyebrow} title={copy.workflow.title} description={copy.workflow.description} />
 
             <div className="landing-workflow-grid">
@@ -531,7 +531,7 @@ export default function Landing() {
                 <p>{copy.workflow.flowSummary}</p>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
         </section>
 
         <section id="modules" className="landing-section landing-progressive-section">
@@ -541,13 +541,13 @@ export default function Landing() {
             {copy.modules.items.map((module, index) => {
               const Icon = MODULE_VISUALS[index % MODULE_VISUALS.length];
               return (
-                <MacOSCard key={module.title} className="landing-module-card" shadow="large" style={cardStyle}>
+                <Card key={module.title} className="landing-module-card" shadow="large" style={cardStyle}>
                   <div className="landing-module-icon">
                     <Icon size={18} />
                   </div>
                   <h3>{module.title}</h3>
                   <p>{module.description}</p>
-                </MacOSCard>
+                </Card>
               );
             })}
           </div>
@@ -571,7 +571,7 @@ export default function Landing() {
         </section>
 
         <section className="landing-section landing-dual-grid landing-progressive-section">
-          <MacOSCard id="integrations" className="landing-section-card" shadow="large" style={cardStyle}>
+          <Card id="integrations" className="landing-section-card" shadow="large" style={cardStyle}>
             <SectionHeading
               eyebrow={copy.integrations.eyebrow}
               title={copy.integrations.title}
@@ -594,9 +594,9 @@ export default function Landing() {
                 );
               })}
             </div>
-          </MacOSCard>
+          </Card>
 
-          <MacOSCard id="security" className="landing-section-card" shadow="large" style={cardStyle}>
+          <Card id="security" className="landing-section-card" shadow="large" style={cardStyle}>
             <SectionHeading eyebrow={copy.security.eyebrow} title={copy.security.title} description={copy.security.description} />
 
             <div className="landing-security-grid">
@@ -613,7 +613,7 @@ export default function Landing() {
                 );
               })}
             </div>
-          </MacOSCard>
+          </Card>
         </section>
 
         <section className="landing-section landing-progressive-section">
@@ -625,7 +625,7 @@ export default function Landing() {
           />
 
           <div className="landing-advantage-grid">
-            <MacOSCard className="landing-advantage-card landing-advantage-card--before" shadow="large" style={cardStyle}>
+            <Card className="landing-advantage-card landing-advantage-card--before" shadow="large" style={cardStyle}>
               <h3>{copy.advantages.beforeTitle}</h3>
               <ul className="landing-checklist landing-checklist--negative">
                 {copy.advantages.beforeItems.map((item) => (
@@ -635,9 +635,9 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-            </MacOSCard>
+            </Card>
 
-            <MacOSCard className="landing-advantage-card landing-advantage-card--after" shadow="large" style={accentCardStyle}>
+            <Card className="landing-advantage-card landing-advantage-card--after" shadow="large" style={accentCardStyle}>
               <h3>{copy.advantages.afterTitle}</h3>
               <ul className="landing-checklist">
                 {copy.advantages.afterItems.map((item) => (
@@ -647,7 +647,7 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-            </MacOSCard>
+            </Card>
           </div>
         </section>
 
@@ -656,7 +656,7 @@ export default function Landing() {
 
           <div className="landing-pricing-grid">
             {copy.pricing.plans.map((plan) => (
-              <MacOSCard
+              <Card
                 key={plan.name}
                 className={`landing-pricing-card ${plan.featured ? 'landing-pricing-card--featured' : ''}`}
                 shadow="large"
@@ -692,7 +692,7 @@ export default function Landing() {
                 >
                   {plan.cta}
                 </Button>
-              </MacOSCard>
+              </Card>
             ))}
           </div>
 
@@ -716,7 +716,7 @@ export default function Landing() {
         </section>
 
         <section id="contact" className="landing-section landing-progressive-section">
-          <MacOSCard className="landing-final-card" shadow="large" style={heroCardStyle}>
+          <Card className="landing-final-card" shadow="large" style={heroCardStyle}>
             <div className="landing-final-copy">
               <SurfaceLabel>{copy.finalCta.eyebrow}</SurfaceLabel>
               <h2>{copy.finalCta.title}</h2>
@@ -758,7 +758,7 @@ export default function Landing() {
                 />
               </div>
             </div>
-          </MacOSCard>
+          </Card>
         </section>
 
         <footer className="landing-footer">
