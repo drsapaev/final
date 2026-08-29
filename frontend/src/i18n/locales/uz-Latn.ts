@@ -7801,6 +7801,7 @@ const uzLatn = {
     emr_sign_desc: 'Imzolagandan soʻng tahrirlash faqat tuzatish orqali mumkin.',
     emr_sign_confirm: 'Imzolash',
     emr_err_visit_id: 'Kontrakt xatosi: EMR v2 uchun `visitId` kerak.',
+    emr_skeleton_aria: 'Qabul kartasi yuklanmoqda…',
     emr_err_specialty: 'Kontrakt xatosi: normalizatsiya qilinmagan specialty uzatildi.',
     emr_title: 'Elektron tibbiy karta',
     emr_patient: 'Bemor #{id}',

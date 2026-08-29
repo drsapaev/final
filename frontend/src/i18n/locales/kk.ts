@@ -7800,6 +7800,7 @@ const kk = {
     emr_sign_desc: 'После подписания редактирование возможно только через поправку.',
     emr_sign_confirm: 'Подписать',
     emr_err_visit_id: 'Ошибка контракта: для EMR v2 требуется `visitId`.',
+    emr_skeleton_aria: 'Қабылдау картасы жүктелуде…',
     emr_err_specialty: 'Ошибка контракта: передана ненормализованная specialty.',
     emr_title: 'Электронная медицинская карта',
     emr_patient: 'Пациент #{id}',
