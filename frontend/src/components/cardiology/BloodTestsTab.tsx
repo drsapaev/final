@@ -17,7 +17,7 @@
  */
 
 import { TestTube, Plus, Save } from 'lucide-react';
-import { Button, Textarea, Badge, MacOSCard } from '../ui/macos';
+import { Button, Textarea, Badge, Card } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface BloodTest {
@@ -174,7 +174,7 @@ export function BloodTestsTab({
       </div>
 
       {/* Header */}
-      <MacOSCard className="cardio-card-padded">
+      <Card className="cardio-card-padded">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: getSpacing('lg') }}>
           <h3 style={{ display: 'flex', alignItems: 'center', fontSize: getFontSize('lg'), fontWeight: '500', color: getColor('text') }}>
             <TestTube size={20} style={{ marginRight: getSpacing('sm'), color: getColor('secondary', 600) }} />
@@ -251,11 +251,11 @@ export function BloodTestsTab({
             </div>
           </div>
         )}
-      </MacOSCard>
+      </Card>
 
       {/* Blood test form */}
       {showFormOpen && (
-        <MacOSCard className="cardio-card-padded">
+        <Card className="cardio-card-padded">
           <h3 style={{ fontSize: getFontSize('lg'), fontWeight: '500', marginBottom: getSpacing('lg'), color: getColor('text') }}>
             {t('cardio.cardio_blood_form_title')}
           </h3>
@@ -335,7 +335,7 @@ export function BloodTestsTab({
               </Button>
             </div>
           </form>
-        </MacOSCard>
+        </Card>
       )}
     </div>
   );
