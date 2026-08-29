@@ -44,8 +44,8 @@ export { default as AnimatedTransition } from './AnimatedTransition';
 // Basic UI Components
 export { default as Box } from './Box';
 export { default as Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './Card';
-// Backward compatibility alias for macOS-styled Card
-export { default as MacOSCard } from './Card';
+// MacOSCard backward-compatibility alias DELETED (PR-UI-06 final decommission):
+// 0 import-consumers remained after PR-UI-11-15 (#2902); canonical = Card.
 export { default as Dialog, DialogTitle, DialogContent, DialogActions } from './Dialog';
 export { default as Grid } from './Grid';
 export { default as Icon } from './Icon';
