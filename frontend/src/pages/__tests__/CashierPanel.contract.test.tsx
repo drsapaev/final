@@ -141,3 +141,28 @@ describe('CashierPanel payment action contract', () => {
     expect(helperBlock).not.toContain('visit_ids');
   });
 });
+
+describe('CashierPanel decomposition size contract (PR-UI-14 final AC)', () => {
+  it('CashierPanel stays within the plan §PR-UI-14 size budget (≤500 LOC, ≤5 useState)', () => {
+    const source = readCashierPanelSource();
+    const loc = source.split('\n').length;
+    expect(loc).toBeLessThanOrEqual(500);
+
+    const useStateCalls = (source.match(/useState[<(]/g) || []).length;
+    expect(useStateCalls).toBeLessThanOrEqual(5);
+  });
+
+  it('RefundRequestsTable stays within the plan §PR-UI-14 size budget (≤150 LOC)', () => {
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../../components/cashier/RefundRequestsTable.tsx'),
+      'utf8',
+    );
+    const loc = source.split('\n').length;
+    expect(loc).toBeLessThanOrEqual(150);
+  });
+
+  it('CashierPanel renders behind the local ErrorBoundary (plan item 4)', () => {
+    const source = readCashierPanelSource();
+    expect(source).toContain('<ErrorBoundary>');
+  });
+});
