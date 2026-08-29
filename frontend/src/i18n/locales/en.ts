@@ -61,6 +61,16 @@ const en = {
     push_notifications: 'Push Notifications',
     ai_tools: 'AI Tools',
   },
+  // PR-UI-12: canonical DataTable toolbar (TableToolbar.tsx — column
+  // visibility menu + density segmented control).
+  table: {
+    columns: 'Columns',
+    columns_menu: 'Column visibility',
+    density: 'Row density',
+    density_compact: 'Compact',
+    density_comfortable: 'Comfortable',
+    density_spacious: 'Spacious',
+  },
   common: {
     save: 'Сохранить',
     save_draft: 'Сохранить черновик',
@@ -7790,6 +7800,7 @@ const en = {
     emr_sign_desc: 'После подписания редактирование возможно только через поправку.',
     emr_sign_confirm: 'Подписать',
     emr_err_visit_id: 'Ошибка контракта: для EMR v2 требуется `visitId`.',
+    emr_skeleton_aria: 'Loading visit record…',
     emr_err_specialty: 'Ошибка контракта: передана ненормализованная specialty.',
     emr_title: 'Электронная медицинская карта',
     emr_patient: 'Пациент #{id}',

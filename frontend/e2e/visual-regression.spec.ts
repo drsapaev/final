@@ -478,3 +478,413 @@ test.describe('Visual regression — registrar EAT', () => {
     });
   });
 });
+
+/**
+ * Visual regression — PR-UI-12-4 five clinical screens (plan §PR-UI-12 AC:
+ * "Visual regression на 5 экранах (EMR, Queue, Appointments, Patients, Lab)").
+ *
+ * Sticky-header wiring shipped in PR-UI-12-4 (plan item 4 "Все таблицы —
+ * sticky header при скролле"):
+ *   - Queue surface: QueueTable (canonical DataTable) — stickyHeader +
+ *     maxHeight=480 bounded viewport.
+ *   - Appointments surface: EAT — stickyHeader + maxHeight=560 bounded
+ *     viewport (the screen's canonical table behind the "Расширенная
+ *     таблица" toggle; the bespoke native fallback table on the same screen
+ *     is intentionally untouched — zero-delta).
+ *   - EMR / Patients / Lab screens carry NO data tables on main (verified:
+ *     EMR = form sections, /clinical/search = result cards, /lab = queue
+ *     cards + virtualized card list), so nothing was wired there — these
+ *     baselines lock the zero-delta invariant for the 12-4 change window.
+ *
+ * Baseline policy (Rule 13): these are NEW baselines captured ONCE on the
+ * PR-UI-12-4 state (new tests → first capture; no existing baseline was
+ * re-captured). The two wired surfaces additionally carry a DOM-level
+ * STICKY PROOF: after scrolling the bounded viewport to the bottom, the
+ * header row's top must sit at the viewport's top — a geometry assertion,
+ * deterministic and independent of sub-pixel screenshot noise.
+ */
+test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
+  const labProfile = {
+    id: 40, username: 'lab@clinic.com', email: 'lab@clinic.com',
+    full_name: 'Lab User', role: 'Lab', is_active: true, is_superuser: false,
+  };
+  const doctorProfile = {
+    id: 50, username: 'doctor@clinic.com', email: 'doctor@clinic.com',
+    full_name: 'Doctor User', role: 'Doctor', is_active: true, is_superuser: false,
+  };
+  // Appointments.tsx gates the page via <RoleGate roles={['Admin','Registrar',
+  // 'Doctor']}> — unlike the route-registry access check (routeSelectors), the
+  // page-level RoleGate does NOT apply ROLE_ALIASES, so a 'Receptionist'
+  // profile is denied there. Use the literal 'Registrar' role (pre-existing
+  // page/route gate divergence, documented in the PR body — not changed by
+  // 12-4).
+  const appointmentsProfile = {
+    id: 21, username: 'registrar2@example.com', email: 'registrar2@example.com',
+    full_name: 'Registrar User', role: 'Registrar', is_active: true, is_superuser: false,
+  };
+
+  // Flat queue entry shape consumed by useQueueManager/QueueTable (mirrors
+  // registrar-time.spec.ts — the REAL /registrar/queues/today entry shape).
+  // PII policy: synthetic "Тестов Тест Тестович" (derived from "test").
+  const queueEntry = (i: number) => ({
+    id: 2000 + i,
+    number: i + 1,
+    patient_id: 100 + i,
+    patient_name: `Тестов Тест Тестович ${i + 1}`,
+    patient_phone: '+998900000000',
+    queue_number: i + 1,
+    queue_time: `2026-08-29T09:${String(i * 3).padStart(2, '0')}:00+05:00`,
+    created_at: `2026-08-29T09:${String(i * 3).padStart(2, '0')}:00+05:00`,
+    status: i === 0 ? 'called' : 'waiting',
+    source: i % 2 === 0 ? 'online' : 'desk',
+    payment_status: 'paid',
+    payment_type: 'cash',
+    cost: 100000,
+    services: ['Консультация'],
+    service_codes: ['K01'],
+    discount_mode: 'none',
+    approval_status: null,
+    type: 'online_queue',
+    record_type: 'online_queue',
+    queue_entry_id: 2000 + i,
+    department_key: 'cardiology',
+    department: 'cardiology',
+    session_id: 'sess-1',
+  });
+
+  const queuesTodayResponse = (entries: ReturnType<typeof queueEntry>[]) => jsonResponse({
+    queues: [{
+      queue_id: 1,
+      specialist_id: 1,
+      specialist_name: 'Dr Test',
+      specialty: 'cardiology',
+      cabinet: '12',
+      entries,
+      stats: { total: entries.length, waiting: entries.length - 1, called: 1, served: 0, online_entries: 0 },
+      opened_at: '2026-08-29T09:00:00+05:00',
+    }],
+    total_queues: 1,
+    date: '2026-08-29',
+    timezone: 'Asia/Tashkent',
+  });
+
+  async function installAuth(page: import('@playwright/test').Page, profile: typeof labProfile) {
+    await page.addInitScript(({ token, profile: p }: { token: string; profile: typeof labProfile }) => {
+      sessionStorage.setItem('auth_token', token);
+      sessionStorage.setItem('refresh_token', token);
+      sessionStorage.setItem('auth_profile', JSON.stringify(p));
+      sessionStorage.setItem('user', JSON.stringify(p));
+    }, { token: createToken(profile), profile });
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+  }
+
+  /**
+   * DOM-level sticky proof: scroll the bounded table viewport to the bottom
+   * and assert the header row stays glued to the viewport's top edge.
+   * Returns the geometry for the caller's additional assertions.
+   */
+  async function assertStickyHeader(page: import('@playwright/test').Page, viewportSelector: string) {
+    const geometry = await page.locator(viewportSelector).evaluate((el: HTMLElement) => {
+      el.scrollTop = el.scrollHeight;
+      const thead = el.querySelector('thead');
+      const headerRect = thead ? thead.getBoundingClientRect() : null;
+      const viewportRect = el.getBoundingClientRect();
+      return {
+        scrollable: el.scrollHeight > el.clientHeight,
+        headerTop: headerRect ? headerRect.top : null,
+        viewportTop: viewportRect.top,
+      };
+    });
+    expect(geometry.scrollable, 'table viewport must actually scroll (content exceeds maxHeight)').toBe(true);
+    expect(geometry.headerTop).not.toBeNull();
+    // Sticky header: after full scroll the header row's top sits at the
+    // viewport's top (tolerance covers sub-pixel rounding only).
+    expect((geometry.headerTop as number) - geometry.viewportTop).toBeLessThan(1.5);
+    return geometry;
+  }
+
+  // --- Surface 1/5: Queue (/registrar/queue → QueueView → ModernQueueManager
+  // → QueueTable). 12 entries exceed the 480px viewport bound → internal
+  // scroll under a sticky header. Deep link ?doctor=1 pre-selects the
+  // specialist (QueueView wires searchParams.doctor into selectedDoctor), so
+  // the queue snapshot loads without any dropdown interaction.
+  test('PR-UI-12-4 queue screen — sticky header under bounded viewport', async ({ page }) => {
+    await installAuth(page, registrarProfile);
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const { pathname } = url;
+      if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
+      if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(registrarProfile)); return; }
+      if (pathname === '/api/v1/queue/available-specialists') {
+        await route.fulfill(jsonResponse({ specialists: [{ id: 1, doctor_name: 'Dr Test', specialty: 'cardiology', cabinet: '12' }] }));
+        return;
+      }
+      if (pathname === '/api/v1/registrar/queues/today') {
+        await route.fulfill(queuesTodayResponse(Array.from({ length: 12 }, (_, i) => queueEntry(i))));
+        return;
+      }
+      if (pathname === '/api/v1/queues/profiles') {
+        await route.fulfill(jsonResponse({ success: true, profiles: [], source: 'database' }));
+        return;
+      }
+      if (pathname === '/api/v1/registrar/doctors') { await route.fulfill(jsonResponse({ doctors: [{ id: 1, full_name: 'Dr Test', specialty: 'cardiology', cabinet: '12' }] })); return; }
+      if (pathname === '/api/v1/registrar/services') { await route.fulfill(jsonResponse({ services_by_group: {} })); return; }
+      if (pathname === '/api/v1/registrar/queue-settings') { await route.fulfill(jsonResponse({ data: { max_queue_size: 25 } })); return; }
+      if (pathname === '/api/v1/registrar/departments') { await route.fulfill(jsonResponse({ data: [{ key: 'cardio', title: 'Кардиология', active: true }] })); return; }
+      if (pathname === '/api/v1/registrar/appointments' || pathname === '/api/v1/registrar/all-appointments') { await route.fulfill(jsonResponse({ appointments: [], total: 0, has_more: false })); return; }
+      if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
+      await route.fulfill(jsonResponse({ success: true }));
+    });
+
+    await page.goto('/registrar/queue?doctor=1');
+    // Deterministic readiness: the queue table renders its entries.
+    await page.locator('.qt-table-container table').first().waitFor({ state: 'visible', timeout: 15000 });
+    await expect(page.locator('.qt-table-container').getByText('Тестов Тест Тестович 1').first()).toBeVisible();
+    await page.waitForTimeout(300);
+
+    // Sticky proof: scroll the bounded viewport, header stays at its top.
+    await assertStickyHeader(page, '.qt-table-container .mac-table-scroll-wrapper');
+
+    // Baseline: the queue table surface at rest (before the scroll above —
+    // reset scroll so the captured state is the canonical at-rest top view).
+    await page.locator('.qt-table-container .mac-table-scroll-wrapper').evaluate((el: HTMLElement) => { el.scrollTop = 0; });
+    await expect(page.locator('.qt-table-container')).toHaveScreenshot('pr124-queue-screen.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  // --- Surface 2/5: Appointments (/clinical/appointments → Appointments.tsx
+  // → EAT behind the "Расширенная таблица" toggle). 15 rows exceed the 560px
+  // viewport bound → internal scroll under a sticky header.
+  test('PR-UI-12-4 appointments screen — EAT sticky header under bounded viewport', async ({ page }) => {
+    await installAuth(page, appointmentsProfile);
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const { pathname } = url;
+      if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
+      if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(appointmentsProfile)); return; }
+      if (pathname === '/api/v1/appointments') {
+        const today = '2026-08-29';
+        await route.fulfill(jsonResponse(Array.from({ length: 15 }, (_, i) => ({
+          id: 5000 + i,
+          record_type: 'appointment',
+          source_type: 'manual',
+          appointment_id: 5000 + i,
+          patient_id: 200 + i,
+          patient_last_name: 'Тестов',
+          patient_first_name: 'Тест',
+          patient_fio: `Тестов Тест Тестович ${i + 1}`,
+          patient_name: `Тестов Тест Тестович ${i + 1}`,
+          patient_phone: '+998900000000',
+          doctor_id: 1,
+          doctor_name: 'Dr Test',
+          specialty: 'cardiology',
+          appointment_time: `10:${String(i * 4).padStart(2, '0')}`,
+          appointment_date: today,
+          status: 'scheduled',
+          session_id: 'session-1',
+          session_color: '#ef4444',
+          services_names: ['Консультация кардиолога'],
+          available_actions: ['cancel', 'print'],
+        }))));
+        return;
+      }
+      if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
+      await route.fulfill(jsonResponse({ success: true }));
+    });
+
+    await page.goto('/clinical/appointments');
+    // Deterministic readiness: the native fallback table renders rows.
+    await page.locator('table').first().waitFor({ state: 'visible', timeout: 15000 });
+    // Switch to the canonical EAT (the appointments surface's table that
+    // PR-UI-12-4 wires sticky headers on).
+    await page.locator('div[role="checkbox"]').filter({ hasText: 'Расширенная таблица' }).first().click();
+    await page.locator('.eat-table-scroll table').first().waitFor({ state: 'visible', timeout: 15000 });
+    await expect(page.locator('.eat-table-scroll').getByText('Тестов Тест Тестович 1').first()).toBeVisible();
+    await page.waitForTimeout(300);
+
+    // Sticky proof: scroll the bounded viewport, header stays at its top.
+    await assertStickyHeader(page, '.eat-table-scroll .mac-table-scroll-wrapper');
+
+    await page.locator('.eat-table-scroll .mac-table-scroll-wrapper').evaluate((el: HTMLElement) => { el.scrollTop = 0; });
+    await expect(page.locator('.eat-table-scroll')).toHaveScreenshot('pr124-appointments-screen.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  // --- Surface 3/5: Patients (/clinical/search → Search.tsx). No data table
+  // on this screen (result cards) — nothing to wire sticky headers on; the
+  // baseline locks the zero-delta invariant for the screen.
+  test('PR-UI-12-4 patients screen — search results (zero-delta lock, no tables)', async ({ page }) => {
+    await installAuth(page, registrarProfile);
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const { pathname } = url;
+      if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
+      if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(registrarProfile)); return; }
+      if (pathname === '/api/v1/patients/') {
+        await route.fulfill(jsonResponse(Array.from({ length: 4 }, (_, i) => ({
+          id: 300 + i,
+          last_name: 'Тестов',
+          first_name: 'Тест',
+          middle_name: 'Тестович',
+          full_name: `Тестов Тест Тестович ${i + 1}`,
+          phone: '+998900000000',
+          birth_date: '1990-01-01',
+          sex: 'male',
+          created_at: '2026-01-01T00:00:00Z',
+        }))));
+        return;
+      }
+      if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
+      await route.fulfill(jsonResponse({ success: true }));
+    });
+
+    await page.goto('/clinical/search');
+    const input = page.getByLabel('Поиск пациентов и визитов');
+    await input.waitFor({ state: 'visible', timeout: 15000 });
+    await input.fill('Тестов');
+    await input.press('Enter');
+    // Deterministic readiness: all 4 patient result cards render (the card
+    // display joins last/first/middle name — identical across fixtures; the
+    // accessible name comes from the button's text content).
+    await expect(page.getByRole('button', { name: /Открыть пациента/ })).toHaveCount(4, { timeout: 15000 });
+    await page.waitForTimeout(300);
+
+    await expect(page.locator('#main-content')).toHaveScreenshot('pr124-patients-screen.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  // --- Surface 4/5: Lab (/lab → LabPanel). No data table on this screen
+  // (queue cards + virtualized card list) — nothing to wire sticky headers
+  // on; the baseline locks the zero-delta invariant for the screen.
+  test('PR-UI-12-4 lab screen — lab queue (zero-delta lock, no tables)', async ({ page }) => {
+    await installAuth(page, labProfile);
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const { pathname } = url;
+      if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
+      if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(labProfile)); return; }
+      if (pathname === '/api/v1/lab/queue/today') {
+        await route.fulfill(jsonResponse({
+          entries: Array.from({ length: 5 }, (_, i) => ({
+            id: 600 + i,
+            appointment_id: 600 + i,
+            patient_fio: `Тестов Тест Тестович ${i + 1}`,
+            patient_id: 400 + i,
+            status: i === 0 ? 'in_progress' : 'waiting',
+            created_at: '2026-08-29T09:00:00+05:00',
+            services: ['Общий анализ крови'],
+            queue_number: i + 1,
+          })),
+          total: 5,
+        }));
+        return;
+      }
+      // Lab catalog endpoints are consumed as BARE ARRAYS (LabTemplateWorkbench
+      // maps over them directly) — object wrappers crash the render tree.
+      if (pathname === '/api/v1/lab/templates') { await route.fulfill(jsonResponse([])); return; }
+      if (pathname === '/api/v1/lab/catalog/units') { await route.fulfill(jsonResponse([])); return; }
+      if (pathname === '/api/v1/lab/catalog/analytes') { await route.fulfill(jsonResponse([])); return; }
+      if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
+      await route.fulfill(jsonResponse({ success: true }));
+    });
+
+    await page.goto('/lab');
+    await page.locator('.lqw-root').first().waitFor({ state: 'visible', timeout: 15000 });
+    await expect(page.locator('.lqw-root').getByText('Тестов Тест Тестович 1').first()).toBeVisible();
+    await page.waitForTimeout(300);
+
+    await expect(page.locator('.lqw-root').first()).toHaveScreenshot('pr124-lab-screen.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  // --- Surface 5/5: EMR (doctor panel visit view → EMRContainerV2). No data
+  // table on this screen (form sections) — nothing to wire sticky headers on;
+  // the baseline locks the zero-delta invariant for the screen. The EMR GET
+  // is mocked 404 → the canonical "new visit draft" state (the same path
+  // production takes for a first visit).
+  test('PR-UI-12-4 EMR screen — dermatology visit view (zero-delta lock, no tables)', async ({ page }) => {
+    await installAuth(page, doctorProfile);
+    const dermaQueueEntry = {
+      id: 1001,
+      number: 1,
+      patient_id: 101,
+      patient_fio: 'Тестов Тест Тестович',
+      patient_name: 'Тестов Тест Тестович',
+      patient_phone: '+998900000000',
+      patient_birth_year: 1990,
+      services: [{ id: 101, code: 'D001', name: 'Консультация дерматолога', price: 150000 }],
+      cost: 150000,
+      total_amount: 150000,
+      payment_status: 'paid',
+      payment_type: 'cash',
+      canonical_status: 'queued',
+      status: 'queued',
+      queue_position: 1,
+      queue_tag: 'derma',
+      visit_id: 501,
+      appointment_date: '2026-08-29',
+      appointment_time: '10:00',
+      created_at: '2026-08-29T09:00:00+05:00',
+      doctor_id: 1,
+      doctor_name: 'Dr Test',
+      department: 'derma',
+      available_actions: ['in_cabinet', 'complete'],
+      queue_entry_id: 1001,
+      can_start_visit: true,
+      record_kind: 'appointment',
+      source_kind: 'manual',
+    };
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const { pathname } = url;
+      if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
+      if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(doctorProfile)); return; }
+      if (pathname === '/api/v1/registrar/queues/today') {
+        await route.fulfill(jsonResponse({
+          queues: [{
+            queue_id: 1,
+            specialist_id: 1,
+            specialist_name: 'Dr Test',
+            specialty: 'derma',
+            cabinet: '12',
+            entries: [dermaQueueEntry],
+            stats: { total: 1, waiting: 1, called: 0, served: 0, online_entries: 0 },
+            opened_at: '2026-08-29T09:00:00+05:00',
+          }],
+          total_queues: 1,
+          date: '2026-08-29',
+          timezone: 'Asia/Tashkent',
+        }));
+        return;
+      }
+      if (pathname === '/api/v1/registrar/services') { await route.fulfill(jsonResponse({ services_by_group: {} })); return; }
+      // EMR GET → 404: canonical "new visit" draft (deterministic — a mocked
+      // 200 would need the full section schema; the draft path is production
+      // behavior for a first visit).
+      if (pathname === '/api/v1/v2/emr/501') { await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ detail: 'not found' }) }); return; }
+      if (pathname === '/api/v1/derma/examinations') { await route.fulfill(jsonResponse({ items: [], data: [] })); return; }
+      if (pathname === '/api/v1/derma/procedures') { await route.fulfill(jsonResponse({ items: [], data: [] })); return; }
+      if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
+      await route.fulfill(jsonResponse({ success: true }));
+    });
+
+    // Deep link: visitId opens the visit tab and resolves the patient from
+    // the mocked derma queue (URL resolution in DermatologistPanelUnified).
+    await page.goto('/doctor/dermatology?visitId=501&patientId=101');
+    await page.locator('.emr-v2-container').first().waitFor({ state: 'visible', timeout: 20000 });
+    await page.waitForTimeout(500);
+
+    await expect(page.locator('.emr-v2-container').first()).toHaveScreenshot('pr124-emr-screen.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+});

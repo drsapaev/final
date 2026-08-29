@@ -107,6 +107,18 @@ const isOnlineSource = (entry: QueueTableEntry): boolean =>
   entry.source === 'qr';
 
 /**
+ * PR-UI-12-4: bounded scroll-viewport height (px) for the queue table.
+ *
+ * Layout parameter for the sticky-header viewport (see DataTable
+ * "Sticky header viewport" doc note) — NOT a sticky offset; the kit measures
+ * header/filter row offsets itself. 480px ≈ 9 visible rows (md size ≈ 48px
+ * per row incl. borders): the queue stays inside the registrar queue card on
+ * a 720px viewport while the manager's call-next controls remain reachable,
+ * and queues longer than ~9 entries scroll internally under a sticky header.
+ */
+const QUEUE_TABLE_VIEWPORT_MAX_HEIGHT = 480;
+
+/**
  * QueueTable Component — displays the current queue entries in a canonical
  * DataTable format.
  *
@@ -249,6 +261,31 @@ const QueueTable = ({
                 hoverable={true}
                 size="md"
                 variant="default"
+                // PR-UI-12-2 (plan §PR-UI-12 item 2): roving keyboard navigation
+                // — ArrowUp/ArrowDown/Home/End move focus between queue rows so
+                // keyboard and screen-reader users can review the queue without
+                // a pointer.
+                //
+                // Contract reconciliation (AGENTS_UI workflow step 4 / §18):
+                // the plan's original wording "Enter для вызова пациента" (a
+                // per-row call action) is superseded by the repo invariant in
+                // QueueManager.contract.test.tsx — "keeps registrar queue
+                // call-next as a backend-owned command, not a row command".
+                // Queue calling stays strictly ordered through the manager's
+                // call-next button (already keyboard-accessible via Tab+Enter);
+                // rows expose focus movement only, no row-level actions.
+                keyboardNavigation
+                // PR-UI-12-4 (plan §PR-UI-12 item 4 "sticky header при скролле"):
+                // sticky header + bounded scroll viewport. The viewport bound
+                // is a layout parameter (NOT a sticky offset — the header/filter
+                // offsets are measured by the kit): 480px keeps the queue table
+                // inside the registrar queue card on a 720px e2e viewport
+                // (~9 rows visible) so the call-next controls above it stay
+                // reachable; longer operational queues get an internal scrollbar
+                // with the header row staying visible. Queues that fit (~9 rows
+                // or fewer) render pixel-identically to the unbounded table.
+                stickyHeader
+                maxHeight={QUEUE_TABLE_VIEWPORT_MAX_HEIGHT}
                 getRowId={(row: QueueTableEntry, index: number) => row.id ?? `qt-row-${index}`}
             />
         </div>

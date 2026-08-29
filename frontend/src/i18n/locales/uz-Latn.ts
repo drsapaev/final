@@ -61,6 +61,16 @@ const uzLatn = {
     push_notifications: 'Push bildirishnomalari',
     ai_tools: 'AI vositalari',
   },
+  // PR-UI-12: canonical DataTable toolbar (TableToolbar.tsx — column
+  // visibility menu + density segmented control).
+  table: {
+    columns: 'Ustunlar',
+    columns_menu: 'Ustunlarni koʻrsatish',
+    density: 'Qatorlar zichligi',
+    density_compact: 'Ixcham',
+    density_comfortable: 'Standart',
+    density_spacious: 'Keng',
+  },
   common: {
     save: 'Saqlash',
     save_draft: 'Qoralamani saqlash',
@@ -7791,6 +7801,7 @@ const uzLatn = {
     emr_sign_desc: 'Imzolagandan soʻng tahrirlash faqat tuzatish orqali mumkin.',
     emr_sign_confirm: 'Imzolash',
     emr_err_visit_id: 'Kontrakt xatosi: EMR v2 uchun `visitId` kerak.',
+    emr_skeleton_aria: 'Qabul kartasi yuklanmoqda…',
     emr_err_specialty: 'Kontrakt xatosi: normalizatsiya qilinmagan specialty uzatildi.',
     emr_title: 'Elektron tibbiy karta',
     emr_patient: 'Bemor #{id}',

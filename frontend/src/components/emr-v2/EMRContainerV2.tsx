@@ -22,6 +22,7 @@ import { useDebouncedCallback } from '../../hooks/useDebouncedCallback';
 import { cacheService, CACHE_CONFIG, CACHE_TAGS } from '../../core/cache';
 import { DEBOUNCE } from '../../core/debouncePolicy';
 import EMRStatusIndicator from './EMRStatusIndicator';
+import EMRSectionSkeleton from './EMRSectionSkeleton';
 import EMRHistoryPanel from './EMRHistoryPanel';
 import EMRDiffViewer from './EMRDiffViewer';
 import EMRConflictDialog from './EMRConflictDialog';
@@ -131,6 +132,7 @@ interface EMRHookResult {
     data: EMRDataShape | null;
     status: string;
     isDirty: boolean;
+    isLoading: boolean;
     lastSaved: string | null;
     conflict: unknown;
     error: unknown;
@@ -164,6 +166,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         data,
         status,
         isDirty,
+        isLoading,
         lastSaved,
         conflict,
         error,
@@ -555,6 +558,21 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     <div className="emr-v2-actions">
                         {t('misc.emr_err_specialty')}
                     </div>
+                </div>
+            </div>
+        );
+    }
+
+    // PR-UI-12-3 (plan §PR-UI-12 item 1: "EMR sections — skeleton loading"):
+    // while the EMR snapshot loads for the FIRST time (no data yet), render
+    // a skeleton stack mirroring the section layout instead of empty clinical
+    // fields. Subsequent saves/refreshes keep the real sections mounted
+    // (autosave must not flash skeletons over a doctor's in-progress input).
+    if (isLoading && !data) {
+        return (
+            <div className="emr-v2-container">
+                <div className="emr-v2-main">
+                    <EMRSectionSkeleton sections={6} ariaLabel={t('misc.emr_skeleton_aria')} />
                 </div>
             </div>
         );

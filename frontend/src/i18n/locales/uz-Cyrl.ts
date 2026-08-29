@@ -65,6 +65,16 @@ const uzCyrl = {
     push_notifications: 'Push билдиришномалари',
     ai_tools: 'AI воситалари',
   },
+  // PR-UI-12: canonical DataTable toolbar (TableToolbar.tsx — column
+  // visibility menu + density segmented control).
+  table: {
+    columns: 'Устунлар',
+    columns_menu: 'Устунларни кўрсатиш',
+    density: 'Қаторлар зичлиги',
+    density_compact: 'Ихчам',
+    density_comfortable: 'Стандарт',
+    density_spacious: 'Кенг',
+  },
   common: {
     save: 'Сохранить',
     save_draft: 'Сохранить черновик',
@@ -7801,6 +7811,7 @@ const uzCyrl = {
     emr_sign_desc: 'После подписания редактирование возможно только через поправку.',
     emr_sign_confirm: 'Подписать',
     emr_err_visit_id: 'Ошибка контракта: для EMR v2 требуется `visitId`.',
+    emr_skeleton_aria: 'Қабул карти ёзилмоқда…',
     emr_err_specialty: 'Ошибка контракта: передана ненормализованная specialty.',
     emr_title: 'Электронная медицинская карта',
     emr_patient: 'Пациент #{id}',
