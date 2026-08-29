@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Skeleton,
@@ -131,7 +131,7 @@ const PhoneVerificationManager = () => {
   <div className="flex flex-col gap-6">
       {/* Основная статистика */}
       <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
@@ -143,9 +143,9 @@ const PhoneVerificationManager = () => {
             </div>
             <Shield className="admin-w-24-h-24-blue" />
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
@@ -157,9 +157,9 @@ const PhoneVerificationManager = () => {
             </div>
             <CheckCircle className="admin-w-24-h-24-success" />
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
@@ -171,9 +171,9 @@ const PhoneVerificationManager = () => {
             </div>
             <Clock className="admin-w-24-h-24-warning" />
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
@@ -185,11 +185,11 @@ const PhoneVerificationManager = () => {
             </div>
             <AlertTriangle className="admin-w-24-h-24-error" />
           </div>
-        </MacOSCard>
+        </Card>
       </div>
 
       {/* Статистика по целям */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <BarChart3 className="w-5 h-5" />
           {t('admin2.pvm_purpose_stats_title')}
@@ -212,10 +212,10 @@ const PhoneVerificationManager = () => {
             </div>
         )}
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Статистика по провайдерам */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <Send className="w-5 h-5" />
           {t('admin2.pvm_provider_stats_title')}
@@ -232,13 +232,13 @@ const PhoneVerificationManager = () => {
             </div>
         )}
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderAdminTools = () =>
   <div className="flex flex-col gap-6">
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <Send className="w-5 h-5" />
           {t('admin2.pvm_admin_send_title')}
@@ -327,13 +327,13 @@ const PhoneVerificationManager = () => {
           }
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderSettings = () =>
   <div className="flex flex-col gap-6">
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <Settings className="w-5 h-5" />
           {t('admin2.pvm_settings_title')}
@@ -403,7 +403,7 @@ const PhoneVerificationManager = () => {
             </ul>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
