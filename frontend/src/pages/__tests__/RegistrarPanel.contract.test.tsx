@@ -144,10 +144,12 @@ describe('RegistrarPanel command contract', () => {
 
   it('allows edit mode for aggregate all-departments rows while keeping preview separate', () => {
     const source = readRegistrarSourceTree();
+    // PR-UI-13-4: handleTableAction (EAT row-action routing) now sits between
+    // openRecordEditor and handleContextMenuAction — the edit block ends there.
     const editBlock = extractSourceBlock(
       source,
       'const openRecordEditor = useCallback((row: unknown) => {',
-      'const handleContextMenuAction = useCallback(async (action: string, row: Appointment) => {',
+      'const handleTableAction = useCallback(',
     );
 
     // Contract: aggregate row detection must use hasMultipleRecordRefs.
@@ -369,6 +371,31 @@ describe('RegistrarPanel command contract', () => {
     expect(rowsSource).toContain('const sortedAggregated = sortRegistrarRowsForPresentation(aggregatedPatients)');
     expect(rowsSource).toContain('return sortRegistrarRowsForPresentation(appointments');
     expect(rowsSource).toContain('aggregateRegistrarPatients(filtered)');
+  });
+
+  it('delegates the worklist section to WorklistView and guards the wizard (PR-UI-13-4)', () => {
+    const panelSource = readRegistrarPanelSource();
+    const worklistViewSource = normalizeSource(fs.readFileSync(
+      path.resolve(__dirname, '../registrar/views/WorklistView.tsx'), 'utf8'));
+
+    // Worklist section boundary: the EAT + empty states + load-more bar render
+    // inside WorklistView; the panel only wires it.
+    expect(panelSource).toContain('<WorklistView');
+    expect(panelSource).not.toContain('<EnhancedAppointmentsTable');
+    expect(worklistViewSource).toContain('<EnhancedAppointmentsTable');
+    expect(worklistViewSource).toContain('AnimatedLoader.TableSkeleton');
+    expect(worklistViewSource).toContain('registrar-load-more-bar');
+    // Row-action routing stays in the panel (handleTableAction) and is passed down.
+    expect(panelSource).toContain('const handleTableAction = useCallback(');
+    expect(panelSource).toContain('onActionClick={handleTableAction}');
+    // Plan §PR-UI-13 item 4: local ErrorBoundary around the wizard.
+    expect(panelSource).toContain('<ErrorBoundary');
+    expect(panelSource).toContain('<AppointmentWizardV2');
+    // Reference data (doctors/services/dynamicDepartments) owned by useRegistrarData.
+    expect(panelSource).not.toContain('const [doctors, setDoctors]');
+    expect(panelSource).not.toContain('const [services, setServices]');
+    expect(panelSource).not.toContain('const [dynamicDepartments, setDynamicDepartments]');
+    expect(panelSource).toContain('} = useRegistrarData();');
   });
 
   it('does not use appointment or queue ids as visit ids for reschedule commands', () => {
