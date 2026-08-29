@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import type { CSSProperties } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
@@ -17,8 +17,9 @@ import '../styles/dark-theme-visibility-fix.css';
 // DS-3: utility classes for common inline style patterns
 import './registrar/registrar.css';
 import logger from '../utils/logger';
-import tokenManager from '../utils/tokenManager';
 // Note: getApiOrigin moved to ./registrar/registrarHelpers.js (decomp step 1)
+// PR-UI-13-1: tokenManager/api imports moved to useRegistrarWorklistData
+// (loadAppointments extraction — no other panel call-sites existed).
 import notify from '../services/notify';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
@@ -34,6 +35,11 @@ import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
 import { useRegistrarReschedule } from './registrar/useRegistrarReschedule';
 // Decomp 4: data-loading functions extracted to useRegistrarData hook
 import { useRegistrarData } from './registrar/useRegistrarData';
+// Decomp 8 (PR-UI-13-1): worklist data lifecycle extracted to
+// useRegistrarWorklistData hook (fetch + reducer state machine + refresh
+// lifecycle: initial load / queueUpdated / departments:updated /
+// 30s auto-refresh / calendar date change).
+import { useRegistrarWorklistData } from './registrar/useRegistrarWorklistData';
 // Decomp 5: record action handlers extracted to useRegistrarActions hook
 import { useRegistrarActions } from './registrar/useRegistrarActions';
 // Decomp 6a: QueueView extracted to component
@@ -79,7 +85,8 @@ import { rescheduleTomorrow, rescheduleVisit } from '../api/visits';
 // Note: formatNetworkErrorMessage + isNetworkFetchError moved to useRegistrarData.js (Decomp 4)
 import { getErrorMessage } from '../utils/errorHandler';
 import {
-  adaptTimeFields,
+  // PR-UI-13-1: adaptTimeFields moved to registrarQueueAdapter (worklist data
+  // extraction). Aggregation/sorting stay until the 13-2 view-model increment.
   aggregatePatientsForAllDepartments as aggregateRegistrarPatients,
   sortRegistrarRowsForPresentation
 } from '../utils/registrarAggregation';
@@ -88,7 +95,8 @@ import {
 import { toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
 
 // API client
-import { api } from '../api/client';
+// PR-UI-13-1: api import moved to useRegistrarWorklistData (loadAppointments
+// extraction — no other panel call-sites existed).
 // UX Audit Registrar #1: getPatient() — централизованный доступ к /patients/{id}.
 // Раньше здесь был raw fetch() с ручным Authorization-хедером.
 import { getPatient } from '../api/patients';
@@ -243,22 +251,13 @@ const RegistrarPanel = () => {
 
   const [contextMenu, setContextMenu] = useState<{ open: boolean; row: Record<string, unknown> | null; position: { x: number; y: number } }>({ open: false, row: null, position: { x: 0, y: 0 } });
 
-  // Состояния для пагинации
-  const [paginationInfo, setPaginationInfo] = useState({ total: 0, hasMore: false, loadingMore: false });
+  // Состояния для пагинации / данных worklist — PR-UI-13-1: moved to
+  // useRegistrarWorklistData (appointments, dataSource, appointmentsLoading,
+  // paginationInfo now owned by the hook's reducer state machine).
   // QW-03 fix: demoAppointments useMemo (260 lines) removed.
   // Production code should never ship demo data. Backend fixtures
   // are used for tests; error states show proper error UI instead.
 
-  // Состояния для управления данными
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  // ⭐ SSOT FIX: Сырые данные (flat list) до агрегации — для Tooltip
-  const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'error' (QW-03: 'demo' removed)
-  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  // QW-01 fix: bulk-action state removed — checkboxes were already disabled
-  // (showCheckboxes=false) and the bulk-action bar was unreachable via UI.
-  // Only hidden Ctrl+A/Alt+1-3 hotkeys could populate this state, creating
-  // dead UI that surfaced unexpectedly. See audit P-011.
-  const appointmentsCount = appointments.length;
   // ✅ Используется только новый мастер (V2)
   const [showWizard, setShowWizard] = useState(false);
   const [wizardEditMode, setWizardEditMode] = useState(false); // ✨ НОВОЕ: Режим редактирования
@@ -266,13 +265,10 @@ const RegistrarPanel = () => {
   const [showPaymentManager, setShowPaymentManager] = useState(false); // Для модуля оплаты
   const [isProcessing, setIsProcessing] = useState(false); // Состояние обработки
 
-
   // Отладка состояния мастера удалена - используется AppointmentWizard
 
-  // Отладка состояния загрузки
-  useEffect(() => {
-    // logger.info('⏳ appointmentsLoading changed:', appointmentsLoading);
-  }, [appointmentsLoading]); // Отладка изменений appointments
+  // Отладка состояния загрузки (QW-03: appointmentsLoading effect moved with
+  // the data lifecycle to useRegistrarWorklistData)
   const [showSlotsModal, setShowSlotsModal] = useState(false);
   // QW-02 fix: hold the date the user picks in the inline date input inside the
   // reschedule slots dialog. Replaces the previous window.prompt() call that was
@@ -280,12 +276,8 @@ const RegistrarPanel = () => {
   const [customRescheduleDate, setCustomRescheduleDate] = useState('');
   // R-27 fix: optional time picker for reschedule (HH:MM)
   const [customRescheduleTime, setCustomRescheduleTime] = useState('');
-  const autoRefresh = true; // Новые состояния для интеграции с админ панелью
-  // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
-  const {
-    resolveRescheduleVisitId,
-    removeRescheduledAppointmentFromView,
-  } = useRegistrarReschedule({ setAppointments: setAppointments as unknown as (updater: (prev: Record<string, unknown>[]) => Record<string, unknown>[]) => void });
+  // PR-UI-13-1: autoRefresh const + reschedule wiring moved below — the
+  // reschedule hook consumes setAppointments from useRegistrarWorklistData.
   const [doctors, setDoctors] = useState<Doctor[]>([]);const [services, setServices] = useState<Record<string, unknown>>({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   // Unified i18n hook: single source of truth for all translations.
   // - registrarPanel.* — flat UI keys (tabs, statuses, headings, buttons)
@@ -318,9 +310,6 @@ const RegistrarPanel = () => {
   // for responsive font-size / padding / border-radius variants.
 
   // Decomp 4: data-loading functions extracted to useRegistrarData hook.
-  // loadAppointments and loadMoreAppointments remain inline due to complex
-  // ref dependencies (loadAppointmentsInFlightRef, autoRefreshCooldownUntilRef,
-  // autoRefreshCooldownLoggedRef, filteredAppointmentsRef).
   const {
     loadIntegratedData,
     enrichAppointmentsWithPatientData,
@@ -330,340 +319,55 @@ const RegistrarPanel = () => {
     setDynamicDepartments,
   });
 
+  // ──────────────────────────────────────────────────────────────────────
+  // PR-UI-13-1 (Decomp 8): worklist data lifecycle — appointments fetching,
+  // reducer state machine (appointments / dataSource / loading / pagination)
+  // and the full refresh lifecycle (initial load, queueUpdated WebSocket
+  // listener, departments:updated listener, 30s auto-refresh with 429
+  // cooldown + WS-freshness skip, calendar date change).
+  // anyDialogOpenRef mirrors the original stale-closure semantics: dialog
+  // flags were intentionally NOT in the auto-refresh effect deps; only
+  // showWizard was. The ref is read at effect-run time, exactly like the
+  // original closure read them.
+  // ──────────────────────────────────────────────────────────────────────
+  const anyDialogOpenRef = useRef(false);
+  anyDialogOpenRef.current = Boolean(
+    paymentDialog.open ||
+    cancelDialog.open ||
+    printDialog.open ||
+    recordPreviewDialog.open ||
+    contextMenu.open ||
+    forceMajeureModal.open ||
+    showSlotsModal
+  );
 
-  // Улучшенная загрузка записей с поддержкой тихого режима
-  const loadAppointments = useCallback(async (rawOptions: unknown = {}) => {
-    const options: Record<string, unknown> = (rawOptions && typeof rawOptions === 'object' ? rawOptions : {}) as Record<string, unknown>;
-    const { silent = false } = options;
-    const callSource = String(options.source || 'unknown');
-    const isAutoRefreshCall = callSource === 'auto_refresh';
-    if (isAutoRefreshCall) {
-      const cooldownUntil = autoRefreshCooldownUntilRef.current;
-      if (Date.now() < cooldownUntil) {
-        if (!autoRefreshCooldownLoggedRef.current) {
-          logger.info('⏳ Автообновление приостановлено после rate limit', {
-            cooldownUntil: new Date(cooldownUntil).toISOString()
-          });
-          autoRefreshCooldownLoggedRef.current = true;
-        }
-        return;
-      }
+  const {
+    appointments,
+    setAppointments,
+    dataSource,
+    appointmentsLoading,
+    paginationInfo,
+    loadAppointments,
+    loadMoreAppointments,
+  } = useRegistrarWorklistData({
+    searchParams,
+    activeTab,
+    showCalendar,
+    historyDate,
+    showWizard,
+    anyDialogOpenRef,
+    enrichAppointmentsWithPatientData,
+    loadIntegratedData,
+    tI18n,
+  });
 
-      if (loadAppointmentsInFlightRef.current) {
-        logger.info('⏭️ Автообновление пропущено: предыдущий запрос еще выполняется');
-        return;
-      }
-    }
-
-    loadAppointmentsInFlightRef.current = true;
-    try {
-      if (!silent) {
-        setAppointmentsLoading(true);
-        setDataSource('loading');
-      }
-
-      // Проверяем наличие токена
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        logger.warn('Токен аутентификации отсутствует, показываем пустое состояние');
-        startTransition(() => {
-          if (!silent) setDataSource('api');
-          setAppointments([]);
-        });
-        return;
-      }
-
-
-      // Используем новый эндпоинт для получения очередей на указанную дату
-      // Если календарь открыт, используем historyDate, иначе сегодня
-      const urlDate = searchParams.get('date');
-      const dateParam = showCalendar && historyDate ? historyDate : urlDate || getLocalDateString();
-
-      const params = new URLSearchParams();
-      params.append('target_date', dateParam);
-
-
-
-      const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } }) as import('axios').AxiosResponse<Record<string, unknown>>;
-
-      // Axios successful response
-      const data = response.data;
-
-      // Новый формат: данные сгруппированы по специальностям
-      let appointmentsData: Record<string, unknown>[] = [];
-
-      if (data && typeof data === 'object') {
-        // Обрабатываем формат от эндпоинта registrar_integration.py
-        if (data.queues && Array.isArray(data.queues)) {
-          // ⭐ SSOT: Simple flatMap - no deduplication, no aggregation
-          // Each backend entry = one frontend row
-          // Removed: appointmentsMap, mergedByPatientKey, getAppointmentKey, calcPriority, mergeAppointments
-
-          // Minimal field adaptation layer
-          const adaptEntry = (entry: Record<string, unknown>, queue: Record<string, unknown>): Record<string, unknown> | null => {
-            const fullEntry = (entry.data ?? entry) as Record<string, unknown>;
-            const entryId = fullEntry?.id;
-            if (!entryId) return null; // Skip entries without ID
-
-            const queueNum = fullEntry.queue_position ?? fullEntry.number ?? 0;
-            const queueTag = fullEntry.queue_tag ?? queue.queue_tag ?? queue.specialty ?? null;
-            const queueName = fullEntry.queue_name ?? queue.specialist_name ?? queue.specialty ?? null;
-            const queueTime = entry.queue_time || fullEntry.queue_time || fullEntry.created_at || null;
-            const canonicalStatus = fullEntry.canonical_status ?? fullEntry.queue_status ?? fullEntry.status ?? null;
-
-            return {
-              // SSOT passthrough
-              id: entryId,
-              canonical_record_id: fullEntry.canonical_record_id ?? entry.canonical_record_id ?? entryId,
-              record_kind: fullEntry.record_kind ?? entry.record_kind ?? null,
-              source_kind: fullEntry.source_kind ?? entry.source_kind ?? null,
-              visit_id: fullEntry.visit_id || entry.visit_id || null,
-              appointment_id: fullEntry.appointment_id || entry.appointment_id || null,
-              queue_entry_id: fullEntry.queue_entry_id || entry.queue_entry_id || null,
-              patient_id: fullEntry.patient_id || entry.patient_id,
-              patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name ?? entry.patient_fio ?? entry.patient_name ?? tI18n('registrarPanel.rp_unknown_patient'),
-              patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year ?? entry.patient_birth_year ?? entry.birth_year ?? null,
-              patient_phone: fullEntry.patient_phone ?? fullEntry.phone ?? entry.patient_phone ?? entry.phone ?? '',
-              patient_gender: normalizePatientGender(fullEntry as Record<string, unknown>) ?? normalizePatientGender(entry as Record<string, unknown>),
-              gender: normalizePatientGender(fullEntry as Record<string, unknown>) ?? normalizePatientGender(entry as Record<string, unknown>),
-              sex: normalizePatientGender(fullEntry as Record<string, unknown>) ?? normalizePatientGender(entry as Record<string, unknown>),
-              address: fullEntry.address ?? entry.address ?? '',
-              services: Array.isArray(fullEntry.services) ? fullEntry.services : [],
-              service_codes: Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [],
-              service_details: Array.isArray(fullEntry.service_details) ? fullEntry.service_details : [],
-              cost: fullEntry.cost || 0,
-              payment_status: fullEntry.payment_status ?? null,
-              source: fullEntry.source || entry.source || 'desk',
-              status: canonicalStatus,
-              canonical_status: fullEntry.canonical_status ?? canonicalStatus,
-              queue_status: fullEntry.queue_status ?? canonicalStatus,
-              record_type: fullEntry.record_type ?? fullEntry.type ?? entry.record_type ?? entry.type ?? null,
-              ...adaptTimeFields(entry, data),
-              // Keep queueTime (computed above) as queue_time fallback for backward compat
-              queue_time: queueTime,
-              discount_mode: fullEntry.discount_mode ?? null,
-              approval_status: fullEntry.approval_status || null,
-              available_actions: Array.isArray(fullEntry.available_actions) ? fullEntry.available_actions : [],
-              can_mark_paid: Boolean(fullEntry.can_mark_paid),
-              can_start_visit: Boolean(fullEntry.can_start_visit),
-              can_cancel: Boolean(fullEntry.can_cancel),
-              can_print_ticket: Boolean(fullEntry.can_print_ticket),
-              can_complete: Boolean(fullEntry.can_complete),
-
-              // Queue info
-              queue_number: queueNum,
-              queue_numbers: [{
-                number: queueNum,
-                queue_tag: queueTag,
-                queue_name: queueName,
-                specialty: queueTag,
-                status: canonicalStatus,
-                queue_time: queueTime,
-                updated_at: fullEntry.updated_at || fullEntry.last_changed_at || null,
-                last_changed_at: fullEntry.last_changed_at || fullEntry.updated_at || null,
-                timezone: fullEntry.timezone || data.timezone || 'Asia/Tashkent'
-              }],
-              specialty: queueTag,
-              queue_tag: queueTag,
-              queue_name: queueName,
-              department: fullEntry.department ?? queueTag,
-              department_key: fullEntry.department_key || null,
-
-              // Derived fields (minimal)
-              visit_type: fullEntry.visit_type ?? fullEntry.discount_mode ?? null,
-              payment_type: fullEntry.payment_type ?? null,
-              date: fullEntry.date ?? data.date ?? dateParam,
-              appointment_date: fullEntry.appointment_date ?? data.date ?? dateParam,
-
-              // ⭐ SSOT: session_id for visual grouping (presentation only)
-              // DO NOT parse this value - it's an opaque string from backend
-              session_id: fullEntry.session_id || null,
-
-              // P1 fix: pass through lab report summary so registrar can see
-              // if lab results are ready for this patient's visit.
-              latest_lab_report: fullEntry.latest_lab_report ?? null,
-            };
-          };
-
-          // ⭐ SSOT: flatMap all entries without any deduplication or aggregation
-          const queuesList = data.queues as Record<string, unknown>[];
-          appointmentsData = queuesList.flatMap((queue) =>
-          (Array.isArray(queue.entries) ? queue.entries : [] as unknown[]).
-          map((entry: Record<string, unknown>) => adaptEntry(entry, queue)).
-          filter((entry: Record<string, unknown> | null) => entry !== null) // Remove entries without ID
-          );
-
-          logger.info(`📊 SSOT: Loaded ${appointmentsData.length} entries (no dedup, no aggregation)`);
-        } else {
-          // Обрабатываем старый формат для совместимости
-          if (activeTab && data[activeTab]) {
-            appointmentsData = Array.isArray(data[activeTab]) ? data[activeTab] : [];
-          } else {
-            // Берем все специальности и объединяем
-            for (const dept in data) {
-              const deptData = data[dept];
-              if (Array.isArray(deptData)) {
-                appointmentsData.push(...deptData);
-              }
-            }
-          }
-        }
-
-        setPaginationInfo({
-          total: appointmentsData.length,
-          hasMore: false,
-          loadingMore: false
-        });
-
-        logger.info(`📊 Загружено ${appointmentsData.length} записей для специальности: ${activeTab || 'все'}`);
-
-        // Отладка: показываем ID всех загруженных записей
-        if (appointmentsData.length > 0) {
-          logger.info('📋 ID всех загруженных записей:', appointmentsData.map((a) => a.id));
-        }
-
-        // ✅ ИСПРАВЛЕНО: Пустая очередь - это нормально, не переключаемся в демо-режим
-        if (appointmentsData.length === 0) {
-          logger.info('📋 Нет записей на сегодня - это нормальная ситуация в начале дня');
-          // Устанавливаем пустой массив, не выбрасываем ошибку
-          setAppointments([]);
-          setDataSource('api'); // ✅ Указываем, что данные получены от API
-          setAppointmentsLoading(false);
-          return; // ✅ Выходим из функции, не загружаем демо-данные
-        }
-      } else {
-        logger.warn('⚠️ Получены некорректные данные от сервера:', data);
-        throw new Error(tI18n('registrarPanel.rp_err_invalid_data'));
-      }
-
-      if (appointmentsData.length > 0) {
-        // Обогащаем данные записей информацией о пациентах
-        const enriched = await enrichAppointmentsWithPatientData(appointmentsData);
-
-        // ⭐ SSOT: Просто устанавливаем данные без local overrides
-        // Removed: _locallyModified, localStorage overrides
-        startTransition(() => {
-          setAppointments(enriched);
-          setDataSource('api');
-        });
-        logger.info('✅ SSOT: Загружено', enriched.length, 'записей (без local overrides)');
-      } else {
-        // QW-03 fix: empty API response is a valid state, not a demo fallback.
-        // Empty result is already handled earlier (line ~1370). This branch
-        // is unreachable but kept as defensive code.
-        startTransition(() => {
-          setAppointments([]);
-          setDataSource('api');
-        });
-      }
-    } catch (error: unknown) {
-      if ((error as HttpApiError)?.response?.status === 429) {
-        autoRefreshCooldownUntilRef.current = Date.now() + 60_000;
-        autoRefreshCooldownLoggedRef.current = false;
-        logger.warn('⏳ Регистраторская очередь ограничена по частоте, включаем cooldown на 60с', {
-          source: callSource,
-          dateParam: showCalendar && historyDate ? historyDate : getLocalDateString()
-        });
-        return;
-      }
-
-      // Handle axios errors
-      if ((error as HttpApiError)?.response?.status === 401) {
-        // Токен недействителен
-        logger.warn('Токен недействителен (401), очищаем и показываем ошибку');
-        sessionStorage.removeItem('auth_token');  // PR-39 / P0-2;
-        // QW-03 fix: show error state instead of demo data.
-        startTransition(() => {
-          if (!silent) setDataSource('error');
-          setAppointments([]);
-        });
-      } else {
-        // Other errors (network, 404, 500, etc.)
-        logger.error('❌ Backend недоступен для загрузки записей:', getErrorMessage(error));
-        logger.error('❌ Детали ошибки:', error);
-        startTransition(() => {
-          if (!silent) setDataSource('error');
-          setAppointments([]);
-        });
-        // Показываем уведомление пользователю только при первой загрузке
-        if (appointmentsCount === 0) {
-          notify.error(tI18n('registrar.backend_unavailable'));
-        }
-      }
-    } finally {
-      loadAppointmentsInFlightRef.current = false;
-      if (!silent) setAppointmentsLoading(false);
-    }
-  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, searchParams, activeTab, appointmentsCount]);
-
-  // Слушаем обновления отделений от админ-панели
-  useEffect(() => {
-    const handleDepartmentsUpdate = (event: Event) => {
-      const detail = (event as CustomEvent).detail;
-      logger.info('RegistrarPanel: Получено обновление отделений, перезагружаю...', detail);
-      loadIntegratedData();
-    };
-
-    window.addEventListener('departments:updated', handleDepartmentsUpdate);
-    return () => window.removeEventListener('departments:updated', handleDepartmentsUpdate);
-  }, [loadIntegratedData]);
-
-  // Первичная загрузка данных (однократно) с защитой от двойного вызова в React 18
-  const initialLoadRef = useRef(false);
-  const loadAppointmentsInFlightRef = useRef(false);
-  const autoRefreshCooldownUntilRef = useRef(0);
-  const autoRefreshCooldownLoggedRef = useRef(false);
-  // UX Audit R-4.1: track last WebSocket update timestamp to skip redundant interval refresh.
-  const lastQueueUpdatedRef = useRef(0);
-  useEffect(() => {
-    if (initialLoadRef.current) return;
-    initialLoadRef.current = true;
-    logger.info('🚀 Starting initial data load (guarded)...');
-    loadAppointments({ source: 'initial_load' });
-    loadIntegratedData();
-  }, [loadAppointments, loadIntegratedData]);
-
-  // Слушаем глобальные события обновления очереди для синхронизации статусов
-  useEffect(() => {
-    const handleQueueUpdate = (event: Event) => {
-      const detail = ((event as CustomEvent).detail ?? {}) as { action?: string; specialty?: string };
-      const { action, specialty } = detail;
-      // UX Audit R-4.1: record WebSocket update timestamp to skip redundant interval refresh.
-      lastQueueUpdatedRef.current = Date.now();
-      logger.info('[RegistrarPanel] Получено событие обновления очереди:', { action, specialty, detail });
-
-      // Для критических действий обновляем немедленно без silent режима
-      const criticalActions = ['patientCalled', 'visitStarted', 'visitCompleted', 'nextPatientCalled', 'refreshAll', 'entryAdded'];
-      const shouldUpdateImmediately = action != null && criticalActions.includes(action);
-
-      if (shouldUpdateImmediately) {
-        logger.info('[RegistrarPanel] Немедленное обновление после действия:', action);
-        logger.info('[RegistrarPanel] Детали события:', detail);
-        // Увеличиваем задержку для гарантии сохранения данных в БД (особенно для новых записей)
-        const delay = action === 'entryAdded' || action === 'refreshAll' ? 500 : 300;
-        setTimeout(() => {
-          logger.info('[RegistrarPanel] Выполняем обновление после задержки:', delay, 'ms');
-          loadAppointments({ source: `queue_update_${action}`, silent: false });
-        }, delay);
-      } else {
-        // Для других событий тихое обновление
-        loadAppointments({ source: 'queue_update_event', silent: true });
-      }
-    };
-    window.addEventListener('queueUpdated', handleQueueUpdate);
-
-    return () => {
-      window.removeEventListener('queueUpdated', handleQueueUpdate);
-    };
-  }, [loadAppointments]);
-
-  // Перезагружаем данные при изменении фильтров
-  useEffect(() => {
-    if (initialLoadRef.current) {
-      logger.info('🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)');
-      // Не перезагружаем данные - фильтрация происходит на клиенте через useMemo filteredAppointments
-    }
-  }, [searchQuery, statusFilter]);
+  // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook.
+  // PR-UI-13-1: wired to the worklist hook's setAppointments shim
+  // (functional-updater API preserved).
+  const {
+    resolveRescheduleVisitId,
+    removeRescheduledAppointmentFromView,
+  } = useRegistrarReschedule({ setAppointments: setAppointments as unknown as (updater: (prev: Record<string, unknown>[]) => Record<string, unknown>[]) => void });
 
   // Синхронизация tempDateInput с historyDate при открытии календаря
   useEffect(() => {
@@ -677,41 +381,6 @@ const RegistrarPanel = () => {
   // «мёртвую» секунду без визуального отклика (Nielsen #2).
   // Теперь: дата применяется только через onBlur в WelcomeView (стандартный
   // паттерн для date-picker'ов) или через нативный onChange календаря.
-
-  // Перезагружаем данные при изменении даты в календаре
-  useEffect(() => {
-    if (showCalendar && historyDate && initialLoadRef.current) {
-      logger.info('📅 Дата календаря изменилась на:', historyDate);
-      logger.info('📅 Вызываем loadAppointments с параметрами:', { showCalendar, historyDate });
-      loadAppointments({ silent: false, source: 'calendar_date_change' });
-    }
-  }, [historyDate, showCalendar, loadAppointments]);
-
-  // Отслеживаем изменения в appointments для отладки
-  useEffect(() => {
-    logger.info('🔔 appointments state изменился:', {
-      count: appointments.length,
-      showCalendar,
-      historyDate,
-      first3: appointments.slice(0, 3).map((a) => ({ id: a.id, fio: a.patient_fio, date: a.appointment_date }))
-    });
-  }, [appointments, showCalendar, historyDate]);
-
-  // Функция для загрузки дополнительных записей
-  const loadMoreAppointments = useCallback(async () => {
-    if (paginationInfo.loadingMore || !paginationInfo.hasMore) return;
-
-    setPaginationInfo((prev) => ({ ...prev, loadingMore: true }));
-
-    try {
-      logger.info('RegistrarPanel: load-more delegates to canonical queue loader');
-      await loadAppointments({ source: 'load_more', silent: true });
-    } catch (error: unknown) {
-      logger.error('Ошибка загрузки дополнительных записей:', error);
-    } finally {
-      setPaginationInfo((prev) => ({ ...prev, loadingMore: false }));
-    }
-  }, [paginationInfo.loadingMore, paginationInfo.hasMore, loadAppointments]);
 
   // Обработчик события из хедера для открытия мастера записи
   useEffect(() => {
@@ -774,49 +443,6 @@ const RegistrarPanel = () => {
   // Для fallback между вкладками можно использовать BroadcastChannel,
   // но polling localStorage — это неэффективный паттерн.
 
-  // Автообновление очереди с возможностью паузы (в тихом режиме)
-  useEffect(() => {
-    // P-026 fix: previously auto-refresh was disabled whenever ANY of
-    // (showWizard, paymentDialog, printDialog, cancelDialog) was open. This
-    // meant a registrar with a payment dialog open for 2+ minutes would not
-    // see new online-queue patients arrive in the worklist behind the dialog.
-    //
-    // R-26 fix: pause auto-refresh when ANY dialog is open.
-    // Раньше только showWizard — но payment/cancel/reschedule dialogs
-    // тоже могут пострадать от фонового refresh (row positions change).
-    const anyDialogOpen = showWizard
-      || paymentDialog.open
-      || cancelDialog.open
-      || printDialog.open
-      || recordPreviewDialog.open
-      || contextMenu.open
-      || forceMajeureModal.open
-      || showSlotsModal;
-    if (anyDialogOpen) return;
-    if (!autoRefresh) return;
-    if (Date.now() < autoRefreshCooldownUntilRef.current) return;
-
-    const id = setInterval(() => {
-      if (Date.now() < autoRefreshCooldownUntilRef.current || loadAppointmentsInFlightRef.current) {
-        return;
-      }
-      // UX Audit R-4.1: skip interval refresh if WebSocket updated recently.
-      // Раньше: setInterval(15000) работал ВСЕГДА, даже когда WebSocket уже
-      // обновил данные. Это создавало race conditions и дублирующие network-запросы.
-      // Теперь: если queueUpdated event был < 30s назад, пропускаем interval refresh.
-      const lastWsUpdate = lastQueueUpdatedRef.current;
-      if (lastWsUpdate && (Date.now() - lastWsUpdate) < 30000) {
-        logger.info('⏰ Автообновление: пропускаем (WebSocket обновил недавно)');
-        return;
-      }
-      // Загружаем только записи тихо, без смены индикаторов
-      logger.info('⏰ Автообновление: вызов loadAppointments (dialog-open resilient)');
-      loadAppointments({ silent: true, source: 'auto_refresh' } as Record<string, unknown>);
-    }, 30000); // UX Audit R-4.1: 15s → 30s (WebSocket покрывает real-time)
-
-    return () => clearInterval(id);
-  }, [autoRefresh, showWizard, loadAppointments]);
-
   // Функции для жесткого потока
   // Decomp 5: record action handlers extracted to useRegistrarActions hook.
   // openRecordPreview, openRecordEditor, handleContextMenuAction remain
@@ -828,7 +454,6 @@ const RegistrarPanel = () => {
     handlePayment,
     updateAppointmentStatus,
   } = useRegistrarActions({ appointments, loadAppointments });
-
 
   // QW-01 fix: handleBulkAction removed along with bulk-action UI.
 
@@ -895,7 +520,6 @@ const RegistrarPanel = () => {
 
     return stats;
   }, [appointments, todayStr, queueProfiles]);
-
 
   // 🎨 PRESENTATION-ONLY: Aggregation for "All departments" tab
   // Groups entries by patient for visual display (1 patient = 1 row)
@@ -1319,7 +943,6 @@ const RegistrarPanel = () => {
   // Мемоизированный компонент индикатора источника данных (для всех вкладок)
   // UX Audit Registrar #14: DataSourceIndicator, generateCSV, downloadCSV
   // extracted to ./registrar/DataSourceIndicator.jsx and ./registrar/registrarCsv.js.
-
 
   // Обработчик действий контекстного меню
   const openRecordPreview = useCallback((row: unknown) => {

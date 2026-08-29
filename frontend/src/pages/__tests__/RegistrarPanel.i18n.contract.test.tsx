@@ -13,6 +13,16 @@ const source = fs.readFileSync(
   'utf8'
 );
 
+// PR-UI-13-1: the worklist data lifecycle (loadAppointments) moved to
+// pages/registrar/useRegistrarWorklistData.ts. Its tI18n notify calls are
+// part of the panel's i18n contract, so the tree is read alongside the panel.
+const worklistDataSource = fs.readFileSync(
+  path.join(ROOT, 'pages/registrar/useRegistrarWorklistData.ts'),
+  'utf8'
+);
+
+const sourceTree = source + '\n' + worklistDataSource;
+
 const translationsSource = fs.readFileSync(
   path.join(ROOT, 'i18n/locales/ru.ts'),
   'utf8'
@@ -53,6 +63,8 @@ describe('RegistrarPanel STRAT#30 — i18n migration', () => {
   });
 
   it('uses tI18n() for all notify messages', () => {
+    // registrar.backend_unavailable lives in useRegistrarWorklistData
+    // (worklist data lifecycle, PR-UI-13-1) — checked against the tree.
     expect(source).toContain("tI18n('registrar.sent_to_cabinet')");
     expect(source).toContain("tI18n('registrar.visit_completed')");
     expect(source).toContain("tI18n('registrar.appointment_created')");
@@ -62,7 +74,7 @@ describe('RegistrarPanel STRAT#30 — i18n migration', () => {
     expect(source).toContain("tI18n('registrar.invalid_date_format')");
     expect(source).toContain("tI18n('registrar.invalid_time_format')");
     expect(source).toContain("tI18n('registrar.cannot_postpone_past')");
-    expect(source).toContain("tI18n('registrar.backend_unavailable')");
+    expect(sourceTree).toContain("tI18n('registrar.backend_unavailable')");
   });
 
   it('does not contain hardcoded Russian strings in confirm() calls anymore', () => {
