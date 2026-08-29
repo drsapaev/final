@@ -19,7 +19,7 @@ import React from "react";
 import {
   Badge,
   Button,
-  MacOSCard,
+  Card,
   AppEmpty,
   Input,
   StatCard,
@@ -339,7 +339,7 @@ const QueueCabinetManagement = () => {
 
   return (
     <div className="admin-p-0-bgc-bg-primary">
-      <MacOSCard className="p-0">
+      <Card className="p-0">
         <div className="p-6">
           <div
             className="admin-d-flex-ai-start-jc-between-gap-16-mb-24-pb-24-bd-b-1px-solid-var-mac-bo">
@@ -405,7 +405,7 @@ const QueueCabinetManagement = () => {
             />
           </div>
 
-          <MacOSCard
+          <Card
             className="admin-p-20-mb-24-bgc-bg-secondary">
             <div
               className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-12-ai-end">
@@ -474,7 +474,7 @@ const QueueCabinetManagement = () => {
                 </Button>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {!loading && queues.length === 0 ? (
             <AppEmpty
@@ -520,7 +520,7 @@ const QueueCabinetManagement = () => {
             />
           )}
         </div>
-      </MacOSCard>
+      </Card>
     </div>
   );
 };

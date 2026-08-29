@@ -4,6 +4,67 @@
  */
 
 const uzCyrl = {
+  // PR-UI-19 (C-6, Codex round 2): nav values below are REAL Uzbek Cyrillic
+  // translations — the rest of this file is a ru-placeholder (the generator
+  // script referenced in the file header no longer exists in the repo; key
+  // parity per scripts/i18n/validate_locales.py is preserved).
+  // PR-UI-19 (C-6): sidebar navigation labels. Keys are referenced by
+  // routeRegistry.ts (labelKey: 'nav.*') and resolved in Sidebar.tsx
+  // via useTranslation(). ru values are byte-identical to the labels
+  // previously hardcoded in routeRegistry (zero-delta for ru).
+  nav: {
+    section_clinical: 'Клиник',
+    section_clinic_queue: 'Клиника ва навбат',
+    section_communications: 'Коммуникациялар',
+    section_patients_booking: 'Беморлар ва ёзилиш',
+    ai_disclaimer_badge: 'Қоралама · тиббий хулоса эмас',
+    ai_disclaimer_aria: 'AI ёрдамчи: қоралама, ташхис эмас, тиббий хулоса эмас',
+    overview: 'Кўрик',
+    queue: 'Навбат',
+    appointments: 'Ёзувлар',
+    patients: 'Беморлар',
+    ai_assistant: 'AI ёрдамчи',
+    visit: 'Қабул',
+    cashier: 'Касса',
+    templates: 'Шаблонлар',
+    photo_archive: 'Фото архив',
+    finance: 'Молия',
+    services: 'Хизматлар',
+    clinic_management: 'Клиника бошқаруви',
+    notifications: 'Билдиришномалар',
+    queue_board: 'Навбат тактаси',
+    dentistry: 'Стоматология',
+    system: 'Тизим',
+    registrar: 'Рўйхат',
+    schedule: 'Жадвал',
+    clinic_profile: 'Клиника профили',
+    users: 'Фойдаланувчилар',
+    search: 'Қидирув',
+    payment_systems: 'Тўлов тизимлари',
+    reports: 'Ҳисоботлар',
+    reports_alt: 'Ҳисоботлар',
+    settings: 'Созламалар',
+    queue_settings: 'Навбат созламалари',
+    telegram_settings: 'Telegram созламалари',
+    booking_wizard: 'Ёзилиш устаси',
+    discounts: 'Имтиёзлар ва чегирмалар',
+    lab: 'Лаборатория',
+    cardiology: 'Кардиология',
+    queue_rooms: 'Навбат хоналари',
+    integrations: 'Интеграциялар',
+    allfree_requests: 'All Free аризалари',
+    dermatology: 'Дерматология',
+    doctors: 'Шифокорлар',
+    doctor: 'Шифокор',
+    phone_verification: 'Телефон тасдиқлаш',
+    blanks: 'Бланкалар',
+    security: 'Хавфсизлик',
+    audit: 'Аудит',
+    analytics: 'Аналитика',
+    activation: 'Фаоллаштириш',
+    push_notifications: 'Push билдиришномалари',
+    ai_tools: 'AI воситалари',
+  },
   common: {
     save: 'Сохранить',
     save_draft: 'Сохранить черновик',

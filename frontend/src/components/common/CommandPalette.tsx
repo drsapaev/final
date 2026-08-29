@@ -173,17 +173,33 @@ export function CommandPalette({ profile, navigate }: { profile: CommandProfile;
       isRouteAccessibleToProfile(route, profile)
     );
 
-    const routeItems: CommandItem[] = accessibleRoutes.map(route => ({
-      id: route.id,
-      label: (typeof route.nav === 'object' && route.nav ? (route.nav as { label?: string }).label : null) || route.title || route.id,
-      description: (typeof route.nav === 'object' && route.nav ? (route.nav as { section?: string }).section : null) || route.group || '',
-      path: route.path,
-      icon: (typeof route.nav === 'object' && route.nav ? (route.nav as { icon?: string }).icon : undefined),
-      section: (typeof route.nav === 'object' && route.nav ? (route.nav as { section?: string }).section : null) || t('misc.cp_marshruty'),
-      keywords: [route.id, route.path, route.title],
-      action: 'navigate',
-      target: route.path,
-    }));
+    const routeItems: CommandItem[] = accessibleRoutes.map(route => {
+      const nav = typeof route.nav === 'object' && route.nav ? (route.nav as {
+        label?: string; labelKey?: string; section?: string; sectionKey?: string; icon?: string;
+      }) : null;
+      // PR-UI-19 (C-6, Codex round 2): resolve nav labels/sections through the
+      // palette's t() subscription so the command palette follows the active
+      // language (labelKey) instead of falling back to mixed-language route
+      // titles; raw values and route.title stay as fallbacks. The localized
+      // label is also added to keywords so searching works in every language.
+      const localizedLabel = nav?.labelKey
+        ? t(nav.labelKey, { defaultValue: nav.label || route.title || route.id })
+        : (nav?.label || route.title || route.id);
+      const localizedSection = nav?.sectionKey
+        ? t(nav.sectionKey, { defaultValue: nav.section || '' })
+        : nav?.section;
+      return {
+        id: route.id,
+        label: localizedLabel,
+        description: localizedSection || route.group || '',
+        path: route.path,
+        icon: nav?.icon,
+        section: localizedSection || t('misc.cp_marshruty'),
+        keywords: [route.id, route.path, route.title, localizedLabel],
+        action: 'navigate',
+        target: route.path,
+      };
+    });
 
     // Filter quick actions by role
     const roleNorm = (profile?.role || '').toLowerCase();
@@ -198,7 +214,7 @@ export function CommandPalette({ profile, navigate }: { profile: CommandProfile;
     });
 
     return [...actionItems, ...routeItems];
-  }, [profile]);
+  }, [profile, t]);
 
   // Filter + sort
   const results = useMemo(() => {

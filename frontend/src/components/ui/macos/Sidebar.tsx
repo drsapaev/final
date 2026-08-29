@@ -8,7 +8,13 @@ type SidebarVariant = 'default' | 'compact' | 'inset';
 
 interface SidebarItemData {
   id: string;
-  label: ReactNode;
+  /** PR-UI-19 (C-6): i18n keys (nav.*) — resolved here via useTranslation. */
+  labelKey?: string;
+  badgeKey?: string;
+  tooltipKey?: string;
+  ariaLabelKey?: string;
+  /** Fallback text (e.g. route title) when labelKey absent/missing. */
+  label?: ReactNode;
   icon?: string;
   badge?: ReactNode;
   tooltip?: string;
@@ -18,6 +24,8 @@ interface SidebarItemData {
 }
 
 interface SidebarSectionData {
+  /** PR-UI-19 (C-6): i18n key for the section heading, resolved here. */
+  titleKey?: string;
   title?: string;
   items?: SidebarItemData[];
 }
@@ -234,8 +242,31 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
           // P-010 fix: helper to render a single sidebar item button.
           const renderItem = (item: SidebarItemData) => {
             const isActive = activeItem === item.id;
-            const itemAriaLabel = (item.ariaLabel || item.tooltip || item.label) as string;
-            const itemTitle = (item.tooltip || item.title || (isCollapsed ? (item.label as string) : undefined)) as string | undefined;
+            // PR-UI-19 (C-6): resolve nav labels through i18n HERE. Sidebar is the
+            // only useTranslation() subscriber in the chrome data flow (App.tsx
+            // computes getRouteChromeState() without an i18n subscription), so
+            // translating inside routeSelectors would freeze the previous
+            // language until an unrelated rerender. Missing key in every locale
+            // falls back to the item's fallback label (or the key itself).
+            const displayLabel: ReactNode = item.labelKey
+              ? t(item.labelKey, {
+                  defaultValue: typeof item.label === 'string' ? item.label : item.labelKey,
+                })
+              : item.label;
+            // PR-UI-19 (C-6, Codex round 1): badge/tooltip/ariaLabel follow the
+            // active language too (AI safety disclaimer et al.), with the raw
+            // values kept as fallbacks so nothing breaks on a missing key.
+            const displayBadge = item.badgeKey
+              ? t(item.badgeKey, { defaultValue: typeof item.badge === 'string' ? item.badge : item.badgeKey })
+              : item.badge;
+            const displayTooltip = item.tooltipKey
+              ? t(item.tooltipKey, { defaultValue: item.tooltip })
+              : item.tooltip;
+            const displayAriaLabel = item.ariaLabelKey
+              ? t(item.ariaLabelKey, { defaultValue: item.ariaLabel })
+              : item.ariaLabel;
+            const itemAriaLabel = (displayAriaLabel || displayTooltip || displayLabel) as string;
+            const itemTitle = (displayTooltip || item.title || (isCollapsed ? (displayLabel as string) : undefined)) as string | undefined;
             const itemStyles: CSSProperties = {
               display: 'flex',
               alignItems: 'center',
@@ -294,11 +325,11 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                   textOverflow: 'ellipsis',
                   color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-primary)'
                 }}>
-                    {item.label}
+                    {displayLabel}
                   </span>
                 }
 
-                {!isCollapsed && item.badge &&
+                {!isCollapsed && displayBadge &&
                 <span style={{
                   backgroundColor: isActive ? 'var(--mac-accent-bg)' : 'var(--mac-bg-tertiary)',
                   color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
@@ -309,7 +340,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                   minWidth: '18px',
                   textAlign: 'center'
                 }}>
-                    {item.badge}
+                    {displayBadge}
                   </span>
                 }
               </button>);
@@ -331,9 +362,13 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
           // If sections provided AND sidebar is expanded (not collapsed),
           // render grouped with macOS-native visual separators between sections.
           if (Array.isArray(sections) && sections.length > 0 && !isCollapsed) {
-            return sections.map((section, sectionIdx) => (
-              <div key={`section-${sectionIdx}-${section.title || ''}`} style={{ marginBottom: '2px' }}>
-                {section.title && (
+            return sections.map((section, sectionIdx) => {
+              const sectionTitle: ReactNode = section.titleKey
+                ? t(section.titleKey, { defaultValue: section.title })
+                : section.title;
+              return (
+              <div key={`section-${sectionIdx}-${section.titleKey || section.title || ''}`} style={{ marginBottom: '2px' }}>
+                {sectionTitle && (
                   <div
                     style={{
                       ...sectionHeaderBaseStyle,
@@ -343,14 +378,13 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                     role="heading"
                     aria-level={3}
                     className="mac-sidebar-section-header">
-                    {section.title}
+                    {sectionTitle}
                   </div>
                 )}
                 {(section.items || []).map(renderItem)}
               </div>
-            ));
-          }
-
+              );
+            })}
           // Flat fallback (original behavior)
           return items.map(renderItem);
         })()}
