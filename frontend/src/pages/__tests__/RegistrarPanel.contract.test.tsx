@@ -24,6 +24,12 @@ const useRegistrarDialogsPath = path.resolve(__dirname, '../registrar/useRegistr
 const useRegistrarWizardPath = path.resolve(__dirname, '../registrar/useRegistrarWizard.ts');
 const RecordPreviewViewPath = path.resolve(__dirname, '../registrar/views/RecordPreview.tsx');
 const RescheduleSlotsViewPath = path.resolve(__dirname, '../registrar/views/RescheduleSlots.tsx');
+// PR-UI-13-5: navigation, row actions, calendar, breadcrumb + dialogs layer.
+const useRegistrarNavigationPath = path.resolve(__dirname, '../registrar/useRegistrarNavigation.ts');
+const useRegistrarRowActionsPath = path.resolve(__dirname, '../registrar/useRegistrarRowActions.ts');
+const useRegistrarCalendarPath = path.resolve(__dirname, '../registrar/useRegistrarCalendar.ts');
+const RegistrarBreadcrumbPath = path.resolve(__dirname, '../registrar/views/RegistrarBreadcrumb.tsx');
+const RegistrarDialogsLayerPath = path.resolve(__dirname, '../registrar/views/RegistrarDialogsLayer.tsx');
 // Contract tests must read all files because they verify that certain
 // functions exist in the registrar panel source tree (not necessarily
 // in the orchestrator file itself).
@@ -63,6 +69,16 @@ const readRegistrarSourceTree = () => [
   normalizeSource(fs.readFileSync(RecordPreviewViewPath, 'utf8')),
   '// ─── RescheduleSlots.jsx (PR-UI-13-3) ───',
   normalizeSource(fs.readFileSync(RescheduleSlotsViewPath, 'utf8')),
+  '// ─── useRegistrarNavigation.js (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(useRegistrarNavigationPath, 'utf8')),
+  '// ─── useRegistrarRowActions.js (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(useRegistrarRowActionsPath, 'utf8')),
+  '// ─── useRegistrarCalendar.js (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(useRegistrarCalendarPath, 'utf8')),
+  '// ─── RegistrarBreadcrumb.jsx (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(RegistrarBreadcrumbPath, 'utf8')),
+  '// ─── RegistrarDialogsLayer.jsx (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(RegistrarDialogsLayerPath, 'utf8')),
 ].join('\n\n');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
@@ -385,17 +401,32 @@ describe('RegistrarPanel command contract', () => {
     expect(worklistViewSource).toContain('<EnhancedAppointmentsTable');
     expect(worklistViewSource).toContain('AnimatedLoader.TableSkeleton');
     expect(worklistViewSource).toContain('registrar-load-more-bar');
-    // Row-action routing stays in the panel (handleTableAction) and is passed down.
-    expect(panelSource).toContain('const handleTableAction = useCallback(');
+    // Row-action routing lives in useRegistrarRowActions (PR-UI-13-5) and is
+    // passed down to WorklistView.
+    const rowActionsSource = normalizeSource(fs.readFileSync(useRegistrarRowActionsPath, 'utf8'));
+    expect(rowActionsSource).toContain('const handleTableAction = useCallback(');
     expect(panelSource).toContain('onActionClick={handleTableAction}');
-    // Plan §PR-UI-13 item 4: local ErrorBoundary around the wizard.
-    expect(panelSource).toContain('<ErrorBoundary');
-    expect(panelSource).toContain('<AppointmentWizardV2');
+    // Plan §PR-UI-13 item 4: local ErrorBoundary around the wizard (mounted
+    // inside RegistrarDialogsLayer since PR-UI-13-5).
+    const dialogsLayerSource = normalizeSource(fs.readFileSync(RegistrarDialogsLayerPath, 'utf8'));
+    expect(dialogsLayerSource).toContain('<ErrorBoundary');
+    expect(dialogsLayerSource).toContain('<AppointmentWizardV2');
     // Reference data (doctors/services/dynamicDepartments) owned by useRegistrarData.
     expect(panelSource).not.toContain('const [doctors, setDoctors]');
     expect(panelSource).not.toContain('const [services, setServices]');
     expect(panelSource).not.toContain('const [dynamicDepartments, setDynamicDepartments]');
     expect(panelSource).toContain('} = useRegistrarData();');
+  });
+
+  it('meets the plan §PR-UI-13 size acceptance criteria (≤500 LOC, ≤5 useState)', () => {
+    // Plan §PR-UI-13 acceptance criteria (final increment PR-UI-13-5):
+    // RegistrarPanel ≤ 500 LOC and useState ≤ 5 after decomposition.
+    const panelRaw = fs.readFileSync(registrarPanelPath, 'utf8');
+    const loc = panelRaw.split('\n').length;
+    expect(loc).toBeLessThanOrEqual(500);
+
+    const useStateMatches = panelRaw.match(/\buseState\s*\(/g) ?? [];
+    expect(useStateMatches.length).toBeLessThanOrEqual(5);
   });
 
   it('does not use appointment or queue ids as visit ids for reschedule commands', () => {
