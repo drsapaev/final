@@ -1,6 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import './cashier.css';
-import { useLocation } from 'react-router-dom';
 import { CreditCard, DollarSign, RefreshCw } from 'lucide-react';
 import { Card } from '../components/ui/macos';
 import { useConfirm } from '../components/common/ConfirmDialog';
@@ -11,24 +10,15 @@ import ErrorBoundary from '../components/common/ErrorBoundary';
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal';
 import { usePayments } from '../hooks/usePayments';
-import { useDebouncedValue } from '../hooks/useDebouncedCallback';
-import { getPatient as fetchPatientById } from '../api/patients';
-import type { Patient } from '../types/domain/clinic';
-import tokenManager from '../utils/tokenManager';
-import logger from '../utils/logger';
 // STRAT#31: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
-import type { Appointment } from '../types/domain/clinic';
 import {
-  getLocalDateString,
   DATE_PRESETS,
 } from './cashier/cashierPaymentContracts';
 import { useCashierWorklistData } from './cashier/useCashierWorklistData';
 import {
   groupPaymentsByPatientAndTime,
   sortCashierPayments,
-  type CashierSortField,
-  type CashierSortDir,
 } from './cashier/cashierPaymentRows';
 import { useCashierDialogs } from './cashier/useCashierDialogs';
 import { useCashierSessionWarning } from './cashier/useCashierSessionWarning';
@@ -39,6 +29,9 @@ import CashierStatsCard from './cashier/views/CashierStatsCard';
 import CashierPendingTable from './cashier/views/CashierPendingTable';
 import CashierHistoryTable from './cashier/views/CashierHistoryTable';
 import CashierDialogsLayer from './cashier/views/CashierDialogsLayer';
+import { useCashierSearch } from './cashier/useCashierSearch';
+import { useCashierFilters } from './cashier/useCashierFilters';
+import { useCashierSort } from './cashier/useCashierSort';
 
 // ✅ Компоненты для возвратов
 import RefundRequestsTable from '../components/cashier/RefundRequestsTable';
@@ -52,7 +45,6 @@ const CashierPanel = () => {
   const confirm = confirmRaw;
   // STRAT#31: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
-  const location = useLocation();
   const { getStats, getPendingPayments, getPayments, ...paymentsHook } = usePayments();
   // ✅ v2.1: isLoading теперь вычисляется из отдельных loading состояний (см. ниже)
 
@@ -61,48 +53,6 @@ const CashierPanel = () => {
     label: tI18n(`cashier.range_${p.id}`),
   }));
 
-// ✅ Получаем patientId из URL для автоматического поиска
-  const getPatientIdFromUrl = useCallback(() => {
-    const params = new URLSearchParams(location.search);
-    const patientIdParam = params.get('patientId');
-    return patientIdParam ? parseInt(patientIdParam, 10) : null;
-  }, [location.search]);
-
-  // Search state - инициализируем с patientId если есть
-  const [query, setQuery] = useState(() => {
-    const patientId = new URLSearchParams(window.location.search).get('patientId');
-    return patientId ? `patient:${patientId}` : '';
-  });
-  // UX Audit #2.4: показывать подсказку с примерами синтаксиса поиска,
-  // пока input в фокусе и запрос пустой.
-  const [searchFocused, setSearchFocused] = useState(false);
-  const debouncedQuery = useDebouncedValue(query, 500); // 500ms debounce
-
-  // ✅ Эффект для загрузки пациента из URL
-  useEffect(() => {
-    const patientIdFromUrl = getPatientIdFromUrl();
-    if (patientIdFromUrl && !query.includes(`patient:${patientIdFromUrl}`)) {
-      // Загружаем данные пациента для поиска
-      const loadPatientForSearch = async () => {
-        try {
-          // PR-53: migrated from raw fetch() to axios client
-          // Wave G5: use api/patients.ts which returns domain Patient via mapper
-          const token = tokenManager.getAccessToken();
-          if (!token) return;
-
-          const patientData: Patient = await fetchPatientById(patientIdFromUrl);
-          const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
-          setQuery(patientName);
-          logger.info('[Cashier] Patient loaded from URL', { patientId: patientData?.id });
-        } catch (error: unknown) {
-          logger.error('[Cashier] Не удалось загрузить пациента:', error);
-        }
-      };
-      loadPatientForSearch();
-    }
-  }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const [status, setStatus] = useState('all');
 
   // PR-UI-14-3: dialog state machines moved verbatim to
   // ./cashier/useCashierDialogs (12 useState -> 1 useReducer) and
@@ -120,6 +70,21 @@ const CashierPanel = () => {
     sessionWarning, sessionSecondsLeft, dismissSessionWarning,
   } = useCashierSessionWarning();
 
+  // PR-UI-14-6: search / filter / sort state slices moved verbatim to
+  // ./cashier/useCashierSearch, useCashierFilters, useCashierSort —
+  // the panel now owns a single view useState (activeTab).
+  const {
+    query, setQuery, searchFocused, setSearchFocused, debouncedQuery,
+  } = useCashierSearch();
+  const {
+    status, setStatus,
+    dateMode, setDateMode,
+    selectedDate, setSelectedDate,
+    dateFrom, setDateFrom,
+    dateTo, setDateTo,
+  } = useCashierFilters();
+  const { sortField, sortDir, toggleSort } = useCashierSort();
+
   // PR-UI-14-3: flattened dialog state bindings (verbatim names, so every
   // handler/JSX reference below keeps reading exactly like before).
   const {
@@ -129,11 +94,6 @@ const CashierPanel = () => {
     hourlyStats, showHourlyChart,
   } = dialogs;
 
-  // Состояния для календаря
-  const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
-  const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
-  const [dateFrom, setDateFrom] = useState(() => getLocalDateString());
-  const [dateTo, setDateTo] = useState(() => getLocalDateString());
 
   // PR-UI-14-1: data lifecycle (stats/pending/history fetch + pagination +
   // refresh lifecycle) moved verbatim to ./cashier/useCashierWorklistData.
@@ -155,11 +115,6 @@ const CashierPanel = () => {
 
 
 
-  // UX Audit #4.2: client-side sort state для таба «История платежей».
-  // Сортировка применяется к уже загруженным filteredPayments (после groupPaymentsByPatientAndTime).
-  // Поддерживаемые поля: 'date' | 'patient' | 'amount'.
-  const [sortField, setSortField] = useState<CashierSortField>('date');
-  const [sortDir, setSortDir] = useState<CashierSortDir>('desc'); // 'asc' | 'desc'
 
   // ✅ УЛУЧШЕНИЕ: Универсальные хуки вместо дублированных состояний
   const paymentModal = useModal();
@@ -197,16 +152,6 @@ const CashierPanel = () => {
     selectedDate,
   });
 
-  // Group payments for display (already filtered by server)
-  // UX Audit #4.2: client-side sort по sortField/sortDir.
-  const toggleSort = (field: CashierSortField) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDir('asc');
-    }
-  };
 
   // PR-UI-14-2: grouping + client-side sort moved verbatim to
   // ./cashier/cashierPaymentRows.ts (presentation-only view-model).
