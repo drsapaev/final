@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import type { CSSProperties } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
+// PR-UI-13-4: EnhancedAppointmentsTable import moved to views/WorklistView.tsx.
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
-import {
-  Button, Badge, Icon
-} from '../components/ui/macos';
-import { AnimatedLoader } from '../components/ui';
+// PR-UI-13-4: Button/Badge moved to views/WorklistView.tsx; Icon stays
+// (breadcrumb + tab separators).
+import { Icon } from '../components/ui/macos';
+// PR-UI-13-4: AnimatedLoader import moved to views/WorklistView.tsx.
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
 import '../components/ui/animations.css';
@@ -23,11 +23,13 @@ import logger from '../utils/logger';
 import notify from '../services/notify';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
+// PR-UI-13-4: local ErrorBoundary around the wizard (plan §PR-UI-13 item 4).
+import ErrorBoundary from '../components/common/ErrorBoundary';
 // Unified i18n: single useTranslation hook for all UI strings (registrarPanel.*)
 // and confirm/notify strings (registrar.*). Replaces the legacy split between
 // getRegistrarTranslator (flat keys) and adapter (namespaced keys).
 import { useTranslation } from '../i18n/useTranslation';
-import type { Appointment, Doctor } from '../types/domain/clinic';
+import type { Appointment } from '../types/domain/clinic';
 import type { QueueEntry } from '../types/domain/queue';
 // Decomp 2: hotkeys extracted to useRegistrarHotkeys hook
 import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
@@ -54,6 +56,8 @@ import { useRegistrarWizard } from './registrar/useRegistrarWizard';
 // Decomp 10 views (PR-UI-13-3): extracted dialog-composition views.
 import RecordPreview from './registrar/views/RecordPreview';
 import RescheduleSlots from './registrar/views/RescheduleSlots';
+// Decomp 11 (PR-UI-13-4): worklist section view.
+import WorklistView from './registrar/views/WorklistView';
 // Decomp 5: record action handlers extracted to useRegistrarActions hook
 import { useRegistrarActions } from './registrar/useRegistrarActions';
 // Decomp 6a: QueueView extracted to component
@@ -94,7 +98,8 @@ import PaymentManager from '../components/payment/PaymentManager';
 // import EditPatientModal from '../components/common/EditPatientModal';
 
 // Утилиты для работы с датами
-import { getLocalDateString, formatRegistrarDate } from '../utils/dateUtils';
+// PR-UI-13-4: formatRegistrarDate moved to views/WorklistView.tsx.
+import { getLocalDateString } from '../utils/dateUtils';
 // PR-UI-13-3: rescheduleTomorrow/rescheduleVisit moved to
 // registrar/views/RescheduleSlotsDialog.tsx.
 // Note: formatNetworkErrorMessage + isNetworkFetchError moved to useRegistrarData.js (Decomp 4)
@@ -223,8 +228,8 @@ const RegistrarPanel = () => {
     loadPatientFromUrl();
   }, [patientIdFromUrl, setSearchParams]);
 
-  // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: состояние для хранения отделений из БД
-  const [dynamicDepartments, setDynamicDepartments] = useState<unknown[]>([]);
+  // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: PR-UI-13-4 — reference-data state (doctors,
+  // services, dynamicDepartments) is owned by useRegistrarData below.
 
   // ⭐ SSOT: Queue profiles loaded from API (via ModernTabs)
   // Used for filtering entries by queue_tags instead of hardcoded mapping
@@ -247,7 +252,10 @@ const RegistrarPanel = () => {
   // (loadAppointments / loadIntegratedData / tI18n).
   // PR-UI-13-1: autoRefresh const + reschedule wiring moved below — the
   // reschedule hook consumes setAppointments from useRegistrarWorklistData.
-  const [doctors, setDoctors] = useState<Doctor[]>([]);const [services, setServices] = useState<Record<string, unknown>>({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
+  // PR-UI-13-4: doctors/services/dynamicDepartments moved into useRegistrarData.
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [historyDate, setHistoryDate] = useState(getLocalDateString());
+  const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   // Unified i18n hook: single source of truth for all translations.
   // - registrarPanel.* — flat UI keys (tabs, statuses, headings, buttons)
   // - registrar.*      — confirm dialog titles/messages + notify messages
@@ -280,13 +288,12 @@ const RegistrarPanel = () => {
 
   // Decomp 4: data-loading functions extracted to useRegistrarData hook.
   const {
+    doctors,
+    services,
+    dynamicDepartments,
     loadIntegratedData,
     enrichAppointmentsWithPatientData,
-  } = useRegistrarData({
-    setDoctors,
-    setServices,
-    setDynamicDepartments,
-  });
+  } = useRegistrarData();
 
   // ──────────────────────────────────────────────────────────────────────
   // PR-UI-13-3 (Decomp 10): dialog + wizard state consolidated into
@@ -539,6 +546,7 @@ const RegistrarPanel = () => {
   // extracted to ./registrar/DataSourceIndicator.jsx and ./registrar/registrarCsv.js.
 
   // Обработчик действий контекстного меню
+
   const openRecordPreview = useCallback((row: unknown) => {
     setRecordPreviewDialog({ open: true, row: row as Appointment });
   }, [setRecordPreviewDialog]);
@@ -560,6 +568,92 @@ const RegistrarPanel = () => {
     setWizardInitialData(appt as Record<string, unknown>);
     setShowWizard(true);
   }, [setWizardEditMode, setWizardInitialData, setShowWizard]);
+
+  // PR-UI-13-4: table row-action routing extracted from the EAT JSX prop into
+  // a panel-level callback (verbatim switch body) — passed to WorklistView.
+  const handleTableAction = useCallback(async (action: string, row: Record<string, unknown>, event?: unknown) => {
+    switch (action) {
+        case 'view':
+          logger.info('Просмотр записи:', row);
+          openRecordPreview(row as unknown as Appointment);
+          break;
+        case 'edit':
+          // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
+          logger.info('[RegistrarPanel] Открытие мастера редактирования для appointment:', row.id);
+          openRecordEditor(row);
+          break;
+        case 'payment':
+          logger.info('Открытие модального окна оплаты для записи:', row);
+          setPaymentDialog({ open: true, row: row as unknown as Appointment, paid: false, source: 'table' });
+          break;
+        case 'in_cabinet': {
+          // UX Audit Registrar #2: window.confirm() → useConfirm hook.
+          // Раньше: if (!window.confirm(`Отправить пациента "..." в кабинет?`)) break;
+          // Теперь: macOS-style ConfirmDialog через useConfirm.
+          const inCabinetName = row.patient_fio || row.patient_name || '';
+          const inCabinetOk = await confirm({
+            title: tI18n('registrar.send_to_cabinet_title'),
+            message: tI18n('registrar.send_to_cabinet_message', { name: inCabinetName }),
+            confirmLabel: tI18n('registrar.send_to_cabinet_confirm'),
+            cancelLabel: tI18n('registrar.cancel'),
+            intent: 'primary',
+          });
+          if (!inCabinetOk) break;
+          logger.info('Отправка пациента в кабинет:', row);
+          updateAppointmentStatus(row.id, 'in_cabinet', '', row as Record<string, unknown>);
+          break;
+        }
+        case 'call':
+          logger.info('Вызов пациента:', row);
+          handleStartVisit(row as Record<string, unknown>);
+          break;
+        case 'complete': {
+          // UX Audit Registrar #2: window.confirm() → useConfirm hook.
+          const completeName = row.patient_fio || row.patient_name || '';
+          const completeOk = await confirm({
+            title: tI18n('registrar.complete_visit_title'),
+            message: tI18n('registrar.complete_visit_message', { name: completeName }),
+            confirmLabel: tI18n('registrar.complete_visit_confirm'),
+            cancelLabel: tI18n('registrar.cancel'),
+            intent: 'primary',
+          });
+          if (!completeOk) break;
+          logger.info('Завершение приёма:', row);
+          updateAppointmentStatus(row.id, 'done', '', row as Record<string, unknown>);
+          break;
+        }
+        case 'print':
+          logger.info('Печать талона:', row);
+          setPrintDialog({ open: true, type: 'ticket', data: row as Record<string, unknown> });
+          break;
+        // UX Audit Registrar #4: cancel и reschedule теперь доступны
+        // как inline кнопки, а не только через context menu.
+        case 'reschedule':
+          // PR-UI-13-3: former setRescheduleData(row) + setShowSlotsModal(true)
+          // consolidated into one reducer action.
+          openRescheduleDialog(row as Record<string, unknown>);
+          break;
+        case 'cancel':
+          setCancelDialog({ open: true, row: row as unknown as Appointment, reason: '' });
+          break;
+        case 'more':{
+            // Показать контекстное меню с дополнительными действиями
+            const evt = event as { target?: HTMLElement; clientX?: number; clientY?: number } | undefined;
+            const rect = evt?.target?.getBoundingClientRect();
+            setContextMenu({
+              open: true,
+              row,
+              position: {
+                x: rect?.right || evt?.clientX || 0,
+                y: rect?.top || evt?.clientY || 0
+              }
+            });
+            break;
+          }
+        default:
+          break;
+    }
+  }, [openRecordPreview, openRecordEditor, confirm, updateAppointmentStatus, handleStartVisit, setPaymentDialog, setPrintDialog, setCancelDialog, setContextMenu, openRescheduleDialog]);
 
   const handleContextMenuAction = useCallback(async (action: string, row: Appointment) => {
     switch (action) {
@@ -792,231 +886,33 @@ const RegistrarPanel = () => {
         }
 
 
-        {/* Основная панель с записями */}
+        {/* Основная панель с записями — extracted to WorklistView (PR-UI-13-4) */}
         {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
-        <div
-          id="main-content"
-          role="tabpanel"
-          aria-labelledby={activeTab ? `${activeTab}-tab` : undefined}
-          className="registrar-table-container"
-          data-breakpoint={isMobile ? 'mobile' : 'desktop'}>
-            <div
-            className="registrar-table-content"
-            data-breakpoint={isMobile ? 'mobile' : 'desktop'}>
-
-              <div
-                className="registrar-workflow-header"
-                aria-label={tI18n('registrarPanel.rp_aria_worklist_summary')}>
-                <div className="registrar-worklist-container">
-                  <div className="registrar-worklist-meta">
-                    {tI18n('registrarPanel.rp_worklist_root')}
-                  </div>
-                  <h2 className="registrar-workflow-title">
-                    {tI18n('registrarPanel.rp_worklist_title', { label: currentWorklistLabel })}
-                  </h2>
-                  <p className="registrar-workflow-meta">
-                    {showCalendar ?
-                    // PR-13: use formatRegistrarDate to avoid browser-local timezone issues
-                    // historyDate is YYYY-MM-DD (Tashkent), parse as Tashkent midnight
-                    formatRegistrarDate(`${historyDate}T00:00:00+05:00`, language?.startsWith('ru') ? 'ru-RU' : 'uz-UZ') :
-                    tI18n('registrarPanel.today')} · {filteredAppointments.length} {tI18n('registrarPanel.tabs_appointments')}
-                  </p>
-                </div>
-
-                <div className="registrar-workflow-actions">
-                  {statusFilterLabel &&
-                  <Badge variant="warning" className="registrar-inline-flex-tight">
-                      <Icon name="magnifyingglass" size="small" />
-                      {tI18n('registrarPanel.rp_worklist_filter', { label: statusFilterLabel })}
-                    </Badge>
-                  }
-                  <Badge variant={appointmentsLoading ? 'info' : 'secondary'}>
-                    {appointmentsLoading ? tI18n('registrarPanel.loading') : `${filteredAppointments.length} ${tI18n('registrarPanel.tabs_appointments')}`}
-                  </Badge>
-                  <Button
-                  variant="primary"
-                  size="default"
-                  onClick={() => {
-                    setWizardEditMode(false);
-                    setWizardInitialData(null);
-                    setShowWizard(true);
-                  }}
-                  aria-label={tI18n('registrarPanel.rp_aria_new_appointment')}
-                  className="registrar-inline-flex registrar-inline-flex-shrink">
-                    <Icon name="plus" size="small" style={{ color: 'white' }} />
-                    {tI18n('registrarPanel.new_appointment')}
-                  </Button>
-                </div>
-              </div>
-
-              {/* QW-01 fix: bulk-action bar removed (was dead UI) */}
-
-              {/* Таблица записей */}
-              {appointmentsLoading ?
-            <AnimatedLoader.TableSkeleton rows={8} columns={10} /> :
-            filteredAppointments.length === 0 && dataSource === 'api' ?
-            <div className="registrar-empty-state">
-                  <div className="registrar-empty-icon-lg">
-                    {/* QW-04: empty state 2 of 3 (worklist empty). */}
-                    <Icon name="doc.text" size="large" />
-                  </div>
-                  <h3 className="registrar-empty-heading registrar-empty-heading-text">
-                    {tI18n('registrarPanel.rp_empty_queue_title')}
-                  </h3>
-                  <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
-                    {activeTab ?
-                tI18n('registrarPanel.rp_empty_queue_dept', { dept: activeTab === 'cardio' ? tI18n('registrarPanel.rp_dept_cardio') : activeTab === 'derma' ? tI18n('registrarPanel.rp_dept_derma') : activeTab === 'dental' ? tI18n('registrarPanel.rp_dept_dental') : activeTab === 'lab' ? tI18n('registrarPanel.rp_dept_lab') : activeTab }) :
-                tI18n('registrarPanel.rp_empty_queue_general')}
-                  </p>
-                  <Button
-                variant="primary"
-                onClick={() => setShowWizard(true)}
-                className="registrar-btn-cta">
-
-                    <Icon name="plus" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />{tI18n('registrarPanel.rp_empty_queue_cta')}
-                  </Button>
-                </div> :
-            filteredAppointments.length === 0 ?
-            <div className="registrar-empty-state">
-                  {/* UX Audit R-4.2: unified empty state pattern — иконка + заголовок + описание + кнопка. */}
-                  <div className="registrar-empty-icon-lg">
-                    <Icon name="magnifyingglass" size="large" />
-                  </div>
-                  <h3 className="registrar-empty-heading registrar-empty-heading-text">
-                    {tI18n('registrarPanel.empty_table')}
-                  </h3>
-                  <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
-                    {tI18n('registrarPanel.rp_empty_filter_desc')}
-                  </p>
-                </div> :
-
-            <EnhancedAppointmentsTable
-              data={filteredAppointments as unknown as NonNullable<Parameters<typeof EnhancedAppointmentsTable>[0]['data']>}
-              loading={appointmentsLoading}
-              theme={theme}
-              language={legacyLanguage}
-              outerBorder={false}
-              services={services}
-              showCheckboxes={false} // UX Audit R-4.7: bulk-action UI удалён (QW-01 fix),
-                                    // поэтому чекбоксы отключены — они были dead UI
-                                    // (видны, но ничего не делают). Nielsen #2 + #4.
-              onRowClick={(row: unknown) => {
-                logger.info('Открыть детали записи:', row);
-                // Здесь можно открыть модальное окно с деталями записи
-              }}
-              onActionClick={async (action, row, event) => {
-                switch (action) {
-                  case 'view':
-                    logger.info('Просмотр записи:', row);
-                    openRecordPreview(row as unknown as Appointment);
-                    break;
-                  case 'edit':
-                    // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
-                    logger.info('[RegistrarPanel] Открытие мастера редактирования для appointment:', row.id);
-                    openRecordEditor(row);
-                    break;
-                  case 'payment':
-                    logger.info('Открытие модального окна оплаты для записи:', row);
-                    setPaymentDialog({ open: true, row: row as unknown as Appointment, paid: false, source: 'table' });
-                    break;
-                  case 'in_cabinet': {
-                    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
-                    // Раньше: if (!window.confirm(`Отправить пациента "..." в кабинет?`)) break;
-                    // Теперь: macOS-style ConfirmDialog через useConfirm.
-                    const inCabinetName = row.patient_fio || row.patient_name || '';
-                    const inCabinetOk = await confirm({
-                      title: tI18n('registrar.send_to_cabinet_title'),
-                      message: tI18n('registrar.send_to_cabinet_message', { name: inCabinetName }),
-                      confirmLabel: tI18n('registrar.send_to_cabinet_confirm'),
-                      cancelLabel: tI18n('registrar.cancel'),
-                      intent: 'primary',
-                    });
-                    if (!inCabinetOk) break;
-                    logger.info('Отправка пациента в кабинет:', row);
-                    updateAppointmentStatus(row.id, 'in_cabinet', '', row as Record<string, unknown>);
-                    break;
-                  }
-                  case 'call':
-                    logger.info('Вызов пациента:', row);
-                    handleStartVisit(row as Record<string, unknown>);
-                    break;
-                  case 'complete': {
-                    // UX Audit Registrar #2: window.confirm() → useConfirm hook.
-                    const completeName = row.patient_fio || row.patient_name || '';
-                    const completeOk = await confirm({
-                      title: tI18n('registrar.complete_visit_title'),
-                      message: tI18n('registrar.complete_visit_message', { name: completeName }),
-                      confirmLabel: tI18n('registrar.complete_visit_confirm'),
-                      cancelLabel: tI18n('registrar.cancel'),
-                      intent: 'primary',
-                    });
-                    if (!completeOk) break;
-                    logger.info('Завершение приёма:', row);
-                    updateAppointmentStatus(row.id, 'done', '', row as Record<string, unknown>);
-                    break;
-                  }
-                  case 'print':
-                    logger.info('Печать талона:', row);
-                    setPrintDialog({ open: true, type: 'ticket', data: row as Record<string, unknown> });
-                    break;
-                  // UX Audit Registrar #4: cancel и reschedule теперь доступны
-                  // как inline кнопки, а не только через context menu.
-                  case 'reschedule':
-                    // PR-UI-13-3: former setRescheduleData(row) + setShowSlotsModal(true)
-                    // consolidated into one reducer action.
-                    openRescheduleDialog(row as Record<string, unknown>);
-                    break;
-                  case 'cancel':
-                    setCancelDialog({ open: true, row: row as unknown as Appointment, reason: '' });
-                    break;
-                  case 'more':{
-                      // Показать контекстное меню с дополнительными действиями
-                      const evt = event as { target?: HTMLElement; clientX?: number; clientY?: number } | undefined;
-                      const rect = evt?.target?.getBoundingClientRect();
-                      setContextMenu({
-                        open: true,
-                        row,
-                        position: {
-                          x: rect?.right || evt?.clientX || 0,
-                          y: rect?.top || evt?.clientY || 0
-                        }
-                      });
-                      break;
-                    }
-                  default:
-                    break;
-                }
-              }} />
-
-            }
-
-              {/* Кнопка загрузки дополнительных записей */}
-              {paginationInfo.hasMore &&
-            <div className="registrar-load-more-bar">
-                  <button
-                onClick={loadMoreAppointments}
-                disabled={paginationInfo.loadingMore}
-                aria-label={paginationInfo.loadingMore ? 'Loading more appointments' : 'Load more appointments'}
-                className={`registrar-btn-base ${paginationInfo.loadingMore ? 'registrar-btn-neutral' : 'registrar-btn-accent'} registrar-load-more-btn`} style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
-                aria-disabled={paginationInfo.loadingMore}>
-
-                    {paginationInfo.loadingMore ?
-                <>
-                        <div className="registrar-spinner" />
-                        {tI18n('registrarPanel.rp_loading_more')}
-                      </> :
-
-                <>
-                        <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />{tI18n('registrarPanel.rp_load_more')}
-                      </>
-                }
-                  </button>
-                </div>
-            }
-
-              {/* Старая таблица и прежняя конфигурация удалены - используется EnhancedAppointmentsTable */}
-            </div>
-          </div>
+          <WorklistView
+            activeTab={activeTab}
+            currentWorklistLabel={currentWorklistLabel}
+            statusFilterLabel={statusFilterLabel}
+            showCalendar={showCalendar}
+            historyDate={historyDate}
+            language={language}
+            legacyLanguage={legacyLanguage}
+            isMobile={isMobile}
+            theme={theme}
+            services={services}
+            filteredAppointments={filteredAppointments}
+            appointmentsLoading={appointmentsLoading}
+            dataSource={dataSource}
+            paginationInfo={paginationInfo}
+            onActionClick={handleTableAction}
+            loadMoreAppointments={loadMoreAppointments}
+            onNewAppointment={() => {
+              setWizardEditMode(false);
+              setWizardInitialData(null);
+              setShowWizard(true);
+            }}
+            onEmptyStateCta={() => setShowWizard(true)}
+            tI18n={tI18n}
+          />
         }
       </div> {/* Закрытие скроллируемого контента */}
 
@@ -1141,7 +1037,30 @@ const RegistrarPanel = () => {
 
 
       {/* ✅ Используется только новый мастер (V2) */}
-      <AppointmentWizardV2
+      {/* ✅ PR-UI-13 (plan item 4): локальный ErrorBoundary вокруг wizard —
+          сбой в мастере записи не должен ронять весь рабочий стол регистратора;
+          fallback UI отрендерится внутри контейнера панели. */}
+      <ErrorBoundary
+        onError={(error, errorInfo) => {
+          logger.error('[RegistrarPanel] AppointmentWizardV2 crashed:', error, errorInfo);
+          // Codex P2-1 (PR-UI-13-4): reset the wizard-open state from the crash
+          // path — otherwise showWizard stays true while the boundary holds
+          // hasError, the auto-refresh effect keeps treating the wizard as an
+          // open dialog, and the wizard cannot be reopened normally.
+          setWizardEditMode(false);
+          setWizardInitialData(null);
+          setShowWizard(false);
+        }}
+        theme={{
+          // Codex P2-2 (PR-UI-13-4): ErrorBoundary's fallback styles read the
+          // theme helper functions — passing only the mode string left the
+          // recovery screen with unstyled raw fallback values.
+          theme,
+          getColor,
+          getSpacing,
+          getFontSize,
+        }}>
+        <AppointmentWizardV2
         isOpen={showWizard}
         editMode={wizardEditMode} // ✨ НОВОЕ: Передаем режим
         initialData={wizardInitialData as unknown as null} // ✨ НОВОЕ: Передаем данные
@@ -1158,6 +1077,7 @@ const RegistrarPanel = () => {
         // (handleWizardComplete — verbatim port: optimistic close + notify +
         // payment/print handoff, then background reload with one silent retry).
         onComplete={handleWizardComplete} />
+      </ErrorBoundary>
 
 
       {/* Старые диалоги удалены - используются современные компоненты CancelDialog, PaymentDialog, PrintDialog */}
