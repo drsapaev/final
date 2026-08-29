@@ -16,7 +16,11 @@ export const PROTECTED_PATIENT_FORMS_ENTRY_ROUTE_ID = 'patient-forms-entry';
 // Route registry is defined in routeRegistry.ts which is currently implicit-any.
 // We model the canonical surface we read here and access fields defensively.
 interface RouteNavMeta {
+  // PR-UI-19 (C-6): nav labels are i18n keys now (nav.* in all 5 locales).
+  // `label` is kept optional for the legacy Nav.tsx consumer (PR-UI-17 owns its
+  // deletion); no registry entry emits it anymore.
   label?: string;
+  labelKey?: string;
   icon?: string;
   badge?: string;
   tooltip?: string;
@@ -74,7 +78,10 @@ export interface RouteProfile {
 interface SidebarItem {
   id: string;
   to: string;
-  label: string;
+  /** PR-UI-19 (C-6): i18n key (nav.*); resolved by Sidebar via useTranslation. */
+  labelKey?: string;
+  /** Fallback text (route title) when labelKey is absent or missing everywhere. */
+  label?: string;
   icon: string;
   badge?: string;
   tooltip?: string;
@@ -367,6 +374,7 @@ export function getAdminNavSections(
     const item: SidebarItem = {
       id: route.id,
       to: route.path,
+      labelKey: routeNav?.labelKey,
       label: routeNav?.label || route.title,
       icon: routeNav?.icon || 'circle',
       badge: routeNav?.badge,
@@ -444,6 +452,7 @@ export function getRouteChromeState(
       const navMeta = typeof navRoute.nav === 'object' ? navRoute.nav : null;
       return {
         id: navRoute.id,
+        labelKey: navMeta?.labelKey,
         label: navMeta?.label || navRoute.title,
         icon: navMeta?.icon || 'circle',
         badge: navMeta?.badge,
@@ -458,6 +467,7 @@ export function getRouteChromeState(
       const navMeta = typeof navRoute.nav === 'object' ? navRoute.nav : null;
       return {
         id: navRoute.id,
+        labelKey: navMeta?.labelKey,
         label: navMeta?.label || navRoute.title,
         icon: navMeta?.icon || 'circle',
         badge: navMeta?.badge,

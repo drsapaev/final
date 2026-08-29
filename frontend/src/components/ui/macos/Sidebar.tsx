@@ -8,7 +8,10 @@ type SidebarVariant = 'default' | 'compact' | 'inset';
 
 interface SidebarItemData {
   id: string;
-  label: ReactNode;
+  /** PR-UI-19 (C-6): i18n key (nav.*) — resolved here via useTranslation. */
+  labelKey?: string;
+  /** Fallback text (e.g. route title) when labelKey absent/missing. */
+  label?: ReactNode;
   icon?: string;
   badge?: ReactNode;
   tooltip?: string;
@@ -234,8 +237,19 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
           // P-010 fix: helper to render a single sidebar item button.
           const renderItem = (item: SidebarItemData) => {
             const isActive = activeItem === item.id;
-            const itemAriaLabel = (item.ariaLabel || item.tooltip || item.label) as string;
-            const itemTitle = (item.tooltip || item.title || (isCollapsed ? (item.label as string) : undefined)) as string | undefined;
+            // PR-UI-19 (C-6): resolve nav labels through i18n HERE. Sidebar is the
+            // only useTranslation() subscriber in the chrome data flow (App.tsx
+            // computes getRouteChromeState() without an i18n subscription), so
+            // translating inside routeSelectors would freeze the previous
+            // language until an unrelated rerender. Missing key in every locale
+            // falls back to the item's fallback label (or the key itself).
+            const displayLabel: ReactNode = item.labelKey
+              ? t(item.labelKey, {
+                  defaultValue: typeof item.label === 'string' ? item.label : item.labelKey,
+                })
+              : item.label;
+            const itemAriaLabel = (item.ariaLabel || item.tooltip || displayLabel) as string;
+            const itemTitle = (item.tooltip || item.title || (isCollapsed ? (displayLabel as string) : undefined)) as string | undefined;
             const itemStyles: CSSProperties = {
               display: 'flex',
               alignItems: 'center',
@@ -294,7 +308,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                   textOverflow: 'ellipsis',
                   color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-primary)'
                 }}>
-                    {item.label}
+                    {displayLabel}
                   </span>
                 }
 
