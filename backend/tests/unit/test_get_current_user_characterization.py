@@ -21,7 +21,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-from jose import jwt as jose_jwt
+import jwt as jose_jwt
 
 from app.core.config import get_settings
 from app.models.authentication import TokenBlacklist
