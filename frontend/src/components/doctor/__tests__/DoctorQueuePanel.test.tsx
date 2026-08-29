@@ -62,7 +62,7 @@ const {
 });
 
 vi.mock('../../ui/macos', () => ({
-  MacOSCard: DoctorQueuePanelTestMacOSCard,
+  Card: DoctorQueuePanelTestMacOSCard,
   Button: DoctorQueuePanelTestMacOSButton,
   Badge: DoctorQueuePanelTestMacOSBadge,
   Skeleton: DoctorQueuePanelTestMacOSLoadingSkeleton,
