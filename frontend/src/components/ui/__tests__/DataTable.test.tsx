@@ -992,6 +992,46 @@ describe('DataTable — PR-UI-12 features (DT-17..27)', () => {
     expect(screen.getByRole('group', { name: /Плотность|density/i })).toBeInTheDocument();
   });
 
+  it('DT-39: focus is restored to the clamped row when the focused row unmounts (Codex P2 round 5)', async () => {
+    const { rerender } = render(<DataTable columns={columns} data={rows} keyboardNavigation />);
+
+    // Focus the LAST row, then the dataset shrinks — the focused row unmounts
+    // and the browser drops focus to <body>.
+    const last = getRowByName('Carol');
+    fireEvent.keyDown(getRowByName('Alice'), { key: 'End' });
+    await waitFor(() => expect(last).toHaveFocus());
+
+    rerender(<DataTable columns={columns} data={[rows[0]]} keyboardNavigation />);
+    // Focus is restored to the clamped tab stop (row 0).
+    await waitFor(() => expect(getRowByName('Alice')).toHaveFocus());
+  });
+
+  it('DT-40: hiding a column clears its active filter via onFilter (Codex P2 round 5)', () => {
+    const onFilter = vi.fn();
+    const onColumnVisibilityChange = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        filterable
+        filterConfig={{ name: 'Bo' }}
+        onFilter={onFilter}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={onColumnVisibilityChange}
+      />
+    );
+
+    // Hide the 'name' column which carries a nonempty filter value.
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+    fireEvent.click(screen.getByLabelText('Name'));
+
+    // The invisible filter is cleared through the existing onFilter contract,
+    // and the visibility change is still propagated.
+    expect(onFilter).toHaveBeenCalledWith('name', '');
+    expect(onColumnVisibilityChange).toHaveBeenCalledWith({ name: false });
+  });
+
 });
 
 describe('DataTable — PR-UI-12 toolbar i18n contract (DT-28)', () => {

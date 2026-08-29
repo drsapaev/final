@@ -413,15 +413,38 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // tab stop back to the old index (and a focused clamped row could suddenly
   // carry tabIndex=-1). Sync the source of truth whenever the row count
   // changes; the derived clamp above stays as belt-and-suspenders.
-  useEffect(() => {
-    setActiveRowIndex((prev) => Math.min(prev, Math.max(0, data.length - 1)));
-  }, [data.length]);
+  //
+  // Codex P2 #6 (PR 2885 round 5): when the FOCUSED row unmounts (filter /
+  // pagination / refresh), the browser silently drops focus to <body> (no
+  // blur fires on node removal). `tableHadFocusRef` — maintained by the
+  // capture handlers on the scroll wrapper — distinguishes "focus lost to
+  // unmount" (restore to the clamped tab stop) from "user moved focus
+  // elsewhere" (do not steal it back).
+  // Mirror the RAW index (pre-clamp) so the effect below can detect the
+  // raw-vs-clamped difference and persist the clamp into state.
+  const activeRowIndexRef = useRef(0);
+  activeRowIndexRef.current = activeRowIndex;
+  const tableHadFocusRef = useRef(false);
   const focusDataRow = useCallback((index: number) => {
     const row = tableRef.current?.querySelector<HTMLTableRowElement>(
       `tr[data-row-index="${index}"]`
     );
     row?.focus();
   }, []);
+  useEffect(() => {
+    const maxIndex = Math.max(0, data.length - 1);
+    const prev = activeRowIndexRef.current;
+    const clamped = Math.min(prev, maxIndex);
+    if (clamped === prev) return;
+    setActiveRowIndex(clamped);
+    const active = document.activeElement;
+    const focusLostToUnmount =
+      !active || active === document.body || !(active instanceof HTMLElement);
+    if (rovingFocusEnabled && tableHadFocusRef.current && focusLostToUnmount) {
+      tableHadFocusRef.current = false;
+      requestAnimationFrame(() => focusDataRow(clamped));
+    }
+  }, [data.length, rovingFocusEnabled, focusDataRow]);
 
   // === Row virtualization (PR-UI-09e-1) ===
   // Activates ONLY on the main data path when BOTH `virtualized` and a numeric
@@ -845,12 +868,26 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   // otherwise every return path below renders the exact pre-PR-UI-12 DOM
   // (single `.mac-table-scroll-wrapper` root, no wrapper element).
   const toolbarEnabled = Boolean(showColumnToggle || showDensityToggle);
+  // Codex P2 #7 (PR 2885 round 5): hiding a column removes its filter input —
+  // a nonempty `filterConfig` entry would keep constraining rows invisibly.
+  // Clear the filter for every column transitioning visible → hidden via the
+  // existing `onFilter` contract.
+  const handleColumnVisibilityChange = (next: Record<string, boolean>): void => {
+    if (onFilter && filterConfig) {
+      for (const [key, visible] of Object.entries(next)) {
+        if (!visible && columnVisibility?.[key] !== false && filterConfig[key]) {
+          onFilter(key, '');
+        }
+      }
+    }
+    onColumnVisibilityChange?.(next);
+  };
   // Main-path toolbar (all non-children branches).
   const toolbarNode = toolbarEnabled ? (
     <TableToolbar
       columns={columns}
       columnVisibility={effectiveColumnVisibility}
-      onColumnVisibilityChange={onColumnVisibilityChange}
+      onColumnVisibilityChange={handleColumnVisibilityChange}
       showColumnToggle={showColumnToggle}
       density={density}
       onDensityChange={onDensityChange}
@@ -984,6 +1021,15 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
       ref={scrollWrapperRef}
       style={scrollViewportStyle}
       aria-busy={loading}
+      onFocusCapture={() => {
+        tableHadFocusRef.current = true;
+      }}
+      onBlurCapture={(e) => {
+        // Focus left the wrapper entirely (moved to a node outside the table).
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          tableHadFocusRef.current = false;
+        }
+      }}
     >
       <table
         ref={tableRef}
