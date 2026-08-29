@@ -23,7 +23,7 @@
 | `R2_ACCESS_KEY_ID` | ✅* | 🟡 | Cloudflare R2 → API tokens | Same |
 | `R2_SECRET_ACCESS_KEY` | ✅* | 🔴 | Cloudflare R2 → API tokens | Same |
 | `R2_BUCKET` | ✅* | — | Chosen bucket name | Same |
-| `SENTRY_DSN` | ✅ | 🟡 | Sentry project settings | No error tracking |
+| `SENTRY_DSN` | ✅ | — (public/send-only) | Sentry project settings | No error tracking |
 | `ENV` | ✅ | — | `production` | Controls fail-fast on bad SECRET_KEY |
 | `CORS_ORIGINS` | ✅ | — | Frontend URL(s) | CORS errors from frontend |
 | `FRONTEND_URL` | ✅ | — | Frontend URL | Password-reset links wrong |
