@@ -2,7 +2,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from "react";
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
@@ -519,7 +519,7 @@ const DynamicPricingManager = () => {
 
 
       pricingRules.map((rule) =>
-      <MacOSCard key={rule.id} className="p-0">
+      <Card key={rule.id} className="p-0">
               <div className="admin-card-header-flex-start">
                 <div className="admin-flex-1">
                   <div className="admin-card-title-badges">
@@ -595,14 +595,14 @@ const DynamicPricingManager = () => {
                   </Button>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       )
       }
       </div>
 
       {/* Форма создания правила */}
       {showCreateRule &&
-    <MacOSCard className="p-6">
+    <Card className="p-6">
           <div className="admin-card-header-between">
             <h4 className="admin-section-h3-m0">
               {t('admin2.dp_create_rule_form_title')}
@@ -741,7 +741,7 @@ const DynamicPricingManager = () => {
               {t('admin2.dp_create_btn')}
             </Button>
           </div>
-        </MacOSCard>
+        </Card>
     }
     </div>;
 
@@ -782,7 +782,7 @@ const DynamicPricingManager = () => {
 
 
       servicePackages.map((pkg) =>
-      <MacOSCard key={pkg.id} className="p-0">
+      <Card key={pkg.id} className="p-0">
               <div className="admin-card-header-flex-start">
                 <div className="admin-flex-1">
                   <div className="admin-card-title-badges">
@@ -851,14 +851,14 @@ const DynamicPricingManager = () => {
                   </Button>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       )
       }
       </div>
 
       {/* Форма создания пакета */}
       {showCreatePackage &&
-    <MacOSCard className="p-6">
+    <Card className="p-6">
           <div className="admin-card-header-between">
             <h4 className="admin-section-h3-m0">
               {t('admin2.dp_create_package_form_title')}
@@ -951,7 +951,7 @@ const DynamicPricingManager = () => {
               {t('admin2.dp_create_btn')}
             </Button>
           </div>
-        </MacOSCard>
+        </Card>
     }
     </div>;
 
@@ -969,7 +969,7 @@ const DynamicPricingManager = () => {
 
       {analytics ?
     <div className="admin-grid-auto-300">
-          <MacOSCard className="p-0">
+          <Card className="p-0">
             <div className="admin-card-title-badges">
               <TrendingUp size={20} color="var(--mac-accent)" />
               <h4 className="admin-rule-header">
@@ -985,9 +985,9 @@ const DynamicPricingManager = () => {
                 end: (() => { const ed = (analytics.period as { end_date?: string })?.end_date; return ed ? new Date(ed).toLocaleDateString() : ''; })()
               })}
             </p>
-          </MacOSCard>
+          </Card>
 
-          <MacOSCard className="p-0">
+          <Card className="p-0">
             <div className="admin-card-title-badges">
               <Settings size={20} color="var(--mac-purple)" />
               <h4 className="admin-rule-header">
@@ -1000,9 +1000,9 @@ const DynamicPricingManager = () => {
             <p className="admin-stats-label">
               {t('admin2.dp_analytics_active_rules_sub')}
             </p>
-          </MacOSCard>
+          </Card>
 
-          <MacOSCard className="p-0">
+          <Card className="p-0">
             <div className="admin-card-title-badges">
               <Package size={20} color="var(--mac-orange)" />
               <h4 className="admin-rule-header">
@@ -1015,7 +1015,7 @@ const DynamicPricingManager = () => {
             <p className="admin-stats-label">
               {t('admin2.dp_analytics_active_packages_sub')}
             </p>
-          </MacOSCard>
+          </Card>
         </div> :
 
     <AppEmpty
@@ -1025,7 +1025,7 @@ const DynamicPricingManager = () => {
     }
 
       {analytics?.rules_statistics ?
-    <MacOSCard className="p-4">
+    <Card className="p-4">
           <h4 className="admin-rule-header mb-4">
             {t('admin2.dp_analytics_rules_stats')}
           </h4>
@@ -1046,11 +1046,11 @@ const DynamicPricingManager = () => {
               </div>
         )}
           </div>
-        </MacOSCard> : null
+        </Card> : null
     }
 
       {analytics?.packages_statistics ?
-    <MacOSCard className="p-4">
+    <Card className="p-4">
           <h4 className="admin-rule-header mb-4">
             {t('admin2.dp_analytics_packages_stats')}
           </h4>
@@ -1071,7 +1071,7 @@ const DynamicPricingManager = () => {
               </div>
         )}
           </div>
-        </MacOSCard> : null
+        </Card> : null
     }
     </div>;
 
