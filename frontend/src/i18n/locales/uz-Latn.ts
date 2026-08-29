@@ -61,6 +61,16 @@ const uzLatn = {
     push_notifications: 'Push bildirishnomalari',
     ai_tools: 'AI vositalari',
   },
+  // PR-UI-12: canonical DataTable toolbar (TableToolbar.tsx — column
+  // visibility menu + density segmented control).
+  table: {
+    columns: 'Ustunlar',
+    columns_menu: 'Ustunlarni koʻrsatish',
+    density: 'Qatorlar zichligi',
+    density_compact: 'Ixcham',
+    density_comfortable: 'Standart',
+    density_spacious: 'Keng',
+  },
   common: {
     save: 'Saqlash',
     save_draft: 'Qoralamani saqlash',

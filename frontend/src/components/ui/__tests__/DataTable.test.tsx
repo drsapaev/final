@@ -1,6 +1,6 @@
 import React from 'react';
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import DataTable from '../DataTable';
@@ -455,6 +455,758 @@ describe('DataTable — row virtualization (DT-13..16, PR-UI-09e-1)', () => {
     // Every rendered row carries the measurement hook.
     for (const tr of dataRows) {
       expect(tr.getAttribute('data-index')).not.toBeNull();
+    }
+  });
+});
+
+describe('DataTable — PR-UI-12 features (DT-17..27)', () => {
+  type Row = { id: string | number; name: string; age: number; city: string };
+  const columns: DataTableColumn<Row>[] = [
+    { key: 'name', title: 'Name', sortable: true },
+    { key: 'age', title: 'Age', sortable: false },
+    { key: 'city', title: 'City', sortable: false }
+  ];
+  const rows: Row[] = [
+    { id: 'r1', name: 'Alice', age: 30, city: 'Almaty' },
+    { id: 'r2', name: 'Bob', age: 25, city: 'Berlin' },
+    { id: 'r3', name: 'Carol', age: 35, city: 'Cairo' }
+  ];
+
+  const getRowByName = (name: string): HTMLTableRowElement =>
+    screen.getByText(name).closest('tr') as HTMLTableRowElement;
+
+  // --- DT-17..20: roving keyboard row navigation ---
+
+  it('DT-17: keyboardNavigation=true gives rows a roving tabindex (active row 0, others -1)', () => {
+    render(<DataTable columns={columns} data={rows} keyboardNavigation />);
+
+    const first = getRowByName('Alice');
+    const second = getRowByName('Bob');
+    const third = getRowByName('Carol');
+    expect(first).toHaveAttribute('tabIndex', '0');
+    expect(second).toHaveAttribute('tabIndex', '-1');
+    expect(third).toHaveAttribute('tabIndex', '-1');
+    // Focus targeting attribute present only under keyboardNavigation.
+    expect(first).toHaveAttribute('data-row-index', '0');
+  });
+
+  it('DT-17b: without keyboardNavigation rows keep the legacy tabIndex contract (zero-delta)', () => {
+    const onRowClick = vi.fn();
+    render(<DataTable columns={columns} data={rows} onRowClick={onRowClick} />);
+
+    // Interactive rows (onRowClick) all carry tabIndex 0 — byte-identical to
+    // the pre-PR-UI-12 behavior; no roving, no data-row-index.
+    expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Bob')).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Alice')).not.toHaveAttribute('data-row-index');
+  });
+
+  it('DT-17c: keyboardNavigation without onRowClick still makes rows focusable', () => {
+    render(<DataTable columns={columns} data={rows} keyboardNavigation />);
+    // Roving focus works with no row action wired (QueueTable pattern).
+    expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Bob')).toHaveAttribute('tabIndex', '-1');
+  });
+
+  it('DT-18: ArrowDown moves roving focus to the next row', async () => {
+    render(<DataTable columns={columns} data={rows} keyboardNavigation />);
+
+    const first = getRowByName('Alice');
+    const second = getRowByName('Bob');
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowDown' });
+
+    // Roving tabindex moved.
+    expect(first).toHaveAttribute('tabIndex', '-1');
+    expect(second).toHaveAttribute('tabIndex', '0');
+    // DOM focus followed (after the rAF hop — awaited via waitFor).
+    await waitFor(() => expect(second).toHaveFocus());
+  });
+
+  it('DT-19: ArrowUp clamps at the first row; Home/End jump to bounds', async () => {
+    render(<DataTable columns={columns} data={rows} keyboardNavigation />);
+
+    const first = getRowByName('Alice');
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowUp' });
+    expect(first).toHaveAttribute('tabIndex', '0');
+    expect(first).toHaveFocus();
+
+    fireEvent.keyDown(first, { key: 'End' });
+    const last = getRowByName('Carol');
+    expect(last).toHaveAttribute('tabIndex', '0');
+    await waitFor(() => expect(last).toHaveFocus());
+
+    fireEvent.keyDown(last, { key: 'Home' });
+    expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '0');
+    await waitFor(() => expect(getRowByName('Alice')).toHaveFocus());
+  });
+
+  it('DT-20: Enter still activates onRowClick under keyboardNavigation', () => {
+    const onRowClick = vi.fn();
+    render(
+      <DataTable columns={columns} data={rows} keyboardNavigation onRowClick={onRowClick} />
+    );
+
+    fireEvent.keyDown(getRowByName('Bob'), { key: 'Enter' });
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+    expect(onRowClick).toHaveBeenCalledWith(rows[1], 1);
+  });
+
+  it('DT-20b: arrow keys do nothing without keyboardNavigation (zero-delta keyboard behavior)', () => {
+    const onRowClick = vi.fn();
+    render(<DataTable columns={columns} data={rows} onRowClick={onRowClick} />);
+
+    fireEvent.keyDown(getRowByName('Alice'), { key: 'ArrowDown' });
+    // No roving movement: every row keeps tabIndex 0, focus did not move.
+    expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Bob')).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Alice')).not.toHaveFocus();
+  });
+
+  // --- DT-21: sticky filter row ---
+
+  it('DT-21: stickyHeader + filterable — filter row cells stick below the header row', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        stickyHeader
+        filterable
+        onFilter={vi.fn()}
+      />
+    );
+
+    const headerCells = screen.getAllByText('Name').map((el) => el.closest('th') as HTMLElement);
+    const headerTh = headerCells[0] as HTMLElement;
+    // The header cell itself is sticky at top 0.
+    expect(headerTh.style.position).toBe('sticky');
+    expect(headerTh.style.top).toBe('0px');
+
+    // The filter input lives in the SECOND row of thead; its th is sticky too,
+    // but with a MEASURED offset (jsdom reports offsetHeight 0 → '0px'; the
+    // point under test is that the filter row carries its own sticky style
+    // derived from filterStyleFinal, not the header row's top: 0 constant).
+    const filterInput = screen.getByLabelText('Фильтр по колонке Name');
+    const filterTh = filterInput.closest('th') as HTMLElement;
+    expect(filterTh.style.position).toBe('sticky');
+    expect(filterTh.style.top).toBe('0px'); // measured height in jsdom = 0
+    // Both rows are in thead, filter strictly after the header row.
+    const thead = filterTh.closest('thead') as HTMLElement;
+    const headerRows = thead.querySelectorAll('tr');
+    expect(headerRows.length).toBe(2);
+  });
+
+  it('DT-21b: filterable without stickyHeader keeps the non-sticky filter row (zero-delta)', () => {
+    render(<DataTable columns={columns} data={rows} filterable onFilter={vi.fn()} />);
+
+    const filterInput = screen.getByLabelText('Фильтр по колонке Name');
+    const filterTh = filterInput.closest('th') as HTMLElement;
+    expect(filterTh.style.position).toBe('');
+  });
+
+  // --- DT-22..23: column visibility ---
+
+  it('DT-22: columnVisibility hides a column from headers, cells and empty-state colSpan', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        columnVisibility={{ age: false }}
+      />
+    );
+
+    expect(screen.queryByText('Age')).toBeNull();
+    expect(screen.queryByText('25')).toBeNull();
+    expect(screen.getByText('City')).toBeInTheDocument();
+
+    // Empty-state colSpan counts VISIBLE columns only.
+    const { unmount } = render(
+      <DataTable columns={columns} data={[]} columnVisibility={{ age: false, city: false }} />
+    );
+    const statusCell = screen.getByRole('status').closest('td') as HTMLElement;
+    expect(statusCell).toHaveAttribute('colspan', '1');
+    unmount();
+  });
+
+  it('DT-22b: static column.hidden is honored (previously inert prop)', () => {
+    render(
+      <DataTable
+        columns={[...columns, { key: 'secret', title: 'Secret', hidden: true }]}
+        data={rows}
+      />
+    );
+    expect(screen.queryByText('Secret')).toBeNull();
+    expect(screen.getByText('Name')).toBeInTheDocument();
+  });
+
+  it('DT-23: toolbar column toggle fires onColumnVisibilityChange with the next map', () => {
+    const onColumnVisibilityChange = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={onColumnVisibilityChange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+    const ageCheckbox = screen.getByLabelText('Age') as HTMLInputElement;
+    fireEvent.click(ageCheckbox);
+
+    expect(onColumnVisibilityChange).toHaveBeenCalledTimes(1);
+    expect(onColumnVisibilityChange).toHaveBeenCalledWith({ age: false });
+  });
+
+  it('DT-24: showDensityToggle renders 3 options and fires onDensityChange', () => {
+    const onDensityChange = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showDensityToggle
+        density="comfortable"
+        onDensityChange={onDensityChange}
+      />
+    );
+
+    const group = screen.getByRole('group', { name: /Плотность|Row density|density/i });
+    const options = group.querySelectorAll('button');
+    expect(options.length).toBe(3);
+
+    const comfortable = [...options].find((b) =>
+      ['Стандарт', 'Comfortable'].includes(b.textContent || '')
+    ) as HTMLButtonElement;
+    expect(comfortable).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click([...options].find((b) => (b.textContent || '') === 'Компактно') as HTMLButtonElement);
+    expect(onDensityChange).toHaveBeenCalledWith('compact');
+  });
+
+  it('DT-25: column menu opens, closes on Escape and on outside pointerdown', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: /Колонки|Columns/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Age')).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    // Outside pointerdown (a target outside the menu root) closes the menu.
+    fireEvent.pointerDown(document.body);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('DT-26: the last visible column checkbox is disabled (a table needs at least one column)', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{ age: false, city: false }}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+    const nameCheckbox = screen.getByLabelText('Name') as HTMLInputElement;
+    const ageCheckbox = screen.getByLabelText('Age') as HTMLInputElement;
+    expect(nameCheckbox.disabled).toBe(true);
+    expect(ageCheckbox.disabled).toBe(false);
+  });
+
+  it('DT-27: no toolbar props → no .mac-table-shell wrapper (zero-delta root)', () => {
+    const { container } = render(<DataTable columns={columns} data={rows} />);
+    expect(container.querySelector('.mac-table-shell')).toBeNull();
+    expect(container.querySelector('.mac-table-toolbar')).toBeNull();
+    // Root is still the plain scroll wrapper.
+    expect(container.firstElementChild?.className).toContain('mac-table-scroll-wrapper');
+  });
+
+  // --- DT-29..31: Codex review fixes (PR 2885) ---
+
+  it('DT-29: key events from embedded controls do not trigger row navigation (Codex P1)', () => {
+    const onRowClick = vi.fn();
+    render(
+      <DataTable
+        columns={[
+          ...columns,
+          {
+            key: 'action',
+            title: 'Action',
+            render: () => (
+              <button type="button" onClick={() => undefined}>
+                Go
+              </button>
+            )
+          }
+        ]}
+        data={rows}
+        keyboardNavigation
+        onRowClick={onRowClick}
+      />
+    );
+
+    const first = getRowByName('Alice');
+    first.focus();
+    // The render fn places the button in every row; take the one inside row 1.
+    const embeddedButton = screen.getAllByText('Go')[0];
+
+    // ArrowDown bubbled from the embedded button: the row must NOT navigate
+    // (roving tabindex unchanged, focus not moved) — the control keeps its keys.
+    fireEvent.keyDown(embeddedButton, { key: 'ArrowDown', bubbles: true });
+    expect(first).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Bob')).toHaveAttribute('tabIndex', '-1');
+
+    // Enter bubbled from the embedded button: no row action fires (the
+    // control's native activation is preserved, no double-activation).
+    fireEvent.keyDown(embeddedButton, { key: 'Enter', bubbles: true });
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('DT-30: Escape inside the column menu restores focus to the toggle button (Codex P2)', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: /Колонки|Columns/ });
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    // Keyboard user tabs into a menu checkbox, presses Escape.
+    const ageCheckbox = screen.getByLabelText('Age') as HTMLInputElement;
+    ageCheckbox.focus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+  });
+
+  it('DT-31: an externally supplied all-hidden visibility map falls back to visible columns (Codex P2)', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        columnVisibility={{ name: false, age: false, city: false }}
+      />
+    );
+
+    // Degenerate map is normalized at the DataTable boundary: all statically
+    // visible columns render (no headerless colSpan=0 table).
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.getByText('City')).toBeInTheDocument();
+  });
+
+  it('DT-27b: toolbar props wrap the table in .mac-table-shell above the scroll wrapper', () => {
+    const { container } = render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+    const shell = container.querySelector('.mac-table-shell') as HTMLElement;
+    expect(shell).not.toBeNull();
+    expect(shell.querySelector('.mac-table-toolbar')).not.toBeNull();
+    expect(shell.querySelector('.mac-table-scroll-wrapper')).not.toBeNull();
+  });
+  it('DT-32: all-hidden map + toolbar — checkboxes reflect the NORMALIZED state (Codex P2 #3)', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{ name: false, age: false, city: false }}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+
+    // All columns render (normalization) AND the menu shows every checkbox
+    // CHECKED — renderer and toolbar share the post-normalization truth.
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+    expect((screen.getByLabelText('Name') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Age') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('City') as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('DT-33: interactive ReactNode column title renders as INERT key text in the menu (Codex P2)', () => {
+    render(
+      <DataTable
+        columns={[
+          {
+            key: 'select',
+            // Live control as header title — the FileManager/ServiceCatalog
+            // select-all pattern.
+            title: <input type="checkbox" aria-label="select-all" readOnly />,
+            sortable: false
+          },
+          { key: 'name', title: 'Name', sortable: false }
+        ]}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+    // The menu item is labeled by the INERT column key ('select'), not the
+    // live checkbox node — no second interactive control inside the menu.
+    const menuItem = screen.getByLabelText('select');
+    expect(menuItem).toBeInTheDocument();
+    expect(menuItem.tagName).toBe('INPUT');
+    // Exactly ONE interactive 'select' control exists (the header title), the
+    // menu item text is the plain key.
+    expect(screen.getByText('select')).toBeInTheDocument();
+  });
+
+  it('DT-34: dataset shrink persists the roving-index clamp; regrowth does not snap back (Codex P2 #4)', () => {
+    const { rerender } = render(<DataTable columns={columns} data={rows} keyboardNavigation />);
+
+    // Move the roving tab stop to the last row (index 2).
+    const first = getRowByName('Alice');
+    fireEvent.keyDown(first, { key: 'End' });
+    expect(getRowByName('Carol')).toHaveAttribute('tabIndex', '0');
+
+    // Dataset shrinks to 1 row (filter/page/refresh): clamp persists.
+    rerender(<DataTable columns={columns} data={[rows[0]]} keyboardNavigation />);
+    expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '0');
+
+    // Dataset grows back: the tab stay stays clamped at 0 — it does NOT snap
+    // back to the stale index 2.
+    rerender(<DataTable columns={columns} data={rows} keyboardNavigation />);
+    expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Bob')).toHaveAttribute('tabIndex', '-1');
+  });
+
+  it('DT-35: toolbar toggle uses the disclosure pattern (aria-expanded + aria-controls, no aria-haspopup) (Codex P2)', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: /Колонки|Columns/ });
+    // The popup is a checkbox GROUP, not a menu — no aria-haspopup.
+    expect(toggle).not.toHaveAttribute('aria-haspopup');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const controlsId = toggle.getAttribute('aria-controls');
+    expect(controlsId).toBeTruthy();
+
+    // Opening mounts the controlled group with the matching id.
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const controlled = document.getElementById(controlsId as string);
+    expect(controlled).not.toBeNull();
+    expect(controlled).toHaveAttribute('role', 'group');
+  });
+
+  it('DT-36: every column statically hidden still renders one column (Codex P2 #5)', () => {
+    render(
+      <DataTable
+        columns={[
+          { key: 'a', title: 'A', hidden: true },
+          { key: 'b', title: 'B', hidden: true }
+        ]}
+        data={rows}
+      />
+    );
+
+    // Author-error guard: the first column renders so the ≥1-column invariant
+    // holds (no headerless colSpan=0 table).
+    expect(screen.getByText('A')).toBeInTheDocument();
+    expect(screen.queryByText('B')).toBeNull();
+  });
+
+  it('DT-37: children composition path suppresses the toolbar entirely (Codex P2 round 4)', () => {
+    const { container } = render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        showDensityToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+        onDensityChange={vi.fn()}
+      >
+        <tbody>
+          <tr>
+            <td>composed</td>
+          </tr>
+        </tbody>
+      </DataTable>
+    );
+
+    // Composition mode: no toolbar shell, no toolbar — columnVisibility and
+    // density cannot reach consumer-supplied children, so the controls must
+    // not be advertised. Children render verbatim (zero-delta root).
+    expect(container.querySelector('.mac-table-shell')).toBeNull();
+    expect(container.querySelector('.mac-table-toolbar')).toBeNull();
+    expect(container.querySelector('.mac-table-scroll-wrapper')).not.toBeNull();
+    expect(screen.getByText('composed')).toBeInTheDocument();
+  });
+
+  it('DT-38: non-children paths keep the toolbar with both controls enabled', () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        showDensityToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={vi.fn()}
+        onDensityChange={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('button', { name: /Колонки|Columns/ })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /Плотность|density/i })).toBeInTheDocument();
+  });
+
+  it('DT-39: focus is restored to the clamped row when the focused row unmounts (Codex P2 round 5)', async () => {
+    const { rerender } = render(<DataTable columns={columns} data={rows} keyboardNavigation />);
+
+    // Focus the LAST row, then the dataset shrinks — the focused row unmounts
+    // and the browser drops focus to <body>.
+    const last = getRowByName('Carol');
+    fireEvent.keyDown(getRowByName('Alice'), { key: 'End' });
+    await waitFor(() => expect(last).toHaveFocus());
+
+    rerender(<DataTable columns={columns} data={[rows[0]]} keyboardNavigation />);
+    // Focus is restored to the clamped tab stop (row 0).
+    await waitFor(() => expect(getRowByName('Alice')).toHaveFocus());
+  });
+
+  it('DT-40: hiding a column clears its active filter via onFilter (Codex P2 round 5)', () => {
+    const onFilter = vi.fn();
+    const onColumnVisibilityChange = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        filterable
+        filterConfig={{ name: 'Bo' }}
+        onFilter={onFilter}
+        showColumnToggle
+        columnVisibility={{}}
+        onColumnVisibilityChange={onColumnVisibilityChange}
+      />
+    );
+
+    // Hide the 'name' column which carries a nonempty filter value.
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+    fireEvent.click(screen.getByLabelText('Name'));
+
+    // The invisible filter is cleared through the existing onFilter contract,
+    // and the visibility change is still propagated.
+    expect(onFilter).toHaveBeenCalledWith('name', '');
+    expect(onColumnVisibilityChange).toHaveBeenCalledWith({ name: false });
+  });
+
+  it('DT-41: virtualized window keeps a tab stop when the active row is off-window (Codex P2 round 6)', async () => {
+    // jsdom performs no layout — mock the geometry (same pattern as DT-13..16;
+    // scrollToIndex cannot drive the window here, so the window is moved by a
+    // manual scrollTop assignment like DT-14).
+    const trDescriptor = Object.getOwnPropertyDescriptor(HTMLTableRowElement.prototype, 'offsetHeight');
+    const divDescriptor = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetHeight');
+    Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get: () => 20
+    });
+    Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', {
+      configurable: true,
+      value: 200
+    });
+    try {
+      const bigData = Array.from({ length: 200 }, (_, i) => ({
+        id: `r${i}`,
+        name: `Name ${i}`,
+        age: 20 + i,
+        city: `City ${i}`
+      }));
+      const { container } = render(
+        <DataTable
+          columns={columns}
+          data={bigData}
+          keyboardNavigation
+          virtualized
+          maxHeight={200}
+          rowHeight={20}
+        />
+      );
+
+      // Initial window at the top: the active row (0) is mounted and holds
+      // the tab stop.
+      const firstRow = screen.getByText('Name 0').closest('tr') as HTMLElement;
+      expect(firstRow.getAttribute('tabIndex')).toBe('0');
+
+      // Manually scroll to the tail: the active row (0) unmounts — every
+      // mounted row must NOT end up with tabIndex=-1.
+      const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+      wrapper.scrollTop = 200 * 20 - 200;
+      fireEvent.scroll(wrapper);
+      await waitFor(() => {
+        expect(screen.getByText('Name 199').closest('tr')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Name 0')).toBeNull();
+
+      // Exactly ONE mounted row carries tabIndex=0 — the window keeps a tab
+      // stop while the active row is off-window. The stop is the FIRST row
+      // of the rendered virtual window (overscan included).
+      const mountedRows = Array.from(
+        container.querySelectorAll('tbody tr[data-row-index]')
+      ) as HTMLElement[];
+      expect(mountedRows.length).toBeGreaterThan(0);
+      const tabStops = mountedRows.filter((tr) => tr.getAttribute('tabIndex') === '0');
+      expect(tabStops.length).toBe(1);
+      expect(tabStops[0]).toBe(mountedRows[0]);
+    } finally {
+      // The DT-13..16 block restores/deletes these descriptors in its own
+      // afterEach — they may be absent here, so restore only when defined.
+      if (trDescriptor) {
+        Object.defineProperty(HTMLTableRowElement.prototype, 'offsetHeight', trDescriptor);
+      } else {
+        Reflect.deleteProperty(HTMLTableRowElement.prototype, 'offsetHeight');
+      }
+      if (divDescriptor) {
+        Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', divDescriptor);
+      } else {
+        Reflect.deleteProperty(HTMLDivElement.prototype, 'offsetHeight');
+      }
+    }
+  });
+
+  it('DT-42: filter clearing compares against EFFECTIVE visibility (normalized map) (Codex P2 round 6)', () => {
+    const onFilter = vi.fn();
+    const onColumnVisibilityChange = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        filterable
+        filterConfig={{ name: 'Bo' }}
+        onFilter={onFilter}
+        showColumnToggle
+        // All-false map: normalized to all-visible.
+        columnVisibility={{ name: false, age: false, city: false }}
+        onColumnVisibilityChange={onColumnVisibilityChange}
+      />
+    );
+
+    // Uncheck 'name' (rendered visible via normalization, filter active).
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+    fireEvent.click(screen.getByLabelText('Name'));
+
+    // The filter IS cleared: the comparison uses the effective map, not the
+    // raw all-false one.
+    expect(onFilter).toHaveBeenCalledWith('name', '');
+  });
+
+  it('DT-43: normalization preserves visibility entries for ABSENT columns (Codex P2 round 7)', () => {
+    const onColumnVisibilityChange = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showColumnToggle
+        // All current columns false (normalizes to all-visible) + a stale
+        // entry for a temporarily-absent column ('legacy_col').
+        columnVisibility={{ name: false, age: false, city: false, legacy_col: false }}
+        onColumnVisibilityChange={onColumnVisibilityChange}
+      />
+    );
+
+    // Current columns render (normalization) and the menu reflects them.
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Колонки|Columns/ }));
+
+    // Unchecking a column emits a map that STILL carries the absent column's
+    // entry — its persisted state is not silently discarded.
+    fireEvent.click(screen.getByLabelText('Name'));
+    expect(onColumnVisibilityChange).toHaveBeenCalledWith(
+      expect.objectContaining({ legacy_col: false, name: false })
+    );
+  });
+
+  it('DT-44: focusing a non-active row syncs the roving index (Codex P2 round 7)', async () => {
+    render(<DataTable columns={columns} data={rows} keyboardNavigation />);
+
+    // Direct focus on the LAST row (pointer/programmatic focus path).
+    const last = getRowByName('Carol');
+    last.focus();
+    await waitFor(() => expect(getRowByName('Carol')).toHaveAttribute('tabIndex', '0'));
+    await waitFor(() => expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '-1'));
+
+    // ArrowDown moves relative to the FOCUSED row — clamped at the last row,
+    // NOT jumping from the old active row 0.
+    fireEvent.keyDown(last, { key: 'ArrowDown' });
+    expect(getRowByName('Carol')).toHaveAttribute('tabIndex', '0');
+    expect(getRowByName('Alice')).toHaveAttribute('tabIndex', '-1');
+
+    // ArrowUp from the focused last row goes to row 1 (not row 0→1 semantics
+    // of a stale index): the roving index followed the actual focus.
+    fireEvent.keyDown(last, { key: 'ArrowUp' });
+    expect(getRowByName('Bob')).toHaveAttribute('tabIndex', '0');
+  });
+
+});
+
+describe('DataTable — PR-UI-12 toolbar i18n contract (DT-28)', () => {
+  it('DT-28: table.* toolbar keys exist and are non-empty in all 5 locales', async () => {
+    const locales: Record<string, Record<string, unknown>> = {
+      ru: (await import('../../../i18n/locales/ru')).default,
+      en: (await import('../../../i18n/locales/en')).default,
+      kk: (await import('../../../i18n/locales/kk')).default,
+      'uz-Latn': (await import('../../../i18n/locales/uz-Latn')).default,
+      'uz-Cyrl': (await import('../../../i18n/locales/uz-Cyrl')).default
+    };
+    const KEYS = [
+      'columns',
+      'columns_menu',
+      'density',
+      'density_compact',
+      'density_comfortable',
+      'density_spacious'
+    ];
+    for (const [localeCode, locale] of Object.entries(locales)) {
+      const table = (locale as { table?: Record<string, unknown> }).table;
+      expect(table, `locale ${localeCode} must define the table.* namespace`).toBeDefined();
+      for (const key of KEYS) {
+        const value = table?.[key];
+        expect(
+          typeof value === 'string' && value.trim().length > 0,
+          `locale ${localeCode}: table.${key} must be a non-empty string (got ${String(value)})`
+        ).toBe(true);
+      }
     }
   });
 });

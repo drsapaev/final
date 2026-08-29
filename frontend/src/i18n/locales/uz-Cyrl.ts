@@ -65,6 +65,16 @@ const uzCyrl = {
     push_notifications: 'Push билдиришномалари',
     ai_tools: 'AI воситалари',
   },
+  // PR-UI-12: canonical DataTable toolbar (TableToolbar.tsx — column
+  // visibility menu + density segmented control).
+  table: {
+    columns: 'Устунлар',
+    columns_menu: 'Устунларни кўрсатиш',
+    density: 'Қаторлар зичлиги',
+    density_compact: 'Ихчам',
+    density_comfortable: 'Стандарт',
+    density_spacious: 'Кенг',
+  },
   common: {
     save: 'Сохранить',
     save_draft: 'Сохранить черновик',

@@ -61,6 +61,16 @@ const kk = {
     push_notifications: 'Push хабарламалары',
     ai_tools: 'AI құралдары',
   },
+  // PR-UI-12: canonical DataTable toolbar (TableToolbar.tsx — column
+  // visibility menu + density segmented control).
+  table: {
+    columns: 'Бағандар',
+    columns_menu: 'Бағандарды көрсету',
+    density: 'Жолдар тығыздығы',
+    density_compact: 'Ықшам',
+    density_comfortable: 'Қалыпты',
+    density_spacious: 'Кең',
+  },
   common: {
     save: 'Сохранить',
     save_draft: 'Сохранить черновик',
