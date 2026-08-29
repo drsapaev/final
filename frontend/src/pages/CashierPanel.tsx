@@ -25,7 +25,7 @@ import { printPanelReceiptInBrowser } from '../services/panelPrint';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { getErrorMessage } from '../utils/errorHandler';
-import { formatRegistrarDate, formatRegistrarTime, parseRegistrarTimestamp } from '../utils/dateUtils';
+import { formatRegistrarDate, formatRegistrarTime } from '../utils/dateUtils';
 import notify from '../services/notify';
 // STRAT#31: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
@@ -77,6 +77,12 @@ import {
   type CashierPaymentData,
 } from './cashier/cashierPaymentContracts';
 import { useCashierWorklistData } from './cashier/useCashierWorklistData';
+import {
+  groupPaymentsByPatientAndTime,
+  sortCashierPayments,
+  type CashierSortField,
+  type CashierSortDir,
+} from './cashier/cashierPaymentRows';
 
 
 const CashierPanel = () => {
@@ -183,8 +189,8 @@ const CashierPanel = () => {
   // UX Audit #4.2: client-side sort state для таба «История платежей».
   // Сортировка применяется к уже загруженным filteredPayments (после groupPaymentsByPatientAndTime).
   // Поддерживаемые поля: 'date' | 'patient' | 'amount'.
-  const [sortField, setSortField] = useState('date');
-  const [sortDir, setSortDir] = useState('desc'); // 'asc' | 'desc'
+  const [sortField, setSortField] = useState<CashierSortField>('date');
+  const [sortDir, setSortDir] = useState<CashierSortDir>('desc'); // 'asc' | 'desc'
 
   // ✅ УЛУЧШЕНИЕ: Универсальные хуки вместо дублированных состояний
   const paymentModal = useModal();
@@ -606,65 +612,9 @@ const CashierPanel = () => {
 
   };
 
-  // ✅ ГРУППИРОВКА: Объединяем платежи одного пациента, созданных в одно время
-  // NOTE: Server pagination makes grouping across pages impossible. 
-  // We only group within the current page.
-  const groupPaymentsByPatientAndTime = (paymentsList: unknown): CashierPaymentRow[] => {
-    if (!paymentsList) return [];
-
-    // Convert backend specific date/time format if needed
-    // The backend returns 'created_at'. We can use that.
-
-    const grouped: Record<string, { services: unknown[]; services_names: unknown[]; service?: unknown; total_amount?: number; amount?: number; patient?: unknown; date?: string; time?: string; id?: string | number; payment_id?: string | number; method?: string; status?: string; grouped_payments: unknown[]; [k: string]: unknown }> = {};
-
-    (paymentsList as Record<string, unknown>[]).forEach((payment) => {
-      // Parse dates from backend
-      const createdAt = payment.created_at as string | undefined;
-      const dateObj = parseRegistrarTimestamp(createdAt);
-      const dateKey = formatRegistrarDate(dateObj || createdAt);
-      const timeKey = formatRegistrarTime(dateObj || createdAt);
-
-      const groupKey = `${payment.patient_id}_${dateKey}_${timeKey}`;
-
-      if (!grouped[groupKey]) {
-        // Создаём новую группу
-        grouped[groupKey] = {
-          ...payment,
-          services: Array.isArray(payment.services) ? [...(payment.services as unknown[])] : [],
-          services_names: Array.isArray(payment.services_names) ? [...(payment.services_names as unknown[])] : [],
-          grouped_payments: [payment.id],
-          total_amount: Number(payment.amount || 0),
-          date: dateKey, // Display helpers
-          time: timeKey,
-          patient: payment.patient_name,
-          service: payment.service || null
-        };
-      } else {
-        grouped[groupKey].grouped_payments.push(payment.id);
-        grouped[groupKey].total_amount = Number(grouped[groupKey].total_amount || 0) + Number(payment.amount);
-        if (payment.service && !grouped[groupKey].service) {
-          grouped[groupKey].service = payment.service;
-        }
-        if (Array.isArray(payment.services)) {
-          grouped[groupKey].services.push(...(payment.services as unknown[]));
-        }
-        if (Array.isArray(payment.services_names)) {
-          grouped[groupKey].services_names.push(...(payment.services_names as unknown[]));
-        }
-      }
-    });
-
-    return Object.values(grouped).map((group) => ({
-      ...group,
-      services: Array.from(new Set(group.services.filter(Boolean))),
-      services_names: Array.from(new Set(group.services_names.filter(Boolean))),
-      service: group.service || group.services_names[0] || group.services[0] || null
-    }));
-  };
-
   // Group payments for display (already filtered by server)
   // UX Audit #4.2: client-side sort по sortField/sortDir.
-  const toggleSort = (field: string) => {
+  const toggleSort = (field: CashierSortField) => {
     if (sortField === field) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -673,23 +623,10 @@ const CashierPanel = () => {
     }
   };
 
+  // PR-UI-14-2: grouping + client-side sort moved verbatim to
+  // ./cashier/cashierPaymentRows.ts (presentation-only view-model).
   const groupedPayments = groupPaymentsByPatientAndTime(payments);
-  const sortedPayments = [...groupedPayments].sort((a, b) => {
-    let aVal: string | number, bVal: string | number;
-    if (sortField === 'amount') {
-      aVal = Number(a.total_amount || a.amount || 0);
-      bVal = Number(b.total_amount || b.amount || 0);
-    } else if (sortField === 'patient') {
-      aVal = String(a.patient || '').toLowerCase();
-      bVal = String(b.patient || '').toLowerCase();
-    } else {
-      // 'date' — sortBy date+time string
-      aVal = `${a.date || ''} ${a.time || ''}`;
-      bVal = `${b.date || ''} ${b.time || ''}`;
-    }
-    const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-    return sortDir === 'asc' ? cmp : -cmp;
-  });
+  const sortedPayments = sortCashierPayments(groupedPayments, sortField, sortDir);
 
   const filteredPayments = sortedPayments;
 
