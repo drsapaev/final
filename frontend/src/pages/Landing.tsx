@@ -106,14 +106,28 @@ function FeatureCard({ accent, icon: Icon, badge, title, description }: {
 
 
 
-function ShowcaseCard({ icon: Icon, label, title, description }: {
+function ScreenshotCard({ icon: Icon, label, title, description, screenshot, alt }: {
   icon?: React.ComponentType<{ size?: number }>;
   label?: React.ReactNode;
   title?: React.ReactNode;
   description?: React.ReactNode;
+  screenshot?: string;
+  alt?: string;
 }) {
   return (
     <Card className="landing-showcase-card" shadow="large">
+      <div className="landing-showcase-shot">
+        {screenshot && (
+          <img
+            src={`/landing/screens/${screenshot}`}
+            alt={alt || (typeof title === 'string' ? title : '')}
+            loading="lazy"
+            decoding="async"
+            width={1440}
+            height={900}
+          />
+        )}
+      </div>
       <div className="landing-showcase-head">
         <div className="landing-showcase-icon">
           {Icon && <Icon size={20} />}
@@ -122,11 +136,6 @@ function ShowcaseCard({ icon: Icon, label, title, description }: {
       </div>
       <h3>{title}</h3>
       <p>{description}</p>
-      <div className="landing-showcase-bars" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
     </Card>
   );
 }
@@ -444,26 +453,23 @@ export default function Landing() {
           </Card>
 
           <div className="landing-hero-visuals">
-            {copy.hero.visualPanels.map((panel, index) => (
-              <Card
-                key={panel.title}
-                className={`landing-console-card landing-console-card--${index + 1}`}
-                shadow="large"
-              >
-                <SurfaceLabel>{panel.label}</SurfaceLabel>
-                <h2>{panel.title}</h2>
-                <p>{panel.description}</p>
-
-                <ul className="landing-console-feed">
-                  {panel.bullets.map((bullet) => (
-                    <li key={bullet} className="landing-console-feed-item">
-                      <CheckCircle size={16} />
-                      <span>{bullet}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            ))}
+            {/* PR-UI-16-3: real product screenshot (deterministic capture
+                pipeline — see e2e/capture-landing-screens.spec.ts). */}
+            <figure className="landing-hero-shot">
+              <div className="landing-hero-shot-frame">
+                <img
+                  src={`/landing/screens/${copy.hero.shot.screenshot}`}
+                  alt={copy.hero.shot.alt}
+                  width={1440}
+                  height={900}
+                  fetchPriority="high"
+                />
+              </div>
+              <figcaption>
+                <SurfaceLabel>{copy.hero.shot.label}</SurfaceLabel>
+                <span>{copy.hero.shot.caption}</span>
+              </figcaption>
+            </figure>
           </div>
         </section>
 
@@ -548,12 +554,14 @@ export default function Landing() {
 
           <div className="landing-showcase-grid">
             {copy.screens.items.map((item, index) => (
-              <ShowcaseCard
+              <ScreenshotCard
                 key={item.title}
                 icon={SHOWCASE_VISUALS[index % SHOWCASE_VISUALS.length]}
                 label={item.label}
                 title={item.title}
                 description={item.description}
+                screenshot={item.screenshot}
+                alt={item.alt}
               />
             ))}
           </div>
