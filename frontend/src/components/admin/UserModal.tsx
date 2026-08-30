@@ -266,7 +266,7 @@ const UserModal = ({
         <FormField label={t('admin2.umdl_field_role')} icon={Shield}>
           <Select
             value={formData.role}
-            onChange={(value) => handleChange('role', value)}
+            onValueChange={(value) => handleChange('role', value)}
             options={roleOptions}
             size="large"
             className="admin-input-pl-40"
