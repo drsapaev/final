@@ -119,8 +119,18 @@ class OperationsMixin(UserManagementServiceMixinBase):
                         if user.profile:
                             user.profile.status = UserStatus.ACTIVE
                     elif action_data.action == "change_role":
-                        if action_data.role:
+                        if action_data.role and action_data.role != user.role:
+                            old_role = user.role
                             user.role = action_data.role
+                            # Lifecycle invariant: bulk role changes follow the
+                            # SAME transition contract as update_user —
+                            # promotion provisions/reactivates the linked
+                            # Doctor profile, demotion deactivates it (history
+                            # preserved). No direct role writes bypassing the
+                            # contract.
+                            self._apply_role_change_doctor_lifecycle(
+                                db, user, old_role, action_data.role
+                            )
                     elif action_data.action == "delete":
                         # Проверяем, что не удаляем последнего администратора
                         if user.role == "Admin" and user.is_superuser:

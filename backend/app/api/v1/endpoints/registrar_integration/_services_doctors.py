@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.user_mgmt._base import is_doctor_profile_incomplete
+
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
 
@@ -186,6 +188,16 @@ def get_registrar_doctors(
     """
     try:
         doctors = crud_clinic.get_doctors(db, active_only=True)
+
+        # Lifecycle invariant (decision #5 / Codex P1-D): auto-created
+        # incomplete profiles (specialty="general" sentinel) are NOT
+        # clinical-eligible — the registrar must not be able to select them
+        # as specialty doctors or assign patients to them until an admin
+        # completes the profile with a real specialty. Admin visibility is
+        # preserved via /admin/doctors (profile_incomplete flag).
+        doctors = [
+            d for d in doctors if not is_doctor_profile_incomplete(d.specialty)
+        ]
 
         if specialty:
             doctors = [d for d in doctors if d.specialty == specialty]

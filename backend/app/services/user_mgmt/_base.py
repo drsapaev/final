@@ -118,6 +118,23 @@ class UserManagementServiceMixinBase:
 
         Returns the number of Doctor rows updated.
         """
+        if active:
+            # Lifecycle invariant: reactivating a User restores the linked
+            # Doctor profile ONLY when the user's CURRENT role still belongs
+            # to the doctor family. A demoted user (Registrar/Admin/other)
+            # keeps the profile linked but INACTIVE — reactivation must never
+            # resurrect it (non-doctor user != active Doctor profile).
+            owner_role = db.query(User.role).filter(User.id == user_id).scalar()
+            if owner_role not in DOCTOR_PROFILE_ROLES:
+                logger.info(
+                    "Doctor profiles NOT reactivated: owner role %r is not "
+                    "doctor-family (user_id=%s reason=%s)",
+                    owner_role,
+                    user_id,
+                    reason,
+                )
+                return 0
+
         values: dict[str, object] = {"active": active}
         if detach_owner:
             values["user_id"] = None

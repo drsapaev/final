@@ -6,6 +6,10 @@ from __future__ import annotations
 
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase, _now
+from app.services.user_mgmt._base import (
+    INCOMPLETE_DOCTOR_SPECIALTY,
+    is_doctor_profile_incomplete,
+)
 
 
 class OperationsMixin(QueueBusinessServiceMixinBase):
@@ -623,12 +627,17 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 profile_key = queue_profile.key
                 queue_tags = queue_profile.queue_tags or [profile_key]
 
-                # Ищем врача с specialty из queue_tags профиля
+                # Ищем врача с specialty из queue_tags профиля.
+                # Incomplete ("general" sentinel) profiles are explicitly
+                # excluded: they are not clinical-eligible for specialty QR
+                # routing even if an admin ever tags a profile with
+                # "general" (defense in depth, Codex P1-D).
                 doctor = (
                     db.query(Doctor)
                     .filter(
                         Doctor.active.is_(True),
                         Doctor.specialty.in_(queue_tags),
+                        Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
                     )
                     .first()
                 )
@@ -670,7 +679,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     )
                     .first()
                 )
-                if not doctor:
+                if not doctor or is_doctor_profile_incomplete(doctor.specialty):
+                    # Incomplete ("general" sentinel) profiles are not
+                    # bookable via QR/online paths (Codex P1-D).
                     raise QueueValidationError("Специалист недоступен для записи")
 
                 qr_profile = self._get_qr_visible_profile_for_doctor(db, doctor)
