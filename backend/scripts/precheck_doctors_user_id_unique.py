@@ -162,11 +162,21 @@ def main() -> int:
         # the constraint name on PostgreSQL (constraints and indexes share
         # one namespace) — upgrade() would die on a raw duplicate-name error.
         # Report it here so the rollout check stays ahead of the migration.
-        colliding_indexes = [
-            idx
-            for idx in inspector.get_indexes("doctors")
-            if idx.get("name") == checker.CONSTRAINT_NAME
-        ]
+        #
+        # The scan runs ONLY when no same-named CONSTRAINT exists (Codex
+        # round-3 P2): when the constraint is present — valid or drifted,
+        # both handled above — any same-name index is the index BACKING that
+        # constraint (PostgreSQL auto-creates one; reflection marks it with
+        # duplicates_constraint) and must be left alone, not reported as a
+        # collision on an idempotent rerun.
+        colliding_indexes = []
+        if existing_uq is None:
+            colliding_indexes = [
+                idx
+                for idx in inspector.get_indexes("doctors")
+                if idx.get("name") == checker.CONSTRAINT_NAME
+                and idx.get("duplicates_constraint") != checker.CONSTRAINT_NAME
+            ]
         if colliding_indexes:
             print(
                 f"  RESULT: FAIL — an INDEX named {checker.CONSTRAINT_NAME!r} "
@@ -179,7 +189,7 @@ def main() -> int:
                 "rename the index manually, then re-run this pre-check."
             )
             drift_fail = True
-        elif not drift_fail:
+        elif existing_uq is None and not drift_fail:
             print(
                 "  RESULT: OK — no index name collision with "
                 f"{checker.CONSTRAINT_NAME!r}."
