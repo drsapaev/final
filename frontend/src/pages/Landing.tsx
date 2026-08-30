@@ -142,18 +142,21 @@ function ScreenshotCard({ icon: Icon, label, title, description, screenshot, alt
 
 
 
-function WorkflowStep({ title, description }: {
+function WorkflowStep({ index, node, title, description }: {
+  index: number;
+  node: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
 }) {
   return (
-    <div className="landing-workflow-step">
-      <div className="landing-workflow-marker" aria-hidden="true" />
+    <li className="landing-workflow-step">
+      <span className="landing-workflow-marker" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
       <div>
+        <span className="landing-workflow-node">{node}</span>
         <h3>{title}</h3>
         <p>{description}</p>
       </div>
-    </div>
+    </li>
   );
 }
 
@@ -507,26 +510,33 @@ export default function Landing() {
           <Card className="landing-section-card" shadow="large">
             <SectionHeading eyebrow={copy.workflow.eyebrow} title={copy.workflow.title} description={copy.workflow.description} />
 
-            <div className="landing-workflow-grid">
-              <div className="landing-workflow-list">
-                {copy.workflow.steps.map((step) => (
-                  <WorkflowStep key={step.title} title={step.title} description={step.description} />
+            {/* PR-UI-16-4: workflow is the central element — the 7-node flow
+                overview sits on top, 7 numbered detail steps below (plan
+                §PR-UI-16 item 2: workflow diagram as the centerpiece). */}
+            <div className="landing-flow-card">
+              <SurfaceLabel>{copy.workflow.flowLabel}</SurfaceLabel>
+              <div className="landing-flow-track" aria-label={copy.workflow.flowLabel}>
+                {copy.workflow.stages.map((stage, index) => (
+                  <React.Fragment key={stage.node}>
+                    <span className="landing-flow-chip">{stage.node}</span>
+                    {index < copy.workflow.stages.length - 1 ? <ChevronRight size={16} className="landing-flow-arrow" /> : null}
+                  </React.Fragment>
                 ))}
               </div>
-
-              <div className="landing-flow-card">
-                <SurfaceLabel>{copy.workflow.flowLabel}</SurfaceLabel>
-                <div className="landing-flow-track" aria-label={copy.workflow.flowLabel}>
-                  {copy.workflow.flowNodes.map((item, index) => (
-                    <React.Fragment key={item}>
-                      <span className="landing-flow-chip">{item}</span>
-                      {index < copy.workflow.flowNodes.length - 1 ? <ChevronRight size={16} className="landing-flow-arrow" /> : null}
-                    </React.Fragment>
-                  ))}
-                </div>
-                <p>{copy.workflow.flowSummary}</p>
-              </div>
+              <p>{copy.workflow.flowSummary}</p>
             </div>
+
+            <ol className="landing-workflow-list">
+              {copy.workflow.stages.map((stage, index) => (
+                <WorkflowStep
+                  key={stage.node}
+                  index={index}
+                  node={stage.node}
+                  title={stage.title}
+                  description={stage.description}
+                />
+              ))}
+            </ol>
           </Card>
         </section>
 
