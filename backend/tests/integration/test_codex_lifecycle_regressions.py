@@ -512,3 +512,200 @@ class TestDoctorReassignmentGuard:
             db_session.query(Doctor).filter(Doctor.id == doctor.id).one().user_id
             == owner_b.id
         )
+
+
+# ---------------------------------------------------------------------------
+# P1-D (round 2, pre-emptive self-review) — the appointment WRITE path
+# (POST/PUT /api/v1/appointments) must honor the SAME eligibility contract
+# that round-1 enforced for the registrar selector and QR/online routing:
+# a new/changed booking must not target a deactivated (ghost-mirrored) or
+# incomplete ("general" sentinel) doctor by raw doctor_id.
+# ---------------------------------------------------------------------------
+
+
+def _make_patient(db_session, label: str):
+    from app.models.patient import Patient
+
+    patient = Patient(
+        last_name=f"Codex-{label}",
+        first_name="Patient",
+    )
+    db_session.add(patient)
+    db_session.commit()
+    db_session.refresh(patient)
+    return patient
+
+
+def _appointment_payload(doctor_id: int | None, patient_id: int) -> dict:
+    return {
+        "patient_id": patient_id,
+        "doctor_id": doctor_id,
+        "appointment_date": "2030-01-15",
+        "appointment_time": "10:00",
+        "status": "scheduled",
+    }
+
+
+class TestAppointmentWriteEligibility:
+    def test_post_appointment_to_deactivated_doctor_rejected(
+        self, client, db_session, auth_headers
+    ):
+        """Ghost-mirror scenario: the owner User was deactivated, the linked
+        Doctor profile got deactivated by the lifecycle mirror — a direct
+        POST /appointments with that doctor_id must be rejected (409)."""
+        owner = _make_user(db_session, "apt_deact", role="Doctor")
+        doctor = _make_doctor(db_session, owner, "cardiology", active=True)
+        patient = _make_patient(db_session, "apt_deact")
+
+        assert client.put(
+            f"/api/v1/users/users/{owner.id}",
+            json={"is_active": False},
+            headers=auth_headers,
+        ).status_code == 200
+
+        response = client.post(
+            "/api/v1/appointments/",
+            json=_appointment_payload(doctor.id, patient.id),
+            headers=auth_headers,
+        )
+        assert response.status_code == 409, response.text
+        assert "деактивирован" in response.json()["detail"]
+
+    def test_post_appointment_to_incomplete_doctor_rejected(
+        self, client, db_session, auth_headers
+    ):
+        """Auto-created (specialty='general' sentinel) doctors are not
+        bookable via the direct write path either — same contract as the
+        registrar selector and QR join (round-1 P1-D)."""
+        owner = _make_user(db_session, "apt_incomplete", role="Doctor")
+        doctor = _make_doctor(db_session, owner, "general", active=True)
+        patient = _make_patient(db_session, "apt_incomplete")
+        assert is_doctor_profile_incomplete(doctor.specialty)
+
+        response = client.post(
+            "/api/v1/appointments/",
+            json=_appointment_payload(doctor.id, patient.id),
+            headers=auth_headers,
+        )
+        assert response.status_code == 409, response.text
+        assert "не завершён" in response.json()["detail"]
+
+    def test_post_appointment_to_active_complete_doctor_ok(
+        self, client, db_session, auth_headers
+    ):
+        """Control: an active doctor with a real specialty stays bookable."""
+        owner = _make_user(db_session, "apt_ok", role="Doctor")
+        doctor = _make_doctor(db_session, owner, "cardiology", active=True)
+        patient = _make_patient(db_session, "apt_ok")
+
+        response = client.post(
+            "/api/v1/appointments/",
+            json=_appointment_payload(doctor.id, patient.id),
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["doctor_id"] == doctor.id
+        assert body["patient_id"] == patient.id
+
+    def test_post_appointment_without_doctor_stays_legal(
+        self, client, db_session, auth_headers
+    ):
+        """doctor_id is optional in AppointmentCreate — doctorless
+        appointments have no doctor to validate and must keep working."""
+        patient = _make_patient(db_session, "apt_none")
+
+        response = client.post(
+            "/api/v1/appointments/",
+            json=_appointment_payload(None, patient.id),
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["doctor_id"] is None
+
+    def test_put_reassignment_to_deactivated_doctor_rejected(
+        self, client, db_session, auth_headers
+    ):
+        """Reassigning an appointment onto a deactivated doctor via PUT must
+        be rejected; the same payload keeping the current doctor is legal."""
+        owner = _make_user(db_session, "apt_reassign", role="Doctor")
+        good = _make_doctor(db_session, owner, "cardiology", active=True)
+        patient = _make_patient(db_session, "apt_reassign")
+
+        create_response = client.post(
+            "/api/v1/appointments/",
+            json=_appointment_payload(good.id, patient.id),
+            headers=auth_headers,
+        )
+        assert create_response.status_code == 200, create_response.text
+        appointment_id = create_response.json()["id"]
+
+        other_owner = _make_user(db_session, "apt_reassign_b", role="Doctor")
+        bad = _make_doctor(db_session, other_owner, "dermatology", active=True)
+        assert client.put(
+            f"/api/v1/users/users/{other_owner.id}",
+            json={"is_active": False},
+            headers=auth_headers,
+        ).status_code == 200
+
+        rejected = client.put(
+            f"/api/v1/appointments/{appointment_id}",
+            json={"doctor_id": bad.id},
+            headers=auth_headers,
+        )
+        assert rejected.status_code == 409, rejected.text
+
+        # Control: reassignment back/forth to the eligible doctor still works
+        allowed = client.put(
+            f"/api/v1/appointments/{appointment_id}",
+            json={"doctor_id": good.id},
+            headers=auth_headers,
+        )
+        assert allowed.status_code == 200, allowed.text
+
+    def test_put_time_only_edit_with_deactivated_doctor_allowed(
+        self, client, db_session, auth_headers
+    ):
+        """Editing an EXISTING appointment whose doctor was deactivated later
+        (payload keeps the same doctor_id) is not a new booking and stays
+        legal — forcing it to fail would break unrelated rescheduling without
+        any lifecycle benefit (historical rows may reference the doctor)."""
+        owner = _make_user(db_session, "apt_timeedit", role="Doctor")
+        doctor = _make_doctor(db_session, owner, "cardiology", active=True)
+        patient = _make_patient(db_session, "apt_timeedit")
+
+        create_response = client.post(
+            "/api/v1/appointments/",
+            json=_appointment_payload(doctor.id, patient.id),
+            headers=auth_headers,
+        )
+        assert create_response.status_code == 200, create_response.text
+        appointment_id = create_response.json()["id"]
+
+        assert client.put(
+            f"/api/v1/users/users/{owner.id}",
+            json={"is_active": False},
+            headers=auth_headers,
+        ).status_code == 200
+
+        response = client.put(
+            f"/api/v1/appointments/{appointment_id}",
+            json={"doctor_id": doctor.id, "appointment_time": "11:30"},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["appointment_time"] == "11:30"
+
+    def test_post_appointment_to_missing_doctor_rejected(
+        self, client, db_session, auth_headers
+    ):
+        """A raw unknown doctor_id must fail with an explicit 404 instead of a
+        database IntegrityError / silent doctorless row."""
+        patient = _make_patient(db_session, "apt_missing")
+
+        response = client.post(
+            "/api/v1/appointments/",
+            json=_appointment_payload(999999, patient.id),
+            headers=auth_headers,
+        )
+        assert response.status_code == 404, response.text
