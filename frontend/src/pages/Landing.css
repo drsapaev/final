@@ -10,30 +10,20 @@ body.landing-body {
 }
 
 .landing-shell {
-  --landing-border: rgba(148, 163, 184, 0.16);
-  --landing-surface: rgba(255, 255, 255, 0.58);
-  --landing-shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+  /* PR-UI-16-1 (D5 ruling): legacy glass layer decommissioned — surfaces now
+     resolve through canonical --mac-* tokens, which auto-switch via the
+     dark theme classes applied to <html>/<body> by ThemeContext.colorScheme. */
+  --landing-border: var(--mac-card-border);
+  --landing-surface: var(--mac-card-bg);
+  --landing-shadow: var(--mac-shadow-lg);
   position: relative;
   min-height: 100vh;
   width: 100%;
   flex-shrink: 0;
   overflow-x: clip;
   overflow-y: visible;
-  background:
-    radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 34%),
-    radial-gradient(circle at top right, rgba(34, 197, 94, 0.16), transparent 32%),
-    linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(240, 249, 255, 0.96) 44%, rgba(255, 255, 255, 0.98) 100%);
+  background: var(--mac-bg-content);
   color: var(--mac-text-primary);
-}
-
-.landing-shell--dark {
-  --landing-border: rgba(148, 163, 184, 0.18);
-  --landing-surface: rgba(15, 23, 42, 0.58);
-  --landing-shadow: 0 24px 80px rgba(2, 6, 23, 0.4);
-  background:
-    radial-gradient(circle at top left, rgba(14, 165, 233, 0.22), transparent 34%),
-    radial-gradient(circle at top right, rgba(34, 197, 94, 0.18), transparent 32%),
-    linear-gradient(180deg, rgba(2, 6, 23, 0.98) 0%, rgba(15, 23, 42, 0.98) 44%, rgba(3, 7, 18, 0.98) 100%);
 }
 
 .landing-page {
@@ -47,42 +37,7 @@ body.landing-body {
   gap: 28px;
 }
 
-.landing-grid-overlay {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
-  background-size: 32px 32px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.4), transparent 78%);
-  pointer-events: none;
-}
-
-.landing-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(48px);
-  opacity: 0.9;
-  pointer-events: none;
-}
-
-.landing-orb--one {
-  top: -120px;
-  left: -80px;
-  width: 320px;
-  height: 320px;
-  background: rgba(14, 165, 233, 0.28);
-}
-
-.landing-orb--two {
-  top: 220px;
-  right: -90px;
-  width: 300px;
-  height: 300px;
-  background: rgba(34, 197, 94, 0.2);
-}
-
-.landing-topbar,
+.landing-page {
 .landing-toolbar,
 .landing-nav,
 .landing-cta-row,
@@ -134,7 +89,7 @@ body.landing-body {
   align-items: center;
   justify-content: center;
   border-radius: 15px;
-  background: linear-gradient(180deg, rgba(14, 165, 233, 0.18), rgba(34, 197, 94, 0.18));
+  background: var(--mac-accent-blue-bg);
   box-shadow: var(--landing-shadow);
 }
 
@@ -158,7 +113,7 @@ body.landing-body {
 
 .landing-nav-link:hover,
 .landing-nav-link:focus-visible {
-  background: rgba(14, 165, 233, 0.12);
+  background: var(--mac-accent-blue-bg);
   color: var(--mac-text-primary);
   outline: none;
 }
@@ -175,15 +130,9 @@ body.landing-body {
 
 .landing-toolbar-button {
   min-width: 42px;
-  border: 1px solid rgba(148, 163, 184, 0.2) !important;
-  background: rgba(255, 255, 255, 0.56) !important;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-}
-
-.landing-shell--dark .landing-toolbar-button {
-  background: rgba(15, 23, 42, 0.62) !important;
-  border-color: rgba(148, 163, 184, 0.18) !important;
-  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.24);
+  border: 1px solid var(--mac-card-border) !important;
+  background: var(--mac-card-bg) !important;
+  box-shadow: var(--mac-shadow-md);
 }
 
 .landing-header-login {
@@ -221,16 +170,9 @@ body.landing-body {
   display: grid;
   gap: 2px;
   border-radius: 16px;
-  background: var(--landing-surface, rgba(255, 255, 255, 0.95));
-  border: 1px solid var(--landing-border, rgba(148, 163, 184, 0.2));
-  box-shadow: var(--landing-shadow, 0 24px 80px rgba(15, 23, 42, 0.12));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-.landing-shell--dark .landing-language-dropdown {
-  background: rgba(15, 23, 42, 0.96);
-  border-color: rgba(148, 163, 184, 0.24);
+  background: var(--landing-surface);
+  border: 1px solid var(--landing-border);
+  box-shadow: var(--landing-shadow);
 }
 
 .landing-language-option {
@@ -253,12 +195,12 @@ body.landing-body {
 
 .landing-language-option:hover,
 .landing-language-option:focus-visible {
-  background: rgba(14, 165, 233, 0.1);
+  background: var(--mac-accent-blue-bg);
   outline: none;
 }
 
 .landing-language-option--active {
-  background: rgba(14, 165, 233, 0.14);
+  background: var(--mac-accent-blue-bg);
   color: var(--mac-accent-blue, #0ea5e9);
 }
 
@@ -322,16 +264,11 @@ body.landing-body {
   padding: 10px 16px;
   margin-bottom: 18px;
   border-radius: 999px;
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.24);
+  background: var(--mac-success-bg);
+  border: 1px solid var(--mac-success-border);
   color: var(--mac-success);
   font-size: 13px;
   font-weight: 700;
-}
-
-.landing-shell--dark .landing-live-badge {
-  color: #4ade80;
-  background: rgba(34, 197, 94, 0.14);
 }
 
 .landing-surface-label {
@@ -401,15 +338,10 @@ body.landing-body {
   align-items: center;
   padding: 9px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.58);
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: var(--mac-card-bg);
+  border: 1px solid var(--mac-card-border);
   font-size: 12px;
   font-weight: 700;
-}
-
-.landing-shell--dark .landing-role-pill {
-  background: rgba(15, 23, 42, 0.54);
-  border-color: rgba(148, 163, 184, 0.18);
 }
 
 .landing-console-metrics,
@@ -586,7 +518,7 @@ body.landing-body {
   width: 44px;
   height: 44px;
   border-radius: 14px;
-  background: rgba(14, 165, 233, 0.12);
+  background: var(--mac-accent-blue-bg);
 }
 
 .landing-module-grid {
@@ -623,7 +555,7 @@ body.landing-body {
   display: block;
   height: 10px;
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(14, 165, 233, 0.18), rgba(34, 197, 94, 0.18));
+  background: var(--mac-accent-blue-bg);
 }
 
 .landing-showcase-bars span:nth-child(1) {
@@ -670,20 +602,15 @@ body.landing-body {
   height: 18px;
   margin-top: 4px;
   border-radius: 999px;
-  background: linear-gradient(180deg, var(--mac-accent-blue), var(--mac-success));
-  box-shadow: 0 0 0 8px rgba(14, 165, 233, 0.08);
+  background: var(--mac-accent-blue);
+  box-shadow: 0 0 0 8px var(--mac-accent-blue-bg);
 }
 
 .landing-flow-card {
   padding: 22px;
   border-radius: 24px;
-  background: rgba(14, 165, 233, 0.08);
-  border: 1px solid rgba(14, 165, 233, 0.16);
-}
-
-.landing-shell--dark .landing-flow-card {
-  background: rgba(14, 165, 233, 0.12);
-  border-color: rgba(14, 165, 233, 0.22);
+  background: var(--mac-accent-blue-bg);
+  border: 1px solid color-mix(in srgb, var(--mac-accent-blue), transparent 80%);
 }
 
 .landing-flow-track {
@@ -699,14 +626,10 @@ body.landing-body {
   align-items: center;
   padding: 10px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: var(--mac-card-bg);
+  border: 1px solid var(--mac-card-border);
   font-size: 13px;
   font-weight: 700;
-}
-
-.landing-shell--dark .landing-flow-chip {
-  background: rgba(15, 23, 42, 0.7);
 }
 
 .landing-flow-arrow {
@@ -730,14 +653,8 @@ body.landing-body {
   align-items: flex-start;
   padding: 16px;
   border-radius: 18px;
-  background: color-mix(in srgb, white, transparent 50%);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-}
-
-.landing-shell--dark .landing-integration-card,
-.landing-shell--dark .landing-security-card {
-  background: rgba(15, 23, 42, 0.48);
-  border-color: rgba(148, 163, 184, 0.16);
+  background: var(--mac-card-bg);
+  border: 1px solid var(--mac-card-border);
 }
 
 .landing-integration-card strong {
@@ -772,7 +689,7 @@ body.landing-body {
 }
 
 .landing-checklist-marker--negative {
-  background: #f97316;
+  background: var(--mac-warning);
 }
 
 .landing-advantage-grid {
@@ -780,11 +697,11 @@ body.landing-body {
 }
 
 .landing-advantage-card--before {
-  border: 1px solid rgba(249, 115, 22, 0.18) !important;
+  border: 1px solid var(--mac-warning-border) !important;
 }
 
 .landing-advantage-card--after {
-  border: 1px solid rgba(34, 197, 94, 0.18) !important;
+  border: 1px solid var(--mac-success-border) !important;
 }
 
 .landing-pricing-grid {
@@ -824,15 +741,10 @@ body.landing-body {
 
 .landing-faq-item {
   border-radius: 20px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--mac-card-border);
+  background: var(--mac-card-bg);
   box-shadow: var(--landing-shadow);
   overflow: hidden;
-}
-
-.landing-shell--dark .landing-faq-item {
-  background: rgba(15, 23, 42, 0.56);
-  border-color: rgba(148, 163, 184, 0.16);
 }
 
 .landing-faq-item summary {
