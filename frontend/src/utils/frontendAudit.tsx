@@ -140,22 +140,6 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     status: 'correct'
   },
 
-  // Аутентификация
-  'src/components/auth/RequireAuth.jsx': {
-    purpose: 'Ролевые ограничения маршрутов',
-    currentLocation: 'src/components/auth/',
-    recommendedLocation: 'src/components/auth/',
-    status: 'correct'
-  },
-
-  // Навигация
-  'src/components/navigation/ProtectedRoute.jsx': {
-    purpose: 'Защищенные маршруты',
-    currentLocation: 'src/components/navigation/',
-    recommendedLocation: 'src/components/navigation/',
-    status: 'correct'
-  },
-
   // Утилиты
   'src/utils/themeChecker.js': {
     purpose: 'Проверка и исправление темы',
@@ -620,12 +604,6 @@ export function getRecommendedStructure(): Record<string, string[]> {
       'Form.jsx',
       'Table.jsx',
       'RoleGuard.jsx'
-    ],
-    'src/components/auth/': [
-      'RequireAuth.jsx'
-    ],
-    'src/components/navigation/': [
-      'ProtectedRoute.jsx'
     ],
     'src/components/layout/': [
       'Header.jsx',
