@@ -1312,36 +1312,3 @@ export const LANDING_COPY = {
   kk: deepMerge(BASE_COPY, KK_OVERRIDES)
 };
 
-export function buildGlassStyle(isDark: boolean, emphasis = 'default') {
-  const baseStyle = {
-    border: isDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(15, 23, 42, 0.08)',
-    boxShadow: isDark ? '0 24px 80px rgba(2, 6, 23, 0.42)' : '0 24px 80px rgba(15, 23, 42, 0.12)',
-    backdropFilter: 'blur(24px)',
-    WebkitBackdropFilter: 'blur(24px)'
-  };
-
-  if (emphasis === 'hero') {
-    return {
-      ...baseStyle,
-      background: isDark
-        ? 'linear-gradient(155deg, rgba(15, 23, 42, 0.94), rgba(14, 165, 233, 0.18))'
-        : 'linear-gradient(155deg, rgba(255, 255, 255, 0.96), rgba(14, 165, 233, 0.16))'
-    };
-  }
-
-  if (emphasis === 'accent') {
-    return {
-      ...baseStyle,
-      background: isDark
-        ? 'linear-gradient(160deg, rgba(17, 24, 39, 0.88), rgba(34, 197, 94, 0.16))'
-        : 'linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(34, 197, 94, 0.14))'
-    };
-  }
-
-  return {
-    ...baseStyle,
-    background: isDark
-      ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.84), rgba(15, 23, 42, 0.7))'
-      : 'linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.78))'
-  };
-}

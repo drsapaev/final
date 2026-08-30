@@ -1,4 +1,4 @@
-import React, { startTransition, useEffect, useMemo, useState } from 'react';
+import React, { startTransition, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import {
@@ -25,7 +25,7 @@ import {
   User,
   Users
 } from 'lucide-react';
-import { LANDING_COPY, buildGlassStyle } from './landingContent';
+import { LANDING_COPY } from './landingContent';
 import { BRAND } from '../config/brand';
 import './Landing.css';
 import { useTranslation } from '../i18n/useTranslation';
@@ -69,14 +69,13 @@ function SectionHeading({ eyebrow, title, description, align = 'left' }: {
 
 
 
-function MetricCard({ value, label, detail, style }: {
+function MetricCard({ value, label, detail }: {
   value?: React.ReactNode;
   label?: React.ReactNode;
   detail?: React.ReactNode;
-  style?: React.CSSProperties;
 }) {
   return (
-    <Card className="landing-metric-card" shadow="large" style={style}>
+    <Card className="landing-metric-card" shadow="large">
       <strong>{value}</strong>
       <span>{label}</span>
       <small>{detail}</small>
@@ -107,15 +106,14 @@ function FeatureCard({ accent, icon: Icon, badge, title, description }: {
 
 
 
-function ShowcaseCard({ icon: Icon, label, title, description, style }: {
+function ShowcaseCard({ icon: Icon, label, title, description }: {
   icon?: React.ComponentType<{ size?: number }>;
   label?: React.ReactNode;
   title?: React.ReactNode;
   description?: React.ReactNode;
-  style?: React.CSSProperties;
 }) {
   return (
-    <Card className="landing-showcase-card" shadow="large" style={style}>
+    <Card className="landing-showcase-card" shadow="large">
       <div className="landing-showcase-head">
         <div className="landing-showcase-icon">
           {Icon && <Icon size={20} />}
@@ -198,9 +196,6 @@ export default function Landing() {
   // Map unified language codes to legacy LANDING_COPY keys ('uz-Latn' → 'uz')
   const landingCopyKey = language?.startsWith('uz') ? 'uz' : language?.split('-')[0];
   const copy = (LANDING_COPY[landingCopyKey as keyof typeof LANDING_COPY] || LANDING_COPY.ru) as typeof LANDING_COPY.ru;
-  const cardStyle = useMemo(() => buildGlassStyle(isDark), [isDark]);
-  const heroCardStyle = useMemo(() => buildGlassStyle(isDark, 'hero'), [isDark]);
-  const accentCardStyle = useMemo(() => buildGlassStyle(isDark, 'accent'), [isDark]);
 
   const currentLanguageIndex = availableLanguages.findIndex((item) => item.code === language);
   const currentLanguage = availableLanguages[currentLanguageIndex] || availableLanguages[0];
@@ -307,10 +302,6 @@ export default function Landing() {
 
   return (
     <div className={`landing-shell ${isDark ? 'landing-shell--dark' : 'landing-shell--light'}`}>
-      <div className="landing-orb landing-orb--one" aria-hidden="true" />
-      <div className="landing-orb landing-orb--two" aria-hidden="true" />
-      <div className="landing-grid-overlay" aria-hidden="true" />
-
       <main className="landing-page">
         <header className="landing-topbar">
           {/* UX Audit Stage 1: используем единый BRAND config вместо хардкода */}
@@ -408,7 +399,7 @@ export default function Landing() {
         </header>
 
         <section id="hero" className="landing-hero">
-          <Card className="landing-hero-card" shadow="large" style={heroCardStyle}>
+          <Card className="landing-hero-card" shadow="large">
             <div className="landing-live-badge" role="status" aria-live="polite">
               <Activity size={15} />
               <span>{copy.liveStatus}</span>
@@ -447,7 +438,7 @@ export default function Landing() {
 
             <div className="landing-console-metrics">
               {copy.hero.quickStats.map((item) => (
-                <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} style={cardStyle} />
+                <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} />
               ))}
             </div>
           </Card>
@@ -458,7 +449,6 @@ export default function Landing() {
                 key={panel.title}
                 className={`landing-console-card landing-console-card--${index + 1}`}
                 shadow="large"
-                style={index === 1 ? accentCardStyle : cardStyle}
               >
                 <SurfaceLabel>{panel.label}</SurfaceLabel>
                 <h2>{panel.title}</h2>
@@ -482,7 +472,7 @@ export default function Landing() {
 
           <div className="landing-metric-strip">
             {copy.trust.items.map((item) => (
-              <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} style={cardStyle} />
+              <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} />
             ))}
           </div>
         </section>
@@ -508,7 +498,7 @@ export default function Landing() {
         </section>
 
         <section id="workflow" className="landing-section landing-progressive-section">
-          <Card className="landing-section-card" shadow="large" style={cardStyle}>
+          <Card className="landing-section-card" shadow="large">
             <SectionHeading eyebrow={copy.workflow.eyebrow} title={copy.workflow.title} description={copy.workflow.description} />
 
             <div className="landing-workflow-grid">
@@ -541,7 +531,7 @@ export default function Landing() {
             {copy.modules.items.map((module, index) => {
               const Icon = MODULE_VISUALS[index % MODULE_VISUALS.length];
               return (
-                <Card key={module.title} className="landing-module-card" shadow="large" style={cardStyle}>
+                <Card key={module.title} className="landing-module-card" shadow="large">
                   <div className="landing-module-icon">
                     <Icon size={18} />
                   </div>
@@ -564,14 +554,13 @@ export default function Landing() {
                 label={item.label}
                 title={item.title}
                 description={item.description}
-                style={index === 0 ? accentCardStyle : cardStyle}
               />
             ))}
           </div>
         </section>
 
         <section className="landing-section landing-dual-grid landing-progressive-section">
-          <Card id="integrations" className="landing-section-card" shadow="large" style={cardStyle}>
+          <Card id="integrations" className="landing-section-card" shadow="large">
             <SectionHeading
               eyebrow={copy.integrations.eyebrow}
               title={copy.integrations.title}
@@ -596,7 +585,7 @@ export default function Landing() {
             </div>
           </Card>
 
-          <Card id="security" className="landing-section-card" shadow="large" style={cardStyle}>
+          <Card id="security" className="landing-section-card" shadow="large">
             <SectionHeading eyebrow={copy.security.eyebrow} title={copy.security.title} description={copy.security.description} />
 
             <div className="landing-security-grid">
@@ -625,7 +614,7 @@ export default function Landing() {
           />
 
           <div className="landing-advantage-grid">
-            <Card className="landing-advantage-card landing-advantage-card--before" shadow="large" style={cardStyle}>
+            <Card className="landing-advantage-card landing-advantage-card--before" shadow="large">
               <h3>{copy.advantages.beforeTitle}</h3>
               <ul className="landing-checklist landing-checklist--negative">
                 {copy.advantages.beforeItems.map((item) => (
@@ -637,7 +626,7 @@ export default function Landing() {
               </ul>
             </Card>
 
-            <Card className="landing-advantage-card landing-advantage-card--after" shadow="large" style={accentCardStyle}>
+            <Card className="landing-advantage-card landing-advantage-card--after" shadow="large">
               <h3>{copy.advantages.afterTitle}</h3>
               <ul className="landing-checklist">
                 {copy.advantages.afterItems.map((item) => (
@@ -660,7 +649,6 @@ export default function Landing() {
                 key={plan.name}
                 className={`landing-pricing-card ${plan.featured ? 'landing-pricing-card--featured' : ''}`}
                 shadow="large"
-                style={plan.featured ? accentCardStyle : cardStyle}
               >
                 <SurfaceLabel>{plan.audience}</SurfaceLabel>
                 <h3>{plan.name}</h3>
@@ -716,7 +704,7 @@ export default function Landing() {
         </section>
 
         <section id="contact" className="landing-section landing-progressive-section">
-          <Card className="landing-final-card" shadow="large" style={heroCardStyle}>
+          <Card className="landing-final-card" shadow="large">
             <div className="landing-final-copy">
               <SurfaceLabel>{copy.finalCta.eyebrow}</SurfaceLabel>
               <h2>{copy.finalCta.title}</h2>
