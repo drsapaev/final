@@ -121,7 +121,9 @@ def login(username: str, password: str, totp_secret: str = "") -> tuple[str | No
     status, body = http("POST", "/api/v1/authentication/login",
                         body={"username": username, "password": password})
     if status != 200 or not isinstance(body, dict):
-        return None, f"login HTTP {status}: {json.dumps(body)[:160] if isinstance(body, dict) else body}"
+        # intentionally no response body in details — it is not needed for
+        # triage and keeps credentials/tokens out of logs and artifacts
+        return None, f"login HTTP {status}"
     if body.get("requires_2fa_setup"):
         return None, "login requires 2FA enrollment (requires_2fa_setup) — smoke cannot automate enrollment"
     if body.get("requires_2fa"):
@@ -131,11 +133,11 @@ def login(username: str, password: str, totp_secret: str = "") -> tuple[str | No
         v_status, v_body = http("POST", "/api/v1/2fa/verify", body={
             "pending_2fa_token": pending, "totp_code": totp_now(totp_secret)})
         if v_status != 200 or not (isinstance(v_body, dict) and v_body.get("access_token")):
-            return None, f"2FA verify HTTP {v_status}: {json.dumps(v_body)[:160] if isinstance(v_body, dict) else v_body}"
+            return None, f"2FA verify HTTP {v_status}"
         return v_body["access_token"], "ok (via TOTP)"
     token = (body.get("access_token") or "").strip()
     if not token:
-        return None, f"login 200 but no access_token: {json.dumps(body)[:160]}"
+        return None, "login HTTP 200 but no access_token in response"
     return token, "ok"
 
 
@@ -147,10 +149,19 @@ RESULTS: list[dict] = []
 CREATED: dict[str, object] = {}
 
 
+def _mask_secrets(text: str) -> str:
+    """Defense-in-depth: never echo credentials into logs or artifacts."""
+    masked = text
+    for secret in filter(None, (SMOKE_PASSWORD, CASHIER_TOTP_SECRET)):
+        masked = masked.replace(secret, "***")
+    return masked
+
+
 def record(step: str, status: str, detail: str) -> None:
+    detail = _mask_secrets(detail)
     RESULTS.append({"step": step, "status": status, "detail": detail})
     mark = {"PASS": "PASS", "FAIL": "FAIL", "SKIP": "SKIP"}[status]
-    print(f"[{mark}] {step}: {detail}")
+    print(f"[{mark}] {step}: {detail}")  # codeql[py/clear-text-logging-sensitive-data] — secrets masked above; details carry no credentials
 
 
 def sentry_report_failures() -> None:
