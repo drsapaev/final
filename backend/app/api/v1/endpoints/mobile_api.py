@@ -135,8 +135,38 @@ def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db))
         if not crud_user.verify_password(credentials.password, user.hashed_password):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        # Генерируем токен
+        # Генерируем access token
         access_token = crud_user.create_access_token(data={"sub": user.username})
+
+        # Issue refresh token so the mobile client can use /mobile/auth/refresh
+        # after the access token expires (default 30 min). Uses the same
+        # AuthenticationService.create_refresh_token() as web login, but does
+        # NOT call login_user() — mobile login has its own auth flow (phone
+        # search, no 2FA, no session fixation revocation).
+        refresh_token = None
+        try:
+            import uuid as _uuid
+            from datetime import UTC, datetime, timedelta
+
+            from app.models.authentication import RefreshToken
+            from app.services.authentication_service import get_authentication_service
+
+            auth_service = get_authentication_service()
+            jti = str(_uuid.uuid4())
+            refresh_token = auth_service.create_refresh_token(user.id, jti)
+            refresh_token_obj = RefreshToken(
+                user_id=user.id,
+                token=refresh_token,
+                jti=jti,
+                expires_at=datetime.now(UTC)
+                + timedelta(days=auth_service.refresh_token_expire_days),
+            )
+            db.add(refresh_token_obj)
+            db.commit()
+        except Exception as exc:
+            # If refresh token creation fails, still return access_token —
+            # the mobile client works for 30 min, just cannot refresh.
+            log_endpoint_error("app/api/v1/endpoints/mobile_api.py", exc)
 
         # Обновляем токен устройства
         if credentials.device_token:
@@ -147,6 +177,7 @@ def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db))
 
         return MobileLoginResponse(
             access_token=access_token,
+            refresh_token=refresh_token,
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             user={
                 "id": user.id,

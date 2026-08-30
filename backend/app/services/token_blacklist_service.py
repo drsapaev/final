@@ -93,6 +93,119 @@ class TokenBlacklistService:
             True если токен в черном списке
         """
         try:
+            # Perf (#2772): two sequential SELECTs (jti + sentinel)
+            # were 2 network roundtrips (~400-800ms on remote DB).
+            # One OR query - same semantics, 1 roundtrip.
+            from datetime import datetime as _dt
+            from sqlalchemy import or_, and_
+
+            conditions = [TokenBlacklist.jti == jti]
+            if user_id is not None:
+                conditions.append(
+                    and_(
+                        TokenBlacklist.user_id == user_id,
+                        TokenBlacklist.reason.like("all_user_tokens:%"),
+                        TokenBlacklist.expires_at > _dt.utcnow(),
+                    )
+                )
+
+            entry = (
+                db.query(TokenBlacklist)
+                .filter(or_(*conditions))
+                .first()
+            )
+            return entry is not None
+        except Exception as e:
+            logger.error(f"Error checking blacklist for {jti}: {e}")
+            return False
+
+
+import logging
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy.orm import Session
+
+from app.models.authentication import TokenBlacklist
+
+logger = logging.getLogger(__name__)
+
+
+class TokenBlacklistService:
+    """Сервис для работы с черным списком токенов"""
+
+    @staticmethod
+    def blacklist_token(
+        db: Session,
+        jti: str,
+        expires_at: datetime,
+        user_id: int | None = None,
+        reason: str = "logout"
+    ) -> bool:
+        """
+        Добавить токен в черный список
+
+        Args:
+            db: Сессия базы данных
+            jti: JWT ID токена
+            expires_at: Время истечения токена
+            user_id: ID пользователя (опционально)
+            reason: Причина блокировки
+
+        Returns:
+            True если успешно, False если ошибка
+        """
+        try:
+            # Проверяем, не истёк ли уже токен
+            if expires_at < datetime.now(UTC):
+                logger.debug(f"Token {jti} already expired, skipping blacklist")
+                return True
+
+            # Проверяем, не заблокирован ли уже
+            existing = db.query(TokenBlacklist).filter(
+                TokenBlacklist.jti == jti
+            ).first()
+
+            if existing:
+                logger.debug(f"Token {jti} already blacklisted")
+                return True
+
+            blacklist_entry = TokenBlacklist(
+                jti=jti,
+                user_id=user_id,
+                expires_at=expires_at,
+                reason=reason
+            )
+            db.add(blacklist_entry)
+            db.commit()
+
+            logger.info(f"Token {jti} blacklisted (reason: {reason})")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error blacklisting token {jti}: {e}")
+            db.rollback()
+            return False
+
+    @staticmethod
+    def is_token_blacklisted(db: Session, jti: str, user_id: int | None = None) -> bool:
+        """
+        Проверить, находится ли токен в черном списке.
+
+        Проверка двух типов записей:
+        1. Точный jti — для индивидуально отозванных токенов (logout).
+        2. "all_user_tokens" sentinel — когда был вызван
+           ``blacklist_all_user_tokens(user_id)``. Все access-токены
+           пользователя считаются отозванными до истечения sentinel-записи.
+
+        Args:
+            db: Сессия базы данных
+            jti: JWT ID токена
+            user_id: ID пользователя (опционально; передаётся deps.get_current_user)
+
+        Returns:
+            True если токен в черном списке
+        """
+        try:
             # 1) Точный jti
             entry = db.query(TokenBlacklist).filter(
                 TokenBlacklist.jti == jti

@@ -21,21 +21,22 @@ export { default as MacOSBreadcrumb } from './MacOSBreadcrumb';
 export { default as MacOSPagination } from './MacOSPagination';
 
 // Data Display Components
-export { default as Table } from './Table';
-export { default as MacOSStatCard } from './MacOSStatCard';
-export { default as MacOSMetricCard } from './MacOSMetricCard';
+// PR-UI-09d: `Table` alias removed — canonical DataTable lives at
+// `src/components/ui/DataTable.tsx` (import directly or via the `ui/` barrel).
+// PR-UI-06: StatCard is canonical name. MacOSStatCard kept as backward-compat alias.
+export { default as StatCard } from './StatCard';
+export { default as MacOSStatCard } from './StatCard';
 export { default as List } from './List';
+// PR-UI-11-1: DataCard is canonical for titled data panels (lists / timelines /
+// activity feeds / queue summaries). New canonical primitive, not an alias.
+export { default as DataCard } from '../DataCard';
+export type { DataCardProps, DataCardVariant, DataCardDensity } from '../DataCard';
 
 // Utility Components
 export { AppLoading, AppEmpty, AppError } from './AppState';
-export { default as MacOSEmptyState } from './MacOSEmptyState';
 export { default as Skeleton } from './Skeleton';
 export { default as Alert } from './Alert';
 export { default as Modal } from './Modal';
-// UX Audit Registrar #1: AccentPicker — экспортируем из macos index,
-// чтобы `import { AccentPicker } from '../components/ui/macos'` работал.
-// Раньше файл существовал, но не был в barrel-export, из-за чего production-build падал.
-export { default as AccentPicker } from './AccentPicker';
 // UX Audit Registrar #1: AnimatedTransition — экспортируем из macos index.
 // Используется в DoctorPanel и др. До этого build падал на этом импорте.
 export { default as AnimatedTransition } from './AnimatedTransition';
@@ -43,8 +44,8 @@ export { default as AnimatedTransition } from './AnimatedTransition';
 // Basic UI Components
 export { default as Box } from './Box';
 export { default as Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './Card';
-// Backward compatibility alias for macOS-styled Card
-export { default as MacOSCard } from './Card';
+// MacOSCard backward-compatibility alias DELETED (PR-UI-06 final decommission):
+// 0 import-consumers remained after PR-UI-11-15 (#2902); canonical = Card.
 export { default as Dialog, DialogTitle, DialogContent, DialogActions } from './Dialog';
 export { default as Grid } from './Grid';
 export { default as Icon } from './Icon';

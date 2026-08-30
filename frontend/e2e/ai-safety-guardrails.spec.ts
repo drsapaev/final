@@ -34,6 +34,8 @@
  */
 
 import { test, expect } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
+import { createHmac } from 'crypto';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18000';
 
@@ -43,9 +45,46 @@ const REGISTRAR_USERNAME = process.env.QA_REGISTRAR_USERNAME || 'registrar@clini
 const REGISTRAR_PASSWORD = process.env.QA_REGISTRAR_PASSWORD;
 
 /**
- * Log in and return the access token. Throws if creds are missing.
+ * RFC 6238 TOTP (SHA1, 6 digits, 30s step) for the CI-seeded admin secret.
+ * Implemented locally to avoid a new devDependency — must match pyotp
+ * defaults used by the backend 2FA service.
  */
-async function login(request, username, password, role) {
+function base32Decode(input: string): Buffer {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const ch of input.replace(/=+$/, '').toUpperCase()) {
+    const idx = alphabet.indexOf(ch);
+    if (idx === -1) throw new Error(`Invalid base32 character: ${ch}`);
+    bits += idx.toString(2).padStart(5, '0');
+  }
+  const bytes: number[] = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  }
+  return Buffer.from(bytes);
+}
+
+function totpCode(secretBase32: string, atMs: number = Date.now()): string {
+  const counter = Math.floor(atMs / 1000 / 30);
+  const msg = Buffer.alloc(8);
+  msg.writeUInt32BE(Math.floor(counter / 2 ** 32), 0);
+  msg.writeUInt32BE(counter % 2 ** 32, 4);
+  const digest = createHmac('sha1', base32Decode(secretBase32)).update(msg).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const code =
+    ((digest[offset] & 0x7f) << 24) |
+    (digest[offset + 1] << 16) |
+    (digest[offset + 2] << 8) |
+    digest[offset + 3];
+  return (code % 1_000_000).toString().padStart(6, '0');
+}
+
+/**
+ * Log in and return the access token. Throws if creds are missing.
+ * Critical 2FA roles (Admin) get a TOTP challenge instead of tokens —
+ * complete it via /2fa/verify using the CI-seeded secret.
+ */
+async function login(request: APIRequestContext, username: string, password: string | undefined, role: string): Promise<string> {
   if (!password) {
     throw new Error(`Set QA_${role.toUpperCase()}_PASSWORD to run AI safety tests.`);
   }
@@ -55,13 +94,37 @@ async function login(request, username, password, role) {
   });
   expect(resp.ok(), `login as ${role} should succeed`).toBeTruthy();
   const body = await resp.json();
+
+  if (body.requires_2fa && body.pending_2fa_token) {
+    const secret = process.env.QA_ADMIN_TOTP_SECRET;
+    if (!secret) {
+      throw new Error('Admin login hit a 2FA challenge — set QA_ADMIN_TOTP_SECRET (the secret seeded for the QA admin).');
+    }
+    const verify = await request.post(`${BACKEND_URL}/api/v1/2fa/verify`, {
+      data: { pending_2fa_token: body.pending_2fa_token, totp_code: totpCode(secret) },
+      headers: { 'Content-Type': 'application/json' },
+    });
+    expect(verify.ok(), `2fa verify as ${role} should succeed`).toBeTruthy();
+    const verified = await verify.json();
+    if (!verified.access_token) {
+      throw new Error(`2fa verify as ${role} returned no access_token: ${JSON.stringify(verified)}`);
+    }
+    return verified.access_token;
+  }
+
+  if (body.requires_2fa_setup && body.enrollment_token) {
+    throw new Error(
+      `login as ${role} hit 2FA enrollment — the QA admin must be seeded with an enrolled TOTP secret (see ai-safety-guardrails.yml seed step).`
+    );
+  }
+
   return body.access_token || body.token;
 }
 
 /**
  * Helper: call an AI endpoint with auth bearer token.
  */
-async function callAiEndpoint(request, endpoint, payload, token) {
+async function callAiEndpoint(request: APIRequestContext, endpoint: string, payload: Record<string, unknown>, token: string) {
   return request.post(`${BACKEND_URL}${endpoint}`, {
     data: payload,
     headers: {
@@ -75,7 +138,15 @@ async function callAiEndpoint(request, endpoint, payload, token) {
  * Assert that a response JSON contains the AI safety metadata block
  * with the required fields set correctly.
  */
-function expectSafetyMeta(body) {
+interface SafetyMeta {
+  requires_doctor_confirmation?: unknown;
+  decision_boundary?: unknown;
+  ai_notice?: unknown;
+  ai_safety_meta?: SafetyMeta;
+  safety_meta?: SafetyMeta;
+}
+
+function expectSafetyMeta(body: SafetyMeta) {
   // The safety meta may be at root level or nested under 'ai_safety_meta' / 'safety_meta'.
   const meta = body.ai_safety_meta || body.safety_meta || body;
   expect(meta, 'response should contain AI safety metadata').toBeDefined();
@@ -92,8 +163,8 @@ function expectSafetyMeta(body) {
 test.describe('AI Safety Guardrails', () => {
   test.describe.configure({ mode: 'serial' });
 
-  let doctorToken;
-  let registrarToken;
+  let doctorToken!: string;
+  let registrarToken: string | undefined;
 
   test.beforeAll(async ({ request }) => {
     doctorToken = await login(request, DOCTOR_USERNAME, DOCTOR_PASSWORD, 'doctor');
@@ -194,7 +265,8 @@ test.describe('AI Safety Guardrails', () => {
     ];
 
     for (const endpoint of endpoints) {
-      const resp = await callAiEndpoint(request, endpoint, {}, registrarToken);
+      // test.skip above guarantees registrarToken is set when the test runs.
+      const resp = await callAiEndpoint(request, endpoint, {}, registrarToken!);
       expect(
         [401, 403].includes(resp.status()),
         `${endpoint} should reject registrar (got ${resp.status()})`,

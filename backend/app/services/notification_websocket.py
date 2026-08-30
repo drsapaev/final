@@ -2,6 +2,7 @@
 import logging
 
 from fastapi import WebSocket
+from app.api.v1.endpoints.ws_token import accept_echoing_subprotocol
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class NotificationWebSocketManager:
         self.active_connections: dict[int, list[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, user_id: int):
-        await websocket.accept()
+        await accept_echoing_subprotocol(websocket)
         if user_id not in self.active_connections:
             self.active_connections[user_id] = []
         self.active_connections[user_id].append(websocket)

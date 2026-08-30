@@ -18,14 +18,14 @@ import {
   Building2 } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
   Select,
   Textarea,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
 } from '../ui/macos';
 import { api } from '../../api/client';
@@ -317,7 +317,7 @@ const EquipmentManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <div className="admin-d-flex-fd-column-gap-16-fw-wrap">
           <div className="admin-flex-1-pos-relative">
             <Input
@@ -370,11 +370,11 @@ const EquipmentManagement = () => {
             </Button>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Форма добавления/редактирования */}
       {showAddForm &&
-      <MacOSCard className="admin-p-24-ov-hidden">
+      <Card className="admin-p-24-ov-hidden">
           <div className="admin-d-flex-jc-between-ai-center-mb-16">
             <h3 className="admin-fs-lg-fw-semi-primary-m-0">
               {editingEquipment ? t('admin2.em_edit_title') : t('admin2.em_add_title')}
@@ -557,20 +557,20 @@ const EquipmentManagement = () => {
               </Button>
             </div>
           </form>
-        </MacOSCard>
+        </Card>
       }
 
       {/* Список оборудования */}
       {loading ?
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-1">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} className="p-6">
+        <Card key={i} className="p-6">
               <Skeleton height="200px" />
-            </MacOSCard>
+            </Card>
         )}
         </div> :
       filteredEquipment.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Wrench}
         title={equipmentEmptyTitle}
         description={equipmentEmptyDescription}
@@ -584,7 +584,7 @@ const EquipmentManagement = () => {
 
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden">
           {filteredEquipment.map((item) =>
-        <MacOSCard key={item.id} className="p-6">
+        <Card key={item.id} className="p-6">
               <div className="admin-d-flex-jc-between-ai-start-mb-16">
                 <div>
                   <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0">
@@ -651,7 +651,7 @@ const EquipmentManagement = () => {
                   <Trash2 aria-hidden="true" className="w-4 h-4" />
                 </Button>
               </div>
-            </MacOSCard>
+            </Card>
         )}
         </div>
       }

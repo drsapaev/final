@@ -111,6 +111,13 @@ class UserSession(Base):
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
+    # Тип pending-сессии (двухстадийная аутентификация):
+    #   'pending_2fa'    — вход пользователя с настроенной 2FA (обмен через /2fa/verify)
+    #   '2fa_enrollment' — первичная настройка 2FA для критичных ролей
+    #                      (только /2fa/setup и /2fa/verify-setup, одноразовый, TTL 10 мин)
+    # NULL (легаси-строки) трактуются как 'pending_2fa'.
+    session_kind: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
     # Метаданные
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

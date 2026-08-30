@@ -81,7 +81,9 @@ class DoctorPhraseHistory(Base):
     doctor: Mapped[User] = relationship("User", foreign_keys=[doctor_id])
 
     def __repr__(self) -> str:
-        return f"<DoctorPhraseHistory(id={self.id}, doctor={self.doctor_id}, field={self.field}, phrase='{self.phrase[:30]}...')>"
+        # FOLLOWUP-4: omit phrase - it contains medical free-text PHI.
+        # field is enum-like (anamnesis/diagnosis/treatment), safe.
+        return f"<DoctorPhraseHistory(id={self.id}, doctor={self.doctor_id}, field={self.field})>"
 
     @staticmethod
     def create_prefix_index(phrase: str, length: int = 50) -> str:

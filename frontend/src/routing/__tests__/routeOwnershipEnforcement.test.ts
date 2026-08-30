@@ -16,7 +16,7 @@ describe('routing anti-regression enforcement', () => {
   });
 
   it('uses the routing subsystem as the route source of truth', () => {
-    expect(read('src/App.tsx')).toContain('from \'./routing/routeRegistry.js\'');
+    expect(read('src/App.tsx')).toContain('from \'./routing/routeRegistry');
     expect(read('src/App.tsx')).toContain('ROUTE_REGISTRY.map');
     expect(read('src/components/layout/Nav.tsx')).toContain('getVisibleRoutesForShell');
   });

@@ -215,8 +215,17 @@ def start_queue_visit(
             changed_at = datetime.now(UTC)
             queue_entry.status = "in_progress"
             queue_entry.updated_at = changed_at
+            # Issue #06 Phase 3: delegate visit status transition to
+            # VisitLifecycleService for state machine validation + row lock.
+            # Only the Visit.status goes through the service; the
+            # queue_entry.status is a separate concern (queue_svc domain).
             if linked_visit:
-                linked_visit.status = "in_progress"
+                from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                linked_visit = VisitLifecycleService(db).start_visit(
+                    visit_id=linked_visit.id,
+                    current_user=current_user,
+                )
                 linked_visit.updated_at = changed_at
 
             logger.info(

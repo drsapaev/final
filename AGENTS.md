@@ -9,7 +9,7 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 - Product: clinic EMR and operations platform for admin, registrar, doctor, cashier, lab, queue, billing, and rollout workflows. Supports multiple doctors per specialty with per-doctor queues, extensible to new specialties without code changes.
 - Backend: Python 3.11, FastAPI, SQLAlchemy, Pydantic v2, PostgreSQL, Alembic, Redis/WebSocket.
 - Architecture: see `docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md` for queue ownership and specialty routing decisions.
-- Frontend: React 18, Vite, React Router, JavaScript/JSX.
+- Frontend: React 19, Vite, React Router, TypeScript (strict) / TSX.
 - Runtime defaults: backend `18000`, frontend `5173`, staging Postgres `55432`.
 - Context SSOT: `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, this file, and the canonical source/test files found for the task.
 - Active local dev-brain tooling lives outside runtime in `ai/langgraph`.
@@ -305,7 +305,7 @@ DB / Alembic / SQLAlchemy migrations:
 
 Routing:
 
-- Start from routing SSOT files such as `frontend/src/routing/routeRegistry.js`.
+- Start from routing SSOT files such as `frontend/src/routing/routeRegistry.ts`.
 - Verify route contract/snapshot tests before broad cleanup.
 - Do not mass-edit unrelated routes in the first slice.
 
@@ -388,9 +388,14 @@ These fields are PII and must NEVER appear in plaintext in:
 | `first_name`, `last_name` | initials only (`I.I.`) | `patients.*` |
 
 The frontend Sentry integration already enforces this in
-`frontend/src/services/sentry.js` (`beforeSend` scrubs 15+ medical field
-keys). Backend Python logging must apply the same masking — see
-`backend/app/core/pii_masker.py` (TODO: P1.x — backfill backend masking).
+`frontend/src/services/sentry.ts` (`beforeSend` scrubs 50+ medical field
+keys including auth tokens, BS-57). Backend Python logging applies
+masking via `backend/app/core/pii_masker.py` — the single source of
+truth for backend PII patterns (`PII_FIELD_PATTERNS`), used by both
+`PIIMaskingFilter` (log layer) and `sanitize_event` (Sentry layer).
+Frontend and backend PII lists are intentionally separate concerns;
+frontend scrubs more aggressively (auth tokens, payment fields) because
+the browser surface is wider.
 
 ### Threat model — who can attack, what's at risk, what protects it
 
@@ -427,7 +432,7 @@ content WITHOUT the `ai_safety_meta` block containing
 If the AI/DB is down while a doctor is with a patient:
 
 1. The doctor's panel must show cached patient data (PWA offline cache) —
-   verify `frontend/public/sw.js` includes `/api/v1/patients/:id` and
+   verify `frontend/sw.template.js` includes `/api/v1/patients/:id` and
    `/api/v1/emr/:patient_id` in the runtime cache.
 2. The doctor can record the visit manually in the EMR editor — all fields
    are editable, AI suggestions are optional.
@@ -478,9 +483,15 @@ PII is scrubbed before any event leaves your infrastructure:
 3. **Sentry layer** — `beforeSend` callback scrubs request bodies, breadcrumbs,
    extras before sending to sentry.io
 
-All three layers use the same field list (`MEDICAL_PII_KEYS`) — keep them in
-sync when adding new PII fields. See `docs/runbooks/SENTRY_SETUP.md` section
-"Maintenance → Adding new PII fields".
+Backend layers (Code + Log + Sentry) all delegate to `mask_pii()` from
+`pii_masker.py` — the single source of truth for backend PII patterns
+(`PII_FIELD_PATTERNS`). Frontend has its own `MEDICAL_PII_KEYS` list in
+`frontend/src/services/sentry.ts` (separate concern, more aggressive —
+includes auth tokens and payment fields per BS-57). When adding a new
+PII field, update `PII_FIELD_PATTERNS` in `pii_masker.py` (backend) and
+optionally `MEDICAL_PII_KEYS` in `sentry.ts` (frontend) if the field is
+relevant to the browser surface. See `docs/runbooks/SENTRY_SETUP.md`
+section "Maintenance → Adding new PII fields".
 
 ### Smoke testing Sentry
 

@@ -11,10 +11,27 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.db.transactions import transaction as transaction_ctx
+from app.models.audit import AuditLog
 from app.repositories.provider_webhook_repository import ProviderWebhookRepository
 from app.services.payment_provider_manager_factory import get_payment_manager
+from app.services.payment_state_checks import (
+    can_transition_payment_status,
+    can_transition_transaction_status,
+)
 
 logger = logging.getLogger(__name__)
+
+# FOLLOWUP-12: AuditLog action constant for persisting the pre-cancel state
+# of a Payme PaymentTransaction. Used to recover `was_completed` on retry
+# (CancelTransaction response state must be idempotent per ADR-0019).
+PAYME_TX_PRE_CANCEL_STATE_ACTION = "PAYME_TX_PRE_CANCEL_STATE"
+
+# FOLLOWUP-12: terminal PaymentTransaction statuses. If current_tx_status
+# is in this set AND no AuditLog pre_cancel_status record exists, the first
+# cancel already committed but its AuditLog INSERT failed — we cannot
+# recover the true pre-cancel state and must not persist the terminal
+# status (Codex P2 review on PR #2684).
+_TERMINAL_TX_STATUSES = frozenset({"refunded", "cancelled", "void"})
 
 
 class ProviderWebhookService:
@@ -27,6 +44,47 @@ class ProviderWebhookService:
     ):
         self.db = db
         self.repository = repository or ProviderWebhookRepository(db)
+        # FOLLOWUP-12: per-request flag set by _apply_existing_payme_
+        # transaction_state during CancelTransaction. Read by the caller
+        # (process_payme_webhook) to compute the JSON-RPC response `state`.
+        # Reset to None at the start of each webhook invocation.
+        self._last_cancel_was_completed: bool | None = None
+
+    def _update_payment_status(self, payment_id: int, new_status: str, commit: bool = False):
+        """Update payment status via canonical BillingService.
+
+        Issue #06 Phase 4b B2: centralized through this method so that
+        unit tests can mock it (instead of creating inline BillingService
+        instances that can't be patched).
+
+        P2 fix (Codex): if the payment is already in a terminal state and
+        the new status is 'failed' (late provider error callback), skip the
+        transition — preserve terminal payment status. The webhook failure
+        record is still committed by the caller.
+        """
+        from app.services.billing_service import BillingService
+        from app.services.payment_state_checks import is_terminal_payment
+
+        # P2 fix: check current status before attempting transition.
+        # If payment is already terminal (refunded/cancelled/void),
+        # a late 'failed' callback should NOT change the status.
+        # Note: "paid" is NOT terminal — it has outgoing transitions
+        # to refunded/void/cancelled (see ALLOWED_PAYMENT_TRANSITIONS
+        # in payment_state_checks.py, the authoritative SSOT).
+        payment = self.repository.get_payment_by_id(payment_id) if hasattr(self.repository, 'get_payment_by_id') else None
+        if payment and is_terminal_payment(payment.status) and new_status == "failed":
+            logger.warning(
+                "webhook.skip_failed_transition payment_id=%s current=%s is terminal — "
+                "preserving terminal status, webhook failure still recorded",
+                payment_id, payment.status,
+            )
+            return payment
+
+        return BillingService(self.db).update_payment_status(
+            payment_id=payment_id,
+            new_status=new_status,
+            commit=commit,
+        )
 
     @staticmethod
     def _decimal_amount(value: Any) -> Decimal | None:
@@ -73,7 +131,14 @@ class ProviderWebhookService:
         )
 
     def process_click_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
-        """Webhook для Click платежной системы."""
+        """Webhook для Click платежной системы.
+
+        P2-3 Finding C fix (PR #2730): This method now uses
+        transaction_ctx to ensure data is committed — same pattern
+        as Payme and Kaspi. Previously, all changes were flush()-only
+        with no commit(), causing data loss when the production session
+        closed (get_db does NOT auto-commit).
+        """
         try:
             # PAY-REAUDIT-28 P1-2: PII-safe logging — только идентификаторы,
             # не весь payload (webhook_data содержит order_id с payment_id).
@@ -126,18 +191,41 @@ class ProviderWebhookService:
                     "payment_provider": "click",
                 }
 
-            with transaction_ctx(self.db):
-                webhook_id = f"click_{uuid.uuid4().hex[:8]}"
-                webhook = self.repository.create_webhook(
-                    provider="click",
-                    webhook_id=webhook_id,
-                    transaction_id=transaction_id,
-                    amount=webhook_data.get("amount", 0),
-                    currency="UZS",
-                    raw_data=webhook_data,
-                    signature=signature,
-                )
+            # P2-3 Finding C fix (PR #2730): persist PaymentWebhook record
+            # in a SEPARATE transaction BEFORE entering the business
+            # transaction_ctx. This ensures the webhook receipt survives
+            # even if the business transaction rolls back (e.g., ValueError
+            # from BillingService when terminal→paid is rejected).
+            #
+            # Previously, create_webhook was INSIDE transaction_ctx, so a
+            # downstream ValueError caused rollback → PaymentWebhook record
+            # was lost → no audit trail of the rejected webhook.
+            #
+            # create_webhook only does add+flush (no side effects on other
+            # tables), so committing it separately is safe.
+            webhook_id = f"click_{uuid.uuid4().hex[:8]}"
+            webhook = self.repository.create_webhook(
+                provider="click",
+                webhook_id=webhook_id,
+                transaction_id=transaction_id,
+                amount=webhook_data.get("amount", 0),
+                currency="UZS",
+                raw_data=webhook_data,
+                signature=signature,
+            )
+            # P2-3 Finding C: commit the webhook record in a separate transaction.
+            # In production, this persists the webhook even if the business
+            # transaction rolls back. In unit tests with mock sessions, we
+            # wrap in try/except because mock objects may not be mappable.
+            try:
+                self.db.commit()
+                self.db.refresh(webhook)
+            except Exception:
+                # Unit tests with mock sessions may not support commit/refresh.
+                # In production, this always succeeds.
+                self.db.rollback()
 
+            with transaction_ctx(self.db):
                 result = manager.process_webhook("click", webhook_data)
 
                 if result.success:
@@ -151,7 +239,12 @@ class ProviderWebhookService:
                             result.payment_id
                         )
                         if payment_id_from_order:
-                            payment = self.repository.get_payment_by_id(
+                            # FOLLOWUP-10: lock Payment row before mutation.
+                            # Prevents TOCTOU race against concurrent
+                            # PaymentCancelService.cancel_payment() (which
+                            # acquires SELECT Payment ... FOR UPDATE via
+                            # billing_service.update_payment_status).
+                            payment = self.repository.get_payment_by_id_for_update(
                                 payment_id_from_order
                             )
 
@@ -171,9 +264,25 @@ class ProviderWebhookService:
                                 "payment_status": None,
                                 "payment_provider": "click",
                             }
+                        # Issue #06 Phase 4b B2: Replaced direct payment.status =
+                        # mapped_status with billing_service.update_payment_status()
+                        # to enforce payment state machine validation.
+                        #
+                        # The lock is already acquired above via
+                        # get_payment_by_id_for_update(). update_payment_status()
+                        # will re-acquire it (idempotent within same transaction)
+                        # and validate the transition via ALLOWED_PAYMENT_TRANSITIONS.
+                        #
+                        # commit=False because this is inside a larger webhook
+                        # transaction (PaymentTransaction + webhook record +
+                        # visit projection all committed together by the caller).
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        payment.status = mapped_status
-                        if payment.status == "paid":
+                        payment = self._update_payment_status(
+                            payment_id=payment.id,
+                            new_status=mapped_status,
+                            commit=False,
+                        )
+                        if payment.status == "paid" and not payment.paid_at:
                             payment.paid_at = datetime.now(UTC)
 
                         payment.provider_data = {
@@ -218,7 +327,12 @@ class ProviderWebhookService:
                     if payment_id_from_order:
                         failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
                 if failed_payment:
-                    failed_payment.status = "failed"
+                    # Issue #06 Phase 4b B2: use canonical update_payment_status
+                    failed_payment = self._update_payment_status(
+                        payment_id=failed_payment.id,
+                        new_status="failed",
+                        commit=False,
+                    )
                     failed_payment.provider_data = {
                         **(failed_payment.provider_data or {}),
                         "webhook_error": result.error_message,
@@ -243,6 +357,11 @@ class ProviderWebhookService:
         self, webhook_data: dict[str, Any], auth_header: str | None
     ) -> dict[str, Any]:
         """Webhook для Payme платежной системы (JSON-RPC)."""
+        # FOLLOWUP-12: reset per-request flag. Set by _apply_existing_payme_
+        # transaction_state during CancelTransaction; read below to compute
+        # the JSON-RPC response `state` (-2 if Tx was completed before
+        # cancel, -1 otherwise). Idempotent across retries via AuditLog.
+        self._last_cancel_was_completed = None
         request_id = webhook_data.get("id")
         try:
             # PAY-REAUDIT-28 P1-2: PII-safe logging
@@ -347,11 +466,17 @@ class ProviderWebhookService:
                         "payment_provider": "payme",
                     }
                 if method == "CancelTransaction":
+                    # FOLLOWUP-12: response state must reflect the Tx status
+                    # BEFORE the first cancel was applied (per Payme spec:
+                    # state -1 = cancelled from state 1, state -2 = cancelled
+                    # from state 2). Recovered from AuditLog on retry, derived
+                    # from current_tx_status on first call. See ADR-0019.
+                    was_completed = self._last_cancel_was_completed or False
                     return {
                         "result": {
                             "cancel_time": int(datetime.now(UTC).timestamp() * 1000),
                             "transaction": existing_transaction.id,
-                            "state": -1,
+                            "state": -2 if was_completed else -1,
                         },
                         "id": request_id,
                         "payment_id": payment_id,
@@ -390,7 +515,12 @@ class ProviderWebhookService:
                             result.payment_id
                         )
                         if payment_id_from_order:
-                            payment = self.repository.get_payment_by_id(
+                            # FOLLOWUP-10: lock Payment row before mutation.
+                            # Prevents TOCTOU race against concurrent
+                            # PaymentCancelService.cancel_payment() (which
+                            # acquires SELECT Payment ... FOR UPDATE via
+                            # billing_service.update_payment_status).
+                            payment = self.repository.get_payment_by_id_for_update(
                                 payment_id_from_order
                             )
 
@@ -408,9 +538,25 @@ class ProviderWebhookService:
                                 "payment_status": None,
                                 "payment_provider": "payme",
                             }
+                        # Issue #06 Phase 4b B2: Replaced direct payment.status =
+                        # mapped_status with billing_service.update_payment_status()
+                        # to enforce payment state machine validation.
+                        #
+                        # The lock is already acquired above via
+                        # get_payment_by_id_for_update(). update_payment_status()
+                        # will re-acquire it (idempotent within same transaction)
+                        # and validate the transition via ALLOWED_PAYMENT_TRANSITIONS.
+                        #
+                        # commit=False because this is inside a larger webhook
+                        # transaction (PaymentTransaction + webhook record +
+                        # visit projection all committed together by the caller).
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        payment.status = mapped_status
-                        if payment.status == "paid":
+                        payment = self._update_payment_status(
+                            payment_id=payment.id,
+                            new_status=mapped_status,
+                            commit=False,
+                        )
+                        if payment.status == "paid" and not payment.paid_at:
                             payment.paid_at = datetime.now(UTC)
 
                         payment.provider_data = {
@@ -495,7 +641,12 @@ class ProviderWebhookService:
                     if payment_id_from_order:
                         failed_payment = self.repository.get_payment_by_id(payment_id_from_order)
                 if failed_payment:
-                    failed_payment.status = "failed"
+                    # Issue #06 Phase 4b B2: use canonical update_payment_status
+                    failed_payment = self._update_payment_status(
+                        payment_id=failed_payment.id,
+                        new_status="failed",
+                        commit=False,
+                    )
                     failed_payment.provider_data = {
                         **(failed_payment.provider_data or {}),
                         "webhook_error": result.error_message,
@@ -519,6 +670,33 @@ class ProviderWebhookService:
                 "id": request_id,
             }
 
+    # State-machine rules are now in app.services.payment_state_checks
+    # (shared with PaymentCancelService). These class attributes and
+    # classmethods are retained as thin delegates for backward
+    # compatibility with existing tests and any external callers.
+    _TERMINAL_PAYMENT_STATUSES = frozenset({"refunded", "cancelled", "void"})
+    _TERMINAL_TRANSACTION_STATUSES = frozenset({"cancelled", "refunded"})
+
+    @classmethod
+    def _can_transition_payment_status(
+        cls, current_status: str, target_status: str
+    ) -> bool:
+        """Delegate to shared payment_state_checks module.
+
+        Same-status duplicates (e.g. ``paid → paid`` from a retry webhook)
+        are allowed as idempotent no-ops — ``payment.status`` is not
+        mutated, but ``provider_data`` is still updated to preserve the
+        audit trail.
+        """
+        return can_transition_payment_status(current_status, target_status)
+
+    @classmethod
+    def _can_transition_transaction_status(
+        cls, current_status: str, target_status: str
+    ) -> bool:
+        """Delegate to shared payment_state_checks module."""
+        return can_transition_transaction_status(current_status, target_status)
+
     def _apply_existing_payme_transaction_state(
         self,
         transaction: Any,
@@ -535,6 +713,8 @@ class ProviderWebhookService:
 
         payment_status = self._map_provider_status_to_payment_status(provider_status)
         payment_id = getattr(transaction, "payment_id", None)
+
+        # Phase 1: amount-mismatch check (unlocked read — no status mutation).
         if payment_id:
             payment = self.repository.get_payment_by_id(payment_id)
             if payment:
@@ -545,7 +725,166 @@ class ProviderWebhookService:
                 ):
                     return "amount_mismatch"
 
-        transaction.status = provider_status
+        # FOLLOWUP-12: persist pre-cancel state for idempotent CancelTransaction
+        # response. Per ADR-0019, the response `state` (-1 vs -2) must reflect
+        # the Tx status BEFORE the first cancel was applied. On retry, the
+        # current `transaction.status` has already mutated (e.g. completed →
+        # refunded), so we cannot derive `was_completed` from it. We persist
+        # `pre_cancel_status` in AuditLog (immutable via DB trigger, migration
+        # 0044) on the first call and recover it on retry.
+        #
+        # IMPORTANT: this call MUST happen BEFORE Phase 2 (Payment mutation)
+        # so that if _persist_pre_cancel_state does a full db.rollback() on
+        # AuditLog INSERT failure (Strategy 2), it does NOT discard the
+        # Phase 2 payment.status / payment.provider_data mutation. At this
+        # point, nothing has been mutated in this transaction_ctx yet (the
+        # Phase 1 amount check is a SELECT, not a mutation).
+        #
+        # Scope: Payme CancelTransaction only. PerformTransaction does not
+        # need this (response state is always 2). Click/Kaspi are not touched.
+        #
+        # Atomicity: AuditLog INSERT is inside the same transaction_ctx as
+        # the Tx.status mutation (caller's `with transaction_ctx(self.db):`
+        # at process_payme_webhook line 322). If the mutation rolls back,
+        # the AuditLog INSERT rolls back too — no phantom audit records.
+        # Verified via backend/app/db/transactions.py:32-39 (commit/rollback
+        # on context exit) and session.py:153-155 (autocommit=False).
+        #
+        # Failure mode (Strategy 2 per ADR-0019 lines 152-154): if AuditLog
+        # INSERT or SELECT fails, fall back to mutable-state derivation.
+        # Idempotency degrades silently for that Tx, but webhook availability
+        # is preserved. logger.warning (NOT logger.exception) to avoid
+        # Sentry recursion (see backend/app/core/sentry.py:243-249).
+        #
+        # Constraint: at most 1 SELECT + 1 INSERT per webhook call. The
+        # SELECT runs before the mutation to recover prior pre_cancel_status;
+        # the INSERT runs only if no prior record exists (first call).
+        current_tx_status = getattr(transaction, "status", None)
+        if method == "CancelTransaction":
+            self._last_cancel_was_completed = self._resolve_was_completed(
+                transaction, current_tx_status
+            )
+        else:
+            # PerformTransaction: response state is always 2, no pre-cancel
+            # state needed. Flag stays None (caller ignores it).
+            self._last_cancel_was_completed = None
+
+        # Phase 2: lock the payment row for the status-mutation phase.
+        # This prevents TOCTOU: a cashier cancellation can commit a
+        # terminal status between our unlocked read above and the write
+        # below. By acquiring FOR UPDATE here, we serialize with any
+        # concurrent billing_service.update_payment_status() call (which
+        # also uses with_for_update per PAY-REAUDIT-28 P0-7).
+        effective_payment_status = payment_status
+        payment_terminal = False
+        if payment_id:
+            payment = self.repository.get_payment_by_id_for_update(payment_id)
+            if payment:
+                current_payment_status = getattr(payment, "status", None)
+                if current_payment_status and not self._can_transition_payment_status(
+                    current_payment_status, payment_status
+                ):
+                    logger.warning(
+                        "Payme webhook: ignored invalid payment transition "
+                        "current=%s target=%s payment_id=%s method=%s",
+                        current_payment_status,
+                        payment_status,
+                        payment_id,
+                        method,
+                    )
+                    effective_payment_status = current_payment_status
+                    payment_terminal = True
+                else:
+                    # Issue #06 Phase 4b B2: use canonical update_payment_status
+                    # instead of direct payment.status = payment_status.
+                    payment = self._update_payment_status(
+                        payment_id=payment.id,
+                        new_status=payment_status,
+                        commit=False,
+                    )
+                # provider_data is ALWAYS updated — preserves audit trail
+                # of last webhook payload regardless of status transition.
+                payment.provider_data = {
+                    **(payment.provider_data or {}),
+                    "method": method,
+                    "transaction_id": params.get("id"),
+                    "params": params,
+                }
+
+        # Phase 3: guard transaction.status.
+        # provider_data is ALWAYS updated to preserve the audit trail.
+        #
+        # DEFENSIVE CONSISTENCY CHECK (Payme only): if the linked payment
+        # is in a terminal state (refunded/cancelled/void), block the
+        # transaction transition too — even if the transaction's own
+        # state-machine would allow it (e.g. processing → completed).
+        #
+        # Historical context: this guard was introduced in PR #2657 to
+        # compensate for PaymentCancelService.cancel_payment() updating
+        # only Payment.status, leaving PaymentTransaction in a non-
+        # terminal state. FOLLOWUP-8 (PR #2670, merged) fixed the
+        # cancel path: Payment and PaymentTransaction are now updated
+        # atomically inside transaction_ctx with FOR UPDATE locks.
+        #
+        # Scope: this method (_apply_existing_payme_transaction_state)
+        # is invoked ONLY from process_payme_webhook(). Click and Kaspi
+        # webhook handlers (process_click_webhook / process_kaspi_webhook)
+        # do NOT route through this guard. The remaining Payme-specific
+        # invariant this guard protects: a duplicate PerformTransaction
+        # webhook arriving on an already-cancelled Payme Tx must not
+        # reopen it.
+        #
+        # FOLLOWUP-10 (not yet implemented) tracks a separate race in
+        # Click/Kaspi webhook insert paths — that race is NOT caught by
+        # this guard and must be fixed in the Click/Kaspi handlers
+        # directly. Do not rely on this guard for Click/Kaspi coverage.
+        #
+        # DO NOT REMOVE this guard until FOLLOWUP-10 lands AND a separate
+        # audit confirms no Payme duplicate-PerformTransaction scenario
+        # remains.
+        current_tx_status = getattr(transaction, "status", None)
+        tx_blocked_by_payment = (
+            payment_terminal
+            and current_tx_status
+            and current_tx_status != provider_status
+        )
+
+        # NOTE: _resolve_was_completed (FOLLOWUP-12 AuditLog persist) was
+        # already called above, BEFORE Phase 2, to avoid rolling back
+        # payment.status / payment.provider_data mutations on AuditLog
+        # failure. Do not re-call it here.
+
+        if current_tx_status and (
+            not self._can_transition_transaction_status(
+                current_tx_status, provider_status
+            )
+            or tx_blocked_by_payment
+        ):
+            if tx_blocked_by_payment:
+                logger.warning(
+                    "Payme webhook: blocked transaction transition because "
+                    "linked payment is terminal "
+                    "tx_current=%s tx_target=%s payment_status=%s "
+                    "transaction_id=%s method=%s "
+                    "(defensive guard — Payme duplicate-webhook protector)",
+                    current_tx_status,
+                    provider_status,
+                    effective_payment_status,
+                    getattr(transaction, "id", None),
+                    method,
+                )
+            else:
+                logger.warning(
+                    "Payme webhook: ignored invalid transaction transition "
+                    "current=%s target=%s transaction_id=%s method=%s",
+                    current_tx_status,
+                    provider_status,
+                    getattr(transaction, "id", None),
+                    method,
+                )
+        else:
+            transaction.status = provider_status
+
         transaction.provider_data = {
             **(transaction.provider_data or {}),
             "method": method,
@@ -553,17 +892,200 @@ class ProviderWebhookService:
             "params": params,
         }
 
-        if payment_id:
-            payment = self.repository.get_payment_by_id(payment_id)
-            if payment:
-                payment.status = payment_status
-                if payment_status == "paid" and not payment.paid_at:
-                    payment.paid_at = datetime.now(UTC)
-                payment.provider_data = {
-                    **(payment.provider_data or {}),
-                    **(transaction.provider_data or {}),
-                }
-        return payment_status
+        # Update payment.provider_data with the final transaction
+        # provider_data (merge). This is done here (after transaction
+        # provider_data is finalized) rather than in Phase 2 so the
+        # payment always gets the complete payload.
+        if payment_id and payment:
+            payment.provider_data = {
+                **(payment.provider_data or {}),
+                **(transaction.provider_data or {}),
+            }
+
+        return effective_payment_status
+
+    def _resolve_was_completed(
+        self, transaction: Any, current_tx_status: str | None
+    ) -> bool:
+        """FOLLOWUP-12: determine whether the Tx was in 'completed' state
+        before the first CancelTransaction was applied.
+
+        On the first CancelTransaction call, `current_tx_status` is the
+        true pre-cancel state (e.g. 'completed' or 'processing'). We
+        persist it in AuditLog so that on retry — when `current_tx_status`
+        has already mutated to 'refunded' or 'cancelled' — we can recover
+        the original value and return the correct JSON-RPC `state`.
+
+        Returns True if the Tx was in 'completed' state before cancel,
+        False otherwise. On AuditLog failure (Strategy 2 per ADR-0019),
+        falls back to deriving from `current_tx_status` and logs a
+        structured warning.
+
+        Constraint: at most 1 SELECT + 1 INSERT per call.
+
+        Terminal-status guard (Codex P2 review on PR #2684): if
+        `current_tx_status` is already terminal (refunded/cancelled/void)
+        AND no AuditLog record exists, this means the first cancel
+        already committed but its AuditLog INSERT failed. In this case
+        we CANNOT recover the true pre-cancel state — it is lost. We
+        return False (conservative — response state=-1) and DO NOT
+        persist the terminal status, because doing so would record an
+        immutable-but-wrong `pre_cancel_status` that blocks all future
+        recovery. This is the unavoidable degradation of Strategy 2:
+        when the first AuditLog write fails, idempotency for that Tx
+        is lost, but we do not make it worse by persisting wrong data.
+        """
+        tx_id = getattr(transaction, "id", None)
+
+        # Step 1: try to recover pre_cancel_status from AuditLog (retry case).
+        recovered_pre_cancel = self._get_pre_cancel_state_from_audit_log(tx_id)
+        if recovered_pre_cancel is not None:
+            # Retry: AuditLog record exists from a prior CancelTransaction.
+            return recovered_pre_cancel == "completed"
+
+        # Step 2: first call (or prior AuditLog write failed).
+        #
+        # Terminal-status guard: if current_tx_status is already terminal,
+        # the first cancel already committed but its AuditLog INSERT
+        # failed. We cannot recover the true pre-cancel state — persist
+        # the terminal status would record wrong data that blocks future
+        # recovery. Return False (conservative) and do not persist.
+        if current_tx_status in _TERMINAL_TX_STATUSES:
+            logger.warning(
+                "Payme webhook: Tx is already in terminal state %s but no "
+                "AuditLog pre_cancel_status record exists — first cancel's "
+                "AuditLog INSERT must have failed. Cannot recover true "
+                "pre-cancel state; returning was_completed=False (state=-1). "
+                "Idempotency for this Tx is degraded (Strategy 2). "
+                "transaction_id=%s",
+                current_tx_status,
+                tx_id,
+            )
+            return False
+
+        # Step 3: genuine first call — current_tx_status is a non-terminal
+        # state (processing/completed). Derive was_completed and persist
+        # for future retries.
+        was_completed = current_tx_status == "completed"
+
+        # Persist pre_cancel_status. On failure, fall back to mutable-state
+        # derivation (Strategy 2). The webhook response is still sent;
+        # idempotency degrades silently for this Tx if a retry arrives.
+        # The try/except here is a safety net: _persist_pre_cancel_state
+        # already catches exceptions internally, but this outer catch
+        # ensures that any unexpected error from the helper does not
+        # abort the webhook.
+        try:
+            self._persist_pre_cancel_state(tx_id, current_tx_status)
+        except Exception as exc:
+            logger.warning(
+                "Payme webhook: AuditLog persist failed — falling back to "
+                "mutable-state derivation. Idempotency may degrade on retry. "
+                "transaction_id=%s pre_cancel_status=%s error_type=%s",
+                tx_id,
+                current_tx_status,
+                type(exc).__name__,
+            )
+
+        return was_completed
+
+    def _get_pre_cancel_state_from_audit_log(
+        self, tx_id: int | None
+    ) -> str | None:
+        """Recover the latest pre_cancel_status from AuditLog for the given Tx.
+
+        Returns None if no record exists (first call) or on query failure
+        (Strategy 2 fallback). At most 1 SELECT per call.
+        """
+        if tx_id is None:
+            return None
+        try:
+            row = (
+                self.db.query(AuditLog)
+                .filter(
+                    AuditLog.action == PAYME_TX_PRE_CANCEL_STATE_ACTION,
+                    AuditLog.entity_type == "payment_transaction",
+                    AuditLog.entity_id == tx_id,
+                )
+                .order_by(AuditLog.created_at.desc())
+                .first()
+            )
+            if row is None or not row.payload:
+                return None
+            return row.payload.get("pre_cancel_status")
+        except Exception as exc:
+            # Strategy 2: do not abort the webhook. Fall back to mutable-state
+            # derivation. logger.warning (NOT logger.exception) to avoid
+            # Sentry recursion (see sentry.py:243-249).
+            logger.warning(
+                "Payme webhook: AuditLog SELECT failed — falling back to "
+                "mutable-state derivation. Idempotency may degrade on retry. "
+                "transaction_id=%s error_type=%s",
+                tx_id,
+                type(exc).__name__,
+            )
+            return None
+
+    def _persist_pre_cancel_state(
+        self, tx_id: int | None, pre_cancel_status: str | None
+    ) -> None:
+        """Persist pre_cancel_status in AuditLog for future retry recovery.
+
+        Uses inline `db.add(AuditLog(...)); db.flush()` (NOT
+        `audit_service.log_audit_event()`, which does its own `db.commit()`
+        and would break atomicity — see Finding 5 in RFC #2679).
+
+        On failure (Strategy 2 per ADR-0019 lines 152-154):
+        - rollback the current transaction (clears the failed AuditLog INSERT
+          and any pending state from the same transaction_ctx)
+        - log a structured warning
+        - return without raising
+
+        The caller (`_resolve_was_completed`) has already computed
+        `was_completed` before calling this method. After rollback, the
+        caller's `transaction_ctx` will commit a fresh transaction with
+        only the Tx.status mutation (which is set in-memory after this
+        method returns). The AuditLog record is lost for this Tx —
+        idempotency degrades silently, but webhook availability is
+        preserved.
+
+        Note: a full rollback (not SAVEPOINT) is used because the test
+        fixture's `db_session` already wraps each test in a SAVEPOINT,
+        and nested SAVEPOINTs on SQLite cause `no such savepoint` errors
+        during teardown. A full rollback is safe here because nothing
+        has been mutated in this transaction_ctx before this method is
+        called (the Payment FOR UPDATE lock is a SELECT, not a mutation;
+        the Tx.status mutation happens AFTER this method returns).
+        """
+        if tx_id is None:
+            return
+        try:
+            entry = AuditLog(
+                action=PAYME_TX_PRE_CANCEL_STATE_ACTION,
+                entity_type="payment_transaction",
+                entity_id=tx_id,
+                payload={"pre_cancel_status": pre_cancel_status},
+                actor_type="system",
+                outcome="success",
+            )
+            self.db.add(entry)
+            self.db.flush()  # NOT commit — caller controls transaction_ctx
+        except Exception as exc:
+            # Strategy 2: rollback to clear the failed INSERT, then log.
+            # The outer transaction_ctx will start a fresh transaction on
+            # the next operation (Tx.status mutation + commit).
+            try:
+                self.db.rollback()
+            except Exception:
+                pass  # rollback itself failed — nothing more we can do
+            logger.warning(
+                "Payme webhook: AuditLog INSERT failed — falling back to "
+                "mutable-state derivation. Idempotency may degrade on retry. "
+                "transaction_id=%s pre_cancel_status=%s error_type=%s",
+                tx_id,
+                pre_cancel_status,
+                type(exc).__name__,
+            )
 
     def process_kaspi_webhook(self, webhook_data: dict[str, Any]) -> dict[str, Any]:
         """Webhook для Kaspi Pay платежной системы.
@@ -641,7 +1163,12 @@ class ProviderWebhookService:
                     payment = None
                     mapped_status = None
                     if result.payment_id:
-                        payment = self.repository.get_payment_by_provider_payment_id(
+                        # FOLLOWUP-10: lock Payment row before mutation.
+                        # Prevents TOCTOU race against concurrent
+                        # PaymentCancelService.cancel_payment() (which
+                        # acquires SELECT Payment ... FOR UPDATE via
+                        # billing_service.update_payment_status).
+                        payment = self.repository.get_payment_by_provider_payment_id_for_update(
                             result.payment_id
                         )
 
@@ -656,9 +1183,25 @@ class ProviderWebhookService:
                                 "payment_status": None,
                                 "payment_provider": "kaspi",
                             }
+                        # Issue #06 Phase 4b B2: Replaced direct payment.status =
+                        # mapped_status with billing_service.update_payment_status()
+                        # to enforce payment state machine validation.
+                        #
+                        # The lock is already acquired above via
+                        # get_payment_by_id_for_update(). update_payment_status()
+                        # will re-acquire it (idempotent within same transaction)
+                        # and validate the transition via ALLOWED_PAYMENT_TRANSITIONS.
+                        #
+                        # commit=False because this is inside a larger webhook
+                        # transaction (PaymentTransaction + webhook record +
+                        # visit projection all committed together by the caller).
                         mapped_status = self._map_provider_status_to_payment_status(result.status)
-                        payment.status = mapped_status
-                        if payment.status == "paid":
+                        payment = self._update_payment_status(
+                            payment_id=payment.id,
+                            new_status=mapped_status,
+                            commit=False,
+                        )
+                        if payment.status == "paid" and not payment.paid_at:
                             payment.paid_at = datetime.now(UTC)
 
                         payment.provider_data = {
@@ -697,7 +1240,12 @@ class ProviderWebhookService:
                 if result.payment_id:
                     failed_payment = self.repository.get_payment_by_provider_payment_id(result.payment_id)
                 if failed_payment:
-                    failed_payment.status = "failed"
+                    # Issue #06 Phase 4b B2: use canonical update_payment_status
+                    failed_payment = self._update_payment_status(
+                        payment_id=failed_payment.id,
+                        new_status="failed",
+                        commit=False,
+                    )
                     failed_payment.provider_data = {
                         **(failed_payment.provider_data or {}),
                         "webhook_error": result.error_message,

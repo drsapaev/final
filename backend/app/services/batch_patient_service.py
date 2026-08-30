@@ -25,6 +25,7 @@ from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
 from app.services.queue_domain_service import QueueDomainService
+from app.services.queue_status import is_terminal_queue
 from app.services.queue_service import get_queue_service
 from app.services.service_mapping import (
     get_default_service_by_specialty,
@@ -88,6 +89,7 @@ class EntryResult(BaseModel):
     id: int
     status: Literal["updated", "cancelled", "created", "error"]
     error: str | None = None
+    error_code: str | None = None
 
 
 class BatchUpdateResponse(BaseModel):
@@ -98,6 +100,7 @@ class BatchUpdateResponse(BaseModel):
     updated_entries: list[EntryResult]
     aggregated_row: dict[str, Any] | None = None
     error: str | None = None
+    error_code: str | None = None
 
 
 # ============================================================================
@@ -226,12 +229,17 @@ class BatchPatientService:
             if has_errors:
                 # Откатываем транзакцию
                 self.db.rollback()
+                # Find the first error code for the top-level response
+                first_error_code = next(
+                    (r.error_code for r in results if r.error_code), None
+                )
                 return BatchUpdateResponse(
                     success=False,
                     patient_id=patient_id,
                     date=str(target_date),
                     updated_entries=results,
-                    error="One or more operations failed"
+                    error="One or more operations failed",
+                    error_code=first_error_code
                 )
 
             # Коммитим транзакцию
@@ -276,17 +284,59 @@ class BatchPatientService:
             action=action,
         )
         if error:
+            if isinstance(error, dict):
+                return EntryResult(
+                    id=action.id, status="error",
+                    error=error["message"], error_code=error.get("code")
+                )
             return EntryResult(id=action.id, status="error", error=error)
 
         if entry_type == "online_queue":
             entry = target
+            # P2-2 (post-merge stabilization): reject cancel on terminal
+            # queue entries. A cancelled/served/no_show entry is already
+            # in a final state — silently "cancelling" it again returns
+            # success='cancelled' which misleads the caller into thinking
+            # a real mutation happened. Return an explicit error instead.
+            if is_terminal_queue(entry.status):
+                return EntryResult(
+                    id=action.id,
+                    status="error",
+                    error_code="entry_already_terminal",
+                    error=(
+                        f"Queue entry {action.id} is in terminal status "
+                        f"'{entry.status}' and cannot be cancelled again."
+                    ),
+                )
             entry.status = "cancelled"
             entry.cancel_reason = action.reason
             return EntryResult(id=action.id, status="cancelled")
 
         if entry_type == "visit":
             visit = target
-            visit.status = "cancelled"
+            # Issue #06 Phase 3 (Gate D): delegate to VisitLifecycleService
+            # with commit=False to preserve batch atomicity.
+            #
+            # Original semantics: _cancel_entry does NOT commit — it only
+            # mutates the ORM object. The batch process() method commits
+            # ONCE at the end (line 245) or rolls back on exception (line 260).
+            #
+            # Migration: use commit=False so the service stages the mutation
+            # without committing. The batch's single commit at the end will
+            # persist ALL staged mutations atomically.
+            from app.services.visit_lifecycle_service import VisitLifecycleService
+
+            # Create a lightweight user-like object for audit logging.
+            class _BatchActor:
+                def __init__(self, user_id: int | None) -> None:
+                    self.id = user_id or 0
+
+            VisitLifecycleService(self.db).cancel_visit(
+                visit_id=visit.id,
+                current_user=_BatchActor(getattr(self, "_actor_user_id", None)),
+                reason=f"Batch cancel: {action.reason or 'no reason provided'}",
+                commit=False,  # CRITICAL: do not commit — batch owns the transaction
+            )
             return EntryResult(id=action.id, status="cancelled")
 
         return EntryResult(
@@ -312,10 +362,37 @@ class BatchPatientService:
             action=action,
         )
         if error:
+            if isinstance(error, dict):
+                return EntryResult(
+                    id=action.id, status="error",
+                    error=error["message"], error_code=error.get("code")
+                )
             return EntryResult(id=action.id, status="error", error=error)
 
         if entry_type == "online_queue":
             entry = target
+            # P2-2 (post-merge stabilization): reject update on terminal
+            # queue entries. Before this check, _find_online_queue_entry_for_action
+            # returned cancelled/served/no_show entries (no status filter),
+            # and _update_entry directly set entry.status = action.status,
+            # RESURRECTING terminal queue entries. This violated the
+            # invariant: terminal queue statuses must not be silently
+            # regressed by a batch update.
+            #
+            # Note: we reject ANY update on a terminal entry, even a
+            # non-status field update (service_id, service_code), because
+            # a terminal entry is immutable by definition — its audit
+            # trail must be preserved.
+            if is_terminal_queue(entry.status):
+                return EntryResult(
+                    id=action.id,
+                    status="error",
+                    error_code="entry_already_terminal",
+                    error=(
+                        f"Queue entry {action.id} is in terminal status "
+                        f"'{entry.status}' and cannot be updated."
+                    ),
+                )
             if action.service_id:
                 entry.service_id = action.service_id
             if action.service_code:
@@ -329,7 +406,36 @@ class BatchPatientService:
             if action.doctor_id:
                 visit.doctor_id = action.doctor_id
             if action.status:
-                visit.status = action.status
+                # Issue #06 Phase 3 (Gate D): delegate status mutation to
+                # VisitLifecycleService with commit=False to preserve
+                # batch atomicity.
+                #
+                # The batch update action can specify an arbitrary target
+                # status. The state machine validates the transition — if
+                # the transition is invalid (e.g. closed → open), the
+                # service raises 409 and the batch item is recorded as
+                # an error (the caller catches the exception).
+                from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                class _BatchActor:
+                    def __init__(self, user_id: int | None) -> None:
+                        self.id = user_id or 0
+
+                try:
+                    VisitLifecycleService(self.db).transition_status(
+                        visit_id=visit.id,
+                        target_status=action.status,
+                        current_user=_BatchActor(getattr(self, "_actor_user_id", None)),
+                        commit=False,  # CRITICAL: batch owns the transaction
+                    )
+                except Exception as exc:
+                    # State machine rejected the transition — record as
+                    # error but do NOT raise (batch continues with other items).
+                    return EntryResult(
+                        id=action.id,
+                        status="error",
+                        error=f"Invalid status transition: {exc}",
+                    )
             return EntryResult(id=action.id, status="updated")
 
         return EntryResult(
@@ -366,12 +472,12 @@ class BatchPatientService:
             return None, None, "Entry not found"
 
         if entry and visit:
-            return None, None, "Ambiguous entry id; include entry_type"
+            return None, None, {"code": "ambiguous_entry_id", "message": "Ambiguous entry id; include entry_type"}
         if entry:
             return "online_queue", entry, None
         if visit:
             return "visit", visit, None
-        return None, None, "Entry not found"
+        return None, None, {"code": "entry_not_found", "message": "Entry not found"}
 
     def _find_online_queue_entry_for_action(
         self,

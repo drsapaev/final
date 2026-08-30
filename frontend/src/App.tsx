@@ -8,11 +8,10 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
-import './theme/macos-tokens.css';
+import './design-system/tokens.css';
 import './styles/macos.css';
 import './styles/header-new.css';
 import 'react-toastify/dist/ReactToastify.css';
-import { MacOSThemeProvider } from './theme/macosTheme';
 import { bootstrapStoredColorScheme } from './theme/colorScheme';
 import {
   Sidebar,
@@ -28,6 +27,7 @@ import Setup from './pages/Setup';
 import { useSetupStatus } from './hooks/useSetupStatus';
 import { useBreakpoint } from './hooks/useEnhancedMediaQuery';
 import auth from './stores/auth';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import { ROUTE_REGISTRY } from './routing/routeRegistry';
 import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards';
 import { getRouteChromeState, type RouteProfile } from './routing/routeSelectors';
@@ -95,6 +95,7 @@ const IntegrationDemo = lazy(() => import('./components/integration/IntegrationD
 
 const ROUTE_COMPONENTS = {
   Landing,
+  ResetPasswordPage,
   LoginFormStyled,
   ChangePasswordRequired,
   Health,
@@ -448,23 +449,21 @@ function AppContent() {
 
 export default function App() {
   return (
-    <MacOSThemeProvider>
-      <ThemeProvider>
-        <AppProviders>
-          <AppContent />
-          <ToastContainer
-            position="bottom-right"
-            autoClose={4000}
-            newestOnTop
-            closeOnClick
-            pauseOnHover
-            draggable
-            theme="colored"
-          />
-          <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
-        </AppProviders>
-      </ThemeProvider>
-    </MacOSThemeProvider>
+    <ThemeProvider>
+      <AppProviders>
+        <AppContent />
+        <ToastContainer
+          position="bottom-right"
+          autoClose={4000}
+          newestOnTop
+          closeOnClick
+          pauseOnHover
+          draggable
+          theme="colored"
+        />
+        <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
+      </AppProviders>
+    </ThemeProvider>
   );
 }
 

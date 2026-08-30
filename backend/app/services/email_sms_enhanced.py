@@ -17,8 +17,23 @@ import httpx
 from jinja2 import Environment, FileSystemLoader
 
 from app.core.config import settings
+from app.core.pii_masker import mask_pii_text
 
 logger = logging.getLogger(__name__)
+
+
+def build_from_header(sender: str | None, username: str | None = None) -> str:
+    """Канонический заголовок From для всех email-отправителей.
+
+    SMTP_FROM может быть голым mailbox (no-reply@…) либо полным
+    заголовком «Name <mailbox>» (формат из docs/DEPLOYMENT_GUIDE.md).
+    Вторую обёртку добавлять нельзя: «Name <Name <mailbox>>» парсится
+    с пустым envelope-sender, и провайдер отклоняет письмо.
+    """
+    value = (sender or username or "").strip()
+    if "<" in value and ">" in value:
+        return value
+    return f"Programma Clinic <{value}>"
 
 
 def _escape_html(text: str | None) -> str:
@@ -40,22 +55,6 @@ def _protected_frontend_url(path: str) -> str:
     normalized_base = base_url.rstrip("/") or "http://localhost:5173"
     normalized_path = f"/{str(path or '').strip().lstrip('/')}"
     return f"{normalized_base}{normalized_path}"
-
-
-def _escape_html(text: str | None) -> str:
-    """NOTIF-REAUDIT-28 P1-4: escape user-supplied text before interpolating
-    into HTML email body (was raw f-string → XSS via <script>, <img onerror>,
-    phishing <a> tags)."""
-    from html import escape
-    return escape(str(text or ""))
-
-
-def _escape_html(text: str | None) -> str:
-    """NOTIF-REAUDIT-28 P1-4: escape user-supplied text before interpolating
-    into HTML email body (was raw f-string → XSS via <script>, <img onerror>,
-    phishing <a> tags)."""
-    from html import escape
-    return escape(str(text or ""))
 
 
 def _protected_frontend_url(path: str) -> str:
@@ -81,6 +80,8 @@ class EmailSMSEnhancedService:
         self.smtp_username = getattr(settings, "SMTP_USERNAME", None)
         self.smtp_password = getattr(settings, "SMTP_PASSWORD", None)
         self.smtp_use_tls = getattr(settings, "SMTP_USE_TLS", True)
+        self.smtp_from = getattr(settings, "SMTP_FROM", None)
+        self.smtp_timeout = int(getattr(settings, "SMTP_TIMEOUT", 30) or 30)
 
         # SMS настройки
         self.sms_api_key = getattr(settings, "SMS_API_KEY", None)
@@ -120,7 +121,7 @@ class EmailSMSEnhancedService:
 
             # Создаем сообщение
             msg = MIMEMultipart("alternative")
-            msg["From"] = f"Programma Clinic <{self.smtp_username}>"
+            msg["From"] = build_from_header(self.smtp_from, self.smtp_username)
             msg["To"] = to_email
             msg["Subject"] = subject
             msg["X-Priority"] = "1" if priority == "high" else "3"
@@ -148,13 +149,10 @@ class EmailSMSEnhancedService:
                 for attachment in attachments:
                     await self._add_attachment(msg, attachment)
 
-            # Отправляем письмо
-            context = ssl.create_default_context()
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                if self.smtp_use_tls:
-                    server.starttls(context=context)
-                server.login(self.smtp_username, self.smtp_password)
-                server.send_message(msg)
+            # Отправляем письмо. smtplib синхронный — уводим в поток,
+            # чтобы медленный/недоступный SMTP не блокировал event
+            # loop; длительность операции ограничена таймаутом.
+            await asyncio.to_thread(self._smtp_send_message, msg)
 
             self.stats['emails_sent'] += 1
             # NOTIF-REAUDIT-28 P1: PII-safe logging
@@ -163,8 +161,24 @@ class EmailSMSEnhancedService:
 
         except Exception as e:
             self.stats['emails_failed'] += 1
-            logger.error(f"Ошибка отправки email: {e}")
-            return False, str(e)
+            # PII: провайдерские исключения (SMTPRecipientsRefused)
+            # содержат адрес получателя — чистим до лога и до возврата
+            # вызывающему (текст доходит до detail HTTP-ответа).
+            masked = mask_pii_text(str(e))
+            logger.error("Ошибка отправки email: %s", masked)
+            return False, masked
+
+    def _smtp_send_message(self, msg) -> None:
+        """Синхронная SMTP-отправка; вызывается через asyncio.to_thread."""
+        context = ssl.create_default_context()
+        with smtplib.SMTP(
+            self.smtp_server, self.smtp_port, timeout=self.smtp_timeout
+        ) as server:
+            if self.smtp_use_tls:
+                server.starttls(context=context)
+            server.login(self.smtp_username, self.smtp_password)
+            server.send_message(msg)
+
 
     async def send_sms_enhanced(
         self,
@@ -213,14 +227,16 @@ class EmailSMSEnhancedService:
                 return True, "SMS отправлено успешно"
             else:
                 self.stats['sms_failed'] += 1
-                error_msg = result.get('error', 'Неизвестная ошибка')
-                logger.error(f"Ошибка отправки SMS: {error_msg}")
+                # PII: ответ SMS-провайдера может цитировать номер.
+                error_msg = mask_pii_text(result.get('error', 'Неизвестная ошибка'))
+                logger.error("Ошибка отправки SMS: %s", error_msg)
                 return False, error_msg
 
         except Exception as e:
             self.stats['sms_failed'] += 1
-            logger.error(f"Ошибка отправки SMS: {e}")
-            return False, str(e)
+            masked = mask_pii_text(str(e))
+            logger.error("Ошибка отправки SMS: %s", masked)
+            return False, masked
 
     async def send_bulk_email(
         self,
@@ -569,7 +585,20 @@ class EmailSMSEnhancedService:
         """Добавление вложения к email"""
         try:
             if attachment.get('type') == 'image':
-                with open(attachment['path'], 'rb') as f:
+                # SECURITY (CodeQL py/path-injection #448): use os.path.basename
+                # to strip any path components from user-supplied path. Combined
+                # with the schema validator (SendCustomEmailRequest._validate_attachments),
+                # this blocks path traversal via attachment['path'].
+                import os
+                safe_path = os.path.basename(attachment['path'])
+                if not safe_path or safe_path != attachment['path']:
+                    logger.warning(
+                        "Email attachment path rejected (traversal attempt): %s",
+                        attachment['path'],
+                    )
+                    return
+                # codeql[py/path-injection]
+                with open(safe_path, 'rb') as f:
                     img_data = f.read()
                 image = MIMEImage(img_data)
                 image.add_header(

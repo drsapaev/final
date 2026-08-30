@@ -27,6 +27,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.core.pii_masker import _mask_string_inplace
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +50,13 @@ def log_endpoint_error(
     context: dict[str, Any] = {
         "endpoint": endpoint,
         "error_type": type(exc).__name__,
-        "error_message": str(exc),
+        # Sanitize the exception message in place. PIIMaskingFilter scrubs
+        # record.msg/record.args via mask_pii(), but mask_pii(dict) only
+        # redacts values whose KEY is in PII_FIELD_PATTERNS — and
+        # "error_message" is not in that list, so str(exc) would otherwise
+        # leak through payload["message"]. The traceback itself is scrubbed
+        # separately by JsonLogFormatter.formatException().
+        "error_message": _mask_string_inplace(str(exc)),
     }
     if user_id is not None:
         context["user_id"] = user_id

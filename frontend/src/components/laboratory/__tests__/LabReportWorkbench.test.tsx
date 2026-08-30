@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LabReportWorkbenchRaw from '../LabReportWorkbench';
 import { labReportingApi } from '@/api/labReporting';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { MacOSThemeProvider } from '@/theme/macosTheme';
 
 // The component under test still relies on TS prop types,
 // so the inferred prop types collapse to `never`/`undefined` defaults under
@@ -53,8 +52,7 @@ describe('LabReportWorkbench', () => {
     const onOpenInstance = vi.fn();
 
     render(
-      <MacOSThemeProvider>
-        <ThemeProvider>
+              <ThemeProvider>
           <LabReportWorkbench
             selectedAppointment={null}
             templates={[]}
@@ -84,7 +82,6 @@ describe('LabReportWorkbench', () => {
             notify={vi.fn()}
           />
         </ThemeProvider>
-      </MacOSThemeProvider>
     );
 
     expect(
@@ -148,8 +145,7 @@ describe('LabReportWorkbench', () => {
     const notify = vi.fn();
 
     render(
-      <MacOSThemeProvider>
-        <ThemeProvider>
+              <ThemeProvider>
           <LabReportWorkbench
             selectedAppointment={{
               id: 17,
@@ -198,7 +194,6 @@ describe('LabReportWorkbench', () => {
             notify={notify}
           />
         </ThemeProvider>
-      </MacOSThemeProvider>
     );
 
     await screen.findByText((content) =>
@@ -216,8 +211,7 @@ describe('LabReportWorkbench', () => {
 
   it('does not auto-select a service-scoped template unless backend provides default_template', async () => {
     render(
-      <MacOSThemeProvider>
-        <ThemeProvider>
+              <ThemeProvider>
           <LabReportWorkbench
             selectedAppointment={{
               id: 17,
@@ -261,7 +255,6 @@ describe('LabReportWorkbench', () => {
             notify={vi.fn()}
           />
         </ThemeProvider>
-      </MacOSThemeProvider>
     );
 
     expect(screen.getByRole('combobox')).toHaveValue('');

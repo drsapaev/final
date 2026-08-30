@@ -1,10 +1,7 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
-import { ThemeProvider } from '@/contexts/ThemeContext';
-import { MacOSThemeProvider } from '@/theme/macosTheme';
-import { TranslationProvider } from '@/i18n/useTranslation';  // PR-50
+import { renderWithProviders } from '@/test/renderWithProviders';
 import HeaderNew, { isThemeMenuInteraction } from '../HeaderNew';
 
 const authState = {
@@ -51,17 +48,9 @@ vi.mock('../../../utils/logger', () => ({
 }));
 
 function renderHeader() {
-  return render(
-    <MemoryRouter initialEntries={['/admin']}>
-      <MacOSThemeProvider>
-        <ThemeProvider>
-          <TranslationProvider>  {/* PR-50: required by HeaderNew useTranslation */}
-            <HeaderNew />
-          </TranslationProvider>
-        </ThemeProvider>
-      </MacOSThemeProvider>
-    </MemoryRouter>
-  );
+  return renderWithProviders(<HeaderNew />, {
+    routerProps: { initialEntries: ['/admin'] },
+  });
 }
 
 describe('HeaderNew theme menu', () => {

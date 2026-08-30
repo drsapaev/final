@@ -34,6 +34,11 @@ class LoginResponse(BaseModel):
     two_factor_method: str | None = None
     pending_2fa_token: str | None = None
     must_change_password: bool = False  # Требуется смена пароля при следующем входе
+    # Двухстадийная аутентификация: критичная роль без настроенной 2FA.
+    # enrollment_token — сервер-сайдный одноразовый токен (НЕ JWT),
+    # принимаемый только /2fa/setup и /2fa/verify-setup (TTL 10 минут).
+    requires_2fa_setup: bool = False
+    enrollment_token: str | None = None
 
 
 class RefreshTokenRequest(BaseModel):

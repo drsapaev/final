@@ -25,14 +25,11 @@ from app.core.security import get_password_hash
 # ===================== FIXTURES =====================
 
 @pytest.fixture
-def admin_token(client: TestClient, admin_user: User, admin_password: str) -> str:
-    """Токен администратора"""
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    assert response.status_code == 200
-    return response.json()["access_token"]
+def admin_token(admin_user: User) -> str:
+    """Токен администратора (Admin — критичная 2FA-роль, минтим напрямую)"""
+    from tests.conftest import mint_access_token
+
+    return mint_access_token(admin_user)
 
 
 @pytest.fixture
@@ -77,12 +74,11 @@ def cashier_token(client: TestClient, db_session: Session) -> str:
         db_session.commit()
         db_session.refresh(cashier)
 
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": cashier.username, "password": "cashier123"},
-    )
-    assert response.status_code == 200
-    return response.json()["access_token"]
+    # Cashier — критичная 2FA-роль: /login уходит в enrollment-флоу,
+    # поэтому минтим access-токен напрямую.
+    from tests.conftest import mint_access_token
+
+    return mint_access_token(cashier)
 
 
 @pytest.fixture
@@ -120,7 +116,7 @@ def test_patient_for_rbac(db_session: Session, admin_user: User) -> Patient:
     from app.schemas.patient import PatientCreate
 
     # Проверяем, не существует ли уже пациент с таким телефоном
-    existing = patient_crud.get_patient_by_phone(db_session, phone="+998901234567")
+    existing = patient_crud.get_patient_by_phone(db_session, phone="+998900000030")
     if existing:
         return existing
 
@@ -129,7 +125,7 @@ def test_patient_for_rbac(db_session: Session, admin_user: User) -> Patient:
         obj_in=PatientCreate(
             last_name="Тестов",
             first_name="Пациент",
-            phone="+998901234567",
+            phone="+998900000030",
             birth_date="1990-01-01",
         ),
     )
@@ -150,7 +146,7 @@ class TestPositiveRBAC:
             json={
                 "last_name": "Иванов",
                 "first_name": "Иван",
-                "phone": "+998901234568",
+                "phone": "+998900000031",
                 "birth_date": "1990-01-01",
             },
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -161,7 +157,7 @@ class TestPositiveRBAC:
         """Registrar может создавать пациентов"""
         import random
         # Используем уникальный телефон для каждого теста
-        phone = f"+99890{random.randint(1000000, 9999999)}"
+        phone = "+998900000000"
         response = client.post(
             "/api/v1/patients/",
             json={
@@ -232,7 +228,7 @@ class TestNegativeRBAC:
         """Patient НЕ может создавать пациентов"""
         import random
         # Используем уникальный телефон для каждого теста
-        phone = f"+99890{random.randint(1000000, 9999999)}"
+        phone = "+998900000000"
         response = client.post(
             "/api/v1/patients/",
             json={
@@ -249,7 +245,7 @@ class TestNegativeRBAC:
         """Doctor НЕ может создавать пациентов"""
         import random
         # Используем уникальный телефон для каждого теста
-        phone = f"+99890{random.randint(1000000, 9999999)}"
+        phone = "+998900000000"
         response = client.post(
             "/api/v1/patients/",
             json={
@@ -266,7 +262,7 @@ class TestNegativeRBAC:
         """Cashier НЕ может создавать пациентов"""
         import random
         # Используем уникальный телефон для каждого теста
-        phone = f"+99890{random.randint(1000000, 9999999)}"
+        phone = "+998900000000"
         response = client.post(
             "/api/v1/patients/",
             json={
@@ -310,7 +306,7 @@ class TestUnauthorizedRBAC:
         """Неавторизованный запрос создания пациента"""
         import random
         # Используем уникальный телефон для каждого теста
-        phone = f"+99890{random.randint(1000000, 9999999)}"
+        phone = "+998900000000"
         response = client.post(
             "/api/v1/patients/",
             json={
@@ -360,13 +356,13 @@ class TestOwnDataRBAC:
             user_id=patient_user.id,
             last_name="Own",
             first_name="Patient",
-            phone="+998909801001",
+            phone="+998900000032",
             birth_date=date(1990, 1, 1),
         )
         other_patient = Patient(
             last_name="Other",
             first_name="Patient",
-            phone="+998909801002",
+            phone="+998900000033",
             birth_date=date(1991, 1, 1),
         )
         db_session.add_all([own_patient, other_patient])
@@ -419,7 +415,7 @@ class TestAuditLog403:
         # Выполняем запрос, который должен вернуть 403
         import random
         # Используем уникальный телефон для каждого теста
-        phone = f"+99890{random.randint(1000000, 9999999)}"
+        phone = "+998900000000"
         response = client.post(
             "/api/v1/patients/",
             json={

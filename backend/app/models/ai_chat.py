@@ -76,7 +76,8 @@ class AIChatSession(Base):
     user = relationship("User", backref="ai_chat_sessions")
 
     def __repr__(self) -> str:
-        return f"<AIChatSession {self.id}: {self.title or 'Untitled'}>"
+        # FOLLOWUP-4: omit title — it may contain free-text PHI.
+        return f"<AIChatSession(id={self.id})>"
 
 
 
@@ -166,8 +167,9 @@ class AIChatMessage(Base):
     )
 
     def __repr__(self) -> str:
-        preview = self.content[:50] + "..." if len(self.content) > 50 else self.content
-        return f"<AIChatMessage {self.id} ({self.role}): {preview}>"
+        # FOLLOWUP-4: omit content preview — it contains free-text PHI.
+        # role is enum-like (user/assistant/system), safe to include.
+        return f"<AIChatMessage(id={self.id}, role={self.role})>"
 
 
 

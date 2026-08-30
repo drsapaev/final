@@ -31,7 +31,7 @@ const {
   DoctorQueuePanelTestMacOSButton,
   DoctorQueuePanelTestMacOSBadge,
   DoctorQueuePanelTestMacOSLoadingSkeleton,
-  DoctorQueuePanelTestMacOSEmptyState,
+  DoctorQueuePanelTestAppEmpty,
   DoctorQueuePanelTestMacOSAlert,
 } = vi.hoisted(() => {
   const DoctorQueuePanelTestMacOSCard = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
@@ -42,7 +42,7 @@ const {
 
   const DoctorQueuePanelTestMacOSLoadingSkeleton = () => <div>loading</div>;
 
-  const DoctorQueuePanelTestMacOSEmptyState = ({ title }: { title?: React.ReactNode }) => <div>{title}</div>;
+  const DoctorQueuePanelTestAppEmpty = ({ title }: { title?: React.ReactNode }) => <div>{title}</div>;
 
   const DoctorQueuePanelTestMacOSAlert = ({ title, description }: { title?: React.ReactNode; description?: React.ReactNode }) => (
     <div>
@@ -56,17 +56,17 @@ const {
     DoctorQueuePanelTestMacOSButton,
     DoctorQueuePanelTestMacOSBadge,
     DoctorQueuePanelTestMacOSLoadingSkeleton,
-    DoctorQueuePanelTestMacOSEmptyState,
+    DoctorQueuePanelTestAppEmpty,
     DoctorQueuePanelTestMacOSAlert,
   };
 });
 
 vi.mock('../../ui/macos', () => ({
-  MacOSCard: DoctorQueuePanelTestMacOSCard,
+  Card: DoctorQueuePanelTestMacOSCard,
   Button: DoctorQueuePanelTestMacOSButton,
   Badge: DoctorQueuePanelTestMacOSBadge,
   Skeleton: DoctorQueuePanelTestMacOSLoadingSkeleton,
-  MacOSEmptyState: DoctorQueuePanelTestMacOSEmptyState,
+  AppEmpty: DoctorQueuePanelTestAppEmpty,
   Alert: DoctorQueuePanelTestMacOSAlert,
 }));
 

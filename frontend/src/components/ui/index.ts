@@ -8,9 +8,14 @@
  */
 
 // Re-export everything from the macos kit (Button, Card, Badge, Input,
-// Select, Label, Textarea, Skeleton, Avatar, Checkbox, Radio, Table,
-// Modal, Dialog, Tooltip, Progress, etc.).
+// Select, Label, Textarea, Skeleton, Avatar, Checkbox, Radio, Modal,
+// Dialog, Tooltip, Progress, etc.).
 export * from './macos';
+
+// PR-UI-09d: canonical table. The macos/Table alias was removed after the
+// 09b–09c consumer migration, so the table component is re-exported here to
+// keep a barrel path (`import { DataTable } from '../ui'`).
+export { default as DataTable } from './DataTable';
 
 // AnimatedTransition was previously in ./native — now lives in ./macos.
 export { default as AnimatedTransition } from './macos/AnimatedTransition';

@@ -262,7 +262,7 @@ class TestDoctorVisitFlow:
         patient = Patient(
             first_name="Visit",
             last_name="Owner",
-            phone="+998909401000",
+            phone="+998900000144",
             birth_date=date(1990, 1, 1),
         )
         db_session.add_all(
@@ -340,7 +340,7 @@ class TestDoctorVisitFlow:
         patient = Patient(
             first_name="Private",
             last_name="Visit",
-            phone="+998909501000",
+            phone="+998900000145",
             birth_date=date(1990, 1, 1),
         )
         db_session.add_all(

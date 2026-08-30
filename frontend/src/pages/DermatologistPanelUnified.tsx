@@ -5,7 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 // S-M-2 fix: lucide-direct replaced with macos <Icon>
 import {
-  Button, MacOSCard, Badge, Input, MacOSEmptyState,
+  Button, Card, Badge, Input, AppEmpty,
   Icon } from '../components/ui/macos';
 
 import { useTheme } from '../contexts/ThemeContext';
@@ -1528,7 +1528,7 @@ const DermatologistPanelUnified = () => {
               Phase 4+: 'patients' tab combines appointments + history. */}
           {(activeTab === 'appointments' || activeTab === 'patients') &&
           <div className="derma-flex-col-24 derma-w-full derma-max-w-none">
-              <MacOSCard className="derma-card-w-full">
+              <Card className="derma-card-w-full">
                 <div style={dermatologyAppointmentsHeaderStyle}>
                   <h3 style={dermatologyAppointmentsTitleStyle}>
                     <Icon name="calendar" size={20} className="derma-icon-mr-green" />
@@ -1556,14 +1556,14 @@ const DermatologistPanelUnified = () => {
                 onRowClick={handleAppointmentRowClick}
                 onActionClick={handleAppointmentActionClick} />
 
-              </MacOSCard>
+              </Card>
             </div>
           }
 
           {/* Список пациентов */}
           {activeTab === 'patients' &&
           <div className="derma-flex-col-24">
-              <MacOSCard className="derma-p-8">
+              <Card className="derma-p-8">
                 <div className="derma-flex-center">
                   <h3 className="derma-flex-center">
                     <Icon name="person" size={20} className="derma-icon-mr-green" />
@@ -1651,7 +1651,7 @@ const DermatologistPanelUnified = () => {
                 )}
                   </div>
               }
-              </MacOSCard>
+              </Card>
             </div>
           }
 
@@ -1662,7 +1662,7 @@ const DermatologistPanelUnified = () => {
 
           {activeTab === 'visit' && currentAppointment &&
           <div className="derma-flex-col-24">
-              <MacOSCard className="derma-p-8">
+              <Card className="derma-p-8">
                 <div className="derma-flex-center">
                   <h3 className="derma-flex-center">
                     <Icon name="stethoscope" size={20} className="derma-icon-mr-orange" />
@@ -1728,7 +1728,7 @@ const DermatologistPanelUnified = () => {
                     </Button>
                   </div>
               }
-              </MacOSCard>
+              </Card>
             </div>
           }
 
@@ -1738,8 +1738,8 @@ const DermatologistPanelUnified = () => {
               If selectedPatient exists without currentAppointment, a useEffect auto-promotes it. */}
 
           {activeTab === 'visit' && !currentAppointment && !selectedPatient &&
-          <MacOSCard className="derma-p-48">
-              <MacOSEmptyState
+          <Card className="derma-p-48">
+              <AppEmpty
               icon="calendar"
               title={t('derma.derma_panel_select_visit_title')}
               description={t('derma.derma_panel_select_visit_desc')}
@@ -1748,7 +1748,7 @@ const DermatologistPanelUnified = () => {
                     {t('derma.derma_panel_go_to_appointments')}
                   </Button>
               } />
-            </MacOSCard>
+            </Card>
           }
 
           {/* Фото — R-15: extracted to DermaPhotosTab */}
@@ -1797,7 +1797,7 @@ const DermatologistPanelUnified = () => {
           {/* Управление услугами */}
           {activeTab === 'services' &&
           <div className="derma-flex-col-24">
-              <MacOSCard className="derma-p-8">
+              <Card className="derma-p-8">
                 <h3 className="derma-flex-center">
                   <Icon name="scissors" size={20} className="derma-icon-mr-orange" />
                   {t('derma.derma_panel_services_title')}
@@ -1897,7 +1897,7 @@ const DermatologistPanelUnified = () => {
                     </div>
                   </div>
                 </div>
-              </MacOSCard>
+              </Card>
             </div>
           }
 

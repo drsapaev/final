@@ -415,12 +415,7 @@ if (failed > 0) {
   process.exit(0);
 }
 
-// ========================================================================
-// Strict island invariants — directories that are strict-clean must stay clean
-// ========================================================================
-// These are checked via tsconfig.strict.json which enables strict:true for
-// specific directories. If a PR introduces implicit-any in these directories,
-// the strict check fails.
-//
-// Note: this check requires `npx tsc --noEmit -p tsconfig.strict.json` to pass.
-// It's run as a separate CI step (or can be added here if performance allows).
+// Strict invariants are enforced by `strict: true` in frontend/tsconfig.json
+// via the `npm run type-check` step in ci-cd-unified.yml (full-tree, not
+// per-directory). The per-directory tsconfig.strict.json island machinery
+// was retired after the G8 strict flip reached zero errors.

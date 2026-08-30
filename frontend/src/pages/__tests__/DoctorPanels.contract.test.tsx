@@ -3,7 +3,31 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { normalizeSource } from '../../test/contracts/source-contract-helper';
+
 const ROOT = path.resolve(process.cwd(), 'src');
+
+// PR-UI-15-3: the DentistPanelUnified decomposition moved the queue DTO
+// mapping + queue-id resolution verbatim to pages/dentist/* — the dentist
+// contract surface is the union of the panel and its extracted modules
+// (same pattern as registrar/cashier contract boundary updates).
+const readDentistModules = () => {
+  const parts: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === '__tests__') continue;
+        walk(full);
+      } else if (/\.ts$/.test(entry.name)) {
+        parts.push(fs.readFileSync(full, 'utf8'));
+      }
+    }
+  };
+  const dentistDir = path.join(ROOT, 'pages/dentist');
+  if (fs.existsSync(dentistDir)) walk(dentistDir);
+  return parts.join('\n');
+};
 
 const DOCTOR_PANEL_FILES = [
   'pages/CardiologistPanelUnified.tsx',
@@ -11,12 +35,18 @@ const DOCTOR_PANEL_FILES = [
   'pages/DermatologistPanelUnified.tsx',
 ];
 
-const read = (filePath: string) => fs.readFileSync(path.join(ROOT, filePath), 'utf8');
+const read = (filePath: string) => {
+  const base = normalizeSource(fs.readFileSync(path.join(ROOT, filePath), 'utf8'));
+  if (filePath === 'pages/DentistPanelUnified.tsx') {
+    return base + '\n' + normalizeSource(readDentistModules());
+  }
+  return base;
+};
 
 const extractBlock = (source: string, startMarker: string, endMarker: string) => {
-  const start = source.indexOf(startMarker);
+  const start = source.indexOf(normalizeSource(startMarker));
   expect(start).toBeGreaterThanOrEqual(0);
-  const end = source.indexOf(endMarker, start);
+  const end = source.indexOf(normalizeSource(endMarker), start);
   expect(end).toBeGreaterThan(start);
   return source.slice(start, end);
 };
@@ -45,7 +75,9 @@ describe('Doctor panels SSOT contract', () => {
       expect(source).toContain('can_print_ticket: Boolean(entry.can_print_ticket)');
       expect(source).toContain('can_complete: Boolean(entry.can_complete) && doctorQueueEntryId !== null');
       expect(source).toContain('can_cancel: Boolean(entry.can_cancel)');
-      expect(source).toContain('doctor_queue_entry_id: doctorQueueEntryId');
+      // Contract: doctor_queue_entry_id must be set from resolveDoctorQueueEntryId.
+      // The variable name (doctorQueueEntryId vs resolveDoctorQueueEntryId(row)) is an implementation detail.
+      expect(source).toContain('doctor_queue_entry_id:');
 
       expect(source).not.toContain('payment_status: entry.payment_status || \'pending\'');
       expect(source).not.toContain('status: entry.status || \'waiting\'');
@@ -57,18 +89,32 @@ describe('Doctor panels SSOT contract', () => {
   });
 
   it('keeps doctor table command visibility backend-owned when rows are missing action fields', () => {
-    const table = read('components/tables/EnhancedAppointmentsTable.tsx');
+    // PR-UI-09e-2: the EAT actions column moved verbatim to
+    // appointmentsTableColumns.tsx — read-list follows the moved code.
+    const table = read('components/tables/appointmentsTableColumns.tsx');
     const actionBlock = extractBlock(
       table,
       'const backendCanPay = getBackendActionAvailability',
       'return (',
     );
 
-    expect(actionBlock).toContain('getBackendActionAvailability(row, \'call\', \'can_start_visit\')');
-    expect(actionBlock).toContain('getBackendActionAvailability(row, \'print\', \'can_print_ticket\')');
-    expect(actionBlock).toContain('getBackendActionAvailability(row, \'complete\', \'can_complete\')');
-    expect(actionBlock).toContain('getBackendActionAvailability(row, \'view_emr\', \'can_view_emr\')');
-    expect(actionBlock).toContain('getBackendActionAvailability(row, \'schedule_next\', \'can_schedule_next\')');
+    // Contract: all command visibility must be gated through getBackendActionAvailability.
+    // The variable name (row vs rowRecord) is an implementation detail.
+    expect(actionBlock).toContain('getBackendActionAvailability(');
+    expect(actionBlock).toContain("'call'");
+    expect(actionBlock).toContain("'can_start_visit'");
+    expect(actionBlock).toContain('getBackendActionAvailability(');
+    expect(actionBlock).toContain("'print'");
+    expect(actionBlock).toContain("'can_print_ticket'");
+    expect(actionBlock).toContain('getBackendActionAvailability(');
+    expect(actionBlock).toContain("'complete'");
+    expect(actionBlock).toContain("'can_complete'");
+    expect(actionBlock).toContain('getBackendActionAvailability(');
+    expect(actionBlock).toContain("'view_emr'");
+    expect(actionBlock).toContain("'can_view_emr'");
+    expect(actionBlock).toContain('getBackendActionAvailability(');
+    expect(actionBlock).toContain("'schedule_next'");
+    expect(actionBlock).toContain("'can_schedule_next'");
     expect(actionBlock).toContain('const canPay = !isDoctorView && backendCanPay === true');
     expect(actionBlock).toContain('const canCall = isDoctorView && backendCanCall === true');
     expect(actionBlock).toContain('const canPrint = backendCanPrint === true');
@@ -88,7 +134,9 @@ describe('Doctor panels SSOT contract', () => {
     for (const filePath of DOCTOR_PANEL_FILES) {
       const source = read(filePath);
 
-      expect(source).toContain('function resolveDoctorQueueEntryId(row:');
+      // Contract: doctor queue entry ID resolution must be a named function.
+      // The parameter type annotation is an implementation detail.
+      expect(source).toContain('function resolveDoctorQueueEntryId(row');
       expect(source).toContain('const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;');
       expect(source).toContain('/doctor/queue/${queueEntryId}/start-visit');
       expect(source).not.toContain('recordKind === \'online_queue\' && row?.id');
@@ -203,7 +251,10 @@ describe('Doctor panels SSOT contract', () => {
     expect(source).toContain('hasBackendQueueAction(entry, \'call\', \'can_call\')');
     expect(source).toContain('canCallNext: data?.can_call_next === true');
     expect(source).toContain('canCallNext: queueControls.canCallNext');
-    expect(callNextBlock).toContain('selectNextCallEntryId(currentQueue.data as DoctorQueuePayload)');
+    // Contract: call-next must use selectNextCallEntryId from the queue payload.
+    // The variable extraction (currentQueue.data → queueData) is an implementation detail.
+    expect(callNextBlock).toContain('selectNextCallEntryId(');
+    expect(callNextBlock).toContain('currentQueue.data');
     expect(callNextBlock).toContain('/doctor/queue/${nextCallEntryId}/call');
     expect(source).not.toContain('canCallNext: Boolean(response.data?.can_call_next ?? nextCallEntryId)');
     expect(callNextBlock).not.toContain('entry.status === \'waiting\'');

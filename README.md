@@ -57,7 +57,7 @@
 - **WebSocket** - реальное время
 
 ### Frontend
-- **React 18** - UI библиотека
+- **React 19** - UI библиотека (TypeScript, strict)
 - **Vite** - сборщик и dev сервер
 - **React Router** - маршрутизация
 - **Axios** - HTTP клиент

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Textarea,
   Alert,
@@ -439,7 +439,7 @@ const GraphQLExplorer = () => {
     }
 
       {/* Примеры запросов */}
-      <MacOSCard style={sectionCardStyle}>
+      <Card style={sectionCardStyle}>
         <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi-1">
           <BookOpen size={20} />
           {t('admin2.gql_heading_examples')}
@@ -457,11 +457,11 @@ const GraphQLExplorer = () => {
             </Button>
         )}
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Редактор запроса */}
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24">
-        <MacOSCard style={sectionCardStyle}>
+        <Card style={sectionCardStyle}>
           <div className="admin-d-flex-fw-wrap-jc-between-ai-center-mb-16-gap-12-1">
             <h3 className="admin-m-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi-1">
               <Code size={20} />
@@ -510,9 +510,9 @@ const GraphQLExplorer = () => {
             className="admin-w-100pct-ff-Monaco-Consolas-Cour-fs-sm-lh-1p5-rz-vertical" />
           
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard style={sectionCardStyle}>
+        <Card style={sectionCardStyle}>
           <div className="admin-d-flex-fw-wrap-jc-between-ai-center-mb-16-gap-12">
             <h3 className="admin-m-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
               <Activity size={20} />
@@ -547,14 +547,14 @@ const GraphQLExplorer = () => {
               </div>
           }
           </div>
-        </MacOSCard>
+        </Card>
       </div>
     </div>;
 
 
   const renderSchemaTab = () =>
   <div className="flex flex-col gap-6">
-      <MacOSCard style={sectionCardStyle}>
+      <Card style={sectionCardStyle}>
         <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
           <Database size={20} />
           {t('admin2.gql_heading_schema')}
@@ -607,7 +607,7 @@ const GraphQLExplorer = () => {
         className="admin-h-200" />
 
       }
-      </MacOSCard>
+      </Card>
     </div>;
 
 
@@ -633,7 +633,7 @@ const GraphQLExplorer = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="admin-p-12px-18px-bd-1px-solid-transparen-cur-pointer-d-flex-ai-center-gap-8-radius-14-fs-sm-tr-all-var-mac-duration-bg-dyn-bsh-dyn-bd-c-dyn-col-dyn-fw-dyn" style={{ '--admin-bg0': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-hover-bg), white 8%)' : 'transparent', '--admin-bsh1': activeTab === tab.id ? 'var(--mac-shadow-sm)' : 'none', '--admin-bd-c2': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-border), white 12%)' : 'transparent', '--admin-col3': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)', '--admin-fw4': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}>
+              className="admin-p-12px-18px-bd-1px-solid-transparen-cur-pointer-d-flex-ai-center-gap-8-radius-14-fs-sm-tr-all-var-mac-duration-bg-dyn-bsh-dyn-bd-c-dyn-col-dyn-fw-dyn" style={{ '--admin-bg0': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-hover-bg), white 8%)' : 'transparent', '--admin-bsh1': activeTab === tab.id ? 'var(--mac-shadow-sm)' : 'none', '--admin-bd-c2': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-border), white 12%)' : 'transparent', '--admin-col3': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)', '--admin-fw4': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-regular)' } as CSSProperties}>
               
               <Icon size={16} />
               {tab.label}

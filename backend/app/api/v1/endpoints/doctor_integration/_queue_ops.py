@@ -465,6 +465,17 @@ def start_patient_visit(
             department=getattr(daily_queue, "queue_tag", None) or "general",
         )
 
+        # BUG 3 fix (Codex P1): transition visit open→in_progress when starting
+        # the visit. Without this, visit stays in "open" and complete_visit()
+        # fails because open→completed is not allowed by the state machine
+        # (only open→in_progress is). This was found by Codex review.
+        from app.services.visit_lifecycle_service import VisitLifecycleService
+        if visit.status == "open":
+            visit = VisitLifecycleService(db).start_visit(
+                visit_id=visit.id,
+                current_user=current_user,
+            )
+
         # Обновляем время начала приема
         visit.visit_time = datetime.now().strftime("%H:%M")
         visit.notes = f"Прием начат в {datetime.now().strftime('%H:%M')}"
@@ -568,16 +579,24 @@ def complete_patient_visit(
                 record_doctor_id=visit.doctor_id,
                 current_user=current_user,
             )
-            # Обновляем статус визита
-            visit.status = "completed"
-            visit.updated_at = datetime.now(UTC)
+            # Issue #06 Phase 3: delegate to VisitLifecycleService for
+            # state machine validation + row lock. The transition
+            # in_progress → completed (or completed → completed idempotent)
+            # is validated against ALLOWED_VISIT_TRANSITIONS.
+            from app.services.visit_lifecycle_service import VisitLifecycleService
 
-            # Payment state remains in Payment; completion must not rewrite
-            # registration discount_mode.
+            visit = VisitLifecycleService(db).complete_visit(
+                visit_id=visit.id,
+                current_user=current_user,
+            )
+            visit.updated_at = datetime.now(UTC)
             db.commit()
-            db.refresh(visit)
 
             # Завершаем визит с медицинскими данными
+            # NOTE: crud_visit.complete_visit() (site #13, legacy CRUD)
+            # sets visit.status = "closed" directly — this is a valid
+            # completed → closed transition but bypasses the service.
+            # Tracked as LEGACY-DEPRECATED in Gate A/B/C audit.
             if visit_data:
                 crud_visit.complete_visit(
                     db=db, visit_id=visit.id, medical_data=visit_data
@@ -669,8 +688,14 @@ def complete_patient_visit(
                         else "cardiology"
                     ),
                 )
-                # ✅ Обновляем статус визита на completed
-                visit.status = "completed"
+                # ✅ Issue #06 Phase 3: delegate to VisitLifecycleService
+                # for state machine validation + row lock.
+                from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                visit = VisitLifecycleService(db).complete_visit(
+                    visit_id=visit.id,
+                    current_user=current_user,
+                )
                 visit.updated_at = changed_at
 
                 # ✅ ИСПРАВЛЕНО: Проверяем и сохраняем информацию об оплате, создаем платеж через SSOT

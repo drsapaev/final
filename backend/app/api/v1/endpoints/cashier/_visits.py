@@ -43,43 +43,53 @@ async def mark_visit_as_paid(
     Отметить визит как оплаченный.
     Создаёт платёж на полную сумму услуг визита.
     """
-    visit = db.query(Visit).filter(Visit.id == visit_id).first()
-
-    if not visit:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Визит не найден"
-        )
+    # Issue #06 (H-4 coverage gap): this endpoint previously created a
+    # Payment via direct db.add() WITHOUT with_for_update() and WITHOUT
+    # the paid_amount check — a second double-payment race that the
+    # H-4 fix in create_payment did not cover.
+    #
+    # Issue #06 Phase 2: now delegates to PaymentInvariantService
+    # (split from VisitLifecycleService), which is the single source
+    # of truth for cashier-initiated payment creation. This ensures:
+    #   1. Row-level lock on the visit (serializes concurrent mark-paid
+    #      and create_payment requests on the same visit).
+    #   2. paid_amount vs total_cost check (rejects if already paid).
+    #   3. Overpayment-allowed-as-deposit policy (logged at WARNING).
+    #   4. Defense-in-depth IntegrityError handler (409, not 500).
+    from app.services.payment_invariant_service import PaymentInvariantService
+    from app.services.visit_lifecycle_service import VisitLifecycleService
 
     try:
-        # Вычисляем общую сумму услуг
-        total_amount = Decimal("0")
-        if hasattr(visit, 'services') and visit.services:
-            for vs in visit.services:
-                price = Decimal(str(vs.price)) if hasattr(vs, 'price') and vs.price else Decimal("0")
-                qty = vs.qty if hasattr(vs, 'qty') and vs.qty else 1
-                total_amount += price * qty
+        payment_service = PaymentInvariantService(db)
+        lifecycle_service = VisitLifecycleService(db)
 
-        # Создаём платёж на полную сумму
+        # Compute the full visit total — mark-paid creates a single
+        # payment for the entire amount.
+        visit = db.query(Visit).filter(Visit.id == visit_id).first()
+        if not visit:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Визит не найден"
+            )
+
+        total_amount = payment_service.compute_total_cost(visit)
+
         if total_amount > 0:
-            new_payment = Payment(
+            new_payment = payment_service.create_payment_for_visit(
                 visit_id=visit_id,
                 amount=total_amount,
                 method="cash",
-                status="paid",
                 note="Помечен как оплаченный",
-                created_at=datetime.now(UTC),
-                paid_at=datetime.now(UTC),
+                current_user=current_user,
             )
-            db.add(new_payment)
 
-        # [FIX:PAYMENT_STATUS] Оплата не должна перезаписывать operational статус визита
-        # и не должна менять registration type.
-        visit.status = _preserve_cashier_visit_status(visit.status)
+            # [FIX:PAYMENT_STATUS] Оплата не должна перезаписывать operational
+            # статус визита и не должна менять registration type.
+            # VisitLifecycleService.restore_operational_status_after_payment_change()
+            # normalizes any legacy "paid" status to an operational status.
+            visit = lifecycle_service.restore_operational_status_after_payment_change(visit_id)
+            db.commit()
 
-        db.commit()
-
-        if total_amount > 0:
             await _emit_payment_notification(
                 db=db,
                 payment=new_payment,
@@ -98,6 +108,8 @@ async def mark_visit_as_paid(
             "amount": float(total_amount)
         }
 
+    except HTTPException:
+        raise
     except Exception:
         db.rollback()
         logger.exception("Unhandled cashier endpoint error")

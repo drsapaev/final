@@ -22,7 +22,7 @@ import {
   XCircle } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
@@ -40,7 +40,6 @@ import { getApiOrigin } from '../../api/runtime';
 // import IconSelector, { iconMap } from './IconSelector';
 
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import { getErrorMessage } from '../../utils/type-guards';
@@ -568,21 +567,13 @@ const DepartmentManagement = () => {
       }
 
       // Импорт данных
-      const token = tokenManager.getAccessToken();
-      const response = await fetch('admin/departments/bulk', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ departments: importedDepartments })
-      });
+      const response = await api.post('/admin/departments/bulk', { departments: importedDepartments });
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         toast.success(t('admin2.dept_import_success', { count: importedDepartments.length }));
         loadDepartments();
       } else {
-        const errorData = await response.json();
+        const errorData = response.data as { detail?: string };
         toast.error(errorData.detail || t('admin2.dept_import_failed'));
       }
 
@@ -633,24 +624,16 @@ const DepartmentManagement = () => {
     if (!confirmed) return;
 
     try {
-      const token = tokenManager.getAccessToken();
-      const response = await fetch('admin/departments/bulk-delete', {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ids: selectedDepartments })
-      });
+      const response = await api.delete('/admin/departments/bulk-delete', { data: { ids: selectedDepartments } });
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         toast.success(t('admin2.dept_bulk_deleted', { count: selectedDepartments.length }));
         setSelectedDepartments([]);
         setSelectAll(false);
         loadDepartments();
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        const errorData = response.data as { detail?: string; message?: string };
+        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}`;
         toast.error(t('admin2.dept_bulk_delete_error', { error: errorMessage }));
       }
     } catch (error: unknown) {
@@ -666,27 +649,19 @@ const DepartmentManagement = () => {
     }
 
     try {
-      const token = tokenManager.getAccessToken();
-      const response = await fetch('admin/departments/bulk-activate', {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ids: selectedDepartments,
-          active: activate
-        })
+      const response = await api.patch('/admin/departments/bulk-activate', {
+        ids: selectedDepartments,
+        active: activate
       });
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         toast.success(activate ? t('admin2.dept_bulk_activated', { count: selectedDepartments.length }) : t('admin2.dept_bulk_deactivated', { count: selectedDepartments.length }));
         setSelectedDepartments([]);
         setSelectAll(false);
         loadDepartments();
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        const errorData = response.data as { detail?: string; message?: string };
+        const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}`;
         toast.error(activate ? t('admin2.dept_bulk_activate_error_on', { error: errorMessage }) : t('admin2.dept_bulk_activate_error_off', { error: errorMessage }));
       }
     } catch (error: unknown) {
@@ -706,12 +681,12 @@ const DepartmentManagement = () => {
 
   if (loading) {
     return (
-      <MacOSCard>
+      <Card>
                 <div className="admin-loading-p-40-center">
                     <div className="spinner admin-spinner-mb-16"></div>
                     <p className="text-[var(--mac-text-secondary)]">{t('admin2.dept_loading')}</p>
                 </div>
-            </MacOSCard>);
+            </Card>);
 
   }
 
@@ -719,7 +694,7 @@ const DepartmentManagement = () => {
     <div className="admin-flex-col-20">
             {/* Статистика отделений */}
             <div className="admin-grid-auto-200-mb-16">
-                <MacOSCard className="p-4">
+                <Card className="p-4">
                     <div className="text-center">
                         <div className="admin-stat-number-mb-4">
                             {departmentStats.total}
@@ -728,9 +703,9 @@ const DepartmentManagement = () => {
                             {t('admin2.dept_stat_total')}
                         </div>
                     </div>
-                </MacOSCard>
+                </Card>
 
-                <MacOSCard className="p-4">
+                <Card className="p-4">
                     <div className="text-center">
                         <div className="admin-stat-number-success-mb-4">
                             {departmentStats.active}
@@ -739,9 +714,9 @@ const DepartmentManagement = () => {
                             {t('admin2.dept_stat_active')}
                         </div>
                     </div>
-                </MacOSCard>
+                </Card>
 
-                <MacOSCard className="p-4">
+                <Card className="p-4">
                     <div className="text-center">
                         <div className="admin-stat-number-warning-mb-4">
                             {departmentStats.inactive}
@@ -750,9 +725,9 @@ const DepartmentManagement = () => {
                             {t('admin2.dept_stat_inactive')}
                         </div>
                     </div>
-                </MacOSCard>
+                </Card>
 
-                <MacOSCard className="p-4">
+                <Card className="p-4">
                     <div className="text-center">
                         <div className="admin-stat-number-info-mb-4">
                             {departmentStats.withDoctors}
@@ -761,10 +736,10 @@ const DepartmentManagement = () => {
                             {t('admin2.dept_stat_with_doctors')}
                         </div>
                     </div>
-                </MacOSCard>
+                </Card>
             </div>
 
-            <MacOSCard>
+            <Card>
                 <div className="p-6">
                     <div className="admin-flex-between-mb-24">
                         <h2 className="admin-title-20">
@@ -1038,7 +1013,8 @@ const DepartmentManagement = () => {
                             </Button>
 
                             <Button
-              variant="success"
+              variant="secondary"
+              color="success"
               size="small"
               onClick={() => handleBulkActivate(true)}>
               
@@ -1047,7 +1023,8 @@ const DepartmentManagement = () => {
                             </Button>
 
                             <Button
-              variant="warning"
+              variant="secondary"
+              color="warning"
               size="small"
               onClick={() => handleBulkActivate(false)}>
               
@@ -1228,7 +1205,7 @@ const DepartmentManagement = () => {
                         </div>
           }
                 </div>
-            </MacOSCard>
+            </Card>
 
             {/* Модальное окно редактирования отделения */}
             <Modal

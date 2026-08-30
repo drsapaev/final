@@ -16,12 +16,15 @@ Use for:
 - avoiding generic AI-looking layouts
 - improving hierarchy, rhythm, and visual confidence
 - making a surface feel intentionally designed
+- naming and rejecting the current AI-default looks: cream + serif + terracotta, near-black + single acid accent, broadsheet hairlines (added from the 2026-06 upstream rewrite)
+- copy as design material: staff-side action names, one stable name per flow, direct errors, actionable empty states (added from the 2026-06 upstream rewrite)
 
 Clinic adaptation:
 
 - distinctive means calm, fast, clinical, and trustworthy
 - avoid hero layouts, ornamental typography, aggressive motion, and decorative complexity
 - do not make operational screens look like landing pages
+- spend boldness in one place: at most one signature element per screen, everything else quiet
 
 ### Impeccable
 

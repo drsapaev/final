@@ -185,7 +185,7 @@ function ModalItem({ modal, onClose }: ModalItemProps) {
   };
 
   const modalStyle = {
-    backgroundColor: 'var(--color-background-primary)',
+    backgroundColor: 'var(--mac-bg-primary)',
     borderRadius: 'var(--mac-radius-lg)',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
     maxWidth: getSize(modal.size ?? 'medium'),
@@ -203,7 +203,7 @@ function ModalItem({ modal, onClose }: ModalItemProps) {
 
   const headerStyle = {
     padding: '1.5rem',
-    borderBottom: '1px solid var(--color-border-medium)',
+    borderBottom: '1px solid var(--mac-border)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between'
@@ -212,7 +212,7 @@ function ModalItem({ modal, onClose }: ModalItemProps) {
   const titleStyle = {
     fontSize: getFontSize('xl'),
     fontWeight: 'var(--mac-font-weight-semibold)',
-    color: 'var(--color-text-primary)',
+    color: 'var(--mac-text-primary)',
     margin: 0
   };
 
@@ -221,7 +221,7 @@ function ModalItem({ modal, onClose }: ModalItemProps) {
     border: 'none',
     fontSize: getFontSize('xl'),
     cursor: 'pointer',
-    color: 'var(--color-text-secondary)',
+    color: 'var(--mac-text-secondary)',
     padding: '0.5rem',
     borderRadius: 'var(--mac-radius-sm)',
     display: 'flex',
@@ -239,7 +239,7 @@ function ModalItem({ modal, onClose }: ModalItemProps) {
 
   const footerStyle = {
     padding: '1.5rem',
-    borderTop: '1px solid var(--color-border-medium)',
+    borderTop: '1px solid var(--mac-border)',
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '0.5rem'
@@ -268,7 +268,7 @@ function ModalItem({ modal, onClose }: ModalItemProps) {
           style={closeButtonStyle as CSSProperties}
           onClick={() => onClose(modal.id)}
           onMouseOver={(e: React.MouseEvent<HTMLElement>) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-background-tertiary)';
+            e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
           }}
           onMouseOut={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.backgroundColor = 'transparent';
@@ -354,7 +354,7 @@ export function Modal({
   };
 
   const modalStyle = {
-    backgroundColor: 'var(--color-background-primary)',
+    backgroundColor: 'var(--mac-bg-primary)',
     borderRadius: 'var(--mac-radius-lg)',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
     maxWidth: getSize(size),
@@ -370,7 +370,7 @@ export function Modal({
 
   const headerStyle = {
     padding: '1.5rem',
-    borderBottom: '1px solid var(--color-border-medium)',
+    borderBottom: '1px solid var(--mac-border)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between'
@@ -379,7 +379,7 @@ export function Modal({
   const titleStyle = {
     fontSize: getFontSize('xl'),
     fontWeight: 'var(--mac-font-weight-semibold)',
-    color: 'var(--color-text-primary)',
+    color: 'var(--mac-text-primary)',
     margin: 0
   };
 
@@ -388,7 +388,7 @@ export function Modal({
     border: 'none',
     fontSize: getFontSize('xl'),
     cursor: 'pointer',
-    color: 'var(--color-text-secondary)',
+    color: 'var(--mac-text-secondary)',
     padding: '0.5rem',
     borderRadius: 'var(--mac-radius-sm)',
     display: 'flex',
@@ -406,7 +406,7 @@ export function Modal({
 
   const footerStyle = {
     padding: '1.5rem',
-    borderTop: '1px solid var(--color-border-medium)',
+    borderTop: '1px solid var(--mac-border)',
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '0.5rem'
@@ -446,7 +446,7 @@ export function Modal({
             style={closeButtonStyle as CSSProperties}
             onClick={onClose}
             onMouseOver={(e: React.MouseEvent<HTMLElement>) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-background-tertiary)';
+              e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
             }}
             onMouseOut={(e: React.MouseEvent<HTMLElement>) => {
               e.currentTarget.style.backgroundColor = 'transparent';

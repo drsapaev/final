@@ -84,9 +84,6 @@ SECRET_KEY=ваш_64_символьный_секретный_ключ
 CORS_DISABLE=0
 CORS_ALLOW_ALL=0
 CORS_ORIGINS=https://yourdomain.com,https://admin.yourdomain.com
-
-# Optional: 2FA
-DISABLE_2FA_REQUIREMENT=0
 ```
 
 ### 4. Генерация SECRET_KEY

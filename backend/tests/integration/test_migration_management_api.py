@@ -194,7 +194,7 @@ class TestMigrationManagementAPI:
                     "number": 1,
                     "patient_id": None,
                     "patient_name": "Test Restore Patient",
-                    "phone": "+998901111111",
+                    "phone": "+998900000110",
                     "telegram_id": None,
                     "visit_id": None,
                     "source": "test_restore",

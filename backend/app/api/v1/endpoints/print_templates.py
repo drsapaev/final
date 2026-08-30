@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from jinja2 import Environment, TemplateError
+from jinja2 import TemplateError
+from jinja2.sandbox import SandboxedEnvironment
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -24,10 +25,37 @@ from app.schemas.print_config import (
 
 router = APIRouter()
 
-# Путь к шаблонам
+# Path to templates
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "print"
 MAX_PRINT_TEMPLATE_UPLOAD_BYTES = 5 * 1024 * 1024
 PRINT_TEMPLATE_READ_CHUNK_BYTES = 1024 * 1024
+
+
+# ---------------------------------------------------------------------------
+# Security: SandboxedEnvironment for Jinja2 template rendering
+#
+# Closes CodeQL py/template-injection alerts #1170, #1171.
+#
+# Print templates are user-controlled (admin-uploaded Jinja2 source). Even
+# though the endpoints are admin-only, a compromised admin account or a
+# future role change could let an attacker submit a malicious template like:
+#
+#     {{ ''.__class__.__mro__[1].__subclasses__() }}
+#
+# A regular jinja2.Environment with autoescape=True does NOT block this -
+# autoescape only prevents HTML/XSS, not Python-level attribute traversal.
+# SandboxedEnvironment blocks access to private/dunder attributes and to
+# unsafe operations (e.g. subclass traversal), making SSTI safe even when
+# the template source is hostile.
+#
+# We use SandboxedEnvironment for BOTH validation (from_string) and rendering
+# (render) - defense in depth.
+# ---------------------------------------------------------------------------
+
+
+def _make_template_env() -> SandboxedEnvironment:
+    """Create a sandboxed Jinja2 environment for print template rendering."""
+    return SandboxedEnvironment(autoescape=True)
 
 
 def _read_print_template_bounded(file: UploadFile) -> bytes:
@@ -160,7 +188,7 @@ def create_print_template(
 
         # Валидируем шаблон Jinja2
         try:
-            env = Environment(autoescape=True)
+            env = _make_template_env()
             env.from_string(template_data.template_content)
         except TemplateError:
             raise HTTPException(
@@ -228,7 +256,7 @@ def update_print_template(
         # Валидируем новый шаблон если он обновляется
         if template_data.template_content:
             try:
-                env = Environment(autoescape=True)
+                env = _make_template_env()
                 env.from_string(template_data.template_content)
             except TemplateError:
                 raise HTTPException(
@@ -306,7 +334,7 @@ def upload_template_file(
 
         # Валидируем шаблон
         try:
-            env = Environment(autoescape=True)
+            env = _make_template_env()
             env.from_string(content.decode('utf-8'))
         except TemplateError:
             raise HTTPException(
@@ -355,7 +383,7 @@ def preview_template(
 
         # Рендерим шаблон с тестовыми данными
         preview_data = preview_data.model_dump(exclude_none=True)
-        env = Environment(autoescape=True)
+        env = _make_template_env()
         jinja_template = env.from_string(template.template_content)
 
         rendered_content = jinja_template.render(**preview_data)

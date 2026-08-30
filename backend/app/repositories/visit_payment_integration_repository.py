@@ -35,6 +35,91 @@ class VisitPaymentIntegrationRepository:
         return self.db.execute(query).first()
 
     def update_visit(self, visit_id: int, values: dict) -> None:
+        """Update visit fields via SQLAlchemy Core.
+
+        Issue #06 Phase 4b Gate C+: this method is a generic dict-based
+        update that CAN set ANY field on the visits table, including
+        ``status`` (the lifecycle field). This makes it a potential
+        lifecycle-invariant bypass.
+
+        Audit finding (2026-08-09): the single caller
+        (``visit_payment_integration.py:329``) only passes PAYMENT
+        PROJECTION fields (``payment_status``, ``payment_processed_at``,
+        ``payment_amount``, ``payment_currency``, ``payment_provider``,
+        ``payment_transaction_id``, ``payment_webhook_id``) — NEVER
+        ``status`` (the lifecycle field). So this is NOT currently a
+        lifecycle bypass.
+
+        However, the generic API is dangerous because nothing prevents
+        a future caller from passing ``{"status": "open"}``.
+
+        Hardening (this change): reject ``status`` in the values dict
+        with a ValueError. This eliminates the capability of bypassing
+        the lifecycle invariant through this generic method, rather
+        than just wrapping it.
+
+        For payment projection updates, use the new specialized method
+        ``update_payment_projection()`` instead.
+        """
+        # Gate C+ hardening: reject lifecycle field mutations.
+        LIFECYCLE_FIELDS = {"status"}
+        forbidden = set(values) & LIFECYCLE_FIELDS
+        if forbidden:
+            raise ValueError(
+                f"VisitPaymentIntegrationRepository.update_visit() rejects "
+                f"lifecycle field(s) {forbidden}. Use "
+                f"VisitLifecycleService for status transitions. For "
+                f"payment projection updates, use "
+                f"update_payment_projection() instead."
+            )
+
+        self.db.execute(
+            update(self.visits_table())
+            .where(self.visits_table().c.id == visit_id)
+            .values(**values)
+        )
+
+    def update_payment_projection(
+        self,
+        visit_id: int,
+        *,
+        payment_status: str | None = None,
+        payment_processed_at=None,
+        payment_amount: float | None = None,
+        payment_currency: str | None = None,
+        payment_provider: str | None = None,
+        payment_transaction_id: str | None = None,
+        payment_webhook_id: int | None = None,
+    ) -> None:
+        """Update ONLY the payment projection fields on the visits table.
+
+        Issue #06 Phase 4b Gate C+: specialized replacement for the
+        generic ``update_visit()`` method. Accepts only payment-related
+        fields — the lifecycle ``status`` field is NOT accepted.
+
+        This method is the correct way to synchronize the denormalized
+        payment projection on the visits table after a payment event
+        (webhook, manual confirmation, refund).
+        """
+        values: dict = {}
+        if payment_status is not None:
+            values["payment_status"] = payment_status
+        if payment_processed_at is not None:
+            values["payment_processed_at"] = payment_processed_at
+        if payment_amount is not None:
+            values["payment_amount"] = payment_amount
+        if payment_currency is not None:
+            values["payment_currency"] = payment_currency
+        if payment_provider is not None:
+            values["payment_provider"] = payment_provider
+        if payment_transaction_id is not None:
+            values["payment_transaction_id"] = payment_transaction_id
+        if payment_webhook_id is not None:
+            values["payment_webhook_id"] = payment_webhook_id
+
+        if not values:
+            return  # nothing to update
+
         self.db.execute(
             update(self.visits_table())
             .where(self.visits_table().c.id == visit_id)

@@ -10,6 +10,7 @@ import CompactConnectionStatus from '../pwa/CompactConnectionStatus';
 import {
   Button, Icon,
 } from '../ui/macos';
+import LanguageSwitcher from '../LanguageSwitcher';
 import GlobalSearchBar from '../search/GlobalSearchBar';
 import ChatButton from '../chat/ChatButton';
 import { COLOR_SCHEMES } from '../../theme/colorScheme';
@@ -42,12 +43,11 @@ export function isThemeMenuInteraction(event: { composedPath?: () => EventTarget
 export default function HeaderNew() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t: rawT, language, setLanguage } = useTranslation();  // PR-50: i18n wired
+  const { t: rawT } = useTranslation();  // PR-UI-03b: language handled by LanguageSwitcher
   const t = rawT;
 
   const [state, setState] = useState(auth.getState());
   const { inboxOpen, setInboxOpen, getUnreadCount } = useNotificationCenter();
-  const [lang, setLang] = useState(language || 'ru');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);  // PR-50: profile dropdown
   const themeMenuRef = useRef<HTMLDivElement | null>(null);
@@ -56,8 +56,6 @@ export default function HeaderNew() {
 
   useEffect(() => auth.subscribe(setState), []);
 
-  // PR-50: sync lang with useTranslation
-  useEffect(() => { setLang(language); }, [language]);
 
   const { theme, colorScheme, setColorScheme } = useTheme();
 
@@ -136,8 +134,6 @@ export default function HeaderNew() {
     isGradientTheme || isVibrantTheme ?
     '1px solid var(--mac-separator)' :
     theme === 'dark' ? '1px solid rgba(255,255,255,0.12)' : '1px solid var(--mac-separator)',
-    backdropFilter: 'var(--mac-blur-light)',
-    WebkitBackdropFilter: 'var(--mac-blur-light)',
     boxShadow: isGlassTheme ?
     '0 2px 10px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1)' :
     isGradientTheme || isVibrantTheme ?
@@ -165,19 +161,14 @@ export default function HeaderNew() {
   const navItems = useMemo(() => {
     const items: Array<{ to: string; label: string; icon: string }> = [];
     if (roleNormalized !== 'admin') {
+      // PR-UI-04b: cashier home button removed from header — now in canonical Sidebar
+      // via SIDEBAR_PRESETS.cashier. Cross-role navigation (registrar → cashier)
+      // is still available here for roles that don't have their own sidebar.
       if (roleNormalized === 'registrar') items.push({ to: getRoleHomeRoute('cashier'), label: t('legacy.hn_nav_cashier_role'), icon: 'creditcard' });
-      if (roleNormalized === 'cashier') items.push({ to: getRoleHomeRoute('cashier'), label: t('legacy.hn_nav_cashier_home'), icon: 'creditcard' });
     }
     return items;
   }, [roleNormalized]);
 
-  // PR-50: changeLang now uses useTranslation's setLanguage (which updates
-  // React context + triggers re-render). Previously only wrote to localStorage
-  // — the toggle was decorative.
-  const changeLang = (v: string) => {
-    setLang(v);
-    setLanguage(v);  // updates useTranslation context → re-renders all consumers
-  };
 
   // QW-05 fix: global Back button. Previously navigate(-1) was used only in 2 of ~50
   // pages, leaving users on detail screens (PatientPickupView, etc.)
@@ -282,28 +273,9 @@ export default function HeaderNew() {
 
       {roleNormalized === 'registrar' && isRegistrarPanel &&
     <>
-          <Button
-        variant="outline"
-        size="small"
-        title={t('legacy.hn_registrar_home_title')}
-        onClick={() => navigate('/registrar/welcome')}
-        className="hdr-hide-md"
-        style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
-
-            <Icon name="house" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : undefined }} />
-            <span className="hdr-hide-md">{t('legacy.hn_registrar_home_title')}</span>
-          </Button>
-          <Button
-        variant="outline"
-        size="small"
-        title={t('legacy.hn_online_queue_title')}
-        onClick={() => navigate('/registrar/queue')}
-        className="hdr-hide-xs"
-        style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
-
-            <Icon name="bell" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
-            <span className="hdr-hide-sm">{t('legacy.hn_online_queue_title')}</span>
-          </Button>
+          {/* PR-UI-04: removed hardcoded "Home" and "Queue" nav buttons —
+              they're now in canonical Sidebar via SIDEBAR_PRESETS.registrar.
+              Kept only the "New appointment" CTA — it's a primary action, not navigation. */}
           <Button
         variant="primary"
         size="small"
@@ -342,30 +314,10 @@ export default function HeaderNew() {
         background: theme === 'dark' ? 'color-mix(in srgb, white, transparent 92%)' : 'var(--mac-separator)'
       }} />
 
-      {/* 1) Язык — PR-50: replaced cycling button with <select> (H-1, H-2 fix) */}
-      <select
-        value={lang}
-        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => changeLang(e.target.value)}
-        aria-label={t('legacy.hn_select_language')}
-        title={t('legacy.hn_select_language')}
-        style={{
-          fontSize: 'var(--mac-font-size-sm)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          padding: '6px 10px',
-          flex: '0 0 auto',
-          border: theme === 'dark' ? '1px solid rgba(255,255,255,0.14)' : '1px solid var(--mac-border)',
-          borderRadius: 'var(--mac-radius-sm)',
-          backgroundColor: 'var(--mac-bg-secondary)',
-          color: 'var(--mac-text-primary)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-1)'
-        }}>
-        <option value="ru">RU</option>
-        <option value="uz">UZ</option>
-        <option value="en">EN</option>
-      </select>
+      {/* 1) Язык — PR-UI-03b: replaced inline <select> with canonical LanguageSwitcher
+          component (dropdown UI with flags + nativeName). LanguageSwitcher uses
+          useTranslation().setLanguage() directly — no local state duplication. */}
+      <LanguageSwitcher compact />
 
       {/* 2) Сеть */}
       <div style={{ flex: '0 0 auto' }}>

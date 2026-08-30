@@ -4,6 +4,8 @@ Split from notifications.py.
 """
 from __future__ import annotations
 
+from app.core.pii_masker import mask_pii_text
+from app.services.email_sms_enhanced import build_from_header
 from app.services.notifications_pkg._base import (
     UTC,
     Any,
@@ -49,7 +51,7 @@ class ChannelsMixin(NotificationSenderMixinBase):
         """Синхронная отправка email (для запуска в executor)"""
         try:
             msg = MIMEMultipart("alternative")
-            msg["From"] = self.smtp_username
+            msg["From"] = build_from_header(self.smtp_from, self.smtp_username)
             msg["To"] = to_email
             msg["Subject"] = subject
 
@@ -75,7 +77,11 @@ class ChannelsMixin(NotificationSenderMixinBase):
             return True
 
         except Exception as e:
-            logger.error(f"Ошибка отправки email: {e}")
+            # PII: исключения SMTP цитируют адрес получателя (#2803)
+            logger.error(
+                "Ошибка отправки email: %s",
+                mask_pii_text(str(e)),
+            )
             return False
 
 

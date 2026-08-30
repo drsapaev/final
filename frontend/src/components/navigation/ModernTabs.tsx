@@ -290,7 +290,6 @@ const ModernTabs = ({
           className="tabs-container"
           style={{
             background: colors.bg,
-            backdropFilter: 'blur(20px)',
             borderTop: `1px solid ${colors.border}`,
             borderLeft: `1px solid ${colors.border}`,
             borderRight: `1px solid ${colors.border}`,
@@ -314,7 +313,6 @@ const ModernTabs = ({
         className="tabs-container"
         style={{
           background: colors.bg,
-          backdropFilter: 'blur(20px)',
           borderTop: `1px solid ${colors.border}`,
           borderLeft: `1px solid ${colors.border}`,
           borderRight: `1px solid ${colors.border}`,

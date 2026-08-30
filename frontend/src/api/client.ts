@@ -263,9 +263,33 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 
 // ✅ SECURITY: Handle 401 responses - log but don't auto-clear tokens
 // (prevents race condition where 401 during login transition clears new token)
+
+// #05 Tier 1: Detect CSRF rejection from the backend.
+// The backend sets `X-CSRF-Status: rejected` header and returns
+// { "detail": "CSRF validation failed", "reason": "missing_cookie|missing_header|mismatch" }
+// when CSRF validation fails. This is distinct from a regular 403
+// (permission denied) and should trigger automatic token refresh + retry,
+// NOT logout.
+function isCSRFRejection(error: AxiosError): boolean {
+  if (error.response?.status !== 403) return false;
+  const headers = error.response?.headers;
+  if (headers) {
+    const csrfStatus = headers['x-csrf-status'] || headers['X-CSRF-Status'];
+    if (csrfStatus === 'rejected') return true;
+  }
+  const data = error.response?.data as Record<string, unknown> | undefined;
+  if (data && typeof data === 'object') {
+    const reason = data.reason;
+    if (typeof reason === 'string' && ['missing_cookie', 'missing_header', 'mismatch'].includes(reason)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     if (error.response?.status === 401) {
       logger.warn('🔒 Unauthorized response received', {
         url: error.config?.url,
@@ -283,6 +307,33 @@ api.interceptors.response.use(
         cooldownMs: GLOBAL_RATE_LIMIT_COOLDOWN_MS
       });
     }
+
+    // #05 Tier 1: CSRF 403 recovery — refresh token and retry exactly once.
+    // This handles CSRF cookie drift (8h expiry, multi-tab, subdomain mixup).
+    // The backend provides "recovery": "GET /auth/csrf-token" hint.
+    if (isCSRFRejection(error) && error.config) {
+      const config = error.config as InternalAxiosRequestConfig & { _csrfRetried?: boolean };
+      if (!config._csrfRetried) {
+        config._csrfRetried = true;
+        logger.info('[FIX:CSRF] CSRF rejection detected — refreshing token and retrying once', {
+          url: config.url,
+        });
+        // Reset cached state so ensureCSRFToken() will re-fetch.
+        csrfEndpointUnavailable = false;
+        csrfTokenPromise = null;
+        const newToken = await ensureCSRFToken();
+        if (newToken) {
+          config.headers.set('X-CSRF-Token', newToken);
+          return api.request(config);
+        }
+        logger.warn('[FIX:CSRF] Could not obtain new CSRF token — rejecting request');
+      } else {
+        logger.warn('[FIX:CSRF] CSRF retry already attempted — not retrying again', {
+          url: config.url,
+        });
+      }
+    }
+
     return Promise.reject(error);
   }
 );
@@ -483,6 +534,8 @@ export {
   clearToken,
   me,
   login,
+  ensureCSRFToken,
+  isCSRFRejection,
 };
 
 export default apiClient;

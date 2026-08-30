@@ -13,6 +13,40 @@ const source = fs.readFileSync(
   'utf8'
 );
 
+// PR-UI-13-1: the worklist data lifecycle (loadAppointments) moved to
+// pages/registrar/useRegistrarWorklistData.ts. Its tI18n notify calls are
+// part of the panel's i18n contract, so the tree is read alongside the panel.
+const worklistDataSource = fs.readFileSync(
+  path.join(ROOT, 'pages/registrar/useRegistrarWorklistData.ts'),
+  'utf8'
+);
+
+// PR-UI-13-3: the wizard completion flow moved to useRegistrarWizard.ts and
+// the reschedule slots dialog (postpone_* confirm/notify keys) to
+// registrar/views/RescheduleSlots.tsx. Both are part of the panel's
+// i18n contract surface.
+const wizardSource = fs.readFileSync(
+  path.join(ROOT, 'pages/registrar/useRegistrarWizard.ts'),
+  'utf8'
+);
+const rescheduleDialogSource = fs.readFileSync(
+  path.join(ROOT, 'pages/registrar/views/RescheduleSlots.tsx'),
+  'utf8'
+);
+
+const rowActionsSource = fs.readFileSync(
+  path.join(ROOT, 'pages/registrar/useRegistrarRowActions.ts'),
+  'utf8'
+);
+
+const sourceTree = [
+  source,
+  worklistDataSource,
+  wizardSource,
+  rescheduleDialogSource,
+  rowActionsSource,
+].join('\n');
+
 const translationsSource = fs.readFileSync(
   path.join(ROOT, 'i18n/locales/ru.ts'),
   'utf8'
@@ -32,37 +66,44 @@ describe('RegistrarPanel STRAT#30 — i18n migration', () => {
   });
 
   it('uses tI18n() for all confirm dialog titles', () => {
-    expect(source).toContain("tI18n('registrar.send_to_cabinet_title')");
-    expect(source).toContain("tI18n('registrar.complete_visit_title')");
-    expect(source).toContain("tI18n('registrar.postpone_tomorrow_title')");
-    expect(source).toContain("tI18n('registrar.postpone_date_title')");
+    // PR-UI-13-3: postpone_tomorrow_* / postpone_date_* titles moved to
+    // RescheduleSlotsDialog — checked against the tree.
+    expect(sourceTree).toContain("tI18n('registrar.send_to_cabinet_title')");
+    expect(sourceTree).toContain("tI18n('registrar.complete_visit_title')");
+    expect(sourceTree).toContain("tI18n('registrar.postpone_tomorrow_title')");
+    expect(sourceTree).toContain("tI18n('registrar.postpone_date_title')");
   });
 
   it('uses tI18n() for confirm dialog confirmLabel and cancelLabel', () => {
-    expect(source).toContain("tI18n('registrar.send_to_cabinet_confirm')");
-    expect(source).toContain("tI18n('registrar.complete_visit_confirm')");
-    expect(source).toContain("tI18n('registrar.postpone_tomorrow_confirm')");
-    expect(source).toContain("tI18n('registrar.postpone_date_confirm')");
-    expect(source).toContain("tI18n('registrar.cancel')");
+    expect(sourceTree).toContain("tI18n('registrar.send_to_cabinet_confirm')");
+    expect(sourceTree).toContain("tI18n('registrar.complete_visit_confirm')");
+    expect(sourceTree).toContain("tI18n('registrar.postpone_tomorrow_confirm')");
+    expect(sourceTree).toContain("tI18n('registrar.postpone_date_confirm')");
+    expect(sourceTree).toContain("tI18n('registrar.cancel')");
   });
 
   it('uses tI18n() with params for confirm dialog messages', () => {
-    expect(source).toContain("tI18n('registrar.send_to_cabinet_message', { name: inCabinetName })");
-    expect(source).toContain("tI18n('registrar.complete_visit_message', { name: completeName })");
-    expect(source).toContain("tI18n('registrar.postpone_tomorrow_message')");
+    expect(sourceTree).toContain("tI18n('registrar.send_to_cabinet_message', { name: inCabinetName })");
+    expect(sourceTree).toContain("tI18n('registrar.complete_visit_message', { name: completeName })");
+    expect(sourceTree).toContain("tI18n('registrar.postpone_tomorrow_message')");
   });
 
   it('uses tI18n() for all notify messages', () => {
-    expect(source).toContain("tI18n('registrar.sent_to_cabinet')");
-    expect(source).toContain("tI18n('registrar.visit_completed')");
-    expect(source).toContain("tI18n('registrar.appointment_created')");
-    expect(source).toContain("tI18n('registrar.visit_postponed')");
-    expect(source).toContain("tI18n('registrar.no_visit_for_postpone')");
-    expect(source).toContain("tI18n('registrar.select_postpone_date')");
-    expect(source).toContain("tI18n('registrar.invalid_date_format')");
-    expect(source).toContain("tI18n('registrar.invalid_time_format')");
-    expect(source).toContain("tI18n('registrar.cannot_postpone_past')");
-    expect(source).toContain("tI18n('registrar.backend_unavailable')");
+    // PR-UI-13-1: registrar.backend_unavailable lives in useRegistrarWorklistData.
+    // PR-UI-13-3: registrar.appointment_created lives in useRegistrarWizard;
+    // the postpone/notify keys live in RescheduleSlots.
+    // PR-UI-13-5: sent_to_cabinet/visit_completed live in useRegistrarRowActions
+    // — all checked against the tree.
+    expect(sourceTree).toContain("tI18n('registrar.sent_to_cabinet')");
+    expect(sourceTree).toContain("tI18n('registrar.visit_completed')");
+    expect(sourceTree).toContain("tI18n('registrar.appointment_created')");
+    expect(sourceTree).toContain("tI18n('registrar.visit_postponed')");
+    expect(sourceTree).toContain("tI18n('registrar.no_visit_for_postpone')");
+    expect(sourceTree).toContain("tI18n('registrar.select_postpone_date')");
+    expect(sourceTree).toContain("tI18n('registrar.invalid_date_format')");
+    expect(sourceTree).toContain("tI18n('registrar.invalid_time_format')");
+    expect(sourceTree).toContain("tI18n('registrar.cannot_postpone_past')");
+    expect(sourceTree).toContain("tI18n('registrar.backend_unavailable')");
   });
 
   it('does not contain hardcoded Russian strings in confirm() calls anymore', () => {

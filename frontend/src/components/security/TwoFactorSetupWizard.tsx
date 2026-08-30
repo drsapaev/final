@@ -1,105 +1,98 @@
+import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent, CSSProperties, ReactNode } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle,
+  Copy,
+  Download,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react';
+
 import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
-import { useState } from 'react';
-import type { CSSProperties } from 'react';
-import { Card, Button,
-  Input } from '../ui/macos';
-import tokenManager from '../../utils/tokenManager';
+import { Button, Input } from '../ui/macos';
 import {
-  Shield,
-  Smartphone,
-  Mail,
-  Phone,
-
-  QrCode,
-  Download,
-  Copy,
-  CheckCircle,
-  AlertCircle,
-  ArrowRight,
-  ArrowLeft,
-  RefreshCw,
-  Eye,
-  EyeOff } from
-'lucide-react';
+  UZ_PHONE_PREFIX,
+  normalizePhoneInput,
+  validatePhone,
+} from '../auth/phoneInput';
 
 /**
- * Мастер настройки Two-Factor Authentication
- * Пошаговая настройка всех методов 2FA
+ * Мастер настройки двухфакторной аутентификации (TOTP).
+ *
+ * Два контекста, один компонент:
+ *  — enrollment при входе (передан enrollmentToken из login-ответа критичной
+ *    роли): успешная верификация возвращает нормальные токены, колбэк
+ *    onEnrolled завершает вход;
+ *  — настройки безопасности профиля (Bearer JWT): завершение через onComplete.
+ *
+ * Контракт бэкенда: POST /2fa/setup -> { qr_code_url (otpauth://), secret_key,
+ * backup_codes }; POST /2fa/verify-setup { totp_code, enrollment_token? } ->
+ * { success, access_token?, refresh_token? }.
+ *
+ * Слой UI: канонические компоненты ui/macos + токены --mac-*; Tailwind —
+ * только раскладка, без хардкода цветов.
  */
-const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => void; onCancel?: () => void }) => {
-  const { t: rawT } = useTranslation();
-  const t = rawT;
-  const [currentStep, setCurrentStep] = useState(1);
+type TwoFactorSetupWizardProps = {
+  onComplete?: () => void;
+  onCancel?: () => void;
+  enrollmentToken?: string;
+  onEnrolled?: (payload: Record<string, unknown>) => void;
+};
+
+type AxiosLike = import('axios').AxiosResponse<Record<string, unknown>>;
+
+const TwoFactorSetupWizard = ({
+  onComplete,
+  onCancel,
+  enrollmentToken,
+  onEnrolled,
+}: TwoFactorSetupWizardProps) => {
+  const { t } = useTranslation();
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState('totp');
-  const [setupData, setSetupData] = useState<Record<string, unknown> | null>(null);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoveryPhone, setRecoveryPhone] = useState('');
+  const [setupData, setSetupData] = useState<Record<string, unknown> | null>(null);
+  const [code, setCode] = useState('');
   const [showSecret, setShowSecret] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [enrolledPayload, setEnrolledPayload] = useState<Record<string, unknown> | null>(null);
+  const [copied, setCopied] = useState('');
+  const codeRef = useRef<HTMLInputElement>(null);
 
-  const steps = [
-  { id: 1, title: t('final.twofactor_step1_title'), description: t('final.twofactor_step1_desc') },
-  { id: 2, title: t('final.twofactor_step2_title'), description: t('final.twofactor_step2_desc') },
-  { id: 3, title: t('final.twofactor_step3_title'), description: t('final.twofactor_step3_desc') },
-  { id: 4, title: t('final.twofactor_step4_title'), description: t('final.twofactor_step4_desc') },
-  { id: 5, title: t('final.twofactor_step5_title'), description: t('final.twofactor_step5_desc') }];
+  const isEnrollment = Boolean(enrollmentToken);
+  const secretKey = String(setupData?.secret_key ?? '');
+  const qrValue = String(setupData?.qr_code_url ?? '');
 
-
-  const methods = [
-  {
-    id: 'totp',
-    name: t('misc.tfsw_method_totp_name'),
-    description: t('misc.tfsw_method_totp_desc'),
-    icon: Smartphone,
-    color: 'blue',
-    recommended: true
-  },
-  {
-    id: 'sms',
-    name: t('misc.tfsw_method_sms_name'),
-    description: t('misc.tfsw_method_sms_desc'),
-    icon: Phone,
-    color: 'green'
-  },
-  {
-    id: 'email',
-    name: t('misc.tfsw_method_email_name'),
-    description: t('misc.tfsw_method_email_desc'),
-    icon: Mail,
-    color: 'purple'
-  }];
-
-
-  const handleMethodSelect = (methodId: string) => {
-    setSelectedMethod(methodId);
-    setError('');
-  };
+  useEffect(() => {
+    if (step === 3) codeRef.current?.focus();
+  }, [step]);
 
   const handleSetup = async () => {
     setLoading(true);
     setError('');
-
     try {
-      const response = await api.post('/2fa/setup', {
-        method: selectedMethod,
+      const response = (await api.post('/2fa/setup', {
         recovery_email: recoveryEmail || null,
-        recovery_phone: recoveryPhone || null,
-      }) as unknown as { json: () => Promise<Record<string, unknown>>; ok: boolean; status: number; data: Record<string, unknown> };
-
-      const data = await response.json();
-
-      if (response.ok) {
+        // Канонический '+998XXXXXXXXX' или null — пустое поле не шлём
+        recovery_phone: validatePhone(recoveryPhone) ? recoveryPhone : null,
+        ...(enrollmentToken ? { enrollment_token: enrollmentToken } : {}),
+      })) as unknown as AxiosLike;
+      const data = response.data;
+      if (response.status >= 200 && response.status < 300 && data.secret_key) {
         setSetupData(data);
         setBackupCodes((data.backup_codes as string[]) || []);
-        setCurrentStep(3);
-        setSuccess(t('misc.tfsw_setup_created'));
+        setStep(2);
       } else {
-        setError(String(data.detail || t('misc.tfsw_setup_error')));
+        setError(String(data.detail || data.message || t('misc.tfsw_setup_error')));
       }
     } catch {
       setError(t('misc.tfsw_setup_error'));
@@ -108,28 +101,27 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
     }
   };
 
-  const handleVerification = async () => {
-    if (!verificationCode) {
-      setError(t('misc.tfsw_code_required'));
-      return;
-    }
-
+  const handleVerify = async () => {
+    if (code.length !== 6) return;
     setLoading(true);
     setError('');
-
     try {
-      const response = await api.post('/2fa/verify-setup', {
-        method: selectedMethod,
-        code: verificationCode,
-      }) as unknown as { json: () => Promise<Record<string, unknown>>; ok: boolean; status: number; data: Record<string, unknown> };
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setCurrentStep(4);
-        setSuccess(t('misc.tfsw_code_confirmed'));
+      const response = (await api.post('/2fa/verify-setup', {
+        totp_code: code,
+        ...(enrollmentToken ? { enrollment_token: enrollmentToken } : {}),
+      })) as unknown as AxiosLike;
+      const data = response.data;
+      if (response.status >= 200 && response.status < 300 && data.success) {
+        if (data.access_token && onEnrolled) {
+          // Резервные коды показываем ДО завершения входа: второй шанс их
+          // увидеть есть только в настройках профиля (regenerate).
+          setEnrolledPayload(data);
+          setStep(4);
+          return;
+        }
+        setStep(4);
       } else {
-        setError(String(data.detail || t('misc.tfsw_invalid_code')));
+        setError(String(data.detail || data.message || t('misc.tfsw_invalid_code')));
       }
     } catch {
       setError(t('misc.tfsw_code_verify_error'));
@@ -138,15 +130,14 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
     }
   };
 
-  const handleComplete = () => {
-    if (onComplete) {
-      onComplete();
+  const copyToClipboard = async (text: string, marker: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(marker);
+      setTimeout(() => setCopied(''), 2000);
+    } catch {
+      // буфер обмена недоступен — не блокируем флоу
     }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setSuccess(t('misc.tfsw_copied_to_clipboard'));
   };
 
   const downloadBackupCodes = () => {
@@ -159,395 +150,392 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
     URL.revokeObjectURL(url);
   };
 
-  const renderStepIndicator = () =>
-  <div className="flex items-center justify-center space-x-4 mb-8">
-      {steps.map((step, index) =>
-    <div key={step.id} className="flex items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${currentStep >= step.id ?
-      'bg-blue-600 text-white' :
-      'bg-gray-200 text-gray-600'}`
-      }>
-            {currentStep > step.id ?
-        <CheckCircle className="w-4 h-4" /> :
+  const stepTitles = [t('misc.tfsw2_step1_title'), t('misc.tfsw2_step2_title'), t('misc.tfsw2_step3_title')];
 
-        step.id
-        }
-          </div>
-          {index < steps.length - 1 &&
-      <div className={`w-8 h-0.5 ${currentStep > step.id ? 'bg-blue-600' : 'bg-gray-200'}`
-      } />
-      }
-        </div>
-    )}
-    </div>;
-
-
-  const renderStep1 = () =>
-  <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-xl font-semibold mb-2">{t('misc.tfsw_step1_title')}</h3>
-        <p className="text-gray-600">
-          {t('misc.tfsw_step1_desc')}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {methods.map((method) => {
-        const IconComponent = method.icon;
+  const renderStepper = () => (
+    <div
+      className="flex items-start justify-center"
+      style={{ marginBottom: 'var(--mac-spacing-5)', gap: 'var(--mac-spacing-2)' }}
+    >
+      {stepTitles.map((title, idx) => {
+        const n = idx + 1;
+        const done = step > n || step === 4;
+        const active = step === n && step !== 4;
         return (
-          <button
-            key={method.id}
-            aria-label={`Select ${method.name} 2FA method`}
-            onClick={() => handleMethodSelect(method.id)}
-            className={`p-6 border-2 rounded-lg text-left transition-all ${selectedMethod === method.id ?
-            'border-blue-500 bg-blue-50' :
-            'border-gray-200 hover:border-gray-300'}`
-            }>
-            
-              <div className="flex items-start space-x-3">
-                <div className={`p-2 rounded-lg ${selectedMethod === method.id ? 'bg-blue-100' : 'bg-gray-100'}`
-              }>
-                  <IconComponent className={`w-6 h-6 ${selectedMethod === method.id ? 'text-blue-600' : 'text-gray-600'}`
-                } />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <h4 className="font-semibold">{method.name}</h4>
-                    {method.recommended &&
-                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                        {t('misc.tfsw_recommended')}
-                      </span>
-                  }
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">{method.description}</p>
-                </div>
+          <div key={title} className="flex flex-col items-center" style={{ width: 96 }}>
+            <div className="flex items-center" style={{ gap: 6 }}>
+              <div
+                aria-label={title}
+                className="flex items-center justify-center"
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 'var(--mac-radius-full)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)' as CSSProperties['fontWeight'],
+                  color: done || active ? 'var(--mac-text-inverse)' : 'var(--mac-text-secondary)',
+                  background: done || active ? 'var(--mac-accent-blue)' : 'var(--mac-background-tertiary)',
+                  transition: 'background 150ms ease',
+                }}
+              >
+                {done ? <CheckCircle style={{ width: 16, height: 16 }} /> : n}
               </div>
-            </button>);
-
+              {idx < stepTitles.length - 1 && (
+                <div
+                  style={{
+                    width: 24,
+                    height: 2,
+                    borderRadius: 1,
+                    marginTop: 13,
+                    background: step > n ? 'var(--mac-accent-blue)' : 'var(--mac-border-secondary)',
+                  }}
+                />
+              )}
+            </div>
+            <div
+              style={{
+                marginTop: 'var(--mac-spacing-1)',
+                fontSize: 'var(--mac-font-size-xs)',
+                color: active ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
+                fontWeight: active ? ('var(--mac-font-weight-medium)' as CSSProperties['fontWeight']) : undefined,
+                textAlign: 'center',
+                lineHeight: 1.2,
+              }}
+            >
+              {title}
+            </div>
+          </div>
+        );
       })}
+    </div>
+  );
+
+  const renderError = () =>
+    error ? (
+      <div
+        role="alert"
+        aria-live="polite"
+        className="flex items-start gap-2"
+        style={{
+          marginTop: 'var(--mac-spacing-3)',
+          padding: 'var(--mac-spacing-3)',
+          borderRadius: 'var(--mac-radius-md)',
+          background: 'var(--mac-accent-red-bg)',
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-sm)',
+        }}
+      >
+        <AlertCircle style={{ width: 16, height: 16, flexShrink: 0, color: 'var(--mac-accent-red)' }} />
+        <span>{error}</span>
       </div>
+    ) : null;
 
-      <div className="flex justify-end">
-        <Button
-        onClick={() => setCurrentStep(2)}
-        disabled={!selectedMethod}>
-        
-          {t('misc.tfsw_next')}
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
-      </div>
-    </div>;
+  const primaryButton = (label: string, onClick: () => void, disabled: boolean, icon?: ReactNode) => (
+    <Button onClick={onClick} disabled={disabled}>
+      {loading ? (
+        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+      ) : (
+        icon
+      )}
+      {label}
+    </Button>
+  );
 
-
-  const renderStep2 = () =>
-  <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-xl font-semibold mb-2">{t('misc.tfsw_step2_title', { method: methods.find((m) => m.id === selectedMethod)?.name })}</h3>
-        <p className="text-gray-600">
-          {t('misc.tfsw_step2_desc')}
-        </p>
-      </div>
-
-      <div className="space-y-4">
-        {(selectedMethod === 'sms' || selectedMethod === 'email') &&
-      <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {selectedMethod === 'sms' ? t('misc.tfsw_label_phone') : t('misc.tfsw_label_email')}
-            </label>
-            <Input
-          type={selectedMethod === 'sms' ? 'tel' : 'email'}
-          aria-label={selectedMethod === 'sms' ? '2FA setup phone number' : '2FA setup email address'}
-          value={selectedMethod === 'sms' ? recoveryPhone : recoveryEmail}
-          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-            if (selectedMethod === 'sms') {
-              setRecoveryPhone(e.target.value);
-            } else {
-              setRecoveryEmail(e.target.value);
-            }
-          }}
-          placeholder={selectedMethod === 'sms' ? '+7 (999) 123-45-67' : 'user@example.com'}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        
-          </div>
-      }
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            {t('misc.tfsw_label_recovery_email')}
-          </label>
-          <Input
-          type="email"
-          aria-label="Recovery email"
-          value={recoveryEmail}
-          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRecoveryEmail(e.target.value)}
-          placeholder="recovery@example.com"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            {t('misc.tfsw_label_recovery_phone')}
-          </label>
-          <Input
-          type="tel"
-          aria-label="Recovery phone"
-          value={recoveryPhone}
-          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRecoveryPhone(e.target.value)}
-          placeholder="+7 (999) 123-45-67"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        
-        </div>
-      </div>
-
-      <div className="flex justify-between">
-        <Button
-        onClick={() => setCurrentStep(1)}
-        variant="outline">
-        
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {t('misc.tfsw_back')}
-        </Button>
-        <Button
-        onClick={handleSetup}
-        disabled={loading}>
-        
-          {loading ?
-        <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> :
-
-        <Shield className="w-4 h-4 mr-2" />
-        }
-          {t('misc.tfsw_setup_button')}
-        </Button>
-      </div>
-    </div>;
-
-
-  const renderStep3 = () =>
-  <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-xl font-semibold mb-2">{t('misc.tfsw_step3_title')}</h3>
-        <p className="text-gray-600">
-          {selectedMethod === 'totp' ?
-        t('misc.tfsw_step3_desc_totp') :
-        t('misc.tfsw_step3_desc_other')
-        }
-        </p>
-      </div>
-
-      {selectedMethod === 'totp' && setupData &&
-    <div className="text-center">
-          <div className="bg-white p-4 rounded-lg border inline-block">
-            <div className="flex justify-center mb-4">
-              <QrCode className="w-8 h-8 text-gray-600" />
-            </div>
-            <div className="text-sm text-gray-600 mb-2">
-              {t('misc.tfsw_scan_qr')}
-            </div>
-            <div className="bg-gray-100 p-4 rounded-lg mb-4">
-              {/* Здесь должен быть QR-код */}
-              <div className="w-48 h-48 bg-gray-200 rounded flex items-center justify-center">
-                <span className="text-gray-500">QR Code</span>
-              </div>
-            </div>
-            <div className="text-sm text-gray-600 mb-2">
-              {t('misc.tfsw_or_enter_secret')}
-            </div>
-            <div className="flex items-center space-x-2">
-              <code className="px-3 py-2 bg-gray-100 rounded font-mono text-sm">
-                {showSecret ? String(setupData?.secret ?? '') : '••••••••••••••••'}
-              </code>
-              <button
-            onClick={() => setShowSecret(!showSecret)}
-            aria-label={showSecret ? t('misc.tfsw_aria_hide_secret') : t('misc.tfsw_aria_show_secret')}
-            className="text-gray-400 hover:text-gray-600">
-            
-                {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-              <button
-            onClick={() => copyToClipboard(String(setupData?.secret ?? ''))}
-            aria-label={t('misc.tfsw_aria_copy_secret')}
-            className="text-gray-400 hover:text-gray-600">
-            
-                <Copy className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-    }
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {t('misc.tfsw_label_verification_code')}
-        </label>
-        <Input
-        type="text"
-        aria-label="2FA verification code"
-        value={verificationCode}
-        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-        placeholder="000000"
-        className="w-full px-3 py-2 text-center text-2xl font-mono border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        maxLength={6} />
-      
-      </div>
-
-      <div className="flex justify-between">
-        <Button
-        onClick={() => setCurrentStep(2)}
-        variant="outline">
-        
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {t('misc.tfsw_back')}
-        </Button>
-        <Button
-        onClick={handleVerification}
-        disabled={loading || verificationCode.length !== 6}>
-        
-          {loading ?
-        <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> :
-
-        <CheckCircle className="w-4 h-4 mr-2" />
-        }
-          {t('misc.tfsw_confirm_button')}
-        </Button>
-      </div>
-    </div>;
-
-
-  const renderStep4 = () =>
-  <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-xl font-semibold mb-2">{t('misc.tfsw_step4_title')}</h3>
-        <p className="text-gray-600">
-          {t('misc.tfsw_step4_desc')}
-        </p>
-      </div>
-
-      <Card className="p-6">
-        <div className="mb-4">
-          <AlertCircle className="w-6 h-6 text-yellow-600 mb-2" />
-          <h4 className="font-semibold text-yellow-800">{t('misc.tfsw_important')}</h4>
-          <p className="text-sm text-yellow-700">
-            {t('misc.tfsw_backup_warning')}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-          {backupCodes.map((code, index) =>
-        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <code className="font-mono text-sm">{code}</code>
-              <button
-            onClick={() => copyToClipboard(code)}
-            aria-label={t('misc.tfsw_aria_copy_backup_code', { index: index + 1 })}
-            className="text-gray-400 hover:text-gray-600">
-            
-                <Copy className="w-4 h-4" />
-              </button>
-            </div>
-        )}
-        </div>
-
-        <div className="flex space-x-2">
-          <Button
-          onClick={() => copyToClipboard(backupCodes.join('\n'))}
-          variant="outline"
-          size="small">
-          
-            <Copy className="w-4 h-4 mr-2" />
-            {t('misc.tfsw_copy_all')}
-          </Button>
-          <Button
-          onClick={downloadBackupCodes}
-          variant="outline"
-          size="small">
-          
-            <Download className="w-4 h-4 mr-2" />
-            {t('misc.tfsw_download')}
-          </Button>
-        </div>
-      </Card>
-
-      <div className="flex justify-end">
-        <Button
-        onClick={() => setCurrentStep(5)}>
-        
-          {t('misc.tfsw_continue')}
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
-      </div>
-    </div>;
-
-
-  const renderStep5 = () =>
-  <div className="text-center space-y-6">
-      <div className="flex justify-center">
-        <div className="p-4 bg-green-100 rounded-full">
-          <CheckCircle className="w-12 h-12 text-green-600" />
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-xl font-semibold mb-2">{t('misc.tfsw_step5_title')}</h3>
-        <p className="text-gray-600">
-          {t('misc.tfsw_step5_desc')}
-        </p>
-      </div>
-
-      <div className="bg-blue-50 p-4 rounded-lg">
-        <h4 className="font-semibold text-blue-800 mb-2">{t('misc.tfsw_what_next')}</h4>
-        <ul className="text-sm text-blue-700 space-y-1 text-left">
-          <li>{t('misc.tfsw_next_step_app')}</li>
-          <li>{t('misc.tfsw_next_step_backup')}</li>
-          <li>{t('misc.tfsw_next_step_settings')}</li>
-        </ul>
-      </div>
-
-      <div className="flex justify-center">
-        <Button
-        onClick={handleComplete}>
-        
-          <Shield className="w-4 h-4 mr-2" />
-          {t('misc.tfsw_finish_button')}
-        </Button>
-      </div>
-    </div>;
-
+  const backButton = (to: 1 | 2) => (
+    <Button onClick={() => setStep(to)} variant="outline" disabled={loading}>
+      <ArrowLeft className="w-4 h-4 mr-2" />
+      {t('misc.tfsw_back')}
+    </Button>
+  );
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <Card className="p-8">
-        {renderStepIndicator()}
+    <div
+      className="mx-auto w-full"
+      style={{ maxWidth: 400, padding: '0 var(--mac-spacing-2)', fontFamily: 'inherit' }}
+    >
+      <div className="flex flex-col items-center text-center" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+        <div
+          className="flex items-center justify-center"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 'var(--mac-radius-full)',
+            background: 'var(--mac-accent-blue-bg)',
+            marginBottom: 'var(--mac-spacing-3)',
+          }}
+        >
+          <ShieldCheck style={{ width: 24, height: 24, color: 'var(--mac-accent-blue)' }} />
+        </div>
+        <h2 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)' as CSSProperties['fontWeight'] }}>
+          {t('misc.tfsw2_title')}
+        </h2>
 
-        {currentStep === 1 && renderStep1()}
-        {currentStep === 2 && renderStep2()}
-        {currentStep === 3 && renderStep3()}
-        {currentStep === 4 && renderStep4()}
-        {currentStep === 5 && renderStep5()}
+      </div>
 
-        {/* Уведомления */}
-        {error &&
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 text-red-600" />
-              <span className="text-sm text-red-800">{error}</span>
+      {step !== 4 && renderStepper()}
+
+      {step === 1 && (
+        <div className="flex flex-col" style={{ gap: 'var(--mac-spacing-4)' }}>
+          <div className="text-center">
+            <h3 style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)' as CSSProperties['fontWeight'], marginBottom: 'var(--mac-spacing-2)' }}>
+              {t('misc.tfsw2_step1_title')}
+            </h3>
+            <p style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+              {t('misc.tfsw2_step1_desc')}
+            </p>
+          </div>
+          <div>
+            <label
+              htmlFor="tfsw-recovery-email"
+              className="block"
+              style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)' as CSSProperties['fontWeight'], marginBottom: 'var(--mac-spacing-2)', color: 'var(--mac-text-primary)' }}
+            >
+              {t('misc.tfsw_label_recovery_email')}
+            </label>
+            <Input
+              id="tfsw-recovery-email"
+              type="email"
+              aria-label="2FA recovery email"
+              value={recoveryEmail}
+              onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRecoveryEmail(e.target.value)}
+              placeholder="recovery@example.com"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="tfsw-recovery-phone"
+              className="block"
+              style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)' as CSSProperties['fontWeight'], marginBottom: 'var(--mac-spacing-2)', color: 'var(--mac-text-primary)' }}
+            >
+              {t('misc.tfsw_label_recovery_phone')}
+            </label>
+            <Input
+              id="tfsw-recovery-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              aria-label="2FA recovery phone"
+              value={recoveryPhone}
+              onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                setRecoveryPhone(normalizePhoneInput(e.target.value))
+              }
+              placeholder={UZ_PHONE_PREFIX}
+              maxLength={13}
+            />
+          </div>
+          {renderError()}
+          <div className="flex justify-end">
+            {primaryButton(t('misc.tfsw_next'), handleSetup, loading, <ArrowRight className="w-4 h-4 mr-2" />)}
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="flex flex-col" style={{ gap: 'var(--mac-spacing-4)' }}>
+          <div className="text-center">
+            <h3 style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)' as CSSProperties['fontWeight'], marginBottom: 'var(--mac-spacing-2)' }}>
+              {t('misc.tfsw2_step2_title')}
+            </h3>
+            <p style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+              {t('misc.tfsw_step3_desc_totp')}
+            </p>
+          </div>
+          <div
+            className="flex flex-col items-center"
+            style={{ padding: 'var(--mac-spacing-4)', border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-lg)', background: 'var(--mac-bg-content)' }}
+          >
+            {qrValue ? (
+              <div style={{ padding: 'var(--mac-spacing-3)', background: '#fff', borderRadius: 'var(--mac-radius-md)' }}>
+                {/* Контракт: qr_code_url — ГОТОВОЕ PNG-изображение QR (data:image/png;base64),
+                    сгенерированное бэкендом из otpauth-URI. otpauth:// на случай смены контракта. */}
+                {qrValue.startsWith('data:image') ? (
+                  <img src={qrValue} width={176} height={176} alt="QR-код 2FA" style={{ display: 'block' }} />
+                ) : (
+                  <QRCodeSVG value={qrValue} size={176} level="M" />
+                )}
+              </div>
+            ) : null}
+            <div style={{ marginTop: 'var(--mac-spacing-3)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', textAlign: 'center' }}>
+              {t('misc.tfsw_or_enter_secret')}
+            </div>
+            <div className="flex items-center" style={{ gap: 'var(--mac-spacing-2)', marginTop: 'var(--mac-spacing-2)' }}>
+              <code
+                style={{
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                  background: 'var(--mac-background-tertiary)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  fontFamily: 'var(--mac-font-family-mono, monospace)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  letterSpacing: '0.08em',
+                  wordBreak: 'break-all',
+                  maxWidth: 260,
+                }}
+              >
+                {showSecret ? secretKey : '•'.repeat(Math.min(secretKey.length || 16, 32))}
+              </code>
+              <button
+                type="button"
+                onClick={() => setShowSecret(!showSecret)}
+                aria-label={showSecret ? t('misc.tfsw_aria_hide_secret') : t('misc.tfsw_aria_show_secret')}
+                style={{ color: 'var(--mac-text-secondary)', cursor: 'pointer', background: 'transparent', border: 'none', padding: 4 }}
+              >
+                {showSecret ? <EyeOff style={{ width: 16, height: 16 }} /> : <Eye style={{ width: 16, height: 16 }} />}
+              </button>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(secretKey, 'secret')}
+                aria-label={t('misc.tfsw_aria_copy_secret')}
+                style={{ color: 'var(--mac-text-secondary)', cursor: 'pointer', background: 'transparent', border: 'none', padding: 4 }}
+              >
+                <Copy style={{ width: 16, height: 16 }} />
+              </button>
+              {copied === 'secret' && (
+                <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-accent-green)' }}>
+                  {t('misc.tfsw_copied_to_clipboard')}
+                </span>
+              )}
             </div>
           </div>
-        }
-
-        {success &&
-        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <span className="text-sm text-green-800">{success}</span>
-            </div>
+          {renderError()}
+          <div className="flex justify-between">
+            {backButton(1)}
+            {primaryButton(t('misc.tfsw_next'), () => setStep(3), false, <ArrowRight className="w-4 h-4 mr-2" />)}
           </div>
-        }
-      </Card>
-    </div>);
+        </div>
+      )}
 
+      {step === 3 && (
+        <div className="flex flex-col" style={{ gap: 'var(--mac-spacing-4)' }}>
+          <div className="text-center">
+            <h3 style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)' as CSSProperties['fontWeight'], marginBottom: 'var(--mac-spacing-2)' }}>
+              {t('misc.tfsw2_step3_title')}
+            </h3>
+            <p style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+              {t('misc.tfsw_step3_desc_totp')}
+            </p>
+          </div>
+          <div>
+            <label
+              htmlFor="tfsw-code"
+              className="block text-center"
+              style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)' as CSSProperties['fontWeight'], marginBottom: 'var(--mac-spacing-2)' }}
+            >
+              {t('misc.tfsw_label_verification_code')}
+            </label>
+            <input
+              id="tfsw-code"
+              ref={codeRef}
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && code.length === 6 && !loading) handleVerify();
+              }}
+              aria-label="2FA verification code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              maxLength={6}
+              className="w-full"
+              style={{
+                padding: 'var(--mac-spacing-3)',
+                textAlign: 'center',
+                fontFamily: 'var(--mac-font-family-mono, monospace)',
+                fontSize: 'var(--mac-font-size-xl)',
+                letterSpacing: '0.5em',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-md)',
+                background: 'var(--mac-bg-content)',
+                color: 'var(--mac-text-primary)',
+                outline: 'none',
+              }}
+            />
+          </div>
+          {renderError()}
+          <div className="flex justify-between">
+            {backButton(2)}
+            {primaryButton(t('misc.tfsw_confirm_button'), handleVerify, loading || code.length !== 6, <CheckCircle className="w-4 h-4 mr-2" />)}
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="flex flex-col items-center" style={{ gap: 'var(--mac-spacing-4)' }}>
+          <CheckCircle style={{ width: 48, height: 48, color: 'var(--mac-accent-green)' }} />
+          <div className="text-center">
+            <h3 style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)' as CSSProperties['fontWeight'], marginBottom: 'var(--mac-spacing-2)' }}>
+              {t('misc.tfsw_step5_title')}
+            </h3>
+            <p style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+              {t('misc.tfsw_step5_desc')}
+            </p>
+          </div>
+          {backupCodes.length > 0 && (
+            <div
+              className="w-full"
+              style={{ padding: 'var(--mac-spacing-4)', border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-lg)' }}
+            >
+              <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-2)' }}>
+                {t('misc.tfsw_backup_warning')}
+              </div>
+              <div className="grid grid-cols-2" style={{ gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-3)' }}>
+                {backupCodes.map((backupCode, idx) => (
+                  <code
+                    key={idx}
+                    style={{
+                      padding: 'var(--mac-spacing-2)',
+                      background: 'var(--mac-background-tertiary)',
+                      borderRadius: 'var(--mac-radius-sm)',
+                      fontFamily: 'var(--mac-font-family-mono, monospace)',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {backupCode}
+                  </code>
+                ))}
+              </div>
+              <div className="flex" style={{ gap: 'var(--mac-spacing-2)' }}>
+                <Button variant="outline" size="small" onClick={() => copyToClipboard(backupCodes.join('\n'), 'codes')}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  {t('misc.tfsw_copy_all')}
+                </Button>
+                <Button variant="outline" size="small" onClick={downloadBackupCodes}>
+                  <Download className="w-4 h-4 mr-2" />
+                  {t('misc.tfsw_download')}
+                </Button>
+              </div>
+            </div>
+          )}
+          <Button
+            onClick={() => {
+              // Завершение входа — только после показа резервных кодов
+              if (enrolledPayload && onEnrolled) {
+                onEnrolled(enrolledPayload);
+                return;
+              }
+              onComplete?.();
+            }}
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            {t('misc.tfsw_finish_button')}
+          </Button>
+        </div>
+      )}
+
+      {onCancel && step !== 4 && (
+        <div className="text-center" style={{ marginTop: 'var(--mac-spacing-4)' }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', background: 'transparent', border: 'none', padding: 0 }}
+          >
+            {t('misc.cancel')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 };
-
-
-// audit/strict: removed self-referencing propTypes spread
 
 export default TwoFactorSetupWizard;

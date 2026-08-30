@@ -197,7 +197,7 @@ const AIClinicalText = ({ content, variant = 'info' }: AIClinicalTextProps) => {
     'success': 'var(--mac-success)',
     'warning': 'var(--mac-warning)',
     'error': 'var(--mac-error)',
-    'info': 'var(--mac-info)'
+    'info': 'var(--mac-accent)'
   };
   const variantBgColor = variantBgColorMap[variant] || 'var(--mac-bg-primary)';
 

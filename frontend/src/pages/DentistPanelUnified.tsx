@@ -4,11 +4,9 @@ import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import { useTheme } from '../contexts/ThemeContext';
-import { adaptTimeFields } from '../utils/registrarAggregation';
 import { getLocalDateString, parseRegistrarTimestamp } from '../utils/dateUtils';
 import {
-  Button, Badge, Card,
-  Input } from '../components/ui/macos';
+  Button, Badge, Card } from '../components/ui/macos';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import auth from '../stores/auth';
 import { apiClient } from '../api/client';
@@ -20,7 +18,6 @@ import TreatmentPlanner from '../components/dental/TreatmentPlanner';
 import PatientCard from '../components/dental/PatientCard';
 import type { PatientFormData } from '../components/dental/PatientCard';
 import DentalPriceManager from '../components/dental/DentalPriceManager';
-import ExaminationForm from '../components/dental/ExaminationForm';
 import DiagnosisForm from '../components/dental/DiagnosisForm';
 import VisitProtocol from '../components/dental/VisitProtocol';
 import PhotoArchive from '../components/dental/PhotoArchive';
@@ -36,40 +33,22 @@ import QueueIntegration from '../components/QueueIntegration';
 
 import {
   Calendar,
-  XCircle,
-  Save } from
+  XCircle } from
 'lucide-react';
 import '../styles/animations.css';
-import { getApiBaseUrl } from '../api/runtime';
-import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { printPanelTicket } from '../services/panelPrint';
 import notify from '../services/notify';
 // STRAT#34: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
 import type { Appointment } from '../types/domain/clinic';
-import type { Patient } from '../types/domain/clinic';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDentalHotkeys } from '../hooks/useDentalHotkeys';
-import {
-  DENTIST_DOCUMENTS_STORAGE_KEY,
-  parseDentistDocuments,
-  upsertDentistVisitProtocol,
-} from '../utils/dentistryDocuments';
-import {
-  buildDentistVisitProtocolCard,
-  buildDentistVisitProtocolSaveRequest,
-  mapDentistVisitProtocolFromEmr,
-  mergeDentistVisitProtocolCards,
-} from '../utils/dentistVisitProtocolBridge';
-import { isDentistrySpecialty } from '../utils/dentistrySpecialty';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { queueService } from '../services/queue';
 import {
   countAppointmentsByStatuses,
-  getAllPatientServices,
-  makeEnsureCanonicalVisitId,
   normalizeNumericId,
   SPECIALTY_KEYS,
 } from '../utils/doctorPanelShared';
@@ -78,129 +57,27 @@ import { getErrorMessage } from '../utils/type-guards';
 
 const LazyReportsAndAnalytics = lazy(() => import('../components/dental/ReportsAndAnalytics'));
 
-/**
- * Loose shape for the doctor-panel `selectedPatient` state object.
- * The shared `useDoctorPanelState` hook keeps `selectedPatient` typed as
- * `null` (its useState is declared without an explicit generic, and the
- * runtime payload is built ad-hoc from API/queue rows). Until the hook
- * ships a proper type, the panel casts its return through this alias.
- */
-type SelectedPatient = {
-  id?: string | number | null;
-  appointment_id?: string | number | null;
-  visit_id?: string | number | null;
-  patient_id?: string | number | null;
-  patient_name?: string;
-  patient_fio?: string;
-  name?: string;
-  phone?: string;
-  number?: string | number | null;
-  doctor_queue_entry_id?: string | number | null;
-  queue_entry_id?: string | number | null;
-  source?: string;
-  status?: string | null;
-  specialty?: string;
-  patient?: { id?: string | number; full_name?: string; name?: string; [k: string]: unknown } | null;
-  visitData?: Record<string, unknown> | null;
-  examinationData?: Record<string, unknown> | null;
-  diagnosisData?: Record<string, unknown> | null;
-  photoArchive?: Record<string, unknown> | null;
-  dentalChart?: Record<string, unknown> | null;
-  [k: string]: unknown;
-};
-
-type DoctorPanelState = {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  handleTabChange: (tab: string) => void;
-  patientIdFromUrl: number | null;
-  visitIdFromUrl: number | null;
-  selectedPatient: SelectedPatient | null;
-  setSelectedPatient: React.Dispatch<React.SetStateAction<SelectedPatient | null>>;
-};
-
-const API_V1_BASE = getApiBaseUrl();
-const DENTISTRY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
-const DENTISTRY_CALLED_STATUSES = ['called', 'in_progress'];
-const DENTISTRY_COMPLETED_STATUSES = ['completed', 'done'];
-let dentistAppointmentsCache: Appointment[] | null = null;
-let dentistAppointmentsLoadPromise: Promise<Appointment[]> | null = null;
-let dentistServicesCache: Record<string, unknown> | null = null;
-let dentistServicesLoadPromise: Promise<Record<string, unknown> | null> | null = null;
-const dentistVisitProtocolsCache = new Map<string, Record<string, unknown>[]>();
-const dentistVisitProtocolsLoadPromises = new Map<string, Promise<Record<string, unknown>[]>>();
-const dentistFallbackLoggedKeys = new Set<string>();
-
-// audit/phase-1, BS-42: invalidation helper for the 7 module-level caches.
-// Previously these caches were never invalidated on patient switch, so on
-// rapid visit-to-visit navigation the panel showed the previous patient's
-// appointments / services (PHI leak between patients on a shared workstation).
-// `useVisitLifecycle` already aborts in-flight requests and clears the
-// cacheService layer; this helper additionally clears the panel-local
-// module-level singletons so the next render refetches from the backend.
-function invalidateDentistPanelCaches() {
-  dentistAppointmentsCache = null;
-  dentistAppointmentsLoadPromise = null;
-  dentistServicesCache = null;
-  dentistServicesLoadPromise = null;
-  dentistVisitProtocolsCache.clear();
-  dentistVisitProtocolsLoadPromises.clear();
-  // Note: dentistFallbackLoggedKeys intentionally retained — it only guards
-  // against duplicate log noise, holds no PHI, and clearing it would resurface
-  // log spam on the next visit to the same patient.
-}
-
-// countAppointmentsByStatuses and normalizeNumericId are imported from
-// utils/doctorPanelShared (unified across Cardiology / Dermatology / Dentistry).
-
-function resolveDoctorQueueEntryId(row: Record<string, unknown> | null | undefined): string | number | null {
-  const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;
-  if (explicitQueueEntryId !== null && explicitQueueEntryId !== undefined) {
-    return explicitQueueEntryId as string | number;
-  }
-
-  return null;
-}
-
-function buildPatientsFromAppointments(
-  appointments: Appointment[] | null | undefined,
-  t: (key: string, params?: Record<string, unknown>) => string,
-): SelectedPatient[] {
-  const patientsById = new Map<string | number, SelectedPatient>();
-
-  (appointments ?? []).forEach((appointment: Appointment) => {
-    const patientId = appointment.patient_id || appointment.id;
-    if (!patientId || patientsById.has(patientId)) {
-      return;
-    }
-
-    const patientName =
-      appointment.patient_fio || appointment.patient_name || (appointment.name as string | undefined) || t('dental.dental_panel_patient_default');
-
-    patientsById.set(patientId, {
-      id: patientId,
-      patient_id: patientId,
-      appointment_id: (appointment.appointment_id as string | number | null | undefined) || null,
-      visit_id: normalizeNumericId(appointment.visit_id),
-      name: patientName,
-      patient_name: patientName,
-      patient_fio: patientName,
-      phone: (appointment.patient_phone as string) || (appointment.phone as string) || '',
-      specialty: (appointment.specialty as string) || 'dentistry',
-      source: (appointment.source as string) || 'appointments',
-    });
-  });
-
-  return Array.from(patientsById.values());
-}
-
-function loadStoredDentistDocuments() {
-  if (typeof window === 'undefined') {
-    return parseDentistDocuments(null);
-  }
-
-  return parseDentistDocuments(window.localStorage.getItem(DENTIST_DOCUMENTS_STORAGE_KEY));
-}
+// PR-UI-15-3: module-level contracts infra (types, status constants, caches +
+// BS-42 invalidation, queue-id resolution, patient derivation, localStorage
+// bootstrap) extracted verbatim to ./dentist/dentistContracts.
+import {
+  DENTISTRY_WAITING_STATUSES,
+  DENTISTRY_CALLED_STATUSES,
+  DENTISTRY_COMPLETED_STATUSES,
+  invalidateDentistPanelCaches,
+  resolveDoctorQueueEntryId,
+  dentistCache,
+  type SelectedPatient,
+  type DoctorPanelState,
+} from './dentist/dentistContracts';
+// PR-UI-15-3: worklist data lifecycle (queues/today fetch + DTO mapping +
+// services + patients + queueUpdated listener) extracted verbatim to
+// ./dentist/useDentistWorklistData.
+import { useDentistWorklistData } from './dentist/useDentistWorklistData';
+// PR-UI-15-4: dialog view-state + EMR v2 visit-protocol lifecycle extracted
+// verbatim to ./dentist/useDentistDialogs + ./dentist/useDentistVisitProtocols.
+import { useDentistDialogs } from './dentist/useDentistDialogs';
+import { useDentistVisitProtocols } from './dentist/useDentistVisitProtocols';
 
 /**
  * Объединенная стоматологическая панель с полным функционалом
@@ -239,41 +116,57 @@ const DentistPanelUnified = () => {
     patientDeepLinkTab: 'patients',
   }) as DoctorPanelState;
 
+  // STRAT#34: useTranslation adapter for confirm/notify i18n.
+  // PR-UI-15-3: moved above the worklist hook — the hook needs tI18n for the
+  // DTO labels (hook order stays consistent across renders).
+  const { t: tI18n } = useTranslation();
+
   const handleCardKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>, action: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       action();
     }
   }, []);
-  const [patients, setPatients] = useState<SelectedPatient[]>([]);
-  // Phase 4+ cleanup: treatmentPlans/prosthetics state removed (dead UI).
   const [loading, setLoading] = useState(true);
   // P-009: selectedPatient / setSelectedPatient now come from useDoctorPanelState
-  const [savedVisitProtocols, setSavedVisitProtocols] = useState<Record<string, unknown>[]>(
-    () => loadStoredDentistDocuments().visitProtocols
-  );
-  const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null }>({ open: false, patient: null });
-  const [protocolTemplateDraft, setProtocolTemplateDraft] = useState<SelectedPatient | null>(null);
+  // PR-UI-15-4: savedVisitProtocols + protocol loaders/persist/reopen moved
+  // verbatim to ./dentist/useDentistVisitProtocols (EMR v2 lifecycle).
 
-  // Состояния для таблицы записей
-  const [appointmentsTableData, setAppointmentsTableData] = useState<Appointment[]>([]);
-  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [services, setServices] = useState<Record<string, unknown>>({});
-  const appointmentsTableDataRef = useRef<Appointment[]>([]);
-  const appointmentsLoadPromiseRef = useRef<Promise<Appointment[]> | null>(null);
+  // PR-UI-15-3: worklist state (patients + appointments table + services +
+  // refs) + the queues/today data lifecycle moved verbatim to
+  // ./dentist/useDentistWorklistData.
+  const {
+    patients,
+    appointmentsTableData,
+    appointmentsTableDataRef,
+    appointmentsLoading,
+    services,
+    loadDentistryAppointments,
+    ensureCanonicalVisitId,
+    loadData,
+  } = useDentistWorklistData({ tI18n, activeTab });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [showDentalChart, setShowDentalChart] = useState(false);
-  const [showTreatmentPlanner, setShowTreatmentPlanner] = useState(false);
-  const [showPatientCard, setShowPatientCard] = useState(false);
-  const [showExaminationForm, setShowExaminationForm] = useState(false);
-  const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
-  const [showVisitProtocol, setShowVisitProtocol] = useState(false);
-  const [showPhotoArchive, setShowPhotoArchive] = useState(false);
-  const [showProtocolTemplates, setShowProtocolTemplates] = useState(false);
-  const [showReports, setShowReports] = useState(false);
-  // Phase 4+ cleanup: showTreatmentForm/showProstheticForm removed (dead UI).
-  const [dentalChartData, setDentalChartData] = useState<Record<string, unknown> | null>(null);
+  // PR-UI-15-4: dialog/tooth/price/schedule view-state slice moved verbatim
+  // to ./dentist/useDentistDialogs (plain useState — no cross-field reset
+  // shapes, unlike the registrar/cashier dialog state machines).
+  const {
+    showDentalChart, setShowDentalChart,
+    showTreatmentPlanner, setShowTreatmentPlanner,
+    showPatientCard, setShowPatientCard,
+    showDiagnosisForm, setShowDiagnosisForm,
+    showVisitProtocol, setShowVisitProtocol,
+    showPhotoArchive, setShowPhotoArchive,
+    showProtocolTemplates, setShowProtocolTemplates,
+    showReports, setShowReports,
+    dentalChartData, setDentalChartData,
+    showPriceManager, setShowPriceManager,
+    selectedServiceForPrice, setSelectedServiceForPrice,
+    selectedTooth, setSelectedTooth,
+    toothModalOpen, setToothModalOpen,
+    protocolTemplateDraft, setProtocolTemplateDraft,
+    scheduleNextModal, setScheduleNextModal,
+  } = useDentistDialogs();
 
   // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
   // is invalidated when the doctor switches between visits or patients.
@@ -315,162 +208,34 @@ const DentistPanelUnified = () => {
     },
   },
   );
-  // Состояние для DentalPriceManager
-  const [showPriceManager, setShowPriceManager] = useState(false);
-  const [selectedServiceForPrice, setSelectedServiceForPrice] = useState<{ id?: string | number; name?: string; price?: number; [key: string]: unknown } | null>(null);
-  const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: unknown } | string | number | null>(null);
-  const [toothModalOpen, setToothModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(
-        DENTIST_DOCUMENTS_STORAGE_KEY,
-        JSON.stringify({ visitProtocols: savedVisitProtocols })
-      );
-    } catch (error: unknown) {
-      logger.warn('[Dentist] Не удалось сохранить локальные протоколы визита:', error);
-    }
-  }, [savedVisitProtocols]);
-
+  // PR-UI-15-4: EMR v2 visit-protocol lifecycle (saved protocols + loaders +
+  // persist + reopen + hydrate) — verbatim port; deps-object wiring keeps the
+  // original setSelectedPatient / setShowVisitProtocol semantics.
+  // Codex P2, PR 2930: вызов размещён ПОСЛЕ useVisitLifecycle — как в
+  // исходной панели (effect-ordering: сначала инвалидация кэшей BS-42,
+  // затем hydrate-эффект; иначе протоколы могли бы читаться из устаревшего
+  // кэша при быстром переключении пациентов).
+  const {
+    savedVisitProtocols,
+    loadDentistVisitProtocolByVisitId,
+    persistVisitProtocol,
+    reopenVisitProtocol,
+  } = useDentistVisitProtocols({
+    tI18n,
+    selectedPatient,
+    setSelectedPatient,
+    setShowVisitProtocol,
+  });
   useEffect(() => {
     appointmentsTableDataRef.current = appointmentsTableData;
   }, [appointmentsTableData]);
 
-  const loadDentistVisitProtocolsForPatient = useCallback(async (patient: SelectedPatient | Record<string, unknown> | null) => {
-    const patientRecord = (patient ?? {}) as Record<string, unknown>;
-    const nestedPatient = patientRecord.patient as { id?: string | number; [k: string]: unknown } | undefined;
-    const patientId = nestedPatient?.id || patientRecord.patient_id || patientRecord.id || null;
-    if (!patientId) {
-      return [];
-    }
-
-    const cacheKey = String(patientId);
-    const cachedProtocols = dentistVisitProtocolsCache.get(cacheKey);
-    if (cachedProtocols) {
-      return cachedProtocols;
-    }
-
-    const inFlightProtocols = dentistVisitProtocolsLoadPromises.get(cacheKey);
-    if (inFlightProtocols) {
-      return inFlightProtocols;
-    }
-
-    logger.info('[Dentist] Загружаю протоколы визитов из EMR v2', {
-      patientId,
-      patientName: patientRecord.patient_name as string || patientRecord.patient_fio as string || patientRecord.name as string || 'Пациент',
-    });
-
-    const loadPromise = (async () => {
-      try {
-        const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
-          params: { limit: 20 },
-          silent: true,
-        } as Record<string, unknown>);
-
-        const summaries: Record<string, unknown>[] = Array.isArray(response.data) ? response.data : [];
-        const records = await Promise.all(
-          summaries.map(async (summary) => {
-            try {
-              const emrResponse = await apiClient.get(`/v2/emr/${summary.visit_id}`, {
-                silent: true,
-                validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
-              } as Record<string, unknown>);
-
-              if (emrResponse.status === 404) {
-                return null;
-              }
-
-              const protocolRecord = mapDentistVisitProtocolFromEmr(
-                emrResponse.data,
-                patient as Record<string, unknown> | null,
-              );
-
-              if (!protocolRecord) {
-                return null;
-              }
-
-              return protocolRecord;
-            } catch (error: unknown) {
-              logger.warn('[Dentist] Не удалось загрузить EMR визита для протокола', {
-                patientId,
-                visitId: summary.visit_id,
-                error: getErrorMessage(error) || error,
-              });
-              return null;
-            }
-          })
-        );
-
-        const filteredRecords = records.filter((r): r is Record<string, unknown> => Boolean(r));
-        dentistVisitProtocolsCache.set(cacheKey, filteredRecords);
-        return filteredRecords;
-      } catch (error: unknown) {
-        dentistVisitProtocolsCache.delete(cacheKey);
-        throw error;
-      } finally {
-        dentistVisitProtocolsLoadPromises.delete(cacheKey);
-      }
-    })();
-
-    dentistVisitProtocolsLoadPromises.set(cacheKey, loadPromise);
-    return loadPromise;
-  }, []);
-
-  const loadDentistVisitProtocolByVisitId = useCallback(async (visitId: string | number | null | undefined, patient: SelectedPatient | Record<string, unknown> | null = null) => {
-    if (!visitId) {
-      return null;
-    }
-
-    try {
-      const response = await apiClient.get(`/v2/emr/${visitId}`, {
-        silent: true,
-        validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
-      } as Record<string, unknown>);
-
-      if (response.status === 404) {
-        return null;
-      }
-
-      const protocolRecord = mapDentistVisitProtocolFromEmr(response.data, patient as Record<string, unknown> | null);
-      if (!protocolRecord) {
-        return null;
-      }
-
-      logger.info('[Dentist] Протокол визита загружен из EMR v2', {
-        visitId,
-        emrId: response.data?.id,
-        status: response.data?.status,
-      });
-
-      return protocolRecord;
-    } catch (error: unknown) {
-      logger.warn('[Dentist] Не удалось загрузить протокол визита из EMR v2', {
-        visitId,
-        error: getErrorMessage(error) || error,
-      });
-      return null;
-    }
-  }, []);
+  // PR-UI-15-4: loadDentistVisitProtocolsForPatient +
+  // loadDentistVisitProtocolByVisitId moved verbatim to
+  // ./dentist/useDentistVisitProtocols.
 
   // Формы данных
-  const [examinationForm, setExaminationForm] = useState<Record<string, string>>({
-    patient_id: '',
-    examination_date: '',
-    oral_hygiene: '',
-    caries_status: '',
-    periodontal_status: '',
-    occlusion: '',
-    missing_teeth: '',
-    dental_plaque: '',
-    gingival_bleeding: '',
-    diagnosis: '',
-    recommendations: ''
-  });
-
 
 
   // Refs
@@ -486,8 +251,6 @@ const DentistPanelUnified = () => {
   // C-1 (UX audit): confirm hook for visit completion
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw;
-  // STRAT#34: useTranslation adapter for confirm/notify i18n.
-  const { t: tI18n } = useTranslation();
   // C-2 (UX audit): session timeout warning
   const [sessionWarning, setSessionWarning] = useState<{ active: boolean } | null>(null);
 
@@ -509,215 +272,9 @@ const DentistPanelUnified = () => {
     clearSelection: () => setSelectedPatient(null),
   });
 
-  // Загрузка данных
-  // Загрузка услуг для правильного отображения в tooltips
-  const loadServices = useCallback(async () => {
-    if (dentistServicesCache) {
-      setServices(dentistServicesCache);
-      return dentistServicesCache;
-    }
-
-    if (dentistServicesLoadPromise) {
-      return dentistServicesLoadPromise;
-    }
-
-    const loadPromise = (async () => {
-      try {
-        const token = tokenManager.getAccessToken();
-        if (!token) return null;
-        const response = await apiClient.get('/registrar/services');
-        if (response.status < 400) {
-          const data = response.data;
-          const servicesData = data.services_by_group || {};
-          dentistServicesCache = servicesData;
-          setServices(servicesData);
-          logger.info('[Dentist] Услуги загружены:', Object.keys(servicesData).length, 'групп');
-          return servicesData;
-        }
-
-        return null;
-      } catch (error: unknown) {
-        logger.error('[Dentist] Ошибка загрузки услуг:', error);
-        return null;
-      }
-    })();
-
-    dentistServicesLoadPromise = loadPromise;
-
-    try {
-      return await loadPromise;
-    } finally {
-      if (dentistServicesLoadPromise === loadPromise) {
-        dentistServicesLoadPromise = null;
-      }
-    }
-  }, []);
-
-  // Функция для получения всех услуг пациента из всех записей
-  const getAllPatientServicesCb = useCallback((patientId: string | number | null | undefined, allAppointments: Appointment[] | null | undefined) => {
-    return getAllPatientServices(patientId, allAppointments as unknown as Array<Record<string, unknown>> | null | undefined);
-  }, []);
-
-  // Загрузка записей стоматолога
-  const loadDentistryAppointments = useCallback(async (forceRefresh = false): Promise<Appointment[]> => {
-    if (!forceRefresh && dentistAppointmentsCache) {
-      appointmentsTableDataRef.current = dentistAppointmentsCache;
-      setAppointmentsTableData(dentistAppointmentsCache);
-      setPatients((prev) => {
-        const derivedPatients = buildPatientsFromAppointments(dentistAppointmentsCache, tI18n);
-        return derivedPatients.length > 0 ? derivedPatients : prev;
-      });
-      return dentistAppointmentsCache;
-    }
-
-    if (appointmentsLoadPromiseRef.current || dentistAppointmentsLoadPromise) {
-      return (appointmentsLoadPromiseRef.current || dentistAppointmentsLoadPromise) as Promise<Appointment[]>;
-    }
-
-    const loadPromise = (async (): Promise<Appointment[]> => {
-      setAppointmentsLoading(true);
-      try {
-        const token = tokenManager.getAccessToken();
-        if (!token) {
-          logger.info('Нет токена аутентификации');
-          return [];
-        }
-
-        // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
-        const response = await apiClient.get('/registrar/queues/today');
-
-        if (response.status < 400) {
-          const data = response.data as Record<string, unknown>;
-
-          // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
-          const allAppointments: Appointment[] = [];
-          if (data && data.queues && Array.isArray(data.queues)) {
-            (data.queues as Record<string, unknown>[]).forEach((queue) => {
-              const entries = queue?.entries as Record<string, unknown>[] | undefined;
-              if (entries) {
-                entries.forEach((entry) => {
-                  const doctorQueueEntryId = resolveDoctorQueueEntryId(entry);
-                  const patientObj = entry.patient as { first_name?: string; last_name?: string; [k: string]: unknown } | undefined;
-                  const entryWithTimes = { ...entry, ...adaptTimeFields(entry, data) };
-                  allAppointments.push({
-                    id: entry.id as string | number,
-                    appointment_id: (entry.appointment_id as string | number | null | undefined) || null,
-                    visit_id: (entry.visit_id as string | number | null | undefined) || null,
-                    patient_id: entry.patient_id as string | number,
-                    patient_fio: (entry.patient_name as string) || `${patientObj?.first_name || ''} ${patientObj?.last_name || ''}`.trim(),
-                    patient_phone: (entry.phone as string) || '',
-                    patient_birth_year: (entry.patient_birth_year as number | undefined) || undefined,
-                    address: (entry.address as string) || '',
-                    visit_type:
-                      entry.discount_mode === 'repeat' ? tI18n('dental.dental_panel_discount_repeat') :
-                      entry.discount_mode === 'benefit' ? tI18n('dental.dental_panel_discount_benefit') :
-                      entry.discount_mode === 'all_free' ? 'All Free' :
-                      tI18n('dental.dental_panel_discount_paid'),
-                    discount_mode: (entry.discount_mode as string) || 'none',
-                    services: (entry.services as unknown as Appointment['services']) || [],
-                    service_codes: (entry.service_codes as string[]) || [],
-                    payment_type: (entry.payment_type as string) || null,
-                    payment_status: (entry.payment_status as string | undefined) ?? null,
-                    available_actions: (entry.available_actions as unknown[]) || [],
-                    can_mark_paid: Boolean(entry.can_mark_paid),
-                    can_start_visit: Boolean(entry.can_start_visit) && doctorQueueEntryId !== null,
-                    can_print_ticket: Boolean(entry.can_print_ticket),
-                    can_complete: Boolean(entry.can_complete) && doctorQueueEntryId !== null,
-                    can_cancel: Boolean(entry.can_cancel),
-                    queue_entry_id: (entry.queue_entry_id as string | number | null | undefined) ?? null,
-                    doctor_queue_entry_id: doctorQueueEntryId,
-                    canonical_record_id: (entry.canonical_record_id as string | number | undefined) || entry.id as string | number,
-                    record_kind: entry.record_kind,
-                    source_kind: entry.source_kind,
-                    canonical_status: (entry.canonical_status as string | null | undefined) ?? null,
-                    queue_status: (entry.queue_status as string | null | undefined) ?? null,
-                    queue_position: entry.queue_position,
-                    doctor: (entry.doctor_name as string) || tI18n('dental.dental_panel_doctor_default'),
-                    specialty: queue.specialty as string,
-                    ...entryWithTimes,
-                    status: (entry.status as string | null | undefined) ?? null,
-                    cost: (entry.cost as number) || 0
-                  } as unknown as Appointment);
-                });
-              }
-            });
-          }
-
-          // Фильтруем только стоматологические записи для отображения
-          const appointmentsData = allAppointments.filter((apt) =>
-            isDentistrySpecialty(apt.specialty)
-          );
-
-          // Добавляем информацию о всех услугах пациента в каждую запись
-          const enrichedAppointmentsData = appointmentsData.map((apt) => {
-            const allPatientServices = getAllPatientServicesCb(apt.patient_id, allAppointments);
-            return {
-              ...apt,
-              all_patient_services: allPatientServices.services,
-              all_patient_service_codes: allPatientServices.service_codes
-            };
-          });
-
-        dentistAppointmentsCache = enrichedAppointmentsData;
-        appointmentsTableDataRef.current = enrichedAppointmentsData;
-        setAppointmentsTableData(enrichedAppointmentsData);
-        setPatients((prev) => {
-          const derivedPatients = buildPatientsFromAppointments(enrichedAppointmentsData, tI18n);
-            return derivedPatients.length > 0 ? derivedPatients : prev;
-          });
-          return enrichedAppointmentsData;
-        }
-
-        logger.error('Ошибка загрузки очередей:', response.status);
-        return [];
-      } catch (error: unknown) {
-        logger.error('Ошибка загрузки записей стоматолога:', error);
-        return [];
-      } finally {
-        setAppointmentsLoading(false);
-      }
-    })();
-
-    appointmentsLoadPromiseRef.current = loadPromise;
-    dentistAppointmentsLoadPromise = loadPromise;
-
-    try {
-      return await loadPromise;
-    } finally {
-      if (appointmentsLoadPromiseRef.current === loadPromise) {
-        appointmentsLoadPromiseRef.current = null;
-      }
-      if (dentistAppointmentsLoadPromise === loadPromise) {
-        dentistAppointmentsLoadPromise = null;
-      }
-    }
-  }, [getAllPatientServicesCb, tI18n]);
-
-  // Загружаем записи при переключении на вкладку
-  useEffect(() => {
-    if (activeTab === 'appointments') {
-      loadDentistryAppointments();
-    }
-
-    // Слушаем глобальные события обновления очереди
-    const handleQueueUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<unknown>;
-      logger.info('[Dentist] Получено событие обновления очереди:', customEvent.detail);
-      if (activeTab === 'appointments') {
-        loadDentistryAppointments(true);
-      }
-    };
-    window.addEventListener('queueUpdated', handleQueueUpdate);
-
-    return () => {
-      window.removeEventListener('queueUpdated', handleQueueUpdate);
-    };
-  }, [activeTab, loadDentistryAppointments]);
-
-  const ensureCanonicalVisitId = useCallback(
-    (row: Appointment | Record<string, unknown>) => makeEnsureCanonicalVisitId(setAppointmentsTableData as unknown as React.Dispatch<React.SetStateAction<unknown[]>>, resolveCanonicalVisitId)(row as Record<string, unknown>),
-    []
-  );
+  // PR-UI-15-3: loadServices / loadDentistryAppointments / getAllPatientServicesCb
+  // / queueUpdated-listener / ensureCanonicalVisitId moved verbatim to
+  // ./dentist/useDentistWorklistData.
 
   const resolvePatientId = useCallback((patient: SelectedPatient | Record<string, unknown> | null | undefined) => {
     const record = (patient ?? {}) as Record<string, unknown>;
@@ -842,113 +399,24 @@ const DentistPanelUnified = () => {
   // Проверяем демо-режим после всех хуков
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
-  const authHeader = useCallback(() => ({
-    Authorization: `Bearer ${tokenManager.getAccessToken()}`
-  }), []);
-
-  const loadPatients = useCallback(async () => {
-    try {
-      const derivedPatients = buildPatientsFromAppointments(appointmentsTableDataRef.current, tI18n);
-      if (derivedPatients.length > 0) {
-        logger.info('[Dentist] Загружаю пациентов из уже загруженных записей', {
-          count: derivedPatients.length,
-        });
-        setPatients(derivedPatients);
-        return;
-      }
-
-      logger.info('[Dentist] Пациенты будут загружены из очереди и записей стоматолога');
-      const refreshedAppointments = await loadDentistryAppointments();
-      const refreshedPatients = buildPatientsFromAppointments(
-        Array.isArray(refreshedAppointments) && refreshedAppointments.length > 0
-          ? refreshedAppointments
-          : appointmentsTableDataRef.current,
-        tI18n,
-      );
-
-      if (refreshedPatients.length > 0) {
-        setPatients(refreshedPatients);
-      }
-    } catch (e: unknown) {
-      logger.error('Ошибка загрузки пациентов:', e);
-    }
-  }, [loadDentistryAppointments, tI18n]);
-
-  const loadTreatmentPlans = useCallback(async () => {
-    try {
-      // PR-43 / Medium-24: stub cleaned up. Treatment plans endpoint not yet
-      // implemented in backend. This function is kept as a no-op placeholder
-      // so the UI hook wiring remains stable when the endpoint ships.
-      logger.debug('Treatment plans endpoint pending backend implementation');
-    } catch {
-
-
-
-      // Игнорируем ошибки загрузки планов лечения
-    }}, []);const loadProsthetics = useCallback(async () => {
-    try {
-      // PR-43 / Medium-24: stub cleaned up. Prosthetics endpoint not yet
-      // implemented in backend. This function is kept as a no-op placeholder
-      // so the UI hook wiring remains stable when the endpoint ships.
-      logger.debug('Prosthetics endpoint pending backend implementation');
-    } catch {
-
-
-
-      // Игнорируем ошибки загрузки протезирования
-    }}, []);const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      // PR-35 / P0-14: Removed duplicate loadPatients() call — was calling
-      // Promise.all([loadPatients(), loadPatients()]) which fetched the
-      // patient list twice on every mount.
-      await Promise.all([
-        loadPatients(),
-        loadServices(),
-      ]);
-    } catch (error: unknown) {
-      logger.error('Ошибка загрузки данных:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [loadPatients, loadServices]);
-
+  // PR-UI-15-3: authHeader (dead, definition-only) + loadPatients +
+  // loadTreatmentPlans / loadProsthetics no-op stubs (dead, PR-43/Medium-24
+  // endpoints pending backend) dropped; loadData moved verbatim to
+  // ./dentist/useDentistWorklistData. The panel keeps only the loading gate
+  // around the hook's loadData (verbatim setLoading semantics).
   useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  useEffect(() => {
-    const selectedPatientIdForProtocols =
-      selectedPatient?.patient?.id || selectedPatient?.patient_id || selectedPatient?.id || null;
-
-    if (!selectedPatientIdForProtocols) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const hydrateDentistVisitProtocols = async () => {
+    const runLoad = async () => {
+      setLoading(true);
       try {
-        const backendProtocols = await loadDentistVisitProtocolsForPatient(selectedPatient);
-        if (cancelled || backendProtocols.length === 0) {
-          return;
-        }
-
-        setSavedVisitProtocols((prev) => mergeDentistVisitProtocolCards(prev, backendProtocols));
+        await loadData();
       } catch (error: unknown) {
-        logger.warn('[Dentist] Не удалось синхронизировать историю протоколов из EMR v2', {
-          patientId: selectedPatientIdForProtocols,
-          error: getErrorMessage(error) || error,
-        });
+        logger.error('Ошибка загрузки данных:', error);
+      } finally {
+        setLoading(false);
       }
     };
-
-    hydrateDentistVisitProtocols();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadDentistVisitProtocolsForPatient, selectedPatient]);
+    runLoad();
+  }, [loadData]);
 
   // ✅ Автоматическая загрузка пациента из URL параметра patientId
   useEffect(() => {
@@ -1039,8 +507,8 @@ const DentistPanelUnified = () => {
           setSelectedPatient(patientObj);
           handleTabChange(visitIdFromUrl ? 'visit' : 'patients');
           const fallbackLogKey = `${patientIdFromUrl || ''}:${visitIdFromUrl || ''}`;
-          if (!dentistFallbackLoggedKeys.has(fallbackLogKey)) {
-            dentistFallbackLoggedKeys.add(fallbackLogKey);
+          if (!dentistCache.fallbackLoggedKeys.has(fallbackLogKey)) {
+            dentistCache.fallbackLoggedKeys.add(fallbackLogKey);
             logger.info('[Dentist] Пациент из URL не найден в очереди, использую безопасный URL-fallback:', patientObj.patient_name);
           }
         }
@@ -1278,20 +746,6 @@ const DentistPanelUnified = () => {
 
 
 
-  const handleExamination = (patient: SelectedPatient | Record<string, unknown> | null) => {
-    const patientId = resolvePatientId(patient);
-    setSelectedPatient({
-      ...(patient as Record<string, unknown>),
-      patient_id: patientId,
-      patient_name: resolvePatientName(patient),
-      patient_fio: resolvePatientName(patient)
-    } as SelectedPatient);
-    setExaminationForm({ ...examinationForm, patient_id: String(patientId ?? '') });
-    setShowExaminationForm(true);
-  };
-
-
-
   const handleDiagnosis = (patient: SelectedPatient | Record<string, unknown> | null) => {
     setSelectedPatient({
       ...(patient as Record<string, unknown>),
@@ -1434,66 +888,8 @@ const DentistPanelUnified = () => {
     setShowReports(true);
   };
 
-  const persistVisitProtocol = useCallback(async (patient: SelectedPatient | Record<string, unknown> | null, visitData: Record<string, unknown>) => {
-    const patientRecord = (patient ?? {}) as Record<string, unknown>;
-    if (!patientRecord.visit_id) {
-      return;
-    }
-
-    const nestedPatient = patientRecord.patient as { id?: string | number; [k: string]: unknown } | undefined;
-    const patientId = nestedPatient?.id || patientRecord.patient_id || patientRecord.id || null;
-    const patientName = (patientRecord.patient_name as string) || (patientRecord.patient_fio as string) || (patientRecord.name as string) || tI18n('dental.dental_panel_patient_default');
-    const localRecord = buildDentistVisitProtocolCard(patient, visitData, {
-      source: 'local_cache',
-    });
-
-    try {
-      const payload = buildDentistVisitProtocolSaveRequest(patient, visitData, {
-        isDraft: true,
-        rowVersion: 0,
-      });
-      logger.info('[Dentist] Сохраняю протокол визита в EMR v2', {
-        visitId: patientRecord.visit_id,
-        patientId,
-      });
-
-      const response = await apiClient.post(`/v2/emr/${patientRecord.visit_id}`, payload);
-      const backendRecord = mapDentistVisitProtocolFromEmr(response.data, patient as Record<string, unknown> | null) || localRecord;
-
-      setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, backendRecord));
-      return backendRecord;
-    } catch (error: unknown) {
-      logger.warn('[Dentist] Не удалось сохранить протокол визита в EMR v2, сохраняю локальный кеш', {
-        visitId: patientRecord.visit_id,
-        patientName,
-        error: getErrorMessage(error) || error,
-      });
-
-      setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, localRecord));
-      return localRecord;
-    }
-  }, [tI18n]);
-
-  const reopenVisitProtocol = useCallback(async (protocolRecord: Record<string, unknown> | null) => {
-    const backendProtocol = await loadDentistVisitProtocolByVisitId(protocolRecord?.visit_id as string | number | null | undefined, protocolRecord);
-
-    if (!backendProtocol && !protocolRecord?.visitData) {
-      notify.error(tI18n('dental.protocol_not_found'));
-      return;
-    }
-
-    const selectedProtocol = (backendProtocol || protocolRecord) as Record<string, unknown>;
-    setSelectedPatient({
-      id: (selectedProtocol.patient_id as string | number | null) || (protocolRecord?.patient_id as string | number | null) || null,
-      patient_id: (selectedProtocol.patient_id as string | number | null) || (protocolRecord?.patient_id as string | number | null) || null,
-      patient_name: (selectedProtocol.patient_name as string) || (protocolRecord?.patient_name as string) || tI18n('dental.dental_panel_patient_default'),
-      patient_fio: (selectedProtocol.patient_name as string) || (protocolRecord?.patient_name as string) || tI18n('dental.dental_panel_patient_default'),
-      visit_id: (selectedProtocol.visit_id as string | number | null) || (protocolRecord?.visit_id as string | number | null) || null,
-      visitData: (selectedProtocol.visitData as Record<string, unknown> | null) || (protocolRecord?.visitData as Record<string, unknown> | null) || null,
-      source: (selectedProtocol.source as string) || (protocolRecord?.source as string) || 'reports',
-    } as SelectedPatient);
-    setShowVisitProtocol(true);
-  }, [loadDentistVisitProtocolByVisitId, setSelectedPatient, tI18n]);
+  // PR-UI-15-4: persistVisitProtocol + reopenVisitProtocol moved verbatim
+  // to ./dentist/useDentistVisitProtocols (EMR v2 POST + reopen flow).
 
   const handleDentalChart = (patient: SelectedPatient | Record<string, unknown> | null) => {
     setSelectedPatient({
@@ -1522,25 +918,6 @@ const DentistPanelUnified = () => {
       visit_id: visitId
     } as SelectedPatient);
     setShowTreatmentPlanner(true);
-  };
-
-  // Обработчики отправки форм
-  const handleExaminationSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      const res = await apiClient.post('/dental/examinations', examinationForm);
-      if (res.status < 400) {
-        setShowExaminationForm(false);
-        setExaminationForm({
-          patient_id: '', examination_date: '', oral_hygiene: '', caries_status: '',
-          periodontal_status: '', occlusion: '', missing_teeth: '', dental_plaque: '',
-          gingival_bleeding: '', diagnosis: '', recommendations: ''
-        });
-        loadDentistryAppointments(true);
-      }
-    } catch (e: unknown) {
-      logger.error('Ошибка сохранения осмотра:', e);
-    }
   };
 
 
@@ -1669,48 +1046,9 @@ const DentistPanelUnified = () => {
     </div>;
 
 
-  // Рендер осмотров
-  const renderExaminations = () =>
-  <div className="dental-flex-col dental-gap-24">
-      <Card padding="large">
-        <h3 className="dental-text-primary">{tI18n('dental.dental_panel_examinations_title')}</h3>
-        <p className="dental-text-desc dental-text-secondary">
-          {tI18n('dental.dental_panel_examinations_subtitle')}
-        </p>
-
-        <div className="dental-grid-auto-fill-250">
-          {patients.map((patient) =>
-        <div
-          key={patient.id}
-          role="button"
-          tabIndex={0}
-          aria-label={tI18n('dental.dental_panel_aria_examination')}
-          className="dental-card-btn"
-          onClick={() => handleExamination(patient)}
-          onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleCardKeyDown(event, () => handleExamination(patient))}
-          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
-            e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-          }}
-          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
-            e.currentTarget.style.background = 'transparent';
-          }}>
-
-              <div className="dental-flex dental-gap-12">
-                <div className="dental-icon-bg dental-icon-bg-success dental-icon-bg-full">
-                  <span className="dental-text-value dental-text-white">
-                    {patient.name?.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-secondary">{tI18n('dental.dental_panel_examination_action')}</p>
-                </div>
-              </div>
-            </div>
-        )}
-        </div>
-      </Card>
-    </div>;
+  // Рендер осмотров удалён (C-2, UI_AUDIT_PLAN.md): вкладка examinations не входит в
+  // 5-tab sidebar (routeRegistry Phase 4: «examinations/diagnoses merged into EMR v2
+  // visit screen»), renderExaminations не имел reachable caller.
 
 
   // Рендер диагнозов
@@ -2011,18 +1349,6 @@ const DentistPanelUnified = () => {
 
       }
 
-      {showExaminationForm && selectedPatient &&
-      <ExaminationForm
-        patientId={selectedPatientId}
-        initialData={selectedPatient.examinationData}
-        onSave={(examinationData: unknown) => {
-          logger.info('Сохранение осмотра:', examinationData);
-          setShowExaminationForm(false);
-        }}
-        onClose={() => setShowExaminationForm(false)} />
-
-      }
-
       {showDiagnosisForm && selectedPatient &&
       <DiagnosisForm
         patientId={selectedPatientId}
@@ -2169,179 +1495,8 @@ const DentistPanelUnified = () => {
         </div>
       }
 
-      {/* Форма осмотра */}
-      {showExaminationForm && selectedPatient &&
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-4xl h-full max-h-[90vh] overflow-auto">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-semibold">
-                {tI18n('dental.dental_panel_exam_form_title', { name: selectedPatientDisplayName })}
-              </h2>
-            </div>
-            <div className="p-6">
-              <form onSubmit={handleExaminationSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_date')}</label>
-                    <Input
-                    type="date"
-                    aria-label={tI18n('dental.dental_panel_exam_aria_date')}
-                    value={examinationForm.examination_date}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, examination_date: e.target.value })}
-                    required
-                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
-
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_hygiene')}</label>
-                    <select
-                    value={examinationForm.oral_hygiene}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, oral_hygiene: e.target.value })}
-                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
-
-                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
-                      <option value="excellent">{tI18n('dental.dental_panel_hygiene_excellent')}</option>
-                      <option value="good">{tI18n('dental.dental_panel_hygiene_good')}</option>
-                      <option value="fair">{tI18n('dental.dental_panel_hygiene_fair')}</option>
-                      <option value="poor">{tI18n('dental.dental_panel_hygiene_poor')}</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_caries')}</label>
-                    <select
-                    value={examinationForm.caries_status}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, caries_status: e.target.value })}
-                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
-
-                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
-                      <option value="none">{tI18n('dental.dental_panel_caries_none')}</option>
-                      <option value="initial">{tI18n('dental.dental_panel_caries_initial')}</option>
-                      <option value="superficial">{tI18n('dental.dental_panel_caries_superficial')}</option>
-                      <option value="medium">{tI18n('dental.dental_panel_caries_medium')}</option>
-                      <option value="deep">{tI18n('dental.dental_panel_caries_deep')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_periodontal')}</label>
-                    <select
-                    value={examinationForm.periodontal_status}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, periodontal_status: e.target.value })}
-                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
-
-                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
-                      <option value="healthy">{tI18n('dental.dental_panel_periodontal_healthy')}</option>
-                      <option value="gingivitis">{tI18n('dental.dental_panel_periodontal_gingivitis')}</option>
-                      <option value="periodontitis">{tI18n('dental.dental_panel_periodontal_periodontitis')}</option>
-                      <option value="advanced">{tI18n('dental.dental_panel_periodontal_advanced')}</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_occlusion')}</label>
-                    <select
-                    value={examinationForm.occlusion}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, occlusion: e.target.value })}
-                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
-
-                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
-                      <option value="normal">{tI18n('dental.dental_panel_occlusion_normal')}</option>
-                      <option value="open_bite">{tI18n('dental.dental_panel_occlusion_open')}</option>
-                      <option value="deep_bite">{tI18n('dental.dental_panel_occlusion_deep')}</option>
-                      <option value="cross_bite">{tI18n('dental.dental_panel_occlusion_cross')}</option>
-                      <option value="crowding">{tI18n('dental.dental_panel_occlusion_crowding')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_missing')}</label>
-                    <Input
-                    type="text"
-                    aria-label={tI18n('dental.dental_panel_exam_aria_missing')}
-                    value={examinationForm.missing_teeth}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, missing_teeth: e.target.value })}
-                    placeholder={tI18n('dental.dental_panel_exam_placeholder_missing')}
-                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
-
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_plaque')}</label>
-                    <select
-                    value={examinationForm.dental_plaque}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, dental_plaque: e.target.value })}
-                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
-
-                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
-                      <option value="none">{tI18n('dental.dental_panel_plaque_none')}</option>
-                      <option value="minimal">{tI18n('dental.dental_panel_plaque_minimal')}</option>
-                      <option value="moderate">{tI18n('dental.dental_panel_plaque_moderate')}</option>
-                      <option value="heavy">{tI18n('dental.dental_panel_plaque_heavy')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_bleeding')}</label>
-                    <select
-                    value={examinationForm.gingival_bleeding}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, gingival_bleeding: e.target.value })}
-                    className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
-
-                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
-                      <option value="none">{tI18n('dental.dental_panel_bleeding_none')}</option>
-                      <option value="mild">{tI18n('dental.dental_panel_bleeding_mild')}</option>
-                      <option value="moderate">{tI18n('dental.dental_panel_bleeding_moderate')}</option>
-                      <option value="severe">{tI18n('dental.dental_panel_bleeding_severe')}</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_diagnosis')}</label>
-                  <textarea
-                  aria-label={tI18n('dental.dental_panel_exam_aria_diagnosis')}
-                  value={examinationForm.diagnosis}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, diagnosis: e.target.value })}
-                  placeholder={tI18n('dental.dental_panel_exam_placeholder_diagnosis')}
-                  rows={3}
-                  className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
-
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_recommendations')}</label>
-                  <textarea
-                  aria-label={tI18n('dental.dental_panel_exam_aria_recommendations')}
-                  value={examinationForm.recommendations}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, recommendations: e.target.value })}
-                  placeholder={tI18n('dental.dental_panel_exam_placeholder_recommendations')}
-                  rows={3}
-                  className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
-
-                </div>
-
-                <div className="flex gap-2">
-                  <Button type="submit" className="flex items-center gap-2">
-                    <Save className="h-4 w-4" />
-                    {tI18n('dental.dental_panel_exam_btn_save')}
-                  </Button>
-                  <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowExaminationForm(false)}>
-
-                    {tI18n('dental.dental_panel_exam_btn_cancel')}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      }
+      {/* C-2 cleanup (UI_AUDIT_PLAN.md): inline examination modal removed —
+           unreachable dead cluster (see git history / renderExaminations note). */}
 
       {/* Phase 4+ cleanup: treatment + prosthetic forms removed (dead UI) */}
 

@@ -62,7 +62,7 @@ def _queue_entry(db_session, *, test_doctor, test_patient, visit_id: int | None 
         number=1,
         patient_id=test_patient.id,
         patient_name="Target Bound Patient",
-        phone="+998901234575",
+        phone="+998900000123",
         source="desk",
         status="waiting",
         queue_time=datetime.utcnow().replace(microsecond=0),
@@ -176,9 +176,9 @@ def test_confirm_cancel_and_move_visit_use_bound_visit_payloads(
     db_session.refresh(move_visit)
     db_session.refresh(cancel_entry)
     db_session.refresh(move_entry)
-    assert cancel_result["visit_status"] == "cancelled"
-    assert cancel_visit.status == "cancelled"
-    assert cancel_entry.status == "cancelled"
+    assert cancel_result["visit_status"] in ("canceled", "cancelled")  # Issue #06: canonical is "canceled"
+    assert cancel_visit.status in ("canceled", "cancelled")  # Issue #06: state machine normalizes to "canceled"
+    assert cancel_entry.status in ("canceled", "cancelled")  # queue entry may keep British spelling
     assert move_result["visit_date"] == (date.today() + timedelta(days=1)).isoformat()
     assert move_visit.visit_date == date.today() + timedelta(days=1)
     assert move_entry.status == "rescheduled"

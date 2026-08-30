@@ -232,10 +232,6 @@ class TokensMixin(AuthenticationServiceMixinBase):
         two_factor_method = None
 
         # ✅ CERTIFICATION: Принудительное 2FA для критичных ролей (Admin, Cashier)
-        # ✅ CI/TESTING: Можно отключить через переменную окружения DISABLE_2FA_REQUIREMENT=1
-        import os
-        disable_2fa_requirement = os.getenv("DISABLE_2FA_REQUIREMENT", "").lower() in ("1", "true", "yes")
-
         from app.core.roles import Roles
 
         CRITICAL_2FA_ROLES = {Roles.ADMIN, Roles.CASHIER}
@@ -249,17 +245,41 @@ class TokensMixin(AuthenticationServiceMixinBase):
             and user.two_factor_auth.totp_verified
         )
 
-        # Если роль критичная (Admin/Cashier), но 2FA не настроена - блокируем вход
-        # КРОМЕ случая, когда DISABLE_2FA_REQUIREMENT=1 (для тестирования)
-        if is_critical_role and not has_2fa_enabled and not disable_2fa_requirement:
+        # Если роль критичная (Admin/Cashier), но 2FA не настроена —
+        # двухстадийная аутентификация: пароль уже верен, поэтому выдаём
+        # строго ограниченный одноразовый enrollment-токен (сервер-сайд,
+        # НЕ JWT), который принимают ТОЛЬКО /2fa/setup и /2fa/verify-setup.
+        if is_critical_role and not has_2fa_enabled:
+            enrollment_token = secrets.token_urlsafe(32)
+            db.add(
+                UserSession(
+                    user_id=user.id,
+                    refresh_token=enrollment_token,
+                    session_kind="2fa_enrollment",
+                    expires_at=datetime.now(UTC) + timedelta(minutes=10),
+                    ip=ip_address,
+                    user_agent=user_agent,
+                )
+            )
+            db.commit()
             return {
-                "success": False,
-                "message": f"Для роли {user_role} требуется настройка двухфакторной аутентификации (2FA). Пожалуйста, настройте 2FA перед входом.",
-                "user": None,
+                "success": True,
+                "message": "Требуется настройка 2FA",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "full_name": user.full_name,
+                    "email": user.email,
+                    "role": user.role,
+                    "is_active": user.is_active,
+                    "is_superuser": user.is_superuser,
+                },
                 "tokens": None,
                 "requires_2fa": False,
-                "requires_2fa_setup": True,  # ✅ Новый флаг: требуется настройка 2FA
+                "requires_2fa_setup": True,
                 "two_factor_method": None,
+                "enrollment_token": enrollment_token,
+                "enrollment_expires_in": 600,
             }
 
         # Если 2FA настроена, требуем верификацию
@@ -277,6 +297,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
             user_session = UserSession(
                 user_id=user.id,
                 refresh_token=pending_2fa_token,
+                session_kind="pending_2fa",
                 expires_at=session_expires,
                 ip=ip_address,
                 user_agent=user_agent,

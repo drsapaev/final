@@ -28,7 +28,7 @@ import {
   ToggleRight } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Input,
   Select,
@@ -323,21 +323,21 @@ const QueueSettings = () => {
   if (loading) {
     return (
       <div className="admin-outer-container-p-0">
-        <MacOSCard className="admin-card-p-0-text-center">
+        <Card className="admin-card-p-0-text-center">
           <div className="admin-flex-center-justify admin-gap-12">
             <RefreshCw className="admin-icon-32-blue-spin" />
             <span className="admin-span-lg-secondary-med">
               {t('admin2.qs_loading')}
             </span>
           </div>
-        </MacOSCard>
+        </Card>
       </div>);
 
   }
 
   return (
     <div className="admin-outer-container-p-0">
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         {/* Заголовок */}
         <div className="admin-header-flex-between-pb-24-border-bottom">
           <div>
@@ -377,7 +377,7 @@ const QueueSettings = () => {
 
         {/* Сообщения */}
         {message.text &&
-        <MacOSCard
+        <Card
           className="admin-dynamic-banner-p-16 mb-6"
           style={{
             '--admin-banner-bg': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
@@ -397,11 +397,11 @@ const QueueSettings = () => {
                 {message.text}
               </span>
             </div>
-          </MacOSCard>
+          </Card>
         }
 
         {/* ⭐ Dev Mode Toggle */}
-        <MacOSCard
+        <Card
           className="admin-dev-mode-card"
           style={{
             '--admin-card-bg': settings.dev_mode_enabled ? 'var(--mac-error-bg)' : 'var(--mac-bg-secondary)',
@@ -448,12 +448,12 @@ const QueueSettings = () => {
               }
             </button>
           </div>
-        </MacOSCard>
+        </Card>
 
         <div className="admin-grid-auto-400-24-mb-24">
 
           {/* Общие настройки */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
               <Settings className="admin-icon-20-blue" />
               {t('admin2.qs_general')}
@@ -506,10 +506,10 @@ const QueueSettings = () => {
                 
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Тестирование */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
               <TestTube className="admin-icon-20-success" />
               {t('admin2.qs_testing')}
@@ -551,7 +551,7 @@ const QueueSettings = () => {
               )}
 
               {testResult &&
-              <MacOSCard className="admin-card-success-p-16">
+              <Card className="admin-card-success-p-16">
                   <h4 className="admin-h4-med-success-mb-8">
                     {t('admin2.qs_result_title')}
                   </h4>
@@ -567,16 +567,16 @@ const QueueSettings = () => {
                     <div><strong>{t('admin2.qs_label_candidates')}</strong> {testResult.matched_doctors_count ?? 0}</div>
                     <div><strong>QR URL:</strong> <code className="admin-code-success-xs">{testResult.qr_url}</code></div>
                   </div>
-                </MacOSCard>
+                </Card>
               }
             </div>
-          </MacOSCard>
+          </Card>
         </div>
 
         {/* Настройки по специальностям */}
         <div className="admin-grid-auto-280-24-mb-24">
           {specialties.map((specialty) =>
-          <MacOSCard key={specialty.key} className="admin-card-p-20">
+          <Card key={specialty.key} className="admin-card-p-20">
               <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
                 <specialty.icon className="admin-icon-20-blue" />
                 {specialty.name}
@@ -629,12 +629,12 @@ const QueueSettings = () => {
                   </div>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
           )}
         </div>
 
         {/* Информационная панель */}
-        <MacOSCard className="admin-card-info-p-24">
+        <Card className="admin-card-info-p-24">
           <h3 className="admin-h3-lg-semi-info-mb-12-flex">
             <QrCode className="w-5 h-5" />
             {t('admin2.qs_info_title')}
@@ -646,8 +646,8 @@ const QueueSettings = () => {
             <p className="admin-m-0">{t('admin2.qs_info_4')}</p>
             <p className="admin-m-0">{t('admin2.qs_info_5')}</p>
           </div>
-        </MacOSCard>
-      </MacOSCard>
+        </Card>
+      </Card>
     </div>);
 
 };

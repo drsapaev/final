@@ -29,7 +29,7 @@ def test_online_queue_join_uses_queue_domain_service_boundary(client, monkeypatc
         json={
             "token": "boundary-token",
             "patient_name": "Boundary Patient",
-            "phone": "+998901010101",
+            "phone": "+998900000050",
         },
     )
 
@@ -42,7 +42,7 @@ def test_online_queue_join_uses_queue_domain_service_boundary(client, monkeypatc
         allocation_mode="join_with_token",
         token_str="boundary-token",
         patient_name="Boundary Patient",
-        phone="+998901010101",
+        phone="+998900000050",
         telegram_id=None,
         source="online",
     )
@@ -54,7 +54,7 @@ def test_online_queue_join_duplicate_response_is_preserved(client, monkeypatch):
     domain_service.allocate_ticket.return_value = {
         "entry": SimpleNamespace(number=5),
         "duplicate": True,
-        "duplicate_reason": "телефону +998902020202",
+        "duplicate_reason": "телефону +998900000051",
         "specialist_name": "Test Specialist",
         "cabinet": "12A",
     }
@@ -69,7 +69,7 @@ def test_online_queue_join_duplicate_response_is_preserved(client, monkeypatch):
         json={
             "token": "duplicate-token",
             "patient_name": "Duplicate Patient",
-            "phone": "+998902020202",
+            "phone": "+998900000051",
         },
     )
 
@@ -78,7 +78,7 @@ def test_online_queue_join_duplicate_response_is_preserved(client, monkeypatch):
     assert payload["success"] is True
     assert payload["number"] == 5
     assert payload["duplicate"] is True
-    assert "телефону +998902020202" in payload["message"]
+    assert "телефону +998900000051" in payload["message"]
 
 
 @pytest.mark.unit
@@ -96,7 +96,7 @@ def test_online_queue_join_validation_error_mapping_is_preserved(client, monkeyp
         json={
             "token": "bad-token",
             "patient_name": "Invalid Patient",
-            "phone": "+998903030303",
+            "phone": "+998900000052",
         },
     )
 

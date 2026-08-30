@@ -140,6 +140,8 @@ All 4 previously-documented casts were eliminated in Phase F5:
 **Zero explicit `any` casts remain** (`as any`, `: any`).
 
 > **Note on implicit `any`:** `strict` and `noImplicitAny` remain disabled in `tsconfig.json`. This means implicit `any` (untyped function parameters, untyped variables) is NOT yet prohibited at the compiler level. The codebase has zero *explicit* `any` casts, but implicit `any` may still exist in untyped code paths. Enabling `strict: true` is tracked as a separate project (see Phase G below and Future Work).
+>
+> **[Update 2026-08-15:** this note described the pre-G8 state. Phase G8 (PR #2598) enabled `strict: true` in `frontend/tsconfig.json` with 0 errors — implicit `any` and null-unsafety are now prohibited across `src/`, and the e2e + node-config boundaries were added in PR #2755.**]
 
 ---
 
@@ -536,6 +538,18 @@ This three-level boundary separates **migration** (complete) from **quality impr
 
 ### Strict baseline gate
 
+> **Retired (2026-08-15).** The G8 flip (PR #2598) enabled `strict: true` in
+> `frontend/tsconfig.json` with 0 errors, after which the actual error counts
+> were 0 while the baseline still recorded 4,255 + 4,788 historical errors —
+> the gate had become vacuous. The whole migration scaffold was removed:
+> `scripts/strict-baseline-check.mjs`, `scripts/strict-baseline.json`,
+> `scripts/strict-gate.mjs`, `scripts/per-directory-strict.mjs`,
+> `frontend/tsconfig.strict.json`, the `strict:baseline*` npm scripts, the
+> `📊 Strict baseline gate` CI step, and the unused
+> `scripts/type-debt-baseline.json`. The single source of truth since then is
+> `tsc --noEmit` (`npm run type-check`) under `strict: true`.
+> The text below is the historical record of how the gate worked.
+
 A CI gate (`scripts/strict-baseline-check.mjs`) was added in Phase H to prevent regression during the Phase G migration:
 
 - **`scripts/strict-baseline.json`** — records the current error count for `noImplicitAny` (5,417) and `strictNullChecks` (4,998)
@@ -604,6 +618,5 @@ These require manual analysis to determine the correct domain type. Blind `: unk
 - **Caller inventory**: `docs/f3-0-caller-inventory.md`
 - **Debt registry**: GitHub Issue #2443
 - **CI gate**: `scripts/type-debt-check.mjs` + `.github/workflows/ci-cd-unified.yml`
-- **Strict baseline gate**: `scripts/strict-baseline-check.mjs` + `scripts/strict-baseline.json`
-- **Baseline**: `scripts/type-debt-baseline.json` (currently 0)
-- **Phase PRs**: #2433, #2444, #2446, #2447, #2449, #2450, #2451, #2452, #2453, #2454, #2455, #2456
+- **Strict enforcement**: `strict: true` in `frontend/tsconfig.json` via `npm run type-check` (the strict-baseline scaffold was retired 2026-08-15 — see the note in the "Strict baseline gate" section)
+- **Phase PRs**: #2433, #2444, #2446, #2447, #2449, #2450, #2451, #2452, #2453, #2454, #2455, #2456, #2598 (G8 strict flip)

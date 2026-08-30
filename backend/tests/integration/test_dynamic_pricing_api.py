@@ -18,12 +18,9 @@ from app.models.visit import Visit
 
 
 def _login_admin(client, admin_user, admin_password):
-    login_response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    assert login_response.status_code == 200, login_response.text
-    return {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+    from tests.conftest import mint_access_token
+
+    return {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
 
 
 @pytest.mark.integration
@@ -176,12 +173,12 @@ def test_purchase_package_rejects_cross_patient_visit_and_appointment(
     purchase_patient = Patient(
         first_name="Package",
         last_name="Owner",
-        phone="+998901110001",
+        phone="+998900000107",
     )
     other_patient = Patient(
         first_name="Other",
         last_name="Context",
-        phone="+998901110002",
+        phone="+998900000108",
     )
     db_session.add_all([purchase_patient, other_patient])
     db_session.flush()

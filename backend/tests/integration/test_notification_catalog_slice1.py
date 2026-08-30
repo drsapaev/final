@@ -255,7 +255,7 @@ def test_admin_all_free_approval_creates_registrar_and_patient_notifications(
     patient = Patient(
         first_name="Петр",
         last_name="Пациентов",
-        phone="+998901112233",
+        phone="+998900000111",
         birth_date=date(1991, 2, 2),
         user_id=patient_user.id,
     )
@@ -320,7 +320,7 @@ def test_admin_all_free_reject_creates_rejected_notifications_with_reason(
     patient = Patient(
         first_name="Елена",
         last_name="Отклонова",
-        phone="+998901112244",
+        phone="+998900000112",
         birth_date=date(1991, 4, 4),
         user_id=patient_user.id,
     )

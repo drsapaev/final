@@ -1,0 +1,56 @@
+# E2E Coverage Invariant Gate
+#
+# Runs scripts/e2e-coverage-invariant.mjs on every PR and push to verify
+# that UX/Visual E2E tests are fully executed — no test.fixme, test.skip,
+# describe.skip, it.skip, test.only, and that retries=0 is enforced.
+#
+# This gate exists because of a real incident (PR #2715): CI showed
+# "success" while 18 of 27 UX/Visual tests were silently skipped via
+# test.fixme + continue-on-error: true. The tests were "green" but not
+# actually running.
+#
+# See scripts/e2e-coverage-invariant.mjs for the full list of checks.
+
+name: E2E Coverage Invariant
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/e2e/cashier-ux-audit.spec.ts'
+      - 'frontend/e2e/registrar-ux-audit.spec.ts'
+      - 'frontend/e2e/visual-regression.spec.ts'
+      - 'frontend/playwright.config.ts'
+      - '.github/workflows/ci-cd-unified.yml'
+      - 'scripts/e2e-coverage-invariant.mjs'
+      - '.github/workflows/e2e-coverage-invariant.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/e2e/cashier-ux-audit.spec.ts'
+      - 'frontend/e2e/registrar-ux-audit.spec.ts'
+      - 'frontend/e2e/visual-regression.spec.ts'
+      - 'frontend/playwright.config.ts'
+      - '.github/workflows/ci-cd-unified.yml'
+      - 'scripts/e2e-coverage-invariant.mjs'
+      - '.github/workflows/e2e-coverage-invariant.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  e2e-coverage-invariant:
+    name: E2E Coverage Invariant
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run E2E coverage invariant checks
+        run: node scripts/e2e-coverage-invariant.mjs

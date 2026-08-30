@@ -22,12 +22,13 @@ export const ROLE_HOME_PRIORITY = [
   'patient',
 ];
 
-const AI_SIDEBAR_DISCLAIMER = 'Черновик · не медицинское заключение';
-const AI_SIDEBAR_ACCESSIBLE_LABEL = 'AI-помощник: черновик, не диагноз, не медицинское заключение';
+// PR-UI-19 (C-6, Codex round 1): the AI safety disclaimer is user-visible in
+// doctor/specialist sidebars (badge + hover tooltip + screen-reader name) and
+// must follow the active language — carried as i18n keys, resolved in Sidebar.
 const AI_SIDEBAR_DISCLAIMER_META = {
-  badge: AI_SIDEBAR_DISCLAIMER,
-  tooltip: AI_SIDEBAR_ACCESSIBLE_LABEL,
-  ariaLabel: AI_SIDEBAR_ACCESSIBLE_LABEL,
+  badgeKey: 'nav.ai_disclaimer_badge',
+  tooltipKey: 'nav.ai_disclaimer_aria',
+  ariaLabelKey: 'nav.ai_disclaimer_aria',
 };
 
 export const SIDEBAR_PRESETS = {
@@ -39,25 +40,41 @@ export const SIDEBAR_PRESETS = {
     navigation: 'path',
     defaultItem: 'clinical-search',
   },
-  // P-016 fix: removed the `registrar`, `patient`, and `cashier` presets —
-  // all routes that referenced them set hideSidebar:true, so the items below
-  // were never rendered. The actual navigation for these roles lives in:
-  //   - registrar: HeaderNew.jsx (hardcoded buttons) + ModernTabs in page body
-  //   - patient:   TelegramMiniAppPatientShell (separate surface, no sidebar)
-  //   - cashier:   HeaderNew.jsx (single "Касса" button) + tabs in CashierPanel
-  // Keeping dead preset configuration here was misleading: it looked
-  // authoritative but never surfaced in the UI.
+  // PR-UI-04: restored registrar preset (P-016 fix partially reversed).
+  // Cashier sidebar restored — AppShell migration complete for all clinical roles.
+  // Patient remains on TelegramMiniAppPatientShell (separate surface).
+  registrar: {
+    navigation: 'path',
+    defaultItem: 'registrar-home',
+    items: [
+      { id: 'registrar-home', labelKey: 'nav.overview', icon: 'chart.bar', to: '/registrar/welcome' },
+      { id: 'registrar-queue', labelKey: 'nav.queue', icon: 'person.2', to: '/registrar/queue' },
+      { id: 'clinical-appointments', labelKey: 'nav.appointments', icon: 'calendar', to: '/clinical/appointments' },
+      { id: 'clinical-search', labelKey: 'nav.patients', icon: 'person.2', to: '/clinical/search' },
+    ],
+  },
+  // PR-UI-04b: restored cashier preset (completes AppShell migration).
+  // Cashier sidebar: Касса (home) + Записи (shared clinical route).
+  // admin-finance excluded — role-scoped to Admin only.
+  cashier: {
+    navigation: 'path',
+    defaultItem: 'cashier-home',
+    items: [
+      { id: 'cashier-home', labelKey: 'nav.cashier', icon: 'creditcard', to: '/cashier' },
+      { id: 'clinical-appointments', labelKey: 'nav.appointments', icon: 'calendar', to: '/clinical/appointments' },
+    ],
+  },
   doctor: {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'dashboard',
     items: [
-      { id: 'dashboard', label: 'Обзор', icon: 'chart.bar' },
-      { id: 'patients', label: 'Пациенты', icon: 'person.2' },
-      { id: 'appointments', label: 'Записи', icon: 'calendar' },
-      { id: 'queue', label: 'Очередь', icon: 'person.2' },
-      { id: 'ai', label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
-      { id: 'reports', label: 'Отчёты', icon: 'doc.text' },
+      { id: 'dashboard', labelKey: 'nav.overview', icon: 'chart.bar' },
+      { id: 'patients', labelKey: 'nav.patients', icon: 'person.2' },
+      { id: 'appointments', labelKey: 'nav.appointments', icon: 'calendar' },
+      { id: 'queue', labelKey: 'nav.queue', icon: 'person.2' },
+      { id: 'ai', labelKey: 'nav.ai_assistant', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
+      { id: 'reports', labelKey: 'nav.reports', icon: 'doc.text' },
     ],
   },
   lab: {
@@ -65,9 +82,9 @@ export const SIDEBAR_PRESETS = {
     queryParam: 'tab',
     defaultItem: 'queue',
     items: [
-      { id: 'queue', label: 'Очередь', icon: 'testtube.2' },
-      { id: 'templates', label: 'Шаблоны', icon: 'rectangle.stack.badge.plus' },
-      { id: 'reports', label: 'Бланки', icon: 'doc.text' },
+      { id: 'queue', labelKey: 'nav.queue', icon: 'testtube.2' },
+      { id: 'templates', labelKey: 'nav.templates', icon: 'rectangle.stack.badge.plus' },
+      { id: 'reports', labelKey: 'nav.blanks', icon: 'doc.text' },
     ],
   },
   cardiology: {
@@ -88,10 +105,10 @@ export const SIDEBAR_PRESETS = {
     //
     // Muscle memory: 4 flat items, well under Miller's 7±2.
     items: [
-      { id: 'queue',    label: 'Очередь',   icon: 'person.2' },
-      { id: 'visit',    label: 'Приём',     icon: 'heart' },
-      { id: 'patients', label: 'Пациенты',  icon: 'person.2' },
-      { id: 'ai',       label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
+      { id: 'queue',    labelKey: 'nav.queue',   icon: 'person.2' },
+      { id: 'visit',    labelKey: 'nav.visit',     icon: 'heart' },
+      { id: 'patients', labelKey: 'nav.patients',  icon: 'person.2' },
+      { id: 'ai',       labelKey: 'nav.ai_assistant', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
   dermatology: {
@@ -110,10 +127,10 @@ export const SIDEBAR_PRESETS = {
     //   patients — поиск/история пациентов (включая бывший 'history' tab)
     //   ai       — AI-помощник (draft support, не диагноз)
     items: [
-      { id: 'queue',    label: 'Очередь',     icon: 'person.2' },
-      { id: 'visit',    label: 'Приём',       icon: 'stethoscope' },
-      { id: 'patients', label: 'Пациенты',    icon: 'person.2' },
-      { id: 'ai',       label: 'AI-помощник', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
+      { id: 'queue',    labelKey: 'nav.queue',     icon: 'person.2' },
+      { id: 'visit',    labelKey: 'nav.visit',       icon: 'stethoscope' },
+      { id: 'patients', labelKey: 'nav.patients',    icon: 'person.2' },
+      { id: 'ai',       labelKey: 'nav.ai_assistant', icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
   dentistry: {
@@ -137,11 +154,11 @@ export const SIDEBAR_PRESETS = {
     //
     // Muscle memory: 5 flat items, well under Miller's 7±2.
     items: [
-      { id: 'queue',         label: 'Очередь',      icon: 'list.number' },
-      { id: 'visit',         label: 'Приём',        icon: 'stethoscope' },
-      { id: 'patients',      label: 'Пациенты',     icon: 'person.2' },
-      { id: 'photos',        label: 'Фотоархив',    icon: 'camera' },
-      { id: 'ai-assistant',  label: 'AI-помощник',  icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
+      { id: 'queue',         labelKey: 'nav.queue',      icon: 'list.number' },
+      { id: 'visit',         labelKey: 'nav.visit',        icon: 'stethoscope' },
+      { id: 'patients',      labelKey: 'nav.patients',     icon: 'person.2' },
+      { id: 'photos',        labelKey: 'nav.photo_archive',    icon: 'camera' },
+      { id: 'ai-assistant',  labelKey: 'nav.ai_assistant',  icon: 'brain', ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
 };
@@ -169,11 +186,28 @@ export const ROUTE_REGISTRY = [
     roles: [],
     entry: 'menu',
     nav: false,
-    title: 'Clinic Management System',
+    title: 'Clinic OS',
     owner: 'marketing.landing',
     component: 'Landing',
     legacyRedirectFrom: [],
-    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Clinic Management System' }),
+    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Clinic OS' }),
+  },
+  {
+    id: 'reset-password',
+    path: '/reset-password',
+    group: 'public',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'landing',
+    auth: 'public',
+    roles: [],
+    entry: 'direct',
+    nav: false,
+    title: 'Reset Password',
+    owner: 'iam.auth',
+    component: 'ResetPasswordPage',
+    legacyRedirectFrom: [],
+    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Reset Password' }),
   },
   {
     id: 'login',
@@ -373,7 +407,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin'],
     homeForRoles: ['admin'],
     entry: 'menu',
-    nav: nav({ label: 'Обзор', icon: 'chart.bar', section: 'Обзор', order: 10, menu: true, sidebar: true }),
+    nav: nav({ labelKey: 'nav.overview', icon: 'chart.bar', sectionKey: 'nav.overview', order: 10, menu: true, sidebar: true }),
     title: 'Админ: обзор',
     owner: 'admin.operations',
     component: 'AdminDashboard',
@@ -390,7 +424,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'menu',
-    nav: nav({ label: 'Аналитика', icon: 'chart.bar', section: 'Обзор', order: 20, sidebar: true }),
+    nav: nav({ labelKey: 'nav.analytics', icon: 'chart.bar', sectionKey: 'nav.overview', order: 20, sidebar: true }),
     title: 'Админ: аналитика',
     owner: 'admin.analytics',
     component: 'AnalyticsPage',
@@ -424,7 +458,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Отчеты', icon: 'file-text', section: 'Обзор', order: 20, sidebar: true }),
+    nav: nav({ labelKey: 'nav.reports_alt', icon: 'file-text', sectionKey: 'nav.overview', order: 20, sidebar: true }),
     title: 'Admin Reports',
     owner: 'admin.reports',
     component: 'UnifiedReports',
@@ -441,7 +475,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Система', icon: 'gear', section: 'Система', order: 50, sidebar: true }),
+    nav: nav({ labelKey: 'nav.system', icon: 'gear', sectionKey: 'nav.system', order: 50, sidebar: true }),
     title: 'Admin System',
     owner: 'admin.system',
     component: 'SystemManagement',
@@ -509,7 +543,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'menu',
-    nav: nav({ label: 'Пользователи', icon: 'users', section: 'Система', order: 10, sidebar: true }),
+    nav: nav({ labelKey: 'nav.users', icon: 'users', sectionKey: 'nav.system', order: 10, sidebar: true }),
     title: 'Admin Users',
     owner: 'admin.users',
     component: 'UnifiedUserManagement',
@@ -526,7 +560,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Врачи', icon: 'user-plus', section: 'Пациенты и запись', order: 20, sidebar: true }),
+    nav: nav({ labelKey: 'nav.doctors', icon: 'user-plus', sectionKey: 'nav.section_patients_booking', order: 20, sidebar: true }),
     title: 'Admin Doctors',
     owner: 'admin.users',
     component: 'AdminDoctors',
@@ -543,7 +577,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Услуги', icon: 'list', section: 'Клиника и очередь', order: 50, sidebar: true }),
+    nav: nav({ labelKey: 'nav.services', icon: 'list', sectionKey: 'nav.section_clinic_queue', order: 50, sidebar: true }),
     title: 'Admin Services',
     owner: 'admin.catalog',
     component: 'AdminServices',
@@ -560,7 +594,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Кабинеты очередей', icon: 'building', section: 'Клиника и очередь', order: 20, sidebar: true }),
+    nav: nav({ labelKey: 'nav.queue_rooms', icon: 'building', sectionKey: 'nav.section_clinic_queue', order: 20, sidebar: true }),
     title: 'Admin Queue Cabinets',
     owner: 'admin.queue',
     component: 'QueueCabinetManagement',
@@ -577,7 +611,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Пациенты', icon: 'users', section: 'Пациенты и запись', order: 10, sidebar: true }),
+    nav: nav({ labelKey: 'nav.patients', icon: 'users', sectionKey: 'nav.section_patients_booking', order: 10, sidebar: true }),
     title: 'Admin Patients',
     owner: 'admin.patients',
     component: 'AdminPatients',
@@ -594,7 +628,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Записи', icon: 'calendar', section: 'Пациенты и запись', order: 30, sidebar: true }),
+    nav: nav({ labelKey: 'nav.appointments', icon: 'calendar', sectionKey: 'nav.section_patients_booking', order: 30, sidebar: true }),
     title: 'Admin Appointments',
     owner: 'admin.scheduling',
     component: 'AdminAppointments',
@@ -611,7 +645,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Заявки All Free', icon: 'exclamationmark.triangle', section: 'Пациенты и запись', order: 40, sidebar: true }),
+    nav: nav({ labelKey: 'nav.allfree_requests', icon: 'exclamationmark.triangle', sectionKey: 'nav.section_patients_booking', order: 40, sidebar: true }),
     title: 'Admin All Free',
     owner: 'admin.operations',
     component: 'AllFreeApproval',
@@ -629,7 +663,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin'],
     entry: 'menu',
     // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
-    nav: nav({ label: 'Льготы и скидки', icon: 'percent', section: 'Финансы', order: 30, sidebar: true }),
+    nav: nav({ labelKey: 'nav.discounts', icon: 'percent', sectionKey: 'nav.finance', order: 30, sidebar: true }),
     title: 'Admin Benefit Settings',
     owner: 'admin.billing',
     component: 'UnifiedSettings',
@@ -647,7 +681,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin'],
     entry: 'menu',
     // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
-    nav: nav({ label: 'Мастер записи', icon: 'wand.and.stars', section: 'Пациенты и запись', order: 50, sidebar: true }),
+    nav: nav({ labelKey: 'nav.booking_wizard', icon: 'wand.and.stars', sectionKey: 'nav.section_patients_booking', order: 50, sidebar: true }),
     title: 'Admin Wizard Settings',
     owner: 'admin.settings',
     component: 'UnifiedSettings',
@@ -665,7 +699,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin'],
     entry: 'menu',
     // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
-    nav: nav({ label: 'Платёжные системы', icon: 'creditcard', section: 'Финансы', order: 20, sidebar: true }),
+    nav: nav({ labelKey: 'nav.payment_systems', icon: 'creditcard', sectionKey: 'nav.finance', order: 20, sidebar: true }),
     title: 'Admin Payment Providers',
     owner: 'admin.billing',
     component: 'UnifiedSettings',
@@ -682,7 +716,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Управление клиникой', icon: 'building', section: 'Клиника и очередь', order: 10, sidebar: true }),
+    nav: nav({ labelKey: 'nav.clinic_management', icon: 'building', sectionKey: 'nav.section_clinic_queue', order: 10, sidebar: true }),
     title: 'Admin Clinic Management',
     owner: 'admin.operations',
     component: 'ClinicManagement',
@@ -700,7 +734,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin'],
     entry: 'menu',
     // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
-    nav: nav({ label: 'Профиль клиники', icon: 'building', section: 'Клиника и очередь', order: 55, sidebar: true }),
+    nav: nav({ labelKey: 'nav.clinic_profile', icon: 'building', sectionKey: 'nav.section_clinic_queue', order: 55, sidebar: true }),
     title: 'Admin Clinic Settings',
     owner: 'admin.settings',
     component: 'UnifiedSettings',
@@ -718,7 +752,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin'],
     entry: 'menu',
     // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
-    nav: nav({ label: 'Настройки очереди', icon: 'list.bullet', section: 'Клиника и очередь', order: 30, sidebar: true }),
+    nav: nav({ labelKey: 'nav.queue_settings', icon: 'list.bullet', sectionKey: 'nav.section_clinic_queue', order: 30, sidebar: true }),
     title: 'Admin Queue Settings',
     owner: 'admin.queue',
     component: 'UnifiedSettings',
@@ -735,7 +769,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'AI Инструменты', icon: 'brain', section: 'Система', order: 20, sidebar: true, ...AI_SIDEBAR_DISCLAIMER_META }),
+    nav: nav({ labelKey: 'nav.ai_tools', icon: 'brain', sectionKey: 'nav.system', order: 20, sidebar: true, ...AI_SIDEBAR_DISCLAIMER_META }),
     title: 'Admin AI Settings',
     owner: 'admin.ai',
     component: 'AISettings',
@@ -753,7 +787,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin'],
     entry: 'menu',
     // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
-    nav: nav({ label: 'Настройки Telegram', icon: 'paperplane', section: 'Коммуникации', order: 30, sidebar: true }),
+    nav: nav({ labelKey: 'nav.telegram_settings', icon: 'paperplane', sectionKey: 'nav.section_communications', order: 30, sidebar: true }),
     title: 'Admin Telegram Settings',
     owner: 'admin.telegram',
     component: 'TelegramSettings',
@@ -771,7 +805,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin'],
     entry: 'menu',
     // P-003 fix: surfaced in sidebar (previously nav:false — orphan route).
-    nav: nav({ label: 'Табло очереди', icon: 'tv', section: 'Клиника и очередь', order: 40, sidebar: true }),
+    nav: nav({ labelKey: 'nav.queue_board', icon: 'tv', sectionKey: 'nav.section_clinic_queue', order: 40, sidebar: true }),
     title: 'Admin Display Settings',
     owner: 'admin.queue',
     component: 'UnifiedSettings',
@@ -812,7 +846,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'menu',
-    nav: nav({ label: 'Уведомления', icon: 'bell', section: 'Коммуникации', order: 10, sidebar: true }),
+    nav: nav({ labelKey: 'nav.notifications', icon: 'bell', sectionKey: 'nav.section_communications', order: 10, sidebar: true }),
     title: 'Admin Notifications',
     owner: 'admin.notifications',
     component: 'EmailSMSManager',
@@ -829,7 +863,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'menu',
-    nav: nav({ label: 'Push-уведомления', icon: 'bell', section: 'Коммуникации', order: 20, sidebar: true }),
+    nav: nav({ labelKey: 'nav.push_notifications', icon: 'bell', sectionKey: 'nav.section_communications', order: 20, sidebar: true }),
     title: 'Admin Push Notifications',
     owner: 'admin.notifications',
     component: 'UnifiedNotifications',
@@ -845,7 +879,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Верификация телефонов', icon: 'phone', section: 'Коммуникации', order: 40, sidebar: true }),
+    nav: nav({ labelKey: 'nav.phone_verification', icon: 'phone', sectionKey: 'nav.section_communications', order: 40, sidebar: true }),
     title: 'Admin Phone Verification',
     owner: 'admin.integrations',
     component: 'PhoneVerificationManager',
@@ -862,7 +896,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'menu',
-    nav: nav({ label: 'Активация', icon: 'key', section: 'Система', order: 40, sidebar: true }),
+    nav: nav({ labelKey: 'nav.activation', icon: 'key', sectionKey: 'nav.system', order: 40, sidebar: true }),
     title: 'Admin Activation',
     owner: 'admin.licensing',
     component: 'ActivationSystem',
@@ -879,7 +913,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'direct',
-    nav: nav({ label: 'Финансы', icon: 'dollarsign.circle', section: 'Финансы', order: 10, sidebar: true }),
+    nav: nav({ labelKey: 'nav.finance', icon: 'dollarsign.circle', sectionKey: 'nav.finance', order: 10, sidebar: true }),
     title: 'Admin Finance',
     owner: 'admin.billing',
     component: 'UnifiedFinance',
@@ -896,7 +930,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'menu',
-    nav: nav({ label: 'Настройки', icon: 'gear', section: 'Система', order: 80, sidebar: true, menu: true }),
+    nav: nav({ labelKey: 'nav.settings', icon: 'gear', sectionKey: 'nav.system', order: 80, sidebar: true, menu: true }),
     title: 'Admin Settings',
     owner: 'admin.settings',
     component: 'Settings',
@@ -913,7 +947,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'menu',
-    nav: nav({ label: 'Безопасность', icon: 'lock', section: 'Система', order: 30, sidebar: true }),
+    nav: nav({ labelKey: 'nav.security', icon: 'lock', sectionKey: 'nav.system', order: 30, sidebar: true }),
     title: 'Admin Security',
     owner: 'admin.security',
     component: 'UnifiedSettings',
@@ -930,7 +964,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'menu',
-    nav: nav({ label: 'Аудит', icon: 'list', section: 'Система', order: 30, sidebar: true }),
+    nav: nav({ labelKey: 'nav.audit', icon: 'list', sectionKey: 'nav.system', order: 30, sidebar: true }),
     title: 'Admin Audit',
     owner: 'admin.audit',
     component: 'Audit',
@@ -964,7 +998,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin'],
     entry: 'menu',
-    nav: nav({ label: 'Интеграции', icon: 'puzzlepiece', section: 'Система', order: 55, sidebar: true }),
+    nav: nav({ labelKey: 'nav.integrations', icon: 'puzzlepiece', sectionKey: 'nav.system', order: 55, sidebar: true }),
     title: 'Admin Integrations',
     owner: 'admin.integrations',
     component: 'UnifiedIntegrations',
@@ -998,12 +1032,12 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin', 'Registrar'],
     homeForRoles: ['registrar', 'receptionist'],
     entry: 'direct',
-    nav: nav({ label: 'Регистратура', icon: 'users', section: 'Clinical', order: 10, menu: true }),
+    nav: nav({ labelKey: 'nav.registrar', icon: 'users', sectionKey: 'nav.section_clinical', order: 10, menu: true }),
     title: 'Registrar Panel',
     owner: 'clinical.registrar',
     component: 'RegistrarPanel',
     legacyRedirectFrom: ['/registrar-panel'],
-    layout: layout({ hideSidebar: true, pageTitle: 'Registrar Panel' }),
+    layout: layout({ sidebarPreset: 'registrar', activeSidebarItem: 'registrar-home', pageTitle: 'Registrar Panel' }),
   },
   // Strategic Direction 3: canonical nested routes for registrar views.
   // These replace the legacy ?view= query param pattern. Backward compat
@@ -1023,7 +1057,7 @@ export const ROUTE_REGISTRY = [
     title: 'Registrar — Welcome Dashboard',
     owner: 'clinical.registrar',
     component: 'RegistrarPanel',
-    layout: layout({ hideSidebar: true, pageTitle: 'Registrar — Welcome' }),
+    layout: layout({ sidebarPreset: 'registrar', activeSidebarItem: 'registrar-home', pageTitle: 'Registrar — Welcome' }),
   },
   {
     id: 'registrar-queue',
@@ -1039,7 +1073,7 @@ export const ROUTE_REGISTRY = [
     title: 'Registrar — Online Queue',
     owner: 'clinical.registrar',
     component: 'RegistrarPanel',
-    layout: layout({ hideSidebar: true, pageTitle: 'Registrar — Queue' }),
+    layout: layout({ sidebarPreset: 'registrar', activeSidebarItem: 'registrar-queue', pageTitle: 'Registrar — Queue' }),
   },
   {
     id: 'doctor-home',
@@ -1052,7 +1086,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin', 'Doctor'],
     homeForRoles: ['doctor', 'nurse'],
     entry: 'menu',
-    nav: nav({ label: 'Врач', icon: 'stethoscope', section: 'Clinical', order: 20, menu: true }),
+    nav: nav({ labelKey: 'nav.doctor', icon: 'stethoscope', sectionKey: 'nav.section_clinical', order: 20, menu: true }),
     title: 'Doctor Panel',
     owner: 'clinical.doctor',
     component: 'DoctorPanel',
@@ -1070,12 +1104,12 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin', 'Cashier'],
     homeForRoles: ['cashier'],
     entry: 'menu',
-    nav: nav({ label: 'Касса', icon: 'creditcard', section: 'Clinical', order: 30, menu: true }),
+    nav: nav({ labelKey: 'nav.cashier', icon: 'creditcard', sectionKey: 'nav.section_clinical', order: 30, menu: true }),
     title: 'Cashier Panel',
     owner: 'clinical.cashier',
     component: 'CashierPanel',
     legacyRedirectFrom: ['/cashier-panel'],
-    layout: layout({ hideSidebar: true, pageTitle: 'Cashier Panel' }),
+    layout: layout({ sidebarPreset: 'cashier', activeSidebarItem: 'cashier-home', pageTitle: 'Cashier Panel' }),
   },
   {
     id: 'lab-home',
@@ -1088,7 +1122,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin', 'Lab'],
     homeForRoles: ['lab'],
     entry: 'menu',
-    nav: nav({ label: 'Лаборатория', icon: 'testtube.2', section: 'Clinical', order: 40, menu: true }),
+    nav: nav({ labelKey: 'nav.lab', icon: 'testtube.2', sectionKey: 'nav.section_clinical', order: 40, menu: true }),
     title: 'Lab Panel',
     owner: 'clinical.lab',
     component: 'LabPanel',
@@ -1129,7 +1163,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin', 'Doctor', 'cardio'],
     homeForRoles: ['cardio'],
     entry: 'menu',
-    nav: nav({ label: 'Кардиология', icon: 'heart', section: 'Clinical', order: 50, menu: true }),
+    nav: nav({ labelKey: 'nav.cardiology', icon: 'heart', sectionKey: 'nav.section_clinical', order: 50, menu: true }),
     title: 'Cardiology Panel',
     owner: 'clinical.cardiology',
     component: 'CardiologistPanelUnified',
@@ -1147,7 +1181,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin', 'Doctor', 'derma'],
     homeForRoles: ['derma'],
     entry: 'menu',
-    nav: nav({ label: 'Дерматология', icon: 'face.smiling', section: 'Clinical', order: 60, menu: true }),
+    nav: nav({ labelKey: 'nav.dermatology', icon: 'face.smiling', sectionKey: 'nav.section_clinical', order: 60, menu: true }),
     title: 'Dermatology Panel',
     owner: 'clinical.dermatology',
     component: 'DermatologistPanelUnified',
@@ -1165,7 +1199,7 @@ export const ROUTE_REGISTRY = [
     roles: ['Admin', 'Doctor', 'dentist'],
     homeForRoles: ['dentist'],
     entry: 'menu',
-    nav: nav({ label: 'Стоматология', icon: 'smile', section: 'Clinical', order: 70, menu: true }),
+    nav: nav({ labelKey: 'nav.dentistry', icon: 'smile', sectionKey: 'nav.section_clinical', order: 70, menu: true }),
     title: 'Dentistry Panel',
     owner: 'clinical.dentistry',
     component: 'DentistPanelUnified',
@@ -1182,7 +1216,7 @@ export const ROUTE_REGISTRY = [
     auth: 'role-scoped',
     roles: ['Admin', 'Doctor', 'Registrar'],
     entry: 'menu',
-    nav: nav({ label: 'Расписание', icon: 'calendar', section: 'Clinical', order: 80, menu: true }),
+    nav: nav({ labelKey: 'nav.schedule', icon: 'calendar', sectionKey: 'nav.section_clinical', order: 80, menu: true }),
     title: 'Clinical Scheduler',
     owner: 'clinical.scheduling',
     component: 'Scheduler',
@@ -1203,7 +1237,7 @@ export const ROUTE_REGISTRY = [
     // All clinical roles now have read access to the appointments list.
     roles: ['Admin', 'Doctor', 'Registrar', 'Cashier', 'Lab', 'cardio', 'derma', 'dentist'],
     entry: 'menu',
-    nav: nav({ label: 'Записи', icon: 'calendar', section: 'Clinical', order: 90, menu: true }),
+    nav: nav({ labelKey: 'nav.appointments', icon: 'calendar', sectionKey: 'nav.section_clinical', order: 90, menu: true }),
     title: 'Clinical Appointments',
     owner: 'clinical.scheduling',
     component: 'Appointments',
@@ -1222,7 +1256,7 @@ export const ROUTE_REGISTRY = [
     // lookup to do their jobs (find a patient for payment / sample collection).
     roles: ['Admin', 'Doctor', 'Registrar', 'Cashier', 'Lab', 'cardio', 'derma', 'dentist'],
     entry: 'menu',
-    nav: nav({ label: 'Поиск', icon: 'magnifyingglass', section: 'Clinical', order: 100, menu: true }),
+    nav: nav({ labelKey: 'nav.search', icon: 'magnifyingglass', sectionKey: 'nav.section_clinical', order: 100, menu: true }),
     title: 'Clinical Search',
     owner: 'clinical.search',
     component: 'Search',

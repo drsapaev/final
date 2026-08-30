@@ -13,8 +13,8 @@ import { useConfirm } from '../common/ConfirmDialog';
 import {
   Badge,
   Button,
-  MacOSCard,
-  MacOSEmptyState,
+  Card,
+  AppEmpty,
   Input,
   Skeleton,
   Select,
@@ -170,7 +170,7 @@ const AdminDoctors = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <MacOSCard variant="default" shadow="none" className="admin-patients-header-card">
+      <Card variant="default" shadow="none" className="admin-patients-header-card">
         <div
           className="admin-patients-header-row"
         >
@@ -245,7 +245,7 @@ const AdminDoctors = () => {
           {loading ? (
             <Skeleton type="table" count={5} />
           ) : error ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={RefreshCw}
               title={t('admin2.ad_error_load_title')}
               description={t('admin2.ad_error_load_description')}
@@ -256,7 +256,7 @@ const AdminDoctors = () => {
               }
             />
           ) : doctors.length === 0 ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={Stethoscope}
               title={t('admin2.ad_empty_title')}
               description={
@@ -375,7 +375,7 @@ const AdminDoctors = () => {
           </div>
           )}
         </div>
-      </MacOSCard>
+      </Card>
 
       <DoctorModal
         isOpen={doctorModal.isOpen}

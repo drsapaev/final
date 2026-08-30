@@ -1,0 +1,56 @@
+name: Nightly Health Report
+
+on:
+  schedule:
+    # Daily 05:00 UTC — after all nightlies (mutation 02:00, unified CI 02:00,
+    # security 03:00, gitleaks 03:30, AI safety 02:30).
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  # Codex review follow-up (P1): the collector calls the workflow-runs and
+  # run-artifacts REST endpoints, which need actions:read; with only
+  # contents:read declared, unspecified scopes default to none.
+  contents: read
+  actions: read
+
+jobs:
+  nightly-health:
+    name: 📊 Nightly health evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect health metrics
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash scripts/nightly-health.sh
+
+      - name: Upload health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-health
+          path: /tmp/nightly-health.md
+          if-no-files-found: error
+
+  # Alert on scheduled-run failures (R1 pattern).
+  notify-failure:
+    name: 🔔 Notify on failure
+    runs-on: ubuntu-latest
+    needs: [nightly-health]
+    if: failure() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create failure issue
+        uses: ./.github/actions/notify-failure
+        with:
+          title: 🔴 Nightly health report collection failed
+          detail: |
+            The observability collector (scripts/nightly-health.sh) failed.
+            Without it, nightly health is not observable in one place.

@@ -117,10 +117,11 @@ class PasskeyCredential(Base):
     )
 
     def __repr__(self) -> str:
+        # FOLLOWUP-4: omit name — it is user-supplied free text that
+        # may contain identifying information.
         return (
             f"<PasskeyCredential("
             f"id={self.id}, "
             f"patient_id={self.patient_id}, "
-            f"name={self.name}, "
             f"active={self.active})>"
         )

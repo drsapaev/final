@@ -82,8 +82,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   };
 
   const currentVariant = error ? 'error' : variant;
-  const currentSize = sizeStyles[size as InputSize];
-  const currentVariantStyle = variantStyles[currentVariant as InputVariant];
+  // Defensive: fallback to 'md' if size is unknown (e.g. caller passes 'default').
+  // Without this, currentSize is undefined and currentSize.padding throws TypeError,
+  // crashing the entire wizard (PR A — E2E registrar fixme tests).
+  const currentSize = sizeStyles[size as InputSize] ?? sizeStyles.md;
+  const currentVariantStyle = variantStyles[currentVariant as InputVariant] ?? variantStyles.default;
   const hasRightIcon = Boolean(Icon) && iconPosition === 'right';
   const hasValue = props.value !== undefined && props.value !== null && String(props.value).length > 0;
   const showClearButton = clearable && typeof onClear === 'function' && hasValue && !disabled;

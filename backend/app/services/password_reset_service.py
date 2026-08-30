@@ -10,12 +10,26 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.pii_masker import mask_pii_text
 from app.core.security import get_password_hash, verify_password
 from app.crud import user as crud_user
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
 from app.services.phone_verification_service import get_phone_verification_service
 
 logger = logging.getLogger(__name__)
+
+# Анти-enumeration: ЕДИНАЯ форма ответа /2fa…/password-reset/initiate
+# для неизвестного адреса, успешной доставки и сбоя доставки — по
+# ответу нельзя отличить существующий аккаунт от несуществующего.
+_EMAIL_RESET_GENERIC_MESSAGE = (
+    "Если пользователь с таким email существует, ссылка для сброса отправлена"
+)
+_PHONE_RESET_GENERIC_MESSAGE = (
+    "Если пользователь с таким номером существует, код для сброса отправлен"
+)
+# Срок жизни SMS-кода; синхронизирован с текстом сообщения
+# ("Код действителен 5 минут") в initiate_phone_reset.
+_PHONE_CODE_TTL_MINUTES = 5
 
 
 class PasswordResetService:
@@ -53,10 +67,11 @@ class PasswordResetService:
             # Проверяем, существует ли пользователь с таким номером
             user = crud_user.get_user_by_phone(db, phone=phone)
             if not user:
-                # Не раскрываем информацию о существовании пользователя
+                # Одинаковая форма ответа для всех исходов.
                 return {
                     "success": True,
-                    "message": "Если пользователь с таким номером существует, код будет отправлен",
+                    "message": _PHONE_RESET_GENERIC_MESSAGE,
+                    "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
                 }
 
             # Отправляем код верификации
@@ -67,22 +82,37 @@ class PasswordResetService:
             )
 
             if verification_result["success"]:
-                logger.info(f"Password reset code sent to phone {phone}")
+                # PII: номер не пишем в лог — только факт отправки.
+                logger.info("Password reset code sent", extra={"has_recipient": True})
                 return {
                     "success": True,
-                    "message": "Код для сброса пароля отправлен на ваш номер",
-                    "expires_in_minutes": verification_result["expires_in_minutes"],
+                    "message": _PHONE_RESET_GENERIC_MESSAGE,
+                    "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
                 }
             else:
+                # Сбой доставки SMS — та же форма ответа, что и для
+                # успеха (анти-enumeration); причина логируется.
+                logger.warning(
+                    "Password reset SMS send failed: %s",
+                    mask_pii_text(str(verification_result.get("error", ""))),
+                )
                 return {
-                    "success": False,
-                    "error": verification_result["error"],
-                    "error_code": verification_result.get("error_code"),
+                    "success": True,
+                    "message": _PHONE_RESET_GENERIC_MESSAGE,
+                    "expires_in_minutes": _PHONE_CODE_TTL_MINUTES,
                 }
 
         except Exception as e:
-            logger.error(f"Error initiating phone reset for {phone}: {e}")
-            return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
+            logger.error(
+                "Error initiating phone reset: %s",
+                mask_pii_text(str(e)),
+                extra={"has_recipient": True},
+            )
+            return {
+                "success": False,
+                "error": "Внутренняя ошибка, попробуйте позже",
+                "error_code": "INTERNAL_ERROR",
+            }
 
     async def initiate_email_reset(self, db: Session, email: str) -> dict[str, Any]:
         """Инициация сброса пароля по email"""
@@ -90,10 +120,12 @@ class PasswordResetService:
             # Проверяем, существует ли пользователь с таким email
             user = crud_user.get_user_by_email(db, email=email)
             if not user:
-                # Не раскрываем информацию о существовании пользователя
+                # Не раскрываем информацию о существовании пользователя:
+                # одинаковая форма ответа для всех исходов.
                 return {
                     "success": True,
-                    "message": "Если пользователь с таким email существует, ссылка будет отправлена",
+                    "message": _EMAIL_RESET_GENERIC_MESSAGE,
+                    "expires_in_hours": self.token_ttl_hours,
                 }
 
             # Генерируем токен сброса
@@ -170,30 +202,47 @@ class PasswordResetService:
             © 2024 Медицинская клиника
             """
 
-            email_result = await self.email_service.send_email(
+            send_ok, send_message = await self.email_service.send_email_enhanced(
                 to_email=email,
                 subject=subject,
                 html_content=html_content,
                 text_content=text_content,
             )
 
-            if email_result.get("success"):
-                logger.info(f"Password reset email sent to {email}")
+            if send_ok:
+                logger.info("Password reset email sent", extra={"has_recipient": True})
                 return {
                     "success": True,
-                    "message": "Ссылка для сброса пароля отправлена на ваш email",
+                    "message": _EMAIL_RESET_GENERIC_MESSAGE,
                     "expires_in_hours": self.token_ttl_hours,
                 }
             else:
+                # PII: текст ошибки провайдера может содержать адрес
+                # получателя — логируем замаскированным. Клиенту — та
+                # же форма ответа, что и для успеха/неизвестного
+                # адреса: сбой доставки не должен выдавать
+                # существование аккаунта (анти-enumeration).
+                logger.warning(
+                    "Password reset email send failed: %s",
+                    mask_pii_text(send_message),
+                )
                 return {
-                    "success": False,
-                    "error": f"Ошибка отправки email: {email_result.get('error')}",
-                    "error_code": "EMAIL_SEND_FAILED",
+                    "success": True,
+                    "message": _EMAIL_RESET_GENERIC_MESSAGE,
+                    "expires_in_hours": self.token_ttl_hours,
                 }
 
         except Exception as e:
-            logger.error(f"Error initiating email reset for {email}: {e}")
-            return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
+            logger.error(
+                "Error initiating email reset: %s",
+                mask_pii_text(str(e)),
+                extra={"has_recipient": True},
+            )
+            return {
+                "success": False,
+                "error": "Внутренняя ошибка, попробуйте позже",
+                "error_code": "INTERNAL_ERROR",
+            }
 
     async def verify_phone_and_get_token(
         self, db: Session, phone: str, verification_code: str
@@ -281,7 +330,9 @@ class PasswordResetService:
                 }
 
             # Проверяем пользователя
-            user = crud_user.get_user(db, user_id=token_data['user_id'])
+            # get_user is a ghost name (Sentry PYTHON-FASTAPI-10); the
+            # crud.user module exposes get(db, id).
+            user = crud_user.get(db, id=token_data['user_id'])
             if not user:
                 return {
                     "success": False,
@@ -305,18 +356,17 @@ class PasswordResetService:
                     "error_code": "PASSWORD_SAME_AS_OLD",
                 }
 
-            # Обновляем пароль
-            hashed_password = get_password_hash(new_password)
-            user_data = {
-                "hashed_password": hashed_password,
-                "password_changed_at": datetime.now(),
-            }
+            # Пароль меняем ПРЯМО здесь: whitelist update_user не содержит
+            # hashed_password/password_changed_at (и не должен — он для FCM-
+            # профиля), а этот сервис — санкционированный владелец смены
+            # пароля. Иначе update_user молча пропускал поля: success=True
+            # при НЕИЗМЕНЁННОМ пароле.
+            user.hashed_password = get_password_hash(new_password)
+            user.password_changed_at = datetime.now()
+            db.commit()
+            db.refresh(user)
 
-            updated_user = crud_user.update_user(
-                db, user_id=user.id, user_data=user_data
-            )
-
-            if updated_user:
+            if user.id:
                 # Помечаем токен как использованный
                 token_data['used'] = True
                 token_data['used_at'] = datetime.now()

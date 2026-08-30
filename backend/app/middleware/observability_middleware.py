@@ -44,6 +44,11 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             return request.client.host
         return "unknown"
 
+    # Пробы здоровья не участвуют в SLA-метриках: одиночный медленный
+    # холодный запрос при малом трафике ронял p95 всего окна и штамповал
+    # фатальные SLA-алерты в Sentry (#2775).
+    _METRICS_EXCLUDED_PATHS = frozenset({"/api/v1/health", "/health"})
+
     async def dispatch(  # type: ignore[override]
         self, request: Request, call_next: Callable[[Request], Response]
     ) -> Response:
@@ -61,18 +66,21 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         status_code = 500
         client_ip = self._extract_client_ip(request)
 
+        track_metrics = route_path not in self._METRICS_EXCLUDED_PATHS
+
         try:
             response = await call_next(request)
             status_code = response.status_code
         except Exception:
             duration_ms = (time.perf_counter() - started_at) * 1000.0
-            observability_state.record_request(
-                method=request.method,
-                path=route_path,
-                status_code=status_code,
-                duration_ms=duration_ms,
-            )
-            observability_state.evaluate_sla_alerts()
+            if track_metrics:
+                observability_state.record_request(
+                    method=request.method,
+                    path=route_path,
+                    status_code=status_code,
+                    duration_ms=duration_ms,
+                )
+                observability_state.evaluate_sla_alerts()
             logger.exception(
                 "request.failed",
                 extra={
@@ -88,13 +96,14 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             raise
 
         duration_ms = (time.perf_counter() - started_at) * 1000.0
-        observability_state.record_request(
-            method=request.method,
-            path=route_path,
-            status_code=status_code,
-            duration_ms=duration_ms,
-        )
-        observability_state.evaluate_sla_alerts()
+        if track_metrics:
+            observability_state.record_request(
+                method=request.method,
+                path=route_path,
+                status_code=status_code,
+                duration_ms=duration_ms,
+            )
+            observability_state.evaluate_sla_alerts()
 
         response.headers["X-Trace-ID"] = trace_id
         response.headers["X-Request-ID"] = str(request_id)

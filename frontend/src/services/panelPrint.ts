@@ -7,7 +7,7 @@ import {
   normalizeTicketPrintSettings,
   TICKET_PRINT_SETTINGS_DEFAULTS,
 } from '../api/ticketPrintSettings';
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 // Phase 1 — panelPrint.ts has 1140 lines with heterogeneous return shapes.
 // Proper typing requires modeling the full print pipeline (Phase 9 cleanup).
 // Using `any` for return types and some params as a pragmatic measure.

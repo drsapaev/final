@@ -4,19 +4,20 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 
 import { fileURLToPath } from 'node:url';
+import { normalizeSource } from '../../../test/contracts/source-contract-helper';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../..');
 
-const source = fs.readFileSync(
+const source = normalizeSource(fs.readFileSync(
   path.join(ROOT, 'components/laboratory/ReportEditor.tsx'),
   'utf8'
-);
+));
 
-const workbenchSource = fs.readFileSync(
+const workbenchSource = normalizeSource(fs.readFileSync(
   path.join(ROOT, 'components/laboratory/LabReportWorkbench.tsx'),
   'utf8'
-);
+));
 
 describe('ReportEditor STRAT#24 — extracted sub-component', () => {
   it('exports default ReportEditor component', () => {
@@ -82,7 +83,9 @@ describe('ReportEditor STRAT#24 — extracted sub-component', () => {
     expect(workbenchSource).toContain("import ReportEditor from './ReportEditor'");
     expect(workbenchSource).toContain('<ReportEditor');
     expect(workbenchSource).toContain('activeInstance={activeInstance}');
-    expect(workbenchSource).toContain('draftValues={draftValues}');
+    // Contract: LabReportWorkbench must pass draftValues to ReportEditor.
+    // After normalizeSource, 'as Record<...>' cast is removed but trailing space may remain.
+    expect(workbenchSource).toContain('draftValues={draftValues');
     expect(workbenchSource).toContain('collapsedSections={collapsedSections}');
     expect(workbenchSource).toContain('onUpdateField={updateField}');
   });

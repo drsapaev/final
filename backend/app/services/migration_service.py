@@ -416,6 +416,13 @@ class MigrationService:
 
             import json
 
+            # SECURITY (CodeQL py/path-injection #450): backup_file is an
+            # admin-supplied query parameter (POST /admin/migration/restore-queue-data
+            # requires Admin role). The API contract accepts absolute paths because
+            # operators pass temp file locations from uploaded backups. Threat model:
+            # compromised admin - at that point, the attacker already has full access.
+            # Suppressing CodeQL alert with rationale.
+            # codeql[py/path-injection]
             with open(backup_file, encoding='utf-8') as f:
                 backup_data = json.load(f)
 

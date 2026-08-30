@@ -23,7 +23,7 @@ import {
 
 'lucide-react';
 import {
-  MacOSCard, Button, Badge, Input, Checkbox,
+  Card, Button, Badge, Input, Checkbox,
 } from '../ui/macos';
 import { api } from '../../api/client';
 
@@ -262,12 +262,12 @@ const AISettings = () => {
 
   if (loading) {
     return (
-      <MacOSCard className="admin-p-32">
+      <Card className="admin-p-32">
         <div className="admin-flex-center-justify">
           <RefreshCw className="admin-icon-20-spin-mr-8" />
           <span className="text-[var(--mac-text-primary)]">{t('admin2.ais_loading')}</span>
         </div>
-      </MacOSCard>);
+      </Card>);
 
   }
 
@@ -315,38 +315,38 @@ const AISettings = () => {
       {/* Статистика */}
       {stats.total_requests !== undefined &&
       <div className="admin-grid-auto-200">
-          <MacOSCard className="admin-loading-p-24-center">
+          <Card className="admin-loading-p-24-center">
             <div className="admin-stat-number admin-text-blue mb-2">
               {stats.total_requests}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.ais_stat_total_requests')}
             </div>
-          </MacOSCard>
-          <MacOSCard className="admin-loading-p-24-center">
+          </Card>
+          <Card className="admin-loading-p-24-center">
             <div className="admin-stat-number text-[var(--mac-success)] mb-2">
               {stats.successful_requests}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.ais_stat_successful')}
             </div>
-          </MacOSCard>
-          <MacOSCard className="admin-loading-p-24-center">
+          </Card>
+          <Card className="admin-loading-p-24-center">
             <div className="admin-stat-number text-[var(--mac-warning)] mb-2">
               {Math.round(stats.cache_hit_rate ?? 0)}%
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.ais_stat_cache')}
             </div>
-          </MacOSCard>
-          <MacOSCard className="admin-loading-p-24-center">
+          </Card>
+          <Card className="admin-loading-p-24-center">
             <div className="admin-stat-number admin-text-purple mb-2">
               {stats.total_tokens_used}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.ais_stat_tokens')}
             </div>
-          </MacOSCard>
+          </Card>
         </div>
       }
 
@@ -357,7 +357,7 @@ const AISettings = () => {
           const testResult = testResults[provider.id];
 
           return (
-            <MacOSCard key={provider.id} className="p-6">
+            <Card key={provider.id} className="p-6">
               <div className="admin-flex-between-mb-16">
                 <div className="flex items-center justify-center">
                   <div className="admin-status-dot-12" style={{ '--admin-dot-bg': provider.active ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' } as CSSProperties} />
@@ -493,12 +493,12 @@ const AISettings = () => {
                   <TestTube aria-hidden="true" className="w-3.5 h-3.5" />
                 </Button>
               </div>
-            </MacOSCard>);
+            </Card>);
 
         })}
 
         {/* Карточка добавления нового провайдера */}
-        <MacOSCard className="p-6 text-center admin-card-dashed">
+        <Card className="p-6 text-center admin-card-dashed">
           <Brain className="admin-icon-48-mx-auto-mb-16-tertiary" />
           <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0 mb-2">
             {t('admin2.ais_add_ai_provider')}
@@ -510,11 +510,11 @@ const AISettings = () => {
             <Plus className="w-4 h-4 mr-2" />
             {t('admin2.ais_add')}
           </Button>
-        </MacOSCard>
+        </Card>
       </div>
 
       {/* Системные настройки */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0 mb-4 flex items-center justify-center">
           <Settings className="admin-icon-20-mr-8-blue" />
           {t('admin2.ais_system_settings_title')}
@@ -527,7 +527,7 @@ const AISettings = () => {
             logger.log('Сохранение системных настроек:', settings);
           }} />
         
-      </MacOSCard>
+      </Card>
 
       {/* Форма провайдера */}
       {(showAddForm || editingProvider) &&
@@ -587,7 +587,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }: ProviderF
   };
 
   return (
-    <MacOSCard className="p-6">
+    <Card className="p-6">
       <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0 mb-4">
         {provider ? t('admin2.ais_edit_provider') : t('admin2.ais_adding_ai_provider')}
       </h3>
@@ -731,7 +731,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }: ProviderF
           </Button>
         </div>
       </form>
-    </MacOSCard>);
+    </Card>);
 
 };
 

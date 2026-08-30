@@ -55,7 +55,7 @@ def test_online_queue_new_join_success_preserves_behavior(
         json={
             "token": token.token,
             "patient_name": "Online Queue Patient",
-            "phone": "+998906060606",
+            "phone": "+998900000140",
         },
     )
 
@@ -96,7 +96,7 @@ def test_online_queue_new_join_duplicate_reuses_existing_entry(
         json={
             "token": token.token,
             "patient_name": "Duplicate Patient",
-            "phone": "+998907070707",
+            "phone": "+998900000141",
         },
     )
     second = client.post(
@@ -104,7 +104,7 @@ def test_online_queue_new_join_duplicate_reuses_existing_entry(
         json={
             "token": token.token,
             "patient_name": "Duplicate Patient",
-            "phone": "+998907070707",
+            "phone": "+998900000141",
         },
     )
 

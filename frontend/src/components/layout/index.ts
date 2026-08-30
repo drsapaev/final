@@ -5,14 +5,7 @@ import React from 'react';
 export { default as ModernContainer } from './ModernContainer';
 export { default as ModernGrid, GridItem } from './ModernGrid';
 export { default as ModernFlex, FlexItem } from './ModernFlex';
-export { 
-  default as ModernCard, 
-  CardHeader, 
-  CardBody, 
-  CardFooter, 
-  CardTitle, 
-  CardDescription 
-} from './ModernCard';
+// PR-UI-06: ModernCard deleted (0 production consumers). Use canonical Card from ui/macos instead.
 
 // Утилиты для layout
 export const layoutUtils = {

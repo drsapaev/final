@@ -141,7 +141,7 @@ def test_e2e_clinic_flow(
         "middle_name": "E2E",
         "birth_date": "1990-01-01",
         "sex": "M",
-        "phone": "+998901234567",
+        "phone": "+998900000121",
         # Не добавляем doc_type и doc_number, чтобы избежать валидации
     }
     patient_response = client.post(

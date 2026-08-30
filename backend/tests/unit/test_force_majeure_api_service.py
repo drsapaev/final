@@ -151,7 +151,7 @@ class TestForceMajeureApiService:
         other_patient = Patient(
             first_name="Other",
             last_name="Patient",
-            phone="+998901113333",
+            phone="+998900000113",
         )
         db_session.add_all([queue, other_patient])
         db_session.flush()

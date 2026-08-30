@@ -64,9 +64,7 @@ const variantStyles: Record<CardVariant, React.CSSProperties> = {
   glass: {
     background: 'var(--mac-glass-bg, rgba(255, 255, 255, 0.72))',
     border: '1px solid var(--mac-glass-border, rgba(255, 255, 255, 0.58))',
-    boxShadow: 'var(--mac-shadow-sm)',
-    backdropFilter: 'var(--mac-blur-light)',
-    WebkitBackdropFilter: 'var(--mac-blur-light)',
+    boxShadow: 'var(--mac-shadow-sm)'
   },
   interactive: {
     background: 'var(--mac-card-bg, var(--mac-bg-primary))',

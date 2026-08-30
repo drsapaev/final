@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { normalizeSource } from '../test/contracts/source-contract-helper';
+
 const ROOT = path.resolve(process.cwd(), 'src');
 
 const NOTIFICATION_FILES = [
@@ -12,17 +14,13 @@ const NOTIFICATION_FILES = [
   'components/chat/NotificationPrompt.tsx'
 ];
 
-const PANEL_FILES = [
-  'App.jsx',
-  'pages/RegistrarPanel.tsx',
-  'pages/CardiologistPanelUnified.tsx',
-  'pages/DentistPanelUnified.tsx',
-  'pages/DermatologistPanelUnified.tsx',
-  'pages/LabPanel.tsx'
-];
+// Note: per-panel GlobalNotificationCenter rendering was removed in commit
+// 6adf9284 — GlobalNotificationCenter now lives only in App.tsx. The per-panel
+// PANEL_FILES list was deleted when the test was updated to reflect the
+// centralized architecture.
 
 function read(filePath: string) {
-  return fs.readFileSync(path.join(ROOT, filePath), 'utf8');
+  return normalizeSource(fs.readFileSync(path.join(ROOT, filePath), 'utf8'));
 }
 
 describe('notification guardrails', () => {
@@ -37,14 +35,24 @@ describe('notification guardrails', () => {
     expect(prompt).toContain('notify.warning(');
     expect(prompt).toContain('notify.error(');
 
-    for (const filePath of PANEL_FILES) {
-      const content = read(filePath);
-      expect(content).toContain('GlobalNotificationCenter');
-    }
+    // Contract (commit 6adf9284): GlobalNotificationCenter is rendered ONCE
+    // in App.tsx as the single, global notification entry point. The header
+    // bell (HeaderNew) toggles the inbox via NotificationCenterContext.
+    // Per-panel GlobalNotificationCenter rendering was intentionally removed
+    // — each panel no longer needs its own instance.
+    const app = read('App.tsx');
+    expect(app).toContain('GlobalNotificationCenter');
 
+    // PR-UI-13-1: the registrar fetch-loop guards (in-flight ref + 429 cooldown
+    // ref) moved verbatim from RegistrarPanel.tsx into the extracted worklist
+    // data lifecycle hook (useRegistrarWorklistData.ts). The contract intent —
+    // the registrar surface keeps its duplicate-fetch/notification-loop
+    // guards — is pinned against the panel + hook tree.
     const registrar = read('pages/RegistrarPanel.tsx');
-    expect(registrar).toContain('loadAppointmentsInFlightRef');
-    expect(registrar).toContain('autoRefreshCooldownUntilRef');
+    const registrarWorklist = read('pages/registrar/useRegistrarWorklistData.ts');
+    expect(registrar).toContain('useRegistrarWorklistData({');
+    expect(registrarWorklist).toContain('loadAppointmentsInFlightRef');
+    expect(registrarWorklist).toContain('autoRefreshCooldownUntilRef');
   });
 
   it('keeps notification center loaders stable to avoid fetch loops', () => {
@@ -64,7 +72,9 @@ describe('notification guardrails', () => {
   });
 
   it('keeps registrar table action visibility on backend-provided actions', () => {
-    const table = read('components/tables/EnhancedAppointmentsTable.tsx');
+    // PR-UI-09e-2: the EAT actions column moved verbatim to
+    // appointmentsTableColumns.tsx — read-list follows the moved code.
+    const table = read('components/tables/appointmentsTableColumns.tsx');
 
     expect(table).toContain('getBackendActionAvailability');
     expect(table).toContain('can_mark_paid');
@@ -72,7 +82,7 @@ describe('notification guardrails', () => {
     expect(table).toContain('can_print_ticket');
     expect(table).toContain('can_complete');
     expect(table).toContain('available_actions');
-    expect(table).toContain('{canPay &&');
+    expect(table).toContain('{canPay ? (');
     expect(table).not.toContain('{!isDoctorView && (() => {');
     const quote = String.fromCharCode(39);
     expect(table).not.toContain(

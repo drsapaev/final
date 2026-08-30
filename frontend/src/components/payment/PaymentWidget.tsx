@@ -508,7 +508,7 @@ const PaymentWidget = ({
               <Typography variant="body2" color="textSecondary">
                 {t('payment.pay_widg_amount_due')}
               </Typography>
-              <Typography variant="h5" color="primary" className="pw-amount-bold">
+              <Typography variant="h5"  className="pw-amount-bold">
                 {formatAmount(amount, currency)}
               </Typography>
             </div>
@@ -574,8 +574,7 @@ const PaymentWidget = ({
             через `loading` state (кнопка дизейблится на время инициализации). */}
         <Box display="flex" className="pw-actions-row">
           <Button
-            variant="contained"
-            color="primary"
+            variant="primary"
             size="large"
             fullWidth
             onClick={initializePayment}
@@ -594,7 +593,6 @@ const PaymentWidget = ({
           {paymentStatus !== 'pending' &&
           <Button
             variant="outline"
-            color="secondary"
             size="large"
             onClick={cancelPayment}
             disabled={loading}>

@@ -55,7 +55,7 @@ def test_update_self_profile_persists_user_and_profile_fields(
             "first_name": "Updated",
             "last_name": "Admin",
             "email": "updated-admin@test.com",
-            "phone": "+998901234567",
+            "phone": "+998900000000",
             "bio": "Updated biography",
             "language": "en",
             "timezone": "Asia/Tashkent",
@@ -70,7 +70,7 @@ def test_update_self_profile_persists_user_and_profile_fields(
     assert data["first_name"] == "Updated"
     assert data["last_name"] == "Admin"
     assert data["email"] == "updated-admin@test.com"
-    assert data["phone"] == "+998901234567"
+    assert data["phone"] == "+998900000000"
     assert data["bio"] == "Updated biography"
     assert data["language"] == "en"
     assert data["timezone"] == "Asia/Tashkent"
@@ -89,7 +89,7 @@ def test_update_self_profile_persists_user_and_profile_fields(
     assert user.full_name == "Updated Admin"
     assert user.email == "updated-admin@test.com"
     assert profile.full_name == "Updated Admin"
-    assert profile.phone == "+998901234567"
+    assert profile.phone == "+998900000000"
     assert profile.bio == "Updated biography"
     assert profile.language == "en"
     assert profile.timezone == "Asia/Tashkent"
@@ -109,9 +109,9 @@ def test_registrar_can_read_and_update_own_profile(
         headers=registrar_auth_headers,
         json={
             "full_name": "Registrar Updated",
-            "phone": "+998909999999",
+            "phone": "+998900000001",
         },
     )
     assert put_response.status_code == 200
     assert put_response.json()["full_name"] == "Registrar Updated"
-    assert put_response.json()["phone"] == "+998909999999"
+    assert put_response.json()["phone"] == "+998900000001"

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 
 const rootDir = path.resolve(process.cwd(), '..');
 const artifactsDir = path.join(rootDir, 'output', 'playwright', 'messaging-rollout-proof');
@@ -51,7 +52,24 @@ with wave.open(path, 'wb') as wav_file:
   });
 }
 
-function createBackendSession(username) {
+interface BackendSessionUser {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  is_superuser: boolean;
+}
+
+interface BackendSession {
+  access_token: string;
+  user: BackendSessionUser;
+}
+
+type ConversationTarget = string | { query: string; userId?: number | null };
+
+function createBackendSession(username: string): BackendSession {
   const script = String.raw`
 import json
 import sys
@@ -105,13 +123,13 @@ finally:
     encoding: 'utf8',
   }).trim();
 
-  return JSON.parse(output);
+  return JSON.parse(output) as BackendSession;
 }
 
-async function seedAuthContext(context, credentials) {
+async function seedAuthContext(context: BrowserContext, credentials: { username: string }): Promise<BackendSession> {
   const session = createBackendSession(credentials.username);
 
-  await context.addInitScript(({ token, profile }) => {
+  await context.addInitScript(({ token, profile }: { token: string; profile: BackendSessionUser }) => {
     sessionStorage.setItem('auth_token', token);
     sessionStorage.setItem('auth_profile', JSON.stringify(profile));
     sessionStorage.setItem('user', JSON.stringify(profile));
@@ -125,14 +143,14 @@ async function seedAuthContext(context, credentials) {
   return session;
 }
 
-async function openChatWindow(page) {
+async function openChatWindow(page: Page) {
   const chatButton = page.getByTitle(/Сообщения/).first();
   await expect(chatButton).toBeVisible({ timeout: 30000 });
   await chatButton.click();
   await expect(page.getByRole('button', { name: /Новый чат/ })).toBeVisible({ timeout: 15000 });
 }
 
-async function openConversation(page, target) {
+async function openConversation(page: Page, target: ConversationTarget) {
   const query = typeof target === 'string' ? target : target.query;
   const userId = typeof target === 'object' ? target.userId : null;
   const exactPattern = new RegExp(`^\\s*${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i');
@@ -161,23 +179,23 @@ async function openConversation(page, target) {
   await expect(page.locator('textarea[aria-label="Введите сообщение"]')).toBeVisible({ timeout: 15000 });
 }
 
-async function sendTextMessage(page, text) {
+async function sendTextMessage(page: Page, text: string) {
   const composer = page.locator('textarea[aria-label="Введите сообщение"]');
   await composer.fill(text);
   await page.locator('button[title="Отправить"]').click();
   await expect(page.getByText(text)).toBeVisible({ timeout: 20000 });
 }
 
-async function attachFile(page) {
+async function attachFile(page: Page) {
   await page.locator('button[title="Прикрепить файл"]').click();
   await page.locator('input[type="file"]').setInputFiles(attachmentPath);
   await expect(page.locator('.message-file .file-link').last()).toContainText('messaging-rollout-proof.txt', { timeout: 20000 });
 }
 
-async function sendVoiceMessage(page, recipientId) {
+async function sendVoiceMessage(page: Page, recipientId: number): Promise<string> {
   const voiceBase64 = fs.readFileSync(voicePath).toString('base64');
 
-  const response = await page.evaluate(async ({ voiceBase64Data, recipientIdValue }) => {
+  const response = await page.evaluate(async ({ voiceBase64Data, recipientIdValue }: { voiceBase64Data: string; recipientIdValue: number }) => {
     const binary = Uint8Array.from(atob(voiceBase64Data), (char) => char.charCodeAt(0));
     const blob = new Blob([binary], { type: 'audio/wav' });
     const formData = new FormData();
@@ -207,13 +225,13 @@ async function sendVoiceMessage(page, recipientId) {
   return response;
 }
 
-async function openAiWidget(page) {
+async function openAiWidget(page: Page) {
   await page.locator('button[title="Открыть AI чат"]').click();
   await expect(page.locator('.chat-widget')).toBeVisible({ timeout: 15000 });
   await expect(page.locator('.chat-widget').getByTitle('Новый чат')).toBeVisible({ timeout: 10000 });
 }
 
-async function sendAiPrompt(page, prompt) {
+async function sendAiPrompt(page: Page, prompt: string) {
   const widget = page.locator('.chat-widget');
   const sessionCreated = page.waitForResponse((response) =>
     response.url().includes('/api/v1/ai/chat/sessions') &&
@@ -238,8 +256,8 @@ test('messaging rollout proof: two-user chat, attachment, voice, reconnect', asy
   testInfo.setTimeout(180000);
   ensureArtifactsDir();
 
-  const networkEvents = [];
-  const consoleEvents = [];
+  const networkEvents: string[] = [];
+  const consoleEvents: string[] = [];
 
   const doctorContext = await browser.newContext({
     baseURL: 'http://localhost:5173',
@@ -261,9 +279,10 @@ test('messaging rollout proof: two-user chat, attachment, voice, reconnect', asy
       configurable: true,
       value: {
         ...originalMediaDevices,
-        getUserMedia: async (constraints) => {
+        getUserMedia: async (constraints: MediaStreamConstraints) => {
           try {
-            const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+            const AudioContextCtor = (window.AudioContext ||
+              (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as typeof AudioContext;
             const audioContext = new AudioContextCtor();
             await audioContext.resume();
 
@@ -307,7 +326,7 @@ test('messaging rollout proof: two-user chat, attachment, voice, reconnect', asy
   const doctorPage = await doctorContext.newPage();
   const adminPage = await adminContext.newPage();
 
-  for (const [role, page] of [['doctor', doctorPage], ['admin', adminPage]]) {
+  for (const [role, page] of [['doctor', doctorPage], ['admin', adminPage]] as [string, Page][]) {
     page.on('request', (request) => {
       if (request.url().includes('/api/v1/')) {
         networkEvents.push(`[${role}] ${request.method()} ${request.url()}`);
@@ -370,7 +389,7 @@ test('messaging rollout proof: doctor AI widget round-trip', async ({ browser },
   testInfo.setTimeout(120000);
   ensureArtifactsDir();
 
-  const networkEvents = [];
+  const networkEvents: string[] = [];
   const doctorContext = await browser.newContext({
     baseURL: 'http://localhost:5173',
     viewport: { width: 1440, height: 1200 },

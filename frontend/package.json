@@ -25,6 +25,8 @@
     "audit:icon-controls": "node scripts/audit-icon-only-controls.mjs --strict --baseline=scripts/a11y/icon-only-controls-baseline.json",
     "audit:icon-controls:components": "node scripts/audit-icon-only-controls.mjs --include-components --strict --baseline=scripts/a11y/icon-only-component-controls-baseline.json",
     "audit:icon-controls:strict": "node scripts/audit-icon-only-controls.mjs --strict",
+    "audit:ui-baseline": "node scripts/ui-baseline.mjs",
+    "audit:ui-ratchet": "node scripts/ui-baseline.mjs --check",
     "audit:icon-controls:update-baseline": "node scripts/audit-icon-only-controls.mjs --write-baseline=scripts/a11y/icon-only-controls-baseline.json",
     "audit:icon-controls:components:update-baseline": "node scripts/audit-icon-only-controls.mjs --include-components --write-baseline=scripts/a11y/icon-only-component-controls-baseline.json",
     "storybook": "storybook dev -p 6006",
@@ -33,6 +35,7 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:e2e": "playwright test",
+    "capture:landing-shots": "CAPTURE_LANDING_SHOTS=1 playwright test e2e/capture-landing-screens.spec.ts --project=chromium",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
     "check-theme": "node scripts/check-theme-compliance.js",
@@ -45,9 +48,7 @@
     "type-check:watch": "tsc --noEmit --watch",
     "generate:api-types": "bash scripts/generate-api-types.sh",
     "generate:api-types:check": "bash scripts/generate-api-types.sh && git diff --exit-code src/types/generated/ || (echo 'API types are out of date! Run: npm run generate:api-types' && exit 1)",
-    "type-debt:check": "node ../scripts/type-debt-check.mjs",
-    "strict:baseline": "node ../scripts/strict-baseline-check.mjs",
-    "strict:baseline:update": "node ../scripts/strict-baseline-check.mjs --update"
+    "type-debt:check": "node ../scripts/type-debt-check.mjs"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",

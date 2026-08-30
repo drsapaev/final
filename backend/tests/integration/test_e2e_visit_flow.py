@@ -390,7 +390,7 @@ class TestE2EVisitFlow:
         confirm_response = client.post(
             f"/api/v1/registrar/visits/{visit.id}/confirm",
             json={
-                "confirmation_notes": "Подтверждено по телефону +998901234567"
+                "confirmation_notes": "Подтверждено по телефону +998900000121"
             },
             headers=auth_headers
         )

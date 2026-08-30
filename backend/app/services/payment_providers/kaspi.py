@@ -216,7 +216,11 @@ class KaspiProvider(BasePaymentProvider):
                 provider_data={
                     "transaction_id": transaction_id,
                     "order_id": order_id,
-                    "amount": amount_decimal,
+                    # SECURITY (Finding F followup): store amount as str, not Decimal.
+                    # Same fix as Click (click.py:218). Decimal is not JSON-serializable
+                    # → PostgreSQL JSON columns reject it → transaction_ctx rolls back.
+                    # Masked by SQLite/savepoint tests; caught by real-DB test.
+                    "amount": str(amount_decimal),
                     "currency": currency,
                     "kaspi_status": status,
                     "timestamp": timestamp,

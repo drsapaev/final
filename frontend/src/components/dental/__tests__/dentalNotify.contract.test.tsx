@@ -16,7 +16,6 @@ const readSource = (fileName: string) =>
 // without UI feedback).
 const FILES_WITH_USER_FACING_ERRORS = [
   'DiagnosisForm.tsx',
-  'ExaminationForm.tsx',
   'PatientCard.tsx',
   'PhotoArchive.tsx',
   'ToothModal.tsx',

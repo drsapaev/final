@@ -5,11 +5,47 @@ import {
   Button, Card, Icon,
 } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 
 type StatsAppointmentAccessor = ((key: string) => unknown) & Record<string, unknown>;
 
-const getAppointmentDate = (appointment: StatsAppointmentAccessor): unknown => appointment.date || appointment.appointment_date;
+// Helper: normalize an appointment entry to an accessor function.
+// Some callers pass raw API objects (Record<string, unknown>) instead of
+// accessor functions. Without this, `apt('misc.ms_status')` throws
+// "apt is not a function" and crashes the entire WelcomeView dashboard.
+// PR A (E2E registrar fixme tests): defensive normalization.
+const toAccessor = (apt: unknown): StatsAppointmentAccessor => {
+  if (typeof apt === 'function') return apt as StatsAppointmentAccessor;
+  if (apt && typeof apt === 'object') {
+    const obj = apt as Record<string, unknown>;
+    // Create an accessor function that supports both flat keys
+    // ('misc.ms_status') and nested paths for forward-compat.
+    return ((key: string) => {
+      if (key in obj) return obj[key];
+      // Support 'misc.ms_status' → obj.misc?.ms_status (legacy nested path)
+      const parts = key.split('.');
+      let cur: unknown = obj;
+      for (const p of parts) {
+        if (cur && typeof cur === 'object' && p in (cur as Record<string, unknown>)) {
+          cur = (cur as Record<string, unknown>)[p];
+        } else {
+          return undefined;
+        }
+      }
+      return cur;
+    }) as StatsAppointmentAccessor;
+  }
+  // Fallback for null/primitive values: return an accessor that always returns undefined.
+  // Cast through `unknown` because StatsAppointmentAccessor is a function & Record intersection
+  // and TypeScript can't convert a bare arrow function directly.
+  return (() => undefined) as unknown as StatsAppointmentAccessor;
+};
+
+const getAppointmentDate = (appointment: unknown): unknown => {
+  const apt = toAccessor(appointment);
+  // Try accessor first (flat key), then fall back to property access.
+  return apt('date') ?? apt('appointment_date') ?? (apt as Record<string, unknown>).date ?? (apt as Record<string, unknown>).appointment_date;
+};
 
 const shiftDate = (dateString: string, days: number): string => {
   const date = new Date(`${dateString}T00:00:00`);
@@ -36,9 +72,13 @@ const getTrendDirection = (current: number, previous: number, goodWhenDown: bool
   return current > previous ? 'up' : 'down';
 };
 
-const getAverageWaitTime = (appointments: StatsAppointmentAccessor[]): number => {
+const getAverageWaitTime = (appointments: unknown[]): number => {
   const waitTimes = appointments.
-  map((apt: StatsAppointmentAccessor) => toNumber(apt('misc.ms_wait_time_minutes') ?? apt('misc.ms_wait_minutes') ?? apt('misc.ms_queue_wait_minutes') ?? apt('misc.ms_wait_time'))).
+  map((rawApt: unknown) => {
+    const apt = toAccessor(rawApt);
+    // Codex P1 fix (PR 2721): use real field names, not misc.ms_* prefix.
+    return toNumber(apt('wait_time_minutes') ?? apt('wait_minutes') ?? apt('queue_wait_minutes') ?? apt('wait_time'));
+  }).
   filter((minutes: number) => minutes > 0);
 
   if (waitTimes.length === 0) {
@@ -50,13 +90,13 @@ const getAverageWaitTime = (appointments: StatsAppointmentAccessor[]): number =>
 
 interface ModernStatisticsProps {
   // TECH-DEBT(modern-stats-appointments): appointments is `any[]` — parent passes raw API responses
-  appointments?: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+  appointments?: any[];  
   language?: string;
   selectedDate?: string | null;
   onExport?: () => void;
   onRefresh?: () => void;
   // TECH-DEBT(modern-stats-index-sig): index signature is `any` — callers pass ad-hoc props
-  [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  [key: string]: any;  
 }
 
 const ModernStatistics = ({
@@ -153,33 +193,39 @@ const ModernStatistics = ({
   const statistics = useMemo(() => {
     const targetDate = selectedDate || new Date().toISOString().split('T')[0];
     const previousDate = shiftDate(targetDate, -1);
-    const dayAppointments = appointments.filter((apt) => getAppointmentDate(apt) === targetDate);
-    const previousDayAppointments = appointments.filter((apt) => getAppointmentDate(apt) === previousDate);
+    // Normalize all appointments to accessor functions first (PR A fix).
+    const normalizedAppts = appointments.map(toAccessor);
+    const dayAppointments = normalizedAppts.filter((apt) => getAppointmentDate(apt) === targetDate);
+    const previousDayAppointments = normalizedAppts.filter((apt) => getAppointmentDate(apt) === previousDate);
 
     // Завершенные визиты за выбранный день
+    // Codex P1 fix (PR 2721): accessor keys must match actual appointment
+    // field names (status, payment_status, patient_id, cost), NOT the
+    // i18n namespace prefix 'misc.ms_*'. The old keys always returned
+    // undefined, making all statistics zero.
     const completedToday = dayAppointments.filter((apt) =>
-    apt('misc.ms_status') === 'completed' || apt('misc.ms_status') === 'done'
+    apt('status') === 'completed' || apt('status') === 'done'
     );
 
     // Ожидают оплаты за выбранный день
     const pendingPayments = dayAppointments.filter((apt) =>
-    apt('misc.ms_status') === 'paid_pending' || apt('misc.ms_payment_status') === 'pending'
+    apt('status') === 'paid_pending' || apt('payment_status') === 'pending'
     );
     const previousPendingPayments = previousDayAppointments.filter((apt) =>
-    apt('misc.ms_status') === 'paid_pending' || apt('misc.ms_payment_status') === 'pending'
+    apt('status') === 'paid_pending' || apt('payment_status') === 'pending'
     );
 
     // Выручка: суммируем оплаченные записи (по payment_status), а не только завершенные
     const totalRevenue = dayAppointments.
-    filter((apt) => apt('misc.ms_payment_status') === 'paid').
-    reduce((sum, apt) => sum + toNumber(apt('misc.ms_payment_amount') || apt('misc.ms_cost')), 0);
+    filter((apt) => apt('payment_status') === 'paid').
+    reduce((sum, apt) => sum + toNumber(apt('payment_amount') || apt('cost')), 0);
     const previousRevenue = previousDayAppointments.
-    filter((apt) => apt('misc.ms_payment_status') === 'paid').
-    reduce((sum, apt) => sum + toNumber(apt('misc.ms_payment_amount') || apt('misc.ms_cost')), 0);
+    filter((apt) => apt('payment_status') === 'paid').
+    reduce((sum, apt) => sum + toNumber(apt('payment_amount') || apt('cost')), 0);
 
     // Уникальные пациенты
-    const uniquePatients = new Set(dayAppointments.map((apt) => apt('misc.ms_patient_id'))).size;
-    const previousUniquePatients = new Set(previousDayAppointments.map((apt) => apt('misc.ms_patient_id'))).size;
+    const uniquePatients = new Set(dayAppointments.map((apt) => apt('patient_id'))).size;
+    const previousUniquePatients = new Set(previousDayAppointments.map((apt) => apt('patient_id'))).size;
 
     // Среднее время ожидания
     const averageWaitTime = getAverageWaitTime(dayAppointments);
@@ -257,7 +303,7 @@ const ModernStatistics = ({
   const statCards = [
   {
     id: 'totalPatients',
-    title: t("misc.ms_total_patients"),
+    title: t('misc.ms_total_patients'),
     value: animatedValues.totalPatients || 0,
     iconName: 'person',
     color: 'var(--mac-accent-blue)',
@@ -384,8 +430,6 @@ const ModernStatistics = ({
                 border: '2px solid var(--mac-separator)',
                 borderRadius: 'var(--mac-radius-lg)',
                 boxShadow: 'var(--mac-shadow-md)',
-                backdropFilter: 'var(--mac-blur-light)',
-                WebkitBackdropFilter: 'var(--mac-blur-light)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 'var(--mac-spacing-4)'

@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowRight, Eye, EyeOff, LogIn, CircleHelp, UserPlus, UserRound, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, LogIn, CircleHelp, UserPlus, UserRound, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { api, setToken, setRefreshToken } from '../../api/client';
+import { api, setToken, setRefreshToken, ensureCSRFToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors';
 import { useSetupStatus } from '../../hooks/useSetupStatus';
-import * as _tokens from '../../theme/tokens';
-const colors = ((_tokens as Record<string, unknown>).colors || {}) as Record<string, unknown>;
+import { colorsLight as colors } from '../../theme/tokens';
 import { BRAND } from '../../config/brand';
 import TwoFactorVerify from '../TwoFactorVerify';
+import TwoFactorSetupWizard from '../security/TwoFactorSetupWizard';
 import ForgotPassword from './ForgotPassword';
 import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from './loginErrorUtils';
 import {
@@ -63,9 +63,7 @@ const LoginFormStyled = () => {
     borderRadius: 'var(--mac-radius-lg)',
     fontWeight: 'var(--mac-font-weight-semibold)',
     letterSpacing: '0.01em',
-    boxShadow: 'none',
-    WebkitBackdropFilter: 'none',
-    backdropFilter: 'none',
+    boxShadow: 'none'
   };
   const authSecondaryButtonStyles = {
     backgroundColor: isDark
@@ -101,6 +99,10 @@ const LoginFormStyled = () => {
   const [requires2FA, setRequires2FA] = useState(false);
   const [pending2FAToken, setPending2FAToken] = useState('');
   const [twoFactorMethod, setTwoFactorMethod] = useState('totp');
+
+  // Двухстадийная аутентификация: критичная роль без настроенной 2FA
+  const [requires2FASetup, setRequires2FASetup] = useState(false);
+  const [enrollmentToken, setEnrollmentToken] = useState('');
 
   // Функция для проверки защищенных панелей
   const isProtectedPanelPath = (pathname: string) => {
@@ -164,6 +166,15 @@ const LoginFormStyled = () => {
         return;
       }
 
+      // Двухстадийная аутентификация: пароль верен, но для критичной роли
+      // (Admin/Cashier) требуется первичная настройка 2FA — открыт мастер.
+      if (data.requires_2fa_setup && data.enrollment_token) {
+        setRequires2FASetup(true);
+        setEnrollmentToken(String(data.enrollment_token));
+        setLoading(false);
+        return;
+      }
+
       // Обычный вход без 2FA
       if (data.access_token) {
         const accessToken = typeof data.access_token === 'string' ? data.access_token.trim() : data.access_token;
@@ -190,6 +201,15 @@ const LoginFormStyled = () => {
         if (data.refresh_token) {
           setRefreshToken(String(data.refresh_token));
         }
+
+        // #05 Tier 1: Eagerly fetch CSRF token after successful login.
+        // This ensures the csrf_token cookie is set before the first
+        // state-changing request, avoiding a lazy-fetch race.
+        // ensureCSRFToken() is single-flight and cookie-first — cheap if
+        // the cookie is already present.
+        ensureCSRFToken().catch(() => {
+          // Non-fatal — the request interceptor will retry on demand.
+        });
 
         try {
           // UX Audit Stage 1 (Login issue 3.7):
@@ -275,6 +295,11 @@ const LoginFormStyled = () => {
           setRefreshToken(String(response.data.refresh_token));
         }
 
+        // #05 Tier 1: Eagerly fetch CSRF token after 2FA success.
+        ensureCSRFToken().catch(() => {
+          // Non-fatal — the request interceptor will retry on demand.
+        });
+
         const profileResponse = (await api.get('/auth/me')) as import('axios').AxiosResponse<Record<string, unknown>>;
         setProfile(profileResponse.data);
 
@@ -296,6 +321,43 @@ const LoginFormStyled = () => {
   const handle2FACancel = () => {
     setRequires2FA(false);
     setPending2FAToken('');
+    setError('');
+  };
+
+  // Двухстадийная аутентификация: /2fa/verify-setup обменял enrollment-токен
+  // на нормальные токены — завершаем вход ровно как после 2FA-верификации.
+  const handle2FAEnrolled = async (payload: Record<string, unknown>) => {
+    try {
+      if (payload.access_token) {
+        const accessToken = typeof payload.access_token === 'string' ? payload.access_token.trim() : payload.access_token;
+        setToken(String(accessToken));
+        if (payload.refresh_token) {
+          setRefreshToken(String(payload.refresh_token));
+        }
+        ensureCSRFToken().catch(() => {
+          // Non-fatal — the request interceptor will retry on demand.
+        });
+
+        const profileResponse = (await api.get('/auth/me')) as import('axios').AxiosResponse<Record<string, unknown>>;
+        setProfile(profileResponse.data);
+
+        const profile = profileResponse.data || null;
+        const computedRoute = getRouteForProfile(profile);
+        const target = computedRoute || from || landingRoute;
+
+        navigate(target, { replace: true });
+      }
+    } catch (postEnrollError) {
+      logger.warn('[AUTH] Post-enrollment navigation error (non-fatal — token already obtained):', postEnrollError);
+      setError(t('misc.lfs_oshibka_posle_2fa_verifikats'));
+      setRequires2FASetup(false);
+      setEnrollmentToken('');
+    }
+  };
+
+  const handle2FASetupCancel = () => {
+    setRequires2FASetup(false);
+    setEnrollmentToken('');
     setError('');
   };
 
@@ -356,129 +418,172 @@ const LoginFormStyled = () => {
     }
   };
 
-  // Если требуется 2FA, показываем компонент верификации
-  if (requires2FA) {
+  // Двухстадийная аутентификация: критичной роли без 2FA показываем мастер
+  // первичной настройки (QR → код → полноценная сессия).
+  if (requires2FASetup) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: `linear-gradient(135deg, ${(colors.primary as Record<number, string>)[500]} 0%, ${(colors.primary as Record<number, string>)[700]} 100%)`,
+        background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 'var(--mac-spacing-5)'
       }}>
-        <div style={{
-          background: 'white',
-          borderRadius: 'var(--mac-radius-lg)',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-          padding: '40px',
+        <Card className="twofactor-setup-auth" style={{
           width: '100%',
-          maxWidth: '400px',
-          position: 'relative'
+          maxWidth: '460px',
+          // Тот же стеклянный стиль, что у карточки логина (UX Audit tokens).
+          background: isDark
+            ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-text-primary)), transparent 26%) 100%)'
+            : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), transparent 26%) 100%)',
+          border: '1px solid var(--mac-card-border, rgba(255, 255, 255, 0.42))',
+          boxShadow: `
+            0 18px 48px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 82%),
+            0 2px 8px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 94%),
+            inset 0 1px 0 color-mix(in srgb, var(--mac-card-bg, #fff), transparent 45%)
+          `,
+          borderRadius: '24px',
+          overflow: 'hidden',
+          position: 'relative',
+          zIndex: 1,
+          maxHeight: '92vh',
+          overflowY: 'auto'
         }}>
-          <div style={{
-            textAlign: 'center',
-            marginBottom: '30px'
-          }}>
-            <div style={{
-              width: '60px',
-              height: '60px',
-              background: `linear-gradient(135deg, ${(colors.primary as Record<number, string>)[500]} 0%, ${(colors.primary as Record<number, string>)[700]} 100%)`,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 20px',
-              fontSize: 'var(--mac-font-size-3xl)',
-              color: 'white',
-              position: 'relative'
-            }}>
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'color-mix(in srgb, black, transparent 80%)',
-                borderRadius: '50%'
-              }} />
-              <span style={{ position: 'relative', zIndex: 1 }}>🔐</span>
-            </div>
-            <h1 style={{
-              fontSize: 'var(--mac-font-size-3xl)',
-              fontWeight: 'var(--mac-font-weight-bold)',
-              color: (colors.semantic as { text?: { primary?: string } })?.text?.primary,
-              margin: '0 0 8px 0'
-            }}>
-              Двухфакторная аутентификация
-            </h1>
-            <p style={{
-              color: (colors.semantic as { text?: { secondary?: string } })?.text?.secondary,
-              margin: '0',
-              fontSize: 'var(--mac-font-size-base)'
-            }}>
-              Подтвердите вход с помощью кода
-            </p>
-          </div>
+          <CardContent style={{ paddingTop: 18, paddingBottom: 18 }}>
+            <TwoFactorSetupWizard
+              enrollmentToken={enrollmentToken}
+              onEnrolled={handle2FAEnrolled}
+              onCancel={handle2FASetupCancel}
+            />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-          {/* UX Audit Stage 2 (Login issue 3.4):
-              Переключатель методов 2FA теперь proper tablist с ARIA roles.
-              Раньше это были 3 обычные <button> без role/aria-selected/aria-controls.
-              Теперь screen reader правильно объявляет это как таб-лист с 3 табами.
-              Keyboard navigation: ArrowLeft/Right, Home, End. */}
-          <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
+  // Если требуется 2FA, показываем компонент верификации
+  if (requires2FA) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'var(--mac-spacing-5)'
+      }}>
+        <Card className="twofactor-verify-auth" style={{
+          width: '100%',
+          maxWidth: '460px',
+          // Та же стеклянная Card-композиция, что у визарда и карточки логина.
+          background: isDark
+            ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-text-primary)), transparent 26%) 100%)'
+            : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), transparent 26%) 100%)',
+          border: '1px solid var(--mac-card-border, rgba(255, 255, 255, 0.42))',
+          boxShadow: `
+            0 18px 48px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 82%),
+            0 2px 8px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 94%),
+            inset 0 1px 0 color-mix(in srgb, var(--mac-card-bg, #fff), transparent 45%)
+          `,
+          borderRadius: '24px',
+          overflow: 'hidden',
+          position: 'relative',
+          zIndex: 1,
+          maxHeight: '92vh',
+          overflowY: 'auto'
+        }}>
+          <CardContent style={{ paddingTop: 18, paddingBottom: 18 }}>
+            <div className="flex flex-col items-center text-center" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 'var(--mac-radius-full)',
+                  background: 'var(--mac-accent-blue-bg)',
+                  marginBottom: 'var(--mac-spacing-3)',
+                }}
+              >
+                <ShieldCheck style={{ width: 24, height: 24, color: 'var(--mac-accent-blue)' }} />
+              </div>
+              <h2 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)' as CSSProperties['fontWeight'], margin: 0 }}>
+                Двухфакторная аутентификация
+              </h2>
+              <p style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)', margin: 'var(--mac-spacing-2) 0 0 0' }}>
+                Подтвердите вход с помощью кода
+              </p>
+            </div>
+
+            {/* UX Audit Stage 2 (Login issue 3.4):
+                Переключатель методов 2FA — proper tablist с ARIA roles.
+                Keyboard navigation: ArrowLeft/Right, Home, End. */}
+            <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+              <div
+                role="tablist"
+                aria-label={t('misc.lfs_metody_dvuhfaktornoy_autenti')}
+                style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}
+              >
+                {twoFactorTabs.map((tab, index) => {
+                  const isActive = twoFactorMethod === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      id={`twofactor-tab-${tab.id}`}
+                      role="tab"
+                      type="button"
+                      aria-selected={isActive}
+                      aria-controls={twoFactorTabPanelId}
+                      tabIndex={isActive ? 0 : -1}
+                      onClick={() => setTwoFactorMethod(tab.id)}
+                      onKeyDown={(e) => handle2FATabKeyDown(e, index)}
+                      style={{
+                        flex: 1,
+                        padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                        background: isActive ? 'var(--mac-accent-blue)' : 'transparent',
+                        color: isActive ? 'var(--mac-text-inverse)' : 'var(--mac-text-secondary)',
+                        border: '1px solid var(--mac-border)',
+                        borderRadius: 'var(--mac-radius-sm)',
+                        fontSize: 'var(--mac-font-size-xs)',
+                        cursor: 'pointer',
+                        font: 'inherit',
+                        outline: isActive ? '2px solid var(--mac-accent-blue)' : 'none',
+                        outlineOffset: '2px',
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div
-              role="tablist"
-              aria-label={t('misc.lfs_metody_dvuhfaktornoy_autenti')}
-              style={{ display: 'flex', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-4)' }}
+              id={twoFactorTabPanelId}
+              role="tabpanel"
+              aria-labelledby={`twofactor-tab-${twoFactorMethod}`}
+              tabIndex={-1}
             >
-              {twoFactorTabs.map((tab, index) => {
-                const isActive = twoFactorMethod === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    id={`twofactor-tab-${tab.id}`}
-                    role="tab"
-                    type="button"
-                    aria-selected={isActive}
-                    aria-controls={twoFactorTabPanelId}
-                    tabIndex={isActive ? 0 : -1}
-                    onClick={() => setTwoFactorMethod(tab.id)}
-                    onKeyDown={(e) => handle2FATabKeyDown(e, index)}
-                    style={{
-                      flex: 1,
-                      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
-                      background: isActive ? (colors.primary as Record<number, string>)[500] : 'transparent',
-                      color: isActive ? 'white' : (colors.semantic as { text?: { secondary?: string } })?.text?.secondary,
-                      border: '1px solid var(--mac-border)',
-                      borderRadius: 'var(--mac-radius-sm)',
-                      fontSize: 'var(--mac-font-size-xs)',
-                      cursor: 'pointer',
-                      font: 'inherit',
-                      outline: isActive ? `2px solid ${(colors.primary as Record<number, string>)[500]}` : 'none',
-                      outlineOffset: '2px',
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
+              <TwoFactorVerify
+                method={twoFactorMethod}
+                pendingToken={pending2FAToken}
+                onSuccess={handle2FASuccess}
+                onCancel={handle2FACancel} />
             </div>
-          </div>
 
-          <div
-            id={twoFactorTabPanelId}
-            role="tabpanel"
-            aria-labelledby={`twofactor-tab-${twoFactorMethod}`}
-            tabIndex={-1}
-          >
-            <TwoFactorVerify
-              method={twoFactorMethod}
-              pendingToken={pending2FAToken}
-              onSuccess={handle2FASuccess}
-              onCancel={handle2FACancel} />
-          </div>
-
-        </div>
-      </div>);
-
+            <div className="text-center" style={{ marginTop: 'var(--mac-spacing-3)' }}>
+              <button
+                type="button"
+                onClick={handle2FACancel}
+                style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', background: 'transparent', border: 'none', padding: 0 }}
+              >
+                {t('misc.cancel')}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Если нажали "Забыли пароль", показываем компонент восстановления
@@ -491,8 +596,6 @@ const LoginFormStyled = () => {
           // UX Audit Stage 2 (Login issue 3.3): используем --mac-bg-primary
           // вместо хардкода #1d1d1f. Теперь фон следует за темой приложения.
           background: 'var(--mac-bg-primary, #1d1d1f)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -520,8 +623,6 @@ const LoginFormStyled = () => {
         // Раньше login был всегда тёмный, независимо от темы приложения.
         // Теперь фон следует за light/dark темой.
         background: 'var(--mac-bg-primary, #1d1d1f)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -537,8 +638,6 @@ const LoginFormStyled = () => {
       background: isDark
         ? 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #1c1c1e), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-text-primary)), transparent 26%) 100%)'
         : 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg, #ffffff), transparent 16%) 0%, color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), transparent 26%) 100%)',
-        backdropFilter: 'blur(26px) saturate(140%)',
-        WebkitBackdropFilter: 'blur(26px) saturate(140%)',
         border: '1px solid var(--mac-card-border, rgba(255, 255, 255, 0.42))',
         boxShadow: `
           0 18px 48px color-mix(in srgb, var(--mac-text-primary, #0f172a), transparent 82%),
@@ -571,7 +670,7 @@ const LoginFormStyled = () => {
             </span>
             <span style={{
               fontSize: 'var(--mac-font-size-base)',
-              fontWeight: 'var(--mac-font-weight-normal)',
+              fontWeight: 'var(--mac-font-weight-regular)',
               // UX Audit Stage 2 (Login issue 3.3): --mac-text-secondary вместо #86868b
               color: 'var(--mac-text-secondary, #86868b)',
               letterSpacing: '0.1px'
@@ -761,11 +860,6 @@ const LoginFormStyled = () => {
 
           .login-form-auth .mac-button:hover {
             box-shadow: 0 10px 18px color-mix(in srgb, var(--mac-text-primary, #0f172a) 8%, transparent) !important;
-            transform: translateY(-1px);
-          }
-
-          .login-form-auth .mac-button:active {
-            transform: translateY(0) scale(0.99);
           }
 
           .login-form-auth .mac-button[disabled] {

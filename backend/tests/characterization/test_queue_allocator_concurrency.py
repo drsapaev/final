@@ -148,7 +148,7 @@ def test_parallel_duplicate_join_read_phase_can_observe_no_existing_entry(test_d
             existing_entry, _reason = queue_service.check_uniqueness(
                 session,
                 queue,
-                phone="+998903333333",
+                phone="+998900000136",
                 source="online",
             )
             with lock:

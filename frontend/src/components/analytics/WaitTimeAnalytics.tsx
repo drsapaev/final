@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
   MacOSTab,
-  MacOSStatCard,
-  MacOSEmptyState,
+  StatCard,
+  AppEmpty,
   Skeleton,
 } from '../ui/macos';
 import {
@@ -251,7 +251,7 @@ const WaitTimeAnalytics = () => {
   <div className="wta-tab-content">
       {/* Сводка */}
       {summary &&
-    <MacOSCard className="wta-card-padded">
+    <Card className="wta-card-padded">
           <div className="wta-section-header">
             <h3 className="wta-h3">
               <Activity style={{ width: '20px', height: '20px' }} />
@@ -269,28 +269,28 @@ const WaitTimeAnalytics = () => {
           </div>
 
           <div className="wta-stat-grid">
-            <MacOSStatCard
+            <StatCard
           title={t('misc.wta_stat_avg_wait_time')}
           value={formatTime(Number(summary.average_wait_time_minutes ?? 0))}
           icon={Clock}
           color="var(--mac-info)" />
         
 
-            <MacOSStatCard
+            <StatCard
           title={t('misc.wta_stat_median_time')}
           value={formatTime(Number(summary.median_wait_time_minutes ?? 0))}
           icon={Activity}
           color="var(--mac-success)" />
         
 
-            <MacOSStatCard
+            <StatCard
           title={t('misc.wta_stat_analyzed_entries')}
           value={String(summary.total_analyzed_entries ?? 0)}
           icon={BarChart3}
           color="var(--mac-accent-purple)" />
         
 
-            <MacOSStatCard
+            <StatCard
           title={t('misc.wta_stat_trend')}
           value={`${Math.abs(summary.trend_change_percent ?? 0)}%`}
           icon={(summary.trend_change_percent ?? 0) > 0 ? TrendingUp : TrendingDown}
@@ -311,19 +311,19 @@ const WaitTimeAnalytics = () => {
             
                     <AlertTriangle style={{ width: '16px', height: '16px', color: 'var(--mac-warning)' }} />
                     <span className="wta-recommendation-text">
-                      {String(recommendation.title ?? recommendation.description ?? '')}
+                      {recommendation.title ?? recommendation.description ?? ''}
                     </span>
                   </div>
           )}
               </div>
             </div>
       }
-        </MacOSCard>
+        </Card>
     }
 
       {/* Real-time оценки */}
       {realTimeEstimates &&
-    <MacOSCard className="wta-card-padded">
+    <Card className="wta-card-padded">
           <div className="wta-section-header">
             <h3 className="wta-h3">
               <Zap style={{ width: '20px', height: '20px' }} />
@@ -335,7 +335,7 @@ const WaitTimeAnalytics = () => {
           </div>
 
           {Object.keys(realTimeEstimates.queues || {}).length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Clock}
         title={t('misc.wta_empty_queues_title')}
         description={t('misc.wta_empty_queues_desc')} /> :
@@ -391,7 +391,7 @@ const WaitTimeAnalytics = () => {
               </div>
             </div>
       }
-        </MacOSCard>
+        </Card>
     }
     </div>;
 
@@ -399,59 +399,59 @@ const WaitTimeAnalytics = () => {
   const renderDetailedTab = () =>
   <div className="wta-tab-content">
       {loading ?
-    <MacOSCard className="wta-card-padded">
+    <Card className="wta-card-padded">
           <Skeleton height="200px" />
-        </MacOSCard> :
+        </Card> :
     analytics ?
     <>
           {/* Общая статистика */}
-          <MacOSCard className="wta-card-padded">
+          <Card className="wta-card-padded">
             <h3 className="wta-h3-mb16">
               <BarChart3 style={{ width: '20px', height: '20px' }} />
               {t('misc.wta_detailed_stats_title', { start: analytics.period?.start_date, end: analytics.period?.end_date })}
             </h3>
 
             <div className="wta-stat-grid-sm">
-              <MacOSStatCard
+              <StatCard
             title={t('misc.wta_stat_average')}
             value={formatTime(analytics.overall_stats?.average_minutes ?? 0)}
             icon={Clock}
             color="var(--mac-info)" />
           
 
-              <MacOSStatCard
+              <StatCard
             title={t('misc.wta_stat_median')}
             value={formatTime(analytics.overall_stats?.median_minutes ?? 0)}
             icon={Activity}
             color="var(--mac-success)" />
           
 
-              <MacOSStatCard
+              <StatCard
             title={t('misc.wta_stat_min')}
             value={formatTime(analytics.overall_stats?.min_minutes ?? 0)}
             icon={TrendingDown}
             color="var(--mac-warning)" />
           
 
-              <MacOSStatCard
+              <StatCard
             title={t('misc.wta_stat_max')}
             value={formatTime(analytics.overall_stats?.max_minutes ?? 0)}
             icon={TrendingUp}
             color="var(--mac-error)" />
           
 
-              <MacOSStatCard
+              <StatCard
             title={t('misc.wta_stat_90th_percentile')}
             value={formatTime(analytics.overall_stats?.percentile_90 ?? 0)}
             icon={BarChart3}
             color="var(--mac-accent-purple)" />
           
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Разбивка по отделениям */}
           {Object.keys(analytics.department_breakdown || {}).length > 0 &&
-      <MacOSCard className="wta-card-padded">
+      <Card className="wta-card-padded">
               <h3 className="wta-h3-mb16-no-icon">
                 {t('misc.wta_by_departments')}
               </h3>
@@ -480,12 +480,12 @@ const WaitTimeAnalytics = () => {
                   </div>
           )}
               </div>
-            </MacOSCard>
+            </Card>
       }
 
           {/* Рекомендации */}
           {analytics.recommendations && analytics.recommendations.length > 0 &&
-      <MacOSCard className="wta-card-padded">
+      <Card className="wta-card-padded">
               <h3 className="wta-h3-mb16-no-icon">
                 {t('misc.wta_improvement_recommendations')}
               </h3>
@@ -497,16 +497,16 @@ const WaitTimeAnalytics = () => {
             
                     <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-info)' }} />
                     <span className="wta-recommendation-text-default">
-                      {String(recommendation.title ?? recommendation.description ?? '')}
+                      {recommendation.title ?? recommendation.description ?? ''}
                     </span>
                   </div>
           )}
               </div>
-            </MacOSCard>
+            </Card>
       }
         </> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={BarChart3}
       title={t('misc.wta_empty_detailed_title')}
       description={t('misc.wta_empty_detailed_desc')} />
@@ -533,11 +533,11 @@ const WaitTimeAnalytics = () => {
       </div>
 
       {loading ?
-    <MacOSCard className="wta-card-padded">
+    <Card className="wta-card-padded">
           <Skeleton height="300px" />
-        </MacOSCard> :
+        </Card> :
     serviceAnalytics && Object.keys(serviceAnalytics.service_analytics || {}).length > 0 ?
-    <MacOSCard className="wta-card-padded">
+    <Card className="wta-card-padded">
           <div className="wta-grid-gap">
             {Object.entries(serviceAnalytics.service_analytics || {}).map(([serviceCode, data]: [string, WaitTimeStat]) =>
         <div
@@ -564,7 +564,7 @@ const WaitTimeAnalytics = () => {
                 
                 {data.wait_time_stats &&
           <div className="wta-stat-grid-xs">
-                    <MacOSStatCard
+                    <StatCard
               title={t('misc.wta_stat_average')}
               value={formatTime(data.wait_time_stats.average_minutes ?? 0)}
               icon={Clock}
@@ -572,7 +572,7 @@ const WaitTimeAnalytics = () => {
               size="small" />
             
 
-                    <MacOSStatCard
+                    <StatCard
               title={t('misc.wta_stat_median')}
               value={formatTime(data.wait_time_stats.median_minutes ?? 0)}
               icon={Activity}
@@ -580,7 +580,7 @@ const WaitTimeAnalytics = () => {
               size="small" />
             
 
-                    <MacOSStatCard
+                    <StatCard
               title={t('misc.wta_stat_analysis')}
               value={String(data.analyzed_visits ?? 0)}
               icon={BarChart3}
@@ -592,9 +592,9 @@ const WaitTimeAnalytics = () => {
               </div>
         )}
           </div>
-        </MacOSCard> :
+        </Card> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={Users}
       title={t('misc.wta_empty_services_title')}
       description={t('misc.wta_empty_services_desc')} />
@@ -621,11 +621,11 @@ const WaitTimeAnalytics = () => {
       </div>
 
       {loading ?
-    <MacOSCard className="wta-card-padded">
+    <Card className="wta-card-padded">
           <Skeleton height="400px" />
-        </MacOSCard> :
+        </Card> :
     heatmapData ?
-    <MacOSCard className="wta-card-padded">
+    <Card className="wta-card-padded">
           <div className="wta-mb-4">
             <h4 className="wta-h4">
               {t('misc.wta_wait_by_hour')}
@@ -675,9 +675,9 @@ const WaitTimeAnalytics = () => {
               <span className="wta-recommendation-text-default">{t('misc.wta_busiest_hour')} <strong>{heatmapData.summary.busiest_hour}:00</strong></span>
             </div>
       }
-        </MacOSCard> :
+        </Card> :
 
-    <MacOSEmptyState
+    <AppEmpty
       icon={Calendar}
       title={t('misc.wta_empty_heatmap_title')}
       description={t('misc.wta_empty_heatmap_desc')} />
@@ -709,7 +709,7 @@ const WaitTimeAnalytics = () => {
       </div>
 
       {/* Фильтры */}
-      <MacOSCard className="wta-card-padded">
+      <Card className="wta-card-padded">
         <div className="wta-stat-grid">
           <div>
             <label className="wta-filter-label">
@@ -757,7 +757,7 @@ const WaitTimeAnalytics = () => {
             </Button>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Вкладки */}
       <MacOSTab
