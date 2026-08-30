@@ -72,8 +72,14 @@ class Doctor(Base):
     user_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        nullable=True,
+        unique=True,
     )  # ✅ SECURITY: SET NULL to preserve doctor record
+    # ✅ INVARIANT (1 doctor = 1 User): doctors.user_id is UNIQUE.
+    # Multiple NULLs are allowed by SQL semantics (userless doctor rows are
+    # still possible for historical data), but one User can never be linked
+    # to two Doctor profiles at the DB level. Backed by migration
+    # 0048_doctors_user_id_unique (pre-checks duplicates before applying).
     department_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("departments.id", ondelete="SET NULL"),
