@@ -15,6 +15,12 @@ The script never writes anything. It reports:
      They must be resolved manually first — the migration never deletes,
      merges or reassigns rows automatically.
 
+  1b. Existing uq_doctors_user_id definition (schema drift). The migration
+     accepts the constraint ONLY as UNIQUE(user_id): a same-name constraint
+     on DIFFERENT columns makes upgrade() HARD-STOP, so this checker applies
+     the SAME definition validation (single source of truth: the migration's
+     own _assert_valid_user_id_constraint) and never reports a false green.
+
   2. Userless Doctor rows (doctors.user_id IS NULL). These stay legal after
      the migration (NULLs are exempt from the UNIQUE constraint), but ACTIVE
      userless doctors are a data-quality finding: per the approved
@@ -27,7 +33,8 @@ Exit codes:
     0 — clean: safe to run `alembic upgrade head`.
     1 — active userless doctors found: migration itself will pass, but the
         hard-validation rollout must pause and the inventory must be reported.
-    2 — duplicate links found: migration will hard-stop; resolve manually.
+    2 — migration will hard-stop: duplicate links found AND/OR a drifted
+        uq_doctors_user_id constraint exists; resolve manually.
 """
 from __future__ import annotations
 
@@ -118,6 +125,66 @@ def main() -> int:
             print("  RESULT: OK — no duplicate links.")
             dup_fail = False
 
+        # ---- Section 1b: schema-drift of uq_doctors_user_id -----------------
+        # The migration accepts an existing uq_doctors_user_id ONLY when its
+        # reflected definition is exactly UNIQUE(user_id) — a same-name/
+        # different-columns constraint is drift and upgrade() HARD-STOPS on
+        # it. Report the SAME condition here so the prescribed rollout check
+        # never gives operators a false green result.
+        print("\n=== 1b. Existing uq_doctors_user_id definition (drift check) ===")
+        inspector = sa.inspect(conn)
+        existing_uq = checker._find_named_unique_constraint(
+            inspector, "doctors", checker.CONSTRAINT_NAME
+        )
+        if existing_uq is None:
+            print(
+                "  RESULT: OK — no existing uq_doctors_user_id; "
+                "migration 0048 will create it."
+            )
+            drift_fail = False
+        else:
+            try:
+                checker._assert_valid_user_id_constraint(
+                    existing_uq, "pre-check"
+                )
+            except RuntimeError as exc:
+                print(f"  RESULT: FAIL — {exc}")
+                drift_fail = True
+            else:
+                print(
+                    "  RESULT: OK — uq_doctors_user_id already exists as "
+                    "UNIQUE(user_id); upgrade() is a no-op (idempotent)."
+                )
+                drift_fail = False
+
+        # Name-namespace check: a unique INDEX named uq_doctors_user_id (any
+        # columns) is not reflected as a constraint but STILL collides with
+        # the constraint name on PostgreSQL (constraints and indexes share
+        # one namespace) — upgrade() would die on a raw duplicate-name error.
+        # Report it here so the rollout check stays ahead of the migration.
+        colliding_indexes = [
+            idx
+            for idx in inspector.get_indexes("doctors")
+            if idx.get("name") == checker.CONSTRAINT_NAME
+        ]
+        if colliding_indexes:
+            print(
+                f"  RESULT: FAIL — an INDEX named {checker.CONSTRAINT_NAME!r} "
+                f"already exists on `doctors` (columns="
+                f"{colliding_indexes[0].get('column_names')!r}, "
+                "unique="
+                f"{colliding_indexes[0].get('unique')!r}). On PostgreSQL the "
+                "constraint name would collide with this index and "
+                "upgrade() would abort with a duplicate-name error. Drop or "
+                "rename the index manually, then re-run this pre-check."
+            )
+            drift_fail = True
+        elif not drift_fail:
+            print(
+                "  RESULT: OK — no index name collision with "
+                f"{checker.CONSTRAINT_NAME!r}."
+            )
+
         # ---- Section 2: userless doctors inventory (decision #13) ------------
         print("\n=== 2. Userless Doctor rows (doctors.user_id IS NULL) ===")
         userless = conn.execute(
@@ -147,8 +214,17 @@ def main() -> int:
 
     engine.dispose()
 
-    if dup_fail:
-        print("\nPRE-CHECK VERDICT: BLOCKED (exit 2) — resolve duplicates before migration.")
+    if dup_fail or drift_fail:
+        reasons = []
+        if dup_fail:
+            reasons.append("resolve duplicates")
+        if drift_fail:
+            reasons.append("fix the drifted uq_doctors_user_id constraint")
+        print(
+            "\nPRE-CHECK VERDICT: BLOCKED (exit 2) — "
+            + " and ".join(reasons)
+            + " before migration."
+        )
         return 2
     if active_userless:
         print(
