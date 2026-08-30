@@ -104319,6 +104319,17 @@
                 "type": "null"
               }
             ]
+          },
+          "doctor_profile_incomplete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Profile Incomplete"
           }
         },
         "type": "object",
@@ -108217,6 +108228,11 @@
               }
             ],
             "title": "Department"
+          },
+          "profile_incomplete": {
+            "type": "boolean",
+            "title": "Profile Incomplete",
+            "default": false
           },
           "user": {
             "anyOf": [
