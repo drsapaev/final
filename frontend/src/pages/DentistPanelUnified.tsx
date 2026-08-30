@@ -503,7 +503,7 @@ const DentistPanelUnified = () => {
           вкладок (падение рендера любого таба не уронит всю страницу
           стоматолога; registrar 13-4 / cashier 14-5 / doctor 15-2
           precedent). key={activeTab} сбрасывает boundary при смене вкладки —
-          упавший таб не «отравляет» здоровые (Codex P2 #2926 precedent). */}
+          упавший таб не «отравляет» здоровые (Codex P2, PR 2926 precedent). */}
       <ErrorBoundary key={activeTab}>
         {renderContent()}
       </ErrorBoundary>
