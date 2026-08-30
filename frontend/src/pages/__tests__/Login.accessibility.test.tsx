@@ -3,7 +3,7 @@ import { fireEvent, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import Login from '../Login';
+import LoginFormStyled from '../../components/auth/LoginFormStyled';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 
 vi.mock('../../api/client', () => ({
@@ -36,7 +36,7 @@ function renderLogin() {
   return render(
     <MemoryRouter>
               <ThemeProvider>
-          <Login />
+          <LoginFormStyled />
         </ThemeProvider>
     </MemoryRouter>
   );

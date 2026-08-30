@@ -223,7 +223,6 @@ export const ROUTE_REGISTRY = [
     title: 'Login',
     owner: 'iam.auth',
     component: 'LoginFormStyled',
-    legacyRedirectFrom: ['/old-login'],
     layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Login' }),
   },
   {
