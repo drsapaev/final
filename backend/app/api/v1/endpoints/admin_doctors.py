@@ -22,6 +22,7 @@ from app.schemas.clinic import (
     WeeklyScheduleUpdate,
 )
 from app.services.admin_doctors_stats_service import AdminDoctorsStatsService
+from app.services.user_mgmt._base import is_doctor_profile_incomplete
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -101,6 +102,9 @@ def _serialize_doctor(db: Session, doctor) -> DoctorOut:
         # PR-21: include department fields
         "department_id": doctor.department_id,
         "department": doctor.department.name_ru if doctor.department else None,
+        # Lifecycle (decision #5): admin must see "Profile incomplete /
+        # Specialty required" for auto-created (or never completed) profiles.
+        "profile_incomplete": is_doctor_profile_incomplete(doctor.specialty),
         "user": _serialize_doctor_user(doctor.user, linked_doctor_id=doctor.id),
     }
     schedules = crud_clinic.get_doctor_schedules(db, doctor.id)
@@ -201,6 +205,24 @@ def get_doctor(
     return _serialize_doctor(db, doctor)
 
 
+def _validate_active_doctor_has_user(user_id: int | None, active: bool) -> None:
+    """Lifecycle invariant (decision #13): a NORMAL active system Doctor must
+    have a linked User account. Creating/updating an ``active=True`` doctor
+    without ``user_id`` is rejected. Inactive userless rows remain legal for
+    historical/special records (DB keeps them; existing rows are untouched —
+    no deletion, no auto-link; see production pre-check script for inventory).
+    """
+    if active and user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Активный врач должен быть привязан к учётной записи "
+                "пользователя (user_id). Создание активного врача без "
+                "пользователя запрещено (инвариант 1 User = 1 Doctor)."
+            ),
+        )
+
+
 @router.post("/doctors", response_model=DoctorOut)
 def create_doctor(
     doctor: DoctorCreate,
@@ -209,6 +231,9 @@ def create_doctor(
 ):
     """Создать врача."""
     try:
+        # Decision #13: no NEW active userless doctors via API.
+        _validate_active_doctor_has_user(doctor.user_id, doctor.active)
+
         if doctor.user_id:
             _validate_doctor_user(db, doctor.user_id)
             existing_doctor = crud_clinic.get_doctor_by_user_id(db, doctor.user_id)
@@ -250,6 +275,18 @@ def update_doctor(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Пользователь уже привязан к другому врачу",
                 )
+
+        # Decision #13: the resulting doctor state must not be active+userless
+        # (e.g. activating a userless doctor, or unsetting user_id on an
+        # active one). Fields not present in the payload keep current values.
+        payload_set = doctor.model_fields_set
+        target_user_id = (
+            doctor.user_id if "user_id" in payload_set else existing_doctor.user_id
+        )
+        target_active = (
+            doctor.active if "active" in payload_set else existing_doctor.active
+        )
+        _validate_active_doctor_has_user(target_user_id, bool(target_active))
 
         updated_doctor = crud_clinic.update_doctor(db, doctor_id, doctor)
         if not updated_doctor:

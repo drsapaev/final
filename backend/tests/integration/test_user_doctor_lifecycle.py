@@ -208,3 +208,280 @@ def test_auth_me_hides_doctor_fields_for_inactive_doctor(
     assert body["doctor_id"] is None
     assert body["specialty"] is None
     assert body["cabinet"] is None
+
+
+
+# ---------------------------------------------------------------------------
+# Role-change lifecycle invariant (decision #12):
+#     role=Doctor-family  <->  active linked Doctor profile
+# ---------------------------------------------------------------------------
+
+
+def _create_user_with_role(db_session, label: str, role: str) -> User:
+    """Create a user of any role directly via ORM (bypasses UserCreate regex)."""
+    user = User(
+        username=f"rc_{label}",
+        email=f"rc-{label}@test.com",
+        full_name=f"RoleChange {label}",
+        hashed_password=get_password_hash("secret123"),
+        role=role,
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+def test_promotion_registrar_to_doctor_creates_incomplete_profile(
+    client, db_session, auth_headers
+):
+    """Registrar -> Doctor: linked Doctor profile provisioned in the
+    controlled default (incomplete, specialty="general") state."""
+    user = _create_user_with_role(db_session, "promo", "Registrar")
+
+    response = client.put(
+        f"/api/v1/users/users/{user.id}",
+        json={"role": "Doctor"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+
+    db_session.expire_all()
+    doctor = db_session.query(Doctor).filter(Doctor.user_id == user.id).one()
+    assert doctor.active is True
+    assert doctor.specialty == "general"  # incomplete sentinel (decision #5)
+
+    # Admin sees the incompleteness on the doctors contract
+    doctors = client.get("/api/v1/admin/doctors", headers=auth_headers)
+    assert doctors.status_code == 200, doctors.text
+    payload = {d["id"]: d for d in doctors.json()}
+    assert payload[doctor.id]["profile_incomplete"] is True
+
+    # ...and on the users contract
+    users = client.get("/api/v1/users/users?search=rc_promo", headers=auth_headers)
+    assert users.status_code == 200, users.text
+    matched = [u for u in users.json()["users"] if u["id"] == user.id]
+    assert matched and matched[0]["doctor_profile_incomplete"] is True
+
+
+def test_demotion_doctor_to_registrar_deactivates_profile_and_keeps_history(
+    client, db_session, auth_headers
+):
+    """Doctor -> Registrar: clinical profile deactivated, user_id link and
+    historical visits preserved (nothing deleted, nothing detached)."""
+    user, doctor = _create_doctor_with_profile(db_session, "demo")
+    visit = _create_visit(db_session, doctor)
+
+    response = client.put(
+        f"/api/v1/users/users/{user.id}",
+        json={"role": "Registrar"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+
+    db_session.expire_all()
+    doctor_row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+    assert doctor_row.active is False
+    assert doctor_row.user_id == user.id  # link kept for history continuity
+
+    visit_row = db_session.query(Visit).filter(Visit.id == visit.id).one()
+    assert visit_row.doctor_id == doctor.id  # history untouched
+
+
+def test_repromotion_reactivates_same_doctor_profile(client, db_session, auth_headers):
+    """Doctor -> Registrar -> Doctor: the SAME Doctor row (same clinical
+    identity) is reactivated, not a duplicate."""
+    user, doctor = _create_doctor_with_profile(db_session, "repro")
+
+    for role in ("Registrar", "Doctor"):
+        response = client.put(
+            f"/api/v1/users/users/{user.id}",
+            json={"role": role},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+
+    db_session.expire_all()
+    doctors = db_session.query(Doctor).filter(Doctor.user_id == user.id).all()
+    assert len(doctors) == 1
+    assert doctors[0].id == doctor.id
+    assert doctors[0].active is True
+
+
+def test_legacy_dentist_to_canonical_doctor_keeps_profile(
+    client, db_session, auth_headers
+):
+    """dentist -> Doctor (inside doctor-family): profile untouched — same
+    identity, specialty preserved (legacy compatibility, decision #12)."""
+    user = _create_user_with_role(db_session, "legacy", "dentist")
+    doctor = Doctor(user_id=user.id, specialty="dentistry", active=True)
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+
+    response = client.put(
+        f"/api/v1/users/users/{user.id}",
+        json={"role": "Doctor"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+
+    db_session.expire_all()
+    doctors = db_session.query(Doctor).filter(Doctor.user_id == user.id).all()
+    assert len(doctors) == 1
+    assert doctors[0].id == doctor.id
+    assert doctors[0].specialty == "dentistry"
+    assert doctors[0].active is True
+
+
+def test_doctor_to_admin_demotion_deactivates_profile(
+    client, db_session, auth_headers
+):
+    """Doctor -> Admin: same demotion contract (decision #17 matrix)."""
+    user, doctor = _create_doctor_with_profile(db_session, "adm")
+
+    response = client.put(
+        f"/api/v1/users/users/{user.id}",
+        json={"role": "Admin"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+
+    db_session.expire_all()
+    assert (
+        db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active
+        is False
+    )
+
+
+def test_admin_to_doctor_promotion_creates_profile(
+    client, db_session, auth_headers
+):
+    """Admin -> Doctor: promotion contract applies to any non-doctor role."""
+    user = _create_user_with_role(db_session, "adm2doc", "Admin")
+
+    response = client.put(
+        f"/api/v1/users/users/{user.id}",
+        json={"role": "Doctor"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+
+    db_session.expire_all()
+    doctor = db_session.query(Doctor).filter(Doctor.user_id == user.id).one()
+    assert doctor.active is True
+    assert doctor.specialty == "general"
+
+
+def test_doctor_to_legacy_role_rejected_by_user_update_schema(
+    client, db_session, auth_headers
+):
+    """UserUpdate.role regex forbids legacy roles (schema guarantee kept).
+    Family-internal transitions that the service supports (e.g. dentist ->
+    Doctor) are covered by test_legacy_dentist_to_canonical_doctor_keeps_profile."""
+    user, doctor = _create_doctor_with_profile(db_session, "toleg")
+
+    response = client.put(
+        f"/api/v1/users/users/{user.id}",
+        json={"role": "dentist"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422, response.text
+
+    db_session.expire_all()
+    row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+    assert row.active is True  # nothing changed
+
+
+# ---------------------------------------------------------------------------
+# Decision #13: API must not create/produce ACTIVE userless Doctors
+# (POST/PUT /admin/doctors). Inactive userless rows stay legal (historical).
+# ---------------------------------------------------------------------------
+
+
+def test_create_active_userless_doctor_rejected(client, db_session, auth_headers):
+    response = client.post(
+        "/api/v1/admin/doctors",
+        json={"specialty": "dentistry", "active": True},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400, response.text
+    assert "user_id" in response.json()["detail"]
+    assert (
+        db_session.query(Doctor).filter(Doctor.user_id.is_(None)).count() == 0
+    )
+
+
+def test_create_inactive_userless_doctor_allowed_for_history(
+    client, db_session, auth_headers
+):
+    response = client.post(
+        "/api/v1/admin/doctors",
+        json={"specialty": "dentistry", "active": False},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["user_id"] is None
+    assert body["active"] is False
+    assert body["profile_incomplete"] is False  # real specialty supplied
+
+
+def test_activate_userless_doctor_rejected(client, db_session, auth_headers):
+    doctor = Doctor(user_id=None, specialty="dentistry", active=False)
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+
+    response = client.put(
+        f"/api/v1/admin/doctors/{doctor.id}",
+        json={"active": True},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400, response.text
+
+    db_session.expire_all()
+    assert (
+        db_session.query(Doctor).filter(Doctor.id == doctor.id).one().active
+        is False
+    )
+
+
+def test_unset_user_on_active_doctor_rejected(client, db_session, auth_headers):
+    user = _create_user_with_role(db_session, "unset", "Doctor")
+    doctor = Doctor(user_id=user.id, specialty="dentistry", active=True)
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+
+    response = client.put(
+        f"/api/v1/admin/doctors/{doctor.id}",
+        json={"user_id": None},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400, response.text
+
+    db_session.expire_all()
+    row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+    assert row.user_id == user.id
+    assert row.active is True
+
+
+def test_doctors_list_flags_incomplete_general_specialty(
+    client, db_session, auth_headers
+):
+    """profile_incomplete=True only for the "general" placeholder."""
+    user = _create_user_with_role(db_session, "flag", "Doctor")
+    incomplete = Doctor(user_id=user.id, specialty="general", active=True)
+    complete = Doctor(user_id=None, specialty="dentistry", active=False)
+    db_session.add_all([incomplete, complete])
+    db_session.commit()
+    db_session.refresh(incomplete)
+    db_session.refresh(complete)
+
+    doctors = client.get("/api/v1/admin/doctors", headers=auth_headers)
+    assert doctors.status_code == 200, doctors.text
+    payload = {d["id"]: d for d in doctors.json()}
+    assert payload[incomplete.id]["profile_incomplete"] is True
+    assert payload[complete.id]["profile_incomplete"] is False

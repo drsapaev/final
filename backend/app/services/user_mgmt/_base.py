@@ -35,6 +35,56 @@ from app.schemas.user_management import (  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Lifecycle invariant (1 User <-> 1 Doctor):
+#     role=Doctor-family  <->  active linked Doctor profile
+#
+# DOCTOR_PROFILE_ROLES is the exact role set the auto-create contract in
+# create_user() provisions a Doctor profile for. It intentionally matches
+# core/roles.py DOCTOR_ROLES = {Doctor, cardio, derma, dentist} and adds the
+# capitalized aliases also accepted by UserCreate.role — a role that gets a
+# Doctor profile at user creation must behave identically at role promotion.
+# ---------------------------------------------------------------------------
+DOCTOR_PROFILE_ROLES: tuple[str, ...] = (
+    "Doctor",
+    "Cardiologist",
+    "Dermatologist",
+    "Dentist",
+    "cardio",
+    "derma",
+    "dentist",
+)
+
+# Default specialty written by the auto-create contract for each role.
+# "Doctor" maps to the INCOMPLETE sentinel "general": the profile is created
+# mechanically, but it is NOT a production specialty — admin must complete it
+# (architecture decision #5). Legacy roles keep their specialty defaults.
+DOCTOR_ROLE_DEFAULT_SPECIALTY: dict[str, str] = {
+    "Doctor": "general",
+    "Cardiologist": "cardiology",
+    "Dermatologist": "dermatology",
+    "Dentist": "dentistry",
+    "cardio": "cardiology",
+    "derma": "dermatology",
+    "dentist": "dentistry",
+}
+
+# Sentinel specialty value marking an INCOMPLETE auto-created Doctor profile.
+# Not a bookable production specialty: specialty-specific consumers (registrar
+# exact-match, queue eligibility) must not treat it as a real specialty.
+INCOMPLETE_DOCTOR_SPECIALTY = "general"
+
+
+def is_doctor_profile_incomplete(specialty: str | None) -> bool:
+    """True when the Doctor profile still carries the auto-create placeholder
+    specialty ("general") instead of a real canonical specialty.
+
+    Uses the existing Doctor.specialty field as the marker — no extra state to
+    keep in sync: completing the profile (admin sets a real specialty) atomically
+    clears the flag, and nothing else can drift it.
+    """
+    return (specialty or "") == INCOMPLETE_DOCTOR_SPECIALTY
+
 
 
 class UserManagementServiceMixinBase:
@@ -90,6 +140,82 @@ class UserManagementServiceMixinBase:
                 updated,
             )
         return updated
+
+    def _apply_role_change_doctor_lifecycle(
+        self,
+        db: Session,
+        user: User,
+        old_role: str,
+        new_role: str,
+    ) -> None:
+        """Enforce the lifecycle invariant across a role change:
+
+            role=Doctor-family  <->  active linked Doctor profile
+
+        Promotion (non-doctor -> doctor-family):
+            ensure a linked Doctor profile exists. Reuses (reactivates) the
+            user's own previous Doctor row when present — the same physical
+            doctor keeps one clinical identity and all historical data. When
+            absent, creates one in the controlled default (incomplete) state:
+            specialty = DOCTOR_ROLE_DEFAULT_SPECIALTY[role] ("general" for the
+            canonical Doctor role — admin must complete it, decision #5).
+
+        Demotion (doctor-family -> non-doctor):
+            deactivate the clinical Doctor profile so it disappears from
+            registrar selectors / queues / schedules, while keeping the
+            user_id link and ALL historical visits/EMR/audit rows intact
+            (nothing is deleted or detached).
+
+        Legacy-role compatibility: transitions inside the doctor-family
+        (e.g. dentist -> Doctor) do not touch the existing profile — same
+        clinical identity, specialty preserved. Runs inside the caller's
+        transaction (no commit here).
+        """
+        old_is_doctor = old_role in DOCTOR_PROFILE_ROLES
+        new_is_doctor = new_role in DOCTOR_PROFILE_ROLES
+        if old_is_doctor == new_is_doctor:
+            return  # transition inside or outside the doctor family
+
+        if new_is_doctor:
+            existing = (
+                db.query(Doctor).filter(Doctor.user_id == user.id).first()
+            )
+            if existing is None:
+                doctor = Doctor(
+                    user_id=user.id,
+                    specialty=DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
+                        new_role, INCOMPLETE_DOCTOR_SPECIALTY
+                    ),
+                    active=bool(user.is_active),
+                )
+                db.add(doctor)
+                db.flush()
+                logger.info(
+                    "Doctor profile created on role promotion: user_id=%s "
+                    "role=%s doctor_id=%s specialty=%r (incomplete=%s)",
+                    user.id,
+                    new_role,
+                    doctor.id,
+                    doctor.specialty,
+                    is_doctor_profile_incomplete(doctor.specialty),
+                )
+            elif not existing.active and user.is_active:
+                existing.active = True
+                db.flush()
+                logger.info(
+                    "Doctor profile reactivated on role promotion: user_id=%s "
+                    "role=%s doctor_id=%s",
+                    user.id,
+                    new_role,
+                    existing.id,
+                )
+        else:
+            self._sync_doctor_active(
+                db,
+                user.id,
+                False,
+                reason="role_demotion_from_doctor_role",
+            )
 
 
 
