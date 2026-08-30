@@ -42,7 +42,6 @@ body.landing-body {
 .landing-nav,
 .landing-cta-row,
 .landing-role-pills,
-.landing-console-feed-item,
 .landing-workflow-step,
 .landing-contact-row,
 .landing-footer-brand,
@@ -239,7 +238,6 @@ body.landing-body {
 }
 
 .landing-hero-card,
-.landing-console-card,
 .landing-feature-card,
 .landing-section-card,
 .landing-module-card,
@@ -385,40 +383,40 @@ body.landing-body {
 .landing-hero-visuals {
   display: grid;
   gap: 16px;
+  align-content: start;
 }
 
-.landing-console-card {
-  padding: 26px !important;
-}
-
-.landing-console-card h2 {
-  margin: 16px 0 0;
-  font-size: 1.32rem;
-  line-height: 1.24;
-}
-
-.landing-console-card p {
-  margin: 14px 0 0;
-  color: var(--mac-text-secondary);
-  line-height: 1.65;
-}
-
-.landing-console-feed {
-  list-style: none;
-  padding: 0;
-  margin: 22px 0 0;
+/* PR-UI-16-3: real product screenshot in the hero (deterministic capture). */
+.landing-hero-shot {
+  margin: 0;
   display: grid;
   gap: 12px;
 }
 
-.landing-console-feed-item {
-  gap: 10px;
-  align-items: flex-start;
-  color: var(--mac-text-primary);
-  line-height: 1.55;
+.landing-hero-shot-frame {
+  border: 1px solid var(--mac-card-border);
+  border-radius: 20px;
+  background: var(--mac-card-bg);
+  box-shadow: var(--mac-shadow-lg);
+  overflow: hidden;
 }
 
-.landing-console-feed-item svg,
+.landing-hero-shot-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.landing-hero-shot figcaption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--mac-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .landing-checklist svg,
 .landing-support-list svg {
   flex: 0 0 auto;
@@ -531,12 +529,15 @@ body.landing-body {
 }
 
 .landing-showcase-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* PR-UI-16-3: real screenshots need larger cards than the old 5-column
+     icon strip — 3 columns keep the captures readable (2 cols ≤1180px,
+     1 col ≤760px via the existing media queries). */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
 .landing-showcase-card {
-  min-height: 250px;
+  min-height: 0;
 }
 
 .landing-showcase-head {
@@ -545,29 +546,18 @@ body.landing-body {
   gap: 12px;
 }
 
-.landing-showcase-bars {
-  display: grid;
-  gap: 10px;
-  margin-top: 20px;
+.landing-showcase-shot {
+  border: 1px solid var(--mac-card-border);
+  border-radius: 16px;
+  background: var(--mac-card-bg);
+  overflow: hidden;
+  margin-bottom: 18px;
 }
 
-.landing-showcase-bars span {
+.landing-showcase-shot img {
   display: block;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--mac-accent-blue-bg);
-}
-
-.landing-showcase-bars span:nth-child(1) {
-  width: 86%;
-}
-
-.landing-showcase-bars span:nth-child(2) {
-  width: 72%;
-}
-
-.landing-showcase-bars span:nth-child(3) {
-  width: 54%;
+  width: 100%;
+  height: auto;
 }
 
 .landing-workflow-grid,
@@ -901,7 +891,6 @@ body.landing-body {
   }
 
   .landing-hero-card,
-  .landing-console-card,
   .landing-section-card,
   .landing-module-card,
   .landing-showcase-card,
