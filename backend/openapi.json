@@ -69032,71 +69032,6 @@
         ],
         "title": "Body_validate_emr_data_api_v1_emr_ai_validate_post"
       },
-      "MobileBookAppointmentRequest": {
-        "properties": {
-          "doctor_id": {
-            "type": "integer",
-            "title": "Doctor Id",
-            "description": "ID врача"
-          },
-          "preferred_date": {
-            "type": "string",
-            "title": "Preferred Date",
-            "description": "Предпочтительная дата (YYYY-MM-DD)"
-          },
-          "preferred_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preferred Time",
-            "description": "Предпочтительное время (HH:MM)"
-          },
-          "complaint": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Complaint",
-            "description": "Жалобы"
-          },
-          "services": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "title": "Services",
-            "description": "ID услуг"
-          },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notes",
-            "description": "Дополнительные заметки"
-          }
-        },
-        "type": "object",
-        "required": [
-          "doctor_id",
-          "preferred_date"
-        ],
-        "title": "MobileBookAppointmentRequest",
-        "description": "Запрос на запись к врачу"
-      },
       "BranchCreate": {
         "properties": {
           "name": {
@@ -86328,6 +86263,71 @@
         ],
         "title": "MobileAttestRequest",
         "description": "Request body for POST /mobile/attest.\n\nP0-6d FIX: previously this endpoint accepted ``request: dict[str, Any]``\nwith no validation. Now Pydantic enforces:\n\n- ``platform`` is one of ``android`` / ``ios`` (required).\n- ``integrity_token`` is required for Android (max 32KB — Play\n  Integrity tokens are typically ~1-2KB but we leave headroom).\n- ``device_token`` is required for iOS (max 32KB — Device Check\n  tokens are similarly small).\n- ``package_name`` / ``bundle_id`` are optional identifier strings\n  capped at 200 chars.\n- ``nonce`` is an optional replay-protection string capped at 256\n  chars.\n\nThe handler still performs the conditional token-presence checks\nso the error messages remain identical to the pre-fix behavior."
+      },
+      "MobileBookAppointmentRequest": {
+        "properties": {
+          "doctor_id": {
+            "type": "integer",
+            "title": "Doctor Id",
+            "description": "ID врача"
+          },
+          "preferred_date": {
+            "type": "string",
+            "title": "Preferred Date",
+            "description": "Предпочтительная дата (YYYY-MM-DD)"
+          },
+          "preferred_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Time",
+            "description": "Предпочтительное время (HH:MM)"
+          },
+          "complaint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complaint",
+            "description": "Жалобы"
+          },
+          "services": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Services",
+            "description": "ID услуг"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Дополнительные заметки"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doctor_id",
+          "preferred_date"
+        ],
+        "title": "MobileBookAppointmentRequest",
+        "description": "Запрос на запись к врачу"
       },
       "MobileLoginRequest": {
         "properties": {

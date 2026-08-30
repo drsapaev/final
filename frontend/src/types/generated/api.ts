@@ -23607,42 +23607,6 @@ export type components = {
             emr_data: components["schemas"]["EmrAiEmrDataRequest"];
             template_structure: components["schemas"]["EmrAiTemplateDataRequest"];
         };
-        /**
-         * MobileBookAppointmentRequest
-         * @description Запрос на запись к врачу
-         */
-        MobileBookAppointmentRequest: {
-            /**
-             * Doctor Id
-             * @description ID врача
-             */
-            doctor_id: number;
-            /**
-             * Preferred Date
-             * @description Предпочтительная дата (YYYY-MM-DD)
-             */
-            preferred_date: string;
-            /**
-             * Preferred Time
-             * @description Предпочтительное время (HH:MM)
-             */
-            preferred_time?: string | null;
-            /**
-             * Complaint
-             * @description Жалобы
-             */
-            complaint?: string | null;
-            /**
-             * Services
-             * @description ID услуг
-             */
-            services?: number[];
-            /**
-             * Notes
-             * @description Дополнительные заметки
-             */
-            notes?: string | null;
-        };
         /** BranchCreate */
         BranchCreate: {
             /** Name */
@@ -29987,6 +29951,42 @@ export type components = {
              * @description Optional replay-protection nonce
              */
             nonce?: string | null;
+        };
+        /**
+         * MobileBookAppointmentRequest
+         * @description Запрос на запись к врачу
+         */
+        MobileBookAppointmentRequest: {
+            /**
+             * Doctor Id
+             * @description ID врача
+             */
+            doctor_id: number;
+            /**
+             * Preferred Date
+             * @description Предпочтительная дата (YYYY-MM-DD)
+             */
+            preferred_date: string;
+            /**
+             * Preferred Time
+             * @description Предпочтительное время (HH:MM)
+             */
+            preferred_time?: string | null;
+            /**
+             * Complaint
+             * @description Жалобы
+             */
+            complaint?: string | null;
+            /**
+             * Services
+             * @description ID услуг
+             */
+            services?: number[];
+            /**
+             * Notes
+             * @description Дополнительные заметки
+             */
+            notes?: string | null;
         };
         /**
          * MobileLoginRequest
