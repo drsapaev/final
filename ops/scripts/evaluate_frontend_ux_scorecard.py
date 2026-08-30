@@ -26,7 +26,18 @@ MODULE_SPECS = [
         "id": "doctor_emr_rw",
         "name": "Doctor EMR Read/Write",
         "files": [
+            # PR-UI-15-1/15-2 (#2925/#2926) extracted DoctorPanel data/views
+            # into pages/doctor/ — the UX surface (empty states, aria labels,
+            # loading/recovery) now lives there, not in the shell file.
             "frontend/src/pages/DoctorPanel.jsx",
+            "frontend/src/pages/doctor/useDoctorPanelData.ts",
+            "frontend/src/pages/doctor/views/DoctorAppointmentsTab.tsx",
+            "frontend/src/pages/doctor/views/DoctorDashboardTab.tsx",
+            "frontend/src/pages/doctor/views/DoctorDialogsLayer.tsx",
+            "frontend/src/pages/doctor/views/DoctorEmptyState.tsx",
+            "frontend/src/pages/doctor/views/DoctorPatientInfo.tsx",
+            "frontend/src/pages/doctor/views/DoctorPatientsTab.tsx",
+            "frontend/src/pages/doctor/views/DoctorTabsNav.tsx",
             "frontend/src/hooks/useDoctorPhrases.js",
             "frontend/src/hooks/useDoctorTreatmentTemplates.js",
         ],
