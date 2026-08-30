@@ -728,6 +728,35 @@ def delete_appointment(
     return {"message": "Запись успешно отменена"}
 
 
+def _ensure_doctor_schedule_access(
+    db: Session, *, doctor_id: int, current_user: User
+) -> None:
+    """Ownership for GET /appointments/doctor/{doctor_id}/schedule.
+
+    Role matrix (mirrors _scope_appointment_list_filters in this module):
+    - Admin/Registrar (+superuser): any doctor's schedule — operational need;
+    - doctor-capable roles (Doctor/cardio/derma/dentist variants): only their
+      own doctor_id (legacy writers stored User.id in doctor_id; allowed only
+      when it does not resolve to a real Doctor row — same rule as
+      appointment record access);
+    - Patient and every other role: denied (a doctor's appointment schedule
+      is not a patient-visible resource; patients have
+      /appointments/patient/{patient_id} instead).
+    """
+    role = getattr(current_user, "role", None)
+    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
+        current_user, "is_superuser", False
+    ):
+        return
+
+    if role in APPOINTMENT_DOCTOR_ROLES:
+        if doctor_id not in _appointment_doctor_scope_ids(db, current_user):
+            raise HTTPException(status_code=403, detail="Access denied")
+        return
+
+    raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.get("/doctor/{doctor_id}/schedule", response_model=list[dict[str, Any]])
 def get_doctor_schedule(
     *,
@@ -739,6 +768,9 @@ def get_doctor_schedule(
     """
     Получить расписание врача на определенную дату
     """
+    _ensure_doctor_schedule_access(
+        db, doctor_id=doctor_id, current_user=current_user
+    )
     schedule = appointment_crud.get_doctor_schedule(db, doctor_id=doctor_id, date=date)
     return schedule
 
