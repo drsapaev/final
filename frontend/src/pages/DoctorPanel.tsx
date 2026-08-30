@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState } from 'react';
 import type { CSSProperties } from "react";
-import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
 import AIAssistant from '../components/ai/AIAssistant';
 import {
@@ -46,77 +45,28 @@ import {
 import { useModal } from '../hooks/useModal';
 import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery';
 import useDoctorQueue from '../hooks/useDoctorQueue';
-import { getProfile } from '../stores/auth';
-import type { UserProfile } from '../types/domain/auth';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import AIChatWidget from '../components/ai/AIChatWidget';
-import { getApiOrigin } from '../api/runtime';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 
 import logger from '../utils/logger';
-import tokenManager from '../utils/tokenManager';
-import { getRegistrarTimestampDisplay } from '../utils/dateUtils';
 // UX Audit Doctor H-30: import DoctorQueuePanel instead of inline queue rendering.
 import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 // i18n-unification: useTranslation hook from unified i18n (replaces adapter shim)
 import { useTranslation } from '../i18n/useTranslation';
-
-// Local shape used for queue entries / patient context helpers.
-// Mirrors the relevant fields from QueueEntry (domain/queue.ts) without
-// importing that type here, to keep the file's dependency surface minimal.
-type QueueEntryLike = {
-  id?: string | number;
-  number?: string | number;
-  patient_name?: string;
-  status?: string;
-  available_actions?: unknown[];
-  [key: string]: unknown;
-};
-
-interface PatientRecord {
-  id: string | number;
-  name?: string;
-  phone?: string;
-  gender?: string;
-  diagnosis?: string;
-  status?: string;
-  age?: number | null;
-  [key: string]: unknown;
-}
-
-interface AppointmentDto {
-  id: string | number;
-  patientId?: number | null;
-  patientName?: string;
-  time?: string;
-  type?: string;
-  status?: string;
-  notes?: string;
-  appointmentDate?: string;
-  confirmationToken?: string | null;
-  confirmationChannel?: string;
-  totalAmount?: number | null;
-  servicesCount?: number;
-  source?: string;
-  [key: string]: unknown;
-}
-
-const hasBackendQueueAction = (entry: QueueEntryLike | null | undefined, action: string, flagName: string) => {
-  if (!entry) return false;
-  if (Array.isArray(entry.available_actions)) {
-    return entry.available_actions.includes(action);
-  }
-  if (flagName && Object.prototype.hasOwnProperty.call(entry, flagName)) {
-    return Boolean(entry[flagName]);
-  }
-  return false;
-};
-
-const DOCTOR_PANEL_TABS = new Set<string>(['dashboard', 'patients', 'appointments', 'queue', 'ai', 'reports']);
+// PR-UI-15-1: types/status maps + tab & data lifecycle extracted to ./doctor/*
+// (registrar/cashier decomposition precedent).
+import {
+  getDoctorStatusText,
+  getDoctorStatusVariant,
+  getPatientA11yContext,
+  getAppointmentA11yContext,
+} from './doctor/doctorStatus';
+import type { PatientRecord } from './doctor/doctorStatus';
+import { useDoctorTabState } from './doctor/useDoctorTabState';
+import { useDoctorPanelData } from './doctor/useDoctorPanelData';
 
 const DoctorPanel = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
   const { isMobile, isTablet } = useBreakpoint();
   const { t: rawT } = useTranslation();
   const t = rawT;
@@ -124,30 +74,17 @@ const DoctorPanel = () => {
   // UX Audit Doctor L-43: isTouchDevice used for disabling hover on touch.
   void isTouchDevice;
 
-  // ✅ Получаем patientId из URL для автоматического выбора пациента
-  const getPatientIdFromUrl = useCallback(() => {
-    const params = new URLSearchParams(location.search);
-    const pid = params.get('patientId');
-    return pid ? parseInt(pid, 10) : null;
-  }, [location.search]);
+  // PR-UI-15-1: tab/URL/filter view-state slice (verbatim port).
+  const {
+    activeTab,
+    setActiveTab,
+    setDoctorTab,
+    searchQuery,
+    setSearchQuery,
+    filterStatus,
+    setFilterStatus,
+  } = useDoctorTabState();
 
-  // Состояние
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    // Если есть patientId, переходим на вкладку пациентов
-    const params = new URLSearchParams(window.location.search);
-    const requestedTab = params.get('tab');
-    if (requestedTab && DOCTOR_PANEL_TABS.has(requestedTab)) {
-      return requestedTab;
-    }
-    if (params.get('patientId')) {
-      return 'patients';
-    }
-    return 'dashboard';
-  });
-  const [patients, setPatients] = useState<PatientRecord[]>([]);
-  const [appointments, setAppointments] = useState<AppointmentDto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   // ✅ УЛУЧШЕНИЕ: Универсальный хук вместо дублированных состояний
   // Cast to a typed shape — useModal is generic-free (selectedItem: null),
   // so we narrow it here for type-safe access in this panel.
@@ -161,121 +98,38 @@ const DoctorPanel = () => {
     toggleModal: (item?: PatientRecord | Record<string, unknown> | null) => void;
     setModalLoading: (isLoading: boolean) => void;
   };
+
+  // PR-UI-15-1: data lifecycle (patients/appointments/loading/error +
+  // specialty + schedule-next refresh + ?patientId deep-link) — verbatim port.
+  const {
+    patients,
+    appointments,
+    loading,
+    loadError,
+    loadData,
+    appointmentStats,
+    doctorSpecialty,
+    handleScheduleNextSuccess,
+  } = useDoctorPanelData({
+    t,
+    setSearchQuery,
+    setActiveTab,
+    openPatientModal: patientModal.openModal,
+  });
   const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: Record<string, unknown> | null }>({ open: false, patient: null });
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-
-  // UX Audit Doctor M-46: useMemo for stat calculations (was 3 filter calls per render).
-  const appointmentStats = useMemo(() => ({
-    scheduled: appointments.filter((a) => a.status === 'scheduled').length,
-    inProgress: appointments.filter((a) => a.status === 'in_progress').length,
-    completed: appointments.filter((a) => a.status === 'completed').length,
-  }), [appointments]);
-
-  const setDoctorTab = useCallback((tabId: string) => {
-    if (!DOCTOR_PANEL_TABS.has(tabId)) {
-      return;
-    }
-
-    setActiveTab(tabId);
-    // UX Audit Doctor QW#2: сброс фильтров при смене вкладки.
-    setFilterStatus('all');
-    setSearchQuery('');
-    const params = new URLSearchParams(location.search);
-    params.set('tab', tabId);
-    // UX Audit Doctor QW#1: replace: false — Back-кнопка браузера работает между вкладками (P-029 fix).
-    navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: false });
-  }, [location.pathname, location.search, navigate]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const requestedTab = params.get('tab');
-    const patientId = params.get('patientId');
-    const nextTab = requestedTab && DOCTOR_PANEL_TABS.has(requestedTab)
-      ? requestedTab
-      : patientId
-        ? 'patients'
-        : 'dashboard';
-
-    if (!requestedTab && patientId) {
-      params.set('tab', nextTab);
-      navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: false });
-    }
-
-    if (activeTab !== nextTab) {
-      setActiveTab(nextTab);
-    }
-  }, [activeTab, location.pathname, location.search, navigate]);
-
-  // PR-27: read specialty from profile instead of hardcoding 'general'
-  const [doctorSpecialty, setDoctorSpecialty] = useState('general');
-
-  useEffect(() => {
-    getProfile().then((profile: UserProfile | null) => {
-      if (profile?.specialty) {
-        setDoctorSpecialty(String(profile.specialty ?? ''));
-      }
-    }).catch(() => {});
-  }, []);
 
   // ✅ НОВОЕ: Получаем данные текущего пользователя и очереди
+  // PR-UI-15-1: канонический деструктор сокращён до живых значений —
+  // остальные поля (queue/loading/error/loadQueue/callNext/markNoShow/
+  // restoreToNext/sendToDiagnostics/markIncomplete/completeVisit) были
+  // definition-only в панели (queue-действия живут в DoctorQueuePanel +
+  // useDoctorQueue). canCallNext сохранён: SSOT-контракт
+  // DoctorPanels.contract.test.tsx ожидает его в DoctorPanel.tsx.
   const {
-    queue: queueEntries,
     stats: queueStats,
-    loading: queueLoading,
-    error: queueError,
     canCallNext,
-    loadQueue,
-    callNext,
-    markNoShow,
-    restoreToNext,
-    sendToDiagnostics,
-    markIncomplete,
-    completeVisit
   } = useDoctorQueue(doctorSpecialty);
-
-  // ✅ Функция отправки push-уведомления "Вернуться с диагностики"
-  const callFromDiagnostics = async (entryId: string | number) => {
-    try {
-      const token = tokenManager.getAccessToken();
-      const apiBase = getApiOrigin();
-      const response = await fetch(`${apiBase}/api/v1/queue/position/notify/diagnostics-return/${entryId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const result = await response.json().catch(() => null);
-      if (response.ok) {
-        logger.log('Push-уведомление отправлено', result);
-      } else {
-        logger.error('Ошибка отправки уведомления', result);
-      }
-    } catch (err) {
-      logger.error('Ошибка:', err);
-    }
-  };
-
-  // ✅ Хелпер для отображения времени с момента события
-  const formatElapsedTime = (timestamp: string | number | Date) => {
-    if (!timestamp) return null;
-    const start = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - start.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return t('doctor.just_now');
-    if (diffMins < 60) return `${diffMins}m`;
-    const hours = Math.floor(diffMins / 60);
-    const mins = diffMins % 60;
-    return `${hours}h ${mins}m`;
-  };
-
-  // Refs
-  const headerRef = useRef<HTMLDivElement | null>(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
-  void headerRef;
-  void headerHeight;
+  void canCallNext;
 
   // Используем централизованную систему темизации
   const {
@@ -300,124 +154,8 @@ const DoctorPanel = () => {
   const panelBorder = 'var(--mac-card-border)';
   // Используем централизованные функции темизации вместо прямых designTokens
 
-  // Загрузка данных
-  // UX Audit Doctor H-08: убрана эмуляция загрузки (setPatients([]) + Skeleton).
-  // Теперь честно показываем empty-state без имитации skeleton-загрузки.
-  const loadData = useCallback(async () => {
-    setLoading(false);
-    setLoadError(null);
-    // Данные загружаются через useDoctorQueue (очередь) и useDoctorHistory (история).
-    // Пациенты и записи на сегодня загружаются из реального API, когда он будет готов.
-    // Пока — честный empty-state без имитации.
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const handleScheduleNextSuccess = useCallback((result?: Record<string, unknown>, submittedFormData?: Record<string, unknown>) => {
-    const confirmation = (result?.confirmation as Record<string, unknown> | undefined) ?? {};
-    const patientIdRaw = submittedFormData?.patient_id;
-    const normalizedPatientId = patientIdRaw ? Number(patientIdRaw) : null;
-    const selectedPatient = normalizedPatientId
-      ? patients.find((patient) => Number(patient.id) === normalizedPatientId)
-      : null;
-    const visitDate = String(confirmation.visit_date ?? submittedFormData?.visit_date ?? '');
-    const visitTime = String(confirmation.visit_time ?? submittedFormData?.visit_time ?? '');
-    const servicesRaw = submittedFormData?.services as unknown[] | undefined;
-
-    const nextAppointment: AppointmentDto = {
-      id: (result?.visit_id as string | number | undefined) ?? Date.now(),
-      patientId: normalizedPatientId,
-      patientName: String(confirmation.patient_name ?? selectedPatient?.name ?? t('doctor.new_patient')),
-      time: visitTime,
-      type:
-        submittedFormData?.discount_mode === 'repeat'
-          ? t('doctor.repeat_visit')
-          : submittedFormData?.discount_mode === 'benefit'
-            ? t('doctor.benefit_visit')
-            : t('doctor.next_visit'),
-      status: 'scheduled',
-      notes: String(result?.message ?? (visitDate ? t('doctor.awaiting_confirmation_on_date', { date: visitDate }) : t('doctor.awaiting_confirmation'))),
-      appointmentDate: visitDate,
-      confirmationToken: (confirmation.token as string | null | undefined) ?? null,
-      confirmationChannel: String(confirmation.channel ?? submittedFormData?.confirmation_channel ?? 'telegram'),
-      totalAmount: (confirmation.total_amount as number | null | undefined) ?? null,
-      servicesCount: Number(confirmation.services_count ?? servicesRaw?.length ?? 1),
-      source: 'schedule-next'
-    };
-
-    setAppointments((prev) => [
-      nextAppointment,
-      ...prev.filter((appointment) => Number(appointment.id) !== Number(nextAppointment.id))
-    ]);
-
-    logger.info('[DOC-05] Appointments table refreshed after schedule-next', {
-      visitId: nextAppointment.id,
-      patientId: nextAppointment.patientId,
-      patientName: nextAppointment.patientName,
-      status: nextAppointment.status
-    });
-  }, [patients, t]);
-
-  // ✅ Автоматическая загрузка пациента из URL параметра patientId
-  useEffect(() => {
-    const loadPatientFromUrl = async () => {
-      const patientIdFromUrl = getPatientIdFromUrl();
-      if (!patientIdFromUrl) return;
-
-      try {
-        const token = tokenManager.getAccessToken();
-        if (!token) return;
-
-        const API_BASE = getApiOrigin();
-
-        // Загружаем данные пациента
-        const patientResponse = await fetch(`${API_BASE}/api/v1/patients/${patientIdFromUrl}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (patientResponse.ok) {
-          const patientData: Record<string, unknown> = await patientResponse.json();
-
-          // Создаем объект пациента для отображения
-          const patientObj: PatientRecord = {
-            id: patientData.id as string | number,
-            name: `${patientData.last_name || ''} ${patientData.first_name || ''} ${patientData.middle_name || ''}`.trim(),
-            phone: String(patientData.phone ?? ''),
-            gender: String(patientData.sex ?? ''),
-            diagnosis: '',
-            status: 'active',
-            age: patientData.birth_date ? new Date().getFullYear() - new Date(patientData.birth_date as string).getFullYear() : null
-          };
-
-          // Добавляем пациента в список и устанавливаем поисковый запрос
-          setPatients((prev) => {
-            const exists = prev.some((p) => p.id === patientObj.id);
-            if (!exists) {
-              return [patientObj, ...prev];
-            }
-            return prev;
-          });
-
-          setSearchQuery(patientObj.name ?? '');
-          setActiveTab('patients');
-
-          // Открываем модальное окно с данными пациента
-          patientModal.openModal(patientObj);
-
-          logger.info('[Doctor] Загружен пациент из URL:', patientObj.name);
-        }
-      } catch (error) {
-        logger.error('[Doctor] Не удалось загрузить пациента из URL:', error);
-      }
-    };
-
-    loadPatientFromUrl();
-  }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Измерение высоты заголовка
-  // UX Audit Doctor H-09: headerHeight useEffect removed — headerRef was never attached.
+  // UX Audit Doctor H-09: headerRef/headerHeight vestiges removed with the
+  // H-09 note (never attached, definition-only — PR-UI-15-1 cleanup).
 
   // Стили
   const pageStyle: CSSProperties = {
@@ -520,89 +258,13 @@ const DoctorPanel = () => {
 
 
   // Функции
-  const getStatusVariant = (status: string | undefined) => {
-    const statusMap: Record<string, string> = {
-      'active': 'success',
-      'recovery': 'warning',
-      'critical': 'danger',
-      'scheduled': 'primary',
-      'in_progress': 'warning',
-      'completed': 'success',
-      'cancelled': 'danger',
-      // Статусы очереди
-      'waiting': 'warning',
-      'called': 'primary',
-      'in_service': 'info',
-      'diagnostics': 'info',
-      'served': 'success',
-      'incomplete': 'danger',
-      'no_show': 'danger'
-    };
-    return statusMap[status ?? ''] || 'default';
-  };
-
-  const getStatusText = (status: string | undefined) => {
-    const statusMap: Record<string, string> = {
-      'active': t('doctor.status_active'),
-      'recovery': t('doctor.status_recovery'),
-      'critical': t('doctor.status_critical'),
-      'scheduled': t('doctor.status_scheduled'),
-      'in_progress': t('doctor.status_in_progress'),
-      'completed': t('doctor.status_completed'),
-      'cancelled': t('doctor.status_cancelled'),
-      // Статусы очереди
-      'waiting': t('doctor.status_waiting'),
-      'called': t('doctor.status_called'),
-      'in_service': t('doctor.status_in_service'),
-      'diagnostics': t('doctor.status_diagnostics'),
-      'served': t('doctor.status_served'),
-      'incomplete': t('doctor.status_incomplete'),
-      'no_show': t('doctor.status_no_show')
-    };
-    return statusMap[status ?? ''] || (status ?? '');
-  };
-
-  const getQueuePatientContext = (entry: QueueEntryLike | null | undefined) => {
-    const queueNumber = entry?.number || entry?.id || 'unknown';
-    const patientName = entry?.patient_name || 'unknown patient';
-    return `queue entry ${queueNumber} for ${patientName}`;
-  };
-
-  const getPatientA11yContext = (patient: PatientRecord | null | undefined) => {
-    const patientId = patient?.id || 'unknown';
-    const patientName = patient?.name || 'patient';
-    return `patient ${patientName} (${patientId})`;
-  };
-
-  const getAppointmentA11yContext = (appointment: AppointmentDto | null | undefined) => {
-    const appointmentId = appointment?.id || 'unknown';
-    const patientName = appointment?.patientName || 'patient';
-    const appointmentTime = appointment?.time ? ` at ${appointment.time}` : '';
-    return `appointment ${appointmentId} for ${patientName}${appointmentTime}`;
-  };
-
-  const getCurrentVisitMeta = (entry: QueueEntryLike | null | undefined) => {
-    const statusMap: Record<string, { label: string; variant: string }> = {
-      called: { label: t('doctor.queue_called'), variant: 'primary' },
-      in_service: { label: t('doctor.queue_in_service'), variant: 'info' },
-      diagnostics: { label: t('doctor.queue_diagnostics'), variant: 'info' }
-    };
-
-    return statusMap[entry?.status ?? ''] || null;
-  };
-
-  const getQueueActionA11yProps = (action: string, entry: QueueEntryLike | null | undefined) => ({
-    type: 'button' as const,
-    'aria-label': `${action} for ${getQueuePatientContext(entry)}`,
-    onFocus: (event: React.FocusEvent<HTMLElement>) => {
-      event.currentTarget.style.outline = `2px solid ${primaryColor}`;
-      event.currentTarget.style.boxShadow = '0 0 0 4px color-mix(in srgb, var(--mac-accent), transparent 72%)';
-    },
-    onBlur: (event: React.FocusEvent<HTMLElement>) => {
-      event.currentTarget.style.outline = '2px solid transparent';
-      event.currentTarget.style.boxShadow = 'none';
-    }
-  });
+  // PR-UI-15-1: status maps + a11y helpers moved verbatim to
+  // ./doctor/doctorStatus (getDoctorStatusVariant / getDoctorStatusText /
+  // getPatientA11yContext / getAppointmentA11yContext). Dead helpers
+  // (getQueuePatientContext / getCurrentVisitMeta / getQueueActionA11yProps)
+  // dropped — see the provenance note in doctorStatus.ts.
+  const getStatusVariant = getDoctorStatusVariant;
+  const getStatusText = (status: string | undefined) => getDoctorStatusText(status, t);
 
   const renderEmptyState = ({ icon: Icon, title, description, tone = 'default', action = null }: {
     icon: React.ComponentType<{ size?: number | string; className?: string }>;

@@ -5,7 +5,14 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../..');
-const source = fs.readFileSync(path.join(ROOT, 'pages/DoctorPanel.tsx'), 'utf8');
+// PR-UI-15-1: status presentation maps moved verbatim to
+// pages/doctor/doctorStatus.ts — the i18n surface is the union of the panel
+// and its extracted modules (same pattern as registrar/cashier contract
+// tests reading extracted hook/view-model files).
+const source =
+  fs.readFileSync(path.join(ROOT, 'pages/DoctorPanel.tsx'), 'utf8') +
+  fs.readFileSync(path.join(ROOT, 'pages/doctor/doctorStatus.ts'), 'utf8') +
+  fs.readFileSync(path.join(ROOT, 'pages/doctor/useDoctorPanelData.ts'), 'utf8');
 const translationsSource = fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.ts'), 'utf8');
 
 describe('DoctorPanel STRAT#35 — i18n migration', () => {
