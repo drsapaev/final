@@ -17,7 +17,6 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import notify from '../../../services/notify';
 import logger from '../../../utils/logger';
 import { apiClient } from '../../../api/client';
-import tokenManager from '../../../utils/tokenManager';
 import { queueService } from '../../../services/queue';
 import { printPanelTicket } from '../../../services/panelPrint';
 
@@ -53,7 +52,7 @@ type Deps = Parameters<typeof useDentistActions>[0];
 
 const makeDeps = (overrides: Partial<Deps> = {}): Deps => ({
   tI18n: t,
-  confirm: vi.fn(async () => true),
+  confirm: vi.fn(async (_options: Record<string, unknown>) => true),
   setLoading: vi.fn(),
   selectedPatient: null,
   setSelectedPatient: vi.fn(),
@@ -165,7 +164,7 @@ describe('useDentistActions (PR-UI-15-5) — handleCompleteVisit C-1 tiered conf
   });
 
   it('aborts when the user rejects the confirm dialog', async () => {
-    const confirm = vi.fn(async () => false);
+    const confirm = vi.fn(async (_options: Record<string, unknown>) => false);
     const deps = makeDeps({ confirm, selectedPatient: patientWith({}) });
     const { result } = renderHook(() => useDentistActions(deps));
     await result.current.handleCompleteVisit();
@@ -175,7 +174,7 @@ describe('useDentistActions (PR-UI-15-5) — handleCompleteVisit C-1 tiered conf
   });
 
   it('uses danger intent when the ICD-10 code is critical (K04)', async () => {
-    const confirm = vi.fn(async () => false);
+    const confirm = vi.fn(async (_options: Record<string, unknown>) => false);
     const deps = makeDeps({
       confirm,
       selectedPatient: patientWith({ visitData: { icd10: 'K04.7' } }),
@@ -188,7 +187,7 @@ describe('useDentistActions (PR-UI-15-5) — handleCompleteVisit C-1 tiered conf
   });
 
   it('uses primary intent for non-critical diagnoses', async () => {
-    const confirm = vi.fn(async () => false);
+    const confirm = vi.fn(async (_options: Record<string, unknown>) => false);
     const deps = makeDeps({
       confirm,
       selectedPatient: patientWith({ visitData: { icd10: 'K02.1' } }),
