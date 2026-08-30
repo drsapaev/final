@@ -84,7 +84,7 @@ class CRUDRefreshToken(CRUDBase[RefreshToken, None, None]):
             .filter(
                 and_(RefreshToken.user_id == user_id, RefreshToken.revoked == False)
             )
-            .update({"revoked": True, "revoked_at": datetime.now(UTC)})
+            .update({"revoked": True})
         )
         db.commit()
         return count
@@ -174,7 +174,6 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
         session = self.get_by_session_id(db, session_id)
         if session and not session.revoked:
             session.revoked = True
-            session.revoked_at = datetime.now(UTC)
             db.commit()
             return True
         return False
@@ -189,7 +188,7 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
                     UserSession.revoked == False,
                 )
             )
-            .update({"revoked": True, "revoked_at": datetime.now(UTC)})
+            .update({"revoked": True})
         )
         db.commit()
         return count
@@ -204,7 +203,7 @@ class CRUDUserSession(CRUDBase[UserSession, None, None]):
                     UserSession.revoked == False,
                 )
             )
-            .update({"revoked": True, "revoked_at": datetime.now(UTC)})
+            .update({"revoked": True})
         )
         db.commit()
         return count
