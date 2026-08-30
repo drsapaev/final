@@ -162,3 +162,6 @@ artifacts/non_shim_endpoints.txt
 /scratch/
 *.draft.md
 *.scratch.py
+
+# Storybook static build output (PR-UI-18-4: build-storybook now works)
+storybook-static/

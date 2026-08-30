@@ -1,7 +1,14 @@
 import React from 'react';
-import { designTokens } from '../src/design-system';
-import '../src/design-system/styles/global.css';
-import '../src/design-system/styles/animations.css';
+// PR-UI-18-4 repair: the preview previously imported a dead JS barrel
+// (`../src/design-system`) plus `styles/global.css` / `styles/animations.css`
+// that no longer exist — `build-storybook` failed with
+// "Could not resolve ../src/design-system". Mirror the app's real global
+// CSS chain instead (the main.tsx subset the primitives consume):
+// theme.css (base vars), macos.css (component classes + font),
+// design-system/tokens.css (canonical --mac-* scale).
+import '../src/styles/theme.css';
+import '../src/styles/macos.css';
+import '../src/design-system/tokens.css';
 
 /** @type { import('@storybook/react').Preview } */
 const preview = {
@@ -19,29 +26,13 @@ const preview = {
     backgrounds: {
       default: 'light',
       values: [
-        {
-          name: 'light',
-          value: designTokens.colors.secondary[50]
-        },
-        {
-          name: 'dark',
-          value: designTokens.colors.secondary[900]
-        }
+        // Canonical --mac-bg-primary values (src/design-system/tokens.css):
+        // light = #eef3fa, dark = #1c1c1e.
+        { name: 'light', value: '#eef3fa' },
+        { name: 'dark', value: '#1c1c1e' }
       ]
     }
   },
-  decorators: [
-    (Story) => React.createElement(
-      'div',
-      {
-        style: {
-          fontFamily: designTokens.typography.fontFamily.sans.join(', '),
-          lineHeight: designTokens.typography.lineHeight.normal
-        }
-      },
-      React.createElement(Story)
-    )
-  ]
 };
 
 export default preview;
