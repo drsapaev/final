@@ -36837,6 +36837,8 @@ export type components = {
             profile?: components["schemas"]["app__schemas__user_management__UserProfileResponse"] | null;
             preferences?: components["schemas"]["UserPreferencesResponse"] | null;
             notification_settings?: components["schemas"]["UserNotificationSettingsResponse"] | null;
+            /** Doctor Profile Incomplete */
+            doctor_profile_incomplete?: boolean | null;
         };
         /**
          * UserSearchRequest
@@ -38192,6 +38194,11 @@ export type components = {
             department_id?: number | null;
             /** Department */
             department?: string | null;
+            /**
+             * Profile Incomplete
+             * @default false
+             */
+            profile_incomplete: boolean;
             /** User */
             user?: {
                 [key: string]: unknown;
