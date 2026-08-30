@@ -177,6 +177,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
         className={className}
         style={inputStyle}
         disabled={disabled}
+        aria-invalid={!!error}
         onFocus={handleFocus}
         onBlur={handleBlur}
         {...props}
