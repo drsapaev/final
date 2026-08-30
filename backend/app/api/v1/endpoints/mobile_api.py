@@ -407,31 +407,66 @@ async def book_mobile_appointment(
         # included (same contract as POST /appointments and the QR path).
         ensure_doctor_eligible_for_appointment(db, request.doctor_id)
 
+        appointment_date = date.fromisoformat(request.preferred_date)
+
+        # Slot-occupancy guard (Codex round-3 P1): same contract as the web
+        # and Telegram writers — two patients must never receive successful
+        # bookings for the same doctor slot.
+        if crud_appointment.appointment.is_time_slot_occupied(
+            db,
+            doctor_id=request.doctor_id,
+            appointment_date=appointment_date,
+            appointment_time=request.preferred_time,
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Это время уже занято у выбранного врача",
+            )
+
+        # Persist requested services through the REAL contract (Codex
+        # round-3 P2): web/Telegram store service NAMES in the
+        # Appointment.services JSON column at creation time — resolve the
+        # mobile service IDs to names here. Unknown IDs are rejected
+        # instead of silently dropped; the former stub loop
+        # (add_appointment_service) wrote nothing and is retired.
+        service_names: list[str] = []
+        if request.services:
+            from app.models.service import Service
+
+            service_rows = (
+                db.query(Service)
+                .filter(Service.id.in_(request.services))
+                .all()
+            )
+            found_ids = {s.id for s in service_rows}
+            missing = [sid for sid in request.services if sid not in found_ids]
+            if missing:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Услуги не найдены: {sorted(missing)}",
+                )
+            service_names = [s.name for s in service_rows]
+
         # Создаем запись. NOTE: the handler used to bind the wrong request
         # schema and referenced nonexistent Appointment columns (complaint,
         # source) — the endpoint returned 500 for EVERY valid request
         # (pre-existing bug surfaced by the round-2 eligibility tests).
         # Bound schema is now MobileBookAppointmentRequest (the shape this
         # handler was written for) and only real model columns are written:
-        # the patient's complaint is folded into notes.
-        notes = request.notes or request.complaint
+        # the patient's complaint AND notes are both preserved (Codex
+        # round-3 P1 — never silently discard one of them).
+        notes_parts = [p for p in (request.complaint, request.notes) if p]
         appointment_data = {
             "patient_id": patient.id,
             "doctor_id": request.doctor_id,
-            "appointment_date": date.fromisoformat(request.preferred_date),
+            "appointment_date": appointment_date,
             "appointment_time": request.preferred_time,
-            "notes": notes,
+            "notes": "\n".join(notes_parts) or None,
             "status": "scheduled",
+            "services": service_names,
         }
 
         appointment = crud_appointment.create_appointment(db, appointment_data)
-
-        # Добавляем услуги
-        if request.services:
-            for service_id in request.services:
-                crud_appointment.add_appointment_service(
-                    db, appointment_id=appointment.id, service_id=service_id
-                )
 
         # PR-3: doctor lives in the doctors table, not users. Use clinic CRUD.
         from app.crud import clinic as crud_clinic

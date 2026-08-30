@@ -212,3 +212,102 @@ class TestPatientFacingSelectors:
         assert good.id in doctor_ids
         assert incomplete.id not in doctor_ids
         assert inactive_owner.id not in doctor_ids
+
+
+class TestMobileBookingRound3Fixes:
+    """Round-3 Codex findings on the repaired mobile booking endpoint:
+    slot-occupancy guard, complaint+notes preservation, service persistence."""
+
+    def _book(self, client, headers, doctor_id: int, **overrides) -> dict:
+        payload = {
+            "doctor_id": doctor_id,
+            "preferred_date": str(date.today() + timedelta(days=2)),
+            "preferred_time": "10:00",
+            "complaint": "болит голова",
+            "notes": "аллергия на лидокаин",
+        }
+        payload.update(overrides)
+        return client.post(
+            "/api/v1/mobile/appointments/book", json=payload, headers=headers
+        )
+
+    def test_book_occupied_slot_rejected(
+        self, client, db_session, auth_headers
+    ):
+        owner = _make_doctor(db_session, "cardiology", active=True)
+        patient_user, _ = _make_patient_user(db_session)
+        headers = _patient_login(client, patient_user)
+
+        # First booking occupies the slot
+        first = self._book(client, headers, owner.id)
+        assert first.status_code == 200, first.text
+
+        # Second patient must be rejected for the same doctor/date/time
+        other_user, _ = _make_patient_user(db_session)
+        other_headers = _patient_login(client, other_user)
+        second = self._book(client, other_headers, owner.id)
+        assert second.status_code == 409, second.text
+        assert "занято" in second.json()["detail"]
+
+    def test_book_preserves_complaint_and_notes(
+        self, client, db_session, auth_headers
+    ):
+        owner = _make_doctor(db_session, "cardiology", active=True)
+        patient_user, _ = _make_patient_user(db_session)
+        headers = _patient_login(client, patient_user)
+
+        response = self._book(client, headers, owner.id)
+        assert response.status_code == 200, response.text
+
+        from app.models.appointment import Appointment
+
+        row = (
+            db_session.query(Appointment)
+            .filter(Appointment.doctor_id == owner.id)
+            .one()
+        )
+        assert "болит голова" in (row.notes or "")
+        assert "аллергия на лидокаин" in (row.notes or "")
+
+    def test_book_persists_requested_services(
+        self, client, db_session, auth_headers
+    ):
+        owner = _make_doctor(db_session, "cardiology", active=True)
+        patient_user, _ = _make_patient_user(db_session)
+
+        from app.models.service import Service
+
+        s1 = Service(name="ЭКГ", price=50000)
+        s2 = Service(name="Консультация кардиолога", price=150000)
+        db_session.add_all([s1, s2])
+        db_session.commit()
+        db_session.refresh(s1)
+        db_session.refresh(s2)
+
+        headers = _patient_login(client, patient_user)
+        response = self._book(
+            client, headers, owner.id, services=[s1.id, s2.id]
+        )
+        assert response.status_code == 200, response.text
+
+        from app.models.appointment import Appointment
+
+        row = (
+            db_session.query(Appointment)
+            .filter(Appointment.doctor_id == owner.id)
+            .one()
+        )
+        assert "ЭКГ" in (row.services or [])
+        assert "Консультация кардиолога" in (row.services or [])
+
+    def test_book_unknown_service_rejected(
+        self, client, db_session, auth_headers
+    ):
+        owner = _make_doctor(db_session, "cardiology", active=True)
+        patient_user, _ = _make_patient_user(db_session)
+        headers = _patient_login(client, patient_user)
+
+        response = self._book(
+            client, headers, owner.id, services=[999999]
+        )
+        assert response.status_code == 400, response.text
