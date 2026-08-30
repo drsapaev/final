@@ -124,6 +124,9 @@ class UserSession(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Связи
     user: Mapped[User] = relationship("User", back_populates="user_sessions")
