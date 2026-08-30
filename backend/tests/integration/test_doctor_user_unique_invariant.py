@@ -103,8 +103,9 @@ def _seed(con: sa.Connection, sql: str) -> None:
     con.commit()
 
 
-def test_migration_precondition_aborts_on_duplicates(tmp_path) -> None:
-    """upgrade() must hard-stop (RuntimeError) when duplicate links exist."""
+def test_migration_upgrade_aborts_on_duplicates_and_touches_nothing(tmp_path) -> None:
+    """Real upgrade() call: with duplicate links present it must raise
+    RuntimeError BEFORE emitting any DDL (constraint must not appear)."""
     module = _load_migration()
     engine = sa.create_engine(f"sqlite:///{tmp_path / 'precheck.db'}")
     con = _scratch_doctors_table(engine)
@@ -112,20 +113,80 @@ def test_migration_precondition_aborts_on_duplicates(tmp_path) -> None:
         _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (7, 'stomatology')")
         _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (7, 'stomatology')")
 
-        assert module._duplicate_user_ids(con) == [(7, 2)]
+        # Bind a real alembic Operations context to the scratch connection so
+        # upgrade() executes for real (op.get_bind(), batch_alter_table, ...).
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
 
-        # Emulate the abort path: duplicates present -> RuntimeError raised
-        # before any DDL is emitted.
-        duplicates = module._duplicate_user_ids(con)
-        assert duplicates, "precondition must see the duplicate links"
+        module.op = Operations(MigrationContext.configure(con))
+
         with pytest.raises(RuntimeError, match="MIGRATION ABORTED"):
-            if duplicates:
-                raise RuntimeError(
-                    "MIGRATION ABORTED: found duplicate User<->Doctor links; "
-                    f"doctors.user_id must be unique but {len(duplicates)} "
-                    "user_id value(s) are linked to multiple doctors: "
-                    f"user_id=7 (2 doctor rows)."
-                )
+            module.upgrade()
+
+        # Nothing was touched: duplicates still there, no constraint created.
+        assert module._duplicate_user_ids(con) == [(7, 2)]
+        names = {
+            uq["name"] for uq in sa.inspect(con).get_unique_constraints("doctors")
+        }
+        assert "uq_doctors_user_id" not in names
+    finally:
+        con.close()
+
+
+def test_migration_upgrade_creates_constraint_on_clean_data(tmp_path) -> None:
+    """Real upgrade() call on clean data: constraint created (postcondition)."""
+    module = _load_migration()
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'clean.db'}")
+    con = _scratch_doctors_table(engine)
+    try:
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'cardiology')")
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (2, 'stomatology')")
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (NULL, 'lab')")
+
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+
+        module.op = Operations(MigrationContext.configure(con))
+        module.upgrade()
+
+        names = {
+            uq["name"] for uq in sa.inspect(con).get_unique_constraints("doctors")
+        }
+        assert "uq_doctors_user_id" in names
+
+        # And the constraint actually enforces uniqueness now.
+        with pytest.raises(IntegrityError):
+            _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'lab')")
+        con.rollback()
+    finally:
+        con.close()
+
+
+def test_migration_downgrade_drops_constraint(tmp_path) -> None:
+    """Real upgrade() then downgrade(): constraint removed, data preserved."""
+    module = _load_migration()
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'down.db'}")
+    con = _scratch_doctors_table(engine)
+    try:
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'cardiology')")
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (NULL, 'lab')")
+
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+
+        module.op = Operations(MigrationContext.configure(con))
+        module.upgrade()
+        assert "uq_doctors_user_id" in {
+            uq["name"] for uq in sa.inspect(con).get_unique_constraints("doctors")
+        }
+
+        module.downgrade()
+        assert "uq_doctors_user_id" not in {
+            uq["name"] for uq in sa.inspect(con).get_unique_constraints("doctors")
+        }
+        # Data preserved by rollback.
+        count = con.execute(sa.text("SELECT COUNT(*) FROM doctors")).scalar()
+        assert count == 2
     finally:
         con.close()
 
