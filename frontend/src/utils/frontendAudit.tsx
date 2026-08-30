@@ -299,13 +299,6 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     status: 'correct'
   },
   
-  'src/styles/cursor-effects.css': {
-    purpose: 'Эффекты курсора',
-    currentLocation: 'src/styles/',
-    recommendedLocation: 'src/styles/',
-    status: 'correct'
-  },
-  
   'src/styles/full-width.css': {
     purpose: 'Полноширинные стили',
     currentLocation: 'src/styles/',
@@ -315,20 +308,6 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
   
   'src/styles/responsive.css': {
     purpose: 'Адаптивные стили',
-    currentLocation: 'src/styles/',
-    recommendedLocation: 'src/styles/',
-    status: 'correct'
-  },
-  
-  'src/styles/sidebar-buttons.css': {
-    purpose: 'Стили кнопок сайдбара',
-    currentLocation: 'src/styles/',
-    recommendedLocation: 'src/styles/',
-    status: 'correct'
-  },
-  
-  'src/styles/unified-sidebar.css': {
-    purpose: 'Унифицированные стили сайдбара',
     currentLocation: 'src/styles/',
     recommendedLocation: 'src/styles/',
     status: 'correct'
@@ -447,24 +426,8 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     issues: ['Следует переместить в src/pages/public/']
   },
   
-  'src/pages/Login.jsx': {
-    purpose: 'Страница входа',
-    currentLocation: 'src/pages/',
-    recommendedLocation: 'src/pages/auth/',
-    status: 'needs_move',
-    issues: ['Следует переместить в src/pages/auth/']
-  },
-  
   'src/pages/UserSelect.jsx': {
     purpose: 'Выбор пользователя',
-    currentLocation: 'src/pages/',
-    recommendedLocation: 'src/pages/auth/',
-    status: 'needs_move',
-    issues: ['Следует переместить в src/pages/auth/']
-  },
-  
-  'src/pages/Activation.jsx': {
-    purpose: 'Активация',
     currentLocation: 'src/pages/',
     recommendedLocation: 'src/pages/auth/',
     status: 'needs_move',
@@ -716,9 +679,7 @@ export function getRecommendedStructure(): Record<string, string[]> {
       'DisplayBoardUnified.jsx'
     ],
     'src/pages/auth/': [
-      'Login.jsx',
-      'UserSelect.jsx',
-      'Activation.jsx'
+      'UserSelect.jsx'
     ],
     'src/pages/mobile/': [
       'MobilePatientDashboard.jsx'
@@ -743,11 +704,8 @@ export function getRecommendedStructure(): Record<string, string[]> {
       'admin.css',
       'admin-dark-theme.css',
       'animations.css',
-      'cursor-effects.css',
       'full-width.css',
-      'responsive.css',
-      'sidebar-buttons.css',
-      'unified-sidebar.css'
+      'responsive.css'
     ],
     'src/utils/': [
       'themeChecker.js',

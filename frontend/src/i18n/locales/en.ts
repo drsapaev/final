@@ -9524,12 +9524,6 @@ const en = {
     vr_zapisat_golosovoe: 'Записать голосовое',
     vr_ostanovit: 'Остановить',
     vr_otpravit_2: 'Отправить',
-    // ModernSelect.jsx (ms_)
-    ms_vyberite_optsiyu: 'Выберите опцию',
-    ms_udalit: 'Удалить',
-    ms_ochistit_vybor: 'Очистить выбор',
-    ms_poisk_accessiblelabel: 'Поиск: {accessibleLabel}',
-    ms_zagruzka: 'Загрузка...',
     // IntegratedDoctorSelector.jsx (ids_)
     ids_kardiologiya: 'Кардиология',
     ids_dermatologiya: 'Дерматология',

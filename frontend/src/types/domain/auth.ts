@@ -5,7 +5,7 @@
  *   - stores/auth.ts (the actual auth store — token + profile snapshot)
  *   - types/auth-store.ts (store API surface)
  *   - contexts/ChatContext.tsx, contexts/ThemeContext.tsx
- *   - routing/routeGuards.tsx, components/layout/Nav.tsx
+ *   - routing/routeGuards.tsx (Nav.tsx deleted in PR-UI-17-2)
 import type { UserId } from './branded';
  *   - LoginForm, UserManagement, RoleGate, security components
  *
@@ -24,7 +24,7 @@ export type AuthStatus = 'authenticated' | 'unauthenticated' | 'loading' | 'erro
 
 // === Store-level auth snapshot (CANONICAL) ==================================
 // This is the actual shape returned by stores/auth.ts getState().
-// All consumers (routeGuards, Nav, ChatContext, etc.) must use this type.
+// All consumers (routeGuards, ChatContext, etc.) must use this type.
 
 export interface UserProfile {
   id?: number | null;
