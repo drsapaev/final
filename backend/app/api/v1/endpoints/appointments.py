@@ -20,7 +20,9 @@ from app.services.online_queue import (
     get_or_create_day,
     load_stats,
 )
-from app.services.user_mgmt._base import is_doctor_profile_incomplete
+from app.services.appointment_eligibility import (
+    ensure_doctor_eligible_for_appointment as _ensure_appointment_doctor_eligible,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -202,55 +204,6 @@ def _ensure_appointment_create_access(
         return
 
     raise HTTPException(status_code=403, detail="Access denied")
-
-
-def _ensure_appointment_doctor_eligible(db: Session, doctor_id: int | None) -> None:
-    """Lifecycle eligibility guard for appointment WRITES (lifecycle PR, Codex
-    P1-D consistency): the TARGET doctor of a new/changed booking must be
-    clinically eligible.
-
-    Mirrors the same contract enforced elsewhere for the "general" sentinel
-    and ghost-doctor mirror:
-      - registrar doctor selector hides inactive/incomplete doctors;
-      - QR/online queue join rejects them;
-      - user deactivation/demotion deactivates the linked Doctor profile.
-    Without this guard the direct POST/PUT /appointments path would still
-    book an INACTIVE (deactivated/demoted owner) or INCOMPLETE (auto-created
-    specialty="general" placeholder) doctor by raw doctor_id, bypassing the
-    whole eligibility contract.
-
-    Only NEW/CHANGED bookings are validated: editing an existing appointment
-    without reassigning the doctor stays legal (historical rows may reference
-    doctors that were deactivated later; forcing their edits to fail would
-    break unrelated rescheduling without any lifecycle benefit).
-
-    doctor_id=None (doctorless appointment) has no doctor to validate.
-    """
-    if doctor_id is None:
-        return
-    doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
-    if doctor is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Врач не найден",
-        )
-    if not doctor.active:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Врач деактивирован и недоступен для записи. Выберите "
-                "другого врача или восстановите профиль врача."
-            ),
-        )
-    if is_doctor_profile_incomplete(doctor.specialty):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Профиль врача не завершён (специализация не указана) и "
-                "недоступен для записи. Администратор должен указать "
-                "специализацию профиля."
-            ),
-        )
 
 
 def _ensure_pending_payment_access(current_user: User) -> None:

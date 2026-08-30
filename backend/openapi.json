@@ -31024,7 +31024,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BookAppointmentRequest"
+                "$ref": "#/components/schemas/MobileBookAppointmentRequest"
               }
             }
           },
@@ -69032,37 +69032,19 @@
         ],
         "title": "Body_validate_emr_data_api_v1_emr_ai_validate_post"
       },
-      "BookAppointmentRequest": {
+      "MobileBookAppointmentRequest": {
         "properties": {
           "doctor_id": {
             "type": "integer",
             "title": "Doctor Id",
             "description": "ID врача"
           },
-          "appointment_date": {
+          "preferred_date": {
             "type": "string",
-            "format": "date",
-            "title": "Appointment Date",
-            "description": "Дата записи (YYYY-MM-DD)"
+            "title": "Preferred Date",
+            "description": "Предпочтительная дата (YYYY-MM-DD)"
           },
-          "specialty": {
-            "type": "string",
-            "title": "Specialty",
-            "description": "Специализация"
-          },
-          "patient_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Id",
-            "description": "ID пациента"
-          },
-          "patient_fio": {
+          "preferred_time": {
             "anyOf": [
               {
                 "type": "string"
@@ -69071,10 +69053,10 @@
                 "type": "null"
               }
             ],
-            "title": "Patient Fio",
-            "description": "ФИО пациента"
+            "title": "Preferred Time",
+            "description": "Предпочтительное время (HH:MM)"
           },
-          "patient_phone": {
+          "complaint": {
             "anyOf": [
               {
                 "type": "string"
@@ -69083,18 +69065,37 @@
                 "type": "null"
               }
             ],
-            "title": "Patient Phone",
-            "description": "Телефон пациента"
+            "title": "Complaint",
+            "description": "Жалобы"
+          },
+          "services": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Services",
+            "description": "ID услуг"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Дополнительные заметки"
           }
         },
         "type": "object",
         "required": [
           "doctor_id",
-          "appointment_date",
-          "specialty"
+          "preferred_date"
         ],
-        "title": "BookAppointmentRequest",
-        "description": "Запрос на запись к врачу для API"
+        "title": "MobileBookAppointmentRequest",
+        "description": "Запрос на запись к врачу"
       },
       "BranchCreate": {
         "properties": {

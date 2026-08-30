@@ -9,7 +9,8 @@ import gzip
 # the module of the same name). Using importlib avoids the shadowing.
 import importlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -35,7 +36,7 @@ from app.db.session import get_db
 from app.schemas.authentication import RefreshTokenResponse
 from app.schemas.mobile import (
     AppointmentUpcomingOut,
-    BookAppointmentRequest,
+    MobileBookAppointmentRequest,
     LabResultOut,
     MobileAppointmentDetailOut,
     MobileAttestRequest,
@@ -45,6 +46,7 @@ from app.schemas.mobile import (
     PatientProfileOut,
 )
 from app.services.mobile_api_service import MobileApiService
+from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
 
@@ -389,7 +391,7 @@ def get_appointment_detail(
 
 @router.post("/appointments/book", response_model=AppointmentUpcomingOut)
 async def book_mobile_appointment(
-    request: BookAppointmentRequest,
+    request: MobileBookAppointmentRequest,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -400,15 +402,26 @@ async def book_mobile_appointment(
         if not patient:
             raise HTTPException(status_code=404, detail="Профиль пациента не найден")
 
-        # Создаем запись
+        # Lifecycle eligibility (Codex round-2 P1): every live appointment
+        # writer must reject inactive/incomplete doctors — mobile booking
+        # included (same contract as POST /appointments and the QR path).
+        ensure_doctor_eligible_for_appointment(db, request.doctor_id)
+
+        # Создаем запись. NOTE: the handler used to bind the wrong request
+        # schema and referenced nonexistent Appointment columns (complaint,
+        # source) — the endpoint returned 500 for EVERY valid request
+        # (pre-existing bug surfaced by the round-2 eligibility tests).
+        # Bound schema is now MobileBookAppointmentRequest (the shape this
+        # handler was written for) and only real model columns are written:
+        # the patient's complaint is folded into notes.
+        notes = request.notes or request.complaint
         appointment_data = {
             "patient_id": patient.id,
             "doctor_id": request.doctor_id,
-            "appointment_date": datetime.fromisoformat(request.preferred_date),
-            "complaint": request.complaint,
-            "notes": request.notes,
+            "appointment_date": date.fromisoformat(request.preferred_date),
+            "appointment_time": request.preferred_time,
+            "notes": notes,
             "status": "scheduled",
-            "source": "mobile",
         }
 
         appointment = crud_appointment.create_appointment(db, appointment_data)
@@ -737,6 +750,15 @@ def list_mobile_doctors(
             doctors = crud_clinic.get_doctors_by_specialty(db, specialty=specialty)
         else:
             doctors = crud_clinic.get_doctors(db, active_only=True)
+        # Lifecycle eligibility (Codex round-2 P2): this list feeds the
+        # patient-facing booking selector — hide incomplete ("general"
+        # sentinel) profiles so patients cannot select a doctor the booking
+        # guard would only reject afterwards.
+        from app.services.user_mgmt._base import is_doctor_profile_incomplete
+        doctors = [
+            d for d in doctors
+            if not is_doctor_profile_incomplete(d.specialty)
+        ]
         # Limit
         doctors = doctors[:limit]
 

@@ -23608,41 +23608,40 @@ export type components = {
             template_structure: components["schemas"]["EmrAiTemplateDataRequest"];
         };
         /**
-         * BookAppointmentRequest
-         * @description Запрос на запись к врачу для API
+         * MobileBookAppointmentRequest
+         * @description Запрос на запись к врачу
          */
-        BookAppointmentRequest: {
+        MobileBookAppointmentRequest: {
             /**
              * Doctor Id
              * @description ID врача
              */
             doctor_id: number;
             /**
-             * Appointment Date
-             * Format: date
-             * @description Дата записи (YYYY-MM-DD)
+             * Preferred Date
+             * @description Предпочтительная дата (YYYY-MM-DD)
              */
-            appointment_date: string;
+            preferred_date: string;
             /**
-             * Specialty
-             * @description Специализация
+             * Preferred Time
+             * @description Предпочтительное время (HH:MM)
              */
-            specialty: string;
+            preferred_time?: string | null;
             /**
-             * Patient Id
-             * @description ID пациента
+             * Complaint
+             * @description Жалобы
              */
-            patient_id?: number | null;
+            complaint?: string | null;
             /**
-             * Patient Fio
-             * @description ФИО пациента
+             * Services
+             * @description ID услуг
              */
-            patient_fio?: string | null;
+            services?: number[];
             /**
-             * Patient Phone
-             * @description Телефон пациента
+             * Notes
+             * @description Дополнительные заметки
              */
-            patient_phone?: string | null;
+            notes?: string | null;
         };
         /** BranchCreate */
         BranchCreate: {
@@ -56975,7 +56974,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BookAppointmentRequest"];
+                "application/json": components["schemas"]["MobileBookAppointmentRequest"];
             };
         };
         responses: {
