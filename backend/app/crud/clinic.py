@@ -170,13 +170,19 @@ def update_ticket_print_settings(
 def get_doctors(
     db: Session, skip: int = 0, limit: int = 100, active_only: bool = False
 ) -> list[Doctor]:
-    """Получить список врачей"""
+    """Получить список врачей.
+
+    Deterministic ordering (doctor id ascending) — the registrar doctor
+    selector and the admin doctor list render this list as-is, so an
+    undefined row order would reshuffle doctors of the same specialty
+    between calls/pages.
+    """
     query = db.query(Doctor)
 
     if active_only:
         query = query.filter(Doctor.active == True)
 
-    return query.offset(skip).limit(limit).all()
+    return query.order_by(Doctor.id.asc()).offset(skip).limit(limit).all()
 
 
 def get_doctor_by_id(db: Session, doctor_id: int) -> Doctor | None:
@@ -190,10 +196,11 @@ def get_doctor_by_user_id(db: Session, user_id: int) -> Doctor | None:
 
 
 def get_doctors_by_specialty(db: Session, specialty: str) -> list[Doctor]:
-    """Получить врачей по специальности"""
+    """Получить врачей по специальности (deterministic: id ascending)"""
     return (
         db.query(Doctor)
         .filter(and_(Doctor.specialty == specialty, Doctor.active == True))
+        .order_by(Doctor.id.asc())
         .all()
     )
 

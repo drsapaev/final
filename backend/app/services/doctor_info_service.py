@@ -115,6 +115,7 @@ class DoctorInfoService:
                         Doctor.active == True,
                     )
                 )
+                .order_by(Doctor.id.asc())
                 .all()
             )
 
