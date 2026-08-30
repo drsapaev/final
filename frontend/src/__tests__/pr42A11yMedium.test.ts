@@ -1,11 +1,18 @@
 /**
- * PR-42 — Frontend a11y medium: Medium-E + Medium-F + Medium-G.
+ * PR-42 — Frontend a11y medium: Medium-F (residual).
  *
  * Tests for:
- * 1. Medium-E: at least one form component has <label htmlFor> association
- * 2. Medium-F: ResponsiveModal, ResponsiveForm, PhotoComparison do not use
+ *   Medium-F: ResponsiveModal, ResponsiveForm, PhotoComparison do not use
  *    hardcoded backgroundColor: 'white' (breaks dark mode)
- * 3. Medium-G: ModernInput, ModernSelect do not use tabIndex={-1} on action icons
+ *
+ * Note (PR-UI-17-2, 2026-08-30):
+ *   Medium-E (label htmlFor association) and Medium-G (tabIndex on action icons)
+ *   tested the dead Modern{Form,Input,Select,Textarea} components, which were
+ *   removed in PR-UI-17-2 (dead-code cleanup; see docs/UI_REMEDIATION_PLAN.md §7
+ *   PR-UI-17 item 2). Those two describe blocks removed together with the
+ *   files; the surviving canonical form component ResponsiveForm does not
+ *   currently use <label htmlFor> — adding that association is tracked
+ *   separately outside PR-UI-17 scope.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,33 +22,8 @@ const ROOT = path.resolve(process.cwd());
 const RESPONSIVE_MODAL = path.join(ROOT, 'src/components/ResponsiveModal.tsx');
 const RESPONSIVE_FORM = path.join(ROOT, 'src/components/forms/ResponsiveForm.tsx');
 const PHOTO_COMPARISON = path.join(ROOT, 'src/components/dermatology/PhotoComparison.tsx');
-const MODERN_INPUT = path.join(ROOT, 'src/components/forms/ModernInput.tsx');
-const MODERN_SELECT = path.join(ROOT, 'src/components/forms/ModernSelect.tsx');
 
-// ---------- 1. Medium-E: label htmlFor association ----------
-
-describe('Medium-E: label htmlFor association', () => {
-  it('at least one form component uses <label htmlFor=...> association', () => {
-    const srcDir = path.join(ROOT, 'src/components/forms');
-    if (!fs.existsSync(srcDir)) {
-      // Skip if no forms dir
-      return;
-    }
-    const files = collectSourceFiles(srcDir);
-    let found = false;
-    for (const f of files) {
-      const src = fs.readFileSync(f, 'utf-8');
-      // Look for <label htmlFor=...> (JSX)
-      if (/<label[^>]*htmlFor\s*=/.test(src)) {
-        found = true;
-        break;
-      }
-    }
-    expect(found).toBe(true);
-  });
-});
-
-// ---------- 2. Medium-F: dark mode backgroundColor ----------
+// ---------- Medium-F: dark mode backgroundColor ----------
 
 describe('Medium-F: dark mode backgroundColor fix', () => {
   it('ResponsiveModal does not use hardcoded backgroundColor: white', () => {
@@ -74,39 +56,3 @@ describe('Medium-F: dark mode backgroundColor fix', () => {
     expect(stripped).not.toMatch(/backgroundColor:\s*['"]#ffffff['"]/i);
   });
 });
-
-// ---------- 3. Medium-G: tabIndex on action icons ----------
-
-describe('Medium-G: tabIndex on action icons', () => {
-  it('ModernInput does not use tabIndex={-1} on action icons', () => {
-    const src = fs.readFileSync(MODERN_INPUT, 'utf-8');
-    const stripped = src
-      .replace(/\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(stripped).not.toMatch(/tabIndex\s*=\s*\{\s*-1\s*\}/);
-  });
-
-  it('ModernSelect does not use tabIndex={-1} on action icons', () => {
-    const src = fs.readFileSync(MODERN_SELECT, 'utf-8');
-    const stripped = src
-      .replace(/\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(stripped).not.toMatch(/tabIndex\s*=\s*\{\s*-1\s*\}/);
-  });
-});
-
-function collectSourceFiles(dir: string) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const files: string[] = []
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...collectSourceFiles(fullPath));
-      continue;
-    }
-    if (/\.(js|jsx|ts|tsx)$/.test(entry.name)) {
-      files.push(fullPath);
-    }
-  }
-  return files;
-}
