@@ -98,6 +98,29 @@ def _scratch_doctors_table(engine: sa.Engine) -> sa.Connection:
     return con
 
 
+def _scratch_doctors_table_drifted(
+    engine: sa.Engine, constraint_sql: str
+) -> sa.Connection:
+    """Doctors table with schema drift: a constraint named uq_doctors_user_id
+    on OTHER columns (not user_id), mimicking a drifted production DB."""
+    con = engine.connect()
+    con.execute(
+        sa.text(
+            f"""
+            CREATE TABLE doctors (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER,
+                specialty VARCHAR(100) NOT NULL,
+                active BOOLEAN NOT NULL DEFAULT 1,
+                {constraint_sql}
+            )
+            """
+        )
+    )
+    con.commit()
+    return con
+
+
 def _seed(con: sa.Connection, sql: str) -> None:
     con.execute(sa.text(sql))
     con.commit()
@@ -202,5 +225,105 @@ def test_migration_precondition_passes_without_duplicates(tmp_path) -> None:
         _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (NULL, 'lab')")
 
         assert module._duplicate_user_ids(con) == []
+    finally:
+        con.close()
+
+
+# ---------------------------------------------------------------------------
+# Schema-drift guard (Codex P2 on 0048): a constraint with the expected NAME
+# but a DIFFERENT definition must abort the migration, never be silently
+# accepted, and user_id must stay non-unique only via an explicit failure.
+# ---------------------------------------------------------------------------
+
+
+def test_migration_aborts_on_wrong_columns_same_name(tmp_path) -> None:
+    """Drifted DB: UNIQUE(specialty) named uq_doctors_user_id must abort.
+
+    The migration must NOT stamp the revision (user_id stays non-unique)
+    and must NOT silently accept the drifted constraint by name."""
+    module = _load_migration()
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'drift_single.db'}")
+    con = _scratch_doctors_table_drifted(
+        engine, "CONSTRAINT uq_doctors_user_id UNIQUE (specialty)"
+    )
+    try:
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'cardiology')")
+
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+
+        module.op = Operations(MigrationContext.configure(con))
+
+        with pytest.raises(RuntimeError, match=r"MIGRATION ABORTED \(precondition\)"):
+            module.upgrade()
+
+        # Drift untouched: same-named constraint still on (specialty) only.
+        uqs = [
+            u
+            for u in sa.inspect(con).get_unique_constraints("doctors")
+            if u["name"] == "uq_doctors_user_id"
+        ]
+        assert [u["column_names"] for u in uqs] == [["specialty"]]
+
+        # Revision was NOT stamped: user_id is still non-unique, so a
+        # duplicate link insert succeeds (proof of no silent acceptance).
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'lab')")
+    finally:
+        con.close()
+
+
+def test_migration_aborts_on_multicolumn_constraint_same_name(tmp_path) -> None:
+    """Drifted DB: UNIQUE(user_id, specialty) under the expected name also
+    allows duplicate user_id values (differing specialty) -> must abort."""
+    module = _load_migration()
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'drift_multi.db'}")
+    con = _scratch_doctors_table_drifted(
+        engine, "CONSTRAINT uq_doctors_user_id UNIQUE (user_id, specialty)"
+    )
+    try:
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'cardiology')")
+
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+
+        module.op = Operations(MigrationContext.configure(con))
+
+        # The abort message must name the offending reflected columns.
+        with pytest.raises(RuntimeError, match=r"\['user_id', 'specialty'\]"):
+            module.upgrade()
+    finally:
+        con.close()
+
+
+def test_migration_upgrade_idempotent_with_correct_constraint(tmp_path) -> None:
+    """Correct UNIQUE(user_id) under the expected name -> second upgrade()
+    is a validated no-op success (idempotent re-run safety preserved)."""
+    module = _load_migration()
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'idempotent.db'}")
+    con = _scratch_doctors_table(engine)
+    try:
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'cardiology')")
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (NULL, 'lab')")
+
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+
+        module.op = Operations(MigrationContext.configure(con))
+
+        module.upgrade()  # first run: creates the constraint
+        module.upgrade()  # second run: must be accepted as a real no-op
+
+        uqs = [
+            u
+            for u in sa.inspect(con).get_unique_constraints("doctors")
+            if u["name"] == "uq_doctors_user_id"
+        ]
+        assert len(uqs) == 1
+        assert uqs[0]["column_names"] == ["user_id"]
+
+        # Uniqueness still enforced after the idempotent pass.
+        with pytest.raises(IntegrityError):
+            _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'lab')")
+        con.rollback()
     finally:
         con.close()

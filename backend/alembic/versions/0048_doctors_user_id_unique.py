@@ -22,7 +22,19 @@ data) remain legal.
 
 POSTCONDITION
 -------------
-    uq_doctors_user_id UNIQUE constraint exists on doctors.user_id.
+    uq_doctors_user_id UNIQUE constraint exists on doctors.user_id
+    AND is verified to cover exactly the user_id column.
+
+SCHEMA-DRIFT GUARD
+------------------
+A drifted database can already contain a constraint named
+``uq_doctors_user_id`` on DIFFERENT columns. Accepting it by name only would
+stamp this revision while ``doctors.user_id`` stays non-unique, silently
+re-enabling duplicate doctor identities. Therefore an existing constraint is
+accepted ONLY when its reflected definition is exactly
+``UNIQUE(user_id)`` (name match + column_names == ['user_id']). Any other
+definition — or an unreflectable one — aborts the migration with a loud
+RuntimeError and no rows modified.
 
 ROLLBACK / RECOVERY
 -------------------
@@ -61,6 +73,39 @@ def _duplicate_user_ids(conn: sa.Connection) -> list[tuple[int | None, int]]:
     return [(row[0], row[1]) for row in rows]
 
 
+def _find_named_unique_constraint(inspector: Inspector, table: str, name: str):
+    """Return the reflected UNIQUE-constraint dict with ``name``, else None."""
+    for uq in inspector.get_unique_constraints(table):
+        if uq.get("name") == name:
+            return uq
+    return None
+
+
+def _assert_valid_user_id_constraint(uq: dict | None, phase: str) -> None:
+    """Accept ``uq_doctors_user_id`` ONLY as UNIQUE(doctors.user_id).
+
+    Schema drift can present a constraint with the expected name but on
+    different columns; silently accepting it would stamp the revision while
+    ``doctors.user_id`` stays non-unique. Refuse loudly instead: abort the
+    migration, leave every row untouched. An unreflectable definition
+    (missing column_names) is treated as drift too — fail closed.
+    """
+    if uq is None:
+        return
+    columns = list(uq.get("column_names") or [])
+    if columns != ["user_id"]:
+        raise RuntimeError(
+            f"MIGRATION ABORTED ({phase}): constraint {CONSTRAINT_NAME} "
+            f"already exists on table `doctors` but covers columns "
+            f"{columns!r}, expected exactly UNIQUE(user_id). This is schema "
+            "drift: stamping revision "
+            f"{revision!r} now would leave doctors.user_id non-unique and "
+            "re-enable duplicate doctor identities. Rename/drop the drifted "
+            "constraint manually (or recreate it correctly) and re-run "
+            "`alembic upgrade head`. No rows were modified by this run."
+        )
+
+
 def upgrade() -> None:
     conn = op.get_bind()
 
@@ -81,13 +126,13 @@ def upgrade() -> None:
         )
 
     inspector = Inspector.from_engine(conn)
-    existing = {
-        uq["name"]
-        for uq in inspector.get_unique_constraints("doctors")
-        if uq.get("name")
-    }
-    if CONSTRAINT_NAME in existing:
-        return  # already applied (idempotent re-run safety)
+    existing = _find_named_unique_constraint(inspector, "doctors", CONSTRAINT_NAME)
+    if existing is not None:
+        # Idempotent re-run: accept the pre-existing constraint ONLY when its
+        # definition really is UNIQUE(user_id) — a same-name/different-columns
+        # constraint is schema drift and must abort, not be silently stamped.
+        _assert_valid_user_id_constraint(existing, "precondition")
+        return
 
     # SQLite (dev/test) does not support ADD CONSTRAINT; batch mode handles it
     # by table rebuild. PostgreSQL (production) uses a plain ALTER TABLE.
@@ -95,17 +140,16 @@ def upgrade() -> None:
         batch_op.create_unique_constraint(CONSTRAINT_NAME, ["user_id"])
 
     # ---- postcondition ------------------------------------------------------
+    # Same strictness as the precondition: the constraint must exist AND cover
+    # exactly doctors.user_id (name-only acceptance would tolerate drift).
     inspector = Inspector.from_engine(conn)
-    names = {
-        uq["name"]
-        for uq in inspector.get_unique_constraints("doctors")
-        if uq.get("name")
-    }
-    if CONSTRAINT_NAME not in names:
+    created = _find_named_unique_constraint(inspector, "doctors", CONSTRAINT_NAME)
+    if created is None:
         raise RuntimeError(
             f"MIGRATION POSTCONDITION FAILED: constraint {CONSTRAINT_NAME} "
             "was not created (check DB permissions / dialect support)."
         )
+    _assert_valid_user_id_constraint(created, "postcondition")
 
 
 def downgrade() -> None:
