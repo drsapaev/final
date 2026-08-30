@@ -235,7 +235,7 @@
     "tsxHex": 373,
     "tsxHexFiles": 64,
     "inlineStyles": 2619,
-    "inlineStyleFiles": 231,
+    "inlineStyleFiles": 232,
     "cssImportant": 349,
     "tsxImportant": 80,
     "modalFilesOutsideKit": [
@@ -470,6 +470,7 @@
     "cssFilesWithDarkSelectors": 13,
     "prefersSchemeRootBlocks": 3,
     "isDarkBranches": 170,
-    "inlineStyleAttributePatches": 58
+    "inlineStyleAttributePatches": 58,
+    "inlineStyleFilesNote": "PR-UI-09e-2: +1 file (231->232) — EAT decomposition spread existing inline-style literals across EAT orchestrator + appointmentsTableColumns.tsx; usage count unchanged (2611 -> 2611, zero new literals); concurrent PR-UI-15-2..4 drift consumed prior headroom (main 230->231). Justified per ratchet policy."
   }
 }

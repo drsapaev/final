@@ -34,6 +34,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { installAuthenticatedQaHarness } from './support/authenticatedQa';
 
 function base64UrlEncode(value: unknown): string {
   return Buffer.from(JSON.stringify(value))
@@ -894,6 +895,339 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     await page.waitForTimeout(500);
 
     await expect(page.locator('.emr-v2-container').first()).toHaveScreenshot('pr124-emr-screen.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+});
+
+/**
+ * Visual regression — PR-UI-16 Landing baselines (plan §PR-UI-16 AC4
+ * "Visual regression"; user decision Q6: light + dark).
+ *
+ * Baseline policy (Rule 13 / Task 46 §D.3): these are NEW baselines captured
+ * ONCE on the PR-UI-16-5 state — Landing had NO baseline before this PR
+ * (first capture, not a re-capture of an existing one). The Landing redesign
+ * itself is the intentional visual change these baselines lock in:
+ *   - 16-1: legacy glass layer decommissioned → canonical --mac-* surfaces
+ *   - 16-3: real product screenshots in Hero + Screens showcase
+ *   - 16-4: workflow as the central element (7 nodes + 7 numbered steps)
+ * All pre-existing baselines (cashier/registrar/wizard/EAT/pr124) stay
+ * UNCHANGED — the redesign touched the Landing route only.
+ *
+ * Surfaces captured (viewport 1280×720, Desktop Chrome):
+ *   1. Landing hero (topbar + hero card + the real queue screenshot, eager
+ *      loading via fetchPriority=high — deterministic above-the-fold state;
+ *      lazy below-fold showcase images are out of frame by design).
+ *   2. Landing workflow (the central 7-node flow + numbered steps — no
+ *      images, fully deterministic; scrolled into view via the body scroll
+ *      container contract).
+ * Both surfaces × light + dark (dark flipped through the real toolbar
+ * toggle — the same path a user takes; verified via the landing-shell
+ * class contract before capture).
+ *
+ * Determinism: APIs mocked (anonymous public state — setup initialized,
+ * auth/me 401); WebSocket closed; ru locale (app default); light theme
+ * pinned via localStorage `colorScheme=light` (ThemeContext default).
+ */
+test.describe('Visual regression — PR-UI-16 Landing (light + dark)', () => {
+  test.beforeEach(async ({ page }) => {
+    // Pin the theme contract explicitly (fresh contexts default to light,
+    // but the baseline should not depend on that default).
+    await page.addInitScript(() => {
+      localStorage.setItem('colorScheme', 'light');
+    });
+    // Mock WebSocket to prevent ECONNREFUSED noise (no backend in E2E).
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+    await page.route('**/api/v1/**', async (route) => {
+      const { pathname } = new URL(route.request().url());
+      if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
+      if (pathname === '/api/v1/auth/me') { await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ detail: 'not authenticated' }) }); return; }
+      if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
+      await route.fulfill(jsonResponse({ success: true }));
+    });
+  });
+
+  async function waitForHeroScreenshot(page: import('@playwright/test').Page) {
+    // The hero screenshot loads eagerly (fetchPriority=high); wait for the
+    // decoded bitmap so the capture is never mid-load.
+    await page.waitForFunction(() => {
+      const img = document.querySelector<HTMLImageElement>('.landing-hero-shot img');
+      return !!img && img.complete && img.naturalWidth > 0;
+    }, undefined, { timeout: 15000 });
+    await page.waitForTimeout(400);
+  }
+
+  async function flipToDarkIfNeeded(page: import('@playwright/test').Page) {
+    const isDark = await page.locator('.landing-shell').evaluate((el) => el.classList.contains('landing-shell--dark'));
+    if (!isDark) {
+      await page.locator('.landing-toolbar-button').first().click();
+      await page
+        .locator('.landing-shell')
+        .evaluate((el) => {
+          if (!el.classList.contains('landing-shell--dark')) {
+            throw new Error('theme flip failed: landing-shell--dark class missing after toggle');
+          }
+        });
+      await page.waitForTimeout(400);
+    }
+  }
+
+  test('landing hero — light theme (real product screenshot, glass decommissioned)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await waitForHeroScreenshot(page);
+    await expect(page).toHaveScreenshot('pr16-landing-hero-light.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  test('landing hero — dark theme (canonical tokens auto-switch)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await flipToDarkIfNeeded(page);
+    await waitForHeroScreenshot(page);
+    await expect(page).toHaveScreenshot('pr16-landing-hero-dark.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  test('landing workflow — light theme (7 nodes + 7 numbered steps)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    // Scroll the workflow section into view (body.landing-body is the scroll
+    // container — scrollIntoView works against it).
+    await page.locator('#workflow').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    // Deterministic readiness: all 7 stages rendered (content-visibility
+    // renders the section once it enters the viewport).
+    await page.waitForFunction(() => document.querySelectorAll('.landing-workflow-step').length === 7, undefined, { timeout: 15000 });
+    await page.waitForTimeout(400);
+    await expect(page).toHaveScreenshot('pr16-landing-workflow-light.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  test('landing workflow — dark theme (7 nodes + 7 numbered steps)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await flipToDarkIfNeeded(page);
+    await page.locator('#workflow').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await page.waitForFunction(() => document.querySelectorAll('.landing-workflow-step').length === 7, undefined, { timeout: 15000 });
+    await page.waitForTimeout(400);
+    await expect(page).toHaveScreenshot('pr16-landing-workflow-dark.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+});
+
+/*
+ * PR-UI-18 (plan §PR-UI-18 item 1): systematic light+dark page snapshots for
+ * the 12 key screens. The suite already locks the Landing route in both
+ * themes (pr16-landing-{hero,workflow}-{light,dark} — 4 baselines above), so
+ * this block adds the remaining screens. Part 1: /login, /display-board,
+ * /admin, /registrar — 4 screens × 2 themes = 8 baselines. Parts 2-3
+ * (doctor/cashier/lab/patient, then cardiology/dermatology/dentistry) land
+ * in follow-up increments; the landing screen stays covered by pr16.
+ *
+ * Determinism contract (mirrors the pr16 + capture-landing-screens pattern):
+ *   - Clock frozen at 2026-08-29T12:00:00+05:00 via page.clock.install — the
+ *     display board renders a live 1-second clock and registrar home renders
+ *     time surfaces; an unfrozen clock makes baselines byte-unstable by
+ *     construction (same instant as capture-landing-screens.spec.ts).
+ *   - Theme pinned via localStorage colorScheme/theme/ui_theme before load.
+ *     The colorScheme key has precedence over the QA harness's theme=light
+ *     pin (colorScheme.ts resolves colorScheme first), so the pin wins for
+ *     both modes. Verified before capture through the body[data-theme]
+ *     contract set by applyColorSchemeToDom (theme/colorScheme.ts).
+ *   - Authenticated screens reuse the QA harness (e2e/support/
+ *     authenticatedQa.ts): QA JWT + generic envelope mocks for every
+ *     /api/v1/** call — deterministic empty-data states, no backend.
+ *   - Public screens (login, display-board) mock setup/status=initialized,
+ *     auth/me=401 and a generic success envelope; WebSocket closed.
+ *   - Viewport: project default Desktop Chrome 1280×720 — same as the pr124
+ *     and pr16 baselines (no viewport override).
+ *
+ * Baseline policy (Rule 13): first capture on the 18-1 branch — new surfaces
+ * introduced by this PR, no existing baseline is modified.
+ */
+test.describe('Visual regression — PR-UI-18 twelve screens · part 1: login, display-board, admin, registrar', () => {
+  const PR18_INSTANT = new Date('2026-08-29T12:00:00+05:00');
+
+  async function pinPr18Theme(page: import('@playwright/test').Page, mode: 'light' | 'dark') {
+    await page.addInitScript((m) => {
+      localStorage.setItem('colorScheme', m);
+      localStorage.setItem('theme', m);
+      localStorage.setItem('ui_theme', m);
+    }, mode);
+  }
+
+  async function installPublicApiMocks(page: import('@playwright/test').Page) {
+    // Mock WebSocket to prevent ECONNREFUSED noise (no backend in E2E).
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+    await page.route('**/api/v1/**', async (route) => {
+      const { pathname } = new URL(route.request().url());
+      if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
+      if (pathname === '/api/v1/auth/me') {
+        await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ detail: 'not authenticated' }) });
+        return;
+      }
+      if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
+      await route.fulfill(jsonResponse({ success: true }));
+    });
+  }
+
+  /** body[data-theme] must reflect the pinned mode before any capture. */
+  async function expectPr18ThemeApplied(page: import('@playwright/test').Page, mode: 'light' | 'dark') {
+    await expect.poll(
+      async () => page.evaluate(() => document.body.getAttribute('data-theme')),
+      { message: `theme contract: body[data-theme="${mode}"] must be applied before capture` }
+    ).toBe(mode);
+  }
+
+  /** Bounded networkidle (polling pages never settle) + paint settle. */
+  async function settleForPr18Capture(page: import('@playwright/test').Page) {
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
+    await page.waitForTimeout(400);
+  }
+
+  // --- Screen 2/12: Login (public, shell=landing, live LoginFormStyled —
+  // NOT the dead pages/Login.tsx slated for PR-UI-17 L-5 deletion).
+  test('pr18 login screen — light theme (public auth surface)', async ({ page }) => {
+    await page.clock.install({ time: PR18_INSTANT });
+    await installPublicApiMocks(page);
+    await pinPr18Theme(page, 'light');
+    await page.goto('/login');
+    await expect(page.locator('form')).toBeVisible({ timeout: 15000 });
+    await settleForPr18Capture(page);
+    await expectPr18ThemeApplied(page, 'light');
+    await expect(page).toHaveScreenshot('pr18-login-light.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  test('pr18 login screen — dark theme (public auth surface)', async ({ page }) => {
+    await page.clock.install({ time: PR18_INSTANT });
+    await installPublicApiMocks(page);
+    await pinPr18Theme(page, 'dark');
+    await page.goto('/login');
+    await expect(page.locator('form')).toBeVisible({ timeout: 15000 });
+    await settleForPr18Capture(page);
+    await expectPr18ThemeApplied(page, 'dark');
+    await expect(page).toHaveScreenshot('pr18-login-dark.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  // --- Screen 12/12: Display board (public fullscreen kiosk, polls
+  // /board/state; the 1s clock is frozen; WS closed → static empty board).
+  test('pr18 display board — light theme (public kiosk surface)', async ({ page }) => {
+    await page.clock.install({ time: PR18_INSTANT });
+    await installPublicApiMocks(page);
+    await pinPr18Theme(page, 'light');
+    await page.goto('/display-board');
+    await expect(page.locator('.displayboard-header')).toBeVisible({ timeout: 15000 });
+    await settleForPr18Capture(page);
+    await expectPr18ThemeApplied(page, 'light');
+    await expect(page).toHaveScreenshot('pr18-display-board-light.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  test('pr18 display board — dark theme (public kiosk surface)', async ({ page }) => {
+    await page.clock.install({ time: PR18_INSTANT });
+    await installPublicApiMocks(page);
+    await pinPr18Theme(page, 'dark');
+    await page.goto('/display-board');
+    await expect(page.locator('.displayboard-header')).toBeVisible({ timeout: 15000 });
+    await settleForPr18Capture(page);
+    await expectPr18ThemeApplied(page, 'dark');
+    await expect(page).toHaveScreenshot('pr18-display-board-dark.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  // --- Screen 3/12: Admin dashboard (/admin, QA harness empty-data state).
+  test('pr18 admin dashboard — light theme (role home, QA harness)', async ({ page }) => {
+    await page.clock.install({ time: PR18_INSTANT });
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+    await installAuthenticatedQaHarness(page, { role: 'Admin' });
+    await pinPr18Theme(page, 'light');
+    await page.goto('/admin');
+    await expect(page.locator('.app-shell[data-route-id="admin-dashboard"]')).toBeVisible({ timeout: 15000 });
+    await expect.poll(
+      async () => (await page.locator('body').innerText()).trim().length,
+      { message: 'admin dashboard should render non-empty body text' }
+    ).toBeGreaterThan(0);
+    await settleForPr18Capture(page);
+    await expectPr18ThemeApplied(page, 'light');
+    await expect(page).toHaveScreenshot('pr18-admin-light.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  test('pr18 admin dashboard — dark theme (role home, QA harness)', async ({ page }) => {
+    await page.clock.install({ time: PR18_INSTANT });
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+    await installAuthenticatedQaHarness(page, { role: 'Admin' });
+    await pinPr18Theme(page, 'dark');
+    await page.goto('/admin');
+    await expect(page.locator('.app-shell[data-route-id="admin-dashboard"]')).toBeVisible({ timeout: 15000 });
+    await expect.poll(
+      async () => (await page.locator('body').innerText()).trim().length,
+      { message: 'admin dashboard should render non-empty body text' }
+    ).toBeGreaterThan(0);
+    await settleForPr18Capture(page);
+    await expectPr18ThemeApplied(page, 'dark');
+    await expect(page).toHaveScreenshot('pr18-admin-dark.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  // --- Screen 4/12: Registrar home (/registrar, QA harness empty-data state;
+  // the wizard-specific surfaces are already locked by the wizard baselines).
+  test('pr18 registrar home — light theme (role home, QA harness)', async ({ page }) => {
+    await page.clock.install({ time: PR18_INSTANT });
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+    await installAuthenticatedQaHarness(page, { role: 'Registrar' });
+    await pinPr18Theme(page, 'light');
+    await page.goto('/registrar');
+    await expect(page.locator('.app-shell[data-route-id="registrar-home"]')).toBeVisible({ timeout: 15000 });
+    await expect.poll(
+      async () => (await page.locator('body').innerText()).trim().length,
+      { message: 'registrar home should render non-empty body text' }
+    ).toBeGreaterThan(0);
+    await settleForPr18Capture(page);
+    await expectPr18ThemeApplied(page, 'light');
+    await expect(page).toHaveScreenshot('pr18-registrar-light.png', {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  });
+
+  test('pr18 registrar home — dark theme (role home, QA harness)', async ({ page }) => {
+    await page.clock.install({ time: PR18_INSTANT });
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+    await installAuthenticatedQaHarness(page, { role: 'Registrar' });
+    await pinPr18Theme(page, 'dark');
+    await page.goto('/registrar');
+    await expect(page.locator('.app-shell[data-route-id="registrar-home"]')).toBeVisible({ timeout: 15000 });
+    await expect.poll(
+      async () => (await page.locator('body').innerText()).trim().length,
+      { message: 'registrar home should render non-empty body text' }
+    ).toBeGreaterThan(0);
+    await settleForPr18Capture(page);
+    await expectPr18ThemeApplied(page, 'dark');
+    await expect(page).toHaveScreenshot('pr18-registrar-dark.png', {
       maxDiffPixelRatio: 0.01,
       animations: 'disabled',
     });

@@ -1,4 +1,4 @@
-import React, { startTransition, useEffect, useMemo, useState } from 'react';
+import React, { startTransition, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import {
@@ -25,7 +25,7 @@ import {
   User,
   Users
 } from 'lucide-react';
-import { LANDING_COPY, buildGlassStyle } from './landingContent';
+import { LANDING_COPY } from './landingContent';
 import { BRAND } from '../config/brand';
 import './Landing.css';
 import { useTranslation } from '../i18n/useTranslation';
@@ -69,14 +69,13 @@ function SectionHeading({ eyebrow, title, description, align = 'left' }: {
 
 
 
-function MetricCard({ value, label, detail, style }: {
+function MetricCard({ value, label, detail }: {
   value?: React.ReactNode;
   label?: React.ReactNode;
   detail?: React.ReactNode;
-  style?: React.CSSProperties;
 }) {
   return (
-    <Card className="landing-metric-card" shadow="large" style={style}>
+    <Card className="landing-metric-card" shadow="large">
       <strong>{value}</strong>
       <span>{label}</span>
       <small>{detail}</small>
@@ -107,15 +106,28 @@ function FeatureCard({ accent, icon: Icon, badge, title, description }: {
 
 
 
-function ShowcaseCard({ icon: Icon, label, title, description, style }: {
+function ScreenshotCard({ icon: Icon, label, title, description, screenshot, alt }: {
   icon?: React.ComponentType<{ size?: number }>;
   label?: React.ReactNode;
   title?: React.ReactNode;
   description?: React.ReactNode;
-  style?: React.CSSProperties;
+  screenshot?: string;
+  alt?: string;
 }) {
   return (
-    <Card className="landing-showcase-card" shadow="large" style={style}>
+    <Card className="landing-showcase-card" shadow="large">
+      <div className="landing-showcase-shot">
+        {screenshot && (
+          <img
+            src={`/landing/screens/${screenshot}`}
+            alt={alt || (typeof title === 'string' ? title : '')}
+            loading="lazy"
+            decoding="async"
+            width={1440}
+            height={900}
+          />
+        )}
+      </div>
       <div className="landing-showcase-head">
         <div className="landing-showcase-icon">
           {Icon && <Icon size={20} />}
@@ -124,29 +136,27 @@ function ShowcaseCard({ icon: Icon, label, title, description, style }: {
       </div>
       <h3>{title}</h3>
       <p>{description}</p>
-      <div className="landing-showcase-bars" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
     </Card>
   );
 }
 
 
 
-function WorkflowStep({ title, description }: {
+function WorkflowStep({ index, node, title, description }: {
+  index: number;
+  node: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
 }) {
   return (
-    <div className="landing-workflow-step">
-      <div className="landing-workflow-marker" aria-hidden="true" />
+    <li className="landing-workflow-step">
+      <span className="landing-workflow-marker" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
       <div>
+        <span className="landing-workflow-node">{node}</span>
         <h3>{title}</h3>
         <p>{description}</p>
       </div>
-    </div>
+    </li>
   );
 }
 
@@ -198,9 +208,6 @@ export default function Landing() {
   // Map unified language codes to legacy LANDING_COPY keys ('uz-Latn' → 'uz')
   const landingCopyKey = language?.startsWith('uz') ? 'uz' : language?.split('-')[0];
   const copy = (LANDING_COPY[landingCopyKey as keyof typeof LANDING_COPY] || LANDING_COPY.ru) as typeof LANDING_COPY.ru;
-  const cardStyle = useMemo(() => buildGlassStyle(isDark), [isDark]);
-  const heroCardStyle = useMemo(() => buildGlassStyle(isDark, 'hero'), [isDark]);
-  const accentCardStyle = useMemo(() => buildGlassStyle(isDark, 'accent'), [isDark]);
 
   const currentLanguageIndex = availableLanguages.findIndex((item) => item.code === language);
   const currentLanguage = availableLanguages[currentLanguageIndex] || availableLanguages[0];
@@ -307,10 +314,6 @@ export default function Landing() {
 
   return (
     <div className={`landing-shell ${isDark ? 'landing-shell--dark' : 'landing-shell--light'}`}>
-      <div className="landing-orb landing-orb--one" aria-hidden="true" />
-      <div className="landing-orb landing-orb--two" aria-hidden="true" />
-      <div className="landing-grid-overlay" aria-hidden="true" />
-
       <main className="landing-page">
         <header className="landing-topbar">
           {/* UX Audit Stage 1: используем единый BRAND config вместо хардкода */}
@@ -408,7 +411,7 @@ export default function Landing() {
         </header>
 
         <section id="hero" className="landing-hero">
-          <Card className="landing-hero-card" shadow="large" style={heroCardStyle}>
+          <Card className="landing-hero-card" shadow="large">
             <div className="landing-live-badge" role="status" aria-live="polite">
               <Activity size={15} />
               <span>{copy.liveStatus}</span>
@@ -447,33 +450,29 @@ export default function Landing() {
 
             <div className="landing-console-metrics">
               {copy.hero.quickStats.map((item) => (
-                <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} style={cardStyle} />
+                <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} />
               ))}
             </div>
           </Card>
 
           <div className="landing-hero-visuals">
-            {copy.hero.visualPanels.map((panel, index) => (
-              <Card
-                key={panel.title}
-                className={`landing-console-card landing-console-card--${index + 1}`}
-                shadow="large"
-                style={index === 1 ? accentCardStyle : cardStyle}
-              >
-                <SurfaceLabel>{panel.label}</SurfaceLabel>
-                <h2>{panel.title}</h2>
-                <p>{panel.description}</p>
-
-                <ul className="landing-console-feed">
-                  {panel.bullets.map((bullet) => (
-                    <li key={bullet} className="landing-console-feed-item">
-                      <CheckCircle size={16} />
-                      <span>{bullet}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            ))}
+            {/* PR-UI-16-3: real product screenshot (deterministic capture
+                pipeline — see e2e/capture-landing-screens.spec.ts). */}
+            <figure className="landing-hero-shot">
+              <div className="landing-hero-shot-frame">
+                <img
+                  src={`/landing/screens/${copy.hero.shot.screenshot}`}
+                  alt={copy.hero.shot.alt}
+                  width={1440}
+                  height={900}
+                  fetchPriority="high"
+                />
+              </div>
+              <figcaption>
+                <SurfaceLabel>{copy.hero.shot.label}</SurfaceLabel>
+                <span>{copy.hero.shot.caption}</span>
+              </figcaption>
+            </figure>
           </div>
         </section>
 
@@ -482,7 +481,7 @@ export default function Landing() {
 
           <div className="landing-metric-strip">
             {copy.trust.items.map((item) => (
-              <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} style={cardStyle} />
+              <MetricCard key={item.label} value={item.value} label={item.label} detail={item.detail} />
             ))}
           </div>
         </section>
@@ -508,29 +507,36 @@ export default function Landing() {
         </section>
 
         <section id="workflow" className="landing-section landing-progressive-section">
-          <Card className="landing-section-card" shadow="large" style={cardStyle}>
+          <Card className="landing-section-card" shadow="large">
             <SectionHeading eyebrow={copy.workflow.eyebrow} title={copy.workflow.title} description={copy.workflow.description} />
 
-            <div className="landing-workflow-grid">
-              <div className="landing-workflow-list">
-                {copy.workflow.steps.map((step) => (
-                  <WorkflowStep key={step.title} title={step.title} description={step.description} />
+            {/* PR-UI-16-4: workflow is the central element — the 7-node flow
+                overview sits on top, 7 numbered detail steps below (plan
+                §PR-UI-16 item 2: workflow diagram as the centerpiece). */}
+            <div className="landing-flow-card">
+              <SurfaceLabel>{copy.workflow.flowLabel}</SurfaceLabel>
+              <div className="landing-flow-track" aria-label={copy.workflow.flowLabel}>
+                {copy.workflow.stages.map((stage, index) => (
+                  <React.Fragment key={stage.node}>
+                    <span className="landing-flow-chip">{stage.node}</span>
+                    {index < copy.workflow.stages.length - 1 ? <ChevronRight size={16} className="landing-flow-arrow" /> : null}
+                  </React.Fragment>
                 ))}
               </div>
-
-              <div className="landing-flow-card">
-                <SurfaceLabel>{copy.workflow.flowLabel}</SurfaceLabel>
-                <div className="landing-flow-track" aria-label={copy.workflow.flowLabel}>
-                  {copy.workflow.flowNodes.map((item, index) => (
-                    <React.Fragment key={item}>
-                      <span className="landing-flow-chip">{item}</span>
-                      {index < copy.workflow.flowNodes.length - 1 ? <ChevronRight size={16} className="landing-flow-arrow" /> : null}
-                    </React.Fragment>
-                  ))}
-                </div>
-                <p>{copy.workflow.flowSummary}</p>
-              </div>
+              <p>{copy.workflow.flowSummary}</p>
             </div>
+
+            <ol className="landing-workflow-list">
+              {copy.workflow.stages.map((stage, index) => (
+                <WorkflowStep
+                  key={stage.node}
+                  index={index}
+                  node={stage.node}
+                  title={stage.title}
+                  description={stage.description}
+                />
+              ))}
+            </ol>
           </Card>
         </section>
 
@@ -541,7 +547,7 @@ export default function Landing() {
             {copy.modules.items.map((module, index) => {
               const Icon = MODULE_VISUALS[index % MODULE_VISUALS.length];
               return (
-                <Card key={module.title} className="landing-module-card" shadow="large" style={cardStyle}>
+                <Card key={module.title} className="landing-module-card" shadow="large">
                   <div className="landing-module-icon">
                     <Icon size={18} />
                   </div>
@@ -558,20 +564,21 @@ export default function Landing() {
 
           <div className="landing-showcase-grid">
             {copy.screens.items.map((item, index) => (
-              <ShowcaseCard
+              <ScreenshotCard
                 key={item.title}
                 icon={SHOWCASE_VISUALS[index % SHOWCASE_VISUALS.length]}
                 label={item.label}
                 title={item.title}
                 description={item.description}
-                style={index === 0 ? accentCardStyle : cardStyle}
+                screenshot={item.screenshot}
+                alt={item.alt}
               />
             ))}
           </div>
         </section>
 
         <section className="landing-section landing-dual-grid landing-progressive-section">
-          <Card id="integrations" className="landing-section-card" shadow="large" style={cardStyle}>
+          <Card id="integrations" className="landing-section-card" shadow="large">
             <SectionHeading
               eyebrow={copy.integrations.eyebrow}
               title={copy.integrations.title}
@@ -596,7 +603,7 @@ export default function Landing() {
             </div>
           </Card>
 
-          <Card id="security" className="landing-section-card" shadow="large" style={cardStyle}>
+          <Card id="security" className="landing-section-card" shadow="large">
             <SectionHeading eyebrow={copy.security.eyebrow} title={copy.security.title} description={copy.security.description} />
 
             <div className="landing-security-grid">
@@ -625,7 +632,7 @@ export default function Landing() {
           />
 
           <div className="landing-advantage-grid">
-            <Card className="landing-advantage-card landing-advantage-card--before" shadow="large" style={cardStyle}>
+            <Card className="landing-advantage-card landing-advantage-card--before" shadow="large">
               <h3>{copy.advantages.beforeTitle}</h3>
               <ul className="landing-checklist landing-checklist--negative">
                 {copy.advantages.beforeItems.map((item) => (
@@ -637,7 +644,7 @@ export default function Landing() {
               </ul>
             </Card>
 
-            <Card className="landing-advantage-card landing-advantage-card--after" shadow="large" style={accentCardStyle}>
+            <Card className="landing-advantage-card landing-advantage-card--after" shadow="large">
               <h3>{copy.advantages.afterTitle}</h3>
               <ul className="landing-checklist">
                 {copy.advantages.afterItems.map((item) => (
@@ -660,7 +667,6 @@ export default function Landing() {
                 key={plan.name}
                 className={`landing-pricing-card ${plan.featured ? 'landing-pricing-card--featured' : ''}`}
                 shadow="large"
-                style={plan.featured ? accentCardStyle : cardStyle}
               >
                 <SurfaceLabel>{plan.audience}</SurfaceLabel>
                 <h3>{plan.name}</h3>
@@ -716,7 +722,7 @@ export default function Landing() {
         </section>
 
         <section id="contact" className="landing-section landing-progressive-section">
-          <Card className="landing-final-card" shadow="large" style={heroCardStyle}>
+          <Card className="landing-final-card" shadow="large">
             <div className="landing-final-copy">
               <SurfaceLabel>{copy.finalCta.eyebrow}</SurfaceLabel>
               <h2>{copy.finalCta.title}</h2>

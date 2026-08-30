@@ -15,7 +15,6 @@ const BASE_COPY = {
     title: 'Единая система управления клиникой, которая держит EMR, очередь и платежи в одном ритме.',
     description:
       'Clinic OS собирает регистратуру, врача, QR-очередь, платежи, Telegram и отчеты в один workflow без ручных разрывов между командами.',
-    primaryCta: 'Открыть демо',
     secondaryCta: 'Посмотреть интерфейс',
     proofChips: ['EMR врача', 'QR-очередь', 'Telegram-уведомления', 'Платежи и отчеты'],
     quickStats: [
@@ -23,26 +22,12 @@ const BASE_COPY = {
       { value: '1', label: 'единый workflow', detail: 'от регистрации до отчетов' },
       { value: '24/7', label: 'операционный контур', detail: 'контроль очереди, оплат и статусов' }
     ],
-    visualPanels: [
-      {
-        label: 'Dashboard',
-        title: 'Руководитель видит клинику в реальном времени',
-        description: 'Очередь, загрузка кабинетов и сигналы смены собраны в одном окне.',
-        bullets: ['Слоты и перегрузка врачей', 'Сигналы по задержкам и очереди', 'Сводка по выручке и статусам']
-      },
-      {
-        label: 'QR Queue',
-        title: 'Регистратура управляет потоком без хаоса в холле',
-        description: 'QR-очередь, табло и маршрутизация пациентов работают как единый сценарий.',
-        bullets: ['Проверка записи и создание визита', 'Маршрутизация в нужный кабинет', 'Прозрачная очередь для пациента']
-      },
-      {
-        label: 'Doctor EMR',
-        title: 'Врач ведет прием внутри живой карты пациента',
-        description: 'История болезни, шаблоны осмотров и PDF-документы остаются внутри EMR.',
-        bullets: ['Шаблоны осмотров и назначения', 'История визитов и вложения', 'Документы без ручной перепечатки']
-      }
-    ]
+    shot: {
+      screenshot: 'queue.png',
+      label: 'Живой интерфейс',
+      alt: 'Экран электронной очереди Clinic OS: таблица пациентов со статусами, номерами и кабинетами',
+      caption: 'Регистратура управляет потоком в реальной таблице очереди — без бумажных списков.'
+    }
   },
   trust: {
     eyebrow: 'Что система закрывает с первого дня',
@@ -99,26 +84,44 @@ const BASE_COPY = {
     title: 'Пациент проходит путь от регистратуры до отчета без ручных разрывов',
     description:
       'Для сложного медицинского продукта лучше всего продает не список функций, а четкий end-to-end workflow клиники.',
-    steps: [
+    stages: [
       {
-        title: '01. Пациент регистрируется',
+        node: 'Пациент',
+        title: '01. Пациент записывается',
+        description: 'Пациент попадает в поток через QR-очередь или запись — без звонков и бумажных анкет.'
+      },
+      {
+        node: 'Регистратура',
+        title: '02. Регистратура оформляет визит',
         description: 'Регистратура находит пациента, подтверждает запись и запускает визит без бумажных обходов.'
       },
       {
-        title: '02. Попадает в очередь',
+        node: 'Очередь',
+        title: '03. Очередь направляет к врачу',
         description: 'Система направляет пациента в нужный поток, а табло и команда видят актуальный статус.'
       },
       {
-        title: '03. Врач ведет EMR',
+        node: 'Врач',
+        title: '04. Врач принимает пациента',
+        description: 'Врач вызывает пациента из очереди и видит контекст визита с первого касания.'
+      },
+      {
+        node: 'EMR',
+        title: '05. EMR хранит прием',
         description: 'Прием, история болезни, документы и шаблоны осмотров остаются в единой карте пациента.'
       },
       {
-        title: '04. Платеж и отчеты автоматически',
-        description: 'Касса закрывает услуги, а руководитель сразу получает прозрачную картину по смене и выручке.'
+        node: 'Платеж',
+        title: '06. Платеж закрывает услуги',
+        description: 'Касса принимает оплату и закрывает услуги визита — наличными или через платежные системы.'
+      },
+      {
+        node: 'Отчеты',
+        title: '07. Отчеты сводят смену',
+        description: 'Руководитель сразу получает прозрачную картину по смене, выручке и нагрузке врачей.'
       }
     ],
     flowLabel: 'Workflow клиники',
-    flowNodes: ['Пациент', 'Регистратура', 'Очередь', 'Врач', 'EMR', 'Платеж', 'Отчеты'],
     flowSummary:
       'Именно эта цепочка показывает ценность продукта сильнее, чем длинный список модулей без контекста.'
   },
@@ -142,32 +145,42 @@ const BASE_COPY = {
     eyebrow: 'Скриншоты интерфейса',
     title: 'Интерфейсы, которые команда понимает с первого дня',
     description:
-      'Показываем не красивые абстракции, а реальные рабочие поверхности: dashboard, очередь, EMR, регистратура и аналитика.',
+      'Реальные рабочие поверхности системы: запись пациента, расписание визитов, поиск карт, лаборатория и EMR врача.',
     items: [
       {
-        label: 'Dashboard',
-        title: 'Операционный центр смены',
-        description: 'Очередь, кабинеты, касса и сигналы загрузки в одном экране.'
-      },
-      {
         label: 'Reception',
+        screenshot: 'registrar-wizard.png',
+        alt: 'Мастер записи пациента: пошаговая форма с индикатором прогресса и выбором услуги',
         title: 'Регистратура без ручной перегонки данных',
-        description: 'Поиск пациента, запись, создание визита и переключение в очередь.'
+        description: 'Мастер записи проводит сотрудника по шагам: пациент, услуга, врач и время.'
       },
       {
-        label: 'Queue',
-        title: 'Прозрачная очередь для команды и пациента',
-        description: 'QR-поток, табло и распределение по кабинетам без хаоса в холле.'
+        label: 'Appointments',
+        screenshot: 'appointments.png',
+        alt: 'Таблица записей на прием: пациенты, время, врачи и статусы визитов',
+        title: 'Расписание визитов под контролем',
+        description: 'Расширенная таблица записей держит врачей, время и статусы в одном экране.'
+      },
+      {
+        label: 'Patients',
+        screenshot: 'patients.png',
+        alt: 'Результаты поиска пациентов: карточки с ФИО, телефоном и датой рождения',
+        title: 'Поиск пациента за секунды',
+        description: 'Карточки найденных пациентов открываются прямо из поиска — без переключения окон.'
+      },
+      {
+        label: 'Laboratory',
+        screenshot: 'lab.png',
+        alt: 'Очередь лаборатории: карточки исследований со статусами выполнения',
+        title: 'Лаборатория в общем контуре',
+        description: 'Направления и статусы исследований видны в общей очереди лаборатории.'
       },
       {
         label: 'EMR',
+        screenshot: 'emr.png',
+        alt: 'Карта приема врача: структурированные разделы осмотра и шаблоны',
         title: 'Прием врача внутри живой карты',
-        description: 'Осмотр, документы и история болезни не распадаются на отдельные инструменты.'
-      },
-      {
-        label: 'Analytics',
-        title: 'Аналитика по выручке и нагрузке',
-        description: 'Руководитель видит результаты смены, перегрузки и точки роста без ручных отчетов.'
+        description: 'Осмотр, документы и история болезни собраны в одной карте приема.'
       }
     ]
   },
@@ -359,7 +372,6 @@ const EN_OVERRIDES = {
     title: 'One clinic management system that keeps EMR, queue and payments in the same rhythm.',
     description:
       'Clinic OS brings reception, doctors, QR queue, payments, Telegram and reporting into one workflow with no manual gaps between teams.',
-    primaryCta: 'Open demo',
     secondaryCta: 'View interface',
     proofChips: ['Doctor EMR', 'QR queue', 'Telegram alerts', 'Payments and reports'],
     quickStats: [
@@ -367,26 +379,12 @@ const EN_OVERRIDES = {
       { value: '1', label: 'unified workflow', detail: 'from registration to reporting' },
       { value: '24/7', label: 'operational visibility', detail: 'queue, payments and status control' }
     ],
-    visualPanels: [
-      {
-        label: 'Dashboard',
-        title: 'Leadership sees the clinic in real time',
-        description: 'Queue, room load and shift signals live in one operating window.',
-        bullets: ['Slots and doctor overload', 'Delay and queue alerts', 'Revenue and status summary']
-      },
-      {
-        label: 'QR Queue',
-        title: 'Reception controls flow without front-desk chaos',
-        description: 'QR queue, display board and patient routing work as one connected scenario.',
-        bullets: ['Booking check and visit creation', 'Routing into the right room', 'A transparent queue for the patient']
-      },
-      {
-        label: 'Doctor EMR',
-        title: 'Doctors work inside a live patient record',
-        description: 'History, exam templates and PDF documents stay inside the EMR during the visit.',
-        bullets: ['Exam templates and treatment plans', 'Visit history and attachments', 'Documents without manual re-entry']
-      }
-    ]
+    shot: {
+      screenshot: 'queue.png',
+      label: 'Live interface',
+      alt: 'Clinic OS electronic queue screen: patient table with statuses, numbers and rooms',
+      caption: 'Reception runs the patient flow in a live queue table — no paper lists.'
+    }
   },
   trust: {
     eyebrow: 'What the platform covers on day one',
@@ -443,26 +441,44 @@ const EN_OVERRIDES = {
     title: 'The patient moves from reception to reporting without manual breaks',
     description:
       'For a complex medical product, a clear end-to-end clinic workflow sells better than a disconnected feature list.',
-    steps: [
+    stages: [
       {
-        title: '01. Patient registration',
+        node: 'Patient',
+        title: '01. Patient books a visit',
+        description: 'The patient enters the flow via QR queue or booking — no calls, no paper forms.'
+      },
+      {
+        node: 'Reception',
+        title: '02. Reception opens the visit',
         description: 'Reception finds the patient, confirms the booking and starts the visit without paper detours.'
       },
       {
-        title: '02. Queue assignment',
+        node: 'Queue',
+        title: '03. The queue routes to the doctor',
         description: 'The system routes the patient into the right flow while the team and display board share the same status.'
       },
       {
-        title: '03. Doctor works in EMR',
+        node: 'Doctor',
+        title: '04. The doctor sees the patient',
+        description: 'The doctor calls the patient from the queue with full visit context from the first touch.'
+      },
+      {
+        node: 'EMR',
+        title: '05. EMR keeps the visit',
         description: 'Consultation, medical history, templates and documents stay in one connected patient record.'
       },
       {
-        title: '04. Payment and reports update automatically',
-        description: 'Cashier closes services while leadership instantly sees shift and revenue visibility.'
+        node: 'Payment',
+        title: '06. Payment closes the services',
+        description: 'Cashier collects payment and closes the visit services — cash or through payment providers.'
+      },
+      {
+        node: 'Reports',
+        title: '07. Reports wrap up the shift',
+        description: 'Leadership instantly sees shift, revenue and doctor-load visibility.'
       }
     ],
     flowLabel: 'Clinic workflow',
-    flowNodes: ['Patient', 'Reception', 'Queue', 'Doctor', 'EMR', 'Payment', 'Reports'],
     flowSummary:
       'This chain makes the product value obvious much faster than a long module list without context.'
   },
@@ -486,32 +502,42 @@ const EN_OVERRIDES = {
     eyebrow: 'Interface previews',
     title: 'Interfaces the team can understand on day one',
     description:
-      'Instead of abstract mockups, the page shows real operating surfaces: dashboard, queue, EMR, reception and analytics.',
+      'Real working surfaces: patient check-in, the visit schedule, chart search, laboratory and the doctor EMR.',
     items: [
       {
-        label: 'Dashboard',
-        title: 'The operating center of the shift',
-        description: 'Queue, rooms, cashier and load signals in one shared screen.'
-      },
-      {
         label: 'Reception',
+        screenshot: 'registrar-wizard.png',
+        alt: 'Patient check-in wizard: step-by-step form with progress indicator and service selection',
         title: 'Reception without manual data relay',
-        description: 'Patient lookup, booking, visit creation and queue handoff stay in one place.'
+        description: 'The check-in wizard walks staff through patient, service, doctor and time.'
       },
       {
-        label: 'Queue',
-        title: 'A transparent queue for staff and patients',
-        description: 'QR flow, display boards and room assignment without lobby chaos.'
+        label: 'Appointments',
+        screenshot: 'appointments.png',
+        alt: 'Appointments table: patients, times, doctors and visit statuses',
+        title: 'The schedule under control',
+        description: 'The enhanced appointments table keeps doctors, times and statuses in one screen.'
+      },
+      {
+        label: 'Patients',
+        screenshot: 'patients.png',
+        alt: 'Patient search results: cards with name, phone and birth date',
+        title: 'Find a patient in seconds',
+        description: 'Result cards open straight from search — no window switching.'
+      },
+      {
+        label: 'Laboratory',
+        screenshot: 'lab.png',
+        alt: 'Laboratory queue: research cards with execution statuses',
+        title: 'The lab inside the same loop',
+        description: 'Orders and result statuses are visible in the shared lab queue.'
       },
       {
         label: 'EMR',
+        screenshot: 'emr.png',
+        alt: 'Doctor visit chart: structured exam sections and templates',
         title: 'Doctor workflow inside a live chart',
-        description: 'Consultation notes, documents and history stay together instead of splitting into separate tools.'
-      },
-      {
-        label: 'Analytics',
-        title: 'Revenue and load analytics',
-        description: 'Leadership sees shift outcomes, overload and growth points without manual spreadsheets.'
+        description: 'Exam notes, documents and history stay in one visit chart.'
       }
     ]
   },
@@ -680,7 +706,6 @@ const UZ_OVERRIDES = {
     title: 'EMR, navbat va tolovlarni bitta ritmda ushlab turadigan yagona klinika boshqaruv tizimi.',
     description:
       'Clinic OS registratura, shifokor, QR-navbat, tolovlar, Telegram va hisobotlarni bitta workflow ichida birlashtiradi, jamoalar orasida qol mehnatisiz.',
-    primaryCta: 'Demo ochish',
     secondaryCta: 'Interfeysni ko\'rish',
     proofChips: ['Shifokor EMR', 'QR-navbat', 'Telegram signal', 'Tolovlar va hisobotlar'],
     quickStats: [
@@ -688,26 +713,12 @@ const UZ_OVERRIDES = {
       { value: '1', label: 'yagona workflow', detail: 'royxatdan otkazishdan hisobotgacha' },
       { value: '24/7', label: 'operatsion korinish', detail: 'navbat, tolov va status nazorati' }
     ],
-    visualPanels: [
-      {
-        label: 'Dashboard',
-        title: 'Rahbar klinikani real vaqt rejimida koradi',
-        description: 'Navbat, kabinet yuklamasi va smena signallari bitta oynada turadi.',
-        bullets: ['Slotlar va shifokor yuklamasi', 'Kechikish va navbat signallari', 'Tushum va statuslar jamlanmasi']
-      },
-      {
-        label: 'QR Queue',
-        title: 'Registratura oqimni tartibsiz boshqaradi',
-        description: 'QR-navbat, tablo va bemor marshruti bitta ulangan ssenariy sifatida ishlaydi.',
-        bullets: ['Yozuvni tekshirish va vizit ochish', 'Kerakli kabinetga yonaltirish', 'Bemor uchun shaffof navbat']
-      },
-      {
-        label: 'Doctor EMR',
-        title: 'Shifokor qabulni tirik bemor kartasi ichida olib boradi',
-        description: 'Tarix, korik shablonlari va PDF hujjatlar qabul davomida EMR ichida qoladi.',
-        bullets: ['Korik shablonlari va tayinlovlar', 'Vizitlar tarixi va fayllar', 'Qolda qayta yozishsiz hujjatlar']
-      }
-    ]
+    shot: {
+      screenshot: 'queue.png',
+      label: 'Jonli interfeys',
+      alt: 'Clinic OS elektron navbat ekrani: bemorlar jadvali, statuslar, raqamlar va kabinetlar',
+      caption: 'Registratura bemor oqimini jonli navbat jadvalida boshqaradi — qogoz royxatlarsiz.'
+    }
   },
   trust: {
     eyebrow: 'Tizim birinchi kundan nimani yopadi',
@@ -764,26 +775,44 @@ const UZ_OVERRIDES = {
     title: 'Bemor registraturadan hisobotgacha qolda uzilishsiz otadi',
     description:
       'Murakkab tibbiy mahsulot uchun eng kuchli sotuv vositasi uzilgan feature royxati emas, balki aniq end-to-end klinika workflowidir.',
-    steps: [
+    stages: [
       {
-        title: '01. Bemor royxatdan otadi',
+        node: 'Bemor',
+        title: '01. Bemor yoziladi',
+        description: 'Bemor QR-navbat yoki yozuv orqali oqimga kiradi — qongiroqsiz, qogoz anketsiz.'
+      },
+      {
+        node: 'Registratura',
+        title: '02. Registratura vizitni ochadi',
         description: 'Registratura bemorni topadi, yozuvni tasdiqlaydi va qabulni qogozsiz boshlaydi.'
       },
       {
-        title: '02. Navbatga tushadi',
+        node: 'Navbat',
+        title: '03. Navbat shifokorga yonaltiradi',
         description: 'Tizim bemorni togri oqimga yonaltiradi, jamoa va tablo esa bir xil statusni koradi.'
       },
       {
-        title: '03. Shifokor EMR bilan ishlaydi',
+        node: 'Shifokor',
+        title: '04. Shifokor bemorni qabul qiladi',
+        description: 'Shifokor bemorni navbatdan chorlaydi va birinchi kontaktdayoq vizit kontekstini koradi.'
+      },
+      {
+        node: 'EMR',
+        title: '05. EMR qabulni saqlaydi',
         description: 'Qabul, tarix, shablonlar va hujjatlar bitta ulangan bemor kartasi ichida qoladi.'
       },
       {
-        title: '04. Tolov va hisobotlar avtomatik yangilanadi',
-        description: 'Kassa xizmatlarni yopadi, rahbar esa smena va tushum manzarasini darhol koradi.'
+        node: 'Tolov',
+        title: '06. Tolov xizmatlarni yopadi',
+        description: 'Kassa tolovni oladi va vizit xizmatlarini yopadi — naxt yoki tolov tizimlari orqali.'
+      },
+      {
+        node: 'Hisobotlar',
+        title: '07. Hisobotlar smenani yigadi',
+        description: 'Rahbar smena, tushum va shifokor yuklamasi manzarasini darhol koradi.'
       }
     ],
     flowLabel: 'Klinika workflowi',
-    flowNodes: ['Bemor', 'Registratura', 'Navbat', 'Shifokor', 'EMR', 'Tolov', 'Hisobotlar'],
     flowSummary:
       'Aynan shu zanjir mahsulot qiymatini kontekstsiz modullar royxatidan ancha tezroq ochib beradi.'
   },
@@ -807,32 +836,42 @@ const UZ_OVERRIDES = {
     eyebrow: 'Interfeys korinishlari',
     title: 'Jamoa birinchi kundan tushunadigan interfeyslar',
     description:
-      'Chiroyli abstraksiyalar emas, balki haqiqiy ish yuzalari korsatiladi: dashboard, navbat, EMR, registratura va analitika.',
+      'Haqiqiy ish yuzalari: bemor yozish, vizit jadvali, karta qidirish, laboratoriya va shifokor EMR.',
     items: [
       {
-        label: 'Dashboard',
-        title: 'Smenaning operatsion markazi',
-        description: 'Navbat, kabinetlar, kassa va yuklama signallari bitta ekranda.'
-      },
-      {
         label: 'Reception',
-        title: 'Qolda malumot otkazmasiz registratura',
-        description: 'Bemorni topish, yozuv, vizit ochish va navbatga otkazish bir joyda qoladi.'
+        screenshot: 'registrar-wizard.png',
+        alt: 'Bemor yozish ustasi: progress korsatkichi va xizmat tanlash bilan qadam-baqadam forma',
+        title: 'Malumot qayta uzatmasdan registratura',
+        description: 'Yozish ustasi xodimni bemor, xizmat, shifokor va vaqt boylab olib boradi.'
       },
       {
-        label: 'Queue',
-        title: 'Jamoa va bemor uchun shaffof navbat',
-        description: 'QR-oqim, tablo va kabinetga taqsimlash holldagi tartibsizliksiz ishlaydi.'
+        label: 'Appointments',
+        screenshot: 'appointments.png',
+        alt: 'Qabul yozuvlari jadvali: bemorlar, vaqt, shifokorlar va statuslar',
+        title: 'Vizit jadvali nazorat ostida',
+        description: 'Kengaytirilgan yozuvlar jadvali shifokor, vaqt va statuslarni bitta ekranda tutadi.'
+      },
+      {
+        label: 'Patients',
+        screenshot: 'patients.png',
+        alt: 'Bemor qidiruv natijalari: FIO, telefon va tugilgan sana bilan kartochkalar',
+        title: 'Bemorni soniyalarda topish',
+        description: 'Natija kartochkalari qidiruvdan togridan-togri ochiladi — oyna almashtirishsiz.'
+      },
+      {
+        label: 'Laboratory',
+        screenshot: 'lab.png',
+        alt: 'Laboratoriya navbati: bajarish statuslari bilan tekshiruv kartochkalari',
+        title: 'Laboratoriya umumiy konturda',
+        description: 'Tekshiruvlar va natija statuslari umumiy lab navbatida korinadi.'
       },
       {
         label: 'EMR',
-        title: 'Shifokor qabuli tirik karta ichida',
-        description: 'Korik, hujjatlar va tarix alohida vositalarga parchalanib ketmaydi.'
-      },
-      {
-        label: 'Analytics',
-        title: 'Tushum va yuklama analitikasi',
-        description: 'Rahbar smena natijalarini, ortiqcha yuklamani va osish nuqtalarini qolda jadvalsiz koradi.'
+        screenshot: 'emr.png',
+        alt: 'Shifokor qabul kartasi: tuzilgan korik bolimlari va shablonlar',
+        title: 'Shifokor qabuli jonli kartada',
+        description: 'Korik, hujjatlar va tarix bitta qabul kartasida saqlanadi.'
       }
     ]
   },
@@ -1001,7 +1040,6 @@ const KK_OVERRIDES = {
     title: 'EMR, кезек және төлемдерді бір ырғақта ұстайтын клиниканы басқарудың бірыңғай жүйесі.',
     description:
       'Clinic OS тіркеуді, дәрігерді, QR-кезекті, төлемдерді, Telegram және есептерді бір workflow ішінде біріктіреді, командалар арасындағы қол еңбегін азайтады.',
-    primaryCta: 'Демоны ашу',
     secondaryCta: 'Интерфейсті қарау',
     proofChips: ['Дәрігер EMR', 'QR-кезек', 'Telegram сигналдары', 'Төлемдер мен есептер'],
     quickStats: [
@@ -1009,26 +1047,12 @@ const KK_OVERRIDES = {
       { value: '1', label: 'бірыңғай workflow', detail: 'тіркеуден есепке дейін' },
       { value: '24/7', label: 'операциялық көрініс', detail: 'кезек, төлем және статус бақылауы' }
     ],
-    visualPanels: [
-      {
-        label: 'Dashboard',
-        title: 'Басшылық клиниканы нақты уақытта көреді',
-        description: 'Кезек, кабинет жүктемесі және ауысым сигналдары бір терезеде тұрады.',
-        bullets: ['Слоттар мен дәрігер жүктемесі', 'Кешігу мен кезек сигналдары', 'Түсім және статус жиынтығы']
-      },
-      {
-        label: 'QR Queue',
-        title: 'Тіркеу ағынды ретсіздіксіз басқарады',
-        description: 'QR-кезек, табло және пациент маршруты бір байланысқан сценарий ретінде жұмыс істейді.',
-        bullets: ['Жазылуды тексеру және визит ашу', 'Дұрыс кабинетке бағыттау', 'Пациент үшін ашық кезек']
-      },
-      {
-        label: 'Doctor EMR',
-        title: 'Дәрігер қабылдауды тірі пациент картасының ішінде жүргізеді',
-        description: 'Тарих, қарау шаблондары және PDF құжаттар қабылдау кезінде EMR ішінде қалады.',
-        bullets: ['Қарау шаблондары мен тағайындаулар', 'Визит тарихы мен файлдар', 'Қолмен қайта терусіз құжаттар']
-      }
-    ]
+    shot: {
+      screenshot: 'queue.png',
+      label: 'Тірі интерфейс',
+      alt: 'Clinic OS электрондық кезек экраны: пациенттер кестесі, статустар, нөмірлер және кабинеттер',
+      caption: 'Тіркеу науқастар ағынын тірі кезек кестесінде басқарады — қағаз тізімдерсіз.'
+    }
   },
   trust: {
     eyebrow: 'Жүйе бірінші күннен нені жабады',
@@ -1085,26 +1109,44 @@ const KK_OVERRIDES = {
     title: 'Пациент тіркеуден есепке дейін қолмен үзіліссіз өтеді',
     description:
       'Күрделі медициналық өнім үшін ең күшті сату құралы үзілген feature тізімі емес, нақты end-to-end клиника workflow-ы.',
-    steps: [
+    stages: [
       {
-        title: '01. Пациент тіркеледі',
+        node: 'Пациент',
+        title: '01. Пациент жазылады',
+        description: 'Пациент QR-кезек немесе жазылу арқылы ағынға енеді — қоңыраусыз, қағаз сауалнамасыз.'
+      },
+      {
+        node: 'Тіркеу',
+        title: '02. Тіркеу қабылдауды ашады',
         description: 'Тіркеу пациентті табады, жазылуды растайды және қабылдауды қағазсыз бастайды.'
       },
       {
-        title: '02. Кезекке түседі',
+        node: 'Кезек',
+        title: '03. Кезек дәрігерге бағыттайды',
         description: 'Жүйе пациентті дұрыс ағынға бағыттайды, ал команда мен табло бірдей статусты көреді.'
       },
       {
-        title: '03. Дәрігер EMR ішінде жұмыс істейді',
+        node: 'Дәрігер',
+        title: '04. Дәрігер науқасты қабылдайды',
+        description: 'Дәрігер науқасты кезектен шақырып, алғашқы жанасудан визит контекстін көреді.'
+      },
+      {
+        node: 'EMR',
+        title: '05. EMR қабылдауды сақтайды',
         description: 'Қабылдау, тарих, шаблондар және құжаттар бір байланысқан пациент картасының ішінде қалады.'
       },
       {
-        title: '04. Төлем мен есептер автоматты жаңарады',
-        description: 'Касса қызметтерді жабады, ал басшылық ауысым мен түсім көрінісін бірден көреді.'
+        node: 'Төлем',
+        title: '06. Төлем қызметтерді жабады',
+        description: 'Касса төлемді қабылдап, визит қызметтерін жабады — қолма-қол немесе төлем жүйелері арқылы.'
+      },
+      {
+        node: 'Есептер',
+        title: '07. Есептер ауысымды жинақтайды',
+        description: 'Басшылық ауысым, түсім және дәрігер жүктемесі көрінісін бірден көреді.'
       }
     ],
     flowLabel: 'Клиника workflow-ы',
-    flowNodes: ['Пациент', 'Тіркеу', 'Кезек', 'Дәрігер', 'EMR', 'Төлем', 'Есептер'],
     flowSummary:
       'Дәл осы тізбек өнімнің құнын контекссіз модульдер тізімінен әлдеқайда тезірек ашады.'
   },
@@ -1128,32 +1170,42 @@ const KK_OVERRIDES = {
     eyebrow: 'Интерфейс көріністері',
     title: 'Команда бірінші күннен түсінетін интерфейстер',
     description:
-      'Әдемі абстракциялар емес, нақты жұмыс беттері көрсетіледі: dashboard, кезек, EMR, тіркеу және аналитика.',
+      'Жүйенің нақты жұмыс беттері: науқасты тіркеу, қабылдау кестесі, карта іздеу, зертхана және дәрігер EMR.',
     items: [
       {
-        label: 'Dashboard',
-        title: 'Ауысымның операциялық орталығы',
-        description: 'Кезек, кабинеттер, касса және жүктеме сигналдары бір экранда.'
-      },
-      {
         label: 'Reception',
-        title: 'Қолмен дерек тасымалдаусыз тіркеу',
-        description: 'Пациентті табу, жазылу, визит ашу және кезекке өткізу бір жерде қалады.'
+        screenshot: 'registrar-wizard.png',
+        alt: 'Науқасты тіркеу шебері: прогресс көрсеткіші және қызмет таңдауы бар қадамдық форма',
+        title: 'Деректерді қайта енгізбейтін тіркеу',
+        description: 'Тіркеу шебері қызметкерді науқас, қызмет, дәрігер және уақыт бойынша жүргізеді.'
       },
       {
-        label: 'Queue',
-        title: 'Команда мен пациент үшін ашық кезек',
-        description: 'QR-ағын, табло және кабинетке бөлу холлдағы ретсіздіксіз жұмыс істейді.'
+        label: 'Appointments',
+        screenshot: 'appointments.png',
+        alt: 'Қабылдау жазулары кестесі: науқастар, уақыт, дәрігерлер және статустар',
+        title: 'Кесте бақылауда',
+        description: 'Кеңейтілген жазулар кестесі дәрігер, уақыт және статустарды бір экранда ұстайды.'
+      },
+      {
+        label: 'Patients',
+        screenshot: 'patients.png',
+        alt: 'Науқас іздеу нәтижелері: аты-жөні, телефон және туған күні бар карточкалар',
+        title: 'Науқасты секундтарда табу',
+        description: 'Нәтиже карточкалары іздеуден тікелей ашылады — терезе ауыстырусыз.'
+      },
+      {
+        label: 'Laboratory',
+        screenshot: 'lab.png',
+        alt: 'Зертхана кезегі: орындалу статустары бар зерттеу карточкалары',
+        title: 'Зертхана жалпы контурда',
+        description: 'Зерттеулер мен нәтиже статустары ортақ зертхана кезегінде көрінеді.'
       },
       {
         label: 'EMR',
-        title: 'Дәрігер қабылдауы тірі карта ішінде',
-        description: 'Қарау, құжаттар және тарих бөлек құралдарға бөлініп кетпейді.'
-      },
-      {
-        label: 'Analytics',
-        title: 'Түсім мен жүктеме аналитикасы',
-        description: 'Басшылық ауысым нәтижелерін, артық жүктемені және өсу нүктелерін қолмен кестесіз көреді.'
+        screenshot: 'emr.png',
+        alt: 'Дәрігер қабылдау картасы: құрылымдық қарау бөлімдері және үлгілер',
+        title: 'Дәрігер қабылдауы тірі картада',
+        description: 'Қарау, құжаттар және анамнез бір қабылдау картасында сақталады.'
       }
     ]
   },
@@ -1312,36 +1364,3 @@ export const LANDING_COPY = {
   kk: deepMerge(BASE_COPY, KK_OVERRIDES)
 };
 
-export function buildGlassStyle(isDark: boolean, emphasis = 'default') {
-  const baseStyle = {
-    border: isDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(15, 23, 42, 0.08)',
-    boxShadow: isDark ? '0 24px 80px rgba(2, 6, 23, 0.42)' : '0 24px 80px rgba(15, 23, 42, 0.12)',
-    backdropFilter: 'blur(24px)',
-    WebkitBackdropFilter: 'blur(24px)'
-  };
-
-  if (emphasis === 'hero') {
-    return {
-      ...baseStyle,
-      background: isDark
-        ? 'linear-gradient(155deg, rgba(15, 23, 42, 0.94), rgba(14, 165, 233, 0.18))'
-        : 'linear-gradient(155deg, rgba(255, 255, 255, 0.96), rgba(14, 165, 233, 0.16))'
-    };
-  }
-
-  if (emphasis === 'accent') {
-    return {
-      ...baseStyle,
-      background: isDark
-        ? 'linear-gradient(160deg, rgba(17, 24, 39, 0.88), rgba(34, 197, 94, 0.16))'
-        : 'linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(34, 197, 94, 0.14))'
-    };
-  }
-
-  return {
-    ...baseStyle,
-    background: isDark
-      ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.84), rgba(15, 23, 42, 0.7))'
-      : 'linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.78))'
-  };
-}

@@ -54,7 +54,6 @@ const QueueJoin = lazy(() => import('./pages/QueueJoin'));
 const PatientPanel = lazy(() => import('./pages/PatientPanel'));
 const DisplayBoardUnified = lazy(() => import('./pages/DisplayBoardUnified'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
-const MediLabDemo = lazy(() => import('./pages/MediLabDemo'));
 const CSSTestPage = lazy(() => import('./pages/CSSTestPage'));
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
 const PaymentCancel = lazy(() => import('./pages/PaymentCancel'));
@@ -126,7 +125,6 @@ const ROUTE_COMPONENTS = {
   Search,
   UserProfile,
   PatientPickupView,
-  MediLabDemo,
   MacOSDemoPage,
   IntegrationDemo,
   PaymentTest,

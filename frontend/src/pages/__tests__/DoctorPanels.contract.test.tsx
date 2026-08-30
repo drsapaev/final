@@ -89,7 +89,9 @@ describe('Doctor panels SSOT contract', () => {
   });
 
   it('keeps doctor table command visibility backend-owned when rows are missing action fields', () => {
-    const table = read('components/tables/EnhancedAppointmentsTable.tsx');
+    // PR-UI-09e-2: the EAT actions column moved verbatim to
+    // appointmentsTableColumns.tsx — read-list follows the moved code.
+    const table = read('components/tables/appointmentsTableColumns.tsx');
     const actionBlock = extractBlock(
       table,
       'const backendCanPay = getBackendActionAvailability',
