@@ -411,12 +411,19 @@ async def book_mobile_appointment(
 
         # Slot-occupancy guard (Codex round-3 P1): same contract as the web
         # and Telegram writers — two patients must never receive successful
-        # bookings for the same doctor slot.
-        if crud_appointment.appointment.is_time_slot_occupied(
-            db,
-            doctor_id=request.doctor_id,
-            appointment_date=appointment_date,
-            appointment_time=request.preferred_time,
+        # bookings for the same doctor slot. Skipped when NO time was chosen
+        # (Codex round-4 P1): preferred_time is optional, and the occupancy
+        # query would match appointment_time IS NULL rows — after the first
+        # date-only booking every later date-only request would get a false
+        # 409 although no concrete slot was ever selected.
+        if (
+            request.preferred_time
+            and crud_appointment.appointment.is_time_slot_occupied(
+                db,
+                doctor_id=request.doctor_id,
+                appointment_date=appointment_date,
+                appointment_time=request.preferred_time,
+            )
         ):
             raise HTTPException(
                 status_code=409,
@@ -426,8 +433,10 @@ async def book_mobile_appointment(
         # Persist requested services through the REAL contract (Codex
         # round-3 P2): web/Telegram store service NAMES in the
         # Appointment.services JSON column at creation time — resolve the
-        # mobile service IDs to names here. Unknown IDs are rejected
-        # instead of silently dropped; the former stub loop
+        # mobile service IDs to names here. Inactive or unknown IDs are
+        # rejected (Codex round-4 P2): the mobile search contract exposes
+        # only Service.active == True rows, so a booking must never persist
+        # an unavailable service; the former stub loop
         # (add_appointment_service) wrote nothing and is retired.
         service_names: list[str] = []
         if request.services:
@@ -435,15 +444,21 @@ async def book_mobile_appointment(
 
             service_rows = (
                 db.query(Service)
-                .filter(Service.id.in_(request.services))
+                .filter(
+                    Service.id.in_(request.services),
+                    Service.active.is_(True),
+                )
                 .all()
             )
             found_ids = {s.id for s in service_rows}
-            missing = [sid for sid in request.services if sid not in found_ids]
-            if missing:
+            unavailable = [sid for sid in request.services if sid not in found_ids]
+            if unavailable:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Услуги не найдены: {sorted(missing)}",
+                    detail=(
+                        "Услуги недоступны (не найдены или деактивированы): "
+                        f"{sorted(unavailable)}"
+                    ),
                 )
             service_names = [s.name for s in service_rows]
 

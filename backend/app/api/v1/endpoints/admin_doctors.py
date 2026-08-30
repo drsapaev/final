@@ -369,6 +369,10 @@ def update_doctor(
         # Decision #13: the resulting doctor state must not be active+userless
         # (e.g. activating a userless doctor, or unsetting user_id on an
         # active one). Fields not present in the payload keep current values.
+        # Validated BEFORE the explicit-detachment guard below so a request
+        # that violates BOTH contracts surfaces the #13 active-userless 400
+        # first (the detachment 409 is about the OWNER-role contract, which
+        # is only reachable for inactive resulting rows).
         payload_set = doctor.model_fields_set
         target_user_id = (
             doctor.user_id if "user_id" in payload_set else existing_doctor.user_id
@@ -380,6 +384,44 @@ def update_doctor(
         # Ghost-state guard (Codex P2-C): never allow the resulting state
         # Doctor.active=True + User.is_active=False for a linked Doctor.
         _validate_linked_owner_allows_active(db, target_user_id, bool(target_active))
+
+        if (
+            "user_id" in payload_set
+            and doctor.user_id is None
+            and existing_doctor.user_id is not None
+        ):
+            # Codex round-4 P2: EXPLICIT DETACHMENT (user_id=null) is the
+            # same risky path as reassignment to another user — the old
+            # owner keeps their doctor-family role but loses the profile,
+            # so /auth/me and clinical endpoints can no longer resolve that
+            # account. The active-userless guard does not catch it (the
+            # resulting row is typically inactive), so it is rejected here
+            # under the same option-A contract: change the owner's role
+            # first (the lifecycle mirror deactivates the profile) — only
+            # then may the link be detached.
+            old_owner = (
+                db.query(User)
+                .filter(User.id == existing_doctor.user_id)
+                .first()
+            )
+            old_owner_role = (
+                str(old_owner.role.value)
+                if old_owner and hasattr(old_owner.role, "value")
+                else (str(old_owner.role) if old_owner else None)
+            )
+            if old_owner is not None and old_owner_role in DOCTOR_PROFILE_ROLES:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Нельзя отвязать профиль врача от пользователя, "
+                        "пока владелец сохраняет врачебную роль "
+                        f"('{old_owner_role}'): учётная запись останется "
+                        "без профиля и потеряет доступ к врачу-панелям. "
+                        "Сначала измените роль владельца (это деактивирует "
+                        "профиль через lifecycle-зеркало), затем отвяжите "
+                        "профиль."
+                    ),
+                )
 
         updated_doctor = crud_clinic.update_doctor(db, doctor_id, doctor)
         if not updated_doctor:

@@ -709,3 +709,59 @@ class TestAppointmentWriteEligibility:
             headers=auth_headers,
         )
         assert response.status_code == 404, response.text
+
+
+# ---------------------------------------------------------------------------
+# Round-4 Codex — explicit detachment (user_id=null) from a doctor-role owner
+# is the same risky path as reassignment and must be rejected (option A).
+# ---------------------------------------------------------------------------
+
+
+class TestExplicitDetachGuard:
+    def test_put_user_id_null_rejected_for_doctor_role_owner(
+        self, client, db_session, auth_headers
+    ):
+        owner = _make_user(db_session, "detach_owner", role="Doctor")
+        doctor = _make_doctor(db_session, owner, "cardiology", active=True)
+
+        response = client.put(
+            f"/api/v1/admin/doctors/{doctor.id}",
+            json={"user_id": None, "active": False},
+            headers=auth_headers,
+        )
+        assert response.status_code == 409, response.text
+        assert "отвязать" in response.json()["detail"]
+
+        db_session.expire_all()
+        refreshed = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+        assert refreshed.user_id == owner.id, (
+            "the profile must stay linked: the owner keeps a doctor-family "
+            "role and would lose panel resolution otherwise"
+        )
+
+    def test_put_user_id_null_allowed_after_role_demotion(
+        self, client, db_session, auth_headers
+    ):
+        """After a demotion the owner has no doctor-family role anymore —
+        the link may then be detached (e.g. genuine userless-record repair
+        or identity cleanup)."""
+        owner = _make_user(db_session, "detach_demo", role="Doctor")
+        doctor = _make_doctor(db_session, owner, "cardiology", active=True)
+
+        assert client.put(
+            f"/api/v1/users/users/{owner.id}",
+            json={"role": "Registrar"},
+            headers=auth_headers,
+        ).status_code == 200
+
+        response = client.put(
+            f"/api/v1/admin/doctors/{doctor.id}",
+            json={"user_id": None},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        db_session.expire_all()
+        assert (
+            db_session.query(Doctor).filter(Doctor.id == doctor.id).one().user_id
+            is None
+        )

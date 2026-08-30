@@ -311,3 +311,101 @@ class TestMobileBookingRound3Fixes:
             client, headers, owner.id, services=[999999]
         )
         assert response.status_code == 400, response.text
+
+
+class TestMobileBookingRound4Fixes:
+    """Round-4 Codex findings: no false slot-conflict for date-only bookings;
+    inactive services are unavailable to mobile bookings."""
+
+    def test_date_only_bookings_do_not_conflict(
+        self, client, db_session, auth_headers
+    ):
+        """preferred_time is optional: the occupancy query must be skipped
+        when no time was selected — otherwise the FIRST date-only booking
+        for a doctor+date (appointment_time IS NULL) would 409 every later
+        date-only request although no concrete slot was ever chosen."""
+        owner = _make_doctor(db_session, "cardiology", active=True)
+        first_user, _ = _make_patient_user(db_session)
+        second_user, _ = _make_patient_user(db_session)
+
+        first = client.post(
+            "/api/v1/mobile/appointments/book",
+            json={
+                "doctor_id": owner.id,
+                "preferred_date": str(date.today() + timedelta(days=3)),
+            },
+            headers=_patient_login(client, first_user),
+        )
+        assert first.status_code == 200, first.text
+
+        second = client.post(
+            "/api/v1/mobile/appointments/book",
+            json={
+                "doctor_id": owner.id,
+                "preferred_date": str(date.today() + timedelta(days=3)),
+            },
+            headers=_patient_login(client, second_user),
+        )
+        assert second.status_code == 200, second.text + (
+            " — date-only bookings must not collide with each other"
+        )
+
+    def test_book_inactive_service_rejected(
+        self, client, db_session, auth_headers
+    ):
+        owner = _make_doctor(db_session, "cardiology", active=True)
+        patient_user, _ = _make_patient_user(db_session)
+
+        from app.models.service import Service
+
+        inactive = Service(name="Светящаяся аура", price=1000, active=False)
+        db_session.add(inactive)
+        db_session.commit()
+        db_session.refresh(inactive)
+
+        headers = _patient_login(client, patient_user)
+        response = client.post(
+            "/api/v1/mobile/appointments/book",
+            json={
+                "doctor_id": owner.id,
+                "preferred_date": str(date.today() + timedelta(days=3)),
+                "services": [inactive.id],
+            },
+            headers=headers,
+        )
+        assert response.status_code == 400, response.text
+        assert "недоступны" in response.json()["detail"]
+
+    def test_book_active_service_still_persists(
+        self, client, db_session, auth_headers
+    ):
+        owner = _make_doctor(db_session, "cardiology", active=True)
+        patient_user, _ = _make_patient_user(db_session)
+
+        from app.models.service import Service
+
+        active = Service(name="УЗИ сердца", price=200000, active=True)
+        db_session.add(active)
+        db_session.commit()
+        db_session.refresh(active)
+
+        headers = _patient_login(client, patient_user)
+        response = client.post(
+            "/api/v1/mobile/appointments/book",
+            json={
+                "doctor_id": owner.id,
+                "preferred_date": str(date.today() + timedelta(days=3)),
+                "services": [active.id],
+            },
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+
+        from app.models.appointment import Appointment
+
+        row = (
+            db_session.query(Appointment)
+            .filter(Appointment.doctor_id == owner.id)
+            .one()
+        )
+        assert row.services == ["УЗИ сердца"]
