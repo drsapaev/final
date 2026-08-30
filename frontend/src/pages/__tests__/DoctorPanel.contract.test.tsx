@@ -20,9 +20,11 @@ describe('DoctorPanel plan §PR-UI-15 AC guards', () => {
     expect(loc).toBeLessThanOrEqual(500);
   });
 
-  it('renders behind the local ErrorBoundary (plan item 5)', () => {
+  it('renders behind the local ErrorBoundary (plan item 5), reset per tab (Codex P2 #2926)', () => {
     const source = readDoctorPanelSource();
-    expect(source).toContain('<ErrorBoundary>');
+    // key={activeTab} — boundary resets when switching tabs so one crashed
+    // tab does not poison the others (Codex review #2926).
+    expect(source).toContain('<ErrorBoundary key={activeTab}>');
   });
 
   it('keeps the slim-orchestrator decomposition: no inline tab tables/stat grids', () => {

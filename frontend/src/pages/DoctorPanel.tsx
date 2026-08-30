@@ -135,8 +135,11 @@ const DoctorPanel = () => {
 
         {/* Контент вкладок — PR-UI-15 (plan item 5): локальный ErrorBoundary
             вокруг контента вкладок (падение рендера любого таба не уронит
-            всю страницу врача; registrar 13-4 / cashier 14-5 precedent). */}
-        <ErrorBoundary>
+            всю страницу врача; registrar 13-4 / cashier 14-5 precedent).
+            Codex P2 (#2926): key={activeTab} сбрасывает boundary при смене
+            вкладки — упавший таб не «отравляет» здоровые (без key
+            hasError сохранялся бы до ручного Retry). */}
+        <ErrorBoundary key={activeTab}>
           {activeTab === 'dashboard' &&
           <DoctorDashboardTab
             patientsCount={patients.length}

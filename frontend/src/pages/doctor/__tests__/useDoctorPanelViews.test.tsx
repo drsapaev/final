@@ -19,14 +19,14 @@ const t = (key: string, params?: Record<string, unknown>) =>
 
 describe('doctorViewmodel (PR-UI-15-2)', () => {
   const patients: PatientRecord[] = [
-    { id: 1, name: 'Ivan Petrov', phone: '998901234567', status: 'active' },
-    { id: 2, name: 'Anna Kim', phone: '998907654321', status: 'critical' },
+    { id: 1, name: 'SYNTHETIC-Patient-One', phone: 'SYNTHETIC-PHONE-1', status: 'active' },
+    { id: 2, name: 'SYNTHETIC-Patient-Two', phone: 'SYNTHETIC-PHONE-2', status: 'critical' },
   ];
 
   it('filterPatients matches by name (case-insensitive) or phone', () => {
-    expect(filterPatients(patients, 'ivan', 'all')).toHaveLength(1);
-    expect(filterPatients(patients, 'IVAN', 'all')).toHaveLength(1);
-    expect(filterPatients(patients, '907654321', 'all')).toHaveLength(1);
+    expect(filterPatients(patients, 'synthetic-patient-one', 'all')).toHaveLength(1);
+    expect(filterPatients(patients, 'SYNTHETIC-PATIENT-ONE', 'all')).toHaveLength(1);
+    expect(filterPatients(patients, 'SYNTHETIC-PHONE-2', 'all')).toHaveLength(1);
     expect(filterPatients(patients, 'no-match', 'all')).toHaveLength(0);
   });
 
@@ -37,19 +37,19 @@ describe('doctorViewmodel (PR-UI-15-2)', () => {
   });
 
   it('filterPatients combines search AND status', () => {
-    expect(filterPatients(patients, 'anna', 'critical')).toHaveLength(1);
-    expect(filterPatients(patients, 'anna', 'active')).toHaveLength(0);
+    expect(filterPatients(patients, 'two', 'critical')).toHaveLength(1);
+    expect(filterPatients(patients, 'two', 'active')).toHaveLength(0);
   });
 
   it('filterAppointments matches by patient name + status', () => {
     const appointments: AppointmentDto[] = [
-      { id: 1, patientName: 'Ivan Petrov', status: 'scheduled' },
-      { id: 2, patientName: 'Anna Kim', status: 'completed' },
+      { id: 1, patientName: 'SYNTHETIC-Patient-One', status: 'scheduled' },
+      { id: 2, patientName: 'SYNTHETIC-Patient-Two', status: 'completed' },
     ];
-    expect(filterAppointments(appointments, 'kim', 'all')).toHaveLength(1);
+    expect(filterAppointments(appointments, 'two', 'all')).toHaveLength(1);
     expect(filterAppointments(appointments, '', 'completed')).toHaveLength(1);
     expect(filterAppointments(appointments, '', 'cancelled')).toHaveLength(0);
-    expect(filterAppointments(appointments, 'ivan', 'completed')).toHaveLength(0);
+    expect(filterAppointments(appointments, 'one', 'completed')).toHaveLength(0);
   });
 });
 
@@ -113,14 +113,14 @@ describe('doctor views (PR-UI-15-2)', () => {
     const onClose = vi.fn();
     renderWithProviders(
       <DoctorPatientInfo
-        patient={{ id: 7, name: 'Dilnoza Rahimova', phone: '998901234567', age: 30, status: 'active' }}
+        patient={{ id: 7, name: 'SYNTHETIC-Patient-Seven', phone: 'SYNTHETIC-PHONE-7', age: 30, status: 'active' }}
         onClose={onClose}
         t={t}
       />,
     );
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Dilnoza Rahimova')).toBeInTheDocument();
-    expect(screen.getByText('998901234567')).toBeInTheDocument();
+    expect(screen.getByText('SYNTHETIC-Patient-Seven')).toBeInTheDocument();
+    expect(screen.getByText('SYNTHETIC-PHONE-7')).toBeInTheDocument();
     screen.getByRole('button', { name: 'doctor.aria_close_patient_info' }).click();
     expect(onClose).toHaveBeenCalledTimes(1);
   });

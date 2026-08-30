@@ -49,7 +49,7 @@ describe('doctorStatus (PR-UI-15-1)', () => {
   });
 
   it('a11y context builders include id + name (and time for appointments)', () => {
-    expect(getPatientA11yContext({ id: 7, name: 'Ivan Petrov' })).toBe('patient Ivan Petrov (7)');
+    expect(getPatientA11yContext({ id: 7, name: 'SYNTHETIC-Patient-Seven' })).toBe('patient SYNTHETIC-Patient-Seven (7)');
     expect(getPatientA11yContext(null)).toBe('patient patient (unknown)');
     expect(getAppointmentA11yContext({ id: 3, patientName: 'Anna', time: '10:30' })).toBe('appointment 3 for Anna at 10:30');
     expect(getAppointmentA11yContext({ id: 3, patientName: 'Anna' })).toBe('appointment 3 for Anna');
@@ -172,7 +172,7 @@ describe('useDoctorPanelData (PR-UI-15-1)', () => {
 
     act(() => {
       result.current.handleScheduleNextSuccess(
-        { visit_id: 'v-1', confirmation: { patient_name: 'Dilnoza', visit_date: '2026-09-01', visit_time: '09:00' } },
+        { visit_id: 'v-1', confirmation: { patient_name: 'SYNTHETIC-Patient-One', visit_date: '2026-09-01', visit_time: '09:00' } },
         { patient_id: 5, discount_mode: 'repeat' },
       );
     });
@@ -181,7 +181,7 @@ describe('useDoctorPanelData (PR-UI-15-1)', () => {
     expect(result.current.appointments[0]).toMatchObject({
       id: 'v-1',
       patientId: 5,
-      patientName: 'Dilnoza',
+      patientName: 'SYNTHETIC-Patient-One',
       status: 'scheduled',
       source: 'schedule-next',
     });
