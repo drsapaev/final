@@ -6,13 +6,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../..');
 // PR-UI-15-1: status presentation maps moved verbatim to
-// pages/doctor/doctorStatus.ts — the i18n surface is the union of the panel
-// and its extracted modules (same pattern as registrar/cashier contract
-// tests reading extracted hook/view-model files).
-const source =
-  fs.readFileSync(path.join(ROOT, 'pages/DoctorPanel.tsx'), 'utf8') +
-  fs.readFileSync(path.join(ROOT, 'pages/doctor/doctorStatus.ts'), 'utf8') +
-  fs.readFileSync(path.join(ROOT, 'pages/doctor/useDoctorPanelData.ts'), 'utf8');
+// pages/doctor/doctorStatus.ts. PR-UI-15-2: tab JSX moved verbatim to
+// pages/doctor/views/* — the i18n surface is the union of the panel and its
+// extracted modules (same pattern as registrar/cashier contract tests
+// reading extracted hook/view files).
+const readDoctorSource = () => {
+  const parts = [fs.readFileSync(path.join(ROOT, 'pages/DoctorPanel.tsx'), 'utf8')];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === '__tests__') continue;
+        walk(full);
+      } else if (/\.(ts|tsx)$/.test(entry.name)) {
+        parts.push(fs.readFileSync(full, 'utf8'));
+      }
+    }
+  };
+  walk(path.join(ROOT, 'pages/doctor'));
+  return parts.join('\n');
+};
+const source = readDoctorSource();
 const translationsSource = fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.ts'), 'utf8');
 
 describe('DoctorPanel STRAT#35 — i18n migration', () => {

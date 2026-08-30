@@ -12,6 +12,12 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
 const DENTIST_PANEL = path.join(ROOT, 'src/pages/DentistPanelUnified.tsx');
+// PR-UI-15-3: the no-op stubs were dropped during the decomposition (dead,
+// definition-only); the stub contract reads the union surface so a future
+// re-introduction inside the extracted hooks is still caught.
+const DENTIST_DATA_HOOK = path.join(ROOT, 'src/pages/dentist/useDentistWorklistData.ts');
+const readDentistSource = () =>
+  fs.readFileSync(DENTIST_PANEL, 'utf8') + '\n' + fs.readFileSync(DENTIST_DATA_HOOK, 'utf8');
 const FILE_VALIDATOR = path.join(ROOT, 'src/utils/fileValidator.ts');
 const CASHIER_PANEL = path.join(ROOT, 'src/pages/CashierPanel.tsx');
 

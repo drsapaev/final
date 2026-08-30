@@ -7,13 +7,41 @@ import { normalizeSource } from '../../test/contracts/source-contract-helper';
 
 const ROOT = path.resolve(process.cwd(), 'src');
 
+// PR-UI-15-3: the DentistPanelUnified decomposition moved the queue DTO
+// mapping + queue-id resolution verbatim to pages/dentist/* — the dentist
+// contract surface is the union of the panel and its extracted modules
+// (same pattern as registrar/cashier contract boundary updates).
+const readDentistModules = () => {
+  const parts: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === '__tests__') continue;
+        walk(full);
+      } else if (/\.ts$/.test(entry.name)) {
+        parts.push(fs.readFileSync(full, 'utf8'));
+      }
+    }
+  };
+  const dentistDir = path.join(ROOT, 'pages/dentist');
+  if (fs.existsSync(dentistDir)) walk(dentistDir);
+  return parts.join('\n');
+};
+
 const DOCTOR_PANEL_FILES = [
   'pages/CardiologistPanelUnified.tsx',
   'pages/DentistPanelUnified.tsx',
   'pages/DermatologistPanelUnified.tsx',
 ];
 
-const read = (filePath: string) => normalizeSource(fs.readFileSync(path.join(ROOT, filePath), 'utf8'));
+const read = (filePath: string) => {
+  const base = normalizeSource(fs.readFileSync(path.join(ROOT, filePath), 'utf8'));
+  if (filePath === 'pages/DentistPanelUnified.tsx') {
+    return base + '\n' + normalizeSource(readDentistModules());
+  }
+  return base;
+};
 
 const extractBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(normalizeSource(startMarker));
