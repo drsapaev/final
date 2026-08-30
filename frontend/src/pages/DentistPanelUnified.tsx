@@ -4,11 +4,9 @@ import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import { useTheme } from '../contexts/ThemeContext';
-import { adaptTimeFields } from '../utils/registrarAggregation';
 import { getLocalDateString, parseRegistrarTimestamp } from '../utils/dateUtils';
 import {
-  Button, Badge, Card,
-  Input } from '../components/ui/macos';
+  Button, Badge, Card } from '../components/ui/macos';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import auth from '../stores/auth';
 import { apiClient } from '../api/client';
@@ -35,40 +33,22 @@ import QueueIntegration from '../components/QueueIntegration';
 
 import {
   Calendar,
-  XCircle,
-  Save } from
+  XCircle } from
 'lucide-react';
 import '../styles/animations.css';
-import { getApiBaseUrl } from '../api/runtime';
-import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { printPanelTicket } from '../services/panelPrint';
 import notify from '../services/notify';
 // STRAT#34: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
 import type { Appointment } from '../types/domain/clinic';
-import type { Patient } from '../types/domain/clinic';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDentalHotkeys } from '../hooks/useDentalHotkeys';
-import {
-  DENTIST_DOCUMENTS_STORAGE_KEY,
-  parseDentistDocuments,
-  upsertDentistVisitProtocol,
-} from '../utils/dentistryDocuments';
-import {
-  buildDentistVisitProtocolCard,
-  buildDentistVisitProtocolSaveRequest,
-  mapDentistVisitProtocolFromEmr,
-  mergeDentistVisitProtocolCards,
-} from '../utils/dentistVisitProtocolBridge';
-import { isDentistrySpecialty } from '../utils/dentistrySpecialty';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { queueService } from '../services/queue';
 import {
   countAppointmentsByStatuses,
-  getAllPatientServices,
-  makeEnsureCanonicalVisitId,
   normalizeNumericId,
   SPECIALTY_KEYS,
 } from '../utils/doctorPanelShared';
@@ -86,8 +66,6 @@ import {
   DENTISTRY_COMPLETED_STATUSES,
   invalidateDentistPanelCaches,
   resolveDoctorQueueEntryId,
-  buildPatientsFromAppointments,
-  loadStoredDentistDocuments,
   dentistCache,
   type SelectedPatient,
   type DoctorPanelState,
@@ -96,6 +74,10 @@ import {
 // services + patients + queueUpdated listener) extracted verbatim to
 // ./dentist/useDentistWorklistData.
 import { useDentistWorklistData } from './dentist/useDentistWorklistData';
+// PR-UI-15-4: dialog view-state + EMR v2 visit-protocol lifecycle extracted
+// verbatim to ./dentist/useDentistDialogs + ./dentist/useDentistVisitProtocols.
+import { useDentistDialogs } from './dentist/useDentistDialogs';
+import { useDentistVisitProtocols } from './dentist/useDentistVisitProtocols';
 
 /**
  * Объединенная стоматологическая панель с полным функционалом
@@ -147,11 +129,8 @@ const DentistPanelUnified = () => {
   }, []);
   const [loading, setLoading] = useState(true);
   // P-009: selectedPatient / setSelectedPatient now come from useDoctorPanelState
-  const [savedVisitProtocols, setSavedVisitProtocols] = useState<Record<string, unknown>[]>(
-    () => loadStoredDentistDocuments().visitProtocols
-  );
-  const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null }>({ open: false, patient: null });
-  const [protocolTemplateDraft, setProtocolTemplateDraft] = useState<SelectedPatient | null>(null);
+  // PR-UI-15-4: savedVisitProtocols + protocol loaders/persist/reopen moved
+  // verbatim to ./dentist/useDentistVisitProtocols (EMR v2 lifecycle).
 
   // PR-UI-15-3: worklist state (patients + appointments table + services +
   // refs) + the queues/today data lifecycle moved verbatim to
@@ -168,16 +147,41 @@ const DentistPanelUnified = () => {
   } = useDentistWorklistData({ tI18n, activeTab });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [showDentalChart, setShowDentalChart] = useState(false);
-  const [showTreatmentPlanner, setShowTreatmentPlanner] = useState(false);
-  const [showPatientCard, setShowPatientCard] = useState(false);
-  const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
-  const [showVisitProtocol, setShowVisitProtocol] = useState(false);
-  const [showPhotoArchive, setShowPhotoArchive] = useState(false);
-  const [showProtocolTemplates, setShowProtocolTemplates] = useState(false);
-  const [showReports, setShowReports] = useState(false);
-  // Phase 4+ cleanup: showTreatmentForm/showProstheticForm removed (dead UI).
-  const [dentalChartData, setDentalChartData] = useState<Record<string, unknown> | null>(null);
+  // PR-UI-15-4: dialog/tooth/price/schedule view-state slice moved verbatim
+  // to ./dentist/useDentistDialogs (plain useState — no cross-field reset
+  // shapes, unlike the registrar/cashier dialog state machines).
+  const {
+    showDentalChart, setShowDentalChart,
+    showTreatmentPlanner, setShowTreatmentPlanner,
+    showPatientCard, setShowPatientCard,
+    showDiagnosisForm, setShowDiagnosisForm,
+    showVisitProtocol, setShowVisitProtocol,
+    showPhotoArchive, setShowPhotoArchive,
+    showProtocolTemplates, setShowProtocolTemplates,
+    showReports, setShowReports,
+    dentalChartData, setDentalChartData,
+    showPriceManager, setShowPriceManager,
+    selectedServiceForPrice, setSelectedServiceForPrice,
+    selectedTooth, setSelectedTooth,
+    toothModalOpen, setToothModalOpen,
+    protocolTemplateDraft, setProtocolTemplateDraft,
+    scheduleNextModal, setScheduleNextModal,
+  } = useDentistDialogs();
+
+  // PR-UI-15-4: EMR v2 visit-protocol lifecycle (saved protocols + loaders +
+  // persist + reopen + hydrate) — verbatim port; deps-object wiring keeps the
+  // original setSelectedPatient / setShowVisitProtocol semantics.
+  const {
+    savedVisitProtocols,
+    loadDentistVisitProtocolByVisitId,
+    persistVisitProtocol,
+    reopenVisitProtocol,
+  } = useDentistVisitProtocols({
+    tI18n,
+    selectedPatient,
+    setSelectedPatient,
+    setShowVisitProtocol,
+  });
 
   // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
   // is invalidated when the doctor switches between visits or patients.
@@ -219,146 +223,13 @@ const DentistPanelUnified = () => {
     },
   },
   );
-  // Состояние для DentalPriceManager
-  const [showPriceManager, setShowPriceManager] = useState(false);
-  const [selectedServiceForPrice, setSelectedServiceForPrice] = useState<{ id?: string | number; name?: string; price?: number; [key: string]: unknown } | null>(null);
-  const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: unknown } | string | number | null>(null);
-  const [toothModalOpen, setToothModalOpen] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(
-        DENTIST_DOCUMENTS_STORAGE_KEY,
-        JSON.stringify({ visitProtocols: savedVisitProtocols })
-      );
-    } catch (error: unknown) {
-      logger.warn('[Dentist] Не удалось сохранить локальные протоколы визита:', error);
-    }
-  }, [savedVisitProtocols]);
-
   useEffect(() => {
     appointmentsTableDataRef.current = appointmentsTableData;
   }, [appointmentsTableData]);
 
-  const loadDentistVisitProtocolsForPatient = useCallback(async (patient: SelectedPatient | Record<string, unknown> | null) => {
-    const patientRecord = (patient ?? {}) as Record<string, unknown>;
-    const nestedPatient = patientRecord.patient as { id?: string | number; [k: string]: unknown } | undefined;
-    const patientId = nestedPatient?.id || patientRecord.patient_id || patientRecord.id || null;
-    if (!patientId) {
-      return [];
-    }
-
-    const cacheKey = String(patientId);
-    const cachedProtocols = dentistCache.visitProtocolsCache.get(cacheKey);
-    if (cachedProtocols) {
-      return cachedProtocols;
-    }
-
-    const inFlightProtocols = dentistCache.visitProtocolsLoadPromises.get(cacheKey);
-    if (inFlightProtocols) {
-      return inFlightProtocols;
-    }
-
-    logger.info('[Dentist] Загружаю протоколы визитов из EMR v2', {
-      patientId,
-      patientName: patientRecord.patient_name as string || patientRecord.patient_fio as string || patientRecord.name as string || 'Пациент',
-    });
-
-    const loadPromise = (async () => {
-      try {
-        const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
-          params: { limit: 20 },
-          silent: true,
-        } as Record<string, unknown>);
-
-        const summaries: Record<string, unknown>[] = Array.isArray(response.data) ? response.data : [];
-        const records = await Promise.all(
-          summaries.map(async (summary) => {
-            try {
-              const emrResponse = await apiClient.get(`/v2/emr/${summary.visit_id}`, {
-                silent: true,
-                validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
-              } as Record<string, unknown>);
-
-              if (emrResponse.status === 404) {
-                return null;
-              }
-
-              const protocolRecord = mapDentistVisitProtocolFromEmr(
-                emrResponse.data,
-                patient as Record<string, unknown> | null,
-              );
-
-              if (!protocolRecord) {
-                return null;
-              }
-
-              return protocolRecord;
-            } catch (error: unknown) {
-              logger.warn('[Dentist] Не удалось загрузить EMR визита для протокола', {
-                patientId,
-                visitId: summary.visit_id,
-                error: getErrorMessage(error) || error,
-              });
-              return null;
-            }
-          })
-        );
-
-        const filteredRecords = records.filter((r): r is Record<string, unknown> => Boolean(r));
-        dentistCache.visitProtocolsCache.set(cacheKey, filteredRecords);
-        return filteredRecords;
-      } catch (error: unknown) {
-        dentistCache.visitProtocolsCache.delete(cacheKey);
-        throw error;
-      } finally {
-        dentistCache.visitProtocolsLoadPromises.delete(cacheKey);
-      }
-    })();
-
-    dentistCache.visitProtocolsLoadPromises.set(cacheKey, loadPromise);
-    return loadPromise;
-  }, []);
-
-  const loadDentistVisitProtocolByVisitId = useCallback(async (visitId: string | number | null | undefined, patient: SelectedPatient | Record<string, unknown> | null = null) => {
-    if (!visitId) {
-      return null;
-    }
-
-    try {
-      const response = await apiClient.get(`/v2/emr/${visitId}`, {
-        silent: true,
-        validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
-      } as Record<string, unknown>);
-
-      if (response.status === 404) {
-        return null;
-      }
-
-      const protocolRecord = mapDentistVisitProtocolFromEmr(response.data, patient as Record<string, unknown> | null);
-      if (!protocolRecord) {
-        return null;
-      }
-
-      logger.info('[Dentist] Протокол визита загружен из EMR v2', {
-        visitId,
-        emrId: response.data?.id,
-        status: response.data?.status,
-      });
-
-      return protocolRecord;
-    } catch (error: unknown) {
-      logger.warn('[Dentist] Не удалось загрузить протокол визита из EMR v2', {
-        visitId,
-        error: getErrorMessage(error) || error,
-      });
-      return null;
-    }
-  }, []);
+  // PR-UI-15-4: loadDentistVisitProtocolsForPatient +
+  // loadDentistVisitProtocolByVisitId moved verbatim to
+  // ./dentist/useDentistVisitProtocols.
 
   // Формы данных
 
@@ -542,39 +413,6 @@ const DentistPanelUnified = () => {
     };
     runLoad();
   }, [loadData]);
-
-  useEffect(() => {
-    const selectedPatientIdForProtocols =
-      selectedPatient?.patient?.id || selectedPatient?.patient_id || selectedPatient?.id || null;
-
-    if (!selectedPatientIdForProtocols) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const hydrateDentistVisitProtocols = async () => {
-      try {
-        const backendProtocols = await loadDentistVisitProtocolsForPatient(selectedPatient);
-        if (cancelled || backendProtocols.length === 0) {
-          return;
-        }
-
-        setSavedVisitProtocols((prev) => mergeDentistVisitProtocolCards(prev, backendProtocols));
-      } catch (error: unknown) {
-        logger.warn('[Dentist] Не удалось синхронизировать историю протоколов из EMR v2', {
-          patientId: selectedPatientIdForProtocols,
-          error: getErrorMessage(error) || error,
-        });
-      }
-    };
-
-    hydrateDentistVisitProtocols();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadDentistVisitProtocolsForPatient, selectedPatient]);
 
   // ✅ Автоматическая загрузка пациента из URL параметра patientId
   useEffect(() => {
@@ -1046,66 +884,8 @@ const DentistPanelUnified = () => {
     setShowReports(true);
   };
 
-  const persistVisitProtocol = useCallback(async (patient: SelectedPatient | Record<string, unknown> | null, visitData: Record<string, unknown>) => {
-    const patientRecord = (patient ?? {}) as Record<string, unknown>;
-    if (!patientRecord.visit_id) {
-      return;
-    }
-
-    const nestedPatient = patientRecord.patient as { id?: string | number; [k: string]: unknown } | undefined;
-    const patientId = nestedPatient?.id || patientRecord.patient_id || patientRecord.id || null;
-    const patientName = (patientRecord.patient_name as string) || (patientRecord.patient_fio as string) || (patientRecord.name as string) || tI18n('dental.dental_panel_patient_default');
-    const localRecord = buildDentistVisitProtocolCard(patient, visitData, {
-      source: 'local_cache',
-    });
-
-    try {
-      const payload = buildDentistVisitProtocolSaveRequest(patient, visitData, {
-        isDraft: true,
-        rowVersion: 0,
-      });
-      logger.info('[Dentist] Сохраняю протокол визита в EMR v2', {
-        visitId: patientRecord.visit_id,
-        patientId,
-      });
-
-      const response = await apiClient.post(`/v2/emr/${patientRecord.visit_id}`, payload);
-      const backendRecord = mapDentistVisitProtocolFromEmr(response.data, patient as Record<string, unknown> | null) || localRecord;
-
-      setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, backendRecord));
-      return backendRecord;
-    } catch (error: unknown) {
-      logger.warn('[Dentist] Не удалось сохранить протокол визита в EMR v2, сохраняю локальный кеш', {
-        visitId: patientRecord.visit_id,
-        patientName,
-        error: getErrorMessage(error) || error,
-      });
-
-      setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, localRecord));
-      return localRecord;
-    }
-  }, [tI18n]);
-
-  const reopenVisitProtocol = useCallback(async (protocolRecord: Record<string, unknown> | null) => {
-    const backendProtocol = await loadDentistVisitProtocolByVisitId(protocolRecord?.visit_id as string | number | null | undefined, protocolRecord);
-
-    if (!backendProtocol && !protocolRecord?.visitData) {
-      notify.error(tI18n('dental.protocol_not_found'));
-      return;
-    }
-
-    const selectedProtocol = (backendProtocol || protocolRecord) as Record<string, unknown>;
-    setSelectedPatient({
-      id: (selectedProtocol.patient_id as string | number | null) || (protocolRecord?.patient_id as string | number | null) || null,
-      patient_id: (selectedProtocol.patient_id as string | number | null) || (protocolRecord?.patient_id as string | number | null) || null,
-      patient_name: (selectedProtocol.patient_name as string) || (protocolRecord?.patient_name as string) || tI18n('dental.dental_panel_patient_default'),
-      patient_fio: (selectedProtocol.patient_name as string) || (protocolRecord?.patient_name as string) || tI18n('dental.dental_panel_patient_default'),
-      visit_id: (selectedProtocol.visit_id as string | number | null) || (protocolRecord?.visit_id as string | number | null) || null,
-      visitData: (selectedProtocol.visitData as Record<string, unknown> | null) || (protocolRecord?.visitData as Record<string, unknown> | null) || null,
-      source: (selectedProtocol.source as string) || (protocolRecord?.source as string) || 'reports',
-    } as SelectedPatient);
-    setShowVisitProtocol(true);
-  }, [loadDentistVisitProtocolByVisitId, setSelectedPatient, tI18n]);
+  // PR-UI-15-4: persistVisitProtocol + reopenVisitProtocol moved verbatim
+  // to ./dentist/useDentistVisitProtocols (EMR v2 POST + reopen flow).
 
   const handleDentalChart = (patient: SelectedPatient | Record<string, unknown> | null) => {
     setSelectedPatient({
