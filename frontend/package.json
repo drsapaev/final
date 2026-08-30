@@ -35,6 +35,7 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:e2e": "playwright test",
+    "capture:landing-shots": "CAPTURE_LANDING_SHOTS=1 playwright test e2e/capture-landing-screens.spec.ts --project=chromium",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
     "check-theme": "node scripts/check-theme-compliance.js",
