@@ -110,7 +110,21 @@ def _assert_valid_user_id_constraint(uq: dict | None, phase: str) -> None:
             "constraint manually (or recreate it correctly) and re-run "
             "`alembic upgrade head`. No rows were modified by this run."
         )
-    if uq.get("postgresql_nulls_not_distinct") is True:
+    # PostgreSQL reflection (SQLAlchemy 2.0) NESTS dialect options — the
+    # actual reflected shape is
+    #   {"column_names": [...], "name": ...,
+    #    "dialect_options": {"postgresql_nulls_not_distinct": <bool>}}
+    # so the nested option is authoritative (round-5 Codex P2); the
+    # top-level key is still honoured as a defensive fallback.
+    dialect_options = uq.get("dialect_options") or {}
+    nulls_not_distinct = dialect_options.get(
+        "postgresql_nulls_not_distinct",
+        uq.get("postgresql_nulls_not_distinct"),
+    )
+    if nulls_not_distinct is True or (
+        isinstance(nulls_not_distinct, str)
+        and "NOT DISTINCT" in nulls_not_distinct.upper()
+    ):
         raise RuntimeError(
             f"MIGRATION ABORTED ({phase}): constraint {CONSTRAINT_NAME} "
             "exists as UNIQUE NULLS NOT DISTINCT (user_id). That variant "

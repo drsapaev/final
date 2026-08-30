@@ -365,7 +365,20 @@ def test_validator_rejects_nulls_not_distinct_variant() -> None:
         },
         "test",
     )
-    # NULLS NOT DISTINCT must be rejected
+    # NULLS NOT DISTINCT must be rejected — in the REAL PostgreSQL
+    # reflection shape, where the dialect option is NESTED inside
+    # dialect_options (round-5 Codex: a top-level-only key is never produced
+    # by actual reflection and would have hidden the regression):
+    with pytest.raises(RuntimeError, match="NULLS NOT DISTINCT"):
+        module._assert_valid_user_id_constraint(
+            {
+                "name": "uq_doctors_user_id",
+                "column_names": ["user_id"],
+                "dialect_options": {"postgresql_nulls_not_distinct": True},
+            },
+            "test",
+        )
+    # Defensive fallback: a top-level key (older/other reflection shapes)
     with pytest.raises(RuntimeError, match="NULLS NOT DISTINCT"):
         module._assert_valid_user_id_constraint(
             {
@@ -375,3 +388,13 @@ def test_validator_rejects_nulls_not_distinct_variant() -> None:
             },
             "test",
         )
+    # A NULLS DISTINCT constraint reflected with dialect_options present but
+    # the option at its default must keep passing:
+    module._assert_valid_user_id_constraint(
+        {
+            "name": "uq_doctors_user_id",
+            "column_names": ["user_id"],
+            "dialect_options": {"postgresql_nulls_not_distinct": False},
+        },
+        "test",
+    )

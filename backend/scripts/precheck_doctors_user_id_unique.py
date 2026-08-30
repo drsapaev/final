@@ -186,28 +186,43 @@ def main() -> int:
                     f"unique={colliding_indexes[0].get('unique')!r})"
                 )
             elif conn.dialect.name == "postgresql":
-                # Schema-wide namespace check (Codex round-4): PostgreSQL
-                # relation names (tables, indexes, views, sequences, ...)
-                # share ONE namespace per schema — a same-named relation on
-                # ANY object blocks CREATE UNIQUE CONSTRAINT's backing index
-                # even though get_indexes('doctors') cannot see it.
-                colliding_relations = [
-                    f"{row[1]} {row[0]!r}"
-                    for row in conn.execute(
-                        sa.text(
-                            "SELECT c.relname, CASE c.relkind "
-                            "WHEN 'r' THEN 'table' WHEN 'i' THEN 'index' "
-                            "WHEN 'S' THEN 'sequence' WHEN 'v' THEN 'view' "
-                            "WHEN 'm' THEN 'materialized view' "
-                            "ELSE 'relation' END AS relkind_label "
-                            "FROM pg_class c "
-                            "JOIN pg_namespace n ON n.oid = c.relnamespace "
-                            "WHERE n.nspname = ANY (current_schemas(false)) "
-                            "AND c.relname = :name"
-                        ),
-                        {"name": checker.CONSTRAINT_NAME},
-                    ).fetchall()
-                ]
+                # Schema-wide namespace check (Codex round-4), restricted to
+                # the schema that actually owns `doctors` (Codex round-5):
+                # PG relation names collide only WITHIN one schema, and the
+                # unqualified `doctors` resolves via search_path to exactly
+                # one relation — a same-named object in ANOTHER search-path
+                # schema does not block the constraint and must not fail the
+                # pre-check. to_regclass('doctors') resolves the same
+                # relation the migration will hit.
+                schema_row = conn.execute(
+                    sa.text(
+                        "SELECT n.nspname FROM pg_class c "
+                        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                        "WHERE c.oid = to_regclass('doctors')"
+                    )
+                ).first()
+                if schema_row is not None:
+                    doctors_schema = schema_row[0]
+                    colliding_relations = [
+                        f"{row[1]} {row[0]!r} (schema {doctors_schema!r})"
+                        for row in conn.execute(
+                            sa.text(
+                                "SELECT c.relname, CASE c.relkind "
+                                "WHEN 'r' THEN 'table' WHEN 'i' THEN 'index' "
+                                "WHEN 'S' THEN 'sequence' WHEN 'v' THEN 'view' "
+                                "WHEN 'm' THEN 'materialized view' "
+                                "ELSE 'relation' END AS relkind_label "
+                                "FROM pg_class c "
+                                "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                                "WHERE n.nspname = :schema "
+                                "AND c.relname = :name"
+                            ),
+                            {
+                                "schema": doctors_schema,
+                                "name": checker.CONSTRAINT_NAME,
+                            },
+                        ).fetchall()
+                    ]
         if colliding_indexes or colliding_relations:
             detail = ", ".join(colliding_relations) or "index on `doctors`"
             print(
