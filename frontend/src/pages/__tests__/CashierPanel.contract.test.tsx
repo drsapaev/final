@@ -12,9 +12,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // boundary updates): helper contracts → contracts module; render contracts → panel.
 const cashierPanelPath = path.resolve(__dirname, '../CashierPanel.tsx');
 const cashierContractsPath = path.resolve(__dirname, '../cashier/cashierPaymentContracts.ts');
+// PR-UI-14-4: the processPayment action handler moved verbatim to
+// ./cashier/useCashierActions.ts — contract re-pinned to the new boundary.
+const cashierActionsPath = path.resolve(__dirname, '../cashier/useCashierActions.ts');
+// PR-UI-14-5: table/dialog JSX moved verbatim to ./cashier/views/* —
+// render contracts re-pinned to the view files.
+const cashierHistoryTablePath = path.resolve(__dirname, '../cashier/views/CashierHistoryTable.tsx');
+const cashierPendingTablePath = path.resolve(__dirname, '../cashier/views/CashierPendingTable.tsx');
+const cashierDialogsLayerPath = path.resolve(__dirname, '../cashier/views/CashierDialogsLayer.tsx');
 
 const readCashierPanelSource = () => fs.readFileSync(cashierPanelPath, 'utf8');
 const readCashierContractsSource = () => fs.readFileSync(cashierContractsPath, 'utf8');
+const readCashierActionsSource = () => fs.readFileSync(cashierActionsPath, 'utf8');
+const readCashierHistoryTableSource = () => fs.readFileSync(cashierHistoryTablePath, 'utf8');
+const readCashierPendingTableSource = () => fs.readFileSync(cashierPendingTablePath, 'utf8');
+const readCashierDialogsLayerSource = () => fs.readFileSync(cashierDialogsLayerPath, 'utf8');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
@@ -40,9 +52,8 @@ describe('CashierPanel payment action contract', () => {
   });
 
   it('renders all payment history commands from backend-provided actions or can flags', () => {
-    const source = readCashierPanelSource();
     const actionCellBlock = extractSourceBlock(
-      source,
+      readCashierHistoryTableSource(),
       'onClick={() => confirmPayment(row.id)}',
       '<td colSpan={7}',
     );
@@ -80,7 +91,7 @@ describe('CashierPanel payment action contract', () => {
       'const PAYMENT_ACTION_CAN_FIELD = {',
     );
     const processPaymentBlock = extractSourceBlock(
-      panelSource,
+      readCashierActionsSource(),
       'const processPayment = async (appointment: unknown, paymentData: unknown) => {',
       'const confirmPayment = async (paymentId: string | number | undefined) => {',
     );
@@ -90,23 +101,23 @@ describe('CashierPanel payment action contract', () => {
     expect(groupedContractBlock).toContain('visit_ids: visitIds');
     expect(processPaymentBlock).toContain('const groupedPayment = isBackendGroupedCashierPayment(appt);');
     expect(processPaymentBlock).toContain('await createGroupedCashierPayment(appt, pData);');
-    expect(processPaymentBlock).toContain('paymentsHook.createPayment');
+    // PR-UI-14-4: paymentsHook.* renamed paymentsApi.* in useCashierActions deps.
+    expect(processPaymentBlock).toContain('paymentsApi.createPayment');
     expect(processPaymentBlock).not.toContain('remaining_amount -');
     expect(processPaymentBlock).not.toContain('remainingAmount');
     expect(processPaymentBlock).not.toContain('Math.min');
   });
 
   it('does not route grouped cashier rows through the single-visit online widget', () => {
-    const source = readCashierPanelSource();
     // P-018 fix: aria-labels were localized to Russian (PHI removed).
     // i18n-unification: aria-labels now use tI18n('cashier.cash_payment_aria')
     const onlineActionBlock = extractSourceBlock(
-      source,
+      readCashierPendingTableSource(),
       'onClick={() => openPaymentWidget(appointment)}',
       "aria-label={tI18n('cashier.cash_payment_aria')}",
     );
     const paymentWidgetBlock = extractSourceBlock(
-      source,
+      readCashierDialogsLayerSource(),
       '<PaymentWidget',
       'amount={Number((paymentWidget.selectedItem as unknown as Appointment).remaining_amount',
     );
@@ -128,5 +139,30 @@ describe('CashierPanel payment action contract', () => {
     expect(helperBlock).not.toContain('resolveSingleCashierVisitId');
     expect(helperBlock).not.toContain('visit_id');
     expect(helperBlock).not.toContain('visit_ids');
+  });
+});
+
+describe('CashierPanel decomposition size contract (PR-UI-14 final AC)', () => {
+  it('CashierPanel stays within the plan §PR-UI-14 size budget (≤500 LOC, ≤5 useState)', () => {
+    const source = readCashierPanelSource();
+    const loc = source.split('\n').length;
+    expect(loc).toBeLessThanOrEqual(500);
+
+    const useStateCalls = (source.match(/useState[<(]/g) || []).length;
+    expect(useStateCalls).toBeLessThanOrEqual(5);
+  });
+
+  it('RefundRequestsTable stays within the plan §PR-UI-14 size budget (≤150 LOC)', () => {
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../../components/cashier/RefundRequestsTable.tsx'),
+      'utf8',
+    );
+    const loc = source.split('\n').length;
+    expect(loc).toBeLessThanOrEqual(150);
+  });
+
+  it('CashierPanel renders behind the local ErrorBoundary (plan item 4)', () => {
+    const source = readCashierPanelSource();
+    expect(source).toContain('<ErrorBoundary>');
   });
 });

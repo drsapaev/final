@@ -263,7 +263,7 @@ interface ThemeContextValue {
 | **2. App Shell** | 3-4 | PR-UI-04, 05, 06 | Единый AppShell + Button + Card primitives | 16 SP | ✅ DONE (04 ✅ · 05 ✅ · 06 ✅ — canonical card strategy закрыта PR-UI-11 (0 import-consumers), dead-alias MacOSCard decommissioned #2909 → `825d8b2d`) |
 | **3. State patterns** | 5-6 | PR-UI-07, 08, 09 | Loading/Empty/Error + убрать glass + DataTable | 17 SP | 07 ✅ (+серия 07a) · 08 ✅ (#2838) · 09 🟡 (SP не кредитованы до 09e-2; 09a ✅ #2843 → §4.1.6; 09b ✅ #2848 → §4.1.7; 09c ✅ COMPLETE — #2857/#2860/#2861/#2862 → §4.1.8; 09d ✅ #2870 → §4.1.9; 09e-1 ✅ #2872 → §4.1.9; 09e-2 LOC-редукция — DEFERRED §4.1.9) |
 | **4. Branding** | 7-8 | PR-UI-10, 11, 12 | Branding + Dashboard + EMR/Queue/Table UX | 16 SP | ✅ DONE (10 ✅ #2867 + `66c7ceff`; 11 ✅ COMPLETE — 15 инкрементов, финальные 11-13/14/15 #2896/#2899/#2902 → MacOSCard import-consumers 0, см. §4.1.11; 12 ✅ COMPLETE — 12-1 #2885, 12-2 #2890, 12-3 #2891, 12-4 #2893 → §4.1.10) |
-| **5. Migration** | 9-10 | PR-UI-13, 14, 15, 19 | RegistrarPanel + Doctor + Cashier + Navigation i18n (C-6) | 27 SP | 19 ✅ (#2879 → `faace538`); 13 ✅ COMPLETE — 5 инкрементов (#2897/#2898/#2900/#2901/#2903 → `a13e0973f`) → §4.1.11; 14/15 ⬜ (14 — assessed, ready: §4.1.11) |
+| **5. Migration** | 9-10 | PR-UI-13, 14, 15, 19 | RegistrarPanel + Doctor + Cashier + Navigation i18n (C-6) | 27 SP | 19 ✅ (#2879 → `faace538`); 13 ✅ COMPLETE — 5 инкрементов (#2897/#2898/#2900/#2901/#2903 → `a13e0973f`) → §4.1.11; 14 ✅ COMPLETE — 6 инкрементов (#2914/#2917/#2918/#2919/#2920/#2921 → `c04c47e71`) → §4.1.12; 15 ⬜ (последний остаток Sprint 5) |
 | **6. Polish** | 11-12 | PR-UI-16, 17, 18 | Landing + cleanup (incl. M-8) + visual regression | 18 SP | ⬜ не начаты |
 
 **Итого:** 19 PR · 103 story points · ~12 недель (3 месяца) при 1 разработчике (18 исходных PR · 98 SP + PR-UI-19 «Navigation i18n (C-6)» · 3 SP + 2 SP к PR-UI-17 за M-8 ownership — оба введены v1.8 из audit-completeness reconciliation, Приложение C).
@@ -630,7 +630,7 @@ Residual `var(--mac-text-muted)` в `frontend/src/`: 0.
 
 **PR-UI-11 — COMPLETE (закрытие MacOSCard-хвоста):** 11-13 #2896 → `87ae20413` (2 analytics), 11-14 #2899 → `0e4a6d556` (5 pages/auth), 11-15 #2902 → `37f6af119` (2 doctor + test-mock rename). Итог среза `a13e0973f`: **import-consumers MacOSCard = 0** (было 61 файл на v1.8, 12 на v1.9); остаточные вхождения — 1 dead-alias export в `ui/macos/index.ts:48` + комментарии-упоминания (DataCard/AdminDashboard docblocks) + substring-совпадения (`loadMacOSCardiology*`). Legacy-debt PR-UI-06 (canonical card strategy: Card/StatCard/DataCard + миграция 329 JSX) закрыт; на срезе v2.0 оставался 1 dead-alias export — удалён #2909 (v2.0 amendment выше), PR-UI-06 закрыт полностью.
 
-**PR-UI-14 assessment (plan §PR-UI-14, готов к старту — НЕ начат):**
+**PR-UI-14 assessment (plan §PR-UI-14, готов к старту — НЕ начат):** *(историческая запись среза v2.0; CLOSED — старт подтверждён пользователем и исполнен, см. §PR-UI-14 статус и §4.1.12.)*
 
 - **Текущее состояние:** CashierPanel.tsx — 2 125 LOC (соответствует плану), 26 useState (план указывал 38 — снижено ранее незадокументированными правками; drift −12 к срезу плана), RefundRequestsTable 432 LOC (RRT-контейнер: fetch + approve/reject business-actions).
 - **Dependencies:** PR-UI-04 ✅, PR-UI-09 ✅ — обе закрыты; блокеров нет.
@@ -638,9 +638,24 @@ Residual `var(--mac-text-muted)` в `frontend/src/`: 0.
 - **Рекомендуемая разбивка (по registrar-паттерну):** 14-1 data lifecycle + refund-requests state; 14-2 view-model; 14-3 dialogs/payment state machines; 14-4 views + ErrorBoundary; 14-5 final slim + RRT→DataTable миграция (plan AC: RefundRequestsTable ≤150 LOC).
 - **Решение, требуемое от пользователя:** подтверждение старта PR-UI-14 (Sprint-5 преамбула: god-panel decomposition не начинается автономно без явного решения; порядок Registrar→Doctor→Cashier зафиксирован планом — Doctor/PR-UI-15 swap с Cashier уже отражён в §4.2).
 
-**Sprint-5 остаток после среза v2.0:** PR-UI-14 (6 SP, assessed — готов к старту по подтверждению), PR-UI-15 (10 SP, Doctor+Dentist). 09e-2 — отдельный architectural track (не стартует параллельно со Sprint 5). RoleGate Receptionist policy — deferred до явного business-решения (см. §4.1.10 finding #1).
+**Sprint-5 остаток после v2.1:** PR-UI-15 (10 SP, Doctor+Dentist) — единственный остаток Sprint 5; PR-UI-14 CLOSED (30.08.2026, срез `c04c47e71`, все AC met). 09e-2 — отдельный architectural track (не стартует параллельно со Sprint 5). RoleGate Receptionist policy — deferred до явного business-решения (см. §4.1.10 finding #1).
 
 **Ratchet на срез v2.0 (`a13e0973f`): 156/282/11882, gate PASS** (к v1.9: −1 noFallback; metric-integrity §17: #2903 commit-message заявлял 11883 — замер PR-head; канонический срез = машинный замер на `a13e0973f`).
+
+### 4.1.12 PR-UI-14 COMPLETE — CashierPanel 2 125 → 345 LOC (30.08.2026, срез main `c04c47e71`)
+
+**Все AC §PR-UI-14 закрыты 6 инкрементами (кумулятивно −84% LOC, zero-delta по visual baselines):**
+
+- **14-1 data lifecycle + payment contracts (PR #2914 → squash `ee87d1b3e`):** `cashierPaymentContracts.ts` (352 LOC вербатим: date presets, payment method/status presentation, receipt payload builders, fail-closed action guards, grouped-payment allocation API) + `useCashierWorklistData` (stats/pending/history effects, server pagination обеих вкладок, page-reset-on-filter-change, refreshKey lifecycle: triggerDataReload + узкий bumpRefreshKey). Panel 2 125→1 628. +10 unit-тестов.
+- **14-2 view-model (PR #2917 → `54999ebef`):** `cashierPaymentRows.ts` (groupPaymentsByPatientAndTime + sortCashierPayments, presentation-only). Panel 1 628→1 565. +10 unit-тестов. Параллельный дрейф: #2916 (test-only +317 для contracts, salvaged из закрытого дубль-PR #2913) — DISJOINT, принят.
+- **14-3 dialog state machines (PR #2918 → `2a49d6de3`):** `useCashierDialogs` (12 dialog-useState → 1 useReducer, вербатимные reset-shapes + пиннированные quirks: CANCEL_DIALOG_CLOSED держит контекст; REFUND_DIALOG_RESET не трогает paymentAmount) + `useCashierSessionWarning` (warning pair + countdown + redirect). Panel 1 565→1 527, useState 25→11. +16 unit-тестов. **Бонус-фикс:** pre-existing date-rollover flake в PR-UI-12-4 appointments visual-тесте (root-caused через бисекцию по зелёным CI-коммитам; mock-дата '2026-08-29' + EAT today-бейджи) — вылечен `page.clock.install` на инстант_capture базлайна; снапшоты не тронуты.
+- **14-4 action handlers (PR #2919 → `0e8d21c15`):** `useCashierActions` (deps-object по прецеденту 13-5: все business-обработчики + hotkeys Ctrl+F/F5/Ctrl+R/Ctrl+E + processingAction anti-double-click + i18n-reactive paymentMethodLabels). Panel 1 527→1 258, useState 11→10. +16 unit-тестов.
+- **14-5 views + ErrorBoundary (PR #2920 → `0b934f5e8`):** `views/` — CashierFiltersCard / CashierStatsCard / CashierPendingTable / CashierHistoryTable / CashierServiceBadges / CashierDialogsLayer (вербатимные JSX-переносы; пропсы сохраняют оригинальные имена обработчиков для байт-идентичности). **Локальный ErrorBoundary (plan item 4)** вокруг tabs+tables Card. Panel 1 258→400.
+- **14-6 final slim + RRT (PR #2921 → `c04c47e71`):** useCashierSearch / useCashierFilters / useCashierSort (panel useState 8→1 — только activeTab); RefundRequestsTable 432→123 (refundRequestsContracts + useRefundRequests + refundRequestsColumns; canonical DataTable уже с PR-UI-09). **Machine-checked AC-гарды** в contract-тесте (≤500 LOC / ≤5 useState / RRT ≤150 / ErrorBoundary). Fix вакуозного маркера в RRT contract-тесте. Panel 400→345. +10 unit-тестов.
+
+**Итог:** CashierPanel **345 LOC / 1 useState** (AC ≤500/≤5), RRT **123 LOC** (AC ≤150), ErrorBoundary ✓. Vitest 1 432→**1 525** (все зелёные), ratchet PASS на каждом срезе (156/282/11882 vs baseline 163/330/12003), visual-regression 14/14 **UNCHANGED** кумулятивно, cashier-ux-audit e2e 12/12 на каждом инкременте. Registrar-паттерн воспроизведён вторым god-panel: contracts → data hook → view-model → state machines → actions hook → views → slim orchestrator (M-11 прецедент ×2).
+
+**Sprint-5 остаток:** PR-UI-15 (10 SP, Doctor 1 330 + Dentist 2 148) — единственный незакрытый пункт Sprint 5; старт по подтверждению пользователя.
 
 ### 4.2. Порядок миграции ролей (обновлено)
 
@@ -1434,7 +1449,7 @@ export const BRAND = {
 
 ### PR-UI-14 — Migration: CashierPanel
 
-> **Статус: ⬜ NOT STARTED (срез v2.0 30.08.2026).** CashierPanel — фактически 2 125 LOC (соответствует плану), 26 useState (drift −12 к плану). **Assessment выполнен (§4.1.11): dependencies закрыты, блокеров нет, рекомендуемая разбивка по registrar-паттерну (14-1..14-5). Старт — по явному подтверждению пользователя (Sprint-5 преамбула).**
+> **Статус: ✅ COMPLETE (30.08.2026, 6 инкрементов, срез main `c04c47e71`).** CashierPanel 2 125 → **345 LOC (−84%)**, useState 37 → **1**, RefundRequestsTable 432 → **123 LOC**, локальный ErrorBoundary. ALL AC MET (закреплены machine-checked contract-тестом). Инкременты: 14-1 #2914 → `ee87d1b3e` (payment contracts + useCashierWorklistData: data lifecycle, pagination, refresh); 14-2 #2917 → `54999ebef` (cashierPaymentRows view-model: grouping + client sort); 14-3 #2918 → `2a49d6de3` (useCashierDialogs 12 useState→1 useReducer + useCashierSessionWarning; + e2e date-rollover flake fix PR-UI-12-4 appointments via page.clock); 14-4 #2919 → `0e8d21c15` (useCashierActions: все business-action handlers + hotkeys + processingAction); 14-5 #2920 → `0b934f5e8` (views/ 6 компонентов + локальный ErrorBoundary, panel 1 258→400); 14-6 #2921 → `c04c47e71` (final slim: search/filters/sort state hooks, useState→1; RRT декомпозиция contracts/hook/columns). Кумулятивный zero-delta: visual-regression 14/14 snapshots UNCHANGED по всем 6 инкрементам; vitest 1 432→1 525 (+93, включая параллельный #2916 +61); ratchet PASS на каждом срезе. Параллельный дубль-инкремент #2913 закрыт (salvaged в #2916, DISJOINT).
 
 **Приоритет:** P2 · **Effort:** 6 SP · **Dependencies:** PR-UI-04, PR-UI-09 · **Sprint:** 5
 
@@ -1710,7 +1725,7 @@ npm run build:analyze
 | **M-8** 4 role-гварда / 6 файлов 2FA / 3 PWA / 2 TelegramManager | Консолидация по одному на сущность | PR-UI-17 (item 12 + AC, v1.8) | ⬜ PLANNED | §7 PR-UI-17: telegram-дубликат 741 LOC DELETE + consolidation-inventory; effort +2 SP |
 | **M-9** 24 font-family / 22 font-size / 30 radius | Шкалы `--mac-*` в tokens.css | PR-UI-02 #2814 + Sprint 5 остатки | 🟡 PARTIAL | canonical-шкалы live; page-CSS остатки → волны 5.x |
 | **M-10** Settings на второй токен-системе + вкладки вне URL | Миграция на `--mac-*` + `?tab=` | Sprint 5 волна 5.6 | ⬜ PLANNED | §6 волна 5.6 |
-| **M-11** 6 монолитов = 44% кода страниц | Декомпозиция по образцу pages/registrar/ | PR-UI-13 ✅ (Registrar 2 252→493, образец-паттерн live: data-lifecycle hook → view-model → state machines → views → slim orchestrator); PR-UI-14/15 (Sprint 5) | 🟡 PARTIAL | §7; Dentist 2 148, Cashier 2 125 — ожидают подтверждения старта; прецедент-образец live |
+| **M-11** 6 монолитов = 44% кода страниц | Декомпозиция по образцу pages/registrar/ | PR-UI-13 ✅ (Registrar 2 252→493); PR-UI-14 ✅ (Cashier 2 125→345, RRT 432→123, тот же паттерн: contracts → data hook → view-model → state machines → actions hook → views → slim orchestrator); PR-UI-15 (Sprint 5 остаток) | 🟡 PARTIAL | §7; Dentist 2 148 — последний монолит Sprint 5; прецедент-образец live ×2 |
 | **M-12** e2e-скриншоты только cashier+wizard | Phase 0 baseline всех ключевых страниц | Phase 0 + PR-UI-18 | 🟡 PARTIAL | baseline committed (15+ merges стабилен); расширение покрытия 12 экранов → PR-UI-18 |
 | **L-1** fallback-hex рассинхрон accent-blue | Единственный источник tokens.css | PR-UI-02 #2814 | ✅ DONE (источник один); остатки контролируются ratchet | live: tokens.css SSOT |
 | **L-2** 4 font-family для html + inline-хардкоды шрифтов | `--mac-font-family` canonical | PR-UI-02 + Sprint 5.5 | 🟡 PARTIAL | canonical live; inline-остатки (LoginFormStyled и др.) → 5.5 |
