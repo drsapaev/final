@@ -168,21 +168,6 @@ const DentistPanelUnified = () => {
     scheduleNextModal, setScheduleNextModal,
   } = useDentistDialogs();
 
-  // PR-UI-15-4: EMR v2 visit-protocol lifecycle (saved protocols + loaders +
-  // persist + reopen + hydrate) — verbatim port; deps-object wiring keeps the
-  // original setSelectedPatient / setShowVisitProtocol semantics.
-  const {
-    savedVisitProtocols,
-    loadDentistVisitProtocolByVisitId,
-    persistVisitProtocol,
-    reopenVisitProtocol,
-  } = useDentistVisitProtocols({
-    tI18n,
-    selectedPatient,
-    setSelectedPatient,
-    setShowVisitProtocol,
-  });
-
   // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
   // is invalidated when the doctor switches between visits or patients.
   // Mirrors the CardiologistPanelUnified wiring (commit 5ee3de3).
@@ -223,6 +208,25 @@ const DentistPanelUnified = () => {
     },
   },
   );
+
+  // PR-UI-15-4: EMR v2 visit-protocol lifecycle (saved protocols + loaders +
+  // persist + reopen + hydrate) — verbatim port; deps-object wiring keeps the
+  // original setSelectedPatient / setShowVisitProtocol semantics.
+  // Codex P2 (#2930): вызов размещён ПОСЛЕ useVisitLifecycle — как в
+  // исходной панели (effect-ordering: сначала инвалидация кэшей BS-42,
+  // затем hydrate-эффект; иначе протоколы могли бы читаться из устаревшего
+  // кэша при быстром переключении пациентов).
+  const {
+    savedVisitProtocols,
+    loadDentistVisitProtocolByVisitId,
+    persistVisitProtocol,
+    reopenVisitProtocol,
+  } = useDentistVisitProtocols({
+    tI18n,
+    selectedPatient,
+    setSelectedPatient,
+    setShowVisitProtocol,
+  });
   useEffect(() => {
     appointmentsTableDataRef.current = appointmentsTableData;
   }, [appointmentsTableData]);
