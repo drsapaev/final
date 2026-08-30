@@ -849,9 +849,6 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  // Проверяем демо-режим после всех хуков
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
-
   const authHeader = useCallback(() => ({
     Authorization: `Bearer ${tokenManager.getAccessToken()}`
   }), []);
@@ -1483,11 +1480,6 @@ const DermatologistPanelUnified = () => {
       notify.error(t('derma.procedure_save_failed'));
     }
   };
-
-  if (isDemoMode) {
-    logger.info('DermatologistPanelUnified: Skipping render in demo mode');
-    return null;
-  }
 
   const appointmentSummaryItems = [
     {
