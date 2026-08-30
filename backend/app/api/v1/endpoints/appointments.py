@@ -728,7 +728,7 @@ def delete_appointment(
     return {"message": "Запись успешно отменена"}
 
 
-@router.get("/doctor/{doctor_id}/schedule", response_model=dict[str, Any])
+@router.get("/doctor/{doctor_id}/schedule", response_model=list[dict[str, Any]])
 def get_doctor_schedule(
     *,
     db: Session = Depends(deps.get_db),
