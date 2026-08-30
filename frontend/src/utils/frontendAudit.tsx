@@ -515,14 +515,6 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     issues: ['Следует переместить в src/pages/mobile/']
   },
   
-  'src/pages/MediLabDemo.jsx': {
-    purpose: 'Демо MediLab',
-    currentLocation: 'src/pages/',
-    recommendedLocation: 'src/pages/demo/',
-    status: 'needs_move',
-    issues: ['Следует переместить в src/pages/demo/']
-  },
-  
   'src/pages/NewApp.jsx': {
     purpose: 'Новое приложение',
     currentLocation: 'src/pages/',
@@ -732,7 +724,6 @@ export function getRecommendedStructure(): Record<string, string[]> {
       'MobilePatientDashboard.jsx'
     ],
     'src/pages/demo/': [
-      'MediLabDemo.jsx',
       'NewApp.jsx',
       'AppOld.jsx',
       'AppNew.jsx'

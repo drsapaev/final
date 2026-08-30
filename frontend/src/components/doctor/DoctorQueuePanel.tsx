@@ -148,8 +148,9 @@ const DoctorQueuePanel = ({
   };
 
   useEffect(() => {
-    // Проверяем, не находимся ли мы в демо-режиме
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
+    // Проверяем, не находимся ли мы в демо-режиме (dev-моки localhost:5173;
+    // medilab-demo дизъюнкт удалён в PR-UI-17-1 вместе с роутом)
+    const isDemoMode =
     window.location.hostname === 'localhost' &&
     window.location.port === '5173';
 
@@ -225,8 +226,8 @@ const DoctorQueuePanel = ({
   }, [specialty]);
 
   const loadDoctorData = async () => {
-    // Проверяем демо-режим еще раз
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
+    // Проверяем демо-режим (dev-моки localhost:5173)
+    const isDemoMode =
     window.location.hostname === 'localhost' &&
     window.location.port === '5173';
 
@@ -254,8 +255,8 @@ const DoctorQueuePanel = ({
   };
 
   const loadQueueData = async () => {
-    // Проверяем демо-режим еще раз
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
+    // Проверяем демо-режим (dev-моки localhost:5173)
+    const isDemoMode =
     window.location.hostname === 'localhost' &&
     window.location.port === '5173';
 

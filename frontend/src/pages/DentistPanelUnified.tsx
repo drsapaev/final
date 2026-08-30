@@ -287,9 +287,6 @@ const DentistPanelUnified = () => {
   // handlers (handleAppointmentRowClick / handleAppointmentActionClick)
   // moved verbatim to ./dentist/useDentistActions.
 
-  // Проверяем демо-режим после всех хуков
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
-
   // PR-UI-15-3: authHeader (dead, definition-only) + loadPatients +
   // loadTreatmentPlans / loadProsthetics no-op stubs (dead, PR-43/Medium-24
   // endpoints pending backend) dropped; loadData moved verbatim to
@@ -473,11 +470,6 @@ const DentistPanelUnified = () => {
         return renderDashboard();
     }
   };
-
-  if (isDemoMode) {
-    logger.info('DentistPanelUnified: Skipping render in demo mode');
-    return null;
-  }
 
   if (loading) {
     return (
