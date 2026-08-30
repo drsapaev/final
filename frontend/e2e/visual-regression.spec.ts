@@ -1338,3 +1338,94 @@ test.describe('Visual regression — PR-UI-18 twelve screens · part 2: doctor, 
     await captureRoleHome(page, 'dark', 'Patient', 'patient-home', '/patient', 'pr18-patient-dark.png');
   });
 });
+
+/*
+ * PR-UI-18 part 3 (plan §PR-UI-18 item 1, final snapshot wave): light+dark
+ * page baselines for the three specialty doctor screens — /doctor/cardiology,
+ * /doctor/dermatology, /doctor/dentistry — 3 screens × 2 themes = 6 baselines.
+ * Same determinism contract as parts 1-2: frozen clock, pinned theme verified
+ * via body[data-theme], QA harness generic envelope mocks (empty-data states),
+ * WebSocket closed, ru locale, Desktop Chrome 1280×720.
+ *
+ * All three snapshots capture the DEFAULT tab (no ?tab= deep link) — the
+ * state a doctor sees on entry. Note on dentistry (PR-QA-02): the
+ * ?tab=appointments deep link falls through to the dashboard tab because the
+ * appointments case is dead code post Phase 4+ — the default-tab capture is
+ * the only meaningful surface for this screen.
+ */
+test.describe('Visual regression — PR-UI-18 twelve screens · part 3: cardiology, dermatology, dentistry', () => {
+  const PR18P3_INSTANT = new Date('2026-08-29T12:00:00+05:00');
+
+  async function pinPr18Part3Theme(page: import('@playwright/test').Page, mode: 'light' | 'dark') {
+    await page.addInitScript((m) => {
+      localStorage.setItem('colorScheme', m);
+      localStorage.setItem('theme', m);
+      localStorage.setItem('ui_theme', m);
+    }, mode);
+  }
+
+  async function expectPr18Part3ThemeApplied(page: import('@playwright/test').Page, mode: 'light' | 'dark') {
+    await expect.poll(
+      async () => page.evaluate(() => document.body.getAttribute('data-theme')),
+      { message: `theme contract: body[data-theme="${mode}"] must be applied before capture` }
+    ).toBe(mode);
+  }
+
+  async function settleForPr18Part3Capture(page: import('@playwright/test').Page) {
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
+    await page.waitForTimeout(400);
+  }
+
+  async function captureSpecialtyHome(
+    page: import('@playwright/test').Page,
+    mode: 'light' | 'dark',
+    routeId: string,
+    path: string,
+    baselineName: string
+  ) {
+    await page.clock.install({ time: PR18P3_INSTANT });
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+    await installAuthenticatedQaHarness(page, { role: 'Doctor' });
+    await pinPr18Part3Theme(page, mode);
+    await page.goto(path);
+    await expect(page.locator(`.app-shell[data-route-id="${routeId}"]`)).toBeVisible({ timeout: 15000 });
+    await expect.poll(
+      async () => (await page.locator('body').innerText()).trim().length,
+      { message: `${routeId} should render non-empty body text` }
+    ).toBeGreaterThan(0);
+    await settleForPr18Part3Capture(page);
+    await expectPr18Part3ThemeApplied(page, mode);
+    await expect(page).toHaveScreenshot(baselineName, {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+    });
+  }
+
+  // --- Screen 8/12: Cardiology (/doctor/cardiology, default tab).
+  test('pr18 cardiology home — light theme (specialty, QA harness)', async ({ page }) => {
+    await captureSpecialtyHome(page, 'light', 'doctor-cardiology', '/doctor/cardiology', 'pr18-cardiology-light.png');
+  });
+
+  test('pr18 cardiology home — dark theme (specialty, QA harness)', async ({ page }) => {
+    await captureSpecialtyHome(page, 'dark', 'doctor-cardiology', '/doctor/cardiology', 'pr18-cardiology-dark.png');
+  });
+
+  // --- Screen 9/12: Dermatology (/doctor/dermatology, default tab).
+  test('pr18 dermatology home — light theme (specialty, QA harness)', async ({ page }) => {
+    await captureSpecialtyHome(page, 'light', 'doctor-dermatology', '/doctor/dermatology', 'pr18-dermatology-light.png');
+  });
+
+  test('pr18 dermatology home — dark theme (specialty, QA harness)', async ({ page }) => {
+    await captureSpecialtyHome(page, 'dark', 'doctor-dermatology', '/doctor/dermatology', 'pr18-dermatology-dark.png');
+  });
+
+  // --- Screen 10/12: Dentistry (/doctor/dentistry, default tab — the
+  // appointments deep link is dead code post Phase 4+, PR-QA-02).
+  test('pr18 dentistry home — light theme (specialty, QA harness)', async ({ page }) => {
+    await captureSpecialtyHome(page, 'light', 'doctor-dentistry', '/doctor/dentistry', 'pr18-dentistry-light.png');
+  });
+
+  test('pr18 dentistry home — dark theme (specialty, QA harness)', async ({ page }) => {
+    await captureSpecialtyHome(page, 'dark', 'doctor-dentistry', '/doctor/dentistry', 'pr18-dentistry-dark.png');
+  });
+});
