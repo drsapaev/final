@@ -293,6 +293,7 @@ class CoreMixin(UserManagementServiceMixinBase):
 
             # Обновляем основные поля
             update_data = user_data.model_dump(exclude_unset=True)
+            old_is_active = user.is_active
 
             target_is_active = update_data.get("is_active", user.is_active)
             target_role = update_data.get("role", user.role)
@@ -362,6 +363,15 @@ class CoreMixin(UserManagementServiceMixinBase):
                         if hasattr(user.profile, field):
                             setattr(user.profile, field, value)
 
+            # Ghost-doctor prevention: mirror is_active onto Doctor profile
+            if "is_active" in update_data and user.is_active != old_is_active:
+                self._sync_doctor_active(
+                    db,
+                    user_id,
+                    user.is_active,
+                    reason="update_user_is_active",
+                )
+
             # Логируем обновление
             self._log_user_action(
                 db, user_id, "update", "Пользователь обновлен", updated_by
@@ -423,6 +433,18 @@ class CoreMixin(UserManagementServiceMixinBase):
             # Логируем удаление
             self._log_user_action(
                 db, user_id, "delete", "Пользователь удален", deleted_by
+            )
+
+            # Ghost-doctor prevention: a deleted owner must not leave an
+            # ACTIVE clinical Doctor profile behind (FK SET NULL will keep
+            # the row). Deactivate BEFORE the delete in the same transaction;
+            # historical visits/EMR/audit keep referencing the Doctor row.
+            self._sync_doctor_active(
+                db,
+                user_id,
+                False,
+                reason="owner_user_deleted",
+                detach_owner=True,
             )
 
             # Удаляем пользователя (каскадное удаление)

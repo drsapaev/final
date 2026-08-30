@@ -102,10 +102,16 @@ class OperationsMixin(UserManagementServiceMixinBase):
                         user.is_active = True
                         if user.profile:
                             user.profile.status = UserStatus.ACTIVE
+                        self._sync_doctor_active(
+                            db, user_id, True, reason="bulk_activate"
+                        )
                     elif action_data.action == "deactivate":
                         user.is_active = False
                         if user.profile:
                             user.profile.status = UserStatus.INACTIVE
+                        self._sync_doctor_active(
+                            db, user_id, False, reason="bulk_deactivate"
+                        )
                     elif action_data.action == "suspend":
                         if user.profile:
                             user.profile.status = UserStatus.SUSPENDED
@@ -138,6 +144,16 @@ class OperationsMixin(UserManagementServiceMixinBase):
                                     }
                                 )
                                 continue
+                        # Ghost-doctor prevention (same contract as
+                        # CoreMixin.delete_user): deactivate the Doctor
+                        # profile before the owner is hard-deleted.
+                        self._sync_doctor_active(
+                            db,
+                            user_id,
+                            False,
+                            reason="bulk_owner_deleted",
+                            detach_owner=True,
+                        )
                         db.delete(user)
 
                     # Логируем действие
