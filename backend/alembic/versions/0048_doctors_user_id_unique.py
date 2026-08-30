@@ -125,7 +125,9 @@ def upgrade() -> None:
             "`alembic upgrade head`. No rows were modified by this run."
         )
 
-    inspector = Inspector.from_engine(conn)
+    # sa.inspect() is the SQLAlchemy 2.0 way to obtain an Inspector
+    # (Inspector.from_engine() is deprecated and slated for removal).
+    inspector = sa.inspect(conn)
     existing = _find_named_unique_constraint(inspector, "doctors", CONSTRAINT_NAME)
     if existing is not None:
         # Idempotent re-run: accept the pre-existing constraint ONLY when its
@@ -142,7 +144,7 @@ def upgrade() -> None:
     # ---- postcondition ------------------------------------------------------
     # Same strictness as the precondition: the constraint must exist AND cover
     # exactly doctors.user_id (name-only acceptance would tolerate drift).
-    inspector = Inspector.from_engine(conn)
+    inspector = sa.inspect(conn)
     created = _find_named_unique_constraint(inspector, "doctors", CONSTRAINT_NAME)
     if created is None:
         raise RuntimeError(
@@ -154,7 +156,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # Rollback is data-safe: dropping the constraint never deletes rows.
-    inspector = Inspector.from_engine(op.get_bind())
+    inspector = sa.inspect(op.get_bind())
     names = {
         uq["name"]
         for uq in inspector.get_unique_constraints("doctors")
