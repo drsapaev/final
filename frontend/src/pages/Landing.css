@@ -560,7 +560,6 @@ body.landing-body {
   height: auto;
 }
 
-.landing-workflow-grid,
 .landing-dual-grid,
 .landing-advantage-grid,
 .landing-final-card {
@@ -568,8 +567,11 @@ body.landing-body {
   gap: 18px;
 }
 
-.landing-workflow-grid {
-  grid-template-columns: minmax(0, 1.12fr) minmax(280px, 0.88fr);
+/* PR-UI-16-4: the workflow list is a 2-column grid of numbered stage cards
+   (1 column ≤960px). */
+.landing-workflow-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .landing-workflow-list,
@@ -583,17 +585,38 @@ body.landing-body {
 }
 
 .landing-workflow-step {
+  display: flex;
   align-items: flex-start;
   gap: 14px;
 }
 
 .landing-workflow-marker {
-  width: 18px;
-  height: 18px;
-  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
   border-radius: 999px;
   background: var(--mac-accent-blue);
-  box-shadow: 0 0 0 8px var(--mac-accent-blue-bg);
+  color: var(--mac-text-on-accent, #fff);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.landing-workflow-node {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: var(--mac-accent-blue-bg);
+  color: var(--mac-accent-blue);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .landing-flow-card {
@@ -864,10 +887,13 @@ body.landing-body {
 
 @media (max-width: 960px) {
   .landing-hero,
-  .landing-workflow-grid,
   .landing-dual-grid,
   .landing-final-card,
   .landing-footer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .landing-workflow-list {
     grid-template-columns: minmax(0, 1fr);
   }
 

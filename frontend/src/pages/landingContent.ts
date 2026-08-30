@@ -84,26 +84,44 @@ const BASE_COPY = {
     title: 'Пациент проходит путь от регистратуры до отчета без ручных разрывов',
     description:
       'Для сложного медицинского продукта лучше всего продает не список функций, а четкий end-to-end workflow клиники.',
-    steps: [
+    stages: [
       {
-        title: '01. Пациент регистрируется',
+        node: 'Пациент',
+        title: '01. Пациент записывается',
+        description: 'Пациент попадает в поток через QR-очередь или запись — без звонков и бумажных анкет.'
+      },
+      {
+        node: 'Регистратура',
+        title: '02. Регистратура оформляет визит',
         description: 'Регистратура находит пациента, подтверждает запись и запускает визит без бумажных обходов.'
       },
       {
-        title: '02. Попадает в очередь',
+        node: 'Очередь',
+        title: '03. Очередь направляет к врачу',
         description: 'Система направляет пациента в нужный поток, а табло и команда видят актуальный статус.'
       },
       {
-        title: '03. Врач ведет EMR',
+        node: 'Врач',
+        title: '04. Врач принимает пациента',
+        description: 'Врач вызывает пациента из очереди и видит контекст визита с первого касания.'
+      },
+      {
+        node: 'EMR',
+        title: '05. EMR хранит прием',
         description: 'Прием, история болезни, документы и шаблоны осмотров остаются в единой карте пациента.'
       },
       {
-        title: '04. Платеж и отчеты автоматически',
-        description: 'Касса закрывает услуги, а руководитель сразу получает прозрачную картину по смене и выручке.'
+        node: 'Платеж',
+        title: '06. Платеж закрывает услуги',
+        description: 'Касса принимает оплату и закрывает услуги визита — наличными или через платежные системы.'
+      },
+      {
+        node: 'Отчеты',
+        title: '07. Отчеты сводят смену',
+        description: 'Руководитель сразу получает прозрачную картину по смене, выручке и нагрузке врачей.'
       }
     ],
     flowLabel: 'Workflow клиники',
-    flowNodes: ['Пациент', 'Регистратура', 'Очередь', 'Врач', 'EMR', 'Платеж', 'Отчеты'],
     flowSummary:
       'Именно эта цепочка показывает ценность продукта сильнее, чем длинный список модулей без контекста.'
   },
@@ -423,26 +441,44 @@ const EN_OVERRIDES = {
     title: 'The patient moves from reception to reporting without manual breaks',
     description:
       'For a complex medical product, a clear end-to-end clinic workflow sells better than a disconnected feature list.',
-    steps: [
+    stages: [
       {
-        title: '01. Patient registration',
+        node: 'Patient',
+        title: '01. Patient books a visit',
+        description: 'The patient enters the flow via QR queue or booking — no calls, no paper forms.'
+      },
+      {
+        node: 'Reception',
+        title: '02. Reception opens the visit',
         description: 'Reception finds the patient, confirms the booking and starts the visit without paper detours.'
       },
       {
-        title: '02. Queue assignment',
+        node: 'Queue',
+        title: '03. The queue routes to the doctor',
         description: 'The system routes the patient into the right flow while the team and display board share the same status.'
       },
       {
-        title: '03. Doctor works in EMR',
+        node: 'Doctor',
+        title: '04. The doctor sees the patient',
+        description: 'The doctor calls the patient from the queue with full visit context from the first touch.'
+      },
+      {
+        node: 'EMR',
+        title: '05. EMR keeps the visit',
         description: 'Consultation, medical history, templates and documents stay in one connected patient record.'
       },
       {
-        title: '04. Payment and reports update automatically',
-        description: 'Cashier closes services while leadership instantly sees shift and revenue visibility.'
+        node: 'Payment',
+        title: '06. Payment closes the services',
+        description: 'Cashier collects payment and closes the visit services — cash or through payment providers.'
+      },
+      {
+        node: 'Reports',
+        title: '07. Reports wrap up the shift',
+        description: 'Leadership instantly sees shift, revenue and doctor-load visibility.'
       }
     ],
     flowLabel: 'Clinic workflow',
-    flowNodes: ['Patient', 'Reception', 'Queue', 'Doctor', 'EMR', 'Payment', 'Reports'],
     flowSummary:
       'This chain makes the product value obvious much faster than a long module list without context.'
   },
@@ -739,26 +775,44 @@ const UZ_OVERRIDES = {
     title: 'Bemor registraturadan hisobotgacha qolda uzilishsiz otadi',
     description:
       'Murakkab tibbiy mahsulot uchun eng kuchli sotuv vositasi uzilgan feature royxati emas, balki aniq end-to-end klinika workflowidir.',
-    steps: [
+    stages: [
       {
-        title: '01. Bemor royxatdan otadi',
+        node: 'Bemor',
+        title: '01. Bemor yoziladi',
+        description: 'Bemor QR-navbat yoki yozuv orqali oqimga kiradi — qongiroqsiz, qogoz anketsiz.'
+      },
+      {
+        node: 'Registratura',
+        title: '02. Registratura vizitni ochadi',
         description: 'Registratura bemorni topadi, yozuvni tasdiqlaydi va qabulni qogozsiz boshlaydi.'
       },
       {
-        title: '02. Navbatga tushadi',
+        node: 'Navbat',
+        title: '03. Navbat shifokorga yonaltiradi',
         description: 'Tizim bemorni togri oqimga yonaltiradi, jamoa va tablo esa bir xil statusni koradi.'
       },
       {
-        title: '03. Shifokor EMR bilan ishlaydi',
+        node: 'Shifokor',
+        title: '04. Shifokor bemorni qabul qiladi',
+        description: 'Shifokor bemorni navbatdan chorlaydi va birinchi kontaktdayoq vizit kontekstini koradi.'
+      },
+      {
+        node: 'EMR',
+        title: '05. EMR qabulni saqlaydi',
         description: 'Qabul, tarix, shablonlar va hujjatlar bitta ulangan bemor kartasi ichida qoladi.'
       },
       {
-        title: '04. Tolov va hisobotlar avtomatik yangilanadi',
-        description: 'Kassa xizmatlarni yopadi, rahbar esa smena va tushum manzarasini darhol koradi.'
+        node: 'Tolov',
+        title: '06. Tolov xizmatlarni yopadi',
+        description: 'Kassa tolovni oladi va vizit xizmatlarini yopadi — naxt yoki tolov tizimlari orqali.'
+      },
+      {
+        node: 'Hisobotlar',
+        title: '07. Hisobotlar smenani yigadi',
+        description: 'Rahbar smena, tushum va shifokor yuklamasi manzarasini darhol koradi.'
       }
     ],
     flowLabel: 'Klinika workflowi',
-    flowNodes: ['Bemor', 'Registratura', 'Navbat', 'Shifokor', 'EMR', 'Tolov', 'Hisobotlar'],
     flowSummary:
       'Aynan shu zanjir mahsulot qiymatini kontekstsiz modullar royxatidan ancha tezroq ochib beradi.'
   },
@@ -1055,26 +1109,44 @@ const KK_OVERRIDES = {
     title: 'Пациент тіркеуден есепке дейін қолмен үзіліссіз өтеді',
     description:
       'Күрделі медициналық өнім үшін ең күшті сату құралы үзілген feature тізімі емес, нақты end-to-end клиника workflow-ы.',
-    steps: [
+    stages: [
       {
-        title: '01. Пациент тіркеледі',
+        node: 'Пациент',
+        title: '01. Пациент жазылады',
+        description: 'Пациент QR-кезек немесе жазылу арқылы ағынға енеді — қоңыраусыз, қағаз сауалнамасыз.'
+      },
+      {
+        node: 'Тіркеу',
+        title: '02. Тіркеу қабылдауды ашады',
         description: 'Тіркеу пациентті табады, жазылуды растайды және қабылдауды қағазсыз бастайды.'
       },
       {
-        title: '02. Кезекке түседі',
+        node: 'Кезек',
+        title: '03. Кезек дәрігерге бағыттайды',
         description: 'Жүйе пациентті дұрыс ағынға бағыттайды, ал команда мен табло бірдей статусты көреді.'
       },
       {
-        title: '03. Дәрігер EMR ішінде жұмыс істейді',
+        node: 'Дәрігер',
+        title: '04. Дәрігер науқасты қабылдайды',
+        description: 'Дәрігер науқасты кезектен шақырып, алғашқы жанасудан визит контекстін көреді.'
+      },
+      {
+        node: 'EMR',
+        title: '05. EMR қабылдауды сақтайды',
         description: 'Қабылдау, тарих, шаблондар және құжаттар бір байланысқан пациент картасының ішінде қалады.'
       },
       {
-        title: '04. Төлем мен есептер автоматты жаңарады',
-        description: 'Касса қызметтерді жабады, ал басшылық ауысым мен түсім көрінісін бірден көреді.'
+        node: 'Төлем',
+        title: '06. Төлем қызметтерді жабады',
+        description: 'Касса төлемді қабылдап, визит қызметтерін жабады — қолма-қол немесе төлем жүйелері арқылы.'
+      },
+      {
+        node: 'Есептер',
+        title: '07. Есептер ауысымды жинақтайды',
+        description: 'Басшылық ауысым, түсім және дәрігер жүктемесі көрінісін бірден көреді.'
       }
     ],
     flowLabel: 'Клиника workflow-ы',
-    flowNodes: ['Пациент', 'Тіркеу', 'Кезек', 'Дәрігер', 'EMR', 'Төлем', 'Есептер'],
     flowSummary:
       'Дәл осы тізбек өнімнің құнын контекссіз модульдер тізімінен әлдеқайда тезірек ашады.'
   },
