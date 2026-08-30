@@ -170,6 +170,7 @@ def main() -> int:
         # duplicates_constraint) and must be left alone, not reported as a
         # collision on an idempotent rerun.
         colliding_indexes = []
+        colliding_relations = []
         if existing_uq is None:
             colliding_indexes = [
                 idx
@@ -177,21 +178,49 @@ def main() -> int:
                 if idx.get("name") == checker.CONSTRAINT_NAME
                 and idx.get("duplicates_constraint") != checker.CONSTRAINT_NAME
             ]
-        if colliding_indexes:
+            if colliding_indexes:
+                # Same-table index collision (SQLite-reachable branch).
+                colliding_relations.append(
+                    f"index on `doctors` "
+                    f"(columns={colliding_indexes[0].get('column_names')!r}, "
+                    f"unique={colliding_indexes[0].get('unique')!r})"
+                )
+            elif conn.dialect.name == "postgresql":
+                # Schema-wide namespace check (Codex round-4): PostgreSQL
+                # relation names (tables, indexes, views, sequences, ...)
+                # share ONE namespace per schema — a same-named relation on
+                # ANY object blocks CREATE UNIQUE CONSTRAINT's backing index
+                # even though get_indexes('doctors') cannot see it.
+                colliding_relations = [
+                    f"{row[1]} {row[0]!r}"
+                    for row in conn.execute(
+                        sa.text(
+                            "SELECT c.relname, CASE c.relkind "
+                            "WHEN 'r' THEN 'table' WHEN 'i' THEN 'index' "
+                            "WHEN 'S' THEN 'sequence' WHEN 'v' THEN 'view' "
+                            "WHEN 'm' THEN 'materialized view' "
+                            "ELSE 'relation' END AS relkind_label "
+                            "FROM pg_class c "
+                            "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                            "WHERE n.nspname = ANY (current_schemas(false)) "
+                            "AND c.relname = :name"
+                        ),
+                        {"name": checker.CONSTRAINT_NAME},
+                    ).fetchall()
+                ]
+        if colliding_indexes or colliding_relations:
+            detail = ", ".join(colliding_relations) or "index on `doctors`"
             print(
-                f"  RESULT: FAIL — an INDEX named {checker.CONSTRAINT_NAME!r} "
-                f"already exists on `doctors` (columns="
-                f"{colliding_indexes[0].get('column_names')!r}, "
-                "unique="
-                f"{colliding_indexes[0].get('unique')!r}). On PostgreSQL the "
-                "constraint name would collide with this index and "
-                "upgrade() would abort with a duplicate-name error. Drop or "
-                "rename the index manually, then re-run this pre-check."
+                f"  RESULT: FAIL — a relation named {checker.CONSTRAINT_NAME!r} "
+                f"already exists ({detail}). On PostgreSQL the constraint "
+                "name would collide with it and upgrade() would abort with "
+                "a duplicate-name error. Drop or rename the conflicting "
+                "relation manually, then re-run this pre-check."
             )
             drift_fail = True
         elif existing_uq is None and not drift_fail:
             print(
-                "  RESULT: OK — no index name collision with "
+                "  RESULT: OK — no relation namespace collision with "
                 f"{checker.CONSTRAINT_NAME!r}."
             )
 

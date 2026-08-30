@@ -327,3 +327,51 @@ def test_migration_upgrade_idempotent_with_correct_constraint(tmp_path) -> None:
         con.rollback()
     finally:
         con.close()
+
+
+def test_validator_rejects_nulls_not_distinct_variant() -> None:
+    """PostgreSQL 15+ reflects UNIQUE NULLS NOT DISTINCT with the same
+    column_names == ['user_id'] — the validator must reject it anyway: it
+    would permit only ONE userless doctor row, contradicting the
+    multiple-NULL semantics promised for historical userless doctors.
+
+    (Unit-level: SQLite reflection cannot produce the PG dialect option,
+    so the reflected dict is simulated; the same validator runs in the
+    migration precondition/postcondition AND in the production pre-check
+    script — single source of truth.)"""
+    from alembic import op as alembic_op  # noqa: F401  (module import side effect)
+
+    import importlib.util
+    from pathlib import Path
+
+    migration_path = (
+        Path(__file__).resolve().parents[2]
+        / "alembic" / "versions" / "0048_doctors_user_id_unique.py"
+    )
+    spec = importlib.util.spec_from_file_location("mig_0048_nnd", migration_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module._assert_valid_user_id_constraint(None, "test") is None
+    # NULLS DISTINCT (absent / None / False) is accepted
+    module._assert_valid_user_id_constraint(
+        {"name": "uq_doctors_user_id", "column_names": ["user_id"]}, "test"
+    )
+    module._assert_valid_user_id_constraint(
+        {
+            "name": "uq_doctors_user_id",
+            "column_names": ["user_id"],
+            "postgresql_nulls_not_distinct": False,
+        },
+        "test",
+    )
+    # NULLS NOT DISTINCT must be rejected
+    with pytest.raises(RuntimeError, match="NULLS NOT DISTINCT"):
+        module._assert_valid_user_id_constraint(
+            {
+                "name": "uq_doctors_user_id",
+                "column_names": ["user_id"],
+                "postgresql_nulls_not_distinct": True,
+            },
+            "test",
+        )

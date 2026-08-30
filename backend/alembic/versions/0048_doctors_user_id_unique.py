@@ -89,6 +89,12 @@ def _assert_valid_user_id_constraint(uq: dict | None, phase: str) -> None:
     ``doctors.user_id`` stays non-unique. Refuse loudly instead: abort the
     migration, leave every row untouched. An unreflectable definition
     (missing column_names) is treated as drift too — fail closed.
+
+    PostgreSQL 15+ NULLS NOT DISTINCT variants are rejected as well: they
+    would permit only ONE userless doctor row, contradicting the promised
+    multiple-NULL semantics for historical userless doctors (reflected via
+    the ``postgresql_nulls_not_distinct`` dialect option; absent/None/False
+    means the default NULLS DISTINCT, which is what this migration needs).
     """
     if uq is None:
         return
@@ -103,6 +109,16 @@ def _assert_valid_user_id_constraint(uq: dict | None, phase: str) -> None:
             "re-enable duplicate doctor identities. Rename/drop the drifted "
             "constraint manually (or recreate it correctly) and re-run "
             "`alembic upgrade head`. No rows were modified by this run."
+        )
+    if uq.get("postgresql_nulls_not_distinct") is True:
+        raise RuntimeError(
+            f"MIGRATION ABORTED ({phase}): constraint {CONSTRAINT_NAME} "
+            "exists as UNIQUE NULLS NOT DISTINCT (user_id). That variant "
+            "allows only ONE userless doctor row (NULL != NULL is not "
+            "honoured), contradicting the multiple-NULL semantics this "
+            "migration promises for historical userless doctors. Recreate "
+            "the constraint as NULLS DISTINCT and re-run `alembic upgrade "
+            "head`. No rows were modified by this run."
         )
 
 
@@ -138,8 +154,15 @@ def upgrade() -> None:
 
     # SQLite (dev/test) does not support ADD CONSTRAINT; batch mode handles it
     # by table rebuild. PostgreSQL (production) uses a plain ALTER TABLE.
+    # postgresql_nulls_not_distinct=False pins NULLS DISTINCT explicitly (the
+    # SQL default) so multiple userless doctor rows stay legal regardless of
+    # any future server/driver default changes; non-PG dialects ignore it.
     with op.batch_alter_table("doctors") as batch_op:
-        batch_op.create_unique_constraint(CONSTRAINT_NAME, ["user_id"])
+        batch_op.create_unique_constraint(
+            CONSTRAINT_NAME,
+            ["user_id"],
+            postgresql_nulls_not_distinct=False,
+        )
 
     # ---- postcondition ------------------------------------------------------
     # Same strictness as the precondition: the constraint must exist AND cover
