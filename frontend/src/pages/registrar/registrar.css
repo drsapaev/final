@@ -530,7 +530,6 @@
   gap: var(--mac-spacing-2);
   font-size: var(--mac-font-size-sm);
   font-weight: var(--mac-font-weight-medium);
-  padding: '4px 10px';
 }
 
 /* Worklist header section */
