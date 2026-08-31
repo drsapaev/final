@@ -1056,6 +1056,121 @@ def test_get_department_info_localizes_canonical_dental(db_session) -> None:
     assert info["doctors_count"] == 1
 
 
+# ===================== K. Round-6 P1: profile CRUD tag expansion =======
+
+
+def test_queue_profile_create_expands_family_tags(db_session) -> None:
+    """Codex round-6 P1: POST /queues/profiles with a dental-family key and
+    omitted/empty tags must persist tags covering the canonical spelling."""
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        QueueProfileCreate,
+        create_queue_profile,
+    )
+
+    created = create_queue_profile(
+        profile_data=QueueProfileCreate(key="dental", title="Dental"),
+        db=db_session,
+        current_user=None,
+    )
+    tags = created["profile"]["queue_tags"]
+    assert "dentistry" in tags
+    assert "dental" in tags
+
+    # explicit unrelated tags on a family-key profile STILL cover the family
+    created2 = create_queue_profile(
+        profile_data=QueueProfileCreate(
+            key="implants", title="Implants", queue_tags=["implants"]
+        ),
+        db=db_session,
+        current_user=None,
+    )
+    # non-family key: passthrough (key unioned, no family)
+    assert created2["profile"]["queue_tags"] == ["implants"]
+
+    created2b = create_queue_profile(
+        profile_data=QueueProfileCreate(
+            key="dentist", title="Dentist", queue_tags=["caries"]
+        ),
+        db=db_session,
+        current_user=None,
+    )
+    # family key ('dentist' is a family spelling) -> canonical guaranteed
+    assert "dentistry" in created2b["profile"]["queue_tags"]
+    assert "caries" in created2b["profile"]["queue_tags"]
+
+    # non-dental profile passes through unchanged
+    created3 = create_queue_profile(
+        profile_data=QueueProfileCreate(key="cardio2", title="Cardio2"),
+        db=db_session,
+        current_user=None,
+    )
+    assert created3["profile"]["queue_tags"] == ["cardio2"]
+
+
+def test_queue_profile_update_expands_family_tags(db_session) -> None:
+    """Codex round-6 P1: PUT /queues/profiles/{key} must expand tags —
+    clearing tags falls back to the profile key; a family-key profile
+    stays canonical-covered even when the admin sets unrelated tags."""
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        QueueProfileUpdate,
+        update_queue_profile,
+    )
+
+    db_session.add(
+        QueueProfile(
+            key="dental",
+            title="Dental",
+            queue_tags=["dental"],
+            display_order=9,
+            is_active=True,
+            show_on_qr_page=True,
+        )
+    )
+    db_session.commit()
+
+    # explicit unrelated tags on a family-key profile: key unioned in
+    updated = update_queue_profile(
+        profile_key="dental",
+        profile_data=QueueProfileUpdate(queue_tags=["prosthesis"]),
+        db=db_session,
+        current_user=None,
+    )
+    tags = updated["profile"]["queue_tags"]
+    assert "prosthesis" in tags
+    assert "dentistry" in tags
+    assert "dental" in tags
+
+    # clearing the tags: falls back to [profile.key] -> family covered
+    cleared = update_queue_profile(
+        profile_key="dental",
+        profile_data=QueueProfileUpdate(queue_tags=[]),
+        db=db_session,
+        current_user=None,
+    )
+    assert "dentistry" in cleared["profile"]["queue_tags"]
+
+    # a NON-family key update never gains dental tags
+    db_session.add(
+        QueueProfile(
+            key="orthodontics2",
+            title="Ortho2",
+            queue_tags=["ortho"],
+            display_order=10,
+            is_active=True,
+            show_on_qr_page=True,
+        )
+    )
+    db_session.commit()
+    updated2 = update_queue_profile(
+        profile_key="orthodontics2",
+        profile_data=QueueProfileUpdate(queue_tags=["ortho2"]),
+        db=db_session,
+        current_user=None,
+    )
+    # the key is always unioned in (creation parity), no dental tags appear
+    assert updated2["profile"]["queue_tags"] == ["ortho2", "orthodontics2"]
+
+
 # ===================== F. Mobile search variants (round-2 P2) ===========
 
 
