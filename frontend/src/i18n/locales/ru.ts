@@ -9672,8 +9672,6 @@ const ru = {
     ecg_delete_failed: 'Не удалось удалить файл. Проверьте соединение и попробуйте позже.',
     check_connection: 'Проверьте подключение к интернету и попробуйте снова',
     notifications_not_supported: 'Уведомления не поддерживаются в этом браузере',
-    modal_confirm_title: 'Подтверждение',
-    modal_notification_title: 'Уведомление',
     col_name: 'Имя',
     col_role: 'Роль',
     test_modal_title: 'Тестовое модальное окно',
