@@ -12,6 +12,7 @@ from app.core.roles import DOCTOR_ROLES
 from app.crud.appointment import appointment as appointment_crud
 from app.models import appointment as appointment_models
 from app.models.clinic import Doctor
+from app.models.department import Department
 from app.models.patient import Patient
 from app.models.setting import Setting
 from app.models.user import User
@@ -812,6 +813,40 @@ def _ensure_doctor_schedule_access(
     raise HTTPException(status_code=403, detail="Access denied")
 
 
+def _ensure_department_schedule_access(
+    db: Session, *, department_id: int, current_user: User
+) -> None:
+    """Ownership for GET /appointments/department/{department}/schedule
+    (D-4 / FU-1) — mirrors _ensure_doctor_schedule_access:
+
+    - Admin/Registrar (+superuser): any department's schedule —
+      operational need;
+    - doctor-capable roles (Doctor/cardio/derma/dentist variants): only
+      their OWN department (their active Doctor row must belong to the
+      requested department); a doctor-capable user without a Doctor row
+      is denied (a cross-doctor department schedule is not a substitute);
+    - Patient and every other role: denied (department schedules expose
+      per-patient PHI; patients have /appointments/patient/{patient_id}).
+    """
+    role = getattr(current_user, "role", None)
+    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
+        current_user, "is_superuser", False
+    ):
+        return
+
+    if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
+        doctor = (
+            db.query(Doctor)
+            .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+            .first()
+        )
+        if doctor is None or doctor.department_id != department_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        return
+
+    raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.get("/doctor/{doctor_id}/schedule", response_model=list[dict[str, Any]])
 def get_doctor_schedule(
     *,
@@ -855,6 +890,7 @@ def get_doctor_schedule(
 @router.get("/department/{department}/schedule", response_model=dict[str, Any])
 def get_department_schedule(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     department: str,
     date: str = Query(..., description="Дата (YYYY-MM-DD)"),
@@ -863,10 +899,60 @@ def get_department_schedule(
     """
     Получить расписание отделения на определенную дату
     """
-    schedule = appointment_crud.get_department_schedule(
-        db, department=department, date=date
+    # D-4 / FU-1: the legacy crud compared the `department` RELATIONSHIP
+    # to a raw string and read a non-existent `apt.reason` column — the
+    # endpoint was a 500 for every non-empty schedule. The department is
+    # now resolved by key (or numeric id) and the schedule is scoped to
+    # its department_id, with the same repaired serializer as the doctor
+    # schedule twin (PR4).
+    department_row = None
+    if department.strip().isdigit():
+        department_row = (
+            db.query(Department)
+            .filter(Department.id == int(department.strip()))
+            .first()
+        )
+    else:
+        department_row = (
+            db.query(Department).filter(Department.key == department).first()
+        )
+    if department_row is None:
+        raise HTTPException(status_code=404, detail="Отделение не найдено")
+
+    _ensure_department_schedule_access(
+        db, department_id=department_row.id, current_user=current_user
     )
-    return schedule
+
+    schedule = appointment_crud.get_department_schedule(
+        db, department_id=department_row.id, date=date
+    )
+
+    # Threat model (AGENTS.md "Threat model"): every returned row is a
+    # per-patient PHI read by a staff actor and gets its own audit trail
+    # entry before the response is returned (mirrors the doctor schedule).
+    for entry in schedule:
+        log_patient_access(
+            db,
+            actor_user=current_user,
+            subject_patient_id=entry["patient_id"],
+            resource_type="appointment",
+            resource_id=str(entry["id"]),
+            action="view",
+            request=request,
+            extra_data={
+                "operation": "department_schedule_view",
+                "department_id": department_row.id,
+                "date": date,
+            },
+        )
+
+    return {
+        "department": department_row.key,
+        "department_id": department_row.id,
+        "date": date,
+        "total": len(schedule),
+        "appointments": schedule,
+    }
 
 
 # Сохраняем существующие endpoints для совместимости
