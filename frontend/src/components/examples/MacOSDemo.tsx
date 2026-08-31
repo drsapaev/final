@@ -1,27 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
-import { BarChart3, Calendar, Home, Settings, User } from 'lucide-react';
-import {
-  Button,
-  Input,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  Modal,
-  Icon,
-  Badge,
-  Progress,
-  CircularProgress,
-  Sidebar,
-  Checkbox,
-  Radio,
-  Switch,
-  Select,
-  SegmentedControl,
-  Textarea,
-} from '../ui/macos';
+import { AlertTriangle, BarChart3, Bell, Calendar, Check, CheckCircle2, CircleHelp, Eye, Folder, Heart, Home, Mail, Moon, Phone, Plus, Search, Settings, Share, Sun, Trash2, User, X } from 'lucide-react';
+import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, Modal, Badge, Progress, CircularProgress, Sidebar, Checkbox, Radio, Switch, Select, SegmentedControl, Textarea } from '../ui/macos';
 import './MacOSDemo.css';
 import { notify } from '../../services/notify';
 
@@ -136,7 +116,7 @@ const MacOSDemo = () => {
               onClick={() => notify.success('Patient created!')}
               className="demo-btn-icon-semibold">
 
-                  <Icon name="plus" size="small" style={{ color: 'white' }} />
+                  <Plus size={16} style={{ color: 'white' }} aria-hidden="true" />
                   New Patient
                 </Button>
                 
@@ -146,7 +126,7 @@ const MacOSDemo = () => {
               onClick={() => notify.info('Search initiated')}
               className="demo-btn-icon">
 
-                  <Icon name="magnifyingglass" size="small" className="demo-tab-indicator-strong" />
+                  <Search size={16} className="demo-tab-indicator-strong" aria-hidden="true" />
                   Search
                 </Button>
                 
@@ -156,7 +136,7 @@ const MacOSDemo = () => {
               onClick={() => notify.warning('Settings opened')}
               className="demo-btn-icon">
 
-                  <Icon name="gear" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
+                  <Settings size={16} style={{ color: 'var(--mac-text-tertiary)' }} aria-hidden="true" />
                   Settings
                 </Button>
               </div>
@@ -171,7 +151,7 @@ const MacOSDemo = () => {
               aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
               title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}>
 
-                  <Icon name={isDarkMode ? 'sun' : 'moon'} size="small" style={{ color: isDarkMode ? 'var(--mac-warning)' : 'var(--mac-accent-blue-light)' }} />
+                  {isDarkMode  ? <Sun size={16} style={{ color: isDarkMode ? 'var(--mac-warning)' : 'var(--mac-accent-blue-light)' }} aria-hidden="true" /> : <Moon size={16} style={{ color: isDarkMode ? 'var(--mac-warning)' : 'var(--mac-accent-blue-light)' }} aria-hidden="true" />}
                 </Button>
               </div>
             </header>
@@ -218,33 +198,33 @@ const MacOSDemo = () => {
                 <div className="demo-flex-col-3">
                 <div className="demo-flex-wrap-2">
                   <Button variant="primary" className="demo-btn-icon">
-                    <Icon name="plus" size="small" style={{ color: 'white' }} />
+                    <Plus size={16} style={{ color: 'white' }} aria-hidden="true" />
                     Primary
                   </Button>
                   <Button variant="secondary" className="demo-btn-icon">
-                    <Icon name="gear" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
+                    <Settings size={16} style={{ color: 'var(--mac-text-tertiary)' }} aria-hidden="true" />
                     Secondary
                   </Button>
                   <Button variant="outline" className="demo-btn-icon">
-                    <Icon name="square.and.arrow.up" size="small" className="demo-tab-indicator-strong" />
+                    <Share size={16} className="demo-tab-indicator-strong" aria-hidden="true" />
                     Outline
                   </Button>
                   <Button variant="ghost" className="demo-btn-icon">
-                    <Icon name="eye" size="small" style={{ color: 'var(--mac-success)' }} />
+                    <Eye size={16} style={{ color: 'var(--mac-success)' }} aria-hidden="true" />
                     Ghost
                   </Button>
                 </div>
                 <div className="demo-flex-wrap-2">
                   <Button variant="secondary" color="success" className="demo-btn-icon">
-                    <Icon name="checkmark.circle" size="small" style={{ color: 'var(--mac-success)' }} />
+                    <CheckCircle2 size={16} style={{ color: 'var(--mac-success)' }} aria-hidden="true" />
                     Success
                   </Button>
                   <Button variant="secondary" color="warning" className="demo-btn-icon">
-                    <Icon name="exclamationmark.triangle" size="small" style={{ color: 'var(--mac-warning)' }} />
+                    <AlertTriangle size={16} style={{ color: 'var(--mac-warning)' }} aria-hidden="true" />
                     Warning
                   </Button>
                   <Button variant="danger" className="demo-btn-icon">
-                    <Icon name="trash" size="small" style={{ color: 'var(--mac-error)' }} />
+                    <Trash2 size={16} style={{ color: 'var(--mac-error)' }} aria-hidden="true" />
                     Danger
                   </Button>
                 </div>
@@ -408,10 +388,10 @@ const MacOSDemo = () => {
                   </h4>
                   <div className="demo-tab-variant-1">
                     {[
-                    { id: 'tab1-1', label: 'Overview', icon: 'house' },
-                    { id: 'tab1-2', label: 'Patients', icon: 'person' },
-                    { id: 'tab1-3', label: 'Reports', icon: 'chart.bar' },
-                    { id: 'tab1-4', label: 'Settings', icon: 'gear' }].
+                    { id: 'tab1-1', label: 'Overview', icon: Home },
+                    { id: 'tab1-2', label: 'Patients', icon: User },
+                    { id: 'tab1-3', label: 'Reports', icon: BarChart3 },
+                    { id: 'tab1-4', label: 'Settings', icon: Settings }].
                     map((tab) => {
                       const isActive = tab.id === activeTab1;
 
@@ -446,7 +426,7 @@ const MacOSDemo = () => {
                             }
                           }}>
 
-                          <Icon name={tab.icon} size="small" style={{
+                          <tab.icon size={16} aria-hidden="true" style={{
                             color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
                           }} />
                           {tab.label}
@@ -480,10 +460,10 @@ const MacOSDemo = () => {
                   </h4>
                   <div className="demo-tab-variant-2">
                     {[
-                    { id: 'tab2-1', label: 'Dashboard', icon: 'house' },
-                    { id: 'tab2-2', label: 'Analytics', icon: 'chart.bar' },
-                    { id: 'tab2-3', label: 'Users', icon: 'person' },
-                    { id: 'tab2-4', label: 'System', icon: 'gear' }].
+                    { id: 'tab2-1', label: 'Dashboard', icon: Home },
+                    { id: 'tab2-2', label: 'Analytics', icon: BarChart3 },
+                    { id: 'tab2-3', label: 'Users', icon: User },
+                    { id: 'tab2-4', label: 'System', icon: Settings }].
                     map((tab) => {
                       const isActive = tab.id === activeTab2;
 
@@ -517,7 +497,7 @@ const MacOSDemo = () => {
                             }
                           }}>
 
-                          <Icon name={tab.icon} size="small" style={{
+                          <tab.icon size={16} aria-hidden="true" style={{
                             color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
                           }} />
                           {tab.label}
@@ -563,10 +543,10 @@ const MacOSDemo = () => {
                   </h4>
                   <div className="demo-tab-variant-3">
                     {[
-                    { id: 'tab3-1', label: 'Files', icon: 'folder' },
-                    { id: 'tab3-2', label: 'Search', icon: 'magnifyingglass' },
-                    { id: 'tab3-3', label: 'Debug', icon: 'gear' },
-                    { id: 'tab3-4', label: 'Help', icon: 'help' }].
+                    { id: 'tab3-1', label: 'Files', icon: Folder },
+                    { id: 'tab3-2', label: 'Search', icon: Search },
+                    { id: 'tab3-3', label: 'Debug', icon: Settings },
+                    { id: 'tab3-4', label: 'Help', icon: CircleHelp }].
                     map((tab) => {
                       const isActive = tab.id === activeTab3;
 
@@ -602,7 +582,7 @@ const MacOSDemo = () => {
                             }
                           }}>
 
-                          <Icon name={tab.icon} size="small" style={{
+                          <tab.icon size={16} aria-hidden="true" style={{
                             color: isActive ? 'white' : 'var(--mac-text-secondary)'
                           }} />
                           {tab.label}
@@ -643,18 +623,22 @@ const MacOSDemo = () => {
           <Card className="demo-card-mb-40">
             <CardHeader>
               <CardTitle>Icon System</CardTitle>
-              <CardDescription>SF Symbols-like icon collection</CardDescription>
+              <CardDescription>Icon System — canonical lucide-react collection (Track 3-2)</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="demo-icon-grid">
                 {[
-                'house', 'person', 'heart', 'gear', 'bell', 'chart.bar',
-                'magnifyingglass', 'plus', 'trash', 'eye', 'phone', 'envelope'].
-                map((iconName) =>
-                <div key={iconName} className="demo-icon-cell">
-                    <Icon name={iconName} size="large" />
+                { icon: Home, label: 'home' }, { icon: User, label: 'person' },
+                { icon: Heart, label: 'heart' }, { icon: Settings, label: 'gear' },
+                { icon: Bell, label: 'bell' }, { icon: BarChart3, label: 'chart.bar' },
+                { icon: Search, label: 'magnifyingglass' }, { icon: Plus, label: 'plus' },
+                { icon: Trash2, label: 'trash' }, { icon: Eye, label: 'eye' },
+                { icon: Phone, label: 'phone' }, { icon: Mail, label: 'envelope' }].
+                map(({ icon: GalleryIcon, label }) =>
+                <div key={label} className="demo-icon-cell">
+                    <GalleryIcon size={24} aria-hidden="true" />
                     <span className="demo-icon-label">
-                      {iconName}
+                      {label}
                     </span>
                   </div>
                 )}
@@ -676,7 +660,7 @@ const MacOSDemo = () => {
             onClick={() => setIsModalOpen(false)}
             className="demo-btn-icon">
 
-              <Icon name="xmark" size="small" style={{ color: 'var(--mac-text-tertiary)' }} />
+              <X size={16} style={{ color: 'var(--mac-text-tertiary)' }} aria-hidden="true" />
               Cancel
             </Button>
             <Button
@@ -684,7 +668,7 @@ const MacOSDemo = () => {
             onClick={() => setIsModalOpen(false)}
             className="demo-btn-icon">
 
-              <Icon name="checkmark" size="small" style={{ color: 'white' }} />
+              <Check size={16} style={{ color: 'white' }} aria-hidden="true" />
               Confirm
             </Button>
           </>
@@ -712,7 +696,7 @@ const MacOSDemo = () => {
           size="large"
           onClick={() => setIsModalOpen(true)}>
 
-          <Icon name="plus" />
+          <Plus aria-hidden="true" />
           Open Demo Modal
         </Button>
       </div>
