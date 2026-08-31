@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -43,6 +44,35 @@ def _admin_doctors_http_error(exc: Exception, operation: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail=ADMIN_DOCTORS_PUBLIC_ERROR,
+    )
+
+
+_DUPLICATE_DOCTOR_LINK_DETAIL = "Пользователь уже привязан к другому врачу"
+
+
+def _is_doctor_user_id_unique_violation(exc: IntegrityError) -> bool:
+    """True when an IntegrityError comes from UNIQUE(doctors.user_id).
+
+    The race guard for the concurrent-link window: two requests can both
+    pass the get_doctor_by_user_id pre-check before either commits, and
+    the losing commit raises from the DB constraint instead (Codex P2,
+    round-6). Constraint-name coverage per backend:
+    - PostgreSQL (migration 0048): 'duplicate key value violates unique
+      constraint "uq_doctors_user_id"'.
+    - SQLite (tests, column-level unique=True): 'UNIQUE constraint
+      failed: doctors.user_id'.
+    Foreign-key violations on the same column match neither pattern and
+    keep the generic 500 path.
+    """
+    text = str(getattr(exc, "orig", None) or exc)
+    return "uq_doctors_user_id" in text or "doctors.user_id" in text
+
+
+def _raise_duplicate_doctor_link_error() -> HTTPException:
+    """Same client error the pre-check returns, for the losing race."""
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=_DUPLICATE_DOCTOR_LINK_DETAIL,
     )
 
 
@@ -222,6 +252,16 @@ def create_doctor(
         return _serialize_doctor(db, new_doctor)
     except HTTPException:
         raise
+    except IntegrityError as exc:
+        # Concurrent-link race (Codex P2 round-6): both requests passed the
+        # get_doctor_by_user_id pre-check before either committed; the DB
+        # UNIQUE constraint (uq_doctors_user_id) rejected the losing commit
+        # here. Roll back the poisoned session and surface the same client
+        # error the pre-check would have returned instead of a 500.
+        db.rollback()
+        if _is_doctor_user_id_unique_violation(exc):
+            raise _raise_duplicate_doctor_link_error() from exc
+        raise _admin_doctors_http_error(exc, "create_doctor") from exc
     except Exception as exc:
         raise _admin_doctors_http_error(exc, "create_doctor") from exc
 
@@ -261,6 +301,15 @@ def update_doctor(
         return _serialize_doctor(db, updated_doctor)
     except HTTPException:
         raise
+    except IntegrityError as exc:
+        # Same concurrent-link race as create_doctor (Codex P2 round-6):
+        # both requests passed the pre-check, the losing commit hits the
+        # UNIQUE(doctors.user_id) constraint. Roll back and return the
+        # duplicate-link client error instead of a 500.
+        db.rollback()
+        if _is_doctor_user_id_unique_violation(exc):
+            raise _raise_duplicate_doctor_link_error() from exc
+        raise _admin_doctors_http_error(exc, "update_doctor") from exc
     except Exception as exc:
         raise _admin_doctors_http_error(exc, "update_doctor") from exc
 
