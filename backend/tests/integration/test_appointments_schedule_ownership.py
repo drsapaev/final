@@ -144,3 +144,85 @@ def test_patient_denied_doctor_schedule(client, db_session):
         headers=_headers_for(patient_user),
     )
     assert response.status_code == 403, response.text
+
+
+def _audit_rows(db_session, subject_patient_id: int):
+    from app.models.patient_access_audit import PatientAccessAuditLog
+
+    return (
+        db_session.query(PatientAccessAuditLog)
+        .filter(PatientAccessAuditLog.subject_patient_id == subject_patient_id)
+        .all()
+    )
+
+
+def test_schedule_read_writes_per_patient_audit_trail(client, db_session, admin_user):
+    """Threat model 'Audit log on every patient read': a successful staff
+    read of a nonempty schedule must leave one audit row per returned
+    patient, attributed to the acting staff user (not patient self-access)."""
+    user_a, doctor_a, _user_b, _doctor_b = _doctor_pair(db_session, "aud_a", "aud_b")
+    patient = _patient(db_session)
+    appointment = _schedule_appointment(db_session, doctor_a, patient)
+
+    response = client.get(
+        f"/api/v1/appointments/doctor/{doctor_a.id}/schedule",
+        params={"date": str(date.today() + timedelta(days=1))},
+        headers=_headers_for(admin_user),
+    )
+    assert response.status_code == 200, response.text
+
+    rows = _audit_rows(db_session, patient.id)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.actor_type == "staff"
+    assert row.actor_staff_user_id == admin_user.id
+    assert row.actor_patient_id is None
+    assert row.resource_type == "appointment"
+    assert row.resource_id == str(appointment.id)
+    assert row.action == "view"
+    assert row.outcome == "success"
+
+
+def test_doctor_own_schedule_read_also_audited(client, db_session):
+    """Doctor self-read goes through the same per-patient audit trail."""
+    user_a, doctor_a, _user_b, _doctor_b = _doctor_pair(db_session, "aud_c", "aud_d")
+    patient = _patient(db_session)
+    _schedule_appointment(db_session, doctor_a, patient)
+
+    response = client.get(
+        f"/api/v1/appointments/doctor/{doctor_a.id}/schedule",
+        params={"date": str(date.today() + timedelta(days=1))},
+        headers=_headers_for(user_a),
+    )
+    assert response.status_code == 200, response.text
+
+    rows = _audit_rows(db_session, patient.id)
+    assert len(rows) == 1
+    assert rows[0].actor_type == "staff"
+    assert rows[0].actor_staff_user_id == user_a.id
+
+
+def test_denied_schedule_read_writes_no_audit_rows(client, db_session):
+    """403 denials must not create patient-access audit entries (the read
+    never happened; the guard rejects before any PHI is assembled)."""
+    _user_a, _doctor_a, _user_b, doctor_b = _doctor_pair(db_session, "aud_e", "aud_f")
+    patient = _patient(db_session)
+    _schedule_appointment(db_session, doctor_b, patient)
+    patient_user = User(
+        username="sched_patient_aud",
+        email="sched-patient-aud@test.com",
+        full_name="Sched Patient Auditor",
+        hashed_password=get_password_hash("secret123"),
+        role="Patient",
+        is_active=True,
+    )
+    db_session.add(patient_user)
+    db_session.commit()
+
+    response = client.get(
+        f"/api/v1/appointments/doctor/{doctor_b.id}/schedule",
+        params={"date": str(date.today() + timedelta(days=1))},
+        headers=_headers_for(patient_user),
+    )
+    assert response.status_code == 403, response.text
+    assert _audit_rows(db_session, patient.id) == []

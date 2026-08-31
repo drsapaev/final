@@ -37,6 +37,7 @@ from app.models.patient_access_audit import PatientAccessAuditLog
 if TYPE_CHECKING:
     from fastapi import Request
     from sqlalchemy.orm import Session
+    from app.models.user import User
     from app.services.telegram_mini_app_init_data import TelegramMiniAppSessionScope
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,7 @@ def log_patient_access(
     db: "Session",
     *,
     scope: "TelegramMiniAppSessionScope | None" = None,
+    actor_user: "User | None" = None,
     subject_patient_id: int | None = None,
     resource_type: str,
     resource_id: str | None = None,
@@ -90,6 +92,11 @@ def log_patient_access(
     Args:
         db: SQLAlchemy session
         scope: TelegramMiniAppSessionScope (if access via Mini App)
+        actor_user: Staff User performing the access when there is no Mini
+            App scope (e.g. admin/doctor reads of patient PHI via staff
+            endpoints); sets actor_type="staff" + actor_staff_user_id so the
+            row is not misattributed as patient self-access. Ignored when
+            scope is provided.
         subject_patient_id: Patient whose PHI is being accessed.
             If None, derived from scope.patient_id.
         resource_type: lab_report | cabinet_summary | form_submission |
@@ -135,6 +142,13 @@ def log_patient_access(
                 actor_staff_user_id = scope.staff_user_id
                 actor_telegram_user_id = scope.telegram_user_id
                 actor_type = "staff"
+        elif actor_user is not None:
+            # Staff-side endpoint access (JWT user, no Mini App scope):
+            # record the acting staff user explicitly so the audit row is
+            # not misattributed as patient self-access (threat model:
+            # "Audit log on every patient read" for staff/admin actors).
+            actor_staff_user_id = actor_user.id
+            actor_type = "staff"
 
         audit_entry = PatientAccessAuditLog(
             subject_patient_id=subject_patient_id,

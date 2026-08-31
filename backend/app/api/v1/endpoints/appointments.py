@@ -3,7 +3,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.models.patient import Patient
 from app.models.setting import Setting
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
+from app.services.patient_access_audit import log_patient_access
 from app.services.online_queue import (
     _broadcast,  # Добавляем _broadcast
     get_or_create_day,
@@ -760,6 +761,7 @@ def _ensure_doctor_schedule_access(
 @router.get("/doctor/{doctor_id}/schedule", response_model=list[dict[str, Any]])
 def get_doctor_schedule(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     doctor_id: int,
     date: str = Query(..., description="Дата (YYYY-MM-DD)"),
@@ -772,6 +774,27 @@ def get_doctor_schedule(
         db, doctor_id=doctor_id, current_user=current_user
     )
     schedule = appointment_crud.get_doctor_schedule(db, doctor_id=doctor_id, date=date)
+
+    # Threat model (AGENTS.md "Threat model"): "Audit log on every patient
+    # read" — the repaired serializer now really returns patient_id + notes,
+    # so each returned row is a per-patient PHI read by a staff actor and
+    # gets its own audit trail entry before the response is returned.
+    for entry in schedule:
+        log_patient_access(
+            db,
+            actor_user=current_user,
+            subject_patient_id=entry["patient_id"],
+            resource_type="appointment",
+            resource_id=str(entry["id"]),
+            action="view",
+            request=request,
+            extra_data={
+                "operation": "doctor_schedule_view",
+                "doctor_id": doctor_id,
+                "date": date,
+            },
+        )
+
     return schedule
 
 
