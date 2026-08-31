@@ -545,7 +545,7 @@ const UserManagement = () => {
             <Select
               label={t('admin2.um_filter_role_label')}
               value={roleFilter}
-              onChange={(v: unknown) => setRoleFilter(String(v))}
+              onValueChange={(v) => setRoleFilter(String(v))}
               options={roleOptions}
               placeholder={t('admin2.um_filter_all_roles')}
               size="large"
@@ -558,7 +558,7 @@ const UserManagement = () => {
             <Select
               label={t('admin2.um_filter_status_label')}
               value={statusFilter}
-              onChange={(v: unknown) => setStatusFilter(String(v))}
+              onValueChange={(v) => setStatusFilter(String(v))}
               options={statusOptions}
               placeholder={t('admin2.um_filter_all_statuses')}
               size="large"
