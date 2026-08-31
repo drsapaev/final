@@ -412,6 +412,13 @@ export default [
               '../../ui/macos',
               '../../components/ui/macos',
               '../../../components/ui/macos',
+              // Track 3-3 (Codex round-1 P2, follow-up): the ui/ barrel
+              // re-exports the macos kit — cover its specifiers too.
+              '@/components/ui',
+              './ui',
+              '../ui',
+              '../../ui',
+              '../../../components/ui',
             ].map((barrel) => ({
               name: barrel,
               importNames: ['Icon'],
