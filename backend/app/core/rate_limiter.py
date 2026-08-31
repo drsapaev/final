@@ -93,23 +93,39 @@ def get_client_ip(request: Request) -> str:
     Logic:
     1. Get the direct TCP peer IP (request.client.host).
     2. If peer is a trusted proxy, parse X-Forwarded-For and return the
-       leftmost (original client) IP.
+       RIGHTMOST entry (the client IP as observed by the nearest trusted
+       proxy to us).
     3. Otherwise, return the direct peer IP.
+
+    Why rightmost, not leftmost: both supported deployment contours hand
+    the backend a chain whose LAST entry is the only non-forgeable one —
+    - Cloudflare Tunnel contour (docs/runbooks/DEPLOYMENT_NEW_CLINIC.md):
+      the edge APPENDS the connecting client IP to any client-supplied
+      X-Forwarded-For prefix, so the leftmost entry is attacker-chosen
+      while the rightmost is the true client IP as seen by Cloudflare.
+    - nginx contour (ops/vps/nginx/clinic.conf.template): nginx OVERWRITES
+      X-Forwarded-For with $remote_addr, producing a single-entry chain
+      where rightmost == leftmost == true client IP.
+    Strict fallback: if the rightmost entry does not parse as an IP, the
+    direct peer is recorded — we deliberately do NOT scan leftward, since
+    any leftward entry past a malformed hop is client-controlled again.
     """
     peer_ip = request.client.host if request.client else "0.0.0.0"
 
     if _is_trusted_proxy(peer_ip):
         xff = request.headers.get("X-Forwarded-For", "")
         if xff:
-            # X-Forwarded-For: client, proxy1, proxy2, ...
-            # The leftmost entry is the original client.
-            first = xff.split(",")[0].strip()
+            # X-Forwarded-For: client, proxy1, ..., proxyN
+            # The rightmost entry is the client IP as seen by proxyN —
+            # the nearest trusted hop and the only non-forgeable one when
+            # the edge appends instead of overwriting.
+            last = xff.split(",")[-1].strip()
             try:
                 # Validate it's a real IP
-                ip_address(first)
-                return first
+                ip_address(last)
+                return last
             except (ValueError, AddressValueError):
-                logger.warning("Invalid IP in X-Forwarded-For header: %r", first)
+                logger.warning("Invalid IP in X-Forwarded-For header: %r", last)
                 return peer_ip
 
     return peer_ip
