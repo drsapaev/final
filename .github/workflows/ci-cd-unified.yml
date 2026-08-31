@@ -812,7 +812,11 @@ jobs:
         # P0 gate policy: frontend-10-route-smoke + frontend-10-visual-a11y
         # are self-contained (mocked/no API, dev server only) and were
         # previously never run in CI.
-        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts --project=chromium --retries=0 2>&1 | tee ux-audit-output.txt
+        # PR-UI-18 item 4: a11y-axe-audit.spec.ts (@axe-core/playwright,
+        # WCAG 2.x A/AA) gates public surfaces × light/dark with a
+        # violation baseline (e2e/a11y-baseline.json — ratchet: fails on NEW
+        # rules and on stale baseline entries).
+        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts --project=chromium --retries=0 2>&1 | tee ux-audit-output.txt
       # E2E root-cause fix: removed continue-on-error. All non-fixme tests
       # must pass. Tests marked test.fixme have documented root causes and
       # are tracked for follow-up. See PR description for details.
@@ -827,14 +831,16 @@ jobs:
         # reality: if the count drops below the expected number, something
         # was skipped).
         #
-        # Expected: 47 passed, 0 skipped, 0 failed
-        # (12 cashier + 9 registrar + 6 visual + 8 route-smoke + 12 visual-a11y).
+        # Expected: 93 passed, 0 skipped, 0 failed
+        # (12 cashier + 9 registrar + 40 visual [7 state baselines + EAT +
+        #  pr16-landing + 22 pr18 twelve-screen baselines] + 8 route-smoke
+        # + 12 visual-a11y + 12 a11y-axe-audit).
         # Reconciliation note: registrar-time.spec.ts (1 test) runs in its own
-        # step above and is intentionally NOT counted here — the total
-        # hard-gated Tier 1 suite is 48 tests. Empirically verified locally:
-        # 48/48 pass in ~3.0m with dev server only, no backend/credentials.
-        # If a test is intentionally added/removed, update EXPECTED_COUNT below.
-        EXPECTED_COUNT=47
+        # step above and is intentionally NOT counted here. Empirically
+        # verified locally with `playwright --list` per file on the PR-UI-18-5
+        # head. If a test is intentionally added/removed, update EXPECTED_COUNT
+        # below.
+        EXPECTED_COUNT=93
         if [ ! -f ux-audit-output.txt ]; then
           echo "ERROR: ux-audit-output.txt not found. The UX Audit step may not have run."
           exit 1

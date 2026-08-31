@@ -46,7 +46,6 @@
  * Optional providers (opt-in via flags — each has mount-time cost/side effect):
  *   - withNotificationWs — NotificationWebSocketProvider (opens WebSocket on mount)
  *   - withChat — ChatProvider (may establish chat state)
- *   - withModal — ModalProvider
  *   - withForm — FormProvider
  *
  * Usage:
@@ -71,7 +70,6 @@ import { NotificationCenterProvider } from '../contexts/NotificationCenterContex
 import { NotificationWebSocketProvider } from '../contexts/NotificationWebSocketContext';
 import { ChatProvider } from '../contexts/ChatContext';
 import { ToastProvider } from '../components/common/Toast';
-import { ModalProvider } from '../components/common/Modal';
 import { FormProvider } from '../components/common/Form';
 
 export interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
@@ -83,8 +81,6 @@ export interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper
   withNotificationWs?: boolean;
   /** Include ChatProvider (may establish chat state — opt-in). */
   withChat?: boolean;
-  /** Include ModalProvider. */
-  withModal?: boolean;
   /** Include FormProvider. */
   withForm?: boolean;
 }
@@ -100,7 +96,6 @@ export function buildProviderWrapper(options: RenderWithProvidersOptions = {}) {
     skipRouter = false,
     withNotificationWs = false,
     withChat = false,
-    withModal = false,
     withForm = false,
   } = options;
 
@@ -111,9 +106,6 @@ export function buildProviderWrapper(options: RenderWithProvidersOptions = {}) {
     // Order matches AppProviders.tsx for the providers we share.
     if (withForm) {
       tree = <FormProvider>{tree}</FormProvider>;
-    }
-    if (withModal) {
-      tree = <ModalProvider>{tree}</ModalProvider>;
     }
     if (withNotificationWs) {
       tree = <NotificationWebSocketProvider>{tree}</NotificationWebSocketProvider>;

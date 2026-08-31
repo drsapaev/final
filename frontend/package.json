@@ -18,7 +18,7 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 5173",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --fix",
-    "lint:check": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint:check": "eslint \"src/**/*.{ts,tsx}\" && stylelint \"src/**/*.css\"",
     "audit:a11y": "eslint \"src/**/*.{ts,tsx}\" --quiet",
     "audit:control-labels": "eslint \"src/**/*.{ts,tsx}\" --quiet --rule \"jsx-a11y/control-has-associated-label: error\"",
     "audit:no-mui-runtime": "node scripts/audit-no-mui-runtime.mjs",
@@ -48,7 +48,8 @@
     "type-check:watch": "tsc --noEmit --watch",
     "generate:api-types": "bash scripts/generate-api-types.sh",
     "generate:api-types:check": "bash scripts/generate-api-types.sh && git diff --exit-code src/types/generated/ || (echo 'API types are out of date! Run: npm run generate:api-types' && exit 1)",
-    "type-debt:check": "node ../scripts/type-debt-check.mjs"
+    "type-debt:check": "node ../scripts/type-debt-check.mjs",
+    "lint:css": "stylelint \"src/**/*.css\""
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",
@@ -82,6 +83,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@eslint/js": "9.39.5",
     "@playwright/test": "^1.62.0",
     "@storybook/addon-a11y": "8.6.18",
@@ -112,6 +114,8 @@
     "openapi-typescript": "^7.13.0",
     "rollup": "^3.30.0",
     "rollup-plugin-visualizer": "^7.0.1",
+    "storybook": "8.6.18",
+    "stylelint": "16.24.0",
     "terser": "^5.49.0",
     "typescript": "^6.0.3",
     "vite": "^6.4.3",

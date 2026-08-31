@@ -22,7 +22,7 @@ import {
 'lucide-react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
-import './ModernTabs.css';
+import './Tabs.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
 // Маппинг иконок из lucide-react
@@ -61,7 +61,7 @@ interface TabItem {
   gradient: string;
 }
 
-interface ModernTabsProps {
+interface TabsProps {
   activeTab?: string | null;
   onTabChange?: (tab: string | null) => void;
   onProfilesLoaded?: (profiles: unknown[]) => void;
@@ -71,7 +71,7 @@ interface ModernTabsProps {
   dynamicDepartments?: unknown[];
 }
 
-const ModernTabs = ({
+const Tabs = ({
   activeTab,
   onTabChange,
   onProfilesLoaded,
@@ -79,7 +79,7 @@ const ModernTabs = ({
   language = 'ru',
   theme,
   dynamicDepartments
-}: ModernTabsProps) => {
+}: TabsProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
   const [indicatorStyle, setIndicatorStyle] = useState<Record<string, any>>({});
   const [tabs, setTabs] = useState<TabItem[]>([]);
@@ -188,7 +188,7 @@ const ModernTabs = ({
   // Слушаем обновления профилей очередей
   useEffect(() => {
     const handleProfilesUpdate = (event: Event) => {
-      logger.log('ModernTabs: Получено обновление профилей очередей', (event as CustomEvent).detail);
+      logger.log('Tabs: Получено обновление профилей очередей', (event as CustomEvent).detail);
       loadQueueProfiles();
     };
 
@@ -399,4 +399,4 @@ const ModernTabs = ({
 
 // audit/strict: removed self-referencing propTypes spread
 
-export default ModernTabs;
+export default Tabs;

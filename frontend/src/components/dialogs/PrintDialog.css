@@ -155,7 +155,6 @@
     display: flex;
     align-items: center;
     gap: var(--mac-spacing-3);
-    padding: '12px 14px';
     border: 1px solid var(--mac-border);
     border-radius: var(--mac-radius-lg);
     background-color: white;

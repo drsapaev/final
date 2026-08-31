@@ -9197,7 +9197,7 @@ const uzCyrl = {
     tfs_skopirovat_rezervnyy_kod_ind: 'Скопировать резервный код {index + 1}',
     tfs_vazhno: 'Важно:',
     tfs_sohranite_eti_kody_v_bezopas: 'Сохраните эти коды в безопасном месте. Каждый код можно использовать только один раз.',
-    // ModernTabs.jsx (mt_)
+    // Tabs.tsx (mt_) — renamed from ModernTabs in PR-UI-17-5
     mt_segodnya: 'Сегодня',
     mt_v_ocheredi: 'В очереди',
     mt_ozhidayut: 'Ожидают',
@@ -9554,8 +9554,6 @@ const uzCyrl = {
     ecg_delete_failed: 'Не удалось удалить файл. Проверьте соединение и попробуйте позже.',
     check_connection: 'Проверьте подключение к интернету и попробуйте снова',
     notifications_not_supported: 'Уведомления не поддерживаются в этом браузере',
-    modal_confirm_title: 'Подтверждение',
-    modal_notification_title: 'Уведомление',
     col_name: 'Имя',
     col_role: 'Роль',
     test_modal_title: 'Тестовое модальное окно',
