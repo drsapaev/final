@@ -218,3 +218,144 @@ def test_queue_cabinet_info_reports_sync_status_and_rejects_manual_canonical_cha
 
     db_session.refresh(queue)
     assert queue.cabinet_number == "305"
+
+
+# ---------------------------------------------------------------------------
+# Codex P2 round-6 (#2934): concurrent doctor-link race must surface the
+# duplicate-link client error, not HTTP 500 from the DB UNIQUE constraint.
+# Two requests can both pass the get_doctor_by_user_id pre-check before
+# either commits; the losing commit raises IntegrityError from
+# UNIQUE(doctors.user_id) (migration 0048: uq_doctors_user_id).
+# ---------------------------------------------------------------------------
+
+
+def _create_doctor_role_user(db_session, username: str) -> User:
+    user = User(
+        username=username,
+        email=f"{username}@test.com",
+        full_name=username.replace("_", " ").title(),
+        hashed_password=get_password_hash("secret123"),
+        role="Doctor",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+def test_create_doctor_returns_duplicate_link_error_on_commit_race(
+    client,
+    db_session,
+    auth_headers,
+    monkeypatch,
+):
+    """Losing create_doctor commit under a concurrent link must return the
+    same 400 the pre-check yields — not a 500 from the UNIQUE constraint."""
+    from app.crud import clinic as crud_clinic
+
+    user = _create_doctor_role_user(db_session, "race_create_user")
+    # The "winning" concurrent request already committed this link.
+    winner = Doctor(user_id=user.id, specialty="cardiology", active=True)
+    db_session.add(winner)
+    db_session.commit()
+    db_session.refresh(winner)
+
+    # Race window: the pre-check runs before the winner commits, so it
+    # misses the link and lets the losing INSERT reach the DB constraint.
+    monkeypatch.setattr(
+        crud_clinic, "get_doctor_by_user_id", lambda db, user_id: None
+    )
+
+    response = client.post(
+        "/api/v1/admin/doctors",
+        headers=auth_headers,
+        json={"user_id": user.id, "specialty": "dermatology"},
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == "Пользователь уже привязан к другому врачу"
+
+    # The rollback must leave the session usable for subsequent requests.
+    follow_up = client.get("/api/v1/admin/doctors", headers=auth_headers)
+    assert follow_up.status_code == 200
+
+
+def test_update_doctor_returns_duplicate_link_error_on_commit_race(
+    client,
+    db_session,
+    auth_headers,
+    monkeypatch,
+):
+    """Losing update_doctor commit under a concurrent link must return the
+    duplicate-link 400 — not a 500 from the UNIQUE constraint."""
+    from app.crud import clinic as crud_clinic
+
+    user = _create_doctor_role_user(db_session, "race_update_user")
+    winner = Doctor(user_id=user.id, specialty="cardiology", active=True)
+    db_session.add(winner)
+    db_session.commit()
+    db_session.refresh(winner)
+
+    # The doctor being updated still looks userless to the pre-check.
+    target = Doctor(user_id=None, specialty="dermatology", active=True)
+    db_session.add(target)
+    db_session.commit()
+    db_session.refresh(target)
+
+    monkeypatch.setattr(
+        crud_clinic, "get_doctor_by_user_id", lambda db, user_id: None
+    )
+
+    response = client.put(
+        f"/api/v1/admin/doctors/{target.id}",
+        headers=auth_headers,
+        json={"user_id": user.id},
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == "Пользователь уже привязан к другому врачу"
+
+    db_session.refresh(target)
+    assert target.user_id is None, "losing update must not partially apply"
+
+
+def test_unique_violation_matcher_discriminates_constraint_types():
+    """The IntegrityError matcher must accept UNIQUE(doctors.user_id) on
+    both backends and reject foreign-key violations on the same column."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.api.v1.endpoints.admin_doctors import (
+        _is_doctor_user_id_unique_violation,
+    )
+
+    pg_unique = IntegrityError(
+        "stmt",
+        None,
+        Exception(
+            'duplicate key value violates unique constraint "uq_doctors_user_id"'
+        ),
+    )
+    sqlite_unique = IntegrityError(
+        "stmt",
+        None,
+        Exception("UNIQUE constraint failed: doctors.user_id"),
+    )
+    pg_fk = IntegrityError(
+        "stmt",
+        None,
+        Exception(
+            'insert or update on table "doctors" violates foreign key '
+            'constraint "doctors_user_id_fkey"'
+        ),
+    )
+    sqlite_fk = IntegrityError(
+        "stmt",
+        None,
+        Exception("FOREIGN KEY constraint failed"),
+    )
+
+    assert _is_doctor_user_id_unique_violation(pg_unique) is True
+    assert _is_doctor_user_id_unique_violation(sqlite_unique) is True
+    assert _is_doctor_user_id_unique_violation(pg_fk) is False
+    assert _is_doctor_user_id_unique_violation(sqlite_fk) is False
