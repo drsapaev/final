@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
+import { BarChart3, Calendar, Home, Settings, User } from 'lucide-react';
 import {
   Button,
   Input,
@@ -107,11 +108,11 @@ const MacOSDemo = () => {
   };
 
   const sidebarItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'house' },
-  { id: 'patients', label: 'Patients', icon: 'person', badge: '12' },
-  { id: 'appointments', label: 'Appointments', icon: 'calendar' },
-  { id: 'reports', label: 'Reports', icon: 'chart.bar' },
-  { id: 'settings', label: 'Settings', icon: 'gear' }];
+  { id: 'dashboard', label: 'Dashboard', icon: Home },
+  { id: 'patients', label: 'Patients', icon: User, badge: '12' },
+  { id: 'appointments', label: 'Appointments', icon: Calendar },
+  { id: 'reports', label: 'Reports', icon: BarChart3 },
+  { id: 'settings', label: 'Settings', icon: Settings }];
 
 
   return (

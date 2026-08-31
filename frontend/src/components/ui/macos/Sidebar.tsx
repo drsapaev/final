@@ -1,7 +1,7 @@
 import React, { useState, useEffect, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import Button from './Button';
-import Icon from './Icon';
 import { useTranslation } from '@/i18n/useTranslation';
 
 type SidebarVariant = 'default' | 'compact' | 'inset';
@@ -15,7 +15,7 @@ interface SidebarItemData {
   ariaLabelKey?: string;
   /** Fallback text (e.g. route title) when labelKey absent/missing. */
   label?: ReactNode;
-  icon?: string;
+  icon?: LucideIcon;
   badge?: ReactNode;
   tooltip?: string;
   title?: string;
@@ -47,7 +47,7 @@ interface SidebarProps extends Omit<React.HTMLAttributes<HTMLElement>, 'children
 }
 
 interface SidebarItemProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style' | 'onClick'> {
-  icon?: string;
+  icon?: LucideIcon;
   label: ReactNode;
   badge?: ReactNode;
   active?: boolean;
@@ -201,10 +201,9 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
             color: 'var(--mac-text-primary)'
           }}>
 
-              <Icon
-            name={isCollapsed ? 'chevron.right' : 'chevron.left'}
-            size="small"
-            style={{ color: 'var(--mac-text-primary)' }} />
+              {isCollapsed
+              ? <ChevronRight size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />
+              : <ChevronLeft size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />}
 
             </Button>
         }
@@ -227,10 +226,9 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
             color: 'var(--mac-text-primary)'
           }}>
 
-          <Icon
-            name={isCollapsed ? 'chevron.right' : 'chevron.left'}
-            size="small"
-            style={{ color: 'var(--mac-text-primary)' }} />
+          {isCollapsed
+              ? <ChevronRight size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />
+              : <ChevronLeft size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />}
 
         </Button>
       </div>
@@ -295,6 +293,9 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
               }
             };
 
+            // Track 3-1: item.icon is now a LucideIcon component reference.
+            const ItemIcon = item.icon;
+
             return (
               <button
                 key={item.id}
@@ -304,10 +305,10 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                 onClick={handleItemClick}
                 title={itemTitle}>
 
-                {item.icon &&
-                <Icon
-                  name={item.icon}
-                  size="default"
+                {ItemIcon &&
+                <ItemIcon
+                  size={20}
+                  aria-hidden="true"
                   style={{
                     // Sprint 8: active icon = accent color, inactive = secondary
                     color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
@@ -481,7 +482,7 @@ Sidebar.displayName = 'macOS Sidebar';
  * Sidebar Item Component
  */
 export const SidebarItem = React.forwardRef<HTMLButtonElement, SidebarItemProps>(({
-  icon,
+  icon: ItemIcon,
   label,
   badge,
   active = false,
@@ -517,10 +518,10 @@ export const SidebarItem = React.forwardRef<HTMLButtonElement, SidebarItemProps>
       onClick={onClick}
       {...props}>
 
-      {icon &&
-      <Icon
-        name={icon}
-        size="default"
+      {ItemIcon &&
+      <ItemIcon
+        size={20}
+        aria-hidden="true"
         style={{
           color: active ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)'
         }} />
@@ -634,14 +635,17 @@ export const SidebarSection = React.forwardRef<HTMLDivElement, SidebarSectionPro
             {title}
           </span>
 
-          <Icon
-          name={isCollapsed ? 'chevron.right' : 'chevron.down'}
-          size="small"
-          style={{
-            color: 'var(--mac-text-tertiary)',
-            transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
-            transform: isCollapsed ? 'rotate(0deg)' : 'rotate(0deg)'
-          }} />
+          {isCollapsed
+            ? <ChevronRight size={16} aria-hidden="true" style={{
+                color: 'var(--mac-text-tertiary)',
+                transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                transform: 'rotate(0deg)'
+              }} />
+            : <ChevronDown size={16} aria-hidden="true" style={{
+                color: 'var(--mac-text-tertiary)',
+                transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                transform: 'rotate(0deg)'
+              }} />}
         </div>
       }
       {title && !collapsible &&
