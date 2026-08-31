@@ -10,6 +10,7 @@ from app.services.user_mgmt._base import (
     INCOMPLETE_DOCTOR_SPECIALTY,
     is_doctor_profile_incomplete,
 )
+from app.core.specialties import expand_queue_tags
 
 
 class OperationsMixin(QueueBusinessServiceMixinBase):
@@ -625,7 +626,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 # QueueProfile.key - это "cardiology", "dermatology", etc.
                 # QueueProfile.queue_tags - это список возможных doctor.specialty значений
                 profile_key = queue_profile.key
-                queue_tags = queue_profile.queue_tags or [profile_key]
+                # D-1 canonical vocabulary: expand queue_tags with every
+                # dental-family spelling, so a canonical "dentistry"
+                # doctor is visible to the stomatology profile even when
+                # its stored tags predate migration 0049.
+                queue_tags = expand_queue_tags(
+                    queue_profile.queue_tags or [profile_key]
+                )
 
                 # Ищем врача с specialty из queue_tags профиля.
                 # Incomplete ("general" sentinel) profiles are explicitly

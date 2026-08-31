@@ -7,6 +7,10 @@ from typing import Any
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
+from app.core.specialties import (
+    canonical_specialty,
+    specialty_variants,
+)
 from app.models.clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
 from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
 from app.schemas.clinic import (
@@ -222,8 +226,16 @@ def get_doctors_by_specialty(
 
     ``eligible_only`` hides the incomplete-profile sentinel ("general")
     from patient-facing selectors — see get_doctors.
+
+    D-1 canonical vocabulary: ``specialty`` matches via
+    ``specialty_variants`` (any dental-family spelling finds every
+    family row), so callers filtering by "dental" also see canonical
+    "dentistry" doctors and vice versa.
     """
-    predicates = [Doctor.specialty == specialty, Doctor.active == True]
+    predicates = [
+        Doctor.specialty.in_(specialty_variants(specialty)),
+        Doctor.active == True,
+    ]
     if eligible_only:
         predicates += [
             func.trim(Doctor.specialty) != '',
@@ -238,8 +250,17 @@ def get_doctors_by_specialty(
 
 
 def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
-    """Создать врача"""
-    db_doctor = Doctor(**doctor.model_dump())
+    """Создать врача
+
+    D-1: ``specialty`` is normalized at the write boundary — any
+    dental-family spelling ("dental" from the DoctorModal department
+    dropdown, legacy "stomatology"/"dentist") is stored canonically as
+    "dentistry" (core/specialties.canonical_specialty).
+    """
+    data = doctor.model_dump()
+    if "specialty" in data:
+        data["specialty"] = canonical_specialty(data["specialty"])
+    db_doctor = Doctor(**data)
     db.add(db_doctor)
     db.commit()
     db.refresh(db_doctor)
@@ -255,6 +276,9 @@ def update_doctor(
         return None
 
     for field, value in doctor.model_dump(exclude_unset=True).items():
+        if field == "specialty":
+            # D-1: canonicalize on update too (PUT /admin/doctors path).
+            value = canonical_specialty(value)
         setattr(db_doctor, field, value)
 
     db.commit()

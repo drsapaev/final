@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.user_mgmt._base import is_doctor_profile_incomplete
+from app.core.specialties import specialty_variants
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
@@ -200,7 +201,11 @@ def get_registrar_doctors(
         ]
 
         if specialty:
-            doctors = [d for d in doctors if d.specialty == specialty]
+            # D-1 canonical vocabulary: match any dental-family spelling
+            # ("dental" filter must find canonical "dentistry" rows and
+            # vice versa) instead of the historical exact comparison.
+            wanted = set(specialty_variants(specialty))
+            doctors = [d for d in doctors if (d.specialty or "") in wanted]
 
         result = []
         for doctor in doctors:
