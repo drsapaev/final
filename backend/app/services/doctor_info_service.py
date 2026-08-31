@@ -154,6 +154,11 @@ class DoctorInfoService:
                 "cardiology": "Кардиология",
                 "dermatology": "Дерматология",
                 "stomatology": "Стоматология",
+                # D-1 (Codex round-5 P2): 0049 guarantees dental doctors
+                # carry the canonical spelling — without this entry the
+                # fallback rendered "Dentistry" instead of the localized
+                # dental department name.
+                "dentistry": "Стоматология",
                 "therapy": "Терапия",
                 "neurology": "Неврология",
                 "pediatrics": "Педиатрия",

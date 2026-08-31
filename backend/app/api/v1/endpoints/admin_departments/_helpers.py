@@ -13,7 +13,7 @@ from sqlalchemy import func  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.api.deps import get_db, require_roles  # noqa: F401
-from app.core.specialties import canonical_specialty, specialty_variants
+from app.core.specialties import canonical_specialty, expand_queue_tags, specialty_variants
 from app.models.appointment import Appointment  # noqa: F401
 from app.models.clinic import ClinicSettings, Doctor, ServiceCategory  # noqa: F401
 from app.models.department import (  # noqa: F401
@@ -371,7 +371,10 @@ def _ensure_department_integrations(
             key=department.key,
             title=department.name_ru or department.key,
             title_ru=department.name_ru or department.key,
-            queue_tags=[department.key],
+            # D-1 (Codex round-5 P1): carry every accepted spelling — a
+            # dental-family department key ('dental') must not produce a
+            # tag list blind to canonical 'dentistry' doctors after 0049.
+            queue_tags=expand_queue_tags([department.key]),
             department_key=department.key,
             display_order=department.display_order,
             is_active=department.active,

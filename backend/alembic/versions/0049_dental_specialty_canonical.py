@@ -23,9 +23,12 @@ WHAT THIS MIGRATION DOES
    read side, so only the exact lowercase form survives (Codex round-3
    P1). Non-dental values (``cardiology``, ``dermatology``,
    ``general``, ...) are untouched.
-2. Appends ``dentistry`` to the stomatology QueueProfile ``queue_tags``
-   (JSON list) so the QR/queue-profile join sees canonical rows even when
-   a deployment's profile row predates the code-level tag update.
+2. Appends ``dentistry`` to EVERY dental-family QueueProfile's
+   ``queue_tags`` (JSON list) so the QR/queue-profile join sees canonical
+   rows even when a deployment's profile row predates the code-level tag
+   update. Profiles under any family key (``dental`` from the departments
+   integration writer, ``stomatology`` legacy seed, ...) are covered —
+   selection is by family key OR family tag (Codex round-5 P1).
 
 PRECONDITION (informational inventory)
 --------------------------------------
@@ -71,7 +74,6 @@ NON_CANONICAL_DENTAL = ("dental", "stomatology", "dentist")
 # variant queries on the read side (Codex round-3 P1).
 FAMILY_SPELLINGS = ("dental", "stomatology", "dentist", "dentistry")
 QUEUE_PROFILE_TABLE = "queue_profiles"
-QUEUE_PROFILE_DENTAL_KEY = "stomatology"
 
 # ClinicSettings (category 'queue') stores per-specialty limits as SEPARATE
 # rows keyed ``start_number_<specialty>`` / ``max_per_day_<specialty>``
@@ -134,7 +136,18 @@ def _inventory(conn: sa.Connection) -> list[tuple[str, int]]:
 
 
 def _patch_queue_profile_tags(conn: sa.Connection) -> int:
-    """Append 'dentistry' to the stomatology profile tags; return patched count."""
+    """Append the canonical spelling to EVERY dental-family profile's tags.
+
+    Codex round-5 P1: dental-family profiles may exist under any family
+    key — the departments integration writer creates ``key='dental'``
+    with ``queue_tags=['dental']`` — and patching only the exact
+    ``stomatology`` key would leave those profiles blind to canonical
+    ``dentistry`` doctors after the rewrite (the QR clinic-wide
+    specialist matcher normalizes doctors to the machinery key and
+    matches profiles by key+tags). Selection: the profile key (matched
+    case-insensitively) is a family spelling OR the stored tags already
+    contain one. Only the canonical value is appended, once.
+    """
     profiles_table = sa.table(
         QUEUE_PROFILE_TABLE,
         sa.column("id", sa.Integer),
@@ -142,12 +155,13 @@ def _patch_queue_profile_tags(conn: sa.Connection) -> int:
         sa.column("queue_tags", sa.JSON),
     )
     rows = conn.execute(
-        sa.select(profiles_table.c.id, profiles_table.c.queue_tags).where(
-            profiles_table.c.key == QUEUE_PROFILE_DENTAL_KEY
+        sa.select(
+            profiles_table.c.id, profiles_table.c.key, profiles_table.c.queue_tags
         )
     ).fetchall()
     patched = 0
     for row in rows:
+        key_is_family = (row.key or "").strip().lower() in FAMILY_SPELLINGS
         tags = row.queue_tags
         if isinstance(tags, str):
             try:
@@ -156,6 +170,13 @@ def _patch_queue_profile_tags(conn: sa.Connection) -> int:
                 tags = None
         if not isinstance(tags, list):
             tags = []
+        tags_are_family = any(
+            isinstance(tag, str)
+            and (tag or "").strip().lower() in FAMILY_SPELLINGS
+            for tag in tags
+        )
+        if not (key_is_family or tags_are_family):
+            continue
         if CANONICAL in tags:
             continue
         tags.append(CANONICAL)
@@ -288,9 +309,13 @@ def upgrade() -> None:
     #    matched) to the exact canonical value.
     _rewrite_family_rows(conn)
 
-    # 2. queue_profiles: make the stomatology profile see canonical rows.
+    # 2. queue_profiles: make every dental-family profile see canonical
+    #    rows.
     patched = _patch_queue_profile_tags(conn)
-    print(f"[0049] stomatology queue profiles patched with '{CANONICAL}' tag: {patched}")
+    print(
+        f"[0049] dental-family queue profiles patched with '{CANONICAL}' tag: "
+        f"{patched}"
+    )
 
     # 3. clinic_settings: rename <prefix><dental-spelling> limit rows
     #    (start_number_* / max_per_day_*) to the canonical suffix so

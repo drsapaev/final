@@ -873,6 +873,189 @@ def test_same_specialty_canonical_comparison(left, right, expected) -> None:
     assert DisplayWebSocketApiService._same_specialty(left, right) is expected
 
 
+# ===================== J. Round-5: family profiles + remaining filters ==
+
+
+def test_migration_0049_patches_every_dental_family_profile(tmp_path) -> None:
+    """Codex round-5 P1: the departments integration writer creates a
+    profile key='dental' with tags=['dental'] — the migration must patch
+    EVERY dental-family profile (by key OR by tag), not only
+    key='stomatology'."""
+    module = _load_migration()
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'd1prof.db'}")
+    con = _scratch_tables(engine)
+    try:
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'dental')")
+        _seed(
+            con,
+            "INSERT INTO queue_profiles (key, queue_tags) VALUES "
+            "('dental', '[\"dental\"]')",
+        )
+        _seed(
+            con,
+            "INSERT INTO queue_profiles (key, queue_tags) VALUES "
+            "('stomatology', '[\"dental\", \"stomatology\", \"dentist\"]')",
+        )
+        # non-family key with a family tag (service profile tagged dental)
+        _seed(
+            con,
+            "INSERT INTO queue_profiles (key, queue_tags) VALUES "
+            "('implants', '[\"dental\", \"implants\"]')",
+        )
+        # already canonical -> untouched
+        _seed(
+            con,
+            "INSERT INTO queue_profiles (key, queue_tags) VALUES "
+            "('dentistry-seed', '[\"dentistry\"]')",
+        )
+        # non-dental profile -> untouched
+        _seed(
+            con,
+            "INSERT INTO queue_profiles (key, queue_tags) VALUES "
+            "('cardiology', '[\"cardio\", \"cardiology\"]')",
+        )
+
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+
+        module.op = Operations(MigrationContext.configure(con))
+        module.upgrade()
+
+        tags_by_key = {}
+        for key, tags in con.execute(
+            sa.text("SELECT key, queue_tags FROM queue_profiles")
+        ).fetchall():
+            if isinstance(tags, str):
+                import json as _json
+
+                tags = _json.loads(tags)
+            tags_by_key[key] = tags
+
+        assert "dentistry" in tags_by_key["dental"]
+        assert "dentistry" in tags_by_key["stomatology"]
+        assert "dentistry" in tags_by_key["implants"]
+        assert tags_by_key["dentistry-seed"] == ["dentistry"]
+        assert "dentistry" not in tags_by_key["cardiology"]
+    finally:
+        con.close()
+
+
+def test_department_integration_profile_tags_cover_family(db_session) -> None:
+    """Codex round-5 P1: the integration writer must not create a
+    'dental'-tag-only profile blind to canonical 'dentistry' doctors."""
+    from app.api.v1.endpoints.admin_departments._helpers import (
+        _ensure_department_integrations,
+    )
+    from app.models.department import Department
+
+    db_session.add(
+        Department(key="dental", name_ru="Стоматология", active=True)
+    )
+    db_session.commit()
+    department = (
+        db_session.query(Department).filter(Department.key == "dental").first()
+    )
+
+    _ensure_department_integrations(db_session, department, None)
+    db_session.commit()
+
+    profile = (
+        db_session.query(QueueProfile).filter(QueueProfile.key == "dental").first()
+    )
+    assert profile is not None
+    assert "dentistry" in (profile.queue_tags or [])
+    assert "dental" in (profile.queue_tags or [])
+
+    # and the QR clinic-wide matcher now sees canonical dentistry doctors
+    from app.models.clinic import Doctor as DoctorModel
+    from app.services.qr_queue import QRQueueService
+
+    doctor = DoctorModel(specialty="dentistry", active=True)
+    db_session.add(doctor)
+    db_session.commit()
+
+    selectable = QRQueueService(db_session)._get_clinic_wide_selectable_specialists()
+    # the dental-family profile (key 'dental', machinery-normalized tags)
+    # must surface the canonical doctor; the entry label is the profile key
+    assert any(s["id"] == doctor.id for s in selectable)
+
+
+def test_admin_doctors_filter_matches_family_spellings(db_session) -> None:
+    """Codex round-5 P2: GET /admin/doctors?specialty=<legacy spelling>
+    keeps finding canonical rows after 0049."""
+    from app.api.v1.endpoints.admin_doctors import get_doctors
+
+    canonical = crud_clinic.create_doctor(
+        db_session, DoctorCreate(specialty="dentistry", active=True)
+    )
+    for query in ("dental", "stomatology", "dentist", "dentistry"):
+        result = get_doctors(
+            skip=0,
+            limit=100,
+            active_only=False,
+            specialty=query,
+            db=db_session,
+            current_user=None,
+        )
+        ids = {item.id for item in result}
+        assert canonical.id in ids, f"admin doctors filter missed for {query!r}"
+
+    result = get_doctors(
+        skip=0,
+        limit=100,
+        active_only=False,
+        specialty="cardiology",
+        db=db_session,
+        current_user=None,
+    )
+    assert canonical.id not in {item.id for item in result}
+
+
+def test_analytics_department_filter_matches_family_spellings(db_session) -> None:
+    """Codex round-5 P2: dental queue analytics filtered by a legacy
+    department key must match canonical 'dentistry' doctors."""
+    from datetime import datetime, timedelta
+
+    from app.models.online_queue import DailyQueue as DailyQueueModel
+    from app.services.analytics import AnalyticsService
+
+    doctor = _family_doctor(db_session, "dentistry")
+    day = datetime.utcnow() - timedelta(days=1)
+    queue = DailyQueueModel(day=day.date(), specialist_id=doctor.id, active=True)
+    db_session.add(queue)
+    db_session.commit()
+
+    stats = AnalyticsService.get_queue_statistics(
+        db_session,
+        start_date=day - timedelta(days=1),
+        end_date=day + timedelta(days=1),
+        department="dental",
+    )
+    assert stats["total_queues"] >= 1
+
+    # canonical spelling works too
+    stats = AnalyticsService.get_queue_statistics(
+        db_session,
+        start_date=day - timedelta(days=1),
+        end_date=day + timedelta(days=1),
+        department="dentistry",
+    )
+    assert stats["total_queues"] >= 1
+
+
+def test_get_department_info_localizes_canonical_dental(db_session) -> None:
+    """Codex round-5 P2: canonical 'dentistry' maps to the localized
+    dental department name, not the .title() fallback 'Dentistry'."""
+    from app.services.doctor_info_service import DoctorInfoService
+
+    _family_doctor(db_session, "dentistry")
+    info = DoctorInfoService(db_session).get_department_info("dentistry")
+    assert info is not None
+    assert info["name"] == "Стоматология"
+    assert info["description"] == "Отделение Стоматология"
+    assert info["doctors_count"] == 1
+
+
 # ===================== F. Mobile search variants (round-2 P2) ===========
 
 

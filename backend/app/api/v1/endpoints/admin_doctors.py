@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.roles import DOCTOR_ROLES
 from app.core.security import require_roles
+from app.core.specialties import specialty_variants
 from app.crud import clinic as crud_clinic
 from app.models.user import User
 from app.schemas.clinic import (
@@ -160,7 +161,11 @@ def get_doctors(
             db, skip=skip, limit=limit, active_only=active_only
         )
         if specialty:
-            doctors = [d for d in doctors if d.specialty == specialty]
+            # D-1 canonical vocabulary: any dental-family spelling finds
+            # every family row (Codex round-5 P2 — the exact comparison
+            # silently returned no doctors for legacy spellings after 0049).
+            wanted = set(specialty_variants(specialty))
+            doctors = [d for d in doctors if (d.specialty or "") in wanted]
         return [_serialize_doctor(db, doctor) for doctor in doctors]
     except Exception as exc:
         raise _admin_doctors_http_error(exc, "get_doctors") from exc
