@@ -498,3 +498,31 @@ def test_mobile_doctors_eligible_doctors_not_crowded_out_by_cap(client, db_sessi
         f"eligible doctors must fill the cap ({len(body)} != {crud_cap}) — "
         "the old post-filter shape would return fewer"
     )
+
+
+def test_blank_specialty_treated_as_incomplete_everywhere(db_session):
+    """Codex round-9 P2: a blank/whitespace specialty (DoctorUpdate permits
+    it) must behave exactly like the "general" sentinel — incomplete for
+    booking eligibility and hidden from the eligible_only selectors."""
+    from app.crud import clinic as crud_clinic
+    from app.services.user_mgmt._base import is_doctor_profile_incomplete
+
+    assert is_doctor_profile_incomplete("") is True
+    assert is_doctor_profile_incomplete("   ") is True
+    assert is_doctor_profile_incomplete(" general ") is True
+    assert is_doctor_profile_incomplete("cardiology") is False
+
+    blank = Doctor(user_id=None, specialty="", active=True)
+    whitespace = Doctor(user_id=None, specialty="   ", active=True)
+    real = Doctor(user_id=None, specialty="cardiology", active=True)
+    db_session.add_all([blank, whitespace, real])
+    db_session.commit()
+
+    rows = crud_clinic.get_doctors(
+        db_session, active_only=True, eligible_only=True
+    )
+    ids = {r.id for r in rows}
+    assert real.id in ids
+    assert blank.id not in ids and whitespace.id not in ids, (
+        "blank-specialty rows must be excluded by the SQL predicate"
+    )

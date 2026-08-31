@@ -4,7 +4,7 @@ CRUD операции для управления клиникой в админ
 
 from typing import Any
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.models.clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
@@ -188,11 +188,13 @@ def get_doctors(
     if active_only:
         query = query.filter(Doctor.active == True)
     if eligible_only:
+        # Codex round-9 P2: blank/whitespace specialties are incomplete
+        # too (is_doctor_profile_incomplete normalizes), so the SQL
+        # predicate must exclude them as well — trim(NULL) is NULL and
+        # NULL != '' is not true, so NULL rows are excluded implicitly.
         query = query.filter(
-            or_(
-                Doctor.specialty.is_(None),
-                Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
-            )
+            func.trim(Doctor.specialty) != '',
+            Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
         )
 
     return query.offset(skip).limit(limit).all()
@@ -218,7 +220,10 @@ def get_doctors_by_specialty(
     """
     predicates = [Doctor.specialty == specialty, Doctor.active == True]
     if eligible_only:
-        predicates.append(Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY)
+        predicates += [
+            func.trim(Doctor.specialty) != '',
+            Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+        ]
     return db.query(Doctor).filter(and_(*predicates)).all()
 
 

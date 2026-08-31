@@ -53,8 +53,33 @@ DOCTOR_PROFILE_ROLES: tuple[str, ...] = (
     "cardio",
     "derma",
     "dentist",
+    # Codex round-9 P2: the specialty-route alias spellings (cardio.py
+    # CARDIO_ROLES / derma.py DERMA_ROLES) are full doctor-family roles
+    # for lifecycle purposes — without them a "cardiology"-role owner's
+    # role change skipped demotion/reactivation entirely (lifecycle and
+    # queue drift). Kept in lockstep with the canonical vocabulary below.
+    "cardiology",
+    "cardiologist",
+    "dermatology",
+    "dermatologist",
+    "dentistry",
 )
 
+
+def _assert_profile_roles_cover_canonical_vocabulary() -> None:
+    """Fail loudly at import if DOCTOR_PROFILE_ROLES drifts from the
+    canonical doctor-role vocabulary (app/core/roles.py)."""
+    from app.core.roles import DOCTOR_ROLE_SPELLINGS, normalize_role_value
+
+    covered = {normalize_role_value(role) for role in DOCTOR_PROFILE_ROLES}
+    missing = DOCTOR_ROLE_SPELLINGS - covered
+    assert not missing, (
+        "DOCTOR_PROFILE_ROLES is missing canonical doctor-role "
+        f"spellings: {sorted(missing)}"
+    )
+
+
+_assert_profile_roles_cover_canonical_vocabulary()
 # Default specialty written by the auto-create contract for each role.
 # "Doctor" maps to the INCOMPLETE sentinel "general": the profile is created
 # mechanically, but it is NOT a production specialty — admin must complete it
@@ -83,7 +108,12 @@ def is_doctor_profile_incomplete(specialty: str | None) -> bool:
     keep in sync: completing the profile (admin sets a real specialty) atomically
     clears the flag, and nothing else can drift it.
     """
-    return (specialty or "") == INCOMPLETE_DOCTOR_SPECIALTY
+    cleaned = (specialty or "").strip()
+    # Codex round-9 P2: a BLANK specialty ("" / whitespace, which
+    # DoctorUpdate permits) is equally "not a real specialty" as the
+    # sentinel — treat both as incomplete, otherwise a blank-specialty
+    # doctor passes booking eligibility and the eligible_only selectors.
+    return (not cleaned) or cleaned == INCOMPLETE_DOCTOR_SPECIALTY
 
 
 

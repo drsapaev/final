@@ -37,8 +37,15 @@ if [[ "${ALLOW_ACTIVE_USERLESS_DOCTORS:-0}" == "1" ]]; then
   echo "[entrypoint] WARNING: ALLOW_ACTIVE_USERLESS_DOCTORS=1 — skipping the doctor-linkage reconciliation check"
 elif [[ "${RUN_ALEMBIC_ON_START}" == "1" ]]; then
   echo "[entrypoint] Checking doctor-linkage reconciliation (decision #13)..."
-  if ! python scripts/reconcile_userless_active_doctors.py; then
-    rc=$?
+  # Codex round-9 P1: capture the script status WITHOUT `!` negation —
+  # inside an `if ! cmd` branch $? is always 0, which masked the block
+  # as a successful `exit 0`. Errexit is suspended around the probe so
+  # the original status can be reported and re-raised verbatim.
+  set +e
+  python scripts/reconcile_userless_active_doctors.py
+  rc=$?
+  set -e
+  if [[ "${rc}" -ne 0 ]]; then
     echo "[entrypoint] BLOCKED by doctor-linkage reconciliation (exit ${rc}). Resolve the inventory rows above or set ALLOW_ACTIVE_USERLESS_DOCTORS=1 explicitly." >&2
     exit "${rc}"
   fi
