@@ -409,6 +409,141 @@ def test_migration_0049_dental_only_limits_are_not_lost(tmp_path) -> None:
         con.close()
 
 
+def test_migration_0049_rewrites_case_variants_of_canonical(tmp_path) -> None:
+    """Codex round-3 P1: case/padding variants of the CANONICAL itself
+    ('Dentistry', 'DENTISTRY', ' dentistry ') must be rewritten to the
+    exact lowercase value — SQL IN is case-sensitive on the read side."""
+    module = _load_migration()
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'd1case.db'}")
+    con = _scratch_tables(engine)
+    try:
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'Dentistry')")
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (2, 'DENTISTRY')")
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (3, ' dentistry ')")
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (4, 'dental')")
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (5, 'cardiology')")
+
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+
+        module.op = Operations(MigrationContext.configure(con))
+        module.upgrade()
+
+        stored = {
+            r[0]
+            for r in con.execute(sa.text("SELECT specialty FROM doctors")).fetchall()
+        }
+        assert stored == {"dentistry", "cardiology"}
+        # every family row is stored EXACTLY canonical
+        exact = con.execute(
+            sa.text(
+                "SELECT COUNT(*) FROM doctors WHERE specialty = 'dentistry'"
+            )
+        ).scalar_one()
+        assert exact == 4
+
+        # the postcondition helper accepts the rewritten state...
+        module._assert_exact_canonical_family_rows(con)
+
+        # ...and rejects a family row stored differently (direct unit test)
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (6, 'Stomatology')")
+        with pytest.raises(RuntimeError, match="postcondition failed"):
+            module._assert_exact_canonical_family_rows(con)
+    finally:
+        con.close()
+
+
+def test_migration_0049_postcondition_rejects_legacy_spellings(tmp_path) -> None:
+    module = _load_migration()
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'd1post.db'}")
+    con = _scratch_tables(engine)
+    try:
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'dentistry')")
+        module._assert_exact_canonical_family_rows(con)  # exact rows pass
+
+        for bad in ("stomatology", "dental", "dentist", "Dentistry", " dentistry "):
+            _seed(
+                con,
+                "INSERT INTO doctors (user_id, specialty) VALUES "
+                f"(NULL, '{bad}')",
+            )
+            with pytest.raises(RuntimeError, match="postcondition failed"):
+                module._assert_exact_canonical_family_rows(con)
+            con.execute(
+                sa.text("DELETE FROM doctors WHERE specialty = :s"), {"s": bad}
+            )
+            con.commit()
+    finally:
+        con.close()
+
+
+def test_migration_0049_normalizes_case_variant_settings_keys(tmp_path) -> None:
+    """Codex round-3 P1 (settings half): a canonical-suffix row stored with
+    a case-variant key (start_number_Dentistry) is normalized to the exact
+    lowercase key; an exact-key row wins the survivor role and duplicates
+    are merged (max)."""
+    module = _load_migration()
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'd1casekey.db'}")
+    con = _scratch_tables(engine)
+    try:
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'dental')")
+        # exact canonical row (survivor) + case-variant duplicate + legacy row
+        _seed(
+            con,
+            "INSERT INTO clinic_settings (key, value, category) VALUES "
+            "('max_per_day_dentistry', 20, 'queue')",
+        )
+        _seed(
+            con,
+            "INSERT INTO clinic_settings (key, value, category) VALUES "
+            "('max_per_day_Dentistry', 8, 'queue')",
+        )
+        _seed(
+            con,
+            "INSERT INTO clinic_settings (key, value, category) VALUES "
+            "('max_per_day_stomatology', 12, 'queue')",
+        )
+        # case-variant canonical row WITHOUT an exact twin: must be renamed
+        _seed(
+            con,
+            "INSERT INTO clinic_settings (key, value, category) VALUES "
+            "('start_number_Dentistry', 4, 'queue')",
+        )
+
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+
+        module.op = Operations(MigrationContext.configure(con))
+        module.upgrade()
+
+        def _scalar(key: str):
+            return con.execute(
+                sa.text("SELECT value FROM clinic_settings WHERE key=:k"),
+                {"k": key},
+            ).scalar()
+
+        keys = {
+            r[0]
+            for r in con.execute(sa.text("SELECT key FROM clinic_settings")).fetchall()
+        }
+        # survivor kept exact key, merged max(20, 8, 12) = 20
+        assert int(_scalar("max_per_day_dentistry")) == 20
+        # case-variant canonical row WITHOUT exact twin renamed in place
+        assert int(_scalar("start_number_dentistry")) == 4
+        # only exact lowercase canonical keys remain for the family
+        assert not any(
+            k.endswith("_Dentistry") or k.endswith("_stomatology") for k in keys
+        )
+        cat = con.execute(
+            sa.text(
+                "SELECT category FROM clinic_settings WHERE key='start_number_dentistry'"
+            )
+        ).scalar()
+        assert cat == "queue"
+    finally:
+        con.close()
+
+
 def test_migration_0049_downgrade_is_noop(tmp_path) -> None:
     module = _load_migration()
     engine = sa.create_engine(f"sqlite:///{tmp_path / 'd1down.db'}")
@@ -478,6 +613,97 @@ def test_update_queue_settings_writes_canonical_keys(db_session) -> None:
     settings = crud_clinic.get_queue_settings(db_session)
     assert settings["start_numbers"]["dentistry"] == 9
     assert settings["max_per_day"]["dentistry"] == 21
+
+
+# ===================== G. Queue repositories (round-3 P1-2) ==============
+
+
+def _family_doctor(db_session, specialty: str) -> Doctor:
+    doctor = Doctor(specialty=specialty, active=True)
+    db_session.add(doctor)
+    db_session.commit()
+    return doctor
+
+
+@pytest.mark.parametrize("query", ["dentistry", "dental", "stomatology", "dentist"])
+def test_queue_repositories_match_family_spellings(db_session, query) -> None:
+    """Both list_active_doctors filters must route through
+    specialty_variants: a legacy spelling query still finds canonical
+    'dentistry' doctors after migration 0049 (Codex round-3 P1)."""
+    from app.repositories.queue_limits_repository import QueueLimitsRepository
+    from app.repositories.queue_read_repository import QueueReadRepository
+
+    canonical = _family_doctor(db_session, "dentistry")
+    legacy = _family_doctor(db_session, "dental")
+    cardiologist = _family_doctor(db_session, "cardiology")
+
+    for repo_cls in (QueueReadRepository, QueueLimitsRepository):
+        found = repo_cls(db_session).list_active_doctors(specialty=query)
+        ids = {d.id for d in found}
+        assert canonical.id in ids, f"{repo_cls.__name__} missed canonical for {query!r}"
+        assert legacy.id in ids, f"{repo_cls.__name__} missed legacy for {query!r}"
+        assert cardiologist.id not in ids
+
+
+def test_queue_repositories_unfiltered_still_returns_all(db_session) -> None:
+    from app.repositories.queue_limits_repository import QueueLimitsRepository
+    from app.repositories.queue_read_repository import QueueReadRepository
+
+    _family_doctor(db_session, "dentistry")
+    _family_doctor(db_session, "cardiology")
+    for repo_cls in (QueueReadRepository, QueueLimitsRepository):
+        found = repo_cls(db_session).list_active_doctors(specialty=None)
+        assert len(found) == 2
+
+
+# ===================== H. /queues/profiles settings_key (round-3 P1-3) ==
+
+
+def test_queue_profiles_response_carries_canonical_settings_key(db_session) -> None:
+    """The profiles payload must carry the backend-computed canonical
+    settings segment so the admin screen reads/edits clinic_settings by
+    the SAME key the runtime writes (dentistry, not stomatology)."""
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        get_queue_profiles,
+    )
+
+    payload = get_queue_profiles(active_only=True, db=db_session, current_user=None)
+    profiles = payload["profiles"]
+    assert profiles, "expected fallback profiles when the table is empty"
+
+    by_key = {p["key"]: p for p in profiles}
+    assert "settings_key" in by_key["stomatology"]
+    # the machinery key normalizes to the canonical settings segment
+    assert by_key["stomatology"]["settings_key"] == "dentistry"
+    # non-dental keys pass through unchanged
+    assert by_key["cardiology"]["settings_key"] == "cardiology"
+    assert by_key["dermatology"]["settings_key"] == "dermatology"
+
+
+def test_queue_profiles_db_path_settings_key_canonical(db_session) -> None:
+    """Database-backed profiles expose the same canonical settings_key."""
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        get_queue_profiles,
+    )
+
+    db_session.add(
+        QueueProfile(
+            key="stomatology",
+            title="Dental",
+            title_ru="Стоматология",
+            queue_tags=["dental", "stomatology", "dentist", "dentistry"],
+            department_key="stomatology",
+            display_order=4,
+            is_active=True,
+            show_on_qr_page=True,
+        )
+    )
+    db_session.commit()
+
+    payload = get_queue_profiles(active_only=True, db=db_session, current_user=None)
+    assert payload["source"] == "database"
+    dental = next(p for p in payload["profiles"] if p["key"] == "stomatology")
+    assert dental["settings_key"] == "dentistry"
 
 
 # ===================== F. Mobile search variants (round-2 P2) ===========

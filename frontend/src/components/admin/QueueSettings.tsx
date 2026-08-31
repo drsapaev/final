@@ -60,6 +60,12 @@ interface QueueProfileDto {
   icon?: string;
   color?: string;
   queue_tags?: string[];
+  // D-1: canonical clinic_settings segment for this profile's
+  // start_number_*/max_per_day_* rows (backend-computed via
+  // core/specialties.canonical_specialty). The profile key itself may
+  // stay a legacy machinery value ("stomatology") while the settings
+  // rows live under the canonical "dentistry" after migration 0049.
+  settings_key?: string;
 }
 
 interface Specialty {
@@ -69,6 +75,8 @@ interface Specialty {
   color: string;
   description: string;
   tags: string[];
+  // Settings reads AND edits use this key, never `key` (Codex round-3 P1).
+  settingsKey: string;
 }
 
 interface QueueSettingsState {
@@ -214,7 +222,11 @@ const QueueSettings = () => {
         icon: ICON_MAP[p.icon ?? ''] || Stethoscope,
         color: p.color || 'var(--mac-text-primary)',
         description: (p.queue_tags || []).join(', '),
-        tags: p.queue_tags || []
+        tags: p.queue_tags || [],
+        // D-1: settings rows are keyed by the canonical specialty
+        // ("dentistry"), not by the profile machinery key
+        // ("stomatology"). Fall back to the key for older backends.
+        settingsKey: p.settings_key || p.key
       })));
 
       const doctorsData = (doctorsRes.data ?? []) as DoctorRecord[];
@@ -605,8 +617,8 @@ const QueueSettings = () => {
                   type="number"
                   min="1"
                   max="100"
-                  value={getNumberSetting(settings.start_numbers, specialty.key, 1)}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
+                  value={getNumberSetting(settings.start_numbers, specialty.settingsKey, 1)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`start_numbers.${specialty.settingsKey}`, parseInt(e.target.value))}
                   className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
@@ -623,8 +635,8 @@ const QueueSettings = () => {
                   type="number"
                   min="1"
                   max="100"
-                  value={getNumberSetting(settings.max_per_day, specialty.key, 1)}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
+                  value={getNumberSetting(settings.max_per_day, specialty.settingsKey, 1)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`max_per_day.${specialty.settingsKey}`, parseInt(e.target.value))}
                   className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
@@ -637,7 +649,7 @@ const QueueSettings = () => {
                   <div className="admin-flex-between-sm">
                     <span className="text-[var(--mac-text-secondary)]">{t('admin2.qs_range_label')}</span>
                     <div className="admin-range-badge">
-                      {getNumberSetting(settings.start_numbers, specialty.key, 1)} - {getNumberSetting(settings.start_numbers, specialty.key, 1) + getNumberSetting(settings.max_per_day, specialty.key, 1) - 1}
+                      {getNumberSetting(settings.start_numbers, specialty.settingsKey, 1)} - {getNumberSetting(settings.start_numbers, specialty.settingsKey, 1) + getNumberSetting(settings.max_per_day, specialty.settingsKey, 1) - 1}
                     </div>
                   </div>
                 </div>

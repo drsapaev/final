@@ -6,6 +6,7 @@ from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_integration._helpers import (
     _raise_registrar_internal_error,
 )  # noqa: F401
+from app.core.specialties import canonical_specialty
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
 
 
@@ -56,6 +57,10 @@ def get_queue_profiles(
                         "icon": p.get("icon"),
                         "color": p.get("color"),
                         "order": p.get("order", 0),
+                        # D-1: canonical clinic_settings segment this
+                        # profile's start_number_*/max_per_day_* rows live
+                        # under (QueueSettings screen reads/edits by it).
+                        "settings_key": canonical_specialty(p["key"]),
                     }
                     for p in INITIAL_QUEUE_PROFILES
                 ],
@@ -76,6 +81,12 @@ def get_queue_profiles(
                     "order": p.display_order,  # API returns as 'order' for frontend compatibility
                     "is_active": p.is_active,
                     "show_on_qr_page": getattr(p, 'show_on_qr_page', True),  # Handle missing column
+                    # D-1: canonical clinic_settings segment this profile's
+                    # start_number_*/max_per_day_* rows live under (the
+                    # profile key itself may be a legacy machinery value —
+                    # e.g. "stomatology" — while settings rows are stored
+                    # under the canonical "dentistry" after migration 0049).
+                    "settings_key": canonical_specialty(p.key),
                 }
                 for p in profiles
             ],
@@ -99,6 +110,7 @@ def get_queue_profiles(
                     "icon": p.get("icon"),
                     "color": p.get("color"),
                     "order": p.get("order", 0),
+                    "settings_key": canonical_specialty(p["key"]),
                 }
                 for p in INITIAL_QUEUE_PROFILES
             ],
