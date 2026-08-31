@@ -226,3 +226,29 @@ def test_denied_schedule_read_writes_no_audit_rows(client, db_session):
     )
     assert response.status_code == 403, response.text
     assert _audit_rows(db_session, patient.id) == []
+
+
+def test_audit_trail_survives_oversized_request_metadata(client, db_session, admin_user):
+    """Codex P1: oversized User-Agent / X-Forwarded-For must not make the
+    audit insert fail (the non-blocking helper would roll back and silently
+    drop the read trail). Metadata is truncated at write site; the audit row
+    survives with bounded values."""
+    user_a, doctor_a, _user_b, _doctor_b = _doctor_pair(db_session, "aud_g", "aud_h")
+    patient = _patient(db_session)
+    _schedule_appointment(db_session, doctor_a, patient)
+
+    response = client.get(
+        f"/api/v1/appointments/doctor/{doctor_a.id}/schedule",
+        params={"date": str(date.today() + timedelta(days=1))},
+        headers={
+            **_headers_for(admin_user),
+            "User-Agent": "A" * 6000,
+            "X-Forwarded-For": f"{'9' * 200}, 10.0.0.1",
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    rows = _audit_rows(db_session, patient.id)
+    assert len(rows) == 1, "audit row must survive oversized metadata"
+    assert rows[0].user_agent is not None and len(rows[0].user_agent) == 512
+    assert rows[0].ip_address is not None and len(rows[0].ip_address) <= 45

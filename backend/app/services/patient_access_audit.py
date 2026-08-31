@@ -150,6 +150,20 @@ def log_patient_access(
             actor_staff_user_id = actor_user.id
             actor_type = "staff"
 
+        # Bound request metadata to the audit columns' lengths BEFORE the
+        # insert. The helper is deliberately non-blocking: if an oversized
+        # User-Agent / X-Forwarded-For made the insert fail, the rollback
+        # below would silently DROP the read trail — an authenticated staff
+        # user could then enumerate patient PHI without any audit row
+        # (AGENTS.md threat model requires an audit log on every patient
+        # read). Truncation keeps the trail writable for any header size.
+        request_ip = _get_client_ip(request)
+        if request_ip and len(request_ip) > 45:
+            request_ip = request_ip[:45]
+        request_ua = _get_user_agent(request)
+        if request_ua and len(request_ua) > 512:
+            request_ua = request_ua[:512]
+
         audit_entry = PatientAccessAuditLog(
             subject_patient_id=subject_patient_id,
             actor_patient_id=actor_patient_id,
@@ -160,8 +174,8 @@ def log_patient_access(
             resource_id=resource_id,
             action=action,
             outcome=outcome,
-            ip_address=_get_client_ip(request),
-            user_agent=_get_user_agent(request),
+            ip_address=request_ip,
+            user_agent=request_ua,
             session_id=session_id,
             correlation_id=correlation_id,
             extra_data=extra_data,
