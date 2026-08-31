@@ -3,8 +3,14 @@
 Business model under test (REQUIRED architectural result):
 
     N physical doctors of one specialty
-      = N User accounts  +  N Doctor profiles (doctors.user_id UNIQUE)
+      = N User accounts  +  N Doctor profiles
       → one shared /doctor panel, per-doctor Doctor.id ownership scope
+
+Scope note: the DB-level UNIQUE(doctors.user_id) invariant is delivered
+separately by the companion PR #2934 (migration 0048) and is deliberately
+NOT part of this branch — here only application-level behavior is covered
+(the app-level duplicate-link rejection is what remains between an
+accidental second POST and the DB constraint landing).
 
 Covers, for Doctor A and Doctor B with the SAME specialty (stomatology):
 - registrar doctor selector returns BOTH doctors, deterministically ordered;
@@ -53,11 +59,13 @@ def _create_dentist(db_session, label: str) -> tuple[User, Doctor]:
 
 
 def _patient(db_session) -> Patient:
+    """Synthetic patient fixture — all-zero subscriber number per conftest
+    convention (no realistic phone/name/birth data: repo PII rule for
+    committed test fixtures, AGENTS.md "PII fields")."""
     patient = Patient(
         first_name="Multi",
         last_name="Dentist",
-        phone="+998900004455",
-        birth_date=date(1990, 1, 1),
+        phone="+998900000000",
     )
     db_session.add(patient)
     db_session.commit()
@@ -222,7 +230,10 @@ def test_registrar_can_call_entry_in_any_queue(client, db_session, registrar_use
 
 
 def test_duplicate_user_link_rejected_app_level(client, db_session, auth_headers):
-    """App-level duplicate check: one User cannot gain a second Doctor row."""
+    """App-level duplicate check: one User cannot gain a second Doctor row.
+
+    Scope: application-level guard only — the DB-level UNIQUE(doctors.user_id)
+    enforcement lives in the companion PR #2934 (migration 0048), not here."""
     user_a, _doctor_a = _create_dentist(db_session, "13")
     _user_b, _doctor_b = _create_dentist(db_session, "14")
 
