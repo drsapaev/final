@@ -13,7 +13,10 @@ interface TabIconProps {
 interface TabDefinition {
   id: TabId;
   label: ReactNode;
-  icon?: ComponentType<TabIconProps> | string;
+  /** Track 3-1: icon accepts a component reference (e.g. lucide-react).
+   * The legacy `| string` union member was a type-lie: a raw string would
+   * render as an unknown DOM element; no consumer ever passed one. */
+  icon?: ComponentType<TabIconProps>;
   badge?: ReactNode;
   disabled?: boolean;
 }
