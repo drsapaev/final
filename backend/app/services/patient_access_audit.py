@@ -33,6 +33,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from app.models.patient_access_audit import PatientAccessAuditLog
+from app.core.rate_limiter import get_client_ip as _trusted_get_client_ip
 
 if TYPE_CHECKING:
     from fastapi import Request
@@ -44,19 +45,19 @@ logger = logging.getLogger(__name__)
 
 
 def _get_client_ip(request: "Request | None") -> str | None:
-    """Extract client IP from FastAPI Request, respecting X-Forwarded-For."""
+    """Extract the client IP for an audit row.
+
+    Delegates to ``app.core.rate_limiter.get_client_ip`` — the repo's single
+    source of truth for trusted-proxy-aware IP resolution. X-Forwarded-For
+    is honored ONLY when the direct TCP peer is a trusted proxy, so a staff
+    caller cannot falsify the source IP recorded in the PHI-read trail by
+    sending the header directly (Codex round-4 P2)."""
     if request is None:
         return None
     try:
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            # X-Forwarded-For: client, proxy1, proxy2
-            return forwarded.split(",")[0].strip()
-        if request.client:
-            return request.client.host
+        return _trusted_get_client_ip(request)
     except Exception:
-        pass
-    return None
+        return None
 
 
 def _get_user_agent(request: "Request | None") -> str | None:

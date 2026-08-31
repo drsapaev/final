@@ -232,7 +232,9 @@ def test_audit_trail_survives_oversized_request_metadata(client, db_session, adm
     """Codex P1: oversized User-Agent / X-Forwarded-For must not make the
     audit insert fail (the non-blocking helper would roll back and silently
     drop the read trail). Metadata is truncated at write site; the audit row
-    survives with bounded values."""
+    survives with bounded values. Also: X-Forwarded-For from an untrusted
+    peer must NOT be recorded as the source IP (Codex round-4 P2 — the
+    trusted-proxy resolution is delegated to rate_limiter.get_client_ip)."""
     user_a, doctor_a, _user_b, _doctor_b = _doctor_pair(db_session, "aud_g", "aud_h")
     patient = _patient(db_session)
     _schedule_appointment(db_session, doctor_a, patient)
@@ -243,7 +245,7 @@ def test_audit_trail_survives_oversized_request_metadata(client, db_session, adm
         headers={
             **_headers_for(admin_user),
             "User-Agent": "A" * 6000,
-            "X-Forwarded-For": f"{'9' * 200}, 10.0.0.1",
+            "X-Forwarded-For": "203.0.113.7, 10.0.0.1",
         },
     )
     assert response.status_code == 200, response.text
@@ -252,3 +254,7 @@ def test_audit_trail_survives_oversized_request_metadata(client, db_session, adm
     assert len(rows) == 1, "audit row must survive oversized metadata"
     assert rows[0].user_agent is not None and len(rows[0].user_agent) == 512
     assert rows[0].ip_address is not None and len(rows[0].ip_address) <= 45
+    assert rows[0].ip_address != "203.0.113.7", (
+        "attacker-supplied X-Forwarded-For must not be persisted from an "
+        "untrusted peer"
+    )

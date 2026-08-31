@@ -201,10 +201,28 @@ class TestPatientAccessAuditService:
 class TestClientIpExtraction:
     """Tests for _get_client_ip() helper."""
 
-    def test_get_client_ip_from_x_forwarded_for(self):
-        """IP extracted from X-Forwarded-For header (first IP)."""
+    def test_get_client_ip_ignores_xff_from_untrusted_peer(self):
+        """X-Forwarded-For from a NON-trusted peer is ignored (spoof guard,
+        Codex round-4 P2): the audit row records the direct peer instead of
+        the attacker-controlled header value."""
         request = MagicMock()
-        request.headers = {"x-forwarded-for": "203.0.113.50, 70.41.0.1, 150.95.2.2"}
+        request.headers = {"x-forwarded-for": "203.0.113.50, 70.41.0.1"}
+        request.client = MagicMock()
+        request.client.host = "192.168.1.100"
+
+        ip = _get_client_ip(request)
+        assert ip == "192.168.1.100"
+
+    def test_get_client_ip_honors_xff_from_trusted_proxy(self, monkeypatch):
+        """X-Forwarded-For is honored ONLY when the direct peer is a trusted
+        proxy (rate_limiter PR-34 semantics) — leftmost validated IP wins."""
+        from app.core import rate_limiter as rate_limiter_module
+
+        monkeypatch.setattr(rate_limiter_module, "TRUSTED_PROXIES", {"10.0.0.9"})
+        request = MagicMock()
+        request.headers = {"X-Forwarded-For": "203.0.113.50, 70.41.0.1"}
+        request.client = MagicMock()
+        request.client.host = "10.0.0.9"
 
         ip = _get_client_ip(request)
         assert ip == "203.0.113.50"
@@ -226,9 +244,10 @@ class TestClientIpExtraction:
 
     def test_get_client_ip_returns_none_on_exception(self):
         """Returns None when request access raises."""
+        from unittest.mock import PropertyMock
+
         request = MagicMock()
-        request.headers = MagicMock()
-        request.headers.get = MagicMock(side_effect=Exception("header access failed"))
+        type(request).client = PropertyMock(side_effect=Exception("peer access failed"))
 
         ip = _get_client_ip(request)
         assert ip is None
