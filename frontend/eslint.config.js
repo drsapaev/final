@@ -377,6 +377,12 @@ export default [
               group: ['**/components/navigation/ModernTabs'],
               message: 'PR-UI-17-5 rename: ModernTabs.tsx is now Tabs.tsx (components/navigation/Tabs.tsx).',
             },
+            // Track 3-3: macos Icon wrapper decommissioned (consumer-dead after
+            // the Track 3-1/3-2 lucide migration; 0 importers, machine-verified).
+            {
+              group: ['**/components/ui/macos/Icon'],
+              message: 'Track 3-3 decommissioned module: macos/Icon.tsx deleted — use direct lucide-react imports (§3.3 canonical icon system, Icon-систем 2→1).',
+            },
           ],
         },
       ],

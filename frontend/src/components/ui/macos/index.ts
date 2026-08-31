@@ -48,7 +48,10 @@ export { default as Card, CardHeader, CardTitle, CardDescription, CardContent, C
 // 0 import-consumers remained after PR-UI-11-15 (#2902); canonical = Card.
 export { default as Dialog, DialogTitle, DialogContent, DialogActions } from './Dialog';
 export { default as Grid } from './Grid';
-export { default as Icon } from './Icon';
+// Track 3-3: macos/Icon.tsx decommissioned — 0 consumers after
+// Track 3-1/3-2 lucide migration. Canonical icon system: direct lucide-react
+// imports (§3.3). Re-importing the wrapper fails the ESLint forbidden-imports
+// register in eslint.config.js.
 export { default as Label } from './Label';
 export { default as Option } from './Option';
 export { default as Paper } from './Paper';
