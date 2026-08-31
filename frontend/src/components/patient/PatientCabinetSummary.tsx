@@ -1,8 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import {
-  Badge, Button, Icon,
-} from '../ui/macos';
+import { Badge, Button } from '../ui/macos';
 import { api } from '../../api/client';
 import {
   readTelegramMiniAppInitData,
@@ -10,6 +8,7 @@ import {
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
 import { useTranslation } from '../../i18n/useTranslation';
+import { AlertTriangle, FileText, RotateCw } from 'lucide-react';
 
 interface CabinetReport {
   id: string | number;
@@ -62,7 +61,7 @@ interface CabinetSummary {
  * L-H-1 fix: все строки на русском.
  * L-H-2 fix: Tailwind classes → CSS-классы .pp-*
  * L-H-5 fix: skeleton-loading вместо EmptyState "Loading..."
- * L-H-8 fix: lucide-direct → macos <Icon>
+ * L-H-8 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3)
  * L-M-2 fix: PDF-download имеет retry-кнопку при ошибке.
  *
  * Показывает сводку кабинета пациента в 3 режимах:
@@ -114,7 +113,7 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
   if (cabinetStatus === 'missing-init-data') {
     return (
       <PanelEmptyState
-        icon="doc.text"
+        icon={FileText}
         title={t('patient.pat_cab_missing_init_title')}
         description={t('patient.pat_cab_missing_init_desc')}
       />
@@ -124,7 +123,7 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
   if (cabinetStatus === 'loading') {
     return (
       <PanelEmptyState
-        icon="doc.text"
+        icon={FileText}
         title={t('patient.pat_cab_loading_title')}
         description={t('patient.pat_cab_loading_desc')}
         variant="loading"
@@ -135,7 +134,7 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
   if (cabinetStatus === 'error') {
     return (
       <PanelEmptyState
-        icon="exclamationmark.triangle"
+        icon={AlertTriangle}
         title={t('patient.pat_cab_error_title')}
         description={cabinetError || t('patient.pat_cab_error_desc')}
         variant="error"
@@ -244,7 +243,7 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
                       <div className="pp-report-date">{report.ready_at || t('patient.pat_cab_report_date_default')}</div>
                       {reportDownloads[report.id] === 'error' && (
                         <div className="pp-message pp-message--error" role="alert">
-                          <Icon name="exclamationmark.triangle" size={14} />
+                          <AlertTriangle size={14} aria-hidden="true" />
                           {t('patient.pat_cab_report_error')}
                         </div>
                       )}
@@ -256,7 +255,7 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
                         size="small"
                         onClick={() => downloadReport(report)}
                       >
-                        <Icon name="arrow.clockwise" size={16} />
+                        <RotateCw size={16} aria-hidden="true" />
                         {t('patient.pat_cab_retry')}
                       </Button>
                     ) : (
@@ -267,7 +266,7 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
                         disabled={reportDownloads[report.id] === 'loading'}
                         onClick={() => downloadReport(report)}
                       >
-                        <Icon name="doc.text" size={16} />
+                        <FileText size={16} aria-hidden="true" />
                         {t('patient.pat_cab_open_pdf')}
                       </Button>
                     )}

@@ -1,11 +1,10 @@
 
-import {
-  Badge, Icon,
-} from '../ui/macos';
+import { Badge } from '../ui/macos';
 import { formatRegistrarTime } from '../../utils/dateUtils';
 import { DataTable, type DataTableColumn } from '../ui/DataTable';
 // UX Audit Registrar #3: inline-стили перенесены в QueueTable.css.
 import './QueueTable.css';
+import { AlertTriangle, Bell, CheckCircle2, CircleHelp, Clock, UserRound, UserRoundSearch, UserRoundX, XCircle, type LucideIcon } from 'lucide-react';
 
 // === Domain types ===
 // QueueTable is a pure display component driven by ModernQueueManager.
@@ -67,13 +66,13 @@ export interface QueueTableProps {
 
 // PR-UI-09c-2: status → {variant, label, icon} mapping (moved out of component
 // body for stable identity). 6 statuses preserved verbatim from original.
-const STATUS_MAP: Record<string, { variant: string; label: string; icon: string }> = {
-  'waiting':     { variant: 'warning',   label: 'Ожидает',   icon: 'clock' },
-  'called':      { variant: 'info',      label: 'Вызван',    icon: 'bell' },
-  'in_progress': { variant: 'primary',   label: 'На приеме', icon: 'person.fill' },
-  'completed':   { variant: 'success',   label: 'Завершен',  icon: 'checkmark.circle' },
-  'cancelled':   { variant: 'secondary', label: 'Отменен',   icon: 'xmark.circle' },
-  'no_show':     { variant: 'secondary', label: 'Не явился', icon: 'person.crop.circle.badge.xmark' }
+const STATUS_MAP: Record<string, { variant: string; label: string; icon: LucideIcon }> = {
+  'waiting':     { variant: 'warning',   label: 'Ожидает',   icon: Clock },
+  'called':      { variant: 'info',      label: 'Вызван',    icon: Bell },
+  'in_progress': { variant: 'primary',   label: 'На приеме', icon: UserRound },
+  'completed':   { variant: 'success',   label: 'Завершен',  icon: CheckCircle2 },
+  'cancelled':   { variant: 'secondary', label: 'Отменен',   icon: XCircle },
+  'no_show':     { variant: 'secondary', label: 'Не явился', icon: UserRoundX }
 };
 
 // PR-UI-09c-2: formatTime helper (moved out of component body). Fixes the
@@ -90,11 +89,11 @@ const formatTime = (timestamp: string | number | null | undefined): string => {
 // PR-UI-09c-2: renderStatusBadge helper — uses STATUS_MAP.
 const renderStatusBadge = (status: string) => {
   const config = STATUS_MAP[status] || {
-    variant: 'secondary', label: status || '—', icon: 'questionmark.circle'
+    variant: 'secondary', label: status || '—', icon: CircleHelp
   };
   return (
     <Badge variant={config.variant}>
-      <Icon name={config.icon} size="small" className="qt-status-badge-icon" />
+      <config.icon size={16} className="qt-status-badge-icon" aria-hidden="true" />
       {config.label}
     </Badge>
   );
@@ -143,7 +142,7 @@ const QueueTable = ({
     if (!effectiveDoctor) {
         return (
             <div className="qt-empty-state">
-                <Icon name="person.crop.circle.badge.questionmark" size="large" className="qt-empty-state-icon" />
+                <UserRoundSearch size={24} className="qt-empty-state-icon" aria-hidden="true" />
                 <p>{(t as Record<string, string>)?.selectDoctor || 'Выберите специалиста'}</p>
             </div>
         );
@@ -163,7 +162,7 @@ const QueueTable = ({
     if (!queueData) {
         return (
             <div className="qt-empty-state">
-                <Icon name="exclamationmark.triangle" size="large" className="qt-empty-state-icon-warning" />
+                <AlertTriangle size={24} className="qt-empty-state-icon-warning" aria-hidden="true" />
                 <p>{(t as Record<string, string>)?.queueNotFound || 'Очередь не найдена'}</p>
                 <p className="qt-empty-state-hint">
                     Попробуйте сгенерировать QR код для создания очереди
@@ -178,7 +177,7 @@ const QueueTable = ({
     if (entries.length === 0) {
         return (
             <div className="qt-empty-state">
-                <Icon name="person.2.slash" size="large" className="qt-empty-state-icon" />
+                <UserRoundX size={24} className="qt-empty-state-icon" aria-hidden="true" />
                 <p>{(t as Record<string, string>)?.queueEmpty || 'Очередь пуста'}</p>
                 <p className="qt-empty-state-hint">
                     Пациенты могут записаться через QR код
@@ -243,7 +242,7 @@ const QueueTable = ({
                 <div className="qt-table-cell-actions">
                     {entry.status === 'called' && (
                         <Badge variant="info" className="qt-called-marker">
-                            <Icon name="bell.fill" size="small" className="qt-status-badge-icon" />
+                            <Bell size={16} className="qt-status-badge-icon" aria-hidden="true" />
                             {(t as Record<string, string>)?.called || 'Вызван'}
                         </Badge>
                     )}

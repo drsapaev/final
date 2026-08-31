@@ -1,8 +1,6 @@
 
 import { useCallback, useRef } from 'react';
-import {
-  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
-} from '../ui/macos';
+import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../ui/macos';
 import {
   formatLabStatus,
   formatSeverityLabel,
@@ -12,6 +10,7 @@ import { historySeverityState, matchesHistoryFilter } from './utils/labReportNor
 // STRAT#21: t() для i18n — history panel strings мигрированы.
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { History } from 'lucide-react';
 
 /**
  * P-04 fix: LabReportHistoryPanel выделен из LabReportWorkbench.
@@ -112,7 +111,7 @@ export default function LabReportHistoryPanel({
     <Card variant="filled" padding="none">
       <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
         <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-          <Icon name="clock.arrow.circlepath" size={20} />
+          <History size={20} aria-hidden="true" />
           {title}
         </CardTitle>
       </CardHeader>

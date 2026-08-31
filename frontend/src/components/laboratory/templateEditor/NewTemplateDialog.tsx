@@ -1,10 +1,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
-} from '../../ui/macos';
+import { Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea } from '../../ui/macos';
 import { useTranslation } from '@/i18n/useTranslation';
 import React from "react";
+import { Plus } from 'lucide-react';
 
 /**
  * L-H-6 fix: NewTemplateDialog выделен в отдельный файл (~110 строк).
@@ -141,7 +140,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
           form="new-template-form"
           disabled={saving || Boolean(codeConflict)}
         >
-          <Icon name="plus" size={16} />
+          <Plus size={16} aria-hidden="true" />
           Создать
         </Button>
       </DialogActions>

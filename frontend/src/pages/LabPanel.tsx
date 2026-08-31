@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  Alert, Badge, Button, Card, CardContent, CardHeader, Icon,
-} from '../components/ui/macos';
+import { Alert, Badge, Button, Card, CardContent, CardHeader } from '../components/ui/macos';
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
 import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
@@ -15,6 +13,7 @@ import { useLabHotkeys } from '../hooks/useLabHotkeys';
 import notifyService from '../services/notify';
 import './lab.css';
 import { useTranslation } from '../i18n/useTranslation';
+import { BriefcaseMedical, FileText, RotateCw, SquareStack, TestTube2, X } from 'lucide-react';
 
 // P-03 fix: API_V1_BASE и tokenManager больше не нужны — loadLabAppointments
 // использует labReportingApi.listQueueToday() с собственным auth-токеном.
@@ -81,9 +80,9 @@ export default function LabPanel() {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const tabs = [
-    { id: 'queue', label: t('misc.lp_ochered'), icon: 'testtube.2' },
-    { id: 'templates', label: t('misc.lp_shablony'), icon: 'rectangle.stack.badge.plus' },
-    { id: 'reports', label: t('misc.lp_otchety'), icon: 'doc.text' },
+    { id: 'queue', label: t('misc.lp_ochered'), icon: TestTube2 },
+    { id: 'templates', label: t('misc.lp_shablony'), icon: SquareStack },
+    { id: 'reports', label: t('misc.lp_otchety'), icon: FileText },
   ];
   const location = useLocation();
   const navigate = useNavigate();
@@ -580,7 +579,7 @@ export default function LabPanel() {
               id={LAB_PANEL_TITLE_ID}
               className="lab-panel-title"
             >
-              <Icon name="cross.case" size={22} />
+              <BriefcaseMedical size={22} aria-hidden="true" />
               <span>{t('misc.lp_panel_laboratorii')}</span>
             </h1>
             <div
@@ -603,7 +602,7 @@ export default function LabPanel() {
                   onClick={() => switchTab(tab.id)}
                   onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleTabKeyDown(event, tab.id)}
                 >
-                  <Icon name={tab.icon} size={16} />
+                  <tab.icon size={16} aria-hidden="true" />
                   {tab.label}
                   <Badge
                     aria-hidden="true"
@@ -642,7 +641,7 @@ export default function LabPanel() {
                         }
                       }}
                     >
-                      <Icon name="arrow.clockwise" size={14} />
+                      <RotateCw size={14} aria-hidden="true" />
                       {String(message.retryLabel || t('misc.lp_povtorit'))}
                     </Button>
                   )}
@@ -652,7 +651,7 @@ export default function LabPanel() {
                     onClick={dismissMessage}
                     aria-label={t('misc.lp_zakryt_uvedomlenie')}
                   >
-                    <Icon name="xmark" size={14} />
+                    <X size={14} aria-hidden="true" />
                   </Button>
                 </div>
               )}

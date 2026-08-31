@@ -5,7 +5,8 @@
  * breadcrumb (current view, selected department from queue profiles, search
  * query, wizard state). Pure presentation; navigation callback is delegated.
  */
-import { Icon } from '../../../components/ui/macos';
+import { ChevronRight } from 'lucide-react';
+;
 
 interface RegistrarBreadcrumbProps {
   activeTab: string | null;
@@ -37,19 +38,19 @@ const RegistrarBreadcrumb = ({
     </button>
     {activeTab && (
       <>
-        <Icon name="chevron.right" size="small" className="registrar-breadcrumb-separator" aria-hidden="true" />
+        <ChevronRight size={16} className="registrar-breadcrumb-separator" aria-hidden="true" />
         <span>{queueProfiles.find(p => p.key === activeTab)?.title || activeTab}</span>
       </>
     )}
     {searchQuery && (
       <>
-        <Icon name="chevron.right" size="small" className="registrar-breadcrumb-separator" aria-hidden="true" />
+        <ChevronRight size={16} className="registrar-breadcrumb-separator" aria-hidden="true" />
         <span>{tI18n('registrarPanel.rp_breadcrumb_search', { query: searchQuery })}</span>
       </>
     )}
     {showWizard && (
       <>
-        <Icon name="chevron.right" size="small" className="registrar-breadcrumb-separator" aria-hidden="true" />
+        <ChevronRight size={16} className="registrar-breadcrumb-separator" aria-hidden="true" />
         <span>{wizardEditMode ? tI18n('registrarPanel.rp_breadcrumb_edit') : tI18n('registrarPanel.rp_breadcrumb_new')}</span>
       </>
     )}

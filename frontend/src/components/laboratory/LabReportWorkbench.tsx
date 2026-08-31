@@ -3,9 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { toast } from 'react-toastify';  // STRAT#2: retained for backward-compat;
 // новые callers должны использовать useLabToast.interactive* вместо прямого toast.
-import {
-  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
-  Input } from '../ui/macos';
+import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../ui/macos';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
 import { useLabReporting } from '../../hooks/useLabReporting';
 import { api } from '../../api/client';
@@ -50,6 +48,7 @@ import { useLabToast } from './hooks/useLabToast';
 // STRAT#9: t() для i18n — confirm dialogs мигрированы на translation keys.
 import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
+import { FileText, FolderPlus } from 'lucide-react';
 
 export default function LabReportWorkbench({
   selectedAppointment = null,
@@ -544,7 +543,7 @@ export default function LabReportWorkbench({
       <Card variant="filled" padding="none">
         <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
           <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-            <Icon name="doc.text" size={20} />
+            <FileText size={20} aria-hidden="true" />
             {t('workbench.title')}
           </CardTitle>
         </CardHeader>
@@ -638,7 +637,7 @@ export default function LabReportWorkbench({
                   onClick={() => handleCreateInstance()}
                   disabled={saving || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId}
                 >
-                  <Icon name="plus.rectangle.on.folder" size={16} />
+                  <FolderPlus size={16} aria-hidden="true" />
                   {busyAction === 'create' ? t('workbench.creating_report') : t('workbench.create_report')}
                 </Button>
               </div>
