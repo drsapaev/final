@@ -13779,8 +13779,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
                   "title": "Response Get Doctor Schedule Api V1 Appointments Doctor  Doctor Id  Schedule Get"
                 }
               }
