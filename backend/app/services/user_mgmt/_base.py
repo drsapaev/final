@@ -14,6 +14,9 @@ from sqlalchemy.exc import IntegrityError  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.core.security import get_password_hash  # noqa: F401
+from app.core.specialties import (
+    INCOMPLETE_DOCTOR_SPECIALTY,  # noqa: F401 — SSOT: core/specialties (D-1)
+)
 from app.models.clinic import Doctor  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.user_profile import (  # noqa: F401
@@ -97,7 +100,10 @@ DOCTOR_ROLE_DEFAULT_SPECIALTY: dict[str, str] = {
 # Sentinel specialty value marking an INCOMPLETE auto-created Doctor profile.
 # Not a bookable production specialty: specialty-specific consumers (registrar
 # exact-match, queue eligibility) must not treat it as a real specialty.
-INCOMPLETE_DOCTOR_SPECIALTY = "general"
+#
+# SSOT moved to core/specialties (D-1) so CRUD, provisioning and Alembic
+# migrations share one constant; re-exported above for backwards
+# compatibility (all existing imports keep working).
 
 
 def is_doctor_profile_incomplete(specialty: str | None) -> bool:
