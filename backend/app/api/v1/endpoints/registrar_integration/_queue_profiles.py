@@ -6,8 +6,35 @@ from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_integration._helpers import (
     _raise_registrar_internal_error,
 )  # noqa: F401
-from app.core.specialties import canonical_specialty, expand_queue_tags
+from app.core.specialties import (
+    DENTAL_FAMILY_SPELLINGS,
+    canonical_specialty,
+    expand_queue_tags,
+)
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
+
+
+def _canonical_profile_tags(tags: list[str] | None, profile_key: str) -> list[str]:
+    """D-1 (Codex round-6/7): the tags a QueueProfile write path persists.
+
+    - omitted/empty tags fall back to ``[profile_key]``;
+    - a dental-family key must always contribute to the expansion (unless
+      the submitted tags already contain a family spelling), so family
+      profiles stay canonical-covered even when the admin sets unrelated
+      tags;
+    - NON-dental profiles keep EXACTLY the tags the admin submitted — the
+      key is never silently re-added after an explicit removal.
+    """
+    tag_list = [t for t in (tags or []) if t]
+    if not tag_list:
+        return expand_queue_tags([profile_key])
+    key_is_family = (profile_key or "").strip().lower() in DENTAL_FAMILY_SPELLINGS
+    tags_are_family = any(
+        (t or "").strip().lower() in DENTAL_FAMILY_SPELLINGS for t in tag_list
+    )
+    if key_is_family and not tags_are_family:
+        tag_list.append(profile_key)
+    return expand_queue_tags(tag_list)
 
 
 @router.get("/queues/profiles", response_model=dict[str, Any])
@@ -267,13 +294,9 @@ def create_queue_profile(
             title=profile_data.title,
             title_ru=profile_data.title_ru,
             # D-1 (Codex round-6 P1): a dental-family profile must never be
-            # persisted with tags blind to the canonical spelling — omitted
-            # or empty tags fall back to the profile key, and the key itself
-            # is always unioned in so family-key profiles stay canonical-
-            # covered even when the admin provides unrelated tags.
-            queue_tags=expand_queue_tags(
-                list(profile_data.queue_tags or []) + [profile_data.key]
-            ),
+            # persisted with tags blind to the canonical spelling (see
+            # _canonical_profile_tags for the exact contract).
+            queue_tags=_canonical_profile_tags(profile_data.queue_tags, profile_data.key),
             department_key=profile_data.department_key,
             display_order=profile_data.display_order,
             is_active=profile_data.is_active,
@@ -337,11 +360,9 @@ def update_queue_profile(
         update_data = profile_data.dict(exclude_unset=True)
         for field, value in update_data.items():
             if field == "queue_tags":
-                # D-1 (Codex round-6 P1): same contract as creation —
-                # omitted/empty tags fall back to the profile key, and the
-                # key is always unioned in so family-key profiles stay
-                # canonical-covered regardless of the provided tags.
-                value = expand_queue_tags(list(value or []) + [profile.key])
+                # D-1 (Codex round-6 P1): same contract as creation (see
+                # _canonical_profile_tags).
+                value = _canonical_profile_tags(value, profile.key)
             if hasattr(profile, field):
                 setattr(profile, field, value)
 

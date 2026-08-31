@@ -6,7 +6,7 @@
 import logging
 from typing import Any
 
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.core.specialties import specialty_variants
@@ -108,11 +108,18 @@ class DoctorInfoService:
     ) -> list[dict[str, Any]]:
         """Получает список врачей по специализации"""
         try:
+            # D-1 canonical vocabulary (Codex round-7 P2): every dental-family
+            # spelling matches — a legacy 'stomatology' request still finds
+            # canonical 'dentistry' rows after 0049.
+            predicates = [
+                Doctor.specialty.ilike(f"%{variant}%")
+                for variant in specialty_variants(specialization)
+            ]
             doctors = (
                 self.db.query(Doctor)
                 .filter(
                     and_(
-                        Doctor.specialty.ilike(f"%{specialization}%"),
+                        or_(*predicates),
                         Doctor.active == True,
                     )
                 )

@@ -1167,8 +1167,30 @@ def test_queue_profile_update_expands_family_tags(db_session) -> None:
         db=db_session,
         current_user=None,
     )
-    # the key is always unioned in (creation parity), no dental tags appear
-    assert updated2["profile"]["queue_tags"] == ["ortho2", "orthodontics2"]
+    # non-family profile: EXACTLY the submitted tags (Codex round-7 P2 —
+    # the key is never silently re-added after an explicit removal)
+    assert updated2["profile"]["queue_tags"] == ["ortho2"]
+
+
+# ===================== L. Round-7 P2: doctor-info specialization ========
+
+
+def test_get_doctors_by_specialization_matches_family(db_session) -> None:
+    """Codex round-7 P2: the ILIKE specialization filter matches every
+    family spelling — legacy 'stomatology' keeps finding canonical rows."""
+    from app.services.doctor_info_service import DoctorInfoService
+
+    canonical = _family_doctor(db_session, "dentistry")
+    _family_doctor(db_session, "cardiology")
+
+    for query in ("dentistry", "dental", "stomatology", "dentist"):
+        result = DoctorInfoService(db_session).get_doctors_by_specialization(query)
+        ids = {item["id"] for item in result}
+        assert canonical.id in ids, f"specialization filter missed for {query!r}"
+
+    # a cardiology query never returns the dental doctor
+    result = DoctorInfoService(db_session).get_doctors_by_specialization("cardiology")
+    assert canonical.id not in {item["id"] for item in result}
 
 
 # ===================== F. Mobile search variants (round-2 P2) ===========
