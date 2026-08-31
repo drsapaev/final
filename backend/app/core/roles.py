@@ -56,6 +56,46 @@ DOCTOR_ROLES = {
     Roles.DENTIST,
 }
 
+def normalize_role_value(role: object) -> str:
+    """Extract a role's string value and normalize case/whitespace.
+
+    Roles are stored as raw strings in the DB and arrive either as plain
+    strings or as the ``Roles`` str-enum, so the raw value must be
+    extracted before any set membership test (str(Roles.X) would yield
+    'Roles.X', not the value).
+    """
+    return str(getattr(role, "value", role)).strip().lower()
+
+
+# Every doctor-role spelling accepted anywhere in the repo's IAM surfaces
+# (Codex round-7/round-8): core/roles.py DOCTOR_ROLES canonical enum values,
+# the user_mgmt/_core.py PR-26 doctor-role tuple, and the cardio/derma
+# specialist-surface tuples (cardio.py CARDIO_ROLES, derma.py DERMA_ROLES).
+# Single source of truth for role gates that must recognize doctor accounts
+# regardless of the exact spelling their row carries (appointments schedule
+# ownership, booking eligibility owner checks, ...).
+DOCTOR_ROLE_SPELLINGS = frozenset(
+    spelling.strip().lower()
+    for spelling in (
+        {str(getattr(r, "value", r)) for r in DOCTOR_ROLES}
+        | {
+            "Cardiologist",
+            "cardiology",
+            "cardiologist",
+            "Dermatologist",
+            "dermatology",
+            "dermatologist",
+            "Dentist",
+            "dentistry",
+        }
+    )
+)
+
+
+def is_doctor_role_spelling(role: object) -> bool:
+    """Case-insensitive doctor-role check against the full IAM vocabulary."""
+    return normalize_role_value(role) in DOCTOR_ROLE_SPELLINGS
+
 # Роли персонала
 STAFF_ROLES = {
     Roles.REGISTRAR,

@@ -22,6 +22,10 @@ from app.services.online_queue import (
     get_or_create_day,
     load_stats,
 )
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
+from app.services.appointment_eligibility import (
+    ensure_doctor_eligible_for_appointment as _ensure_appointment_doctor_eligible,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -431,6 +435,15 @@ def create_appointment(
     # Проверяем, не занято ли время у врача
     _ensure_appointment_create_access(db, appointment_in, current_user)
 
+    # Atomic slot reservation (Codex P1 round-7, ordering fixed round-8: the
+    # per-doctor FOR UPDATE lock is taken BEFORE eligibility so a concurrent
+    # deactivation must commit first and the eligibility read below sees the
+    # post-commit state).
+    lock_doctor_for_slot_reservation(db, appointment_in.doctor_id)
+
+    # Lifecycle eligibility (Codex P1-D consistency): a NEW booking must
+    # target a clinically eligible doctor (active, completed profile).
+    _ensure_appointment_doctor_eligible(db, appointment_in.doctor_id)
     if appointment_crud.is_time_slot_occupied(
         db,
         doctor_id=appointment_in.doctor_id,
@@ -720,6 +733,19 @@ def update_appointment(
         new_time = appointment_in.appointment_time or appointment.appointment_time
         new_doctor_id = appointment_in.doctor_id or appointment.doctor_id
 
+        # Atomic slot reservation (Codex P1 round-7, ordering fixed round-8: the
+        # per-doctor FOR UPDATE lock is taken BEFORE eligibility so a concurrent
+        # deactivation must commit first and the eligibility read below sees the
+        # post-commit state) — concurrent same-slot writers (reschedules
+        # included) serialize.
+        lock_doctor_for_slot_reservation(db, new_doctor_id)
+
+        # Lifecycle eligibility (Codex P1-D consistency): validate a doctor
+        # REASSIGNMENT to an eligible doctor. A payload that keeps the current
+        # doctor_id (time-only reschedule of an existing row) is not a new
+        # booking and stays legal even if that doctor was deactivated later.
+        if appointment_in.doctor_id and appointment_in.doctor_id != appointment.doctor_id:
+            _ensure_appointment_doctor_eligible(db, appointment_in.doctor_id)
         if appointment_crud.is_time_slot_occupied(
             db,
             doctor_id=new_doctor_id,

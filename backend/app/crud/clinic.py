@@ -4,10 +4,11 @@ CRUD операции для управления клиникой в админ
 
 from typing import Any
 
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.models.clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
+from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
 from app.schemas.clinic import (
     ClinicSettingsCreate,
     ClinicSettingsUpdate,
@@ -168,19 +169,38 @@ def update_ticket_print_settings(
 
 
 def get_doctors(
-    db: Session, skip: int = 0, limit: int = 100, active_only: bool = False
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    active_only: bool = False,
+    eligible_only: bool = False,
 ) -> list[Doctor]:
-    """Получить список врачей.
+    """Получить список врачей
+
+    ``eligible_only`` (Codex round-7 P2): apply the incomplete-profile
+    predicate IN THE DATABASE QUERY so pagination cannot crowd eligible
+    doctors out of the result (filtering the "general" sentinel AFTER the
+    row cap omitted eligible doctors beyond the cap while the caller's
+    limit allowed more rows).
 
     Deterministic ordering (doctor id ascending) — the registrar doctor
     selector and the admin doctor list render this list as-is, so an
     undefined row order would reshuffle doctors of the same specialty
-    between calls/pages.
+    between calls/pages (from #2967).
     """
     query = db.query(Doctor)
 
     if active_only:
         query = query.filter(Doctor.active == True)
+    if eligible_only:
+        # Codex round-9 P2: blank/whitespace specialties are incomplete
+        # too (is_doctor_profile_incomplete normalizes), so the SQL
+        # predicate must exclude them as well — trim(NULL) is NULL and
+        # NULL != '' is not true, so NULL rows are excluded implicitly.
+        query = query.filter(
+            func.trim(Doctor.specialty) != '',
+            Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+        )
 
     return query.order_by(Doctor.id.asc()).offset(skip).limit(limit).all()
 
@@ -195,11 +215,23 @@ def get_doctor_by_user_id(db: Session, user_id: int) -> Doctor | None:
     return db.query(Doctor).filter(Doctor.user_id == user_id).first()
 
 
-def get_doctors_by_specialty(db: Session, specialty: str) -> list[Doctor]:
-    """Получить врачей по специальности (deterministic: id ascending)"""
+def get_doctors_by_specialty(
+    db: Session, specialty: str, eligible_only: bool = False
+) -> list[Doctor]:
+    """Получить врачей по специальности
+
+    ``eligible_only`` hides the incomplete-profile sentinel ("general")
+    from patient-facing selectors — see get_doctors.
+    """
+    predicates = [Doctor.specialty == specialty, Doctor.active == True]
+    if eligible_only:
+        predicates += [
+            func.trim(Doctor.specialty) != '',
+            Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+        ]
     return (
         db.query(Doctor)
-        .filter(and_(Doctor.specialty == specialty, Doctor.active == True))
+        .filter(and_(*predicates))
         .order_by(Doctor.id.asc())
         .all()
     )

@@ -119,6 +119,11 @@ class DoctorOut(DoctorBase):
     department_id: int | None = None
     department: str | None = None
 
+    # Lifecycle (decision #5): True = the profile still carries the auto-create
+    # placeholder specialty ("general") instead of a real canonical specialty —
+    # admin must complete it ("Profile incomplete / Specialty required").
+    profile_incomplete: bool = False
+
     # Связанные данные
     user: dict[str, Any] | None = None
     schedules: list["ScheduleOut"] = []

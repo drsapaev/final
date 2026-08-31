@@ -31027,7 +31027,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BookAppointmentRequest"
+                "$ref": "#/components/schemas/MobileBookAppointmentRequest"
               }
             }
           },
@@ -69035,70 +69035,6 @@
         ],
         "title": "Body_validate_emr_data_api_v1_emr_ai_validate_post"
       },
-      "BookAppointmentRequest": {
-        "properties": {
-          "doctor_id": {
-            "type": "integer",
-            "title": "Doctor Id",
-            "description": "ID врача"
-          },
-          "appointment_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Appointment Date",
-            "description": "Дата записи (YYYY-MM-DD)"
-          },
-          "specialty": {
-            "type": "string",
-            "title": "Specialty",
-            "description": "Специализация"
-          },
-          "patient_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Id",
-            "description": "ID пациента"
-          },
-          "patient_fio": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Fio",
-            "description": "ФИО пациента"
-          },
-          "patient_phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Phone",
-            "description": "Телефон пациента"
-          }
-        },
-        "type": "object",
-        "required": [
-          "doctor_id",
-          "appointment_date",
-          "specialty"
-        ],
-        "title": "BookAppointmentRequest",
-        "description": "Запрос на запись к врачу для API"
-      },
       "BranchCreate": {
         "properties": {
           "name": {
@@ -86330,6 +86266,71 @@
         ],
         "title": "MobileAttestRequest",
         "description": "Request body for POST /mobile/attest.\n\nP0-6d FIX: previously this endpoint accepted ``request: dict[str, Any]``\nwith no validation. Now Pydantic enforces:\n\n- ``platform`` is one of ``android`` / ``ios`` (required).\n- ``integrity_token`` is required for Android (max 32KB — Play\n  Integrity tokens are typically ~1-2KB but we leave headroom).\n- ``device_token`` is required for iOS (max 32KB — Device Check\n  tokens are similarly small).\n- ``package_name`` / ``bundle_id`` are optional identifier strings\n  capped at 200 chars.\n- ``nonce`` is an optional replay-protection string capped at 256\n  chars.\n\nThe handler still performs the conditional token-presence checks\nso the error messages remain identical to the pre-fix behavior."
+      },
+      "MobileBookAppointmentRequest": {
+        "properties": {
+          "doctor_id": {
+            "type": "integer",
+            "title": "Doctor Id",
+            "description": "ID врача"
+          },
+          "preferred_date": {
+            "type": "string",
+            "title": "Preferred Date",
+            "description": "Предпочтительная дата (YYYY-MM-DD)"
+          },
+          "preferred_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Time",
+            "description": "Предпочтительное время (HH:MM)"
+          },
+          "complaint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complaint",
+            "description": "Жалобы"
+          },
+          "services": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Services",
+            "description": "ID услуг"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Дополнительные заметки"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doctor_id",
+          "preferred_date"
+        ],
+        "title": "MobileBookAppointmentRequest",
+        "description": "Запрос на запись к врачу"
       },
       "MobileLoginRequest": {
         "properties": {
@@ -104322,6 +104323,17 @@
                 "type": "null"
               }
             ]
+          },
+          "doctor_profile_incomplete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Profile Incomplete"
           }
         },
         "type": "object",
@@ -108220,6 +108232,11 @@
               }
             ],
             "title": "Department"
+          },
+          "profile_incomplete": {
+            "type": "boolean",
+            "title": "Profile Incomplete",
+            "default": false
           },
           "user": {
             "anyOf": [

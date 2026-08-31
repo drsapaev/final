@@ -23607,43 +23607,6 @@ export type components = {
             emr_data: components["schemas"]["EmrAiEmrDataRequest"];
             template_structure: components["schemas"]["EmrAiTemplateDataRequest"];
         };
-        /**
-         * BookAppointmentRequest
-         * @description Запрос на запись к врачу для API
-         */
-        BookAppointmentRequest: {
-            /**
-             * Doctor Id
-             * @description ID врача
-             */
-            doctor_id: number;
-            /**
-             * Appointment Date
-             * Format: date
-             * @description Дата записи (YYYY-MM-DD)
-             */
-            appointment_date: string;
-            /**
-             * Specialty
-             * @description Специализация
-             */
-            specialty: string;
-            /**
-             * Patient Id
-             * @description ID пациента
-             */
-            patient_id?: number | null;
-            /**
-             * Patient Fio
-             * @description ФИО пациента
-             */
-            patient_fio?: string | null;
-            /**
-             * Patient Phone
-             * @description Телефон пациента
-             */
-            patient_phone?: string | null;
-        };
         /** BranchCreate */
         BranchCreate: {
             /** Name */
@@ -29988,6 +29951,42 @@ export type components = {
              * @description Optional replay-protection nonce
              */
             nonce?: string | null;
+        };
+        /**
+         * MobileBookAppointmentRequest
+         * @description Запрос на запись к врачу
+         */
+        MobileBookAppointmentRequest: {
+            /**
+             * Doctor Id
+             * @description ID врача
+             */
+            doctor_id: number;
+            /**
+             * Preferred Date
+             * @description Предпочтительная дата (YYYY-MM-DD)
+             */
+            preferred_date: string;
+            /**
+             * Preferred Time
+             * @description Предпочтительное время (HH:MM)
+             */
+            preferred_time?: string | null;
+            /**
+             * Complaint
+             * @description Жалобы
+             */
+            complaint?: string | null;
+            /**
+             * Services
+             * @description ID услуг
+             */
+            services?: number[];
+            /**
+             * Notes
+             * @description Дополнительные заметки
+             */
+            notes?: string | null;
         };
         /**
          * MobileLoginRequest
@@ -36837,6 +36836,8 @@ export type components = {
             profile?: components["schemas"]["app__schemas__user_management__UserProfileResponse"] | null;
             preferences?: components["schemas"]["UserPreferencesResponse"] | null;
             notification_settings?: components["schemas"]["UserNotificationSettingsResponse"] | null;
+            /** Doctor Profile Incomplete */
+            doctor_profile_incomplete?: boolean | null;
         };
         /**
          * UserSearchRequest
@@ -38192,6 +38193,11 @@ export type components = {
             department_id?: number | null;
             /** Department */
             department?: string | null;
+            /**
+             * Profile Incomplete
+             * @default false
+             */
+            profile_incomplete: boolean;
             /** User */
             user?: {
                 [key: string]: unknown;
@@ -56968,7 +56974,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BookAppointmentRequest"];
+                "application/json": components["schemas"]["MobileBookAppointmentRequest"];
             };
         };
         responses: {

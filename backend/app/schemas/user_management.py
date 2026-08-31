@@ -600,6 +600,11 @@ class UserResponse(BaseModel):
     preferences: UserPreferencesResponse | None = None
     notification_settings: UserNotificationSettingsResponse | None = None
 
+    # Lifecycle (decision #5): None = no linked Doctor row; True = linked
+    # Doctor profile still has the auto-create placeholder specialty
+    # ("general") and must be completed by an admin.
+    doctor_profile_incomplete: bool | None = None
+
 
 class UserListResponse(BaseModel):
     """Схема ответа списка пользователей"""
