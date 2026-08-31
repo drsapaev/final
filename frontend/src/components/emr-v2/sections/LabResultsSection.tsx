@@ -15,15 +15,15 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-// UX-AUDIT-FIX6: lucide-react заменён на macos Icon для консистентности со
-// всеми остальными lab-компонентами. Смешивание двух библиотек иконок
-// (lucide + macos SF-Symbol-style) нарушало Nielsen Heuristic #4
-// (Consistency & Standards) — разные stroke-width, optical size, padding.
+// UX-AUDIT-FIX6 (история, направление ОТМЕНЕНО Track 3-2, §3.3 / Plan v2.10):
+// macos-Icon обёртка → прямые lucide-react импорты. Канонический end-state —
+// одна иконок-система (lucide), Nielsen Heuristic #4 сохраняется в обратную
+// сторону: консистентность с 146+ lucide-файлов проекта.
 import EMRSection from './EMRSection';
 import React from 'react';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
 import { useLabReporting } from '@/hooks/useLabReporting';
-import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions, Icon } from '../../ui/macos';
+import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
 // UX-AUDIT-FIX10: ранее STATUS_LABELS / STATUS_VARIANTS дублировались локально.
 // Комментарий "PR-58: unified with labUiLabels.js" обещал SSOT, но реально
@@ -36,6 +36,7 @@ import logger from '@/utils/logger';
 import notify from '@/services/notify';
 import { useTranslation } from '@/i18n/useTranslation';
 import { getErrorMessage } from '../../../utils/type-guards';
+import { Download, FileText, Plus, TestTube2 } from 'lucide-react';
 
 // UX-AUDIT-FIX10: STATUS_LABELS и STATUS_VARIANTS удалены —
 // используются formatLabStatus() и getLabStatusVariant() из labUiLabels.js.
@@ -219,7 +220,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
               background: 'var(--mac-bg-secondary)',
             }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-              <Icon name="testtube.2" size={16} color="secondary" aria-hidden="true" />
+              <TestTube2 size={16} aria-hidden="true" style={{ color: 'var(--mac-text-secondary)' }} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 500, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
                   {instance.template_name || instance.template_code || 'Лабораторный отчёт'}
@@ -244,7 +245,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
                   size="small"
                   onClick={() => handleDownload(instance.id)}
                   aria-label={`Скачать PDF: ${instance.template_name || 'лабораторный отчёт'}`}>
-                  <Icon name="square.and.arrow.down" size={14} style={{ marginRight: 4 }} aria-hidden="true" />
+                  <Download size={14} style={{ marginRight: 4 }} aria-hidden="true" />
                   PDF
                 </Button>
               )}
@@ -259,12 +260,12 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
     <>
       <EMRSection
         title="Результаты анализов"
-        icon={<Icon name="doc.text" size={16} aria-hidden="true" />}
+        icon={<FileText size={16} aria-hidden="true" />}
         disabled={disabled}
         defaultOpen={instances.length > 0}
         headerAction={!disabled && patientId ? (
           <Button variant="outline" size="small" onClick={handleOpenOrderModal}>
-            <Icon name="plus" size={14} style={{ marginRight: 4 }} aria-hidden="true" />
+            <Plus size={14} style={{ marginRight: 4 }} aria-hidden="true" />
             Заказать анализы
           </Button>
         ) : null}
@@ -311,7 +312,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }: LabR
                         {template.code} • {template.family}
                       </div>
                     </div>
-                    <Icon name="testtube.2" size={20} color="secondary" aria-hidden="true" />
+                    <TestTube2 size={20} aria-hidden="true" style={{ color: 'var(--mac-text-secondary)' }} />
                   </button>
                 ))
               )}

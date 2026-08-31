@@ -4,8 +4,9 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 // STRAT#28: QueueCard already wrapped in React.memo for per-item performance.
 import QueueCard from './QueueCard';
 // STRAT#27: t() for load-more button labels.
-import { Button, Icon } from '../ui/macos';
+import { Button } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import { ArrowDown, RotateCw } from 'lucide-react';
 
 interface VirtualizedQueueListAppointment {
   id?: string | number;
@@ -139,7 +140,7 @@ export default function VirtualizedQueueList({
             disabled={loadingMore}
             aria-label={t('queue.load_more_aria')}
           >
-            <Icon name={loadingMore ? 'arrow.clockwise' : 'arrow.down'} size={14} />
+            {loadingMore  ? <RotateCw size={14} aria-hidden="true" /> : <ArrowDown size={14} aria-hidden="true" />}
             {loadingMore
               ? t('queue.loading')
               : `${t('queue.show_more')} (${queueTotal - appointments.length} ${t('queue.remaining')})`}

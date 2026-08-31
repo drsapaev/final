@@ -11,11 +11,12 @@
  * routing is delegated to the panel via onActionClick.
  */
 import EnhancedAppointmentsTable from '../../../components/tables/EnhancedAppointmentsTable';
-import { Button, Badge, Icon } from '../../../components/ui/macos';
+import { Button, Badge } from '../../../components/ui/macos';
 import { AnimatedLoader } from '../../../components/ui';
 import logger from '../../../utils/logger';
 import { formatRegistrarDate } from '../../../utils/dateUtils';
 import type { WorklistPaginationInfo } from '../useRegistrarWorklistData';
+import { ArrowUpDown, FileText, Plus, Search } from 'lucide-react';
 
 interface WorklistViewProps {
   // presentation inputs
@@ -97,7 +98,7 @@ const WorklistView = ({
         <div className="registrar-workflow-actions">
           {statusFilterLabel &&
           <Badge variant="warning" className="registrar-inline-flex-tight">
-              <Icon name="magnifyingglass" size="small" />
+              <Search size={16} aria-hidden="true" />
               {tI18n('registrarPanel.rp_worklist_filter', { label: statusFilterLabel })}
             </Badge>
           }
@@ -110,7 +111,7 @@ const WorklistView = ({
           onClick={onNewAppointment}
           aria-label={tI18n('registrarPanel.rp_aria_new_appointment')}
           className="registrar-inline-flex registrar-inline-flex-shrink">
-            <Icon name="plus" size="small" style={{ color: 'white' }} />
+            <Plus size={16} style={{ color: 'white' }} aria-hidden="true" />
             {tI18n('registrarPanel.new_appointment')}
           </Button>
         </div>
@@ -125,7 +126,7 @@ const WorklistView = ({
     <div className="registrar-empty-state">
           <div className="registrar-empty-icon-lg">
             {/* QW-04: empty state 2 of 3 (worklist empty). */}
-            <Icon name="doc.text" size="large" />
+            <FileText size={24} aria-hidden="true" />
           </div>
           <h3 className="registrar-empty-heading registrar-empty-heading-text">
             {tI18n('registrarPanel.rp_empty_queue_title')}
@@ -140,14 +141,14 @@ const WorklistView = ({
         onClick={onEmptyStateCta}
         className="registrar-btn-cta">
 
-            <Icon name="plus" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />{tI18n('registrarPanel.rp_empty_queue_cta')}
+            <Plus size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} aria-hidden="true" />{tI18n('registrarPanel.rp_empty_queue_cta')}
           </Button>
         </div> :
     filteredAppointments.length === 0 ?
     <div className="registrar-empty-state">
           {/* UX Audit R-4.2: unified empty state pattern — иконка + заголовок + описание + кнопка. */}
           <div className="registrar-empty-icon-lg">
-            <Icon name="magnifyingglass" size="large" />
+            <Search size={24} aria-hidden="true" />
           </div>
           <h3 className="registrar-empty-heading registrar-empty-heading-text">
             {tI18n('registrarPanel.empty_table')}
@@ -192,7 +193,7 @@ const WorklistView = ({
               </> :
 
         <>
-                <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />{tI18n('registrarPanel.rp_load_more')}
+                <ArrowUpDown size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} aria-hidden="true" />{tI18n('registrarPanel.rp_load_more')}
               </>
         }
           </button>

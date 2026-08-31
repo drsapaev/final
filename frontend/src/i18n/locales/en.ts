@@ -3914,7 +3914,9 @@ const en = {
     um_role_admin: 'Администратор',
     um_role_doctor: 'Врач',
     um_role_nurse: 'Медсестра',
-    um_role_receptionist: 'Регистратор',
+    um_role_receptionist: 'Receptionist',
+
+    um_role_registrar: 'Registrar',
     um_role_cashier: 'Кассир',
     um_role_lab: 'Лаборант',
     um_role_patient: 'Пациент',
@@ -4601,7 +4603,9 @@ const en = {
     umdl_role_derma: 'Дерматолог',
     umdl_role_dentist: 'Стоматолог',
     umdl_role_nurse: 'Медсестра',
-    umdl_role_receptionist: 'Регистратор',
+    umdl_role_receptionist: 'Receptionist',
+
+    umdl_role_registrar: 'Registrar',
     umdl_role_cashier: 'Кассир',
     umdl_role_lab: 'Лаборант',
     umdl_role_patient: 'Пациент',

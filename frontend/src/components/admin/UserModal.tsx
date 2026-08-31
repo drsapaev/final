@@ -101,6 +101,7 @@ const UserModal = ({
     { value: 'derma', label: t('admin2.umdl_role_derma') },
     { value: 'dentist', label: t('admin2.umdl_role_dentist') },
     { value: 'Nurse', label: t('admin2.umdl_role_nurse') },
+    { value: 'Registrar', label: t('admin2.umdl_role_registrar') },
     { value: 'Receptionist', label: t('admin2.umdl_role_receptionist') },
     { value: 'Cashier', label: t('admin2.umdl_role_cashier') },
     { value: 'Lab', label: t('admin2.umdl_role_lab') },
