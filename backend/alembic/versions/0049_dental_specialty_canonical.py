@@ -124,23 +124,32 @@ def _patch_queue_profile_tags(conn: sa.Connection) -> int:
 
 def _patch_settings_keys(conn: sa.Connection) -> int:
     """Rename ``<prefix><dental-spelling>`` settings rows to the canonical
-    suffix; merge duplicates (most permissive) and drop the extra rows."""
+    suffix and merge duplicates (most permissive) into one row.
+
+    Rename is implemented as an UPDATE of the surviving row (not
+    delete+insert) so ``category='queue'`` and the audit columns survive —
+    ``get_queue_settings`` loads rows BY CATEGORY, and a category-less
+    replacement row would be invisible (Codex round-2 P1). The ``value``
+    column is a JSON column in production: the table construct therefore
+    declares ``sa.JSON`` so SQLAlchemy serializes the merged integer on
+    bind (Codex round-2 P1).
+    """
     settings_table = sa.table(
         SETTINGS_TABLE,
         sa.column("id", sa.Integer),
         sa.column("key", sa.String),
-        sa.column("value", sa.Integer),
+        sa.column("value", sa.JSON),
     )
     rows = conn.execute(
         sa.select(settings_table.c.id, settings_table.c.key, settings_table.c.value)
     ).fetchall()
-    # canonical target value per prefix (max = most permissive); seeded
-    # from BOTH existing canonical rows and the dental rows being renamed
-    # (otherwise a deployment with only "stomatology"-suffixed rows would
-    # lose its configured limits entirely).
+    # merged value per prefix (max = most permissive); seeded from BOTH
+    # existing canonical rows and the dental rows being renamed (otherwise
+    # a deployment with only "stomatology"-suffixed rows would lose its
+    # configured limits entirely).
     canonical_values: dict[str, int] = {}
     canonical_row_ids: dict[str, int] = {}
-    dental_row_ids: list[int] = []
+    dental_row_ids_by_prefix: dict[str, list[int]] = {}
     for row in rows:
         key = row.key or ""
         prefix = next((p for p in SETTINGS_PREFIXES if key.startswith(p)), None)
@@ -150,7 +159,7 @@ def _patch_settings_keys(conn: sa.Connection) -> int:
         if suffix not in NON_CANONICAL_DENTAL and suffix != CANONICAL:
             continue
         if suffix in NON_CANONICAL_DENTAL:
-            dental_row_ids.append(row.id)
+            dental_row_ids_by_prefix.setdefault(prefix, []).append(row.id)
         else:
             canonical_row_ids.setdefault(prefix, row.id)
         try:
@@ -160,31 +169,41 @@ def _patch_settings_keys(conn: sa.Connection) -> int:
         prev = canonical_values.get(prefix)
         canonical_values[prefix] = existing if prev is None else max(prev, existing)
 
-    removed = 0
-    for row_id in dental_row_ids:
-        conn.execute(
-            settings_table.delete().where(settings_table.c.id == row_id)
-        )
-        removed += 1
-
     touched = 0
     for prefix, value in canonical_values.items():
         existing_id = canonical_row_ids.get(prefix)
+        dental_ids = dental_row_ids_by_prefix.get(prefix, [])
         if existing_id is not None:
-            # canonical row already exists: merge limits into it
+            # canonical row already exists: merge limits into it, drop the
+            # duplicate-spelling rows.
             conn.execute(
                 settings_table.update()
                 .where(settings_table.c.id == existing_id)
                 .values(value=value)
             )
-        else:
-            conn.execute(
-                settings_table.insert().values(
-                    key=f"{prefix}{CANONICAL}", value=value
+            for row_id in dental_ids:
+                conn.execute(
+                    settings_table.delete().where(settings_table.c.id == row_id)
                 )
+        elif dental_ids:
+            # no canonical row: RENAME the oldest dental row in place
+            # (key + merged value) — category/audit columns preserved —
+            # and remove the remaining duplicate-spelling rows.
+            keep_id = min(dental_ids)
+            conn.execute(
+                settings_table.update()
+                .where(settings_table.c.id == keep_id)
+                .values(key=f"{prefix}{CANONICAL}", value=value)
             )
+            for row_id in dental_ids:
+                if row_id != keep_id:
+                    conn.execute(
+                        settings_table.delete().where(settings_table.c.id == row_id)
+                    )
+        else:
+            continue
         touched += 1
-    return removed + touched
+    return touched
 
 
 def upgrade() -> None:

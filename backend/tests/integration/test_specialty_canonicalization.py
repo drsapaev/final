@@ -29,7 +29,7 @@ from app.core.specialties import (
     specialty_variants,
 )
 from app.crud import clinic as crud_clinic
-from app.models.clinic import Doctor
+from app.models.clinic import ClinicSettings, Doctor
 from app.models.online_queue import QueueToken
 from app.models.queue_profile import QueueProfile
 from app.schemas.clinic import DoctorCreate, DoctorUpdate
@@ -249,7 +249,8 @@ def _scratch_tables(engine: sa.Engine) -> sa.Connection:
             CREATE TABLE clinic_settings (
                 id INTEGER PRIMARY KEY,
                 key VARCHAR(100) UNIQUE,
-                value VARCHAR(255)
+                value JSON,
+                category VARCHAR(50)
             )
             """
         )
@@ -283,28 +284,28 @@ def test_migration_0049_rewrites_doctors_profiles_and_settings(tmp_path) -> None
             "('stomatology', '[\"dental\", \"stomatology\", \"dentist\"]')",
         )
         # limits use the REAL storage representation: one row per
-        # <prefix><specialty> (Codex round-1 P1), value = integer
+        # <prefix><specialty>, category='queue' (Codex round-2 P1)
         _seed(
             con,
-            "INSERT INTO clinic_settings (key, value) VALUES "
-            "('max_per_day_stomatology', 12)",
+            "INSERT INTO clinic_settings (key, value, category) VALUES "
+            "('max_per_day_stomatology', 12, 'queue')",
         )
         _seed(
             con,
-            "INSERT INTO clinic_settings (key, value) VALUES "
-            "('start_number_Dental', 4)",
+            "INSERT INTO clinic_settings (key, value, category) VALUES "
+            "('start_number_Dental', 4, 'queue')",
         )
         # an existing canonical row must be MERGED (max wins), not duplicated
         _seed(
             con,
-            "INSERT INTO clinic_settings (key, value) VALUES "
-            "('max_per_day_dentistry', 20)",
+            "INSERT INTO clinic_settings (key, value, category) VALUES "
+            "('max_per_day_dentistry', 20, 'queue')",
         )
         # non-dental rows untouched
         _seed(
             con,
-            "INSERT INTO clinic_settings (key, value) VALUES "
-            "('max_per_day_cardiology', 30)",
+            "INSERT INTO clinic_settings (key, value, category) VALUES "
+            "('max_per_day_cardiology', 30, 'queue')",
         )
 
         from alembic.migration import MigrationContext
@@ -346,10 +347,16 @@ def test_migration_0049_rewrites_doctors_profiles_and_settings(tmp_path) -> None
         # merge semantics: max(12 stomatology, 20 canonical) -> 20
         assert int(_scalar_one("max_per_day_dentistry")) == 20
         assert not _exists("max_per_day_stomatology")
-        # dental-only row renamed: canonical created from dental value
+        # dental-only row renamed IN PLACE: canonical created from dental
+        # value with its category preserved (get_queue_settings reads by
+        # category — a category-less row would be invisible)
         assert int(_scalar_one("start_number_dentistry")) == 4
         assert not _exists("start_number_Dental")
         assert not _exists("start_number_dental")
+        row_cat = con.execute(
+            sa.text("SELECT category FROM clinic_settings WHERE key='start_number_dentistry'")
+        ).scalar()
+        assert row_cat == "queue"
         # non-dental untouched
         assert int(_scalar_one("max_per_day_cardiology")) == 30
     finally:
@@ -366,13 +373,13 @@ def test_migration_0049_dental_only_limits_are_not_lost(tmp_path) -> None:
         _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'dental')")
         _seed(
             con,
-            "INSERT INTO clinic_settings (key, value) VALUES "
-            "('max_per_day_stomatology', 12)",
+            "INSERT INTO clinic_settings (key, value, category) VALUES "
+            "('max_per_day_stomatology', 12, 'queue')",
         )
         _seed(
             con,
-            "INSERT INTO clinic_settings (key, value) VALUES "
-            "('start_number_stomatology', 7)",
+            "INSERT INTO clinic_settings (key, value, category) VALUES "
+            "('start_number_stomatology', 7, 'queue')",
         )
 
         from alembic.migration import MigrationContext
@@ -394,6 +401,10 @@ def test_migration_0049_dental_only_limits_are_not_lost(tmp_path) -> None:
             for r in con.execute(sa.text("SELECT key FROM clinic_settings")).fetchall()
         }
         assert not any(k.endswith("_stomatology") for k in keys)
+        cat = con.execute(
+            sa.text("SELECT category FROM clinic_settings WHERE key='max_per_day_dentistry'")
+        ).scalar()
+        assert cat == "queue"
     finally:
         con.close()
 
@@ -418,3 +429,64 @@ def test_migration_0049_downgrade_is_noop(tmp_path) -> None:
         assert spellings == {"dentistry"}
     finally:
         con.close()
+
+
+# ===================== E. Settings-key normalization (round-2 P1-3) =====
+
+
+def test_get_queue_settings_exposes_canonical_keys(db_session) -> None:
+    """Legacy prefixed rows (any dental spelling) read as ONE canonical key."""
+    from app.models.clinic import ClinicSettings
+
+    db_session.add_all(
+        [
+            ClinicSettings(
+                key="max_per_day_stomatology", value=12, category="queue"
+            ),
+            ClinicSettings(key="start_number_Dental", value=4, category="queue"),
+        ]
+    )
+    db_session.commit()
+
+    settings = crud_clinic.get_queue_settings(db_session)
+    assert settings["max_per_day"]["dentistry"] == 12
+    assert settings["start_numbers"]["dentistry"] == 4
+    assert "stomatology" not in settings["max_per_day"]
+
+
+def test_update_queue_settings_writes_canonical_keys(db_session) -> None:
+    """A screen editing by a legacy profile key must not resurrect a row
+    runtime code ignores: the stored key uses the canonical segment."""
+    crud_clinic.update_queue_settings(
+        db_session,
+        {"start_numbers": {"stomatology": 9}, "max_per_day": {"dental": 21}},
+        user_id=1,
+    )
+
+    keys = {
+        s.key
+        for s in db_session.query(ClinicSettings).filter(
+            ClinicSettings.category == "queue"
+        )
+    }
+    assert "start_number_dentistry" in keys
+    assert "max_per_day_dentistry" in keys
+    assert not any(k.endswith("_stomatology") for k in keys)
+    assert not any(k.endswith("_dental") for k in keys)
+
+    # and it reads back canonically
+    settings = crud_clinic.get_queue_settings(db_session)
+    assert settings["start_numbers"]["dentistry"] == 9
+    assert settings["max_per_day"]["dentistry"] == 21
+
+
+# ===================== F. Mobile search variants (round-2 P2) ===========
+
+
+def test_search_doctors_matches_family_spellings(db_session) -> None:
+    canonical = crud_clinic.create_doctor(
+        db_session, DoctorCreate(specialty="dentistry", active=True)
+    )
+    for query in ("dental", "stomatology", "dentist"):
+        found = crud_clinic.search_doctors(db_session, specialty=query)
+        assert canonical.id in {d.id for d in found}, f"missed for {query!r}"

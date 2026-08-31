@@ -459,10 +459,13 @@ def get_queue_settings(db: Session) -> dict[str, Any]:
             result["auto_close_time"] = setting.value
         elif setting.key.startswith("start_number_"):
             specialty = setting.key.replace("start_number_", "")
-            result["start_numbers"][specialty] = setting.value
+            # D-1: legacy rows may carry any dental-family suffix; expose
+            # the canonical segment so the settings screen reads a single
+            # key regardless of which spelling a deployment stored.
+            result["start_numbers"][canonical_specialty(specialty)] = setting.value
         elif setting.key.startswith("max_per_day_"):
             specialty = setting.key.replace("max_per_day_", "")
-            result["max_per_day"][specialty] = setting.value
+            result["max_per_day"][canonical_specialty(specialty)] = setting.value
 
     return result
 
@@ -484,12 +487,15 @@ def update_queue_settings(
     # Стартовые номера по специальностям
     if "start_numbers" in settings:
         for specialty, number in settings["start_numbers"].items():
-            updates[f"start_number_{specialty}"] = number
+            # D-1: normalize the specialty segment — a screen editing by a
+            # legacy profile key ("stomatology") must not resurrect a row
+            # runtime code (keyed by doctor.specialty) ignores.
+            updates[f"start_number_{canonical_specialty(specialty)}"] = number
 
     # Лимиты по специальностям
     if "max_per_day" in settings:
         for specialty, limit in settings["max_per_day"].items():
-            updates[f"max_per_day_{specialty}"] = limit
+            updates[f"max_per_day_{canonical_specialty(specialty)}"] = limit
 
     # Массовое обновление
     update_settings_batch(db, "queue", updates, user_id)
@@ -519,7 +525,9 @@ def search_doctors(
     query = db.query(Doctor).filter(Doctor.active == True)  # noqa: E712
 
     if specialty:
-        query = query.filter(Doctor.specialty == specialty)
+        # D-1 canonical vocabulary: any dental-family spelling finds every
+        # family row (mobile /doctors/search contract).
+        query = query.filter(Doctor.specialty.in_(specialty_variants(specialty)))
 
     if name:
         # Name lives on the linked User; join via user_id.

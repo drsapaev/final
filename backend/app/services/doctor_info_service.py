@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.core.specialties import specialty_variants
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.visit import Visit
@@ -135,9 +136,16 @@ class DoctorInfoService:
                 return None
 
             # Получаем врачей данной специальности
+            # D-1 canonical vocabulary: any dental-family spelling finds
+            # every family row.
             doctors = (
                 self.db.query(Doctor)
-                .filter(and_(Doctor.specialty == specialty, Doctor.active == True))
+                .filter(
+                    and_(
+                        Doctor.specialty.in_(specialty_variants(specialty)),
+                        Doctor.active == True,
+                    )
+                )
                 .all()
             )
 
