@@ -92,13 +92,16 @@ def get_client_ip(request: Request) -> str:
 
     Logic:
     1. Get the direct TCP peer IP (request.client.host).
-    2. If peer is a trusted proxy, parse X-Forwarded-For and return the
-       RIGHTMOST entry (the client IP as observed by the nearest trusted
-       proxy to us).
-    3. Otherwise, return the direct peer IP.
+    2. If peer is a trusted proxy, walk X-Forwarded-For from the RIGHT:
+       skip entries that are themselves trusted proxies (each appended a
+       hop's view of the chain), and return the first non-trusted entry —
+       the client IP as observed by the nearest trusted proxy to us.
+    3. Otherwise (or when nothing attributable remains), return the direct
+       peer IP.
 
-    Why rightmost, not leftmost: both supported deployment contours hand
-    the backend a chain whose LAST entry is the only non-forgeable one —
+    Why right-to-left, not leftmost: both supported deployment contours
+    hand the backend a chain whose LAST entry is the only non-forgeable
+    one —
     - Cloudflare Tunnel contour (docs/runbooks/DEPLOYMENT_NEW_CLINIC.md):
       the edge APPENDS the connecting client IP to any client-supplied
       X-Forwarded-For prefix, so the leftmost entry is attacker-chosen
@@ -106,27 +109,41 @@ def get_client_ip(request: Request) -> str:
     - nginx contour (ops/vps/nginx/clinic.conf.template): nginx OVERWRITES
       X-Forwarded-For with $remote_addr, producing a single-entry chain
       where rightmost == leftmost == true client IP.
-    Strict fallback: if the rightmost entry does not parse as an IP, the
-    direct peer is recorded — we deliberately do NOT scan leftward, since
-    any leftward entry past a malformed hop is client-controlled again.
+
+    Multi-hop chains (Codex P2, round-7): with two reverse-proxy hops the
+    direct peer is the LAST hop and the rightmost XFF entry is that hop's
+    VIEW (the previous hop), not the client. Walking right-to-left and
+    skipping trusted-proxy entries recovers the client — provided the
+    operator lists EVERY reverse-proxy hop between the client and the
+    backend in TRUSTED_PROXIES (see backend/.env.example).
+
+    Strict fallback: a malformed entry stops the walk and the direct peer
+    is recorded — we deliberately do NOT scan past it, since everything
+    left of a malformed hop is client-controlled again. If every entry is
+    itself a trusted proxy, there is no attributable client and the peer
+    is recorded.
     """
     peer_ip = request.client.host if request.client else "0.0.0.0"
 
     if _is_trusted_proxy(peer_ip):
         xff = request.headers.get("X-Forwarded-For", "")
         if xff:
-            # X-Forwarded-For: client, proxy1, ..., proxyN
-            # The rightmost entry is the client IP as seen by proxyN —
-            # the nearest trusted hop and the only non-forgeable one when
-            # the edge appends instead of overwriting.
-            last = xff.split(",")[-1].strip()
-            try:
-                # Validate it's a real IP
-                ip_address(last)
-                return last
-            except (ValueError, AddressValueError):
-                logger.warning("Invalid IP in X-Forwarded-For header: %r", last)
-                return peer_ip
+            entries = [entry.strip() for entry in xff.split(",") if entry.strip()]
+            for entry in reversed(entries):
+                try:
+                    # Validate it's a real IP before any trust decision
+                    ip_address(entry)
+                except (ValueError, AddressValueError):
+                    logger.warning("Invalid IP in X-Forwarded-For header: %r", entry)
+                    return peer_ip
+                if _is_trusted_proxy(entry):
+                    # A hop we operate — its report of the chain is
+                    # client-influenced, keep walking left.
+                    continue
+                return entry
+            # Every entry is itself a trusted proxy (or the chain was
+            # empty after stripping): nothing attributable beyond the peer.
+            return peer_ip
 
     return peer_ip
 

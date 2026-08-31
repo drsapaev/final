@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.roles import DOCTOR_ROLES
 from app.crud.appointment import appointment as appointment_crud
 from app.models import appointment as appointment_models
 from app.models.clinic import Doctor
@@ -27,16 +28,43 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 APPOINTMENTS_PUBLIC_ERROR = "Internal server error"
 APPOINTMENT_BROAD_ACCESS_ROLES = {"Admin", "Registrar"}
+def _normalized_role_value(role: object) -> str:
+    """Extract a role's string value and normalize case/whitespace.
+
+    Roles are stored as raw strings in the DB and arrive either as plain
+    strings or as the ``Roles`` str-enum, so the raw value must be
+    extracted before any set membership test (str(Roles.X) would yield
+    'Roles.X', not the value).
+    """
+    return str(getattr(role, "value", role)).strip().lower()
+
+
+# Doctor-role spellings accepted across the repo's IAM surfaces. Codex P1
+# (round-7): the hardcoded set omitted the canonical lowercase
+# 'cardiologist'/'dermatologist' spellings exercised by test_cardio_api,
+# so those doctor accounts were denied their OWN schedule by the new
+# ownership guard. Derived from the canonical sources instead of another
+# hand-maintained list:
+# - core/roles.py DOCTOR_ROLES (canonical enum values),
+# - user_mgmt/_core.py doctor-role tuple (PR-26 specialty mapping),
+# - cardio.py CARDIO_ROLES / derma.py DERMA_ROLES (specialist surfaces).
+# Membership is case-insensitive via _normalized_role_value so any case
+# variant of a recognized spelling resolves to the same gate.
+_APPOINTMENT_DOCTOR_ROLE_VOCABULARY = (
+    {str(getattr(r, "value", r)) for r in DOCTOR_ROLES}
+    | {
+        "Cardiologist",
+        "cardiology",
+        "cardiologist",
+        "Dermatologist",
+        "dermatology",
+        "dermatologist",
+        "Dentist",
+        "dentistry",
+    }
+)
 APPOINTMENT_DOCTOR_ROLES = {
-    "Doctor",
-    "cardio",
-    "cardiology",
-    "Cardiologist",
-    "Cardio",
-    "derma",
-    "Dermatologist",
-    "dentist",
-    "Dentist",
+    value.strip().lower() for value in _APPOINTMENT_DOCTOR_ROLE_VOCABULARY
 }
 APPOINTMENT_PATIENT_ROLES = {"Patient"}
 APPOINTMENT_PENDING_PAYMENT_ROLES = {"Admin", "Registrar", "Cashier"}
@@ -77,7 +105,7 @@ def _ensure_appointment_record_access(
     ):
         return
 
-    if role in APPOINTMENT_DOCTOR_ROLES:
+    if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
         doctor = (
             db.query(Doctor)
             .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
@@ -160,7 +188,7 @@ def _scope_appointment_list_filters(
     ):
         return patient_id, doctor_id
 
-    if role in APPOINTMENT_DOCTOR_ROLES:
+    if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
         if doctor_id is None:
             raise HTTPException(status_code=403, detail="Access denied")
         if doctor_id not in _appointment_doctor_scope_ids(db, current_user):
@@ -187,7 +215,7 @@ def _ensure_appointment_create_access(
     ):
         return
 
-    if role in APPOINTMENT_DOCTOR_ROLES:
+    if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
         if appointment_in.doctor_id not in _appointment_doctor_scope_ids(
             db, current_user
         ):
@@ -750,7 +778,7 @@ def _ensure_doctor_schedule_access(
     ):
         return
 
-    if role in APPOINTMENT_DOCTOR_ROLES:
+    if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
         if doctor_id not in _appointment_doctor_scope_ids(db, current_user):
             raise HTTPException(status_code=403, detail="Access denied")
         return

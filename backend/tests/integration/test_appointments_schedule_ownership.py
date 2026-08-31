@@ -258,3 +258,78 @@ def test_audit_trail_survives_oversized_request_metadata(client, db_session, adm
         "attacker-supplied X-Forwarded-For must not be persisted from an "
         "untrusted peer"
     )
+
+
+def test_canonical_lowercase_specialist_role_reads_own_schedule(client, db_session):
+    """Codex P1 round-7 (#2966): the repo's canonical lowercase
+    'cardiologist' spelling (accepted by cardio.py CARDIO_ROLES and
+    exercised by test_cardio_api) must pass the schedule-ownership gate —
+    the doctor reads their OWN schedule, and still cannot read another
+    doctor's."""
+    user = User(
+        username="sched_cardio_lc",
+        email="sched-cardio-lc@test.com",
+        full_name="Schedule Cardio LC",
+        hashed_password=get_password_hash("secret123"),
+        role="cardiologist",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    doctor = Doctor(user_id=user.id, specialty="cardiology", active=True)
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+
+    other_user, _other_doctor_row_a, _u2, other_doctor = _doctor_pair(
+        db_session, "lc_a", "lc_b"
+    )
+    patient = _patient(db_session)
+    appointment = _schedule_appointment(db_session, doctor, patient)
+
+    # Own schedule via the lowercase specialist role: allowed.
+    response = client.get(
+        f"/api/v1/appointments/doctor/{doctor.id}/schedule",
+        params={"date": str(date.today() + timedelta(days=1))},
+        headers=_headers_for(user),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    entries = body if isinstance(body, list) else body.get("appointments", body.get("schedule", []))
+    assert any(entry.get("id") == appointment.id for entry in entries)
+
+    # A doctor-capable role is still ownership-scoped: the same lowercase
+    # specialist role cannot read another doctor's schedule.
+    forbidden = client.get(
+        f"/api/v1/appointments/doctor/{other_doctor.id}/schedule",
+        params={"date": str(date.today() + timedelta(days=1))},
+        headers=_headers_for(other_user),
+    )
+    assert forbidden.status_code == 403, forbidden.text
+
+
+def test_doctor_role_vocabulary_matches_repo_iam_surfaces():
+    """The guard's doctor-role vocabulary must normalize case/enum and cover
+    every doctor-role spelling accepted by the repo's IAM surfaces
+    (core/roles.py, user_mgmt/_core.py PR-26 tuple, cardio/derma surfaces)."""
+    from app.api.v1.endpoints.appointments import (
+        APPOINTMENT_DOCTOR_ROLES,
+        _normalized_role_value,
+    )
+    from app.core.roles import Roles
+
+    assert _normalized_role_value(Roles.DOCTOR) == "doctor"
+    assert _normalized_role_value("Cardiologist") == "cardiologist"
+    assert _normalized_role_value("  cardiologist ") == "cardiologist"
+
+    for spelling in (
+        "Doctor", "DOCTOR", "cardio", "Cardio", "cardiology", "cardiologist",
+        "Cardiologist", "derma", "Dermatologist", "dermatology", "dermatologist",
+        "dentist", "Dentist", "dentistry",
+    ):
+        assert _normalized_role_value(spelling) in APPOINTMENT_DOCTOR_ROLES, spelling
+
+    # Non-doctor roles must stay outside the gate.
+    for outsider in ("Patient", "Admin", "Registrar", "Lab", "Cashier"):
+        assert _normalized_role_value(outsider) not in APPOINTMENT_DOCTOR_ROLES

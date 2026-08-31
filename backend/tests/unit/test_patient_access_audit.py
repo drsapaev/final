@@ -265,6 +265,42 @@ class TestClientIpExtraction:
         ip = _get_client_ip(request)
         assert ip == "203.0.113.77"
 
+    def test_get_client_ip_multi_hop_chain_recovers_client_ip(self, monkeypatch):
+        """Codex P2 round-7 (#2966): with two reverse-proxy hops the direct
+        peer is the LAST hop and the rightmost XFF entry is that hop's view
+        (the previous hop), not the client. The walk must skip trusted-hop
+        entries and recover the client IP — otherwise every user behind the
+        hop shares one rate-limit budget and audit rows record the proxy."""
+        from app.core import rate_limiter as rate_limiter_module
+
+        monkeypatch.setattr(
+            rate_limiter_module, "TRUSTED_PROXIES", {"10.0.0.2", "10.0.0.1"}
+        )
+        request = MagicMock()
+        # proxy2 -> backend (direct peer), proxy1 -> proxy2, client -> proxy1
+        request.headers = {"X-Forwarded-For": "203.0.113.50, 10.0.0.1"}
+        request.client = MagicMock()
+        request.client.host = "10.0.0.2"
+
+        ip = _get_client_ip(request)
+        assert ip == "203.0.113.50"
+
+    def test_get_client_ip_all_trusted_chain_falls_back_to_peer(self, monkeypatch):
+        """Every chain entry being a trusted proxy means there is nothing
+        attributable beyond the direct peer — record the peer, not a hop."""
+        from app.core import rate_limiter as rate_limiter_module
+
+        monkeypatch.setattr(
+            rate_limiter_module, "TRUSTED_PROXIES", {"10.0.0.2", "10.0.0.1"}
+        )
+        request = MagicMock()
+        request.headers = {"X-Forwarded-For": "10.0.0.1"}
+        request.client = MagicMock()
+        request.client.host = "10.0.0.2"
+
+        ip = _get_client_ip(request)
+        assert ip == "10.0.0.2"
+
     def test_get_client_ip_malformed_rightmost_falls_back_to_peer(self, monkeypatch):
         """Strict fallback: a malformed RIGHTMOST entry must record the direct
         peer, NOT a leftward entry — everything left of a malformed hop is
