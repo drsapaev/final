@@ -66,11 +66,13 @@ def _headers_for(user: User) -> dict[str, str]:
 
 
 def _patient(db_session) -> Patient:
+    """Synthetic patient fixture — all-zero subscriber number per conftest
+    convention (no realistic phone/name/birth data: repo PII rule for
+    committed test fixtures, AGENTS.md "PII fields")."""
     patient = Patient(
         first_name="Sched",
         last_name="Patient",
-        phone="+998900001122",
-        birth_date=date(1990, 1, 1),
+        phone="+998900000000",
     )
     db_session.add(patient)
     db_session.commit()
