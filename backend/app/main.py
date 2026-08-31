@@ -14,6 +14,7 @@ from urllib.parse import urlsplit, urlunsplit
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.background_jobs import spawn_daemon_job
 from app.core.config import get_settings
 from app.core.logging_config import setup_logging
 from app.core.prometheus import init_prometheus
@@ -611,7 +612,7 @@ async def _startup_tasks() -> None:
                         db.close()
 
                 try:
-                    job = asyncio.get_running_loop().run_in_executor(None, _run_lab_job)
+                    job = spawn_daemon_job(_run_lab_job)
                     _inflight_thread_jobs.add(job)
                     job.add_done_callback(_inflight_thread_jobs.discard)
                     # shield(): cancelling the scheduler task must not cancel
