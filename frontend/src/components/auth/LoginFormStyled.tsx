@@ -755,7 +755,10 @@ const LoginFormStyled = () => {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', gap: 8 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Checkbox checked={rememberMe} onChange={(checked) => setRememberMe(checked)} /> Запомнить меня
+                {/* PR-UI-18-5 a11y fix (axe aria-toggle-field-name): the external
+                    label text node does not name a div[role="checkbox"] — pass
+                    an explicit aria-label. DOM/visual structure unchanged. */}
+                <Checkbox checked={rememberMe} onChange={(checked) => setRememberMe(checked)} aria-label="Запомнить меня" /> Запомнить меня
               </label>
               <Button type="button" variant="ghost" size="small" onClick={() => setShowForgotPassword(true)} style={{ ...authGhostButtonStyles, ...authButtonBaseStyles }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

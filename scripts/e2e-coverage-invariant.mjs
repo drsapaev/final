@@ -37,6 +37,10 @@ const TARGET_E2E_FILES = [
   'e2e/cashier-ux-audit.spec.ts',
   'e2e/registrar-ux-audit.spec.ts',
   'e2e/visual-regression.spec.ts',
+  // PR-UI-18 item 4: a11y axe audit runs in the same CI step as the files
+  // above (ci-cd-unified.yml "UX Audit e2e + Visual regression") — the
+  // anti-skip invariant must cover it too.
+  'e2e/a11y-axe-audit.spec.ts',
 ];
 
 // Patterns that silently disable tests. Each is a RegExp source.
