@@ -32,7 +32,6 @@ interface CommandItem {
   label: string;
   description?: string;
   path?: string;
-  icon?: string;
   section?: string;
   keywords?: string[];
   action: 'navigate' | 'back';
@@ -62,7 +61,6 @@ const getQuickActions = (t: (key: string, options?: Record<string, unknown>) => 
     id: 'action-new-appointment',
     label: t('misc.cpqa_new_appointment_label'),
     description: t('misc.cpqa_new_appointment_desc'),
-    icon: 'plus',
     keywords: [t('misc.cpqa_kw_zapis'), t('misc.cpqa_kw_new'), t('misc.cpqa_kw_create'), 'appointment', 'new'],
     action: 'navigate',
     target: '/registrar?action=new',
@@ -72,7 +70,6 @@ const getQuickActions = (t: (key: string, options?: Record<string, unknown>) => 
     id: 'action-search-patient',
     label: t('misc.cpqa_search_patient_label'),
     description: t('misc.cpqa_search_patient_desc'),
-    icon: 'search',
     keywords: [t('misc.cpqa_kw_patient'), t('misc.cpqa_kw_search'), 'find', 'patient', 'search'],
     action: 'navigate',
     target: '/clinical/search',
@@ -82,7 +79,6 @@ const getQuickActions = (t: (key: string, options?: Record<string, unknown>) => 
     id: 'action-back',
     label: t('misc.cpqa_back_label'),
     description: t('misc.cpqa_back_desc'),
-    icon: 'arrow.left',
     keywords: [t('misc.cpqa_kw_back'), 'back', 'previous'],
     action: 'back',
     section: t('misc.cpqa_section_actions'),
@@ -175,7 +171,7 @@ export function CommandPalette({ profile, navigate }: { profile: CommandProfile;
 
     const routeItems: CommandItem[] = accessibleRoutes.map(route => {
       const nav = typeof route.nav === 'object' && route.nav ? (route.nav as {
-        label?: string; labelKey?: string; section?: string; sectionKey?: string; icon?: string;
+        label?: string; labelKey?: string; section?: string; sectionKey?: string;
       }) : null;
       // PR-UI-19 (C-6, Codex round 2): resolve nav labels/sections through the
       // palette's t() subscription so the command palette follows the active
@@ -193,7 +189,6 @@ export function CommandPalette({ profile, navigate }: { profile: CommandProfile;
         label: localizedLabel,
         description: localizedSection || route.group || '',
         path: route.path,
-        icon: nav?.icon,
         section: localizedSection || t('misc.cp_marshruty'),
         keywords: [route.id, route.path, route.title, localizedLabel],
         action: 'navigate',

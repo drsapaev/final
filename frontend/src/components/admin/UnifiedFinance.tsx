@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { DollarSign, Percent, Receipt, TrendingUp } from 'lucide-react';
 import BillingManager from './BillingManager';
 import DynamicPricingManager from './DynamicPricingManager';
 import DiscountBenefitsManager from './DiscountBenefitsManager';
@@ -34,10 +35,10 @@ const UnifiedFinance = ({ renderFinance }: { renderFinance?: () => React.ReactNo
   }, [section]);
 
   const tabs = [
-  { id: 'overview', label: t('admin2.uf_tab_overview'), icon: 'DollarSign' },
-  { id: 'billing', label: t('admin2.uf_tab_billing'), icon: 'Receipt' },
-  { id: 'pricing', label: t('admin2.uf_tab_pricing'), icon: 'TrendingUp' },
-  { id: 'discounts', label: t('admin2.uf_tab_discounts'), icon: 'Percent' }];
+  { id: 'overview', label: t('admin2.uf_tab_overview'), icon: DollarSign },
+  { id: 'billing', label: t('admin2.uf_tab_billing'), icon: Receipt },
+  { id: 'pricing', label: t('admin2.uf_tab_pricing'), icon: TrendingUp },
+  { id: 'discounts', label: t('admin2.uf_tab_discounts'), icon: Percent }];
 
 
   const renderContent = () => {
