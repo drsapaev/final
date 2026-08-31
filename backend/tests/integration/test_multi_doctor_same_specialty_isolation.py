@@ -15,7 +15,11 @@ accidental second POST and the DB constraint landing).
 Covers, for Doctor A and Doctor B with the SAME specialty (stomatology):
 - registrar doctor selector returns BOTH doctors, deterministically ordered;
 - admin doctor list is deterministically ordered;
-- Doctor A cannot call patients from Doctor B's queue (403);
+- same-specialty collaboration per ADR-001 ("Any doctor of the same
+  specialty can call/start/cancel patients from any same-specialty
+  queue"): Doctor A CAN call an entry in Doctor B's queue via the
+  canonical /doctor/queue/{entry_id}/call endpoint (PR-26 semantics);
+- a doctor of a DIFFERENT specialty is denied (403);
 - Doctor A cannot save EMR into Doctor B's visit (403);
 - admin keeps cross-doctor queue privileges (200);
 - registrar can still pick a specific doctor (both visible);
@@ -32,7 +36,9 @@ from app.models.patient import Patient
 from app.models.user import User
 
 
-def _create_dentist(db_session, label: str) -> tuple[User, Doctor]:
+def _create_dentist(
+    db_session, label: str, specialty: str = "stomatology"
+) -> tuple[User, Doctor]:
     """N-th dentist: own User account + own Doctor profile, same specialty."""
     user = User(
         username=f"multi_dentist_{label}",
@@ -48,7 +54,7 @@ def _create_dentist(db_session, label: str) -> tuple[User, Doctor]:
 
     doctor = Doctor(
         user_id=user.id,
-        specialty="stomatology",
+        specialty=specialty,
         cabinet=f"10{label}" if not label.isdigit() else f"1{label}0",
         active=True,
     )
@@ -155,9 +161,13 @@ def test_admin_doctor_list_deterministically_ordered(client, db_session, auth_he
     assert ids == sorted(ids)
 
 
-def test_doctor_cannot_call_patient_from_same_specialty_colleagues_queue(
-    client, db_session
-):
+def test_same_specialty_colleague_can_call_entry_per_adr001(client, db_session):
+    """ADR-001: any doctor of the SAME specialty may call another
+    same-specialty doctor's queue entry (canonical /doctor/queue endpoint,
+    PR-26 semantics — 'Allow if caller is the queue owner OR has the same
+    specialty'). The legacy /queue/legacy/call owner-only restriction is
+    deliberately NOT asserted here: it is a deprecated surface whose strict
+    behavior contradicts the accepted collaboration workflow."""
     user_a, _doctor_a = _create_dentist(db_session, "5")
     _user_b, doctor_b = _create_dentist(db_session, "6")
     patient = _patient(db_session)
@@ -166,8 +176,28 @@ def test_doctor_cannot_call_patient_from_same_specialty_colleagues_queue(
     )
 
     response = client.post(
-        f"/api/v1/queue/legacy/call/{foreign_entry.id}",
+        f"/api/v1/doctor/queue/{foreign_entry.id}/call",
         headers=_login_headers(client, user=user_a, password="secret123"),
+    )
+    assert response.status_code == 200, response.text
+
+    db_session.refresh(foreign_entry)
+    assert foreign_entry.status == "called"
+
+
+def test_different_specialty_doctor_cannot_call_entry(client, db_session):
+    """ADR-001 isolation boundary: a doctor of a DIFFERENT specialty is
+    neither the owner nor a same-specialty colleague — 403, entry untouched."""
+    user_cardio, _cardio_doctor = _create_dentist(db_session, "5c", specialty="cardiology")
+    _user_b, doctor_b = _create_dentist(db_session, "6")
+    patient = _patient(db_session)
+    foreign_entry = _seed_queue_entry(
+        db_session, doctor=doctor_b, patient=patient, number=1
+    )
+
+    response = client.post(
+        f"/api/v1/doctor/queue/{foreign_entry.id}/call",
+        headers=_login_headers(client, user=user_cardio, password="secret123"),
     )
     assert response.status_code == 403, response.text
 
