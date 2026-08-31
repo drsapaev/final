@@ -5,8 +5,9 @@ GraphQL резолверы для API клиники
 from datetime import date
 
 import strawberry
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
+from app.core.specialties import specialty_variants
 from app.graphql.types import (
     AppointmentFilter,
     AppointmentStats,
@@ -35,6 +36,7 @@ from app.graphql.types import (
     VisitStats,
     VisitType,
 )
+from app.core.specialties import specialty_variants
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -300,7 +302,18 @@ class Query:
         # Применяем фильтры
         if filter:
             if filter.specialty:
-                query = query.filter(Doctor.specialty.ilike(f"%{filter.specialty}%"))
+                # D-1 canonical vocabulary (Codex round-8 P2): every
+                # dental-family spelling matches — a legacy 'stomatology'
+                # / 'dental' GraphQL filter keeps finding canonical
+                # 'dentistry' rows after 0049.
+                query = query.filter(
+                    or_(
+                        *[
+                            Doctor.specialty.ilike(f"%{variant}%")
+                            for variant in specialty_variants(filter.specialty)
+                        ]
+                    )
+                )
             if filter.cabinet:
                 query = query.filter(Doctor.cabinet.ilike(f"%{filter.cabinet}%"))
             if filter.active is not None:

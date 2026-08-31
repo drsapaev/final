@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.specialties import canonical_specialty
 from app.repositories.display_websocket_api_repository import (
     DisplayWebSocketApiRepository,
 )
@@ -39,7 +40,16 @@ class DisplayWebSocketApiService:
 
     @staticmethod
     def _same_specialty(left: str | None, right: str | None) -> bool:
-        return str(left or "").strip().lower() == str(right or "").strip().lower()
+        # D-1 canonical vocabulary: compare via canonical_specialty so a
+        # doctor stored as 'dentistry' matches a request spelling
+        # 'stomatology'/'dental' (the still-live profile key) — exact
+        # comparison returned 403 for the dental doctor after 0049
+        # (Codex round-4 P1). Lowercasing stays for non-dental values;
+        # empty/None equality semantics are preserved.
+        def _canon(value: str | None) -> str:
+            return (canonical_specialty(str(value or "").strip()) or "").strip().lower()
+
+        return _canon(left) == _canon(right)
 
     def _current_doctor_or_403(self, current_user: object) -> object:
         doctor = self.repository.get_active_doctor_by_user_id(

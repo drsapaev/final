@@ -7,6 +7,10 @@ from typing import Any
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
+from app.core.specialties import (
+    canonical_specialty,
+    specialty_variants,
+)
 from app.models.clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
 from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
 from app.schemas.clinic import (
@@ -222,8 +226,16 @@ def get_doctors_by_specialty(
 
     ``eligible_only`` hides the incomplete-profile sentinel ("general")
     from patient-facing selectors — see get_doctors.
+
+    D-1 canonical vocabulary: ``specialty`` matches via
+    ``specialty_variants`` (any dental-family spelling finds every
+    family row), so callers filtering by "dental" also see canonical
+    "dentistry" doctors and vice versa.
     """
-    predicates = [Doctor.specialty == specialty, Doctor.active == True]
+    predicates = [
+        Doctor.specialty.in_(specialty_variants(specialty)),
+        Doctor.active == True,
+    ]
     if eligible_only:
         predicates += [
             func.trim(Doctor.specialty) != '',
@@ -238,8 +250,17 @@ def get_doctors_by_specialty(
 
 
 def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
-    """Создать врача"""
-    db_doctor = Doctor(**doctor.model_dump())
+    """Создать врача
+
+    D-1: ``specialty`` is normalized at the write boundary — any
+    dental-family spelling ("dental" from the DoctorModal department
+    dropdown, legacy "stomatology"/"dentist") is stored canonically as
+    "dentistry" (core/specialties.canonical_specialty).
+    """
+    data = doctor.model_dump()
+    if "specialty" in data:
+        data["specialty"] = canonical_specialty(data["specialty"])
+    db_doctor = Doctor(**data)
     db.add(db_doctor)
     db.commit()
     db.refresh(db_doctor)
@@ -255,6 +276,9 @@ def update_doctor(
         return None
 
     for field, value in doctor.model_dump(exclude_unset=True).items():
+        if field == "specialty":
+            # D-1: canonicalize on update too (PUT /admin/doctors path).
+            value = canonical_specialty(value)
         setattr(db_doctor, field, value)
 
     db.commit()
@@ -435,10 +459,13 @@ def get_queue_settings(db: Session) -> dict[str, Any]:
             result["auto_close_time"] = setting.value
         elif setting.key.startswith("start_number_"):
             specialty = setting.key.replace("start_number_", "")
-            result["start_numbers"][specialty] = setting.value
+            # D-1: legacy rows may carry any dental-family suffix; expose
+            # the canonical segment so the settings screen reads a single
+            # key regardless of which spelling a deployment stored.
+            result["start_numbers"][canonical_specialty(specialty)] = setting.value
         elif setting.key.startswith("max_per_day_"):
             specialty = setting.key.replace("max_per_day_", "")
-            result["max_per_day"][specialty] = setting.value
+            result["max_per_day"][canonical_specialty(specialty)] = setting.value
 
     return result
 
@@ -460,12 +487,15 @@ def update_queue_settings(
     # Стартовые номера по специальностям
     if "start_numbers" in settings:
         for specialty, number in settings["start_numbers"].items():
-            updates[f"start_number_{specialty}"] = number
+            # D-1: normalize the specialty segment — a screen editing by a
+            # legacy profile key ("stomatology") must not resurrect a row
+            # runtime code (keyed by doctor.specialty) ignores.
+            updates[f"start_number_{canonical_specialty(specialty)}"] = number
 
     # Лимиты по специальностям
     if "max_per_day" in settings:
         for specialty, limit in settings["max_per_day"].items():
-            updates[f"max_per_day_{specialty}"] = limit
+            updates[f"max_per_day_{canonical_specialty(specialty)}"] = limit
 
     # Массовое обновление
     update_settings_batch(db, "queue", updates, user_id)
@@ -495,7 +525,9 @@ def search_doctors(
     query = db.query(Doctor).filter(Doctor.active == True)  # noqa: E712
 
     if specialty:
-        query = query.filter(Doctor.specialty == specialty)
+        # D-1 canonical vocabulary: any dental-family spelling finds every
+        # family row (mobile /doctors/search contract).
+        query = query.filter(Doctor.specialty.in_(specialty_variants(specialty)))
 
     if name:
         # Name lives on the linked User; join via user_id.

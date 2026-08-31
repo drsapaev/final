@@ -6,6 +6,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.core.specialties import specialty_variants
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
@@ -35,9 +36,16 @@ class DisplayWebSocketApiRepository:
         )
 
     def get_active_doctor_by_specialty(self, specialty: str) -> Doctor | None:
+        # D-1 canonical vocabulary: /queues/profiles/public still exposes the
+        # supported legacy profile key 'stomatology', so a quick call with any
+        # family spelling must find canonical 'dentistry' doctors after
+        # migration 0049 (Codex round-4 P1 — exact == returned 404/403).
         return (
             self.db.query(Doctor)
-            .filter(Doctor.specialty == specialty, Doctor.active.is_(True))
+            .filter(
+                Doctor.specialty.in_(specialty_variants(specialty)),
+                Doctor.active.is_(True),
+            )
             .first()
         )
 

@@ -60,6 +60,12 @@ interface QueueProfileDto {
   icon?: string;
   color?: string;
   queue_tags?: string[];
+  // D-1: canonical clinic_settings segment for this profile's
+  // start_number_*/max_per_day_* rows (backend-computed via
+  // core/specialties.canonical_specialty). The profile key itself may
+  // stay a legacy machinery value ("stomatology") while the settings
+  // rows live under the canonical "dentistry" after migration 0049.
+  settings_key?: string;
 }
 
 interface Specialty {
@@ -68,6 +74,9 @@ interface Specialty {
   icon: LucideIcon;
   color: string;
   description: string;
+  tags: string[];
+  // Settings reads AND edits use this key, never `key` (Codex round-3 P1).
+  settingsKey: string;
 }
 
 interface QueueSettingsState {
@@ -132,11 +141,22 @@ const getDoctorDisplayName = (doctor: DoctorRecord | null | undefined, t: Transl
 
 const pickCanonicalDoctorForSpecialty = (
   doctorsList: DoctorRecord[] | null | undefined,
-  specialtyKey: string
+  specialtyKey: string,
+  queueTags?: string[]
 ): { doctor: DoctorRecord | null; candidates: DoctorRecord[] } => {
-  const specialty = normalizeText(specialtyKey);
+  // D-1 canonical vocabulary: a doctor's stored specialty is canonical
+  // ('dentistry') while the queue profile key keeps its machinery value
+  // ('stomatology') — match against the profile key AND its queue_tags
+  // (which carry every accepted family spelling) instead of the key alone.
+  const accepted = new Set<string>([normalizeText(specialtyKey)]);
+  for (const tag of Array.isArray(queueTags) ? queueTags : []) {
+    const normalizedTag = normalizeText(tag);
+    if (normalizedTag) {
+      accepted.add(normalizedTag);
+    }
+  }
   const candidates = (Array.isArray(doctorsList) ? doctorsList : [])
-    .filter((doctor) => normalizeText(doctor?.specialty) === specialty)
+    .filter((doctor) => accepted.has(normalizeText(doctor?.specialty)))
     .sort((left, right) => {
       const leftScore = [
         left?.active === false ? 1 : 0,
@@ -201,7 +221,12 @@ const QueueSettings = () => {
         name: p.title_ru || p.title || p.key,
         icon: ICON_MAP[p.icon ?? ''] || Stethoscope,
         color: p.color || 'var(--mac-text-primary)',
-        description: (p.queue_tags || []).join(', ')
+        description: (p.queue_tags || []).join(', '),
+        tags: p.queue_tags || [],
+        // D-1: settings rows are keyed by the canonical specialty
+        // ("dentistry"), not by the profile machinery key
+        // ("stomatology"). Fall back to the key for older backends.
+        settingsKey: p.settings_key || p.key
       })));
 
       const doctorsData = (doctorsRes.data ?? []) as DoctorRecord[];
@@ -278,16 +303,16 @@ const QueueSettings = () => {
     }
   };
 
-  const testQueueGeneration = async (specialty: string) => {
+  const testQueueGeneration = async (specialty: Specialty) => {
     try {
       setTesting(true);
       setTestResult(null);
 
       // ⭐ SSOT: Выбираем врача детерминированно среди докторов этой специальности.
-      const { doctor, candidates } = pickCanonicalDoctorForSpecialty(doctors, specialty);
+      const { doctor, candidates } = pickCanonicalDoctorForSpecialty(doctors, specialty.key, specialty.tags);
 
       if (!doctor || !doctor.id) {
-        setMessage({ type: 'error', text: t('admin2.qs_doctor_not_found', { specialty }) });
+        setMessage({ type: 'error', text: t('admin2.qs_doctor_not_found', { specialty: specialty.name }) });
         setTesting(false);
         return;
       }
@@ -535,7 +560,7 @@ const QueueSettings = () => {
                   </div>
                   <Button
                   variant="outline"
-                  onClick={() => testQueueGeneration(specialty.key)}
+                  onClick={() => testQueueGeneration(specialty)}
                   disabled={testing}
                   title={`Test queue generation for ${specialty.name}`}
                   aria-label={`Test queue generation for ${specialty.name}`}
@@ -592,8 +617,8 @@ const QueueSettings = () => {
                   type="number"
                   min="1"
                   max="100"
-                  value={getNumberSetting(settings.start_numbers, specialty.key, 1)}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
+                  value={getNumberSetting(settings.start_numbers, specialty.settingsKey, 1)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`start_numbers.${specialty.settingsKey}`, parseInt(e.target.value))}
                   className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
@@ -610,8 +635,8 @@ const QueueSettings = () => {
                   type="number"
                   min="1"
                   max="100"
-                  value={getNumberSetting(settings.max_per_day, specialty.key, 1)}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
+                  value={getNumberSetting(settings.max_per_day, specialty.settingsKey, 1)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`max_per_day.${specialty.settingsKey}`, parseInt(e.target.value))}
                   className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
@@ -624,7 +649,7 @@ const QueueSettings = () => {
                   <div className="admin-flex-between-sm">
                     <span className="text-[var(--mac-text-secondary)]">{t('admin2.qs_range_label')}</span>
                     <div className="admin-range-badge">
-                      {getNumberSetting(settings.start_numbers, specialty.key, 1)} - {getNumberSetting(settings.start_numbers, specialty.key, 1) + getNumberSetting(settings.max_per_day, specialty.key, 1) - 1}
+                      {getNumberSetting(settings.start_numbers, specialty.settingsKey, 1)} - {getNumberSetting(settings.start_numbers, specialty.settingsKey, 1) + getNumberSetting(settings.max_per_day, specialty.settingsKey, 1) - 1}
                     </div>
                   </div>
                 </div>
