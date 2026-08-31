@@ -210,7 +210,7 @@ def _load_migration():
         .parents[2]
         / "alembic"
         / "versions"
-        / "0049_specialty_dental_canonicalization.py"
+        / "0049_dental_specialty_canonical.py"
     )
     spec = importlib.util.spec_from_file_location("mig_0049", path)
     module = importlib.util.module_from_spec(spec)

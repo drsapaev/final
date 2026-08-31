@@ -50,7 +50,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers — chained after 0048_doctors_user_id_unique.
-revision = "0049_specialty_dental_canonicalization"
+revision = "0049_dental_specialty_canonical"
 down_revision = "0048_doctors_user_id_unique"
 branch_labels = None
 depends_on = None
