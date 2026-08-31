@@ -262,7 +262,9 @@ def _validate_active_doctor_has_user(user_id: int | None, active: bool) -> None:
     have a linked User account. Creating/updating an ``active=True`` doctor
     without ``user_id`` is rejected. Inactive userless rows remain legal for
     historical/special records (DB keeps them; existing rows are untouched —
-    no deletion, no auto-link; see production pre-check script for inventory).
+    no deletion, no auto-link; pre-existing data is inventoried and BLOCKED
+    at deploy time by backend/scripts/reconcile_userless_active_doctors.py,
+    exit code 1 when any active userless row exists — Codex round-7 P2).
     """
     if active and user_id is None:
         raise HTTPException(

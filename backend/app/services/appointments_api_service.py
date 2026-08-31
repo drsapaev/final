@@ -359,6 +359,7 @@ from app.api import (  # noqa: E402  # manual-review: conditional import after c
 from app.models.user import (  # noqa: E402  # manual-review: conditional import after config — intentional
     User,  # noqa: E402  # manual-review: conditional import after config — intentional
 )
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.online_queue import (  # noqa: E402  # manual-review: conditional import after config — intentional
     _broadcast,
     get_or_create_day,
@@ -435,6 +436,9 @@ def create_appointment(
     current_user: User = Depends(deps.get_current_user),
 ):
     del current_user
+    # Atomic slot reservation (Codex P1 round-7): per-doctor FOR UPDATE lock
+    # before the occupancy check — concurrent same-slot writers serialize.
+    lock_doctor_for_slot_reservation(db, appointment_in.doctor_id)
     if appointment_crud.is_time_slot_occupied(
         db,
         doctor_id=appointment_in.doctor_id,
@@ -508,6 +512,9 @@ def update_appointment(
         new_date = appointment_in.appointment_date or appointment.appointment_date
         new_time = appointment_in.appointment_time or appointment.appointment_time
         new_doctor_id = appointment_in.doctor_id or appointment.doctor_id
+        # Atomic slot reservation (Codex P1 round-7): per-doctor FOR UPDATE
+        # lock before the occupancy check.
+        lock_doctor_for_slot_reservation(db, new_doctor_id)
         if appointment_crud.is_time_slot_occupied(
             db,
             doctor_id=new_doctor_id,

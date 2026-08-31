@@ -47,6 +47,7 @@ from app.schemas.mobile import (
 )
 from app.services.mobile_api_service import MobileApiService
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
 
@@ -416,6 +417,10 @@ async def book_mobile_appointment(
         # query would match appointment_time IS NULL rows — after the first
         # date-only booking every later date-only request would get a false
         # 409 although no concrete slot was ever selected.
+        # Atomic slot reservation (Codex P1 round-7): take the per-doctor
+        # FOR UPDATE lock BEFORE the occupancy check so two concurrent
+        # bookings for the same slot cannot both pass check-then-act.
+        lock_doctor_for_slot_reservation(db, request.doctor_id)
         if (
             request.preferred_time
             and crud_appointment.appointment.is_time_slot_occupied(
@@ -796,19 +801,20 @@ def list_mobile_doctors(
     """
     try:
         from app.crud import clinic as crud_clinic
+        # Lifecycle eligibility (Codex round-2 P2, refined round-7 P2): the
+        # incomplete-profile ("general" sentinel) predicate is applied IN
+        # THE DATABASE QUERY (eligible_only=True) — this list feeds the
+        # patient-facing booking selector, and filtering the sentinel AFTER
+        # the crud row cap omitted eligible doctors beyond the cap while
+        # the requested limit allowed more rows.
         if specialty:
-            doctors = crud_clinic.get_doctors_by_specialty(db, specialty=specialty)
+            doctors = crud_clinic.get_doctors_by_specialty(
+                db, specialty=specialty, eligible_only=True
+            )
         else:
-            doctors = crud_clinic.get_doctors(db, active_only=True)
-        # Lifecycle eligibility (Codex round-2 P2): this list feeds the
-        # patient-facing booking selector — hide incomplete ("general"
-        # sentinel) profiles so patients cannot select a doctor the booking
-        # guard would only reject afterwards.
-        from app.services.user_mgmt._base import is_doctor_profile_incomplete
-        doctors = [
-            d for d in doctors
-            if not is_doctor_profile_incomplete(d.specialty)
-        ]
+            doctors = crud_clinic.get_doctors(
+                db, active_only=True, eligible_only=True
+            )
         # Limit
         doctors = doctors[:limit]
 

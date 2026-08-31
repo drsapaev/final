@@ -41,6 +41,7 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
 from app.api.v1.endpoints.telegram_webhook._patient_commands import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._staff_commands import *  # noqa: F401, F403
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.schemas.notifications import (
     SendMessageRequest,
     TelegramWebhookUpdateRequest,
@@ -663,6 +664,10 @@ def create_mini_app_appointment_booking(
             ) from exc
 
     if preview.draft.doctor_id is not None and preview.draft.appointment_time:
+        # Atomic slot reservation (Codex P1 round-7): per-doctor FOR UPDATE
+        # lock before the occupancy check — concurrent same-slot writers
+        # (web/mobile/telegram) serialize on the doctor row.
+        lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)
         slot_occupied = appointment_crud.is_time_slot_occupied(
             db,
             doctor_id=preview.draft.doctor_id,

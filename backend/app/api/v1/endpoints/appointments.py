@@ -20,6 +20,7 @@ from app.services.online_queue import (
     get_or_create_day,
     load_stats,
 )
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.appointment_eligibility import (
     ensure_doctor_eligible_for_appointment as _ensure_appointment_doctor_eligible,
 )
@@ -409,6 +410,9 @@ def create_appointment(
     # target a clinically eligible doctor (active, completed profile).
     _ensure_appointment_doctor_eligible(db, appointment_in.doctor_id)
 
+    # Atomic slot reservation (Codex P1 round-7): per-doctor FOR UPDATE lock
+    # before the occupancy check — concurrent same-slot writers serialize.
+    lock_doctor_for_slot_reservation(db, appointment_in.doctor_id)
     if appointment_crud.is_time_slot_occupied(
         db,
         doctor_id=appointment_in.doctor_id,
@@ -705,6 +709,10 @@ def update_appointment(
         if appointment_in.doctor_id and appointment_in.doctor_id != appointment.doctor_id:
             _ensure_appointment_doctor_eligible(db, appointment_in.doctor_id)
 
+        # Atomic slot reservation (Codex P1 round-7): per-doctor FOR UPDATE
+        # lock before the occupancy check — concurrent same-slot writers
+        # (reschedules included) serialize.
+        lock_doctor_for_slot_reservation(db, new_doctor_id)
         if appointment_crud.is_time_slot_occupied(
             db,
             doctor_id=new_doctor_id,

@@ -4,10 +4,11 @@ CRUD операции для управления клиникой в админ
 
 from typing import Any
 
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.models.clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
+from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
 from app.schemas.clinic import (
     ClinicSettingsCreate,
     ClinicSettingsUpdate,
@@ -168,13 +169,31 @@ def update_ticket_print_settings(
 
 
 def get_doctors(
-    db: Session, skip: int = 0, limit: int = 100, active_only: bool = False
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    active_only: bool = False,
+    eligible_only: bool = False,
 ) -> list[Doctor]:
-    """Получить список врачей"""
+    """Получить список врачей
+
+    ``eligible_only`` (Codex round-7 P2): apply the incomplete-profile
+    predicate IN THE DATABASE QUERY so pagination cannot crowd eligible
+    doctors out of the result (filtering the "general" sentinel AFTER the
+    row cap omitted eligible doctors beyond the cap while the caller's
+    limit allowed more rows).
+    """
     query = db.query(Doctor)
 
     if active_only:
         query = query.filter(Doctor.active == True)
+    if eligible_only:
+        query = query.filter(
+            or_(
+                Doctor.specialty.is_(None),
+                Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+            )
+        )
 
     return query.offset(skip).limit(limit).all()
 
@@ -189,13 +208,18 @@ def get_doctor_by_user_id(db: Session, user_id: int) -> Doctor | None:
     return db.query(Doctor).filter(Doctor.user_id == user_id).first()
 
 
-def get_doctors_by_specialty(db: Session, specialty: str) -> list[Doctor]:
-    """Получить врачей по специальности"""
-    return (
-        db.query(Doctor)
-        .filter(and_(Doctor.specialty == specialty, Doctor.active == True))
-        .all()
-    )
+def get_doctors_by_specialty(
+    db: Session, specialty: str, eligible_only: bool = False
+) -> list[Doctor]:
+    """Получить врачей по специальности
+
+    ``eligible_only`` hides the incomplete-profile sentinel ("general")
+    from patient-facing selectors — see get_doctors.
+    """
+    predicates = [Doctor.specialty == specialty, Doctor.active == True]
+    if eligible_only:
+        predicates.append(Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY)
+    return db.query(Doctor).filter(and_(*predicates)).all()
 
 
 def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
