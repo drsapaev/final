@@ -706,6 +706,173 @@ def test_queue_profiles_db_path_settings_key_canonical(db_session) -> None:
     assert dental["settings_key"] == "dentistry"
 
 
+# ===================== I. Round-4 P1: department writer + display ======
+
+
+def test_reconcile_queue_setting_aliases_renames_when_no_canonical(db_session) -> None:
+    """No canonical row: the oldest alias row is renamed IN PLACE (value,
+    category, audit columns survive) — get_queue_settings sees ONE row."""
+    from app.api.v1.endpoints.admin_departments._helpers import (
+        _reconcile_queue_setting_aliases,
+    )
+
+    alias = ClinicSettings(
+        key="start_number_dental", value=7, category="queue"
+    )
+    db_session.add(alias)
+    db_session.commit()
+
+    _reconcile_queue_setting_aliases(db_session, "start_number_", "dental")
+    db_session.commit()
+
+    keys = {s.key for s in db_session.query(ClinicSettings)}
+    assert "start_number_dentistry" in keys
+    assert "start_number_dental" not in keys
+    row = (
+        db_session.query(ClinicSettings)
+        .filter(ClinicSettings.key == "start_number_dentistry")
+        .first()
+    )
+    assert int(row.value) == 7
+    assert row.category == "queue"
+
+
+def test_reconcile_queue_setting_aliases_deletes_when_canonical_exists(db_session) -> None:
+    """Canonical row already present: alias rows are removed so the
+    unordered read cannot collapse a stale alias over the enforced value."""
+    from app.api.v1.endpoints.admin_departments._helpers import (
+        _reconcile_queue_setting_aliases,
+    )
+
+    db_session.add_all(
+        [
+            ClinicSettings(key="max_per_day_dentistry", value=50, category="queue"),
+            ClinicSettings(key="max_per_day_dental", value=13, category="queue"),
+            ClinicSettings(key="max_per_day_stomatology", value=9, category="queue"),
+        ]
+    )
+    db_session.commit()
+
+    _reconcile_queue_setting_aliases(db_session, "max_per_day_", "dental")
+    db_session.commit()
+
+    keys = {s.key for s in db_session.query(ClinicSettings)}
+    assert keys == {"max_per_day_dentistry"}
+    row = (
+        db_session.query(ClinicSettings)
+        .filter(ClinicSettings.key == "max_per_day_dentistry")
+        .first()
+    )
+    assert int(row.value) == 50  # canonical value untouched by reconciliation
+
+
+def test_reconcile_queue_setting_aliases_passthrough_non_dental(db_session) -> None:
+    from app.api.v1.endpoints.admin_departments._helpers import (
+        _reconcile_queue_setting_aliases,
+    )
+
+    db_session.add(
+        ClinicSettings(key="start_number_cardiology", value=3, category="queue")
+    )
+    db_session.commit()
+
+    _reconcile_queue_setting_aliases(db_session, "start_number_", "cardiology")
+
+    keys = {s.key for s in db_session.query(ClinicSettings)}
+    assert keys == {"start_number_cardiology"}
+
+
+def test_department_integration_writes_canonical_settings_keys(db_session) -> None:
+    """Codex round-4 P1: re-integrating the 'dental' department must write
+    start_number_dentistry / max_per_day_dentistry and reconcile legacy
+    alias rows instead of creating a colliding duplicate."""
+    from app.api.v1.endpoints.admin_departments._helpers import (
+        _ensure_department_integrations,
+    )
+    from app.models.department import Department
+
+    legacy_alias = ClinicSettings(
+        key="start_number_dental", value=7, category="queue"
+    )
+    db_session.add(legacy_alias)
+    db_session.add(
+        Department(key="dental", name_ru="Стоматология", active=True)
+    )
+    db_session.commit()
+
+    department = (
+        db_session.query(Department).filter(Department.key == "dental").first()
+    )
+    result = _ensure_department_integrations(db_session, department, None)
+    db_session.commit()
+
+    keys = {s.key for s in db_session.query(ClinicSettings)}
+    assert "start_number_dental" not in keys
+    assert "max_per_day_dental" not in keys
+    assert "start_number_dentistry" in keys
+    assert "max_per_day_dentistry" in keys
+    # renamed in place: legacy configured value preserved
+    start_row = (
+        db_session.query(ClinicSettings)
+        .filter(ClinicSettings.key == "start_number_dentistry")
+        .first()
+    )
+    assert int(start_row.value) == 7
+    # integration result reports the canonical keys
+    assert "start_number_dentistry" in result["clinic_settings_updated"] or (
+        "max_per_day_dentistry" in result["clinic_settings_updated"]
+    )
+    # and the screen reads ONE canonical value per key
+    settings = crud_clinic.get_queue_settings(db_session)
+    assert settings["start_numbers"]["dentistry"] == 7
+
+
+def test_display_repository_matches_family_spellings(db_session) -> None:
+    """Codex round-4 P1: /display/quick/call-next resolves a canonical
+    'dentistry' doctor for the still-live 'stomatology' profile key."""
+    from app.repositories.display_websocket_api_repository import (
+        DisplayWebSocketApiRepository,
+    )
+
+    doctor = _family_doctor(db_session, "dentistry")
+    found = DisplayWebSocketApiRepository(db_session).get_active_doctor_by_specialty(
+        "stomatology"
+    )
+    assert found is not None
+    assert found.id == doctor.id
+
+    doctor.active = False
+    db_session.commit()
+    assert (
+        DisplayWebSocketApiRepository(db_session).get_active_doctor_by_specialty(
+            "dentistry"
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "left,right,expected",
+    [
+        ("dentistry", "stomatology", True),
+        ("dental", "dentistry", True),
+        ("Dentistry", " dentistry ", True),
+        ("dentist", "stomatology", True),
+        ("cardiology", "Cardiology", True),
+        ("cardiology", "cardio", False),
+        ("dentistry", "cardiology", False),
+        ("", "", True),
+        (None, None, True),
+        ("", "dentistry", False),
+    ],
+)
+def test_same_specialty_canonical_comparison(left, right, expected) -> None:
+    """The doctor-branch quick-call guard must accept family spellings."""
+    from app.services.display_websocket_api_service import DisplayWebSocketApiService
+
+    assert DisplayWebSocketApiService._same_specialty(left, right) is expected
+
+
 # ===================== F. Mobile search variants (round-2 P2) ===========
 
 
