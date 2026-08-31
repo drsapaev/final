@@ -27,6 +27,7 @@ Covers, for Doctor A and Doctor B with the SAME specialty (stomatology):
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import date, datetime
 
 from app.core.security import get_password_hash
@@ -293,3 +294,68 @@ def test_multiple_dentists_have_independent_queues_and_ids(client, db_session):
     entry_a = _seed_queue_entry(db_session, doctor=doctor_a, patient=patient, number=1)
     entry_b = _seed_queue_entry(db_session, doctor=doctor_b, patient=patient, number=1)
     assert entry_a.queue_id != entry_b.queue_id
+
+
+# ---------------------------------------------------------------------------
+# Query-level determinism guards (Codex P2 round-3)
+#
+# The data-order tests above (registrar selector / admin list) CANNOT fail
+# when the ORDER BY clause is removed: SQLite scans rowids in ascending
+# order anyway and PostgreSQL heap order typically matches insertion order,
+# and the fixtures insert doctors with ascending auto-increment ids. So the
+# emitted SQL itself is asserted: removing .order_by(Doctor.id.asc()) from
+# any of the three resolvers fails these tests.
+# ---------------------------------------------------------------------------
+
+@contextmanager
+def _captured_sql(db_session):
+    """Capture raw SQL statements executed on the session's engine."""
+    from sqlalchemy import event
+
+    engine = db_session.get_bind()
+    captured: list[str] = []
+
+    def _record(conn, cursor, statement, parameters, context, executemany):
+        captured.append(statement)
+
+    event.listen(engine, "before_cursor_execute", _record)
+    try:
+        yield captured
+    finally:
+        event.remove(engine, "before_cursor_execute", _record)
+
+
+def _assert_doctors_query_ordered(db_session, run_query):
+    with _captured_sql(db_session) as captured:
+        run_query()
+    stmts = [s for s in captured if "FROM doctors" in s]
+    assert stmts, "expected at least one SELECT against the doctors table"
+    assert any(
+        "order by doctors.id asc" in s.lower() for s in stmts
+    ), f"doctors query lost its deterministic ORDER BY: {stmts}"
+
+
+def test_get_doctors_query_has_deterministic_order_by(db_session):
+    from app.crud.clinic import get_doctors
+
+    _create_dentist(db_session, "q1")
+    _assert_doctors_query_ordered(db_session, lambda: get_doctors(db_session))
+
+
+def test_get_doctors_by_specialty_query_has_deterministic_order_by(db_session):
+    from app.crud.clinic import get_doctors_by_specialty
+
+    _create_dentist(db_session, "q2")
+    _assert_doctors_query_ordered(
+        db_session, lambda: get_doctors_by_specialty(db_session, "stomatology")
+    )
+
+
+def test_get_doctors_by_specialization_query_has_deterministic_order_by(db_session):
+    from app.services.doctor_info_service import DoctorInfoService
+
+    _create_dentist(db_session, "q3")
+    service = DoctorInfoService(db_session)
+    _assert_doctors_query_ordered(
+        db_session, lambda: service.get_doctors_by_specialization("stomatology")
+    )
