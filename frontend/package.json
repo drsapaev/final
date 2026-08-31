@@ -83,6 +83,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@eslint/js": "9.39.5",
     "@playwright/test": "^1.62.0",
     "@storybook/addon-a11y": "8.6.18",
@@ -113,6 +114,7 @@
     "openapi-typescript": "^7.13.0",
     "rollup": "^3.30.0",
     "rollup-plugin-visualizer": "^7.0.1",
+    "storybook": "8.6.18",
     "stylelint": "16.24.0",
     "terser": "^5.49.0",
     "typescript": "^6.0.3",

@@ -119,13 +119,6 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     status: 'correct'
   },
   
-  'src/components/common/Modal.jsx': {
-    purpose: 'Система модальных окон',
-    currentLocation: 'src/components/common/',
-    recommendedLocation: 'src/components/common/',
-    status: 'correct'
-  },
-  
   'src/components/common/Form.jsx': {
     purpose: 'Система форм с валидацией',
     currentLocation: 'src/components/common/',
