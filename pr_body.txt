@@ -1,0 +1,60 @@
+This PR adds a custom tooltip wrapper to the admin `IconButton` component, replacing the native `title` attribute with the design system's `Tooltip`. This improves the visual consistency of hover states across the application while maintaining accessibility.
+
+## Summary
+💡 What: Added the custom `Tooltip` wrapper to the admin `IconButton` component and removed the native `title` attribute.
+🎯 Why: Provides a more consistent, immediate, and aesthetically pleasing hover state for users without relying on the native browser tooltip which doesn't match the design system.
+📸 Before/After: Verified visually via Playwright script.
+♿ Accessibility: Retained the `aria-label` attribute on the inner `Button` while removing the native `title` attribute, preventing potential redundant announcements by screen readers while keeping full keyboard and screen reader accessibility intact.
+
+## Cyclic Execution Evidence
+Not applicable because this is a simple UI wrapper change.
+- Fresh main sync: Yes
+- Clean workspace: Yes
+- Branch: Yes
+- Scope gate: Yes
+- Red-check handling: Yes
+
+## Contract Impact
+Not applicable because no contracts were changed.
+- Canonical surface: Not applicable because no contracts were changed.
+- Request shape: Not applicable because no contracts were changed.
+- Response shape: Not applicable because no contracts were changed.
+- Status codes: Not applicable because no contracts were changed.
+- Frontend consumer: Not applicable because no contracts were changed.
+- Compatibility path or alias: Not applicable because no contracts were changed.
+- Contract proof: Not applicable because no contracts were changed.
+
+## RBAC / Permissions
+Not applicable because permissions were not altered.
+- Roles allowed: Not applicable because permissions were not altered.
+- Roles denied: Not applicable because permissions were not altered.
+- Positive auth proof: Not applicable because permissions were not altered.
+- Negative auth proof: Not applicable because permissions were not altered.
+
+## Notification / Realtime
+Not applicable because no realtime features were changed.
+- Event type or websocket channel: Not applicable because no realtime features were changed.
+- Payload version / ack behavior: Not applicable because no realtime features were changed.
+- Read/unread or delivery semantics: Not applicable because no realtime features were changed.
+- Reconnect/resync proof: Not applicable because no realtime features were changed.
+
+## Frontend Resilience
+Not applicable because this is just a UI tooltip update.
+- Empty data proof: Not applicable because this is just a UI tooltip update.
+- Partial data proof: Not applicable because this is just a UI tooltip update.
+- Forbidden secondary path behavior: Not applicable because this is just a UI tooltip update.
+- Missing draft/resource behavior: Not applicable because this is just a UI tooltip update.
+- Stale route/deep-link behavior: Not applicable because this is just a UI tooltip update.
+
+## Scope Gate
+Not applicable because routing was not modified.
+- Allowed paths: Not applicable because routing was not modified.
+- Denied paths: Not applicable because routing was not modified.
+- Migration/docs/test impact: Not applicable because routing was not modified.
+- Rollback note: Not applicable because routing was not modified.
+
+## Validation
+Passed frontend vitest suite and ESLint successfully. Visual verification completed using headless Playwright testing standalone HTML component.
+- Targeted tests or smoke run: Passed vitest
+- Result: 100% pass
+- Not checked: None
