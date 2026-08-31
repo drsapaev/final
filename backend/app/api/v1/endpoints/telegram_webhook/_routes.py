@@ -647,6 +647,13 @@ def create_mini_app_appointment_booking(
     draft_payload = preview.draft.to_appointment_create_payload()
 
     if preview.draft.doctor_id is not None:
+        # Atomic slot reservation (Codex P1 round-7, ordering fixed round-8:
+        # the per-doctor FOR UPDATE lock is taken BEFORE eligibility so a
+        # concurrent deactivation must commit first and the eligibility read
+        # below sees the post-commit state) — concurrent same-slot writers
+        # (web/mobile/telegram) serialize on the doctor row.
+        lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)
+
         # Lifecycle eligibility (Codex round-2 P1): every live appointment
         # writer must reject inactive/incomplete doctors — the Telegram Mini
         # App booking included (same contract as POST /appointments, mobile
@@ -664,10 +671,6 @@ def create_mini_app_appointment_booking(
             ) from exc
 
     if preview.draft.doctor_id is not None and preview.draft.appointment_time:
-        # Atomic slot reservation (Codex P1 round-7): per-doctor FOR UPDATE
-        # lock before the occupancy check — concurrent same-slot writers
-        # (web/mobile/telegram) serialize on the doctor row.
-        lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)
         slot_occupied = appointment_crud.is_time_slot_occupied(
             db,
             doctor_id=preview.draft.doctor_id,

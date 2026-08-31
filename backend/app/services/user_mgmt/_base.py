@@ -198,17 +198,59 @@ class UserManagementServiceMixinBase:
                 db.query(Doctor).filter(Doctor.user_id == user.id).first()
             )
             if existing is None:
-                doctor = Doctor(
-                    user_id=user.id,
-                    specialty=DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
-                        new_role, INCOMPLETE_DOCTOR_SPECIALTY
-                    ),
-                    active=bool(user.is_active),
+                # Codex round-8 P2: a concurrent promotion of the same user
+                # (or a parallel admin create) can insert the profile first;
+                # UNIQUE(doctors.user_id) — model-enforced here, DB revision
+                # ships in the sibling UNIQUE-constraint PR #2934 — rejects
+                # the losing insert. INSERT ... ON CONFLICT DO NOTHING makes
+                # the insert idempotent WITHOUT savepoints (session-level
+                # savepoints conflict with the test-isolation recipe — see
+                # the morning_assignment docstring): the loser simply adopts
+                # whichever row is in the table after the statement, and the
+                # caller's role-change transaction stays intact.
+                specialty = DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
+                    new_role, INCOMPLETE_DOCTOR_SPECIALTY
                 )
-                db.add(doctor)
-                db.flush()
+                values = {
+                    "user_id": user.id,
+                    "specialty": specialty,
+                    "active": bool(user.is_active),
+                }
+                dialect_name = db.bind.dialect.name
+                if dialect_name in ("postgresql", "sqlite"):
+                    if dialect_name == "postgresql":
+                        from sqlalchemy.dialects.postgresql import (
+                            insert as dialect_insert,
+                        )
+                    else:
+                        from sqlalchemy.dialects.sqlite import (
+                            insert as dialect_insert,
+                        )
+                    db.execute(
+                        dialect_insert(Doctor.__table__)
+                        .values(**values)
+                        .on_conflict_do_nothing()
+                    )
+                else:
+                    # Legacy dialects: plain insert (the pre-check above
+                    # remains the only guard, same as before this change).
+                    db.add(Doctor(**values))
+                    db.flush()
+                doctor = (
+                    db.query(Doctor)
+                    .filter(Doctor.user_id == user.id)
+                    .first()
+                )
+                if doctor is None:  # pragma: no cover — defensive
+                    db.add(Doctor(**values))
+                    db.flush()
+                    doctor = (
+                        db.query(Doctor)
+                        .filter(Doctor.user_id == user.id)
+                        .first()
+                    )
                 logger.info(
-                    "Doctor profile created on role promotion: user_id=%s "
+                    "Doctor profile ensured on role promotion: user_id=%s "
                     "role=%s doctor_id=%s specialty=%r (incomplete=%s)",
                     user.id,
                     new_role,

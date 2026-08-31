@@ -29,7 +29,9 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.roles import is_doctor_role_spelling
 from app.models.clinic import Doctor
+from app.models.user import User
 from app.services.user_mgmt._base import is_doctor_profile_incomplete
 
 
@@ -38,7 +40,12 @@ def ensure_doctor_eligible_for_appointment(
 ) -> None:
     """Raise unless ``doctor_id`` resolves to an eligible doctor.
 
-    Eligible = exists (404), active (409), completed profile (409).
+    Eligible = exists (404), active (409), completed profile (409), and —
+    Codex round-8 P2 — its owner account must exist, be active and carry a
+    doctor-family role (409): on deployments upgraded from before the
+    lifecycle mirroring existed, a User deactivation did not deactivate the
+    linked Doctor row, so an owner-inactive "legacy ghost" remained active
+    and selectable while this check examined only the Doctor row.
     ``doctor_id=None`` short-circuits (nothing to validate).
     """
     if doctor_id is None:
@@ -64,5 +71,36 @@ def ensure_doctor_eligible_for_appointment(
                 "Профиль врача не завершён (специализация не указана) и "
                 "недоступен для записи. Администратор должен указать "
                 "специализацию профиля."
+            ),
+        )
+    if doctor.user_id is None:
+        # Decision #13: an ACTIVE userless row violates the linkage
+        # contract (only possible as legacy data — the API can no longer
+        # create it, and the pre-deploy reconciler blocks deployments that
+        # still carry it).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Врач не привязан к учётной записи пользователя и "
+                "недоступен для записи. Администратор должен связать "
+                "профиль врача с пользователем."
+            ),
+        )
+    owner = db.query(User).filter(User.id == doctor.user_id).first()
+    if owner is None or not owner.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Учётная запись владельца этого врача деактивирована — "
+                "врач недоступен для записи. Выберите другого врача."
+            ),
+        )
+    if not is_doctor_role_spelling(owner.role):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Учётная запись владельца этого врача не имеет врачебной "
+                "роли — врач недоступен для записи. Выберите другого "
+                "врача."
             ),
         )

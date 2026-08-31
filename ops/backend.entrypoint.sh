@@ -28,6 +28,22 @@ else
   echo "[entrypoint] Alembic migration skipped because RUN_ALEMBIC_ON_START=${RUN_ALEMBIC_ON_START}"
 fi
 
+# Blocking pre-deploy reconciliation (decision #13 doctor-linkage
+# contract, Codex round-8 P2): refuse to serve while pre-existing data
+# contains active Doctor rows without a live doctor-role owner (userless
+# rows or legacy ghost owners). Break-glass: ALLOW_ACTIVE_USERLESS_DOCTORS=1
+# explicitly skips the check (logged as a warning).
+if [[ "${ALLOW_ACTIVE_USERLESS_DOCTORS:-0}" == "1" ]]; then
+  echo "[entrypoint] WARNING: ALLOW_ACTIVE_USERLESS_DOCTORS=1 — skipping the doctor-linkage reconciliation check"
+elif [[ "${RUN_ALEMBIC_ON_START}" == "1" ]]; then
+  echo "[entrypoint] Checking doctor-linkage reconciliation (decision #13)..."
+  if ! python scripts/reconcile_userless_active_doctors.py; then
+    rc=$?
+    echo "[entrypoint] BLOCKED by doctor-linkage reconciliation (exit ${rc}). Resolve the inventory rows above or set ALLOW_ACTIVE_USERLESS_DOCTORS=1 explicitly." >&2
+    exit "${rc}"
+  fi
+fi
+
 if [[ "${ENSURE_ADMIN}" == "1" ]]; then
   echo "[entrypoint] Ensuring admin user..."
   python app/scripts/ensure_admin.py || echo "[entrypoint] Warning: Could not ensure admin user"

@@ -315,7 +315,9 @@ def test_telegram_confirm_wires_slot_lock():
 
 def test_reconciliation_finder_finds_only_active_userless(db_session):
     mod = _load_reconcile_module()
-    find_userless_active_doctors = mod.find_userless_active_doctors
+    find_active_doctor_linkage_violations = (
+        mod.find_active_doctor_linkage_violations
+    )
 
     target = Doctor(user_id=None, specialty="dermatology", active=True)
     inactive_userless = Doctor(user_id=None, specialty="cardiology", active=False)
@@ -324,27 +326,68 @@ def test_reconciliation_finder_finds_only_active_userless(db_session):
     db_session.commit()
     db_session.refresh(target)
 
-    rows = find_userless_active_doctors(db_session)
-    ids = {row.id for row in rows}
-    assert target.id in ids, "active userless row must be inventoried"
-    assert linked.id not in ids
-    assert inactive_userless.id not in ids
+    violations = find_active_doctor_linkage_violations(db_session)
+    reasons = {row.id: reason for row, reason in violations}
+    assert reasons.get(target.id) == "userless", (
+        "active userless row must be inventoried"
+    )
+    assert linked.id not in reasons
+    assert inactive_userless.id not in reasons
+
+
+def test_reconciliation_finder_flags_ghost_owners(db_session):
+    """Codex round-8 P2: a legacy ghost — active Doctor whose linked User
+    was deactivated before lifecycle mirroring existed — must be
+    inventoried too, not just userless rows."""
+    mod = _load_reconcile_module()
+    find_active_doctor_linkage_violations = (
+        mod.find_active_doctor_linkage_violations
+    )
+
+    inactive_owner = _make_patient(db_session)  # active user, non-doctor role
+    ghost_inactive = Doctor(
+        user_id=inactive_owner.id,
+        specialty="cardiology",
+        active=True,
+    )
+    deactivated_user = _make_patient(db_session)
+    deactivated_user.is_active = False
+    db_session.commit()
+    ghost_deactivated = Doctor(
+        user_id=deactivated_user.id,
+        specialty="dermatology",
+        active=True,
+    )
+    healthy = _make_doctor(db_session)
+    db_session.add_all([ghost_inactive, ghost_deactivated])
+    db_session.commit()
+    db_session.refresh(ghost_inactive)
+    db_session.refresh(ghost_deactivated)
+
+    violations = find_active_doctor_linkage_violations(db_session)
+    reasons = {row.id: reason for row, reason in violations}
+    assert reasons.get(ghost_inactive.id) == "owner_not_doctor_role"
+    assert reasons.get(ghost_deactivated.id) == "owner_inactive"
+    assert healthy.id not in reasons
 
 
 def test_reconciliation_inventory_shape(db_session):
     mod = _load_reconcile_module()
     build_inventory = mod.build_inventory
-    find_userless_active_doctors = mod.find_userless_active_doctors
+    find_active_doctor_linkage_violations = (
+        mod.find_active_doctor_linkage_violations
+    )
 
     db_session.add(Doctor(user_id=None, specialty="cardiology", active=True))
     db_session.commit()
 
-    rows = find_userless_active_doctors(db_session)
-    assert rows, "seed must produce at least one violating row"
-    item = build_inventory(rows)[0]
-    assert set(item) == {"doctor_id", "specialty", "cabinet", "active"}
+    violations = find_active_doctor_linkage_violations(db_session)
+    assert violations, "seed must produce at least one violating row"
+    item = build_inventory(violations)[0]
+    assert set(item) == {"doctor_id", "specialty", "cabinet", "active", "reason"}
     assert item["specialty"] == "cardiology"
     assert item["active"] is True
+    assert item["reason"] == "userless"
 
 
 def test_reconciliation_main_exit_codes(db_session, monkeypatch):

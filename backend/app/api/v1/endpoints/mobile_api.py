@@ -403,12 +403,27 @@ async def book_mobile_appointment(
         if not patient:
             raise HTTPException(status_code=404, detail="Профиль пациента не найден")
 
+        # Atomic slot reservation (Codex P1 round-7, ordering fixed round-8:
+        # the per-doctor FOR UPDATE lock is taken BEFORE eligibility so a
+        # concurrent deactivation must commit first and the eligibility
+        # reads below see the post-commit state — lock-then-validate, never
+        # validate-then-wait-then-proceed).
+        lock_doctor_for_slot_reservation(db, request.doctor_id)
+
         # Lifecycle eligibility (Codex round-2 P1): every live appointment
         # writer must reject inactive/incomplete doctors — mobile booking
         # included (same contract as POST /appointments and the QR path).
         ensure_doctor_eligible_for_appointment(db, request.doctor_id)
 
-        appointment_date = date.fromisoformat(request.preferred_date)
+        try:
+            appointment_date = date.fromisoformat(request.preferred_date)
+        except ValueError as exc:
+            # Codex round-8 P2: malformed patient input must surface as a
+            # 4xx validation error, not as a 500 from the catch-all.
+            raise HTTPException(
+                status_code=400,
+                detail="Некорректный формат даты записи (ожидается YYYY-MM-DD)",
+            ) from exc
 
         # Slot-occupancy guard (Codex round-3 P1): same contract as the web
         # and Telegram writers — two patients must never receive successful
@@ -417,10 +432,6 @@ async def book_mobile_appointment(
         # query would match appointment_time IS NULL rows — after the first
         # date-only booking every later date-only request would get a false
         # 409 although no concrete slot was ever selected.
-        # Atomic slot reservation (Codex P1 round-7): take the per-doctor
-        # FOR UPDATE lock BEFORE the occupancy check so two concurrent
-        # bookings for the same slot cannot both pass check-then-act.
-        lock_doctor_for_slot_reservation(db, request.doctor_id)
         if (
             request.preferred_time
             and crud_appointment.appointment.is_time_slot_occupied(
