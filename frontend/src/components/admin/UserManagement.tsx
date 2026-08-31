@@ -85,6 +85,7 @@ const UserManagement = () => {
   { value: 'Admin', label: t('admin2.um_role_admin') },
   { value: 'Doctor', label: t('admin2.um_role_doctor') },
   { value: 'Nurse', label: t('admin2.um_role_nurse') },
+  { value: 'Registrar', label: t('admin2.um_role_registrar') },
   { value: 'Receptionist', label: t('admin2.um_role_receptionist') },
   { value: 'Cashier', label: t('admin2.um_role_cashier') },
   { value: 'Lab', label: t('admin2.um_role_lab') },

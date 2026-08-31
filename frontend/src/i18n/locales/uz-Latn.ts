@@ -3915,7 +3915,9 @@ const uzLatn = {
     um_role_admin: 'Administrator',
     um_role_doctor: 'Shifokor',
     um_role_nurse: 'Hamshira',
-    um_role_receptionist: 'Registrator',
+    um_role_receptionist: 'Kutuvchi (respsionist)',
+
+    um_role_registrar: 'Registrator',
     um_role_cashier: 'Kassir',
     um_role_lab: 'Laborant',
     um_role_patient: 'Bemor',
@@ -4602,7 +4604,9 @@ const uzLatn = {
     umdl_role_derma: 'Dermatolog',
     umdl_role_dentist: 'Stomatolog',
     umdl_role_nurse: 'Hamshira',
-    umdl_role_receptionist: "Ro'yxatdan o'tkazuvchi",
+    umdl_role_receptionist: 'Kutuvchi (respsionist)',
+
+    umdl_role_registrar: 'Registrator',
     umdl_role_cashier: 'Kassir',
     umdl_role_lab: 'Laborant',
     umdl_role_patient: 'Bemor',
