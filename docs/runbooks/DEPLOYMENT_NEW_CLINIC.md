@@ -70,6 +70,7 @@ ENCRYPTION_KEY → encrypts .dump.enc artifacts (external Task Scheduler backup)
 | 2.9 | Disable sleep: `powercfg /change standby-timeout-ac 0` | `powercfg /query` shows 0x0 |
 | 2.10 | Disable hibernate: `powercfg /change hibernate-timeout-ac 0` | Same |
 | 2.11 | Disable unattended sleep: `powercfg /setacvalueindex SCHEME_CURRENT SUB_SLEEP UNATTENDSLEEP 0` | Same |
+| 2.12 | Set `TRUSTED_PROXIES=127.0.0.1,::1` in `.env` (cloudflared dials uvicorn from loopback; required so the audit trail and rate limiting record the real client IP instead of `127.0.0.1` — see `.env.example`) | uvicorn startup log: `Rate limiter trusting X-Forwarded-For from 2 proxy/ies` |
 
 **Failure handling**: if `alembic` not found, install: `pip install alembic`.
 
@@ -83,8 +84,9 @@ ENCRYPTION_KEY → encrypts .dump.enc artifacts (external Task Scheduler backup)
 | 3.4 | Set `protocol: http2` in config.yml. Prefer HTTP/2 for this deployment unless QUIC has been explicitly validated on target ISP | Tunnel connects via HTTP/2 |
 | 3.5 | `cloudflared tunnel run <clinic-name>` | `curl https://api.<domain>/api/v1/health` → 200 |
 | 3.6 | Autostart script in Startup folder | Survives reboot |
+| 3.7 | Attribution check (requires step 2.12): from an EXTERNAL device, authenticate and read a patient record in the Mini App | Row in `patient_access_audit_logs` records the external client IP — NOT `127.0.0.1` and not the tunnel peer |
 
-**Failure handling**: if tunnel won't connect, check cloudflared logfile. Common: DNS not propagated (wait 5 min), wrong tunnel ID.
+**Failure handling**: if tunnel won't connect, check cloudflared logfile. Common: DNS not propagated (wait 5 min), wrong tunnel ID. If the attribution check (3.7) records `127.0.0.1`, `TRUSTED_PROXIES` is missing from `.env` (step 2.12) — fix it and restart uvicorn.
 
 ### Phase 4: Cloudflare R2
 

@@ -182,6 +182,11 @@ def get_doctors(
     doctors out of the result (filtering the "general" sentinel AFTER the
     row cap omitted eligible doctors beyond the cap while the caller's
     limit allowed more rows).
+
+    Deterministic ordering (doctor id ascending) — the registrar doctor
+    selector and the admin doctor list render this list as-is, so an
+    undefined row order would reshuffle doctors of the same specialty
+    between calls/pages (from #2967).
     """
     query = db.query(Doctor)
 
@@ -197,7 +202,7 @@ def get_doctors(
             Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
         )
 
-    return query.offset(skip).limit(limit).all()
+    return query.order_by(Doctor.id.asc()).offset(skip).limit(limit).all()
 
 
 def get_doctor_by_id(db: Session, doctor_id: int) -> Doctor | None:
@@ -224,7 +229,12 @@ def get_doctors_by_specialty(
             func.trim(Doctor.specialty) != '',
             Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
         ]
-    return db.query(Doctor).filter(and_(*predicates)).all()
+    return (
+        db.query(Doctor)
+        .filter(and_(*predicates))
+        .order_by(Doctor.id.asc())
+        .all()
+    )
 
 
 def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:

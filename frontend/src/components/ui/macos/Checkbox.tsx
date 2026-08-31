@@ -1,4 +1,4 @@
-import React, { type ReactNode, type CSSProperties, type KeyboardEvent } from 'react';
+import React, { useId, type ReactNode, type CSSProperties, type KeyboardEvent } from 'react';
 import { Check } from 'lucide-react';
 type CheckboxSize = 'sm' | 'md' | 'lg';
 type CheckboxVariant = 'default' | 'filled' | 'error';
@@ -14,6 +14,16 @@ interface CheckboxProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'chil
   description?: ReactNode;
   checked?: boolean;
   onChange?: (checked: boolean) => void;
+  /**
+   * Accessible name for the `div[role="checkbox"]`.
+   * PR-UI-18-5 a11y fix (axe aria-toggle-field-name): the wrapper exposes
+   * role="checkbox" but had no accessible name — a plain <label> sibling
+   * does not label a non-form-control element. Priority:
+   *   1. explicit aria-label prop;
+   *   2. aria-labelledby → the rendered `label` prop content (useId);
+   *   3. none (callers rendering external label text must pass aria-label).
+   */
+  'aria-label'?: string;
 }
 
 interface CheckboxStyle extends CSSProperties {
@@ -31,8 +41,11 @@ const Checkbox = React.forwardRef<HTMLDivElement, CheckboxProps>(({
   description,
   checked,
   onChange,
+  'aria-label': ariaLabel,
   ...props
 }, ref) => {
+  // PR-UI-18-5: accessible name for the role="checkbox" wrapper (see prop docs).
+  const labelId = useId();
   const sizeStyles: Record<CheckboxSize, CSSProperties> = {
     sm: {
       width: '16px',
@@ -130,7 +143,12 @@ const Checkbox = React.forwardRef<HTMLDivElement, CheckboxProps>(({
         tabIndex={disabled ? -1 : 0}
         role="checkbox"
         aria-checked={checked}
-        aria-disabled={disabled}>
+        aria-disabled={disabled}
+        {...(ariaLabel
+          ? { 'aria-label': ariaLabel }
+          : label
+            ? { 'aria-labelledby': labelId }
+            : {})}>
 
         <div
           ref={ref}
@@ -149,7 +167,7 @@ const Checkbox = React.forwardRef<HTMLDivElement, CheckboxProps>(({
           }
         </div>
         {label &&
-        <label style={labelStyle}>
+        <label id={labelId} style={labelStyle}>
             {label}
           </label>
         }

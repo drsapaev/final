@@ -1163,14 +1163,6 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     }
   }, [selectedPatient, authRefreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Проверяем демо-режим после всех хуков
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
-
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    return null;
-  }
-
   // Обработка AI предложений
   const handleAISuggestion = (type: string, suggestion: unknown) => {
     if (type === 'icd10') {

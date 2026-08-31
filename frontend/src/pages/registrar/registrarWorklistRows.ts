@@ -54,7 +54,7 @@ export const computeDepartmentStats = (
   const stats: Record<string, unknown> = {};
 
   // ⭐ SSOT: Use queue profile keys from API, not hardcoded department keys
-  // queueProfiles is loaded from GET /queues/profiles via ModernTabs
+  // queueProfiles is loaded from GET /queues/profiles via Tabs (renamed from ModernTabs in PR-UI-17-5)
   const profileKeys = queueProfiles.length > 0 ?
   queueProfiles.map((p) => p.key) :
   ['cardiology', 'ecg', 'dermatology', 'stomatology', 'lab', 'procedures']; // Fallback

@@ -326,6 +326,63 @@ export default [
     },
   },
   {
+    // PR-UI-17-5 (plan §PR-UI-17 item 9): forbidden-imports register for
+    // decommissioned modules. Re-importing any PR-UI-17-deleted surface is a
+    // regression and fails lint at ERROR level. The generated-OpenAPI paths
+    // from the warn-level block above are merged here (promoted to error —
+    // verified 0 current violations at promotion time) because this later
+    // block overrides the rule for all files.
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@/types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+          ],
+          patterns: [
+            // PR-UI-17-1: MediLabDemo demo perimeter
+            {
+              group: ['**/pages/MediLabDemo', '**/components/medical', '**/components/medical/**', '**/components/Icon', '**/assets/iconsMap'],
+              message: 'PR-UI-17-1 decommissioned module: MediLabDemo page, medical/ components, legacy Icon + iconsMap were deleted (dead demo perimeter).',
+            },
+            // PR-UI-17-2: zero-importer dead files
+            {
+              group: ['**/components/forms/Modern*', '**/components/forms/ResponsiveForm', '**/components/forms', '**/components/layout/Modern*', '**/components/layout/Nav', '**/components/layout/index', '**/styles/cursor-effects', '**/PublicApp', '**/pages/Login', '**/pages/Activation'],
+              message: 'PR-UI-17-2 decommissioned module: dead forms/, layout/Modern*, Nav, cursor-effects.css, PublicApp/Login, Activation page were deleted (0 runtime importers).',
+            },
+            // PR-UI-17-3: telegram dead pair + M-8 dead duplicates
+            {
+              group: ['**/components/telegram', '**/components/telegram/**', '**/pages/TelegramPage', '**/components/TwoFactorSettings', '**/components/TwoFactorSetup', '**/components/PWAInstallPrompt', '**/components/mobile/PWAInstallPrompt', '**/components/pwa/PWAInstallPrompt', '**/components/pwa/index', '**/components/pwa/ConnectionStatus', '**/components/auth/RequireAuth', '**/components/auth/index', '**/components/navigation/ProtectedRoute', '**/components/index'],
+              message: 'PR-UI-17-3 decommissioned module: dead telegram pair, dead 2FA/PWA/role-guard duplicates and their barrels were deleted (M-8).',
+            },
+            // PR-UI-17-4: legacy tokens
+            {
+              group: ['**/theme/tokens-legacy'],
+              message: 'PR-UI-17-4 decommissioned module: tokens-legacy.ts deleted; ThemeContext owns the values privately (contexts/themeLegacyTokens.ts).',
+            },
+            // PR-UI-17-5: renamed component (old name must not come back)
+            {
+              group: ['**/components/navigation/ModernTabs'],
+              message: 'PR-UI-17-5 rename: ModernTabs.tsx is now Tabs.tsx (components/navigation/Tabs.tsx).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Игнорируемые файлы
     ignores: [
       'dist/**',

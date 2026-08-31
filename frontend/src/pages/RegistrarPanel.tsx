@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
-import ModernTabs from '../components/navigation/ModernTabs';
+import Tabs from '../components/navigation/Tabs';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
 import '../components/ui/animations.css';
@@ -70,7 +70,7 @@ const RegistrarPanel = () => {
     tempDateInput, setTempDateInput,
   } = useRegistrarCalendar();
 
-  // ⭐ SSOT: Queue profiles loaded from API (via ModernTabs)
+  // ⭐ SSOT: Queue profiles loaded from API (via Tabs)
   // Used for filtering entries by queue_tags instead of hardcoded mapping
   const [queueProfiles, setQueueProfiles] = useState<QueueProfileItem[]>([]);
 
@@ -328,7 +328,7 @@ const RegistrarPanel = () => {
       {/* Современные вкладки */}
       {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
       <div className="registrar-tabs-wrapper">
-          <ModernTabs
+          <Tabs
           activeTab={activeTab}
           onTabChange={setActiveTab}
           onProfilesLoaded={handleProfilesLoaded} // ⭐ SSOT: Store profiles for filtering

@@ -33,29 +33,31 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from app.models.patient_access_audit import PatientAccessAuditLog
+from app.core.rate_limiter import get_client_ip as _trusted_get_client_ip
 
 if TYPE_CHECKING:
     from fastapi import Request
     from sqlalchemy.orm import Session
+    from app.models.user import User
     from app.services.telegram_mini_app_init_data import TelegramMiniAppSessionScope
 
 logger = logging.getLogger(__name__)
 
 
 def _get_client_ip(request: "Request | None") -> str | None:
-    """Extract client IP from FastAPI Request, respecting X-Forwarded-For."""
+    """Extract the client IP for an audit row.
+
+    Delegates to ``app.core.rate_limiter.get_client_ip`` — the repo's single
+    source of truth for trusted-proxy-aware IP resolution. X-Forwarded-For
+    is honored ONLY when the direct TCP peer is a trusted proxy, so a staff
+    caller cannot falsify the source IP recorded in the PHI-read trail by
+    sending the header directly (Codex round-4 P2)."""
     if request is None:
         return None
     try:
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            # X-Forwarded-For: client, proxy1, proxy2
-            return forwarded.split(",")[0].strip()
-        if request.client:
-            return request.client.host
+        return _trusted_get_client_ip(request)
     except Exception:
-        pass
-    return None
+        return None
 
 
 def _get_user_agent(request: "Request | None") -> str | None:
@@ -72,6 +74,7 @@ def log_patient_access(
     db: "Session",
     *,
     scope: "TelegramMiniAppSessionScope | None" = None,
+    actor_user: "User | None" = None,
     subject_patient_id: int | None = None,
     resource_type: str,
     resource_id: str | None = None,
@@ -90,6 +93,11 @@ def log_patient_access(
     Args:
         db: SQLAlchemy session
         scope: TelegramMiniAppSessionScope (if access via Mini App)
+        actor_user: Staff User performing the access when there is no Mini
+            App scope (e.g. admin/doctor reads of patient PHI via staff
+            endpoints); sets actor_type="staff" + actor_staff_user_id so the
+            row is not misattributed as patient self-access. Ignored when
+            scope is provided.
         subject_patient_id: Patient whose PHI is being accessed.
             If None, derived from scope.patient_id.
         resource_type: lab_report | cabinet_summary | form_submission |
@@ -135,6 +143,27 @@ def log_patient_access(
                 actor_staff_user_id = scope.staff_user_id
                 actor_telegram_user_id = scope.telegram_user_id
                 actor_type = "staff"
+        elif actor_user is not None:
+            # Staff-side endpoint access (JWT user, no Mini App scope):
+            # record the acting staff user explicitly so the audit row is
+            # not misattributed as patient self-access (threat model:
+            # "Audit log on every patient read" for staff/admin actors).
+            actor_staff_user_id = actor_user.id
+            actor_type = "staff"
+
+        # Bound request metadata to the audit columns' lengths BEFORE the
+        # insert. The helper is deliberately non-blocking: if an oversized
+        # User-Agent / X-Forwarded-For made the insert fail, the rollback
+        # below would silently DROP the read trail — an authenticated staff
+        # user could then enumerate patient PHI without any audit row
+        # (AGENTS.md threat model requires an audit log on every patient
+        # read). Truncation keeps the trail writable for any header size.
+        request_ip = _get_client_ip(request)
+        if request_ip and len(request_ip) > 45:
+            request_ip = request_ip[:45]
+        request_ua = _get_user_agent(request)
+        if request_ua and len(request_ua) > 512:
+            request_ua = request_ua[:512]
 
         audit_entry = PatientAccessAuditLog(
             subject_patient_id=subject_patient_id,
@@ -146,8 +175,8 @@ def log_patient_access(
             resource_id=resource_id,
             action=action,
             outcome=outcome,
-            ip_address=_get_client_ip(request),
-            user_agent=_get_user_agent(request),
+            ip_address=request_ip,
+            user_agent=request_ua,
             session_id=session_id,
             correlation_id=correlation_id,
             extra_data=extra_data,

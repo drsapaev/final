@@ -124,7 +124,7 @@ Patients can exist without user accounts:
 
 Doctor/clinic records are preserved:
 
-- `doctors.user_id` → SET NULL
+- `doctors.user_id` → SET NULL + UNIQUE (migration 0048: 1 User = 1 Doctor)
 - `doctors.department_id` → SET NULL
 - `branches.manager_id` → SET NULL
 - `clinic_settings.updated_by` → SET NULL

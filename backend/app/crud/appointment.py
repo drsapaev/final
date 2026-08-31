@@ -122,14 +122,17 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             .all()
         )
 
+        # NOTE: Appointment has no `reason` column (it is `notes`) and
+        # `department` is a relationship, so the previous mapping raised
+        # AttributeError (HTTP 500) for any doctor with appointments.
         return [
             {
                 "id": apt.id,
                 "appointment_time": apt.appointment_time,
                 "patient_id": apt.patient_id,
-                "department": apt.department,
+                "department_id": apt.department_id,
                 "status": apt.status,
-                "reason": apt.reason,
+                "notes": apt.notes,
             }
             for apt in appointments
         ]

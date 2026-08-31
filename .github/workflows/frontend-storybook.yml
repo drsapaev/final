@@ -1,0 +1,70 @@
+# Frontend Storybook Build Gate
+#
+# PR-UI-18 item 2 (plan §PR-UI-18): Storybook stories for canonical
+# primitives are a maintained deliverable — this gate keeps them compiling.
+#
+# Rationale: before PR-UI-18 the Storybook infrastructure rotted silently —
+# the `storybook` core package was pruned from package-lock.json and
+# .storybook/preview.js imported dead module paths, so `npm run
+# build-storybook` failed on main while 8 story files sat unexercised
+# (Storybook was referenced by no CI workflow). This gate prevents recurrence:
+# any change to stories, .storybook config, or dependency manifests must keep
+# the static Storybook build green.
+#
+# Path-filtered: runs only when Storybook-relevant files change, so regular
+# frontend PRs pay no extra CI time.
+
+name: Frontend Storybook
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'frontend/src/**/*.stories.*'
+      - 'frontend/.storybook/**'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '.github/workflows/frontend-storybook.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'frontend/src/**/*.stories.*'
+      - 'frontend/.storybook/**'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '.github/workflows/frontend-storybook.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  storybook-build:
+    name: Frontend Storybook build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: cd frontend && npm ci --legacy-peer-deps
+
+      - name: Build Storybook
+        run: cd frontend && npm run build-storybook
+
+      - name: Upload Storybook static build (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-static-debug
+          path: frontend/storybook-static
+          retention-days: 3
