@@ -206,7 +206,7 @@ const AdminDoctors = () => {
           {/* UX Audit Admin #4.7: фильтр специализации — Select вместо текстового инпута. */}
           <Select
             value={filterSpecialization}
-            onChange={(v: unknown) => setFilterSpecialization(String(v))}
+            onValueChange={(v) => setFilterSpecialization(String(v))}
             options={[
               { value: '', label: t('admin2.ad_specialization_all') },
               ...[...new Set(doctors.map((d: Doctor) => d.specialty).filter((s): s is string => Boolean(s)))].map((s: string) => ({ value: s, label: s })),
@@ -216,14 +216,14 @@ const AdminDoctors = () => {
           />
           <Select
             value={filterDepartment}
-            onChange={(v: unknown) => setFilterDepartment(String(v))}
+            onValueChange={(v) => setFilterDepartment(String(v))}
             options={departmentOptions}
             size="large"
             aria-label={t('admin2.ad_filter_department_aria')}
           />
           <Select
             value={filterStatus}
-            onChange={(v: unknown) => setFilterStatus(String(v))}
+            onValueChange={(v) => setFilterStatus(String(v))}
             options={statusOptions}
             size="large"
             aria-label={t('admin2.ad_filter_status_aria')}
