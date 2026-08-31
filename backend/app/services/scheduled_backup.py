@@ -4,19 +4,18 @@ Scheduled Backup Service
 ✅ SECURITY: Automated scheduled database backups
 """
 import asyncio
-import functools
 import logging
 from datetime import datetime, time, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.background_jobs import spawn_daemon_job
 from app.services.backup_service import BackupService
 
 logger = logging.getLogger(__name__)
 
 # Bounded wait in stop() for an in-flight pg_dump worker thread; past this the
-# job finishes detached (the thread itself is non-daemon, so interpreter exit
-# still joins it).
+# job is abandoned and the daemon thread dies with the process.
 _SHUTDOWN_GRACE_SECONDS = 30
 
 
@@ -67,12 +66,11 @@ class ScheduledBackupService:
                             # P0 2026-08-28: create_backup shells out to
                             # pg_dump (subprocess.run). On the event loop it
                             # froze every HTTP request for the whole dump, so
-                            # it must run in a worker thread.
-                            job = asyncio.get_running_loop().run_in_executor(
-                                None,
-                                functools.partial(
-                                    self.backup_service.create_backup, "scheduled"
-                                ),
+                            # it must run in a worker thread. Daemon thread:
+                            # a dump outliving the shutdown grace dies with
+                            # the process instead of blocking exit.
+                            job = spawn_daemon_job(
+                                self.backup_service.create_backup, "scheduled"
                             )
                             self._inflight.add(job)
                             job.add_done_callback(self._inflight.discard)
