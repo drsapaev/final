@@ -248,8 +248,8 @@ def _scratch_tables(engine: sa.Engine) -> sa.Connection:
             """
             CREATE TABLE clinic_settings (
                 id INTEGER PRIMARY KEY,
-                key VARCHAR(100),
-                value JSON
+                key VARCHAR(100) UNIQUE,
+                value VARCHAR(255)
             )
             """
         )
@@ -282,15 +282,29 @@ def test_migration_0049_rewrites_doctors_profiles_and_settings(tmp_path) -> None
             "INSERT INTO queue_profiles (key, queue_tags) VALUES "
             "('stomatology', '[\"dental\", \"stomatology\", \"dentist\"]')",
         )
+        # limits use the REAL storage representation: one row per
+        # <prefix><specialty> (Codex round-1 P1), value = integer
         _seed(
             con,
             "INSERT INTO clinic_settings (key, value) VALUES "
-            "('max_per_day', '{\"stomatology\": 12, \"cardiology\": 20}')",
+            "('max_per_day_stomatology', 12)",
         )
         _seed(
             con,
             "INSERT INTO clinic_settings (key, value) VALUES "
-            "('start_numbers', '{\"Dental\": 4}')",
+            "('start_number_Dental', 4)",
+        )
+        # an existing canonical row must be MERGED (max wins), not duplicated
+        _seed(
+            con,
+            "INSERT INTO clinic_settings (key, value) VALUES "
+            "('max_per_day_dentistry', 20)",
+        )
+        # non-dental rows untouched
+        _seed(
+            con,
+            "INSERT INTO clinic_settings (key, value) VALUES "
+            "('max_per_day_cardiology', 30)",
         )
 
         from alembic.migration import MigrationContext
@@ -317,25 +331,69 @@ def test_migration_0049_rewrites_doctors_profiles_and_settings(tmp_path) -> None
         assert "dentistry" in tags
         assert "dental" in tags and "dentist" in tags  # originals preserved
 
-        max_per_day = con.execute(
-            sa.text("SELECT value FROM clinic_settings WHERE key='max_per_day'")
+        def _scalar_one(key: str):
+            return con.execute(
+                sa.text("SELECT value FROM clinic_settings WHERE key=:k"),
+                {"k": key},
+            ).scalar()
+
+        def _exists(key: str) -> bool:
+            return con.execute(
+                sa.text("SELECT COUNT(*) FROM clinic_settings WHERE key=:k"),
+                {"k": key},
+            ).scalar_one() > 0
+
+        # merge semantics: max(12 stomatology, 20 canonical) -> 20
+        assert int(_scalar_one("max_per_day_dentistry")) == 20
+        assert not _exists("max_per_day_stomatology")
+        # dental-only row renamed: canonical created from dental value
+        assert int(_scalar_one("start_number_dentistry")) == 4
+        assert not _exists("start_number_Dental")
+        assert not _exists("start_number_dental")
+        # non-dental untouched
+        assert int(_scalar_one("max_per_day_cardiology")) == 30
+    finally:
+        con.close()
+
+
+def test_migration_0049_dental_only_limits_are_not_lost(tmp_path) -> None:
+    """Deployment with ONLY stomatology-suffixed rows: canonical rows are
+    created from the dental values (limits not silently reset to defaults)."""
+    module = _load_migration()
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'd1only.db'}")
+    con = _scratch_tables(engine)
+    try:
+        _seed(con, "INSERT INTO doctors (user_id, specialty) VALUES (1, 'dental')")
+        _seed(
+            con,
+            "INSERT INTO clinic_settings (key, value) VALUES "
+            "('max_per_day_stomatology', 12)",
+        )
+        _seed(
+            con,
+            "INSERT INTO clinic_settings (key, value) VALUES "
+            "('start_number_stomatology', 7)",
+        )
+
+        from alembic.migration import MigrationContext
+        from alembic.operations import Operations
+
+        module.op = Operations(MigrationContext.configure(con))
+        module.upgrade()
+
+        mx = con.execute(
+            sa.text("SELECT value FROM clinic_settings WHERE key='max_per_day_dentistry'")
         ).scalar()
-        if isinstance(max_per_day, str):
-            import json as _json
-
-            max_per_day = _json.loads(max_per_day)
-        assert max_per_day["dentistry"] == 12
-        assert "stomatology" not in max_per_day
-        assert max_per_day["cardiology"] == 20
-
-        start_numbers = con.execute(
-            sa.text("SELECT value FROM clinic_settings WHERE key='start_numbers'")
+        sn = con.execute(
+            sa.text("SELECT value FROM clinic_settings WHERE key='start_number_dentistry'")
         ).scalar()
-        if isinstance(start_numbers, str):
-            import json as _json
-
-            start_numbers = _json.loads(start_numbers)
-        assert start_numbers["dentistry"] == 4
+        assert int(mx) == 12
+        assert int(sn) == 7
+        keys = {
+            r[0]
+            for r in con.execute(sa.text("SELECT key FROM clinic_settings")).fetchall()
+        }
+        assert not any(k.endswith("_stomatology") for k in keys)
     finally:
         con.close()
 

@@ -68,6 +68,7 @@ interface Specialty {
   icon: LucideIcon;
   color: string;
   description: string;
+  tags: string[];
 }
 
 interface QueueSettingsState {
@@ -132,11 +133,22 @@ const getDoctorDisplayName = (doctor: DoctorRecord | null | undefined, t: Transl
 
 const pickCanonicalDoctorForSpecialty = (
   doctorsList: DoctorRecord[] | null | undefined,
-  specialtyKey: string
+  specialtyKey: string,
+  queueTags?: string[]
 ): { doctor: DoctorRecord | null; candidates: DoctorRecord[] } => {
-  const specialty = normalizeText(specialtyKey);
+  // D-1 canonical vocabulary: a doctor's stored specialty is canonical
+  // ('dentistry') while the queue profile key keeps its machinery value
+  // ('stomatology') — match against the profile key AND its queue_tags
+  // (which carry every accepted family spelling) instead of the key alone.
+  const accepted = new Set<string>([normalizeText(specialtyKey)]);
+  for (const tag of Array.isArray(queueTags) ? queueTags : []) {
+    const normalizedTag = normalizeText(tag);
+    if (normalizedTag) {
+      accepted.add(normalizedTag);
+    }
+  }
   const candidates = (Array.isArray(doctorsList) ? doctorsList : [])
-    .filter((doctor) => normalizeText(doctor?.specialty) === specialty)
+    .filter((doctor) => accepted.has(normalizeText(doctor?.specialty)))
     .sort((left, right) => {
       const leftScore = [
         left?.active === false ? 1 : 0,
@@ -201,7 +213,8 @@ const QueueSettings = () => {
         name: p.title_ru || p.title || p.key,
         icon: ICON_MAP[p.icon ?? ''] || Stethoscope,
         color: p.color || 'var(--mac-text-primary)',
-        description: (p.queue_tags || []).join(', ')
+        description: (p.queue_tags || []).join(', '),
+        tags: p.queue_tags || []
       })));
 
       const doctorsData = (doctorsRes.data ?? []) as DoctorRecord[];
@@ -278,16 +291,16 @@ const QueueSettings = () => {
     }
   };
 
-  const testQueueGeneration = async (specialty: string) => {
+  const testQueueGeneration = async (specialty: Specialty) => {
     try {
       setTesting(true);
       setTestResult(null);
 
       // ⭐ SSOT: Выбираем врача детерминированно среди докторов этой специальности.
-      const { doctor, candidates } = pickCanonicalDoctorForSpecialty(doctors, specialty);
+      const { doctor, candidates } = pickCanonicalDoctorForSpecialty(doctors, specialty.key, specialty.tags);
 
       if (!doctor || !doctor.id) {
-        setMessage({ type: 'error', text: t('admin2.qs_doctor_not_found', { specialty }) });
+        setMessage({ type: 'error', text: t('admin2.qs_doctor_not_found', { specialty: specialty.name }) });
         setTesting(false);
         return;
       }
@@ -535,7 +548,7 @@ const QueueSettings = () => {
                   </div>
                   <Button
                   variant="outline"
-                  onClick={() => testQueueGeneration(specialty.key)}
+                  onClick={() => testQueueGeneration(specialty)}
                   disabled={testing}
                   title={`Test queue generation for ${specialty.name}`}
                   aria-label={`Test queue generation for ${specialty.name}`}

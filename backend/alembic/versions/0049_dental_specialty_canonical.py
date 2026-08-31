@@ -61,12 +61,17 @@ NON_CANONICAL_DENTAL = ("dental", "stomatology", "dentist")
 QUEUE_PROFILE_TABLE = "queue_profiles"
 QUEUE_PROFILE_DENTAL_KEY = "stomatology"
 
-# ClinicSettings rows whose JSON value maps specialty -> number. Their dict
-# keys are raw Doctor.specialty spellings, so a stored "stomatology" key
-# would silently stop matching canonical "dentistry" doctors after the
-# rewrite; rename those keys too (limits enforcement reads them per doctor).
-SETTINGS_KEY_COLUMN = "key"
-SETTINGS_SPECIALTY_KEYS = ("max_per_day", "start_numbers")
+# ClinicSettings (category 'queue') stores per-specialty limits as SEPARATE
+# rows keyed ``start_number_<specialty>`` / ``max_per_day_<specialty>``
+# (written by crud update_queue_settings, read by get_queue_settings —
+# Codex round-1 P1). A stored ``start_number_stomatology`` row would stop
+# matching canonical ``dentistry`` doctors after the doctors rewrite, so
+# those rows are renamed to the canonical suffix; if several family
+# spellings coexisted for one prefix, the values are merged into ONE row
+# (most permissive: max for both limit kinds) and the duplicate spelling
+# rows are removed — operational settings only, no clinical data touched.
+SETTINGS_TABLE = "clinic_settings"
+SETTINGS_PREFIXES = ("start_number_", "max_per_day_")
 
 
 def _inventory(conn: sa.Connection) -> list[tuple[str, int]]:
@@ -118,45 +123,68 @@ def _patch_queue_profile_tags(conn: sa.Connection) -> int:
 
 
 def _patch_settings_keys(conn: sa.Connection) -> int:
-    """Rename non-canonical dental keys inside specialty-keyed settings JSON."""
+    """Rename ``<prefix><dental-spelling>`` settings rows to the canonical
+    suffix; merge duplicates (most permissive) and drop the extra rows."""
     settings_table = sa.table(
-        "clinic_settings",
+        SETTINGS_TABLE,
         sa.column("id", sa.Integer),
-        sa.column(SETTINGS_KEY_COLUMN, sa.String),
-        sa.column("value", sa.JSON),
+        sa.column("key", sa.String),
+        sa.column("value", sa.Integer),
     )
     rows = conn.execute(
-        sa.select(settings_table.c.id, settings_table.c.value).where(
-            settings_table.c.key.in_(SETTINGS_SPECIALTY_KEYS)
-        )
+        sa.select(settings_table.c.id, settings_table.c.key, settings_table.c.value)
     ).fetchall()
-    patched = 0
+    # canonical target value per prefix (max = most permissive); seeded
+    # from BOTH existing canonical rows and the dental rows being renamed
+    # (otherwise a deployment with only "stomatology"-suffixed rows would
+    # lose its configured limits entirely).
+    canonical_values: dict[str, int] = {}
+    canonical_row_ids: dict[str, int] = {}
+    dental_row_ids: list[int] = []
     for row in rows:
-        value = row.value
-        if isinstance(value, str):
-            try:
-                value = json.loads(value)
-            except (TypeError, ValueError):
-                value = None
-        if not isinstance(value, dict):
+        key = row.key or ""
+        prefix = next((p for p in SETTINGS_PREFIXES if key.startswith(p)), None)
+        if prefix is None:
             continue
-        changed = False
-        for spelling in NON_CANONICAL_DENTAL:
-            # rename any-case keys: "Stomatology" -> "dentistry" etc.
-            # First spelling wins if several coexisted (setdefault keeps
-            # an already-written canonical value).
-            for actual_key in [k for k in value if str(k).strip().lower() == spelling]:
-                old = value.pop(actual_key)
-                value.setdefault(CANONICAL, old)
-                changed = True
-        if changed:
+        suffix = key[len(prefix):].strip().lower()
+        if suffix not in NON_CANONICAL_DENTAL and suffix != CANONICAL:
+            continue
+        if suffix in NON_CANONICAL_DENTAL:
+            dental_row_ids.append(row.id)
+        else:
+            canonical_row_ids.setdefault(prefix, row.id)
+        try:
+            existing = int(row.value)
+        except (TypeError, ValueError):
+            continue
+        prev = canonical_values.get(prefix)
+        canonical_values[prefix] = existing if prev is None else max(prev, existing)
+
+    removed = 0
+    for row_id in dental_row_ids:
+        conn.execute(
+            settings_table.delete().where(settings_table.c.id == row_id)
+        )
+        removed += 1
+
+    touched = 0
+    for prefix, value in canonical_values.items():
+        existing_id = canonical_row_ids.get(prefix)
+        if existing_id is not None:
+            # canonical row already exists: merge limits into it
             conn.execute(
                 settings_table.update()
-                .where(settings_table.c.id == row.id)
+                .where(settings_table.c.id == existing_id)
                 .values(value=value)
             )
-            patched += 1
-    return patched
+        else:
+            conn.execute(
+                settings_table.insert().values(
+                    key=f"{prefix}{CANONICAL}", value=value
+                )
+            )
+        touched += 1
+    return removed + touched
 
 
 def upgrade() -> None:
@@ -182,10 +210,14 @@ def upgrade() -> None:
     patched = _patch_queue_profile_tags(conn)
     print(f"[0049] stomatology queue profiles patched with '{CANONICAL}' tag: {patched}")
 
-    # 3. clinic_settings: rename dental-family dict keys in specialty-keyed
-    #    limit settings so per-doctor enforcement keeps resolving.
+    # 3. clinic_settings: rename <prefix><dental-spelling> limit rows
+    #    (start_number_* / max_per_day_*) to the canonical suffix so
+    #    per-doctor enforcement keeps resolving configured limits.
     settings_patched = _patch_settings_keys(conn)
-    print(f"[0049] clinic_settings rows with dental keys renamed: {settings_patched}")
+    print(
+        "[0049] clinic_settings limit rows renamed/merged to canonical suffix: "
+        f"{settings_patched}"
+    )
 
     # 4. Postcondition: no non-canonical dental spellings remain.
     leftovers = conn.execute(
