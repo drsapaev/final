@@ -1,8 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import {
-  Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert,
-  Input } from '../ui/macos';
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Alert, Input } from '../ui/macos';
 import {
   formatLabStatus,
   formatPaymentStatus,
@@ -18,6 +16,7 @@ import VirtualizedQueueList from './VirtualizedQueueList';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
 import React from "react";
+import { Eye, EyeOff, History, RotateCw, Search, TestTube2 } from 'lucide-react';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 // P-05 fix: маскирование PII (номера телефона) в карточках очереди.
@@ -57,7 +56,7 @@ function MaskedPhone({ phone, canReveal = true }: { phone: string; canReveal?: b
   if (!canReveal) {
     return (
       <span className="lqw-masked-phone-readonly" title={t18('pii.phone_restricted')}>
-        <Icon name="eye.slash" size={12} aria-hidden="true" />
+        <EyeOff size={12} aria-hidden="true" />
         <span className="lqw-masked-phone-text">{maskPhone(phone)}</span>
       </span>
     );
@@ -74,7 +73,7 @@ function MaskedPhone({ phone, canReveal = true }: { phone: string; canReveal?: b
       aria-pressed={revealed}
       className={`lqw-masked-phone ${revealed ? 'lqw-masked-phone-revealed' : ''}`}
     >
-      <Icon name={revealed ? 'eye.slash' : 'eye'} size={12} aria-hidden="true" />
+      {revealed ? <EyeOff size={12} aria-hidden="true" /> : <Eye size={12} aria-hidden="true" />}
       <span className="lqw-masked-phone-text">{revealed ? phone : maskPhone(phone)}</span>
     </button>
   );
@@ -230,7 +229,7 @@ export default function LabQueueWorkbench({
       <Card variant="filled" padding="none">
         <CardHeader className="lqw-card-header">
           <CardTitle className="lqw-card-title">
-            <Icon name="testtube.2" size={20} />
+            <TestTube2 size={20} aria-hidden="true" />
             {t18('queue.title')}
           </CardTitle>
           <div className="lqw-meta-row">
@@ -239,18 +238,14 @@ export default function LabQueueWorkbench({
               {t18('queue.in_progress')}: {appointments.filter((item) => activeQueueStatuses.has(item.status || '')).length}
             </Badge>
             <Button variant="outline" onClick={onRefresh} disabled={loading}>
-              <Icon name="arrow.clockwise" size={16} />
+              <RotateCw size={16} aria-hidden="true" />
               {t18('common.refresh')}
             </Button>
           </div>
           {/* QW-8 fix: панель поиска и фильтра статусов. L-H-4: CSS-классы. */}
           <div className="lqw-search-filter-row">
             <div className="lqw-search-wrapper">
-              <Icon
-                name="magnifyingglass"
-                size={14}
-                className="lqw-search-icon"
-              />
+              <Search size={14} className="lqw-search-icon" aria-hidden="true" />
               <Input
                 type="search"
                 value={searchQuery}
@@ -368,7 +363,7 @@ export default function LabQueueWorkbench({
         <Card variant="filled" padding="none">
           <CardHeader className="lqw-card-header">
             <CardTitle className="lqw-card-title">
-              <Icon name="clock.arrow.circlepath" size={20} />
+              <History size={20} aria-hidden="true" />
               {t18('queue.history_title')}
             </CardTitle>
           </CardHeader>

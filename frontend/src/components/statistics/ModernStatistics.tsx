@@ -1,11 +1,10 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import {
-  Button, Card, Icon,
-} from '../ui/macos';
+import { Button, Card } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from 'react';
+import { BarChart3, Calendar, CheckCircle2, Clock, CreditCard, Settings, Share, User, XCircle } from 'lucide-react';
 
 type StatsAppointmentAccessor = ((key: string) => unknown) & Record<string, unknown>;
 
@@ -305,7 +304,7 @@ const ModernStatistics = ({
     id: 'totalPatients',
     title: t('misc.ms_total_patients'),
     value: animatedValues.totalPatients || 0,
-    iconName: 'person',
+    icon: User,
     color: 'var(--mac-accent-blue)',
     trend: statistics.trends.patients,
     trendValue: statistics.trendValues.patients,
@@ -315,7 +314,7 @@ const ModernStatistics = ({
     id: 'todayAppointments',
     title: t('misc.ms_todayAppointments'),
     value: animatedValues.todayAppointments || 0,
-    iconName: 'calendar',
+    icon: Calendar,
     color: 'var(--mac-success)',
     trend: statistics.trends.appointments,
     trendValue: statistics.trendValues.appointments,
@@ -325,7 +324,7 @@ const ModernStatistics = ({
     id: 'completedToday',
     title: t('misc.ms_completedToday'),
     value: animatedValues.completedToday || 0,
-    iconName: 'checkmark.circle',
+    icon: CheckCircle2,
     color: 'var(--mac-accent-blue-light)',
     trend: statistics.trends.appointments,
     trendValue: statistics.trendValues.appointments,
@@ -335,7 +334,7 @@ const ModernStatistics = ({
     id: 'pendingPayments',
     title: t('misc.ms_pendingPayments'),
     value: animatedValues.pendingPayments || 0,
-    iconName: 'creditcard',
+    icon: CreditCard,
     color: 'var(--mac-warning)',
     trend: statistics.trends.pendingPayments,
     trendValue: statistics.trendValues.pendingPayments,
@@ -345,7 +344,7 @@ const ModernStatistics = ({
     id: 'revenue',
     title: t('misc.ms_revenue'),
     value: animatedValues.revenue || 0,
-    iconName: 'creditcard',
+    icon: CreditCard,
     color: 'var(--mac-success)',
     trend: statistics.trends.revenue,
     trendValue: statistics.trendValues.revenue,
@@ -356,7 +355,7 @@ const ModernStatistics = ({
     id: 'averageWaitTime',
     title: t('misc.ms_averageWaitTime'),
     value: statistics.averageWaitTime,
-    iconName: 'clock',
+    icon: Clock,
     color: 'var(--mac-accent-blue-light)',
     trend: statistics.trends.waitTime,
     trendValue: statistics.trendValues.waitTime,
@@ -398,16 +397,16 @@ const ModernStatistics = ({
           alignItems: 'center',
           gap: 'var(--mac-spacing-2)'
         }}>
-          <Icon name="chart('misc.ms_bar')" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+          <BarChart3 size={20} aria-hidden="true" style={{ color: 'var(--mac-accent-blue)' }} />
           {t('misc.ms_statistics')}
         </h2>
         
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
           <Button type="button" variant="ghost" size="small" onClick={onRefresh} title={t('misc.ms_refresh')} aria-label={t('misc.ms_refresh')}>
-            <Icon aria-hidden="true" name="gear" size="small" />
+            <Settings aria-hidden="true" size={16} />
           </Button>
           <Button type="button" variant="primary" size="small" onClick={onExport} title={t('misc.ms_export')} aria-label={t('misc.ms_export')}>
-            <Icon aria-hidden="true" name="square.and.arrow.up" size="small" style={{ color: 'white' }} />
+            <Share aria-hidden="true" size={16} style={{ color: 'white' }} />
           </Button>
         </div>
       </div>
@@ -436,7 +435,7 @@ const ModernStatistics = ({
               }}>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Icon name={card.iconName} size="xlarge" style={{ color: card.color }} />
+                <card.icon size={32} aria-hidden="true" style={{ color: card.color }} />
                 
                 <div style={{
                   display: 'flex',
@@ -446,10 +445,7 @@ const ModernStatistics = ({
                   fontWeight: 'var(--mac-font-weight-bold)',
                   color: getTrendColor(card.trend, isGoodWhenDown)
                 }}>
-                  <Icon
-                    name={card.trend === 'up' ? 'checkmark.circle' : 'xmark.circle'}
-                    size="xlarge" // xlarge для ровного размера с левой иконкой
-                    style={{ color: getTrendColor(card.trend, isGoodWhenDown) }} />
+                  {card.trend === 'up'  ? <CheckCircle2 size={32} style={{ color: getTrendColor(card.trend, isGoodWhenDown) }} aria-hidden="true" /> : <XCircle size={32} style={{ color: getTrendColor(card.trend, isGoodWhenDown) }} aria-hidden="true" />}
 
                   {card.trendValue}%
                 </div>
