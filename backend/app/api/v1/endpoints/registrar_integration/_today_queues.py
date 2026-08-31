@@ -23,6 +23,7 @@ from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F40
     _process_online_queue_entries,
     _process_online_queue_entry,
     _process_visit_entry,
+    _register_bucket_doctor,
     _resolve_queue_entry_metadata,
     _same_patient_queue_entry_for_visit,
     _serialize_queue_entry,
@@ -274,6 +275,8 @@ def _process_visits_for_queues(
                 "entries": [],
                 "doctor": None,
                 "doctor_id": visit.doctor_id,
+                # D-2: per-doctor representation (see _queue_ops helpers)
+                "doctors": {},
             }
 
         # Безопасно получаем дату создания
@@ -312,6 +315,7 @@ def _process_visits_for_queues(
                 queues_by_specialty[specialty]["doctor"] = visit_doctor
                 # ✅ ИСПРАВЛЕНО: Обновляем doctor_id, если doctor найден
                 queues_by_specialty[specialty]["doctor_id"] = visit_doctor.id
+        _register_bucket_doctor(queues_by_specialty[specialty], getattr(visit, 'doctor', None))
         # ✅ ИСПРАВЛЕНО: Убрана логика обновления doctor_id для visit записей, если specialty уже существует
         # Это предотвращает перезапись doctor_id, установленного online_queue записями (которые обрабатываются позже)
 

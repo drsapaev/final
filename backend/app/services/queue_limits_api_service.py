@@ -53,6 +53,13 @@ class QueueLimitsApiService:
 
         result: list[dict] = []
         for spec_name, spec_data in specialties.items():
+            # D-2 display-fix: enforcement stays PER DOCTOR, but with
+            # several doctors per specialty the aggregate cap the admin
+            # sees must be max_per_day x N (the single max_per_day next to
+            # the summed usage was misleading).
+            aggregate_max = max_per_day_settings.get(spec_name, 15) * len(
+                spec_data["doctors"]
+            )
             result.append(
                 {
                     "specialty": spec_name,
@@ -61,6 +68,7 @@ class QueueLimitsApiService:
                     "enabled": True,
                     "current_usage": spec_data["current_usage"],
                     "doctors_count": len(spec_data["doctors"]),
+                    "aggregate_max_per_day": aggregate_max,
                     "last_updated": datetime.now(UTC),
                 }
             )

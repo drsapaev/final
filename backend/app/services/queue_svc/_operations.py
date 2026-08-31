@@ -568,6 +568,46 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         }
         return queue_token, metadata
 
+    @staticmethod
+    def _pick_least_loaded_doctor(
+        db: Session,
+        doctors: list[Doctor],
+        day,
+    ) -> Doctor | None:
+        """D-2 least-loaded routing: pick the doctor with the shortest
+        ACTIVE queue (waiting+called entries) for ``day``; ties break to
+        the lowest ``Doctor.id`` so the choice is deterministic.
+
+        ``doctors`` are assumed already filtered to active/eligible rows.
+        Doctors without a DailyQueue for the day have load 0 — a fresh
+        doctor wins over an already loaded one, and equal loads keep the
+        historical lowest-id preference.
+        """
+        if not doctors:
+            return None
+        if len(doctors) == 1:
+            return doctors[0]
+
+        doctor_ids = [d.id for d in doctors]
+        load_rows = (
+            db.query(
+                DailyQueue.specialist_id,
+                func.count(OnlineQueueEntry.id),
+            )
+            .join(
+                OnlineQueueEntry,
+                OnlineQueueEntry.queue_id == DailyQueue.id,
+            )
+            .filter(
+                DailyQueue.day == day,
+                DailyQueue.specialist_id.in_(doctor_ids),
+                OnlineQueueEntry.status.in_(["waiting", "called"]),
+            )
+            .group_by(DailyQueue.specialist_id)
+            .all()
+        )
+        active_loads = {specialist_id: count for specialist_id, count in load_rows}
+        return min(doctors, key=lambda d: (active_loads.get(d.id, 0), d.id))
 
     def join_queue_with_token(
         self,
@@ -634,19 +674,27 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     queue_profile.queue_tags or [profile_key]
                 )
 
-                # Ищем врача с specialty из queue_tags профиля.
+                # Ищем врачей с specialty из queue_tags профиля.
                 # Incomplete ("general" sentinel) profiles are explicitly
                 # excluded: they are not clinical-eligible for specialty QR
                 # routing even if an admin ever tags a profile with
                 # "general" (defense in depth, Codex P1-D).
-                doctor = (
+                eligible_doctors = (
                     db.query(Doctor)
                     .filter(
                         Doctor.active.is_(True),
                         Doctor.specialty.in_(queue_tags),
                         Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
                     )
-                    .first()
+                    .order_by(Doctor.id.asc())
+                    .all()
+                )
+                # D-2 least-loaded routing (NEEDS DECISION resolved): with
+                # several active doctors per specialty the new patient goes
+                # to the doctor with the shortest ACTIVE queue for the day
+                # (waiting+called), ties break to the lowest Doctor.id.
+                doctor = self._pick_least_loaded_doctor(
+                    db, eligible_doctors, day
                 )
 
                 # Если не нашли - это ошибка сопоставления профиля, а не повод
