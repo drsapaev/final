@@ -1193,6 +1193,49 @@ def test_get_doctors_by_specialization_matches_family(db_session) -> None:
     assert canonical.id not in {item["id"] for item in result}
 
 
+# ===================== M. Round-8 P2: GraphQL filter + stats metadata ===
+
+
+def test_graphql_doctors_filter_matches_family(db_session, monkeypatch) -> None:
+    """Codex round-8 P2: the GraphQL doctors() specialty filter matches
+    every family spelling via variants (OR of ILIKEs).
+
+    NOTE: the session is injected because ALL resolvers share a
+    pre-existing defect (db = get_db_session() without 'with') that is
+    out of scope for D-1 — the filter logic itself is under test."""
+    from app.graphql import resolvers as gql_resolvers
+    from app.graphql.types import DoctorFilter, PaginatedDoctors
+
+    monkeypatch.setattr(gql_resolvers, "get_db_session", lambda: db_session)
+
+    canonical = _family_doctor(db_session, "dentistry")
+
+    for query_value in ("stomatology", "dental", "dentistry", "dentist"):
+        page = gql_resolvers.Query().doctors(
+            filter=DoctorFilter(specialty=query_value), pagination=None
+        )
+        assert isinstance(page, PaginatedDoctors)
+        ids = {item.id for item in page.items}
+        assert canonical.id in ids, f"GraphQL filter missed for {query_value!r}"
+
+
+def test_admin_specialties_metadata_covers_canonical(db_session) -> None:
+    """Codex round-8 P2: /admin/doctors/specialties returns the localized
+    dental metadata for the canonical 'dentistry' code, not raw labels."""
+    from app.services.admin_doctors_stats_service import AdminDoctorsStatsService
+
+    _family_doctor(db_session, "dentistry")
+    service = AdminDoctorsStatsService(db_session)
+    rows = service.get_specialties()
+
+    dental = next(r for r in rows if r["code"] == "dentistry")
+    assert dental["name_ru"] == "Стоматология"
+    assert dental["name_en"] == "Dentistry"
+    assert dental["color"] == "#007bff"
+    assert dental["description"] == "Стоматологические услуги"
+    assert dental["doctor_count"] == 1
+
+
 # ===================== F. Mobile search variants (round-2 P2) ===========
 
 
