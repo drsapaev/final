@@ -5514,6 +5514,8 @@ const uzLatn = {
 
     // ─── GraphQLExplorer (admin2.gql2_*) ───
     gql2_example_full_name: "Ivanov Ivan Ivanovich",
+    gql2_example_last_name: "Ivanov",
+    gql2_example_first_name: "Ivan",
     gql2_example_notes: "Boshlang'ich konsultatsiya",
 
     // ─── DisplayBoardSettings (admin2.db2_*) ───
