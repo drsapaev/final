@@ -48,6 +48,7 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit
+from app.services.patient_access_audit import log_patient_access
 
 
 def get_db_session():
@@ -98,6 +99,27 @@ def patient_full_name(patient: Patient) -> str:
     """SSOT-совместимое ФИО: Patient хранит last/first/middle раздельно."""
     parts = [patient.last_name, patient.first_name, patient.middle_name]
     return " ".join(p for p in parts if p).strip()
+
+
+def _audit_patient_access(
+    info: strawberry.Info, db, patient_ids: list[int], resource_type: str
+) -> None:
+    """M4-P0-1: каждый доступ admin-актора к PHI пациентов — в audit log.
+
+    Non-blocking (log_patient_access не бросает); пропускается, когда
+    контекста нет (прямые schema.execute_sync тесты).
+    """
+    user = getattr(info.context, "user", None) if info.context else None
+    if not user:
+        return
+    for pid in patient_ids:
+        log_patient_access(
+            db,
+            actor_user=user,
+            subject_patient_id=pid,
+            resource_type=resource_type,
+            action="view",
+        )
 
 
 # ===================== CONVERTERS =====================
@@ -247,6 +269,7 @@ class Query:
     @strawberry.field
     def patients(
         self,
+        info: strawberry.Info,
         filter: PatientFilter | None = None,
         pagination: PaginationInput | None = None,
     ) -> PaginatedPatients:
@@ -278,16 +301,13 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию
-            if pagination:
-                query = apply_pagination(query, pagination.page, pagination.per_page)
-                page = pagination.page
-                per_page = pagination.per_page
-            else:
-                page = 1
-                per_page = 20
+            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
+            page = pagination.page if pagination else 1
+            per_page = pagination.per_page if pagination else 20
+            query = apply_pagination(query, page, per_page)
 
             patients = query.all()
+            _audit_patient_access(info, db, [p.id for p in patients], "patient")
 
             return PaginatedPatients(
                 items=[patient_to_type(p) for p in patients],
@@ -295,7 +315,7 @@ class Query:
             )
 
     @strawberry.field
-    def patient(self, id: int) -> PatientType | None:
+    def patient(self, info: strawberry.Info, id: int) -> PatientType | None:
         """Получить пациента по ID"""
         with get_db_session() as db:
             patient = (
@@ -303,6 +323,8 @@ class Query:
                 .filter(Patient.id == id, Patient.is_deleted.is_(False))
                 .first()
             )
+            if patient:
+                _audit_patient_access(info, db, [patient.id], "patient")
             return patient_to_type(patient) if patient else None
 
     # ===================== DOCTORS =====================
@@ -340,14 +362,10 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию
-            if pagination:
-                query = apply_pagination(query, pagination.page, pagination.per_page)
-                page = pagination.page
-                per_page = pagination.per_page
-            else:
-                page = 1
-                per_page = 20
+            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
+            page = pagination.page if pagination else 1
+            per_page = pagination.per_page if pagination else 20
+            query = apply_pagination(query, page, per_page)
 
             doctors = query.all()
 
@@ -395,14 +413,10 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию
-            if pagination:
-                query = apply_pagination(query, pagination.page, pagination.per_page)
-                page = pagination.page
-                per_page = pagination.per_page
-            else:
-                page = 1
-                per_page = 20
+            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
+            page = pagination.page if pagination else 1
+            per_page = pagination.per_page if pagination else 20
+            query = apply_pagination(query, page, per_page)
 
             services = query.all()
 
@@ -423,6 +437,7 @@ class Query:
     @strawberry.field
     def appointments(
         self,
+        info: strawberry.Info,
         filter: AppointmentFilter | None = None,
         pagination: PaginationInput | None = None,
     ) -> PaginatedAppointments:
@@ -452,16 +467,18 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию
-            if pagination:
-                query = apply_pagination(query, pagination.page, pagination.per_page)
-                page = pagination.page
-                per_page = pagination.per_page
-            else:
-                page = 1
-                per_page = 20
+            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
+            page = pagination.page if pagination else 1
+            per_page = pagination.per_page if pagination else 20
+            query = apply_pagination(query, page, per_page)
 
             appointments = query.all()
+            _audit_patient_access(
+                info,
+                db,
+                [a.patient_id for a in appointments if a.patient_id],
+                "appointment",
+            )
 
             return PaginatedAppointments(
                 items=[appointment_to_type(a) for a in appointments],
@@ -469,10 +486,12 @@ class Query:
             )
 
     @strawberry.field
-    def appointment(self, id: int) -> AppointmentType | None:
+    def appointment(self, info: strawberry.Info, id: int) -> AppointmentType | None:
         """Получить запись по ID"""
         with get_db_session() as db:
             appointment = db.query(Appointment).filter(Appointment.id == id).first()
+            if appointment and appointment.patient_id:
+                _audit_patient_access(info, db, [appointment.patient_id], "appointment")
             return appointment_to_type(appointment) if appointment else None
 
     # ===================== VISITS =====================
@@ -480,6 +499,7 @@ class Query:
     @strawberry.field
     def visits(
         self,
+        info: strawberry.Info,
         filter: VisitFilter | None = None,
         pagination: PaginationInput | None = None,
     ) -> PaginatedVisits:
@@ -505,16 +525,15 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию
-            if pagination:
-                query = apply_pagination(query, pagination.page, pagination.per_page)
-                page = pagination.page
-                per_page = pagination.per_page
-            else:
-                page = 1
-                per_page = 20
+            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
+            page = pagination.page if pagination else 1
+            per_page = pagination.per_page if pagination else 20
+            query = apply_pagination(query, page, per_page)
 
             visits = query.all()
+            _audit_patient_access(
+                info, db, [v.patient_id for v in visits if v.patient_id], "visit"
+            )
 
             return PaginatedVisits(
                 items=[visit_to_type(v) for v in visits],
@@ -522,10 +541,12 @@ class Query:
             )
 
     @strawberry.field
-    def visit(self, id: int) -> VisitType | None:
+    def visit(self, info: strawberry.Info, id: int) -> VisitType | None:
         """Получить визит по ID"""
         with get_db_session() as db:
             visit = db.query(Visit).filter(Visit.id == id).first()
+            if visit and visit.patient_id:
+                _audit_patient_access(info, db, [visit.patient_id], "visit")
             return visit_to_type(visit) if visit else None
 
     # ===================== QUEUES =====================
@@ -557,14 +578,10 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию
-            if pagination:
-                query = apply_pagination(query, pagination.page, pagination.per_page)
-                page = pagination.page
-                per_page = pagination.per_page
-            else:
-                page = 1
-                per_page = 20
+            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
+            page = pagination.page if pagination else 1
+            per_page = pagination.per_page if pagination else 20
+            query = apply_pagination(query, page, per_page)
 
             entries = query.all()
 

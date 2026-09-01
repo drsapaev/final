@@ -10,8 +10,10 @@ GQL-AUDIT-28 follow-up:
 """
 
 from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
 
 import strawberry
+from fastapi import HTTPException
 from sqlalchemy import func
 
 from app.core.i18n import t
@@ -28,6 +30,7 @@ from app.crud.appointment import (
 from app.crud.appointment import (
     create_appointment as crud_create_appointment,
 )
+from app.crud.clinic import get_queue_settings
 from app.crud.patient import (
     patient as patient_crud,  # instance: get_patient_by_phone
 )
@@ -183,7 +186,7 @@ class Mutation:
             )
 
     @strawberry.mutation
-    def delete_patient(self, id: int) -> MutationResponse:
+    def delete_patient(self, info: strawberry.Info, id: int) -> MutationResponse:
         """Удалить пациента"""
         try:
             with get_db_session() as db:
@@ -212,9 +215,13 @@ class Mutation:
                         errors=["HAS_RELATED_RECORDS"],
                     )
 
-                # SSOT: soft delete (deleted_by=0 — у резолвера нет контекста
-                # пользователя; авторизация выполняется на уровне роутера)
-                soft_delete_patient(db, patient_id=id, deleted_by=0)
+                # SSOT: soft delete; deleted_by — РЕАЛЬНЫЙ user.id
+                # (FK users.id; user приходит из контекста роутера, None —
+                # только в прямых тестах схемы без контекста)
+                actor = getattr(info.context, "user", None) if info.context else None
+                soft_delete_patient(
+                    db, patient_id=id, deleted_by=actor.id if actor else None
+                )
 
                 return MutationResponse(success=True, message="Пациент успешно удален")
 
@@ -307,13 +314,21 @@ class Mutation:
                         errors=["INVALID_STATUS"],
                     )
 
-                # SSOT: CRUD-метод с валидацией перехода
-                updated = appointment_crud.update_status(
-                    db,
-                    appointment_id=id,
-                    new_status=status,
-                    validate_transition=False,
-                )
+                # SSOT: CRUD-метод; state machine ВКЛЮЧЕНА — терминальные
+                # статусы нельзя переоткрыть (completed -> pending и т.п.)
+                try:
+                    updated = appointment_crud.update_status(
+                        db,
+                        appointment_id=id,
+                        new_status=status,
+                        validate_transition=True,
+                    )
+                except HTTPException as exc:
+                    return AppointmentMutationResponse(
+                        success=False,
+                        message=str(exc.detail),
+                        errors=["INVALID_STATUS_TRANSITION"],
+                    )
                 if not updated:
                     return AppointmentMutationResponse(
                         success=False,
@@ -426,24 +441,20 @@ class Mutation:
                             errors=["SERVICES_NOT_FOUND"],
                         )
 
-                # Подготавливаем услуги для SSOT create_visit
+                # Подготавливаем услуги для SSOT create_visit.
+                # Цены — КАНОНИЧЕСКИЕ (service.price); расчёт скидок
+                # (repeat/benefit/all_free) остаётся SSOT биллинга
+                # (DiscountBenefitsService) — дублировать проценты здесь
+                # нельзя. discount_mode сохраняется на визите как факт.
                 services_data = []
                 for service in services:
-                    service_price = (
-                        0 if input.discount_mode == "all_free" else (service.price or 0)
-                    )
-                    if input.discount_mode == "repeat":
-                        service_price = float(service_price) * 0.8
-                    elif input.discount_mode == "benefit":
-                        service_price = float(service_price) * 0.5
-
                     services_data.append(
                         {
                             "service_id": service.id,
                             "code": service.code,
                             "name": service.name,
                             "qty": 1,
-                            "price": float(service_price),
+                            "price": float(service.price or 0),
                         }
                     )
 
@@ -640,6 +651,26 @@ class Mutation:
                     queue_tag=input.queue_tag,
                 )
 
+                # Правила онлайн-набора — как в SSOT join_online_queue:
+                # приём открыт (opened_at) -> онлайн-запись закрыта
+                if daily_queue.opened_at:
+                    return QueueMutationResponse(
+                        success=False,
+                        message="Онлайн-набор закрыт. Обратитесь в регистратуру.",
+                        errors=["QUEUE_CLOSED"],
+                    )
+
+                # рабочие часы (настройки клиники, timezone-aware)
+                queue_settings = get_queue_settings(db)
+                timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+                queue_start_hour = queue_settings.get("queue_start_hour", 7)
+                if datetime.now(timezone).hour < queue_start_hour:
+                    return QueueMutationResponse(
+                        success=False,
+                        message=f"Онлайн-запись доступна с {queue_start_hour}:00",
+                        errors=["OUTSIDE_HOURS"],
+                    )
+
                 # Проверяем, не стоит ли пациент уже в очереди к этому врачу сегодня
                 existing_entry = (
                     db.query(OnlineQueueEntry)
@@ -660,7 +691,17 @@ class Mutation:
                         errors=["ALREADY_IN_QUEUE"],
                     )
 
-                # Проверяем лимит онлайн записей
+                # GQL-AUDIT-28 P0-3 (codex r2): лочим строку очереди ДО
+                # вычисления MAX(number) — иначе параллельные joinQueue
+                # читают одинаковый MAX и вставляют дубликаты номеров
+                daily_queue = (
+                    db.query(DailyQueue)
+                    .filter(DailyQueue.id == daily_queue.id)
+                    .with_for_update()
+                    .first()
+                )
+
+                # Лимит: индивидуальный на очередь -> капа врача
                 online_entries_count = (
                     db.query(OnlineQueueEntry)
                     .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
@@ -671,7 +712,12 @@ class Mutation:
                     .count()
                 )
 
-                if online_entries_count >= doctor.max_online_per_day:
+                max_slots = (
+                    daily_queue.max_online_entries
+                    if daily_queue.max_online_entries is not None
+                    else doctor.max_online_per_day
+                )
+                if online_entries_count >= max_slots:
                     return QueueMutationResponse(
                         success=False,
                         message="Превышен лимит онлайн записей на сегодня",

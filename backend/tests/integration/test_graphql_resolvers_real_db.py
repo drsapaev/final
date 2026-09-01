@@ -23,8 +23,7 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
-from app.models.visit import Visit
-from app.models.visit import VisitService
+from app.models.visit import Visit, VisitService
 
 pytestmark = pytest.mark.integration
 
@@ -50,9 +49,9 @@ def gql_data(test_db, gql_session_factory):
     created: dict = {}
     try:
         user = User(
-            username=f"gqldoc-{suffix}",
+            username=f"synthetic-gql-doc-{suffix}",
             hashed_password="x",
-            full_name="GQL Врач Тестовый",
+            full_name="SYNTHETIC GQL Doctor",
             role="Doctor",
             is_active=True,
         )
@@ -71,11 +70,11 @@ def gql_data(test_db, gql_session_factory):
         session.flush()
 
         patient = Patient(
-            last_name=f"Иванов-{suffix}",
-            first_name="Иван",
-            middle_name="Иванович",
-            phone=f"+99890{suffix}1",
-            email=f"gql-{suffix}@example.com",
+            last_name=f"SYNTHETIC-Ivanov-{suffix}",
+            first_name="SYNTHETIC",
+            middle_name="SYNTHETIC",
+            phone=f"DEV-DEMO-{suffix}-1",
+            email=f"synthetic-{suffix}@example.com",
         )
         session.add(patient)
         session.flush()
@@ -143,7 +142,7 @@ def gql_data(test_db, gql_session_factory):
             user_ids = [
                 u.id
                 for u in cleanup.query(User).filter(
-                    User.username.like(f"gqldoc-{suffix}%")
+                    User.username.like(f"synthetic-gql-doc-{suffix}%")
                 )
             ]
             doctor_ids = [
@@ -291,16 +290,16 @@ def test_graphql_mutations_succeed_against_real_db(gql_data):
         """,
         {
             "input": {
-                "lastName": f"Петров-{suffix}",
-                "firstName": "Пётр",
-                "phone": f"+99891{suffix}2",
+                "lastName": f"SYNTHETIC-Petrov-{suffix}",
+                "firstName": "SYNTHETIC",
+                "phone": f"DEV-DEMO-{suffix}-2",
             }
         },
     )
     created = data["createPatient"]
     assert created["success"] is True, created
     linked_patient_id = created["patient"]["id"]
-    assert created["patient"]["fullName"].startswith(f"Петров-{suffix}")
+    assert created["patient"]["fullName"].startswith(f"SYNTHETIC-Petrov-{suffix}")
 
     # --- updatePatient ---
     data = _execute(
@@ -440,7 +439,12 @@ def test_graphql_mutations_succeed_against_real_db(gql_data):
           createPatient(input: $input) { success patient { id } }
         }
         """,
-        {"input": {"lastName": f"Сидоров-{suffix}", "firstName": "Сидор"}},
+        {
+            "input": {
+                "lastName": f"SYNTHETIC-Sidorov-{suffix}",
+                "firstName": "SYNTHETIC",
+            }
+        },
     )
     orphan_id = data["createPatient"]["patient"]["id"]
 
