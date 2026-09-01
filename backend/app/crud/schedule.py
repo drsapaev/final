@@ -31,7 +31,9 @@ def list_schedules(
         stmt = stmt.where(ScheduleTemplate.active == active)
     stmt = (
         stmt.order_by(
-            ScheduleTemplate.department.nulls_last(),
+            # department_id/doctor_id are real columns; .department is a
+            # relationship and ordering by it 500s (Sentry PYTHON-FASTAPI-M)
+            ScheduleTemplate.department_id.nulls_last(),
             ScheduleTemplate.doctor_id.nulls_last(),
             ScheduleTemplate.weekday.asc(),
             ScheduleTemplate.start_time.asc(),
