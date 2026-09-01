@@ -168,3 +168,13 @@ storybook-static/
 
 # Agent session worktrees (Multi-Session Worktree & Deploy Convention)
 _wt*/
+
+# Legacy session scratch at repo root (predates the Multi-Session Worktree
+# Convention, #3001). These are ignored so the production clean-tree guard
+# only fails on NEW untracked files. Do not add new entries here casually.
+/_diag/
+/_sec/
+/_sec2/
+/_restore_pg/
+/_offsite_restore/
+/_*.*
