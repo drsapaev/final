@@ -110,7 +110,6 @@ const GraphQLExplorer = () => {
         id
         fullName
         email
-        phone
       }
     }
     pagination {
@@ -132,8 +131,10 @@ const GraphQLExplorer = () => {
     items {
       id
       appointmentDate
+      appointmentTime
       status
-      paymentStatus
+      paymentType
+      services
       patient {
         fullName
         phone
@@ -144,17 +145,13 @@ const GraphQLExplorer = () => {
           fullName
         }
       }
-      service {
-        name
-        price
-      }
     }
   }
 }`,
       variables: {
         'filter': {
-          'dateFrom': new Date().toISOString().split('T')[0] + 'T00:00:00Z',
-          'dateTo': new Date().toISOString().split('T')[0] + 'T23:59:59Z'
+          'dateFrom': new Date().toISOString().split('T')[0],
+          'dateTo': new Date().toISOString().split('T')[0]
         }
       }
     },
@@ -165,11 +162,10 @@ const GraphQLExplorer = () => {
     items {
       id
       visitDate
+      visitTime
       status
       discountMode
-      allFree
-      totalAmount
-      paymentStatus
+      notes
       doctor {
         specialty
         user {
@@ -194,22 +190,16 @@ const GraphQLExplorer = () => {
       name
       code
       price
-      category
-      description
-      durationMinutes
+      unit
+      currency
+      categoryCode
       active
-      doctor {
-        specialty
-        user {
-          fullName
-        }
-      }
     }
   }
 }`,
       variables: {
         'filter': {
-          'category': 'consultation',
+          'categoryCode': 'consultation',
           'active': true
         }
       }

@@ -2,6 +2,7 @@
 
 Split from qr_queue_service.py.
 """
+
 from __future__ import annotations
 
 from app.services.qr_queue._base import *  # noqa: F401, F403
@@ -90,12 +91,12 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
     # === QUEUE OPERATIONS ===
     # ============================================================
 
-
     def call_next_patient(
         self,
         specialist_id: int,
         called_by_user_id: int,
         target_date: date | None = None,
+        queue_tag: str | None = None,
     ) -> dict[str, Any]:
         """
         Вызывает следующего пациента в очереди
@@ -104,20 +105,22 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             specialist_id: ID специалиста
             called_by_user_id: ID пользователя, вызвавшего пациента
             target_date: Дата очереди (по умолчанию сегодня)
+            queue_tag: Опциональный тег очереди (GQL-AUDIT-28 follow-up):
+                когда задан, вызов происходит из очереди этого тега, а не
+                из произвольной активной очереди специалиста
 
         Returns:
             Информация о вызванном пациенте
         """
         queue_date = target_date if target_date else date.today()
-        daily_queue = (
-            self.db.query(DailyQueue)
-            .filter(
-                DailyQueue.day == queue_date,
-                DailyQueue.specialist_id == specialist_id,
-                DailyQueue.active == True,
-            )
-            .first()
+        queue_query = self.db.query(DailyQueue).filter(
+            DailyQueue.day == queue_date,
+            DailyQueue.specialist_id == specialist_id,
+            DailyQueue.active == True,
         )
+        if queue_tag:
+            queue_query = queue_query.filter(DailyQueue.queue_tag == queue_tag)
+        daily_queue = queue_query.first()
 
         if not daily_queue:
             raise ValueError(f"Очередь не активна на дату {queue_date}")
@@ -162,7 +165,6 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
     # === TOKEN QUERIES ===
     # ============================================================
 
-
     def _get_queue_length(self, queue_id: int) -> int:
         """
         Получает текущую длину очереди (только OnlineQueueEntry).
@@ -191,13 +193,13 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         except Exception as e:
             logger.error(f"[_get_queue_length] Ошибка: {e}")
             import traceback
+
             traceback.print_exc()
             return 0
 
     # ============================================================
     # === WAIT TIME ESTIMATION ===
     # ============================================================
-
 
     def _estimate_wait_time(self, queue_id: int, queue_number: int) -> int:
         """Оценивает время ожидания в минутах"""
@@ -226,7 +228,6 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             traceback.print_exc()
             return 0
 
-
     def _get_department_name(self, department: str) -> str:
         """Получает человекочитаемое название отделения"""
         department_names = {
@@ -238,7 +239,6 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             "general": "Общая практика",
         }
         return department_names.get(department, department.title())
-
 
     def _update_queue_statistics(self, queue_id: int, stat_field: str):
         """Обновляет статистику очереди"""
@@ -266,7 +266,6 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
 
         self.db.commit()
 
-
     def _check_online_time_restrictions(self, token: str) -> dict[str, Any]:
         """
         Проверяет временные ограничения для онлайн записи
@@ -279,9 +278,16 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         """
         # ✅ НОВОЕ: Dev Mode - отключение временных ограничений для разработки
         import os
+
         if os.getenv("DISABLE_QUEUE_TIME_RESTRICTIONS", "").lower() == "true":
-            logger.info("[_check_online_time_restrictions] ⚠️ DEV MODE: Временные ограничения отключены")
-            return {"allowed": True, "status": "dev_mode", "message": "Dev Mode: ограничения отключены"}
+            logger.info(
+                "[_check_online_time_restrictions] ⚠️ DEV MODE: Временные ограничения отключены"
+            )
+            return {
+                "allowed": True,
+                "status": "dev_mode",
+                "message": "Dev Mode: ограничения отключены",
+            }
 
         # Получаем токен
         qr_token = self.db.query(QueueToken).filter(QueueToken.token == token).first()
@@ -518,7 +524,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             )
 
             # TEMPORARY: Disable end time check for testing
-            if False: # current_time_obj > end_time_obj:
+            if False:  # current_time_obj > end_time_obj:
                 return {
                     "allowed": False,
                     "message": f"Запись закрыта в {end_time_str}",
@@ -594,5 +600,3 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             "current_entries": current_entries,
             "remaining_slots": max_entries - current_entries,
         }
-
-

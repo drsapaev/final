@@ -33,12 +33,13 @@ from app.crud.appointment import (
     create_appointment as crud_create_appointment,
 )
 from app.crud.clinic import get_queue_settings
-from app.crud.patient import (
-    soft_delete_patient,
-    update_patient,
-)
+from app.crud.patient import soft_delete_patient
 from app.crud.visit import create_visit
-from app.schemas.patient import PatientCreate
+from app.schemas.patient import PatientCreate, PatientUpdate
+from app.services.appointment_eligibility import (
+    ensure_doctor_eligible_for_appointment,
+)
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.display_websocket import get_display_manager
 from app.services.patient_service import PatientService
 from app.services.qr_queue import QRQueueService
@@ -75,32 +76,6 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit
-
-
-def _patient_update_data(input: PatientUpdateInput) -> dict:
-    """Собрать dict обновления только из переданных полей."""
-    update_data = {}
-    if input.last_name is not None:
-        update_data["last_name"] = input.last_name
-    if input.first_name is not None:
-        update_data["first_name"] = input.first_name
-    if input.middle_name is not None:
-        update_data["middle_name"] = input.middle_name
-    if input.phone is not None:
-        update_data["phone"] = input.phone
-    if input.email is not None:
-        update_data["email"] = input.email
-    if input.birth_date is not None:
-        update_data["birth_date"] = input.birth_date
-    if input.sex is not None:
-        update_data["sex"] = input.sex
-    if input.address is not None:
-        update_data["address"] = input.address
-    if input.doc_type is not None:
-        update_data["doc_type"] = input.doc_type
-    if input.doc_number is not None:
-        update_data["doc_number"] = input.doc_number
-    return update_data
 
 
 @strawberry.type
@@ -172,27 +147,35 @@ class Mutation:
 
     @strawberry.mutation
     def update_patient(
-        self, id: int, input: PatientUpdateInput
+        self, info: strawberry.Info, id: int, input: PatientUpdateInput
     ) -> PatientMutationResponse:
-        """Обновить данные пациента"""
+        """Обновить пациента (SSOT: PatientService.update_patient)."""
+        actor = getattr(info.context, "user", None) if info.context else None
+        if not actor:
+            return PatientMutationResponse(
+                success=False,
+                message=t("error.unauthorized"),
+                errors=["UNAUTHENTICATED"],
+            )
         try:
             with get_db_session() as db:
-                patient = (
-                    db.query(Patient)
-                    .filter(Patient.id == id, Patient.is_deleted.is_(False))
-                    .first()
-                )
-                if not patient:
-                    return PatientMutationResponse(
-                        success=False,
-                        message=t("patient.not_found"),
-                        errors=["PATIENT_NOT_FOUND"],
-                    )
-
-                # Обновляем только переданные поля (SSOT: mobile API wrapper)
-                update_data = _patient_update_data(input)
-                updated_patient = update_patient(
-                    db, patient_id=id, update_data=update_data
+                # SSOT: duplicate-phone check, critical-change audit и т.д.
+                updated_patient = PatientService(db).update_patient(
+                    request=getattr(info.context, "request", None),
+                    patient_id=id,
+                    patient_in=PatientUpdate(
+                        last_name=input.last_name,
+                        first_name=input.first_name,
+                        middle_name=input.middle_name,
+                        phone=input.phone,
+                        email=input.email,
+                        birth_date=input.birth_date,
+                        sex=input.sex,
+                        address=input.address,
+                        doc_type=input.doc_type,
+                        doc_number=input.doc_number,
+                    ),
+                    current_user=actor,
                 )
 
                 return PatientMutationResponse(
@@ -201,6 +184,19 @@ class Mutation:
                     patient=patient_to_type(updated_patient),
                 )
 
+        except HTTPException as exc:
+            detail = str(exc.detail)
+            if "не найден" in detail or "not found" in detail.lower():
+                return PatientMutationResponse(
+                    success=False, message=detail, errors=["PATIENT_NOT_FOUND"]
+                )
+            if "номером телефона" in detail:
+                return PatientMutationResponse(
+                    success=False, message=detail, errors=["PHONE_EXISTS"]
+                )
+            return PatientMutationResponse(
+                success=False, message=detail, errors=["VALIDATION_ERROR"]
+            )
         except Exception:
             return PatientMutationResponse(
                 success=False,
@@ -290,6 +286,24 @@ class Mutation:
                             success=False,
                             message=t("doctor.not_found"),
                             errors=["DOCTOR_NOT_FOUND"],
+                        )
+
+                    # SSOT: атомарная бронь слота (как в canonical endpoint) —
+                    # per-doctor FOR UPDATE lock ДО проверки занятости
+                    lock_doctor_for_slot_reservation(db, input.doctor_id)
+                    ensure_doctor_eligible_for_appointment(db, input.doctor_id)
+                    if input.appointment_time and (
+                        appointment_crud.is_time_slot_occupied(
+                            db,
+                            doctor_id=input.doctor_id,
+                            appointment_date=input.appointment_date,
+                            appointment_time=input.appointment_time,
+                        )
+                    ):
+                        return AppointmentMutationResponse(
+                            success=False,
+                            message="Это время уже занято у выбранного врача",
+                            errors=["SLOT_OCCUPIED"],
                         )
 
                 # Создаем запись (SSOT: crud create_appointment)
@@ -751,14 +765,11 @@ class Mutation:
                         errors=["ALREADY_IN_QUEUE"],
                     )
 
-                # Лимит: индивидуальный на очередь -> капа врача
+                # Лимит: считаем записи ВЫБРАННОЙ очереди (не всех очередей
+                # врача за день) и сравниваем с её же капой
                 online_entries_count = (
                     db.query(OnlineQueueEntry)
-                    .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-                    .filter(
-                        DailyQueue.specialist_id == input.doctor_id,
-                        DailyQueue.day == today,
-                    )
+                    .filter(OnlineQueueEntry.queue_id == daily_queue.id)
                     .count()
                 )
 
@@ -829,12 +840,16 @@ class Mutation:
             entry_snapshot = None
             entry_id = None
             cabinet = None
+            specialist_name = "Врач"
             with get_db_session() as db:
-                # SSOT: with_for_update, called_by-аудит, канонические ответы.
-                # queue_tag принят для совместимости контракта; каноничный
-                # сервис вызывает из активной очереди специалиста на дату.
+                # SSOT: with_for_update, called_by-аудит, канонические ответы;
+                # queue_tag передаётся в канонический сервис (фильтр очереди).
                 result = await run_in_threadpool(
-                    QRQueueService(db).call_next_patient, doctor_id, actor.id, None
+                    QRQueueService(db).call_next_patient,
+                    doctor_id,
+                    actor.id,
+                    None,
+                    queue_tag,
                 )
 
                 if not result.get("success"):
@@ -881,7 +896,9 @@ class Mutation:
                         "GraphQL callNext: notify_patient_called failed: %s", e
                     )
 
-                # 2) TV-табло
+                # 2) TV-табло — payload строится и отправляется, ПОКА
+                # сессия открыта (entry3.queue/specialist — lazy-load;
+                # после закрытия сессии был бы DetachedInstanceError)
                 try:
                     manager = get_display_manager()
                     with get_db_session() as db3:
@@ -890,19 +907,19 @@ class Mutation:
                             .filter(OnlineQueueEntry.id == entry_id)
                             .first()
                         )
-                    if entry3:
-                        specialist_name = (
-                            entry3.queue.specialist.user.full_name
-                            if entry3.queue
-                            and entry3.queue.specialist
-                            and entry3.queue.specialist.user
-                            else "Врач"
-                        )
-                        await manager.broadcast_patient_call(
-                            queue_entry=entry3,
-                            doctor_name=specialist_name,
-                            cabinet=cabinet,
-                        )
+                        if entry3:
+                            specialist_name = (
+                                entry3.queue.specialist.user.full_name
+                                if entry3.queue
+                                and entry3.queue.specialist
+                                and entry3.queue.specialist.user
+                                else "Врач"
+                            )
+                            await manager.broadcast_patient_call(
+                                queue_entry=entry3,
+                                doctor_name=specialist_name,
+                                cabinet=cabinet,
+                            )
                 except Exception as e:  # noqa: BLE001 — non-blocking
                     logger.warning("GraphQL callNext: display broadcast failed: %s", e)
 
