@@ -57,7 +57,8 @@ def _make_doctor(db_session, specialty: str) -> Doctor:
 
 
 def _make_loaded_queue(
-    db_session, doctor: Doctor, day, *, waiting: int = 0, served: int = 0
+    db_session, doctor: Doctor, day, *, waiting: int = 0, served: int = 0,
+    called: int = 0,
 ) -> DailyQueue:
     queue = DailyQueue(
         day=day,
@@ -86,6 +87,17 @@ def _make_loaded_queue(
                 number=number,
                 patient_name=f"Served {number}",
                 status="served",
+                source="desk",
+            )
+        )
+        number += 1
+    for _ in range(called):
+        db_session.add(
+            OnlineQueueEntry(
+                queue_id=queue.id,
+                number=number,
+                patient_name=f"Called {number}",
+                status="called",
                 source="desk",
             )
         )
@@ -301,8 +313,8 @@ def test_queue_limits_aggregate_max_for_multi_doctor_specialty(db_session) -> No
         def list_active_doctors(self, *, specialty: str | None):
             return self._doctors
 
-        def get_daily_queue(self, *, day, specialist_id):
-            return None
+        def list_active_daily_queues(self, *, day, specialist_id):
+            return []
 
     d1 = _make_doctor(db_session, "dentistry")
     d2 = _make_doctor(db_session, "dentistry")
@@ -469,8 +481,8 @@ def test_queue_limits_response_model_exposes_aggregate(db_session) -> None:
         def list_active_doctors(self, *, specialty: str | None):
             return self._doctors
 
-        def get_daily_queue(self, *, day, specialist_id):
-            return None
+        def list_active_daily_queues(self, *, day, specialist_id):
+            return []
 
     d1 = _make_doctor(db_session, "dentistry")
     d2 = _make_doctor(db_session, "dentistry")
@@ -763,13 +775,13 @@ def test_queue_limits_aggregate_sums_per_doctor_caps(db_session) -> None:
     class _Repo:
         def __init__(self, doctors, queues):
             self._doctors = doctors
-            self._queues = queues  # doctor_id -> DailyQueue | None
+            self._queues = queues  # doctor_id -> list[DailyQueue]
 
         def list_active_doctors(self, *, specialty: str | None):
             return self._doctors
 
-        def get_daily_queue(self, *, day, specialist_id):
-            return self._queues.get(specialist_id)
+        def list_active_daily_queues(self, *, day, specialist_id):
+            return self._queues.get(specialist_id, [])
 
         def count_entries(self, *, queue_id):
             return 0
@@ -792,7 +804,7 @@ def test_queue_limits_aggregate_sums_per_doctor_caps(db_session) -> None:
 
     service = QueueLimitsApiService(
         db_session,
-        repository=_Repo([d1, d2, d3], {d1.id: q1, d2.id: q2, d3.id: None}),
+        repository=_Repo([d1, d2, d3], {d1.id: [q1], d2.id: [q2], d3.id: []}),
         get_settings=lambda _db: {"max_per_day": {"dentistry": 15}, "start_numbers": {}},
     )
     rows = service.get_queue_limits(specialty="dentistry")
@@ -917,3 +929,86 @@ def test_queue_limits_repo_prefers_active_queue(db_session) -> None:
     found = repo.get_daily_queue(day=today, specialist_id=doctor.id)
     assert found.id == live.id
     assert found.max_online_entries == 10
+
+
+# ===================== J. Codex round-5 regressions =====================
+
+
+@pytest.mark.queue
+def test_display_quick_call_skips_owner_ineligible_ghosts(db_session) -> None:
+    """Codex round-5 P2: the quick-call candidate query applies the same
+    owner-eligibility contract as the join — an active ghost (deactivated
+    owner) with a shorter waiting queue must not win the pick."""
+    ghost_owner = User(
+        username="d2_qc_ghost_owner",
+        email="d2_qc_ghost_owner@test.com",
+        hashed_password=_D2_HASHED_PASSWORD,
+        role="Doctor",
+        is_active=False,
+        is_superuser=False,
+    )
+    db_session.add(ghost_owner)
+    db_session.flush()
+    ghost = Doctor(user_id=ghost_owner.id, specialty="dentistry", active=True)
+    db_session.add(ghost)
+    db_session.flush()
+    ghost_queue = _make_loaded_queue(db_session, ghost, date.today(), waiting=1)
+
+    healthy = _make_doctor(db_session, "dentistry")
+    healthy_queue = _make_loaded_queue(db_session, healthy, date.today(), waiting=3)
+    assert ghost.id < healthy.id  # the ghost would win waiting-count ties too
+
+    from app.repositories.display_websocket_api_repository import (
+        DisplayWebSocketApiRepository,
+    )
+
+    picked = DisplayWebSocketApiRepository(db_session).get_active_doctor_by_specialty(
+        "stomatology"
+    )
+    assert picked.id == healthy.id
+
+
+@pytest.mark.queue
+def test_display_quick_call_ranks_waiting_candidates_by_active_load(db_session) -> None:
+    """Codex round-5 P2: among doctors with waiting entries the ranking key
+    is the documented D-2 load metric (waiting+called), not the waiting
+    count — 1 waiting + 10 called must lose to 2 waiting + 0 called."""
+    busy = _make_doctor(db_session, "dentistry")
+    fresh = _make_doctor(db_session, "dentistry")
+    _make_loaded_queue(db_session, busy, date.today(), waiting=1, called=10)
+    _make_loaded_queue(db_session, fresh, date.today(), waiting=2)
+
+    from app.repositories.display_websocket_api_repository import (
+        DisplayWebSocketApiRepository,
+    )
+
+    picked = DisplayWebSocketApiRepository(db_session).get_active_doctor_by_specialty(
+        "stomatology"
+    )
+    assert picked.id == fresh.id
+
+
+@pytest.mark.queue
+def test_queue_limits_aggregate_enumerates_all_tagged_queues(db_session) -> None:
+    """Codex round-5 P2: a doctor holding several ACTIVE queues under
+    different tags contributes EVERY enforced cap (and usage) to the
+    aggregate — get_daily_queue's lowest-id row must not hide the rest."""
+    from app.repositories.queue_limits_repository import QueueLimitsRepository
+
+    today = date.today()
+    doctor = _make_doctor(db_session, "dentistry")
+    q_tag = DailyQueue(
+        day=today, specialist_id=doctor.id, queue_tag="stomatology",
+        active=True, max_online_entries=10,
+    )
+    q_legacy = DailyQueue(
+        day=today, specialist_id=doctor.id, queue_tag="dentistry",
+        active=True, max_online_entries=30,
+    )
+    db_session.add_all([q_tag, q_legacy])
+    db_session.flush()
+
+    repo = QueueLimitsRepository(db_session)
+    queues = repo.list_active_daily_queues(day=today, specialist_id=doctor.id)
+    assert sorted(q.id for q in queues) == sorted([q_tag.id, q_legacy.id])
+    assert sum(q.max_online_entries for q in queues) == 40

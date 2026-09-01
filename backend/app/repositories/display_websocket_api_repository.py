@@ -7,9 +7,11 @@ from datetime import date
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
+from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import specialty_variants
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.user import User
 
 
 class DisplayWebSocketApiRepository:
@@ -49,9 +51,16 @@ class DisplayWebSocketApiRepository:
         (deterministic)."""
         doctors = (
             self.db.query(Doctor)
+            .join(User, Doctor.user_id == User.id)
             .filter(
                 Doctor.specialty.in_(specialty_variants(specialty)),
                 Doctor.active.is_(True),
+                # Codex round-5 P2: same owner-eligibility contract as the
+                # clinic-wide join — an active legacy ghost (owner missing
+                # per decision #13, deactivated or demoted to a non-doctor
+                # role) must not be quick-callable either.
+                User.is_active.is_(True),
+                func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
             )
             .order_by(Doctor.id.asc())
             .all()
@@ -97,18 +106,21 @@ class DisplayWebSocketApiRepository:
         # only already-called entries) has "load 0" in the raw least-loaded
         # ranking and used to win the pick while another doctor's patients
         # stayed uncalled — quick_call_next then answered 404/queue_empty.
-        # Route among doctors whose queue REALLY has waiting entries first
-        # (least waiting first, ties to the lowest Doctor.id); only when NO
-        # candidate has waiting entries does the legacy least-active-load
-        # pick stand (the downstream 404/queue_empty is then the same
-        # signal the single-doctor flow produced).
+        # Route among doctors whose queue REALLY has waiting entries first;
+        # Codex round-5 P2: those candidates are still ranked by the
+        # documented D-2 load metric (waiting+called = active_loads), NOT
+        # by the waiting count alone — 1 waiting + 10 called loses to
+        # 2 waiting + 0 called. Only when NO candidate has waiting entries
+        # does the legacy least-active-load pick stand (the downstream
+        # 404/queue_empty is then the same signal the single-doctor flow
+        # produced).
         candidates_with_waiting = [
             d for d in doctors if waiting_loads.get(d.id, 0) > 0
         ]
         if candidates_with_waiting:
             return min(
                 candidates_with_waiting,
-                key=lambda d: (waiting_loads[d.id], d.id),
+                key=lambda d: (active_loads.get(d.id, 0), d.id),
             )
         return min(doctors, key=lambda d: (active_loads.get(d.id, 0), d.id))
 

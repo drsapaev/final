@@ -624,7 +624,25 @@ def test_update_queue_settings_writes_canonical_keys(db_session) -> None:
 
 
 def _family_doctor(db_session, specialty: str) -> Doctor:
-    doctor = Doctor(specialty=specialty, active=True)
+    """A clinic-eligible doctor: linked to an ACTIVE Doctor-role owner
+    (the owner-eligibility contract the quick-call/join candidate queries
+    apply — Codex round-5 P2; userless rows are legacy ghosts per
+    decision #13)."""
+    from app.core.security import get_password_hash
+    from app.models.user import User
+
+    ordinal = db_session.query(User).count() + 1
+    user = User(
+        username=f"d1_family_user_{ordinal}",
+        email=f"d1_family_user_{ordinal}@test.com",
+        hashed_password=get_password_hash("d1family123"),
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    doctor = Doctor(user_id=user.id, specialty=specialty, active=True)
     db_session.add(doctor)
     db_session.commit()
     return doctor

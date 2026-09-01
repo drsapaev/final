@@ -44,18 +44,23 @@ class QueueLimitsApiService:
             total_usage = 0
             aggregate_cap = 0
             for doctor in spec_data["doctors"]:
-                daily_queue = self.repository.get_daily_queue(
+                # Codex round-5 P2: a doctor may hold several ACTIVE queues
+                # for today under different tags (the quick-call surface
+                # supports that) — enumerate ALL of them, both for usage
+                # and for the aggregate capacity; get_daily_queue would
+                # silently pick only the lowest-id row.
+                queues = self.repository.list_active_daily_queues(
                     day=today,
                     specialist_id=doctor.id,
                 )
-                if daily_queue:
+                for daily_queue in queues:
                     total_usage += self.repository.count_entries(queue_id=daily_queue.id)
-                    # Codex round-3 P2: enforcement reads the persisted
-                    # per-queue cap (check_queue_limits -> max_online_entries)
-                    # — the admin aggregate must sum THAT, not the specialty
-                    # default. Falsy -> 15 mirrors the enforcement fallback.
+                    # enforcement reads the persisted per-queue cap
+                    # (check_queue_limits -> max_online_entries) — the
+                    # admin aggregate must sum THAT. Falsy -> 15 mirrors
+                    # the enforcement fallback.
                     aggregate_cap += daily_queue.max_online_entries or 15
-                else:
+                if not queues:
                     # No queue yet: the join would create one with the
                     # doctor's own per-doctor default (Doctor.
                     # max_online_per_day, column default 15).
