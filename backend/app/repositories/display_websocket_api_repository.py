@@ -73,6 +73,13 @@ class DisplayWebSocketApiRepository:
             .filter(
                 DailyQueue.day == today,
                 DailyQueue.specialist_id.in_(doctor_ids),
+                # Codex round-2 P1: an active doctor may retain a same-day
+                # INACTIVE queue with waiting entries — counting them can
+                # hand the call to that doctor while a sibling holds the
+                # live active queue, and quick_call_next would then fetch
+                # the inactive row. Only active queues are quick-call
+                # candidates (selection AND the later lookup agree).
+                DailyQueue.active.is_(True),
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
             )
             .group_by(DailyQueue.specialist_id, OnlineQueueEntry.status)
@@ -118,11 +125,16 @@ class DisplayWebSocketApiRepository:
         day: date,
         specialist_id: int,
     ) -> DailyQueue | None:
+        """The doctor's ACTIVE queue for ``day`` (Codex round-2 P1: the
+        quick-call lookup must agree with the selection query — patients
+        must never be called out of a same-day inactive queue; when only
+        an inactive row exists the caller's 404 is the honest answer)."""
         return (
             self.db.query(DailyQueue)
             .filter(
                 DailyQueue.day == day,
                 DailyQueue.specialist_id == specialist_id,
+                DailyQueue.active.is_(True),
             )
             .first()
         )

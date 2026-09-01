@@ -82,8 +82,14 @@ def _unbookable_doctor_ids(
         if same_day and queue.opened_at is not None:
             unbookable.add(queue.specialist_id)
             continue
+        # Codex round-2 P2: DailyQueue persists the online cap as
+        # ``max_online_entries`` (dev_seed sets 20, legacy crud honors it);
+        # the old getattr(queue, "max_slots", ...) never existed on the
+        # model, so every queue silently fell back to DEFAULT_MAX_SLOTS=15
+        # and the picker disagreed with the configured bookability. Same
+        # fallback shape as the legacy crud path (falsy -> default).
         max_slots = (
-            getattr(queue, "max_slots", None)
+            queue.max_online_entries
             or QueueBusinessServiceMixinBase.DEFAULT_MAX_SLOTS
         )
         if active_counts.get(queue.id, 0) >= max_slots:
@@ -150,7 +156,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             .count()
         )
 
-        max_slots = getattr(daily_queue, 'max_slots', None) or cls.DEFAULT_MAX_SLOTS
+        # Codex round-2 P2 (companion of the _unbookable_doctor_ids fix):
+        # the enforcement side carried the same phantom ``max_slots``
+        # attribute — the admin-configured ``max_online_entries`` cap was
+        # never honored here, so a capacity-30 queue still rejected at 15
+        # while a capacity-10 queue stayed eligible. Read the persisted cap
+        # exactly like the legacy crud path (falsy -> DEFAULT_MAX_SLOTS).
+        max_slots = daily_queue.max_online_entries or cls.DEFAULT_MAX_SLOTS
 
         if current_entries >= max_slots:
             return (
@@ -693,6 +705,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             .filter(
                 DailyQueue.day == day,
                 DailyQueue.specialist_id.in_(doctor_ids),
+                # Codex round-2 P2: only ACTIVE queues carry live load —
+                # historical same-day entries in an inactive queue (the row
+                # the join would NOT use — get_or_create_daily_queue filters
+                # active) must not inflate a doctor's ranking.
+                DailyQueue.active.is_(True),
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
             )
             .group_by(DailyQueue.specialist_id)

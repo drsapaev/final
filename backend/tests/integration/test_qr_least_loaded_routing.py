@@ -510,3 +510,125 @@ def test_today_queues_ecg_buckets_register_visit_doctor(db_session) -> None:
     # ECG-only visit -> echokg bucket carries the doctor in "doctors"
     assert "echokg" in queues_by_specialty
     assert doctor.id in queues_by_specialty["echokg"]["doctors"]
+
+
+# ===================== G. Codex round-2 regressions =====================
+
+
+@pytest.mark.queue
+def test_pick_least_loaded_ignores_inactive_queue_load(db_session) -> None:
+    """Codex round-2 P2: historical same-day entries in an INACTIVE queue
+    (a row the join would never use — get_or_create_daily_queue filters
+    active) must not inflate a doctor's routing load, otherwise the QR
+    join routes to a more heavily loaded sibling."""
+    today = date.today()
+    stale = _make_doctor(db_session, "dentistry")
+    honest = _make_doctor(db_session, "dentistry")
+
+    _make_loaded_queue(db_session, stale, today, waiting=4)  # real load
+    stale_inactive = _make_loaded_queue(db_session, stale, today, waiting=5)
+    stale_inactive.active = False
+    db_session.flush()
+    _make_loaded_queue(db_session, honest, today, waiting=5)
+
+    picked = QueueBusinessService._pick_least_loaded_doctor(db_session, [stale, honest], today)
+    # correct: 4 < 5 -> stale wins. Buggy (inactive counted): 9 > 5 -> honest.
+    assert picked.id == stale.id
+
+
+@pytest.mark.queue
+def test_unbookable_honors_persisted_online_cap(db_session, monkeypatch) -> None:
+    """Codex round-2 P2: DailyQueue persists the online cap as
+    ``max_online_entries`` (never ``max_slots``) — the picker must treat a
+    queue that reached ITS OWN cap as unbookable while a below-cap queue
+    stays eligible regardless of the 15 default."""
+    from app.services.queue_svc._operations import _unbookable_doctor_ids
+
+    # inside the online window (pre-07:00 runs would mark EVERY doctor
+    # unbookable at the day level and mask the per-queue cap assertions)
+    _freeze_online_window(monkeypatch)
+    today = date.today()
+
+    # cap=2, 2 waiting -> unbookable (buggy code: 2 < 15 -> bookable)
+    small = _make_doctor(db_session, "dentistry")
+    q_small = _make_loaded_queue(db_session, small, today, waiting=2)
+    q_small.max_online_entries = 2
+    db_session.flush()
+    assert _unbookable_doctor_ids(
+        db_session, [small], today, queue_tag="stomatology"
+    ) == {small.id}
+
+    # cap=30, 15 waiting -> still bookable (buggy code: 15 >= 15 -> not)
+    large = _make_doctor(db_session, "dentistry")
+    q_large = _make_loaded_queue(db_session, large, today, waiting=15)
+    q_large.max_online_entries = 30
+    db_session.flush()
+    assert (
+        _unbookable_doctor_ids(db_session, [large], today, queue_tag="stomatology")
+        == set()
+    )
+
+    # routing follows the configured caps: the capped-out doctor is skipped
+    fresh = _make_doctor(db_session, "dentistry")
+    picked = QueueBusinessService._pick_least_loaded_doctor(
+        db_session, [small, fresh], today, queue_tag="stomatology"
+    )
+    assert picked.id == fresh.id
+
+
+@pytest.mark.queue
+def test_check_queue_limits_honors_persisted_cap(db_session) -> None:
+    """Codex round-2 P2 (enforcement side): check_queue_limits carried the
+    same phantom ``max_slots`` attribute, so the admin-configured
+    ``max_online_entries`` cap was never honored — a capacity-30 queue
+    rejected at 15 while a capacity-2 queue accepted up to 15."""
+    today = date.today()
+
+    # capacity 30: 15 waiting still accepted (buggy: rejected with 15)
+    large = _make_doctor(db_session, "dentistry")
+    q_large = _make_loaded_queue(db_session, large, today, waiting=15)
+    q_large.max_online_entries = 30
+    db_session.flush()
+    allowed, message = QueueBusinessService.check_queue_limits(db_session, q_large)
+    assert allowed, message
+
+    # capacity 2: rejected at 2 (buggy: accepted up to 15), message names 2
+    small = _make_doctor(db_session, "dentistry")
+    q_small = _make_loaded_queue(db_session, small, today, waiting=2)
+    q_small.max_online_entries = 2
+    db_session.flush()
+    allowed, message = QueueBusinessService.check_queue_limits(db_session, q_small)
+    assert not allowed
+    assert "2" in message
+
+
+@pytest.mark.queue
+def test_display_quick_call_ignores_inactive_queues(db_session) -> None:
+    """Codex round-2 P1: a same-day INACTIVE queue must be invisible to
+    quick-call — neither the candidate selection (waiting counts) nor the
+    queue lookup may touch it."""
+    from app.repositories.display_websocket_api_repository import (
+        DisplayWebSocketApiRepository,
+    )
+
+    today = date.today()
+    repo = DisplayWebSocketApiRepository(db_session)
+
+    # lower-id doctor holds ONLY an inactive queue with waiting entries:
+    # buggy code counted it (waiting=1 < 3) and picked him, calling a
+    # patient out of the inactive queue.
+    stale = _make_doctor(db_session, "dentistry")
+    stale_q = _make_loaded_queue(db_session, stale, today, waiting=1)
+    stale_q.active = False
+    db_session.flush()
+    live = _make_doctor(db_session, "dentistry")
+    _make_loaded_queue(db_session, live, today, waiting=3)
+
+    picked = repo.get_active_doctor_by_specialty("stomatology")
+    assert picked.id == live.id
+
+    # the lookup agrees: only an inactive row -> None; both rows -> active
+    assert repo.get_daily_queue_for_specialist(day=today, specialist_id=stale.id) is None
+    active_q = _make_loaded_queue(db_session, stale, today, waiting=0)
+    found = repo.get_daily_queue_for_specialist(day=today, specialist_id=stale.id)
+    assert found is not None and found.id == active_q.id

@@ -93252,6 +93252,10 @@
             "type": "integer",
             "title": "Doctors Count"
           },
+          "aggregate_max_per_day": {
+            "type": "integer",
+            "title": "Aggregate Max Per Day"
+          },
           "last_updated": {
             "anyOf": [
               {
@@ -93273,6 +93277,7 @@
           "enabled",
           "current_usage",
           "doctors_count",
+          "aggregate_max_per_day",
           "last_updated"
         ],
         "title": "QueueLimitResponse",
