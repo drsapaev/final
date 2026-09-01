@@ -45,6 +45,21 @@ def upsert_users():
     from app.core.security import get_password_hash
     from app.db.session import SessionLocal
     from app.models.user import User
+    from app.services.user_mgmt._base import (
+        DOCTOR_PROFILE_ROLES,
+        DOCTOR_ROLE_DEFAULT_SPECIALTY,
+    )
+
+    # D-3 RBAC unification: the lifecycle invariant is
+    #   role=Doctor-family  <->  active linked Doctor profile
+    # Legacy doctor users (cardio/derma/dentist) used to be created WITHOUT
+    # a Doctor row — they could log in but were invisible to queues,
+    # schedules and ownership checks that resolve via doctors.user_id.
+    # Opt out with ENSURE_ROLES_SKIP_DOCTOR_PROFILES=1 (e.g. for a stripped
+    # staging DB that intentionally keeps profiles detached).
+    skip_profiles = os.getenv("ENSURE_ROLES_SKIP_DOCTOR_PROFILES") == "1"
+
+    from app.models.clinic import Doctor
 
     db = SessionLocal()
     try:
@@ -68,6 +83,21 @@ def upsert_users():
                     u.hashed_password = get_password_hash(password)
                 u.is_active = True
             db.commit()
+
+            if skip_profiles or role not in DOCTOR_PROFILE_ROLES:
+                continue
+            doctor = (
+                db.query(Doctor).filter(Doctor.user_id == u.id).first()
+            )
+            if doctor is None:
+                doctor = Doctor(
+                    user_id=u.id,
+                    specialty=DOCTOR_ROLE_DEFAULT_SPECIALTY.get(role, "general"),
+                    active=bool(u.is_active),
+                )
+                db.add(doctor)
+                db.commit()
+                print(f"doctor profile ensured for {username} (role={role})")
         print("ok")
     finally:
         db.close()

@@ -507,6 +507,17 @@ class UserAuditLogResponse(UserAuditLogBase):
 
 # Схемы для управления пользователями
 
+# Single shared role vocabulary for UserCreateRequest AND UserUpdateRequest
+# (D-3 RBAC unification): the two patterns used to drift — creation accepted
+# the legacy doctor spellings (cardio/derma/dentist) while updates forbade
+# them, so a legacy spelling could never be (re)assigned after creation.
+# The doctor-lifecycle mapping (user_mgmt DOCTOR_ROLE_DEFAULT_SPECIALTY)
+# normalizes whatever spelling arrives.
+_USER_MANAGEMENT_ROLE_PATTERN = (
+    "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|"
+    "SuperAdmin|Manager|cardio|derma|dentist)$"
+)
+
 
 class UserCreateRequest(BaseModel):
     """Схема создания пользователя"""
@@ -517,7 +528,7 @@ class UserCreateRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=254)
     password: str = Field(..., min_length=8, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
-    role: str = Field(..., pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|derma|dentist)$")
+    role: str = Field(..., pattern=_USER_MANAGEMENT_ROLE_PATTERN)
     is_active: bool | None = True
     is_superuser: bool | None = False
     must_change_password: bool | None = False  # Требуется смена пароля при первом входе
@@ -559,7 +570,7 @@ class UserUpdateRequest(BaseModel):
     email: str | None = Field(None, min_length=3, max_length=254)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str | None = Field(
-        None, pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
     )
     is_active: bool | None = None
     is_superuser: bool | None = None
@@ -643,7 +654,7 @@ class UserSearchRequest(BaseModel):
     query: str | None = Field(None, min_length=1, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str | None = Field(
-        None, pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
     )
     status: UserStatus | None = None
     is_active: bool | None = None
@@ -667,7 +678,7 @@ class UserBulkActionRequest(BaseModel):
     )
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str | None = Field(
-        None, pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
     )
     reason: str | None = Field(None, max_length=500)
 
