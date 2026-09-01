@@ -192,6 +192,34 @@ def test_department_schedule_receptionist_alias_reads_any(client, db_session):
     assert appointment.id in ids
 
 
+def test_department_schedule_numeric_key_resolved_by_key_first(client, db_session):
+    """Codex round-2 P2: all-numeric KEYS are legal (DepartmentCreate
+    permits them) — resolution must try the key FIRST and only fall back
+    to the numeric-id lookup, otherwise /department/{numeric_key}/schedule
+    would return ANOTHER department's schedule or a false 404."""
+    numeric_dep = _department(db_session, "12345")
+    other_dep = _department(db_session, "cardio")
+    assert numeric_dep.key == "12345"
+    assert other_dep.id != numeric_dep.id
+
+    user, doctor = _doctor_with_user(
+        db_session, specialty="cardiology", department=other_dep, label="num"
+    )
+    patient = _patient(db_session)
+    appointment = _appointment(db_session, doctor, patient, other_dep)
+
+    response = client.get(
+        "/api/v1/appointments/department/12345/schedule",
+        params={"date": str(date.today() + timedelta(days=1))},
+        headers=_headers_for(_admin(db_session)),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["department"] == "12345"
+    ids = [entry["id"] for entry in body["appointments"]]
+    assert appointment.id not in ids  # the OTHER department's rows stay out
+
+
 def test_department_schedule_doctor_of_same_department_allowed(client, db_session):
     dep = _department(db_session, "cardio")
     user, doctor = _doctor_with_user(

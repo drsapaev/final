@@ -923,16 +923,19 @@ def get_department_schedule(
     # now resolved by key (or numeric id) and the schedule is scoped to
     # its department_id, with the same repaired serializer as the doctor
     # schedule twin (PR4).
-    department_row = None
-    if department.strip().isdigit():
+    # Codex round-2 P2: an all-numeric KEY is legal (DepartmentCreate
+    # permits it), so resolution tries the KEY first and only falls back
+    # to a numeric-id lookup — the previous id-first order silently
+    # returned another department's schedule (or a false 404) for a
+    # numeric-key department.
+    department_row = (
+        db.query(Department).filter(Department.key == department).first()
+    )
+    if department_row is None and department.strip().isdigit():
         department_row = (
             db.query(Department)
             .filter(Department.id == int(department.strip()))
             .first()
-        )
-    else:
-        department_row = (
-            db.query(Department).filter(Department.key == department).first()
         )
     if department_row is None:
         raise HTTPException(status_code=404, detail="Отделение не найдено")
