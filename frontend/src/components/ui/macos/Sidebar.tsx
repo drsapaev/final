@@ -272,7 +272,13 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
               borderRadius: 'var(--mac-radius-md, 6px)',
               // Sprint 8: macOS Finder-style active state — accent bg, no border, subtle
               background: isActive ? 'var(--mac-accent-bg)' : 'transparent',
-              color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-primary)',
+              // CC-1: active ink was var(--mac-accent) — blue-on-blue (1.0:1) against
+              // the solid --mac-nav-item-active !important background from the
+              // embedded style block below; invisible in light and (after the
+              // visibility-fix decommission) dark. The canonical pair token is
+              // --mac-nav-item-active-text (= --mac-text-on-accent, white), the
+              // same one SidebarItem already uses.
+              color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)',
               textDecoration: 'none',
               fontSize: 'var(--mac-font-size-base, 13px)',
               fontWeight: isActive ? 'var(--mac-font-weight-semibold, 600)' : 'var(--mac-font-weight-regular, 400)',
@@ -311,7 +317,9 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                   aria-hidden="true"
                   style={{
                     // Sprint 8: active icon = accent color, inactive = secondary
-                    color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                    // CC-1: active icon mirrors the label fix — nav-item-active-text
+                    // on the solid active background (was var(--mac-accent), 1.0:1).
+                    color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-secondary)',
                     opacity: isActive ? 1 : 0.85,
                   }} />
 

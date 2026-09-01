@@ -37,6 +37,17 @@
   --mac-accent-blue: #007aff;
   --mac-accent-blue-hover: #0051d5;
   --mac-accent-blue-active: #004bb5;
+  /* CC-1 (UI color-contrast track): strong accent/danger/success values for
+   * surfaces that carry WHITE text (--mac-text-on-accent). The base accent
+   * #007aff measures 4.02:1 against white (below the WCAG AA 4.5:1 floor —
+   * axe color-contrast, e2e/a11y-baseline.json); #0066d6 measures 5.42:1.
+   * #ff453a → #d92c20 = 3.41 → 4.85:1; #30d158 → #147a38 = 2.02 → 6.14:1.
+   * Border/link/status chips keep the base accent values; only text-bearing
+   * fills use the strong variants. Used by QueueJoin recovery buttons here;
+   * Button.tsx variants and the macos class set follow in CC-2. */
+  --mac-accent-blue-strong: #0066d6;
+  --mac-danger-strong: #d92c20;
+  --mac-success-strong: #147a38;
   --mac-accent-blue-500: var(--mac-accent-blue);
   --mac-accent-blue-600: var(--mac-accent-blue-hover);
   --mac-accent-blue-700: var(--mac-accent-blue-active);
@@ -181,7 +192,11 @@
     --mac-bg-quaternary: #48484a;
 
     --mac-text-primary: #ffffff;
-    --mac-text-secondary: #8e8e93;
+    /* CC-1: #8e8e93 → #98989d — muted ink was 4.27:1 on --mac-bg-content
+     * (#2c2c2e), below the WCAG AA 4.5:1 floor (axe color-contrast on the
+     * landing dark shell). #98989d measures 4.85:1 on #2c2c2e and 5.93:1 on
+     * #1c1c1e; on the translucent card surface it only improves. */
+    --mac-text-secondary: #98989d;
     --mac-text-tertiary: #636366;
 
     --mac-border: #38383a;
@@ -267,7 +282,8 @@
   --mac-bg-quaternary: #48484a;
 
   --mac-text-primary: #ffffff;
-  --mac-text-secondary: #8e8e93;
+  /* CC-1: mirror of the prefers-color-scheme block — see comment above. */
+  --mac-text-secondary: #98989d;
   --mac-text-tertiary: #636366;
 
   --mac-border: #38383a;
