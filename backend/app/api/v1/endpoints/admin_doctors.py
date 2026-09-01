@@ -227,6 +227,22 @@ def get_doctors_stats(
     return _get_doctors_stats_payload(db)
 
 
+@router.get("/doctors/specialty-vocabulary", response_model=list[dict[str, str]])
+def get_doctor_specialty_vocabulary(
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Canonical specialty ids selectable at new-doctor onboarding.
+
+    Feeds the mandatory specialty SELECT in the Users → Add User flow.
+    SSOT: app/core/specialties.py DOCTOR_ONBOARDING_SPECIALTIES (pilot
+    bootstrap — extendable without new User roles). Labels are localized
+    on the frontend; this endpoint returns domain ids only.
+    """
+    from app.core.specialties import DOCTOR_ONBOARDING_SPECIALTIES
+
+    return [{"code": specialty} for specialty in DOCTOR_ONBOARDING_SPECIALTIES]
+
+
 @router.get("/doctors/{doctor_id}", response_model=DoctorOut)
 def get_doctor(
     doctor_id: int,

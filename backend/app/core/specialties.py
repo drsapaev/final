@@ -41,6 +41,21 @@ DENTAL_FAMILY_SPELLINGS = frozenset(
     {"dentistry", "dental", "stomatology", "dentist"}
 )
 
+# Doctor-onboarding vocabulary (owner decision 2026-09-01): the specialty
+# domain ids an Admin may SELECT when creating a new system doctor via the
+# normal ``POST /users`` flow (User.role=Doctor + doctor_profile).
+# Semantics — "selectable at new-doctor onboarding", NOT "the only
+# specialties that exist": this is a pilot bootstrap registry; new
+# specialties are added here (plus frontend i18n labels) without new User
+# roles. It must NEVER contain the incomplete sentinel or legacy dental
+# spellings; values are compared exactly (canonical ids only). It is not
+# tied to Department.key or queue_tags.
+DOCTOR_ONBOARDING_SPECIALTIES: tuple[str, ...] = (
+    "cardiology",
+    "dermatology",
+    "dentistry",
+)
+
 
 def canonical_specialty(value: str | None) -> str | None:
     """Normalize a specialty value for STORAGE (write boundary).

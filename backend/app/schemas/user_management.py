@@ -5,12 +5,13 @@ Pydantic схемы для управления пользователями
 import logging
 import os
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Any
 
 from email_validator import EmailNotValidError
 from email_validator import validate_email as validate_email_address
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.config import ConfigDict
 
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
@@ -529,6 +530,25 @@ _USER_MANAGEMENT_ROLE_PATTERN = (
 )
 
 
+class DoctorProfileCreate(BaseModel):
+    """Doctor profile block for canonical new-doctor onboarding (POST /users).
+
+    Only accepted for role="Doctor" (canonical onboarding); legacy
+    doctor-role spellings keep their compatibility auto-map and must not
+    send this block. ``specialty`` must be a canonical onboarding id —
+    the incomplete sentinel ("general"), legacy dental spellings and any
+    free-text value are rejected.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    specialty: str = Field(..., min_length=1, max_length=100)
+    cabinet: str | None = Field(None, max_length=20)
+    price_default: Decimal | None = Field(None, ge=0)
+    start_number_online: int | None = Field(None, ge=1, le=100)
+    max_online_per_day: int | None = Field(None, ge=1, le=100)
+
+
 class UserCreateRequest(BaseModel):
     """Схема создания пользователя"""
 
@@ -548,6 +568,35 @@ class UserCreateRequest(BaseModel):
     first_name: str | None = Field(None, min_length=1, max_length=50)
     last_name: str | None = Field(None, min_length=1, max_length=50)
     phone: str | None = Field(None, min_length=10, max_length=20)
+
+    # Профиль врача — обязателен для role="Doctor" (canonical onboarding):
+    # новый системный врач создаётся одной операцией User+Doctor с явной
+    # канонической specialty. Для всех остальных ролей (включая legacy
+    # doctor-роли) блок запрещён.
+    doctor_profile: DoctorProfileCreate | None = None
+
+    @model_validator(mode="after")
+    def validate_doctor_profile_contract(self) -> "UserCreateRequest":
+        from app.core.specialties import DOCTOR_ONBOARDING_SPECIALTIES
+
+        if self.role == "Doctor":
+            if self.doctor_profile is None:
+                raise ValueError(
+                    "doctor_profile обязателен для role=Doctor: укажите "
+                    "каноническую специальность (например, cardiology)"
+                )
+            specialty = self.doctor_profile.specialty.strip()
+            if specialty not in DOCTOR_ONBOARDING_SPECIALTIES:
+                raise ValueError(
+                    "doctor_profile.specialty должна быть каноническим id из "
+                    "списка онбординга: "
+                    + ", ".join(DOCTOR_ONBOARDING_SPECIALTIES)
+                )
+        elif self.doctor_profile is not None:
+            raise ValueError(
+                "doctor_profile принимается только для role=Doctor"
+            )
+        return self
 
     @field_validator('password')
     @classmethod

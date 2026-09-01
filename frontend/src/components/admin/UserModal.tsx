@@ -1,7 +1,7 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
-import { User, Mail, Lock, Shield, Save, AlertCircle } from 'lucide-react';
+import { User, Mail, Lock, Shield, Save, AlertCircle, Stethoscope } from 'lucide-react';
 import { Modal } from '../ui/macos';
 import { Button } from '../ui/macos';
 import { Checkbox } from '../ui/macos';
@@ -9,6 +9,7 @@ import {
   Select,
   Input } from '../ui/macos';
 import { useRoles } from '../../hooks/useRoles';
+import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import React from "react";
@@ -35,6 +36,20 @@ interface UserModalProps {
   onSave: (userData: Record<string, unknown>) => Promise<void> | void;
   loading?: boolean;
 }
+
+// Owner decision 2026-09-01: canonical onboarding creates doctors as
+// User(role=Doctor) + doctor_profile. Legacy doctor-role spellings are
+// compatibility-only and must not be offered when CREATING a user; in edit
+// mode the user's existing legacy role stays selectable so a plain save
+// never performs a hidden role migration.
+const LEGACY_DOCTOR_ROLE_VALUES = new Set([
+  'cardio', 'derma', 'dentist',
+  'cardiologist', 'dermatologist',
+  'cardiology', 'dermatology', 'dentistry',
+]);
+
+const isLegacyDoctorRoleValue = (value: string) =>
+  LEGACY_DOCTOR_ROLE_VALUES.has(String(value).trim().toLowerCase());
 
 // Форм-обёртки вынесены на уровень модуля: компоненты, определённые ВНУТРИ
 // UserModal, пересоздавали свой тип на каждом рендере — React размонтировал
@@ -85,21 +100,24 @@ const UserModal = ({
     role: 'Patient',
     is_active: true,
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    doctorSpecialty: '',
+    doctorCabinet: '',
+    doctorPrice: '',
+    doctorStartNumber: '',
+    doctorMaxOnline: ''
   });
   const [errors, setErrors] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [specialtyOptions, setSpecialtyOptions] = useState<{ value: string; label: string }[]>([]);
 
   // Load roles from API (Phase 4: DB-driven roles - completed)
   const { roleOptions: apiRoleOptions } = useRoles({ includeAll: false });
 
   // Fallback roles if API fails
-  const roleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
+  const baseRoleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
     { value: 'Admin', label: t('admin2.umdl_role_admin') },
     { value: 'Doctor', label: t('admin2.umdl_role_doctor_general') },
-    { value: 'cardio', label: t('admin2.umdl_role_cardio') },
-    { value: 'derma', label: t('admin2.umdl_role_derma') },
-    { value: 'dentist', label: t('admin2.umdl_role_dentist') },
     { value: 'Nurse', label: t('admin2.umdl_role_nurse') },
     { value: 'Registrar', label: t('admin2.umdl_role_registrar') },
     { value: 'Receptionist', label: t('admin2.umdl_role_receptionist') },
@@ -107,6 +125,51 @@ const UserModal = ({
     { value: 'Lab', label: t('admin2.umdl_role_lab') },
     { value: 'Patient', label: t('admin2.umdl_role_patient') }
   ];
+
+  // Canonical onboarding: legacy doctor-role spellings are hidden in create
+  // mode. Edit mode keeps the user's current (possibly legacy) role so a
+  // plain save does not silently migrate the role.
+  const createRoleOptions = baseRoleOptions.filter(
+    (option) => !isLegacyDoctorRoleValue(String(option.value))
+  );
+  const roleOptions = user && !createRoleOptions.some((option) => option.value === user.role)
+    ? [...createRoleOptions, { value: user.role as string, label: user.role as string }]
+    : createRoleOptions;
+
+  const isDoctorOnboarding = !user && formData.role === 'Doctor';
+
+  // Canonical specialty vocabulary for the onboarding block (Admin-only
+  // endpoint; SSOT lives in backend app/core/specialties.py).
+  useEffect(() => {
+    if (!isOpen || user) return;
+    let cancelled = false;
+    api
+      .get('/admin/doctors/specialty-vocabulary')
+      .then((response: { data?: unknown }) => {
+        const data = response?.data;
+        const items: Array<{ code?: string }> = Array.isArray(data)
+          ? (data as Array<{ code?: string }>)
+          : ((data as { items?: Array<{ code?: string }> })?.items ?? []);
+        if (!cancelled) {
+          setSpecialtyOptions(
+            items
+              .filter((item) => Boolean(item?.code))
+              .map((item) => ({
+                value: String(item.code),
+                label: t(`admin2.umdl_spec_${item.code}`),
+              }))
+          );
+        }
+      })
+      .catch((fetchError: unknown) => {
+        if (!cancelled) setSpecialtyOptions([]);
+        logger.error('Error fetching doctor specialty vocabulary:', fetchError);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, user]);
 
   // Инициализация формы при открытии
   useEffect(() => {
@@ -119,7 +182,12 @@ const UserModal = ({
           role: user.role || 'Patient',
           is_active: user.is_active !== undefined ? user.is_active : true,
           password: '',
-          confirmPassword: ''
+          confirmPassword: '',
+          doctorSpecialty: '',
+          doctorCabinet: '',
+          doctorPrice: '',
+          doctorStartNumber: '',
+          doctorMaxOnline: ''
         });
       } else {
         setFormData({
@@ -129,7 +197,12 @@ const UserModal = ({
           role: 'Patient',
           is_active: true,
           password: '',
-          confirmPassword: ''
+          confirmPassword: '',
+          doctorSpecialty: '',
+          doctorCabinet: '',
+          doctorPrice: '',
+          doctorStartNumber: '',
+          doctorMaxOnline: ''
         });
       }
       setErrors({});
@@ -163,6 +236,12 @@ const UserModal = ({
       newErrors.confirmPassword = t('admin2.umdl_err_passwords_mismatch');
     }
 
+    // Canonical doctor onboarding: specialty is mandatory — a new system
+    // doctor can no longer be created incomplete ("general" sentinel).
+    if (isDoctorOnboarding && !formData.doctorSpecialty) {
+      newErrors.doctorSpecialty = t('admin2.umdl_err_doctor_specialty_required');
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -184,6 +263,31 @@ const UserModal = ({
 
       if (formData.password) {
         userData.password = formData.password;
+      }
+
+      // doctor_profile is attached ONLY for the canonical doctor onboarding
+      // path — switching Doctor → non-doctor before submit cannot leak stale
+      // form state into the payload.
+      if (isDoctorOnboarding) {
+        const doctorProfile: Record<string, unknown> = {
+          specialty: formData.doctorSpecialty,
+        };
+        if (formData.doctorCabinet.trim()) {
+          doctorProfile.cabinet = formData.doctorCabinet.trim();
+        }
+        const price = parseFloat(formData.doctorPrice);
+        if (formData.doctorPrice.trim() !== '' && Number.isFinite(price)) {
+          doctorProfile.price_default = price;
+        }
+        const startNumber = parseInt(formData.doctorStartNumber, 10);
+        if (formData.doctorStartNumber.trim() !== '' && Number.isFinite(startNumber)) {
+          doctorProfile.start_number_online = startNumber;
+        }
+        const maxOnline = parseInt(formData.doctorMaxOnline, 10);
+        if (formData.doctorMaxOnline.trim() !== '' && Number.isFinite(maxOnline)) {
+          doctorProfile.max_online_per_day = maxOnline;
+        }
+        userData.doctor_profile = doctorProfile;
       }
 
       await onSave(userData);
@@ -273,6 +377,73 @@ const UserModal = ({
             className="admin-input-pl-40"
           />
         </FormField>
+
+        {/* Doctor profile block — canonical new-doctor onboarding only */}
+        {isDoctorOnboarding && (
+          <div className="admin-doctor-onboarding-block">
+            <div className="admin-flex-center-12 admin-mb-8">
+              <Stethoscope className="admin-icon-16" />
+              <span className="admin-font-semibold">
+                {t('admin2.umdl_doctor_profile_section')}
+              </span>
+            </div>
+            <p className="admin-patients-subtitle admin-mb-12">
+              {t('admin2.umdl_doctor_hint')}
+            </p>
+            <FormField
+              label={t('admin2.umdl_doctor_specialty')}
+              required
+              error={errors.doctorSpecialty}
+            >
+              <Select
+                value={formData.doctorSpecialty}
+                onValueChange={(value) => handleChange('doctorSpecialty', value)}
+                options={[
+                  { value: '', label: t('admin2.umdl_doctor_specialty_ph') },
+                  ...specialtyOptions,
+                ]}
+                size="large"
+              />
+            </FormField>
+            <div className="admin-doctor-onboarding-grid">
+              <FormField label={t('admin2.umdl_doctor_cabinet')}>
+                <Input
+                  type="text"
+                  value={formData.doctorCabinet}
+                  onChange={(e) => handleChange('doctorCabinet', e.target.value)}
+                  placeholder="12"
+                />
+              </FormField>
+              <FormField label={t('admin2.umdl_doctor_price')}>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={formData.doctorPrice}
+                  onChange={(e) => handleChange('doctorPrice', e.target.value)}
+                  placeholder="150000"
+                />
+              </FormField>
+              <FormField label={t('admin2.umdl_doctor_start_number')}>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={formData.doctorStartNumber}
+                  onChange={(e) => handleChange('doctorStartNumber', e.target.value)}
+                  placeholder="1"
+                />
+              </FormField>
+              <FormField label={t('admin2.umdl_doctor_max_online')}>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={formData.doctorMaxOnline}
+                  onChange={(e) => handleChange('doctorMaxOnline', e.target.value)}
+                  placeholder="15"
+                />
+              </FormField>
+            </div>
+          </div>
+        )}
 
         {/* Status */}
         <div className="admin-mb-16">

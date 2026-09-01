@@ -246,22 +246,55 @@ class CoreMixin(UserManagementServiceMixinBase):
                     .first()
                 )
                 if not existing_doctor:
-                    # PR-26: map role to specialty including lowercase cardio/derma/dentist.
-                    # "Doctor" -> "general" is the INCOMPLETE sentinel (decision #5):
-                    # the profile is provisioned mechanically; admin must complete
-                    # the real specialty (see is_doctor_profile_incomplete).
-                    new_doctor = Doctor(
-                        user_id=user.id,
-                        specialty=DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
-                            user_data.role, INCOMPLETE_DOCTOR_SPECIALTY
-                        ),
-                        active=user_data.is_active,
-                    )
-                    db.add(new_doctor)
-                    doctor_created = True
-                    logger.info(
-                        f"Auto-created Doctor row for user {user.id} (role={user_data.role})"
-                    )
+                    if user_data.role == "Doctor" and user_data.doctor_profile:
+                        # Canonical onboarding (owner decision 2026-09-01):
+                        # the schema layer guarantees a real onboarding
+                        # specialty here — no "general" sentinel can enter
+                        # through the normal create path anymore.
+                        profile_block = user_data.doctor_profile
+                        new_doctor = Doctor(
+                            user_id=user.id,
+                            specialty=profile_block.specialty.strip(),
+                            cabinet=profile_block.cabinet,
+                            price_default=profile_block.price_default,
+                            start_number_online=(
+                                profile_block.start_number_online
+                                if profile_block.start_number_online is not None
+                                else 1
+                            ),
+                            max_online_per_day=(
+                                profile_block.max_online_per_day
+                                if profile_block.max_online_per_day is not None
+                                else 15
+                            ),
+                            active=user_data.is_active,
+                        )
+                        db.add(new_doctor)
+                        doctor_created = True
+                        logger.info(
+                            "Onboarded Doctor profile for user %s "
+                            "(specialty=%s) in the create-user transaction",
+                            user.id,
+                            profile_block.specialty,
+                        )
+                    else:
+                        # Legacy doctor-role spellings via API keep the
+                        # compatibility auto-map (recovery/migration surface,
+                        # NOT canonical onboarding). "Doctor" without a
+                        # doctor_profile is unreachable here: the schema
+                        # validator rejects it with 422.
+                        new_doctor = Doctor(
+                            user_id=user.id,
+                            specialty=DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
+                                user_data.role, INCOMPLETE_DOCTOR_SPECIALTY
+                            ),
+                            active=user_data.is_active,
+                        )
+                        db.add(new_doctor)
+                        doctor_created = True
+                        logger.info(
+                            f"Auto-created Doctor row for user {user.id} (role={user_data.role})"
+                        )
 
             db.commit()
             # Обновляем объекты, чтобы получить все поля (id, created_at, updated_at)
