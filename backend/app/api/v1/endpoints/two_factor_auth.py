@@ -244,28 +244,35 @@ async def verify_two_factor(
                 detail="At least one verification method must be provided",
             )
 
-        # ✅ CERTIFICATION: Получаем пользователя из access_token или pending_2fa_token
+        # ✅ CERTIFICATION: Получаем пользователя из pending_2fa_token или access_token.
+        # SECURITY (#2986): when pending_2fa_token is present it is the authoritative
+        # credential of the BLOCKING LOGIN challenge and must win. Resolving the
+        # access_token header first let any unrelated valid token stored in the
+        # browser (e.g. another staff user's session) hijack the challenge —
+        # verify ran against THAT user and returned "2FA not enabled" for a
+        # fully correct admin code. Access_token remains the path for the
+        # already-authenticated settings flow (no pending token in that case).
         user: User | None = None
 
-        # Пробуем получить из access_token (если передан в заголовке)
-        try:
-            from fastapi.security import HTTPBearer
-
-            security = HTTPBearer(auto_error=False)
-            token_result = await security(request)
-            if token_result and token_result.credentials:
-                try:
-                    user = await get_current_user(token_result.credentials, db)
-                except HTTPException:
-                    pass  # Не JWT токен, пробуем pending_2fa_token
-        except Exception:
-            pass
-
-        # Если access_token не сработал, пробуем pending_2fa_token
-        if not user and request_data.pending_2fa_token:
+        if request_data.pending_2fa_token:
             user = TwoFactorAuthApiService(db).get_user_from_pending_token(
                 request_data.pending_2fa_token
             )
+
+        # Fallback for the authenticated settings flow: access_token header.
+        if not user:
+            try:
+                from fastapi.security import HTTPBearer
+
+                security = HTTPBearer(auto_error=False)
+                token_result = await security(request)
+                if token_result and token_result.credentials:
+                    try:
+                        user = await get_current_user(token_result.credentials, db)
+                    except HTTPException:
+                        pass  # Не JWT токен
+            except Exception:
+                pass
 
         if not user:
             raise HTTPException(

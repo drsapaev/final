@@ -353,3 +353,69 @@ class Test2FAEnforcement:
         assert verify_data["success"] is True
         assert "access_token" in verify_data
 
+
+
+class Test2FAChallengeResolution:
+    """Regression tests for the login 2FA challenge user resolution (#2986).
+
+    /2fa/verify previously resolved the user from the Authorization header
+    FIRST and only fell back to pending_2fa_token. Any unrelated valid token
+    in the browser (another staff user's session) hijacked the challenge:
+    the admin's correct code was verified against THAT user, returning
+    "2FA not enabled". pending_2fa_token must be authoritative.
+    """
+
+    def test_stray_access_token_does_not_hijack_pending_challenge(
+        self,
+        client: TestClient,
+        db_session: Session,
+        admin_user_with_2fa: tuple[User, str],
+        admin_password: str,
+        cashier_user_without_2fa: User,
+    ):
+        from app.api.deps import create_access_token
+
+        admin_user, secret = admin_user_with_2fa
+        service = get_two_factor_service()
+        correct_otp = service.generate_totp_code(secret)
+
+        # Step 1: admin login issues the pending challenge
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": admin_user.username, "password": admin_password},
+        )
+        assert login_response.status_code == 200
+        login_data = login_response.json()
+        assert login_data["requires_2fa"] is True
+        pending_token = login_data["pending_2fa_token"]
+
+        # Step 2: mint a VALID token for an unrelated user (no 2FA) —
+        # simulates another staff session kept in the same browser
+        stray_token = create_access_token(
+            {"sub": str(cashier_user_without_2fa.id), "username": cashier_user_without_2fa.username}
+        )
+
+        # Step 3: verify WITH the stray Authorization header + correct OTP.
+        # Old behavior: verified against the cashier -> "2FA not enabled".
+        verify_response = client.post(
+            "/api/v1/2fa/verify",
+            json={
+                "totp_code": correct_otp,
+                "pending_2fa_token": pending_token,
+            },
+            headers={"Authorization": f"Bearer {stray_token}"},
+        )
+        assert verify_response.status_code == 200
+        verify_data = verify_response.json()
+        assert verify_data["success"] is True, (
+            f"pending_2fa_token must win over the stray header; got: {verify_data.get('message')}"
+        )
+        assert verify_data.get("access_token"), "tokens must be issued for the challenged user"
+
+        # Step 4: the issued session must belong to the ADMIN, not the stray user
+        me_response = client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {verify_data['access_token']}"},
+        )
+        assert me_response.status_code == 200
+        assert me_response.json()["username"] == admin_user.username
