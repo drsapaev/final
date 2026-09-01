@@ -138,10 +138,16 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         ]
 
     def get_department_schedule(
-        self, db: Session, *, department: str, date: str
+        self, db: Session, *, department_id: int, date: str
     ) -> list[dict[str, Any]]:
         """
         Получить расписание отделения на определенную дату
+
+        NOTE: the previous version compared the ``department``
+        RELATIONSHIP to a raw string and read a non-existent ``apt.reason``
+        column — the serializer raised AttributeError (HTTP 500) for any
+        non-empty schedule (same defect class as get_doctor_schedule,
+        repaired in PR4). Filtering goes through department_id now.
         """
         try:
             schedule_date = datetime.strptime(date, "%Y-%m-%d").date()
@@ -152,7 +158,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             db.query(self.model)
             .filter(
                 and_(
-                    self.model.department == department,
+                    self.model.department_id == department_id,
                     self.model.appointment_date == schedule_date,
                     self.model.status != "cancelled",
                 )
@@ -167,8 +173,9 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
                 "appointment_time": apt.appointment_time,
                 "patient_id": apt.patient_id,
                 "doctor_id": apt.doctor_id,
+                "department_id": apt.department_id,
                 "status": apt.status,
-                "reason": apt.reason,
+                "notes": apt.notes,
             }
             for apt in appointments
         ]
