@@ -29,14 +29,20 @@ class QueueLimitsRepository:
         return query.all()
 
     def get_daily_queue(self, *, day: date, specialist_id: int) -> DailyQueue | None:
+        """The doctor's ACTIVE queue for ``day`` (Codex round-4 P2: an
+        inactive historical row for the same day must not feed usage counts
+        or the aggregate capacity — QR joins operate on active rows).
+        Deterministic ordering when several rows match."""
         return (
             self.db.query(DailyQueue)
             .filter(
                 and_(
                     DailyQueue.day == day,
                     DailyQueue.specialist_id == specialist_id,
+                    DailyQueue.active.is_(True),
                 )
             )
+            .order_by(DailyQueue.id.asc())
             .first()
         )
 
@@ -45,6 +51,23 @@ class QueueLimitsRepository:
             self.db.query(OnlineQueueEntry)
             .filter(OnlineQueueEntry.queue_id == queue_id)
             .count()
+        )
+
+    def list_active_daily_queues(self, *, day: date, specialist_id: int) -> list[DailyQueue]:
+        """ALL active same-day queues of the doctor (Codex round-5 P2: a
+        doctor may hold several active queues under different tags — the
+        aggregate capacity must enumerate every enforced cap)."""
+        return (
+            self.db.query(DailyQueue)
+            .filter(
+                and_(
+                    DailyQueue.day == day,
+                    DailyQueue.specialist_id == specialist_id,
+                    DailyQueue.active.is_(True),
+                )
+            )
+            .order_by(DailyQueue.id.asc())
+            .all()
         )
 
     def get_doctor(self, doctor_id: int) -> Doctor | None:

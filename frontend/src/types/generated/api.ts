@@ -32780,6 +32780,8 @@ export type components = {
             current_usage: number;
             /** Doctors Count */
             doctors_count: number;
+            /** Aggregate Max Per Day */
+            aggregate_max_per_day: number;
             /** Last Updated */
             last_updated: string | null;
         };
