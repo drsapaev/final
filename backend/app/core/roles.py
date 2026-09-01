@@ -96,6 +96,19 @@ def is_doctor_role_spelling(role: object) -> bool:
     """Case-insensitive doctor-role check against the full IAM vocabulary."""
     return normalize_role_value(role) in DOCTOR_ROLE_SPELLINGS
 
+
+# require_roles gate members admitting the WHOLE doctor family
+# (canonical "Doctor" + every legacy spelling listed in
+# DOCTOR_ROLE_SPELLINGS). require_roles() is case-insensitive
+# (app/core/security.py), so one lowercase member per spelling is enough
+# - spell them straight from the SSOT frozenset so a future vocabulary
+# addition is picked up here too. Spread with ``*`` into require_roles:
+#     require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)
+# (RBAC unification D-3: visits/patients/appointment-flow used to admit
+# only the exact "Doctor" spelling and 403'd legacy doctor accounts that
+# EMR v2 and the specialist panels accepted - single behavior now.)
+DOCTOR_FAMILY_GATE_ROLES: tuple[str, ...] = tuple(sorted(DOCTOR_ROLE_SPELLINGS))
+
 # Роли персонала
 STAFF_ROLES = {
     Roles.REGISTRAR,

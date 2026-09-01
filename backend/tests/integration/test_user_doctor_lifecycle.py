@@ -374,12 +374,16 @@ def test_admin_to_doctor_promotion_creates_profile(
     assert doctor.specialty == "general"
 
 
-def test_doctor_to_legacy_role_rejected_by_user_update_schema(
+def test_doctor_to_legacy_role_accepted_by_aligned_user_update_schema(
     client, db_session, auth_headers
 ):
-    """UserUpdate.role regex forbids legacy roles (schema guarantee kept).
-    Family-internal transitions that the service supports (e.g. dentist ->
-    Doctor) are covered by test_legacy_dentist_to_canonical_doctor_keeps_profile."""
+    """D-3 RBAC unification: UserUpdate.role now shares UserCreate's
+    vocabulary, so family-internal transitions to a legacy spelling
+    (Doctor -> dentist) are ACCEPTED (no more create/update drift).
+    Both roles belong to the doctor family, so the linked Doctor profile
+    stays active and untouched (same clinical identity, specialty kept).
+    The demotion path (family -> non-family) is covered by
+    test_demote_doctor_deactivates_profile."""
     user, doctor = _create_doctor_with_profile(db_session, "toleg")
 
     response = client.put(
@@ -387,11 +391,14 @@ def test_doctor_to_legacy_role_rejected_by_user_update_schema(
         json={"role": "dentist"},
         headers=auth_headers,
     )
-    assert response.status_code == 422, response.text
+    assert response.status_code == 200, response.text
 
     db_session.expire_all()
-    row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
-    assert row.active is True  # nothing changed
+    row = db_session.query(User).filter(User.id == user.id).one()
+    assert row.role == "dentist"
+    profile = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+    assert profile.active is True  # family-internal: profile preserved
+    assert profile.user_id == user.id  # link preserved
 
 
 # ---------------------------------------------------------------------------
