@@ -15,7 +15,7 @@ Covers:
 from __future__ import annotations
 
 import importlib.util
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -153,10 +153,15 @@ def test_get_doctors_by_specialty_eligible_only_still_hides_general(db_session) 
 
 @pytest.mark.queue
 def test_clinic_wide_join_finds_canonical_dentistry_doctor(
-    db_session, test_doctor_user
+    db_session, test_doctor_user, monkeypatch
 ) -> None:
     """A profile with OLD queue_tags (no 'dentistry') must still see a
     canonical 'dentistry' doctor (the 0049 code-level half of D-1)."""
+    # The join path enforces the online booking window (07:00 local):
+    # without freezing it this test fails whenever the suite runs between
+    # midnight and 07:00 (observed as CI red at 02:50-03:22 local).
+    # Same pattern as test_qr_queue_join.py.
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
     doctor = Doctor(user_id=test_doctor_user.id, specialty="dentistry", active=True)
     db_session.add(doctor)
     db_session.flush()
