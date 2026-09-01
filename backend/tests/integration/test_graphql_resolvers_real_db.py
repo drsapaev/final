@@ -273,8 +273,17 @@ def test_graphql_query_resolvers_against_real_db(gql_data):
     assert data["doctorStats"]["totalAppointments"] >= 1
 
 
-def test_graphql_mutations_succeed_against_real_db(gql_data):
+def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
     """Все 12 мутаций возвращают success=True (раньше — тихий INTERNAL_ERROR)."""
+    from app.graphql import mutations as gql_mutations
+
+    # Time-of-day gotcha (#2992): окно онлайн-набора queue_start_hour=7
+    # роняет joinQueue ночью (CI/ночь по Ташкенту) — фиксируем окно.
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
     d = gql_data
     suffix = d["suffix"]
 
