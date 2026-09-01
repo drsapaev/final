@@ -227,6 +227,50 @@ def get_doctors_stats(
     return _get_doctors_stats_payload(db)
 
 
+@router.get(
+    "/doctors/specialty-vocabulary",
+    response_model=list[dict[str, str | None]],
+)
+def get_doctor_specialty_vocabulary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Medical specialty catalog — codes selectable at new-doctor onboarding.
+
+    Runtime SSOT is the ``medical_specialties`` table (migration 0051);
+    there is deliberately NO hardcoded fallback. Ordering: sort_order,
+    then code (deterministic). Frontend label resolution per owner spec:
+    locale → catalog translation → title_ru → code (the ru titles are a
+    compatibility fallback for kk/uz-Cyrl, not a translation claim).
+    """
+    from fastapi import HTTPException
+
+    from app.services.medical_specialty_catalog import (
+        MedicalSpecialtyCatalogError,
+        MedicalSpecialtyCatalogService,
+    )
+
+    try:
+        rows = MedicalSpecialtyCatalogService(db).list_active()
+    except MedicalSpecialtyCatalogError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Каталог медицинских специальностей не настроен: "
+                "выполните миграции БД (baseline seed 0051)."
+            ),
+        ) from exc
+    return [
+        {
+            "code": row.code,
+            "title_ru": row.title_ru,
+            "title_uz": row.title_uz,
+            "title_en": row.title_en,
+        }
+        for row in rows
+    ]
+
+
 @router.get("/doctors/{doctor_id}", response_model=DoctorOut)
 def get_doctor(
     doctor_id: int,

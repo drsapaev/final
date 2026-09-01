@@ -44,6 +44,7 @@ from app.models import (  # noqa: F401
     emr,
     file_system,
     lab,
+    medical_specialty,  # Medical Specialty Catalog (migration 0051)
     online_queue,
     payment,
     payment_webhook,

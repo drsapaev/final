@@ -9869,6 +9869,32 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/doctors/specialty-vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Doctor Specialty Vocabulary
+         * @description Medical specialty catalog — codes selectable at new-doctor onboarding.
+         *
+         *     Runtime SSOT is the ``medical_specialties`` table (migration 0051);
+         *     there is deliberately NO hardcoded fallback. Ordering: sort_order,
+         *     then code (deterministic). Frontend label resolution per owner spec:
+         *     locale → catalog translation → title_ru → code (the ru titles are a
+         *     compatibility fallback for kk/uz-Cyrl, not a translation claim).
+         */
+        get: operations["get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/doctors/{doctor_id}": {
         parameters: {
             query?: never;
@@ -55653,6 +55679,28 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string | null;
+                    }[];
                 };
             };
         };

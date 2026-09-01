@@ -28900,6 +28900,47 @@
         ]
       }
     },
+    "/api/v1/admin/doctors/specialty-vocabulary": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Doctor Specialty Vocabulary",
+        "description": "Medical specialty catalog — codes selectable at new-doctor onboarding.\n\nRuntime SSOT is the ``medical_specialties`` table (migration 0051);\nthere is deliberately NO hardcoded fallback. Ordering: sort_order,\nthen code (deterministic). Frontend label resolution per owner spec:\nlocale → catalog translation → title_ru → code (the ru titles are a\ncompatibility fallback for kk/uz-Cyrl, not a translation claim).",
+        "operationId": "get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Doctor Specialty Vocabulary Api V1 Admin Doctors Specialty Vocabulary Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/doctors/{doctor_id}": {
       "get": {
         "tags": [

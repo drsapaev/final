@@ -131,6 +131,7 @@ from .lab import (
     LabResult,
     LabTemplateServiceBinding,
 )
+from .medical_specialty import MedicalSpecialty
 from .message import Message
 from .notification import (
     NotificationDelivery,
