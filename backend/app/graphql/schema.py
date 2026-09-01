@@ -2,8 +2,6 @@
 Основная GraphQL схема для API клиники
 """
 
-from dataclasses import dataclass
-
 import strawberry
 from fastapi import Depends, Request
 from strawberry.fastapi import BaseContext, GraphQLRouter
@@ -13,7 +11,6 @@ from app.graphql.mutations import Mutation
 from app.graphql.resolvers import Query
 
 
-@dataclass
 class GraphQLContext(BaseContext):
     """Контекст исполнения: аутентифицированный admin + Request.
 
@@ -21,11 +18,13 @@ class GraphQLContext(BaseContext):
     (тот же cached-dependency, что в dependencies=[...], — один запрос
     к БД на вызов). Нужен резолверам для PHI-аудита (log_patient_access)
     и soft-delete атрибуции (deleted_by). BaseContext — требование
-    strawberry для кастомного контекста.
+    strawberry для кастомного контекста (request живёт в базовом классе).
     """
 
-    user: object | None = None  # app.models.user.User
-    _query_depth: int = 0
+    def __init__(self, user: object | None = None) -> None:
+        super().__init__()
+        self.user = user  # app.models.user.User
+        self._query_depth = 0
 
 
 # Создаем GraphQL схему

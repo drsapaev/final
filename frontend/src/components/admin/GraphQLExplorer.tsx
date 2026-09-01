@@ -254,7 +254,8 @@ const GraphQLExplorer = () => {
 }`,
       variables: {
         'input': {
-          'fullName': t('admin2.gql2_example_full_name'),
+          'lastName': t('admin2.gql2_example_last_name'),
+          'firstName': t('admin2.gql2_example_first_name'),
           'phone': '+998901234567',
           'email': 'ivanov@example.com',
           'birthDate': '1990-01-01'
@@ -280,10 +281,7 @@ const GraphQLExplorer = () => {
           fullName
         }
       }
-      service {
-        name
-        price
-      }
+      services
     }
   }
 }`,
@@ -291,8 +289,9 @@ const GraphQLExplorer = () => {
         'input': {
           'patientId': 1,
           'doctorId': 1,
-          'serviceId': 1,
-          'appointmentDate': new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          'appointmentDate': new Date(Date.now() + 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 10),
           'notes': t('admin2.gql2_example_notes')
         }
       }

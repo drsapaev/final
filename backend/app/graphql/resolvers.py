@@ -554,6 +554,7 @@ class Query:
     @strawberry.field
     def queue_entries(
         self,
+        info: strawberry.Info,
         filter: QueueFilter | None = None,
         pagination: PaginationInput | None = None,
     ) -> PaginatedQueueEntries:
@@ -584,6 +585,12 @@ class Query:
             query = apply_pagination(query, page, per_page)
 
             entries = query.all()
+            _audit_patient_access(
+                info,
+                db,
+                [e.patient_id for e in entries if e.patient_id],
+                "cabinet_summary",
+            )
 
             return PaginatedQueueEntries(
                 items=[queue_entry_to_type(e) for e in entries],

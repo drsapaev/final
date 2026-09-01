@@ -9,20 +9,27 @@
 тестовой SQLite-БД, и гоняют схему целиком: seeded данные -> schema.execute_sync.
 """
 
+import asyncio
 import uuid
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy.orm import sessionmaker
 
 from app.db import session as db_session_module
-from app.graphql.schema import schema
+from app.graphql.schema import GraphQLContext, schema
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
+from app.models.notification import (
+    NotificationDelivery,
+    NotificationSettings,
+)
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
+from app.models.user_profile import UserAuditLog
 from app.models.visit import Visit, VisitService
 
 pytestmark = pytest.mark.integration
@@ -41,6 +48,9 @@ def gql_session_factory(test_db, monkeypatch):
     return factory
 
 
+gql_data_ctx: dict = {}
+
+
 @pytest.fixture
 def gql_data(test_db, gql_session_factory):
     """Seed реальных строк в тестовую БД; очистка в finally."""
@@ -48,6 +58,16 @@ def gql_data(test_db, gql_session_factory):
     suffix = uuid.uuid4().hex[:8]
     created: dict = {}
     try:
+        admin_user = User(
+            username=f"synthetic-gql-admin-{suffix}",
+            hashed_password="x",
+            full_name="SYNTHETIC GQL Admin",
+            role="Admin",
+            is_active=True,
+        )
+        session.add(admin_user)
+        session.flush()
+
         user = User(
             username=f"synthetic-gql-doc-{suffix}",
             hashed_password="x",
@@ -121,6 +141,7 @@ def gql_data(test_db, gql_session_factory):
         session.commit()
 
         created.update(
+            admin_user=admin_user,
             user=user,
             doctor=doctor,
             patient=patient,
@@ -131,6 +152,8 @@ def gql_data(test_db, gql_session_factory):
             entry=entry,
             suffix=suffix,
         )
+        gql_data_ctx.clear()
+        gql_data_ctx.update(created)
         yield created
     finally:
         session.close()
@@ -142,7 +165,7 @@ def gql_data(test_db, gql_session_factory):
             user_ids = [
                 u.id
                 for u in cleanup.query(User).filter(
-                    User.username.like(f"synthetic-gql-doc-{suffix}%")
+                    User.username.like(f"synthetic-gql-%{suffix}%")
                 )
             ]
             doctor_ids = [
@@ -190,6 +213,17 @@ def gql_data(test_db, gql_session_factory):
             cleanup.query(Doctor).filter(Doctor.id.in_(doctor_ids)).delete(
                 synchronize_session=False
             )
+            # строки, ссылающиеся на users (FK на postgres CI), — до юзеров
+            if user_ids:
+                cleanup.query(UserAuditLog).filter(
+                    UserAuditLog.user_id.in_(user_ids)
+                ).delete(synchronize_session=False)
+                cleanup.query(NotificationDelivery).filter(
+                    NotificationDelivery.recipient_id.in_(user_ids)
+                ).delete(synchronize_session=False)
+                cleanup.query(NotificationSettings).filter(
+                    NotificationSettings.user_id.in_(user_ids)
+                ).delete(synchronize_session=False)
             cleanup.query(User).filter(User.id.in_(user_ids)).delete(
                 synchronize_session=False
             )
@@ -199,7 +233,24 @@ def gql_data(test_db, gql_session_factory):
 
 
 def _execute(query: str, variables: dict | None = None):
-    result = schema.execute_sync(query, variable_values=variables)
+    """execute через event loop: callNextPatient — async-мутация."""
+    admin = gql_data_ctx["admin_user"]
+    context = GraphQLContext(
+        user=SimpleNamespace(
+            id=admin.id,
+            username=admin.username,
+            full_name=admin.full_name,
+            role="Admin",
+            is_active=True,
+        )
+    )
+
+    async def _run():
+        return await schema.execute(
+            query, variable_values=variables, context_value=context
+        )
+
+    result = asyncio.run(_run())
     assert not result.errors, f"GraphQL errors: {result.errors}"
     return result.data
 
@@ -301,7 +352,6 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
             "input": {
                 "lastName": f"SYNTHETIC-Petrov-{suffix}",
                 "firstName": "SYNTHETIC",
-                "phone": f"DEV-DEMO-{suffix}-2",
             }
         },
     )
@@ -409,11 +459,12 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
     visit_id = data["createVisit"]["visit"]["id"]
 
     data = _execute(
-        "mutation($id: Int!) { updateVisitStatus(id: $id, status: \"completed\") "
+        "mutation($id: Int!) { updateVisitStatus(id: $id, status: \"confirmed\") "
         "{ success visit { status } } }",
         {"id": visit_id},
     )
-    assert data["updateVisitStatus"]["success"] is True
+    assert data["updateVisitStatus"]["success"] is True, data["updateVisitStatus"]
+    assert data["updateVisitStatus"]["visit"]["status"] == "confirmed"
 
     # --- joinQueue / callNextPatient (свежий пациент — seed-пациент
     # уже waiting, словили бы ALREADY_IN_QUEUE) ---
