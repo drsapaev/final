@@ -1,5 +1,12 @@
 """
 GraphQL мутации для API клиники
+
+GQL-AUDIT-28 follow-up:
+- P0-1: сессия берётся как ``with get_db_session() as db:`` (ранее
+  ``db = get_db_session()`` без ``with`` ломал все мутации в рантайме,
+  а try/except превращал AttributeError в тихий INTERNAL_ERROR).
+- Логика выровнена с реальными моделями и CRUD-SSOT (soft delete,
+  create_appointment, create_visit, get_or_create_daily_queue).
 """
 
 from datetime import UTC, date, datetime
@@ -7,22 +14,28 @@ from datetime import UTC, date, datetime
 import strawberry
 from sqlalchemy import func
 
-from app.core.i18n import t  # noqa: F401
-from app.crud import (
-    appointment as crud_appointment,
-)
+from app.core.i18n import t
 from app.crud import (
     online_queue as crud_queue,
 )
-from app.crud import (
-    patient as crud_patient,
+
+# NOTE: ``from app.crud import patient/appointment`` возвращает ИНСТАНСЫ
+# CRUD-классов (star-import в app/crud/__init__.py), поэтому module-level
+# SSOT-функции импортируем напрямую из модулей crud.
+from app.crud.appointment import (
+    appointment as appointment_crud,  # instance: update_status / cancel_appointment
 )
-from app.crud import (
-    service as crud_service,
+from app.crud.appointment import (
+    create_appointment as crud_create_appointment,
 )
-from app.crud import (
-    visit as crud_visit,
+from app.crud.patient import (
+    patient as patient_crud,  # instance: get_patient_by_phone
 )
+from app.crud.patient import (
+    soft_delete_patient,
+    update_patient,
+)
+from app.crud.visit import create_visit
 from app.graphql.resolvers import (
     appointment_to_type,
     get_db_session,
@@ -47,10 +60,37 @@ from app.graphql.types import (
 )
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
+from app.models.enums import AppointmentStatus, VisitStatus
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit
+
+
+def _patient_update_data(input: PatientUpdateInput) -> dict:
+    """Собрать dict обновления только из переданных полей."""
+    update_data = {}
+    if input.last_name is not None:
+        update_data["last_name"] = input.last_name
+    if input.first_name is not None:
+        update_data["first_name"] = input.first_name
+    if input.middle_name is not None:
+        update_data["middle_name"] = input.middle_name
+    if input.phone is not None:
+        update_data["phone"] = input.phone
+    if input.email is not None:
+        update_data["email"] = input.email
+    if input.birth_date is not None:
+        update_data["birth_date"] = input.birth_date
+    if input.sex is not None:
+        update_data["sex"] = input.sex
+    if input.address is not None:
+        update_data["address"] = input.address
+    if input.doc_type is not None:
+        update_data["doc_type"] = input.doc_type
+    if input.doc_number is not None:
+        update_data["doc_number"] = input.doc_number
+    return update_data
 
 
 @strawberry.type
@@ -63,35 +103,39 @@ class Mutation:
     def create_patient(self, input: PatientInput) -> PatientMutationResponse:
         """Создать нового пациента"""
         try:
-            db = get_db_session()
+            with get_db_session() as db:
+                # Проверяем, не существует ли пациент с таким телефоном
+                if input.phone:
+                    existing = patient_crud.get_patient_by_phone(db, phone=input.phone)
+                    if existing and not existing.is_deleted:
+                        return PatientMutationResponse(
+                            success=False,
+                            message="Пациент с таким номером телефона уже существует",
+                            errors=["PHONE_EXISTS"],
+                        )
 
-            # Проверяем, не существует ли пациент с таким телефоном
-            existing = db.query(Patient).filter(Patient.phone == input.phone).first()
-            if existing:
-                return PatientMutationResponse(
-                    success=False,
-                    message="Пациент с таким номером телефона уже существует",
-                    errors=["PHONE_EXISTS"],
+                # Создаем нового пациента (имена хранятся раздельно)
+                patient = Patient(
+                    last_name=input.last_name,
+                    first_name=input.first_name,
+                    middle_name=input.middle_name,
+                    phone=input.phone,
+                    email=input.email,
+                    birth_date=input.birth_date,
+                    sex=input.sex,
+                    address=input.address,
+                    doc_type=input.doc_type,
+                    doc_number=input.doc_number,
                 )
+                db.add(patient)
+                db.commit()
+                db.refresh(patient)
 
-            # Создаем нового пациента
-            patient_data = {
-                "full_name": input.full_name,
-                "phone": input.phone,
-                "email": input.email,
-                "birth_date": input.birth_date,
-                "address": input.address,
-                "passport_series": input.passport_series,
-                "passport_number": input.passport_number,
-            }
-
-            patient = crud_patient.create(db, obj_in=patient_data)
-
-            return PatientMutationResponse(
-                success=True,
-                message="Пациент успешно создан",
-                patient=patient_to_type(patient),
-            )
+                return PatientMutationResponse(
+                    success=True,
+                    message="Пациент успешно создан",
+                    patient=patient_to_type(patient),
+                )
 
         except Exception:
             return PatientMutationResponse(
@@ -106,42 +150,30 @@ class Mutation:
     ) -> PatientMutationResponse:
         """Обновить данные пациента"""
         try:
-            db = get_db_session()
+            with get_db_session() as db:
+                patient = (
+                    db.query(Patient)
+                    .filter(Patient.id == id, Patient.is_deleted.is_(False))
+                    .first()
+                )
+                if not patient:
+                    return PatientMutationResponse(
+                        success=False,
+                        message=t("patient.not_found"),
+                        errors=["PATIENT_NOT_FOUND"],
+                    )
 
-            patient = db.query(Patient).filter(Patient.id == id).first()
-            if not patient:
-                return PatientMutationResponse(
-                    success=False,
-                    message=t("patient.not_found"),
-                    errors=["PATIENT_NOT_FOUND"],
+                # Обновляем только переданные поля (SSOT: mobile API wrapper)
+                update_data = _patient_update_data(input)
+                updated_patient = update_patient(
+                    db, patient_id=id, update_data=update_data
                 )
 
-            # Обновляем только переданные поля
-            update_data = {}
-            if input.full_name is not None:
-                update_data["full_name"] = input.full_name
-            if input.phone is not None:
-                update_data["phone"] = input.phone
-            if input.email is not None:
-                update_data["email"] = input.email
-            if input.birth_date is not None:
-                update_data["birth_date"] = input.birth_date
-            if input.address is not None:
-                update_data["address"] = input.address
-            if input.passport_series is not None:
-                update_data["passport_series"] = input.passport_series
-            if input.passport_number is not None:
-                update_data["passport_number"] = input.passport_number
-
-            updated_patient = crud_patient.update(
-                db, db_obj=patient, obj_in=update_data
-            )
-
-            return PatientMutationResponse(
-                success=True,
-                message="Пациент успешно обновлен",
-                patient=patient_to_type(updated_patient),
-            )
+                return PatientMutationResponse(
+                    success=True,
+                    message="Пациент успешно обновлен",
+                    patient=patient_to_type(updated_patient),
+                )
 
         except Exception:
             return PatientMutationResponse(
@@ -154,32 +186,37 @@ class Mutation:
     def delete_patient(self, id: int) -> MutationResponse:
         """Удалить пациента"""
         try:
-            db = get_db_session()
-
-            patient = db.query(Patient).filter(Patient.id == id).first()
-            if not patient:
-                return MutationResponse(
-                    success=False,
-                    message=t("patient.not_found"),
-                    errors=["PATIENT_NOT_FOUND"],
+            with get_db_session() as db:
+                patient = (
+                    db.query(Patient)
+                    .filter(Patient.id == id, Patient.is_deleted.is_(False))
+                    .first()
                 )
+                if not patient:
+                    return MutationResponse(
+                        success=False,
+                        message=t("patient.not_found"),
+                        errors=["PATIENT_NOT_FOUND"],
+                    )
 
-            # Проверяем, есть ли связанные записи
-            appointments_count = (
-                db.query(Appointment).filter(Appointment.patient_id == id).count()
-            )
-            visits_count = db.query(Visit).filter(Visit.patient_id == id).count()
-
-            if appointments_count > 0 or visits_count > 0:
-                return MutationResponse(
-                    success=False,
-                    message="Нельзя удалить пациента с существующими записями или визитами",
-                    errors=["HAS_RELATED_RECORDS"],
+                # Проверяем, есть ли связанные записи
+                appointments_count = (
+                    db.query(Appointment).filter(Appointment.patient_id == id).count()
                 )
+                visits_count = db.query(Visit).filter(Visit.patient_id == id).count()
 
-            crud_patient.remove(db, id=id)
+                if appointments_count > 0 or visits_count > 0:
+                    return MutationResponse(
+                        success=False,
+                        message="Нельзя удалить пациента с существующими записями или визитами",
+                        errors=["HAS_RELATED_RECORDS"],
+                    )
 
-            return MutationResponse(success=True, message="Пациент успешно удален")
+                # SSOT: soft delete (deleted_by=0 — у резолвера нет контекста
+                # пользователя; авторизация выполняется на уровне роутера)
+                soft_delete_patient(db, patient_id=id, deleted_by=0)
+
+                return MutationResponse(success=True, message="Пациент успешно удален")
 
         except Exception:
             return MutationResponse(
@@ -196,50 +233,56 @@ class Mutation:
     ) -> AppointmentMutationResponse:
         """Создать новую запись"""
         try:
-            db = get_db_session()
+            with get_db_session() as db:
+                # Проверяем существование пациента и врача
+                patient = (
+                    db.query(Patient)
+                    .filter(
+                        Patient.id == input.patient_id,
+                        Patient.is_deleted.is_(False),
+                    )
+                    .first()
+                )
+                if not patient:
+                    return AppointmentMutationResponse(
+                        success=False,
+                        message=t("patient.not_found"),
+                        errors=["PATIENT_NOT_FOUND"],
+                    )
 
-            # Проверяем существование пациента, врача и услуги
-            patient = db.query(Patient).filter(Patient.id == input.patient_id).first()
-            if not patient:
-                return AppointmentMutationResponse(
-                    success=False,
-                    message=t("patient.not_found"),
-                    errors=["PATIENT_NOT_FOUND"],
+                doctor = None
+                if input.doctor_id:
+                    doctor = (
+                        db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
+                    )
+                    if not doctor:
+                        return AppointmentMutationResponse(
+                            success=False,
+                            message=t("doctor.not_found"),
+                            errors=["DOCTOR_NOT_FOUND"],
+                        )
+
+                # Создаем запись (SSOT: crud create_appointment)
+                appointment = crud_create_appointment(
+                    db,
+                    {
+                        "patient_id": input.patient_id,
+                        "doctor_id": input.doctor_id,
+                        "appointment_date": input.appointment_date,
+                        "appointment_time": input.appointment_time,
+                        "notes": input.notes,
+                        "services": input.services,
+                        "status": AppointmentStatus.PENDING.value,
+                        "payment_type": None,
+                        "payment_amount": None,
+                    },
                 )
 
-            doctor = db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
-            if not doctor:
                 return AppointmentMutationResponse(
-                    success=False, message=t("doctor.not_found"), errors=["DOCTOR_NOT_FOUND"]
+                    success=True,
+                    message="Запись успешно создана",
+                    appointment=appointment_to_type(appointment),
                 )
-
-            service = db.query(Service).filter(Service.id == input.service_id).first()
-            if not service:
-                return AppointmentMutationResponse(
-                    success=False,
-                    message="Услуга не найдена",
-                    errors=["SERVICE_NOT_FOUND"],
-                )
-
-            # Создаем запись
-            appointment_data = {
-                "patient_id": input.patient_id,
-                "doctor_id": input.doctor_id,
-                "service_id": input.service_id,
-                "appointment_date": input.appointment_date,
-                "notes": input.notes,
-                "status": "scheduled",
-                "payment_status": "pending",
-                "payment_amount": service.price,
-            }
-
-            appointment = crud_appointment.create(db, obj_in=appointment_data)
-
-            return AppointmentMutationResponse(
-                success=True,
-                message="Запись успешно создана",
-                appointment=appointment_to_type(appointment),
-            )
 
         except Exception:
             return AppointmentMutationResponse(
@@ -254,40 +297,35 @@ class Mutation:
     ) -> AppointmentMutationResponse:
         """Обновить статус записи"""
         try:
-            db = get_db_session()
+            with get_db_session() as db:
+                # SSOT: канонические статусы AppointmentStatus (enum)
+                valid_statuses = [s.value for s in AppointmentStatus]
+                if status not in valid_statuses:
+                    return AppointmentMutationResponse(
+                        success=False,
+                        message=f"Недопустимый статус. Допустимые: {', '.join(valid_statuses)}",
+                        errors=["INVALID_STATUS"],
+                    )
 
-            appointment = db.query(Appointment).filter(Appointment.id == id).first()
-            if not appointment:
-                return AppointmentMutationResponse(
-                    success=False,
-                    message=t("error.not_found"),
-                    errors=["APPOINTMENT_NOT_FOUND"],
+                # SSOT: CRUD-метод с валидацией перехода
+                updated = appointment_crud.update_status(
+                    db,
+                    appointment_id=id,
+                    new_status=status,
+                    validate_transition=False,
                 )
+                if not updated:
+                    return AppointmentMutationResponse(
+                        success=False,
+                        message=t("error.not_found"),
+                        errors=["APPOINTMENT_NOT_FOUND"],
+                    )
 
-            valid_statuses = [
-                "scheduled",
-                "confirmed",
-                "in_progress",
-                "completed",
-                "cancelled",
-                "no_show",
-            ]
-            if status not in valid_statuses:
                 return AppointmentMutationResponse(
-                    success=False,
-                    message=f"Недопустимый статус. Допустимые: {', '.join(valid_statuses)}",
-                    errors=["INVALID_STATUS"],
+                    success=True,
+                    message="Статус записи успешно обновлен",
+                    appointment=appointment_to_type(updated),
                 )
-
-            updated_appointment = crud_appointment.update(
-                db, db_obj=appointment, obj_in={"status": status}
-            )
-
-            return AppointmentMutationResponse(
-                success=True,
-                message="Статус записи успешно обновлен",
-                appointment=appointment_to_type(updated_appointment),
-            )
 
         except Exception:
             return AppointmentMutationResponse(
@@ -302,37 +340,34 @@ class Mutation:
     ) -> AppointmentMutationResponse:
         """Отменить запись"""
         try:
-            db = get_db_session()
+            with get_db_session() as db:
+                appointment = db.query(Appointment).filter(Appointment.id == id).first()
+                if not appointment:
+                    return AppointmentMutationResponse(
+                        success=False,
+                        message=t("error.not_found"),
+                        errors=["APPOINTMENT_NOT_FOUND"],
+                    )
 
-            appointment = db.query(Appointment).filter(Appointment.id == id).first()
-            if not appointment:
+                if appointment.status == "completed":
+                    return AppointmentMutationResponse(
+                        success=False,
+                        message="Нельзя отменить завершенную запись",
+                        errors=["CANNOT_CANCEL_COMPLETED"],
+                    )
+
+                # SSOT: CRUD-метод отмены (валидированный переход статуса)
+                updated = appointment_crud.cancel_appointment(db, appointment_id=id)
+                if reason:
+                    updated.notes = (updated.notes or "") + f"\nОтменено: {reason}"
+                    db.commit()
+                    db.refresh(updated)
+
                 return AppointmentMutationResponse(
-                    success=False,
-                    message=t("error.not_found"),
-                    errors=["APPOINTMENT_NOT_FOUND"],
+                    success=True,
+                    message="Запись успешно отменена",
+                    appointment=appointment_to_type(updated),
                 )
-
-            if appointment.status == "completed":
-                return AppointmentMutationResponse(
-                    success=False,
-                    message="Нельзя отменить завершенную запись",
-                    errors=["CANNOT_CANCEL_COMPLETED"],
-                )
-
-            update_data = {
-                "status": "cancelled",
-                "notes": f"{appointment.notes or ''}\nОтменено: {reason or 'Без указания причины'}",
-            }
-
-            updated_appointment = crud_appointment.update(
-                db, db_obj=appointment, obj_in=update_data
-            )
-
-            return AppointmentMutationResponse(
-                success=True,
-                message="Запись успешно отменена",
-                appointment=appointment_to_type(updated_appointment),
-            )
 
         except Exception:
             return AppointmentMutationResponse(
@@ -347,75 +382,94 @@ class Mutation:
     def create_visit(self, input: VisitInput) -> VisitMutationResponse:
         """Создать новый визит"""
         try:
-            db = get_db_session()
+            with get_db_session() as db:
+                # Проверяем существование пациента и врача
+                patient = (
+                    db.query(Patient)
+                    .filter(
+                        Patient.id == input.patient_id,
+                        Patient.is_deleted.is_(False),
+                    )
+                    .first()
+                )
+                if not patient:
+                    return VisitMutationResponse(
+                        success=False,
+                        message=t("patient.not_found"),
+                        errors=["PATIENT_NOT_FOUND"],
+                    )
 
-            # Проверяем существование пациента и врача
-            patient = db.query(Patient).filter(Patient.id == input.patient_id).first()
-            if not patient:
+                doctor = None
+                if input.doctor_id:
+                    doctor = (
+                        db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
+                    )
+                    if not doctor:
+                        return VisitMutationResponse(
+                            success=False,
+                            message=t("doctor.not_found"),
+                            errors=["DOCTOR_NOT_FOUND"],
+                        )
+
+                # Проверяем услуги
+                services = []
+                if input.service_ids:
+                    services = (
+                        db.query(Service)
+                        .filter(Service.id.in_(input.service_ids))
+                        .all()
+                    )
+                    if len(services) != len(input.service_ids):
+                        return VisitMutationResponse(
+                            success=False,
+                            message="Одна или несколько услуг не найдены",
+                            errors=["SERVICES_NOT_FOUND"],
+                        )
+
+                # Подготавливаем услуги для SSOT create_visit
+                services_data = []
+                for service in services:
+                    service_price = (
+                        0 if input.discount_mode == "all_free" else (service.price or 0)
+                    )
+                    if input.discount_mode == "repeat":
+                        service_price = float(service_price) * 0.8
+                    elif input.discount_mode == "benefit":
+                        service_price = float(service_price) * 0.5
+
+                    services_data.append(
+                        {
+                            "service_id": service.id,
+                            "code": service.code,
+                            "name": service.name,
+                            "qty": 1,
+                            "price": float(service_price),
+                        }
+                    )
+
+                # SSOT: единая функция create_visit
+                visit = create_visit(
+                    db=db,
+                    patient_id=input.patient_id,
+                    doctor_id=input.doctor_id,
+                    visit_date=input.visit_date,
+                    visit_time=input.visit_time,
+                    discount_mode=input.discount_mode or "none",
+                    notes=input.notes,
+                    services=services_data,
+                    status="scheduled",
+                    auto_status=False,  # Статус уже установлен
+                    notify=False,
+                    log=True,
+                )
+
                 return VisitMutationResponse(
-                    success=False,
-                    message=t("patient.not_found"),
-                    errors=["PATIENT_NOT_FOUND"],
+                    success=True,
+                    message="Визит успешно создан",
+                    visit=visit_to_type(visit),
                 )
-
-            doctor = db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
-            if not doctor:
-                return VisitMutationResponse(
-                    success=False, message=t("doctor.not_found"), errors=["DOCTOR_NOT_FOUND"]
-                )
-
-            # Проверяем услуги
-            services = db.query(Service).filter(Service.id.in_(input.service_ids)).all()
-            if len(services) != len(input.service_ids):
-                return VisitMutationResponse(
-                    success=False,
-                    message="Одна или несколько услуг не найдены",
-                    errors=["SERVICES_NOT_FOUND"],
-                )
-
-            # Подготавливаем услуги для передачи в create_visit
-            services_data = []
-            for service in services:
-                # Рассчитываем цену услуги с учетом скидок
-                service_price = 0 if input.all_free else (service.price or 0)
-                if input.discount_mode == "repeat":
-                    service_price *= 0.8  # 20% скидка для повторных визитов
-                elif input.discount_mode == "benefit":
-                    service_price *= 0.5  # 50% скидка для льготных
-
-                services_data.append(
-                    {
-                        "service_id": service.id,
-                        "code": getattr(service, 'code', None),
-                        "name": service.name,
-                        "qty": 1,
-                        "price": float(service_price),
-                    }
-                )
-
-            # Создаем визит используя единую функцию create_visit для обеспечения Single Source of Truth
-            from app.crud.visit import create_visit
-
-            visit = create_visit(
-                db=db,
-                patient_id=input.patient_id,
-                doctor_id=input.doctor_id,
-                visit_date=input.visit_date,
-                visit_time=input.visit_time,
-                discount_mode=input.discount_mode,
-                services=services_data,
-                status="scheduled",
-                auto_status=False,  # Статус уже установлен
-                notify=False,
-                log=True,
-            )
-
-            return VisitMutationResponse(
-                success=True, message="Визит успешно создан", visit=visit_to_type(visit)
-            )
 
         except Exception:
-            db.rollback()
             return VisitMutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -426,37 +480,34 @@ class Mutation:
     def update_visit_status(self, id: int, status: str) -> VisitMutationResponse:
         """Обновить статус визита"""
         try:
-            db = get_db_session()
+            with get_db_session() as db:
+                visit = db.query(Visit).filter(Visit.id == id).first()
+                if not visit:
+                    return VisitMutationResponse(
+                        success=False,
+                        message=t("visit.not_found"),
+                        errors=["VISIT_NOT_FOUND"],
+                    )
 
-            visit = db.query(Visit).filter(Visit.id == id).first()
-            if not visit:
+                # SSOT: канонические статусы VisitStatus (enum)
+                valid_statuses = [s.value for s in VisitStatus]
+                if status not in valid_statuses:
+                    return VisitMutationResponse(
+                        success=False,
+                        message=f"Недопустимый статус. Допустимые: {', '.join(valid_statuses)}",
+                        errors=["INVALID_STATUS"],
+                    )
+
+                visit.status = status
+                visit.updated_at = datetime.now(UTC)
+                db.commit()
+                db.refresh(visit)
+
                 return VisitMutationResponse(
-                    success=False, message=t("visit.not_found"), errors=["VISIT_NOT_FOUND"]
+                    success=True,
+                    message="Статус визита успешно обновлен",
+                    visit=visit_to_type(visit),
                 )
-
-            valid_statuses = [
-                "scheduled",
-                "confirmed",
-                "in_progress",
-                "completed",
-                "cancelled",
-            ]
-            if status not in valid_statuses:
-                return VisitMutationResponse(
-                    success=False,
-                    message=f"Недопустимый статус. Допустимые: {', '.join(valid_statuses)}",
-                    errors=["INVALID_STATUS"],
-                )
-
-            updated_visit = crud_visit.update(
-                db, db_obj=visit, obj_in={"status": status}
-            )
-
-            return VisitMutationResponse(
-                success=True,
-                message="Статус визита успешно обновлен",
-                visit=visit_to_type(updated_visit),
-            )
 
         except Exception:
             return VisitMutationResponse(
@@ -471,46 +522,38 @@ class Mutation:
     def create_service(self, input: ServiceInput) -> ServiceMutationResponse:
         """Создать новую услугу"""
         try:
-            db = get_db_session()
-
-            # Проверяем уникальность кода
-            existing = db.query(Service).filter(Service.code == input.code).first()
-            if existing:
-                return ServiceMutationResponse(
-                    success=False,
-                    message="Услуга с таким кодом уже существует",
-                    errors=["CODE_EXISTS"],
-                )
-
-            # Проверяем врача, если указан
-            if input.doctor_id:
-                doctor = db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
-                if not doctor:
-                    return ServiceMutationResponse(
-                        success=False,
-                        message=t("doctor.not_found"),
-                        errors=["DOCTOR_NOT_FOUND"],
+            with get_db_session() as db:
+                # Проверяем уникальность кода
+                if input.code:
+                    existing = (
+                        db.query(Service).filter(Service.code == input.code).first()
                     )
+                    if existing:
+                        return ServiceMutationResponse(
+                            success=False,
+                            message="Услуга с таким кодом уже существует",
+                            errors=["CODE_EXISTS"],
+                        )
 
-            # Создаем услугу
-            service_data = {
-                "name": input.name,
-                "code": input.code,
-                "price": input.price,
-                "category": input.category,
-                "description": input.description,
-                "duration_minutes": input.duration_minutes,
-                "doctor_id": input.doctor_id,
-                "active": True,
-            }
+                # Создаем услугу
+                service = Service(
+                    name=input.name,
+                    code=input.code,
+                    price=input.price,
+                    unit=input.unit,
+                    currency=input.currency,
+                    category_code=input.category_code,
+                    active=True,
+                )
+                db.add(service)
+                db.commit()
+                db.refresh(service)
 
-            service = crud_service.create(db, obj_in=service_data)
-
-            return ServiceMutationResponse(
-                success=True,
-                message="Услуга успешно создана",
-                service=service_to_type(service),
-            )
+                return ServiceMutationResponse(
+                    success=True,
+                    message="Услуга успешно создана",
+                    service=service_to_type(service),
+                )
 
         except Exception:
             return ServiceMutationResponse(
@@ -523,32 +566,32 @@ class Mutation:
     def update_service_price(self, id: int, price: float) -> ServiceMutationResponse:
         """Обновить цену услуги"""
         try:
-            db = get_db_session()
+            with get_db_session() as db:
+                service = db.query(Service).filter(Service.id == id).first()
+                if not service:
+                    return ServiceMutationResponse(
+                        success=False,
+                        message="Услуга не найдена",
+                        errors=["SERVICE_NOT_FOUND"],
+                    )
 
-            service = db.query(Service).filter(Service.id == id).first()
-            if not service:
+                if price < 0:
+                    return ServiceMutationResponse(
+                        success=False,
+                        message="Цена не может быть отрицательной",
+                        errors=["INVALID_PRICE"],
+                    )
+
+                service.price = price
+                service.updated_at = datetime.now(UTC)
+                db.commit()
+                db.refresh(service)
+
                 return ServiceMutationResponse(
-                    success=False,
-                    message="Услуга не найдена",
-                    errors=["SERVICE_NOT_FOUND"],
+                    success=True,
+                    message="Цена услуги успешно обновлена",
+                    service=service_to_type(service),
                 )
-
-            if price < 0:
-                return ServiceMutationResponse(
-                    success=False,
-                    message="Цена не может быть отрицательной",
-                    errors=["INVALID_PRICE"],
-                )
-
-            updated_service = crud_service.update(
-                db, db_obj=service, obj_in={"price": price}
-            )
-
-            return ServiceMutationResponse(
-                success=True,
-                message="Цена услуги успешно обновлена",
-                service=service_to_type(updated_service),
-            )
 
         except Exception:
             return ServiceMutationResponse(
@@ -563,94 +606,107 @@ class Mutation:
     def join_queue(self, input: QueueEntryInput) -> QueueMutationResponse:
         """Встать в очередь"""
         try:
-            db = get_db_session()
+            with get_db_session() as db:
+                # Проверяем существование пациента и врача
+                patient = (
+                    db.query(Patient)
+                    .filter(
+                        Patient.id == input.patient_id,
+                        Patient.is_deleted.is_(False),
+                    )
+                    .first()
+                )
+                if not patient:
+                    return QueueMutationResponse(
+                        success=False,
+                        message=t("patient.not_found"),
+                        errors=["PATIENT_NOT_FOUND"],
+                    )
 
-            # Проверяем существование пациента и врача
-            patient = db.query(Patient).filter(Patient.id == input.patient_id).first()
-            if not patient:
+                doctor = db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
+                if not doctor:
+                    return QueueMutationResponse(
+                        success=False,
+                        message=t("doctor.not_found"),
+                        errors=["DOCTOR_NOT_FOUND"],
+                    )
+
+                today = date.today()
+                # SSOT: get_or_create_daily_queue (уникальность day+specialist+tag)
+                daily_queue = crud_queue.get_or_create_daily_queue(
+                    db,
+                    day=today,
+                    specialist_id=input.doctor_id,
+                    queue_tag=input.queue_tag,
+                )
+
+                # Проверяем, не стоит ли пациент уже в очереди к этому врачу сегодня
+                existing_entry = (
+                    db.query(OnlineQueueEntry)
+                    .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+                    .filter(
+                        OnlineQueueEntry.patient_id == input.patient_id,
+                        DailyQueue.specialist_id == input.doctor_id,
+                        DailyQueue.day == today,
+                        OnlineQueueEntry.status.in_(["waiting", "called"]),
+                    )
+                    .first()
+                )
+
+                if existing_entry:
+                    return QueueMutationResponse(
+                        success=False,
+                        message="Пациент уже стоит в очереди к этому врачу сегодня",
+                        errors=["ALREADY_IN_QUEUE"],
+                    )
+
+                # Проверяем лимит онлайн записей
+                online_entries_count = (
+                    db.query(OnlineQueueEntry)
+                    .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+                    .filter(
+                        DailyQueue.specialist_id == input.doctor_id,
+                        DailyQueue.day == today,
+                    )
+                    .count()
+                )
+
+                if online_entries_count >= doctor.max_online_per_day:
+                    return QueueMutationResponse(
+                        success=False,
+                        message="Превышен лимит онлайн записей на сегодня",
+                        errors=["QUEUE_LIMIT_EXCEEDED"],
+                    )
+
+                # GQL-AUDIT-28 P0-3: race на выдаче номера — берём MAX(number)
+                # внутри транзакции; у DailyQueue нет счётчика current_number
+                next_number = (
+                    db.query(func.max(OnlineQueueEntry.number))
+                    .filter(OnlineQueueEntry.queue_id == daily_queue.id)
+                    .scalar()
+                    or 0
+                ) + 1
+
+                queue_entry = OnlineQueueEntry(
+                    queue_id=daily_queue.id,
+                    number=next_number,
+                    patient_id=input.patient_id,
+                    status="waiting",
+                    source="online",
+                    queue_time=datetime.now(UTC),
+                )
+
+                db.add(queue_entry)
+                db.commit()
+                db.refresh(queue_entry)
+
                 return QueueMutationResponse(
-                    success=False,
-                    message=t("patient.not_found"),
-                    errors=["PATIENT_NOT_FOUND"],
+                    success=True,
+                    message=f"Вы встали в очередь под номером {next_number}",
+                    queue_entry=queue_entry_to_type(queue_entry),
                 )
-
-            doctor = db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
-            if not doctor:
-                return QueueMutationResponse(
-                    success=False, message=t("doctor.not_found"), errors=["DOCTOR_NOT_FOUND"]
-                )
-
-            # Проверяем, не стоит ли пациент уже в очереди к этому врачу сегодня
-            today = date.today()
-            existing_entry = (
-                db.query(OnlineQueueEntry)
-                .filter(
-                    OnlineQueueEntry.patient_id == input.patient_id,
-                    OnlineQueueEntry.doctor_id == input.doctor_id,
-                    OnlineQueueEntry.status.in_(["waiting", "called"]),
-                    func.date(OnlineQueueEntry.created_at) == today,
-                )
-                .first()
-            )
-
-            if existing_entry:
-                return QueueMutationResponse(
-                    success=False,
-                    message="Пациент уже стоит в очереди к этому врачу сегодня",
-                    errors=["ALREADY_IN_QUEUE"],
-                )
-
-            # Получаем или создаем дневную очередь
-            daily_queue = crud_queue.get_or_create_daily_queue(
-                db,
-                doctor_id=input.doctor_id,
-                queue_date=today,
-                queue_tag=input.queue_tag,
-            )
-
-            # Проверяем лимит онлайн записей
-            online_entries_count = (
-                db.query(OnlineQueueEntry)
-                .filter(
-                    OnlineQueueEntry.doctor_id == input.doctor_id,
-                    func.date(OnlineQueueEntry.created_at) == today,
-                )
-                .count()
-            )
-
-            if online_entries_count >= doctor.max_online_per_day:
-                return QueueMutationResponse(
-                    success=False,
-                    message="Превышен лимит онлайн записей на сегодня",
-                    errors=["QUEUE_LIMIT_EXCEEDED"],
-                )
-
-            # Создаем запись в очереди
-            # GQL-AUDIT-28 P0-3: lock daily_queue to prevent race on current_number
-            daily_queue = db.query(DailyQueue).filter(
-                DailyQueue.id == daily_queue.id
-            ).with_for_update().first()
-            queue_number = (daily_queue.current_number or 0) + 1
-            daily_queue.current_number = queue_number
-
-            queue_entry = OnlineQueueEntry(
-                patient_id=input.patient_id,
-                doctor_id=input.doctor_id,
-                queue_number=queue_number,
-                status="waiting",
-            )
-
-            db.add(queue_entry)
-            db.commit()
-
-            return QueueMutationResponse(
-                success=True,
-                message=f"Вы встали в очередь под номером {queue_number}",
-                queue_entry=queue_entry_to_type(queue_entry),
-            )
 
         except Exception:
-            db.rollback()
             return QueueMutationResponse(
                 success=False,
                 message=t("error.internal"),
@@ -663,68 +719,47 @@ class Mutation:
     ) -> QueueMutationResponse:
         """Вызвать следующего пациента"""
         try:
-            db = get_db_session()
-
-            # Находим следующего пациента в очереди
-            query = db.query(OnlineQueueEntry).filter(
-                OnlineQueueEntry.doctor_id == doctor_id,
-                OnlineQueueEntry.status == "waiting",
-                func.date(OnlineQueueEntry.created_at) == date.today(),
-            )
-
-            if queue_tag:
-                # Если указан тег очереди, ищем в соответствующей очереди
-                daily_queue = (
-                    db.query(DailyQueue)
+            with get_db_session() as db:
+                # Находим следующего пациента в очереди (через дневную очередь)
+                query = (
+                    db.query(OnlineQueueEntry)
+                    .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
                     .filter(
-                        DailyQueue.doctor_id == doctor_id,
-                        DailyQueue.queue_date == date.today(),
-                        DailyQueue.queue_tag == queue_tag,
+                        DailyQueue.specialist_id == doctor_id,
+                        DailyQueue.day == date.today(),
+                        OnlineQueueEntry.status == "waiting",
                     )
-                    .first()
                 )
-                if daily_queue:
-                    query = query.filter(
-                        OnlineQueueEntry.created_at >= daily_queue.created_at
+
+                if queue_tag:
+                    query = query.filter(DailyQueue.queue_tag == queue_tag)
+
+                # GQL-AUDIT-28 P0-2: with_for_update — защита от race condition
+                next_entry = (
+                    query.order_by(OnlineQueueEntry.number).with_for_update().first()
+                )
+
+                if not next_entry:
+                    return QueueMutationResponse(
+                        success=False,
+                        message="Нет пациентов в очереди",
+                        errors=["NO_PATIENTS_IN_QUEUE"],
                     )
 
-            # GQL-AUDIT-28 P0-2: with_for_update — защита от race condition
-            next_entry = query.order_by(OnlineQueueEntry.queue_number).with_for_update().first()
+                # Обновляем статус и время вызова
+                next_entry.status = "called"
+                next_entry.called_at = datetime.now(UTC)
 
-            if not next_entry:
+                db.commit()
+                db.refresh(next_entry)
+
                 return QueueMutationResponse(
-                    success=False,
-                    message="Нет пациентов в очереди",
-                    errors=["NO_PATIENTS_IN_QUEUE"],
+                    success=True,
+                    message=f"Вызван пациент под номером {next_entry.number}",
+                    queue_entry=queue_entry_to_type(next_entry),
                 )
-
-            # Обновляем статус и время вызова
-            next_entry.status = "called"
-            next_entry.called_at = datetime.now(UTC)
-
-            # Обновляем последний вызванный номер в дневной очереди
-            daily_queue = (
-                db.query(DailyQueue)
-                .filter(
-                    DailyQueue.doctor_id == doctor_id,
-                    DailyQueue.queue_date == date.today(),
-                )
-                .first()
-            )
-
-            if daily_queue:
-                daily_queue.last_called_number = next_entry.queue_number
-
-            db.commit()
-
-            return QueueMutationResponse(
-                success=True,
-                message=f"Вызван пациент под номером {next_entry.queue_number}",
-                queue_entry=queue_entry_to_type(next_entry),
-            )
 
         except Exception:
-            db.rollback()
             return QueueMutationResponse(
                 success=False,
                 message=t("error.internal"),

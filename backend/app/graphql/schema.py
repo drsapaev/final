@@ -21,6 +21,7 @@ def _depth_limit_handler(next_func, source, info, **kwargs):
         raise Exception(f"Query depth exceeds maximum ({max_depth})")
     return next_func(source, info, **kwargs)
 
+
 schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,

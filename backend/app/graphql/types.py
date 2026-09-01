@@ -1,5 +1,9 @@
 """
 GraphQL типы для API клиники
+
+GQL-AUDIT-28 follow-up: типы выровнены с реальными моделями SQLAlchemy
+(ранее резолверы ссылались на несуществующие колонки — full_name,
+passport_series, queue_date, current_number и т.д.).
 """
 
 from datetime import date, datetime, time
@@ -13,29 +17,28 @@ class UserType:
 
     id: int
     username: str
-    email: str
     full_name: str | None = None
-    phone: str | None = None
+    email: str | None = None
     role: str
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @strawberry.type
 class PatientType:
-    """Тип пациента"""
+    """Тип пациента (Patient: last/first/middle имена, doc_type/doc_number)"""
 
     id: int
     full_name: str
-    phone: str
+    phone: str | None = None
     email: str | None = None
+    sex: str | None = None
     birth_date: date | None = None
     address: str | None = None
-    passport_series: str | None = None
-    passport_number: str | None = None
-    created_at: datetime
-    updated_at: datetime
+    doc_type: str | None = None
+    doc_number: str | None = None
+    created_at: datetime | None = None
 
 
 @strawberry.type
@@ -51,118 +54,89 @@ class DoctorType:
     max_online_per_day: int
     auto_close_time: time | None = None
     active: bool
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @strawberry.type
 class ServiceType:
-    """Тип услуги"""
+    """Тип услуги (Service: unit/currency/category_code, без doctor-связи)"""
 
     id: int
     name: str
-    code: str
-    price: float
-    category: str | None = None
-    description: str | None = None
-    duration_minutes: int | None = None
-    doctor: DoctorType | None = None
+    code: str | None = None
+    price: float | None = None
+    unit: str | None = None
+    currency: str | None = None
+    category_code: str | None = None
     active: bool
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @strawberry.type
 class AppointmentType:
-    """Тип записи"""
+    """Тип записи (Appointment: services — JSON-коды, payment_type)"""
 
     id: int
-    patient: PatientType
-    doctor: DoctorType
-    service: ServiceType
-    appointment_date: datetime
+    patient: PatientType | None = None
+    doctor: DoctorType | None = None
+    appointment_date: date
+    appointment_time: str | None = None
     status: str
     notes: str | None = None
-    payment_status: str
+    services: list[str] | None = None
+    payment_type: str | None = None
     payment_amount: float | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @strawberry.type
 class VisitType:
-    """Тип визита"""
+    """Тип визита (Visit: суммы живут в VisitService, не в самом визите)"""
 
     id: int
-    patient: PatientType
-    doctor: DoctorType
-    visit_date: date
-    visit_time: time | None = None
+    patient: PatientType | None = None
+    doctor: DoctorType | None = None
+    visit_date: date | None = None
+    visit_time: str | None = None
     status: str
     discount_mode: str | None = None
-    all_free: bool
-    total_amount: float | None = None
-    payment_status: str
-    created_at: datetime
-    updated_at: datetime
-
-
-@strawberry.type
-class VisitServiceType:
-    """Тип услуги в визите"""
-
-    id: int
-    visit: VisitType
-    service: ServiceType
-    price: float
-    quantity: int
-    total_price: float
-    created_at: datetime
+    notes: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @strawberry.type
 class QueueEntryType:
-    """Тип записи в очереди"""
+    """Тип записи в очереди (OnlineQueueEntry: queue_id/number, called_at)"""
 
     id: int
-    patient: PatientType
-    doctor: DoctorType
-    queue_number: int
+    queue: "DailyQueueType"
+    patient: PatientType | None = None
+    number: int
     status: str
-    created_at: datetime
+    source: str | None = None
+    queue_time: datetime | None = None
     called_at: datetime | None = None
-    completed_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 @strawberry.type
 class DailyQueueType:
-    """Тип дневной очереди"""
+    """Тип дневной очереди (DailyQueue: day/specialist_id/active)"""
 
     id: int
-    doctor: DoctorType
-    queue_date: date
+    specialist: DoctorType
+    day: date
     queue_tag: str | None = None
-    current_number: int
-    last_called_number: int
-    is_active: bool
+    active: bool
+    opened_at: datetime | None = None
     cabinet_number: str | None = None
-    cabinet_floor: str | None = None
+    cabinet_floor: int | None = None
     cabinet_building: str | None = None
-    created_at: datetime
-    updated_at: datetime
-
-
-@strawberry.type
-class ClinicSettingsType:
-    """Тип настроек клиники"""
-
-    id: int
-    key: str
-    value: str | None = None
-    category: str | None = None
-    description: str | None = None
-    updated_at: datetime
-    created_at: datetime
+    created_at: datetime | None = None
 
 
 # ===================== INPUT TYPES =====================
@@ -172,26 +146,32 @@ class ClinicSettingsType:
 class PatientInput:
     """Входные данные для создания пациента"""
 
-    full_name: str
-    phone: str
+    last_name: str
+    first_name: str
+    middle_name: str | None = None
+    phone: str | None = None
     email: str | None = None
     birth_date: date | None = None
+    sex: str | None = None
     address: str | None = None
-    passport_series: str | None = None
-    passport_number: str | None = None
+    doc_type: str | None = None
+    doc_number: str | None = None
 
 
 @strawberry.input
 class PatientUpdateInput:
     """Входные данные для обновления пациента"""
 
-    full_name: str | None = None
+    last_name: str | None = None
+    first_name: str | None = None
+    middle_name: str | None = None
     phone: str | None = None
     email: str | None = None
     birth_date: date | None = None
+    sex: str | None = None
     address: str | None = None
-    passport_series: str | None = None
-    passport_number: str | None = None
+    doc_type: str | None = None
+    doc_number: str | None = None
 
 
 @strawberry.input
@@ -199,10 +179,11 @@ class AppointmentInput:
     """Входные данные для создания записи"""
 
     patient_id: int
-    doctor_id: int
-    service_id: int
-    appointment_date: datetime
+    doctor_id: int | None = None
+    appointment_date: date
+    appointment_time: str | None = None
     notes: str | None = None
+    services: list[str] | None = None
 
 
 @strawberry.input
@@ -210,12 +191,12 @@ class VisitInput:
     """Входные данные для создания визита"""
 
     patient_id: int
-    doctor_id: int
-    visit_date: date
-    visit_time: time | None = None
+    doctor_id: int | None = None
+    visit_date: date | None = None
+    visit_time: str | None = None
     discount_mode: str | None = None
-    all_free: bool = False
-    service_ids: list[int]
+    notes: str | None = None
+    service_ids: list[int] | None = None
 
 
 @strawberry.input
@@ -223,12 +204,11 @@ class ServiceInput:
     """Входные данные для создания услуги"""
 
     name: str
-    code: str
-    price: float
-    category: str | None = None
-    description: str | None = None
-    duration_minutes: int | None = None
-    doctor_id: int | None = None
+    code: str | None = None
+    price: float | None = None
+    unit: str | None = None
+    currency: str | None = None
+    category_code: str | None = None
 
 
 @strawberry.input
@@ -271,11 +251,10 @@ class AppointmentFilter:
 
     patient_id: int | None = None
     doctor_id: int | None = None
-    service_id: int | None = None
     status: str | None = None
-    payment_status: str | None = None
-    date_from: datetime | None = None
-    date_to: datetime | None = None
+    payment_type: str | None = None
+    date_from: date | None = None
+    date_to: date | None = None
 
 
 @strawberry.input
@@ -285,11 +264,9 @@ class VisitFilter:
     patient_id: int | None = None
     doctor_id: int | None = None
     status: str | None = None
-    payment_status: str | None = None
     date_from: date | None = None
     date_to: date | None = None
     discount_mode: str | None = None
-    all_free: bool | None = None
 
 
 @strawberry.input
@@ -298,8 +275,7 @@ class ServiceFilter:
 
     name: str | None = None
     code: str | None = None
-    category: str | None = None
-    doctor_id: int | None = None
+    category_code: str | None = None
     active: bool | None = None
     price_min: float | None = None
     price_max: float | None = None
