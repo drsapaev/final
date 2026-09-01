@@ -83,7 +83,7 @@ if (Test-UvicornHealthy) {
     }
     Set-ConsecutiveFailures 0
 } else {
-    $failures = Get-ConsecutiveFailures + 1
+    $failures = (Get-ConsecutiveFailures) + 1
     Set-ConsecutiveFailures $failures
     Write-WatchdogLog "uvicorn unhealthy (consecutive failure #$failures)."
 

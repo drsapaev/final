@@ -90,13 +90,14 @@ try {
 
     Set-Location -LiteralPath $MainTree
 
-    # --- Guard 1: main tree is on main (skipped for pure runtime restart) ----
-    if (-not $RestartRuntime) {
-        $branch = (& git branch --show-current)
-        if ($LASTEXITCODE -ne 0) { Fail "git branch failed in $MainTree." }
-        if ($branch -ne 'main') {
-            Fail "main tree is on branch '$branch' - production deploys only from 'main'. Switch the tree to main after your PR merges, then retry."
-        }
+    # --- Guard 1: main tree is on main (ENFORCED FOR EVERY MODE) -------------
+    # The runtime is launched from C:inalackend, so a watchdog restart
+    # while the tree sits on a feature branch would deploy unreviewed code.
+    # Only the clean-tree and sync checks are relaxed for -RestartRuntime.
+    $branch = (& git branch --show-current)
+    if ($LASTEXITCODE -ne 0) { Fail "git branch failed in $MainTree." }
+    if ($branch -ne 'main') {
+        Fail "main tree is on branch '$branch' - production restarts and deploys only run from 'main'. Switch the tree to main, then retry."
     }
 
     # --- Guard 2: fully clean tree (tracked changes AND untracked files) -----
