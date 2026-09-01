@@ -66,6 +66,7 @@ class DisplayWebSocketApiRepository:
         load_rows = (
             self.db.query(
                 DailyQueue.specialist_id,
+                OnlineQueueEntry.status,
                 func.count(OnlineQueueEntry.id),
             )
             .join(OnlineQueueEntry, OnlineQueueEntry.queue_id == DailyQueue.id)
@@ -74,10 +75,34 @@ class DisplayWebSocketApiRepository:
                 DailyQueue.specialist_id.in_(doctor_ids),
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
             )
-            .group_by(DailyQueue.specialist_id)
+            .group_by(DailyQueue.specialist_id, OnlineQueueEntry.status)
             .all()
         )
-        active_loads = {specialist_id: count for specialist_id, count in load_rows}
+        active_loads: dict[int, int] = {}
+        waiting_loads: dict[int, int] = {}
+        for specialist_id, status_value, count in load_rows:
+            active_loads[specialist_id] = active_loads.get(specialist_id, 0) + count
+            if status_value == "waiting":
+                waiting_loads[specialist_id] = count
+
+        # Codex round-1 P1: quick-call must actually CALL someone. A doctor
+        # whose queue holds NO waiting entries (no queue row / empty queue /
+        # only already-called entries) has "load 0" in the raw least-loaded
+        # ranking and used to win the pick while another doctor's patients
+        # stayed uncalled — quick_call_next then answered 404/queue_empty.
+        # Route among doctors whose queue REALLY has waiting entries first
+        # (least waiting first, ties to the lowest Doctor.id); only when NO
+        # candidate has waiting entries does the legacy least-active-load
+        # pick stand (the downstream 404/queue_empty is then the same
+        # signal the single-doctor flow produced).
+        candidates_with_waiting = [
+            d for d in doctors if waiting_loads.get(d.id, 0) > 0
+        ]
+        if candidates_with_waiting:
+            return min(
+                candidates_with_waiting,
+                key=lambda d: (waiting_loads[d.id], d.id),
+            )
         return min(doctors, key=lambda d: (active_loads.get(d.id, 0), d.id))
 
     def get_active_doctor_by_user_id(self, user_id: int) -> Doctor | None:

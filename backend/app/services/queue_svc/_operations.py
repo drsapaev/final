@@ -13,6 +13,84 @@ from app.services.user_mgmt._base import (
 from app.core.specialties import expand_queue_tags
 
 
+def _unbookable_doctor_ids(
+    db: Session,
+    doctors: list[Doctor],
+    day,
+    queue_tag: str | None = None,
+) -> set[int]:
+    """Doctors of ``doctors`` whose online queue for ``day`` can NOT accept
+    a new entry (mirror of check_queue_time_window + check_queue_limits):
+
+    - past days: never bookable;
+    - same-day joins before the 07:00 online window: never bookable;
+    - the per-(day, doctor, tag) queue already OPENED reception
+      (``opened_at`` set, same-day only): not bookable;
+    - the per-(day, doctor, tag) queue reached its online cap
+      (active waiting+called entries >= max slots): not bookable.
+
+    Doctors WITHOUT a matching queue row are bookable — the join creates
+    their queue with ``opened_at = NULL`` and zero entries (exactly what
+    ``get_or_create_daily_queue`` would do).
+    """
+    if not doctors:
+        return set()
+
+    doctor_ids = [d.id for d in doctors]
+
+    # Day-level window (identical semantics to check_queue_time_window).
+    now = _now()
+    today = now.date()
+    if day < today:
+        return set(doctor_ids)
+    if day == today and now.time() < QueueBusinessServiceMixinBase.ONLINE_QUEUE_START_TIME:
+        return set(doctor_ids)
+    same_day = day == today
+
+    # Per-queue state: the row the join would use is
+    # (day, specialist_id, queue_tag, active) — first row wins, mirroring
+    # get_or_create_daily_queue's .first() lookup.
+    query = db.query(DailyQueue).filter(
+        DailyQueue.day == day,
+        DailyQueue.specialist_id.in_(doctor_ids),
+        DailyQueue.active == True,  # noqa: E712 — same filter as get_or_create
+    )
+    if queue_tag:
+        query = query.filter(DailyQueue.queue_tag == queue_tag)
+    queues = query.order_by(DailyQueue.id.asc()).all()
+
+    unbookable: set[int] = set()
+    active_counts: dict[int, int] = {}
+    if queues:
+        count_rows = (
+            db.query(
+                OnlineQueueEntry.queue_id,
+                func.count(OnlineQueueEntry.id),
+            )
+            .filter(
+                OnlineQueueEntry.queue_id.in_([q.id for q in queues]),
+                OnlineQueueEntry.status.in_(["waiting", "called"]),
+            )
+            .group_by(OnlineQueueEntry.queue_id)
+            .all()
+        )
+        active_counts = {queue_id: count for queue_id, count in count_rows}
+
+    for queue in queues:
+        if queue.specialist_id in unbookable:
+            continue
+        if same_day and queue.opened_at is not None:
+            unbookable.add(queue.specialist_id)
+            continue
+        max_slots = (
+            getattr(queue, "max_slots", None)
+            or QueueBusinessServiceMixinBase.DEFAULT_MAX_SLOTS
+        )
+        if active_counts.get(queue.id, 0) >= max_slots:
+            unbookable.add(queue.specialist_id)
+    return unbookable
+
+
 class OperationsMixin(QueueBusinessServiceMixinBase):
     """Operations methods."""
 
@@ -573,6 +651,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         db: Session,
         doctors: list[Doctor],
         day,
+        queue_tag: str | None = None,
     ) -> Doctor | None:
         """D-2 least-loaded routing: pick the doctor with the shortest
         ACTIVE queue (waiting+called entries) for ``day``; ties break to
@@ -582,6 +661,19 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         Doctors without a DailyQueue for the day have load 0 — a fresh
         doctor wins over an already loaded one, and equal loads keep the
         historical lowest-id preference.
+
+        Codex round-1 P1 (bookable-state routing): a doctor whose own
+        queue can no longer accept an online entry for ``day`` — reception
+        already opened (``opened_at`` set), the per-queue online cap
+        reached, or (for same-day joins) the 07:00 online window not yet
+        reached — is NOT routed to while another candidate remains
+        bookable. Otherwise the later ``check_queue_time_window`` /
+        ``check_queue_limits`` validation rejected the WHOLE
+        specialty-wide join even though a sibling doctor still accepted
+        patients. Ranking happens over the bookable subset first; when NO
+        candidate is bookable the original least-loaded pick stands, so
+        the precise downstream error (opened reception / limit reached /
+        window not open yet) surfaces unchanged.
         """
         if not doctors:
             return None
@@ -607,7 +699,16 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             .all()
         )
         active_loads = {specialist_id: count for specialist_id, count in load_rows}
-        return min(doctors, key=lambda d: (active_loads.get(d.id, 0), d.id))
+
+        # Codex round-1 P1: rank BOOKABLE doctors first (see docstring).
+        unbookable_ids = _unbookable_doctor_ids(db, doctors, day, queue_tag)
+        candidates = [d for d in doctors if d.id not in unbookable_ids]
+        if not candidates:
+            # Nobody bookable: keep the legacy least-loaded pick so the
+            # downstream window/limit validation produces its precise,
+            # actionable message for the patient instead of a generic one.
+            candidates = doctors
+        return min(candidates, key=lambda d: (active_loads.get(d.id, 0), d.id))
 
     def join_queue_with_token(
         self,
@@ -693,8 +794,10 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 # several active doctors per specialty the new patient goes
                 # to the doctor with the shortest ACTIVE queue for the day
                 # (waiting+called), ties break to the lowest Doctor.id.
+                # queue_tag scopes the bookability pre-check to the exact
+                # (day, doctor, tag) row the join will use (Codex round-1 P1).
                 doctor = self._pick_least_loaded_doctor(
-                    db, eligible_doctors, day
+                    db, eligible_doctors, day, queue_tag=profile_key
                 )
 
                 # Если не нашли - это ошибка сопоставления профиля, а не повод

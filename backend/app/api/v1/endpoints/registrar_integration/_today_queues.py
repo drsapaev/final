@@ -229,6 +229,13 @@ def _process_visits_for_queues(
                     "ecg_only": False,  # Исключаем ЭКГ услуги
                 }
             )
+            # D-2 (Codex round-1 P2): both split-visit buckets contain this
+            # visit's doctor — register BEFORE the continue, otherwise the
+            # echokg/cardiology buckets keep an empty "doctors" map and the
+            # payload's "specialists" list hides a doctor that really has a
+            # visit in the queue.
+            _register_bucket_doctor(queues_by_specialty[specialty_ecg], getattr(visit, 'doctor', None))
+            _register_bucket_doctor(queues_by_specialty[specialty], getattr(visit, 'doctor', None))
             continue  # Переходим к следующему визиту
         elif has_ecg and has_only_ecg:
             # Только ЭКГ - идёт в echokg
@@ -254,6 +261,11 @@ def _process_visits_for_queues(
                     "ecg_only": True,  # [OK] ИСПРАВЛЕНО: Показываем только ЭКГ услуги
                 }
             )
+            # D-2 (Codex round-1 P2): ECG-only visits return here — register
+            # the visit's doctor in the echokg bucket BEFORE the continue so
+            # "specialists" is not empty while the queue holds that doctor's
+            # visit.
+            _register_bucket_doctor(queues_by_specialty[specialty], getattr(visit, 'doctor', None))
             continue  # Переходим к следующему визиту
         else:
             # [OK] ОБНОВЛЕНО: Определяем specialty по department_key из услуг визита
