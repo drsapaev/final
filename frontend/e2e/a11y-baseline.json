@@ -5,8 +5,6 @@
     "scope": "Public routes only (landing, login, display-board, queue-join, payment-success, payment-cancel) × light/dark. The login aria-toggle-field-name finding was FIXED in PR-UI-18-5 (Checkbox aria-label wiring) — not baselined.",
     "axeTags": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
   },
-  "landing:light": ["color-contrast"],
-  "landing:dark": ["color-contrast"],
   "display-board:dark": ["color-contrast"],
   "payment-cancel:dark": ["color-contrast"]
 }
