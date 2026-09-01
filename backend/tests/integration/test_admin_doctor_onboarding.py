@@ -18,17 +18,23 @@ Invariants under test:
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
 from app.models.user import User
+from pydantic import TypeAdapter
+
+from app.schemas.user_management import UserCreateRequest
 from app.services.user_mgmt._operations import get_user_management_service
 
-# Synthetic test credential assembled from parts so secret scanners
-# do not see a standalone strong-password literal (GitGuardian).
-_TEST_PASSWORD = 'Pass' + 'w0rd' + '123'
+# Synthetic test credential in the repo's established pattern
+# (cf. "Admin1234" in test_admin_user_reserved_email.py): obviously
+# role-flavored and never used outside the test database.
+_TEST_PASSWORD = 'Doctor1234'
 
 _DOCTOR_PAYLOAD = {
     "username": "onboard_doc",
@@ -181,10 +187,8 @@ class TestOnboardingAtomicity:
         monkeypatch.setattr(user_mgmt_core, "Doctor", _boom)
         service = get_user_management_service()
 
-        from app.schemas.user_management import UserCreateRequest
-
-        request = UserCreateRequest(
-            **{**_DOCTOR_PAYLOAD, "doctor_profile": {"specialty": "cardiology"}}
+        request = TypeAdapter(UserCreateRequest).validate_python(
+            {**_DOCTOR_PAYLOAD, "doctor_profile": {"specialty": "cardiology"}}
         )
         success, _message, user = service.create_user(db_session, request, created_by=1)
         assert success is False
@@ -197,17 +201,15 @@ class TestOnboardingAtomicity:
 
     def test_user_failure_leaves_no_doctor(self, client, auth_headers, db_session):
         """Duplicate username fails the User step; no Doctor row may appear."""
-        from app.schemas.user_management import UserCreateRequest
-
         service = get_user_management_service()
-        request = UserCreateRequest(
-            **{**_DOCTOR_PAYLOAD, "doctor_profile": {"specialty": "cardiology"}}
+        request = TypeAdapter(UserCreateRequest).validate_python(
+            {**_DOCTOR_PAYLOAD, "doctor_profile": {"specialty": "cardiology"}}
         )
         success, _message, _user = service.create_user(db_session, request, created_by=1)
         assert success is True
 
-        duplicate = UserCreateRequest(
-            **{
+        duplicate = TypeAdapter(UserCreateRequest).validate_python(
+            {
                 **_DOCTOR_PAYLOAD,
                 "email": "second.mail@clinic.test",
                 "doctor_profile": {"specialty": "cardiology"},
@@ -264,3 +266,77 @@ class TestSpecialtyVocabularyEndpoint:
     def test_vocabulary_requires_admin(self, client, auth_headers):
         response = client.get("/api/v1/admin/doctors/specialty-vocabulary")
         assert response.status_code in (401, 403)
+
+
+class TestConditionalCreateContract:
+    """Codex P2: the conditional requirement must live in the published
+    contract, not only in the runtime validator."""
+
+    def test_union_accepts_every_pattern_role(self):
+        """Equivalence with the legacy role pattern: no previously accepted
+        role value may start failing validation after the union refactor."""
+        import re as _re
+
+        from pydantic import TypeAdapter
+
+        from app.schemas.user_management import _USER_MANAGEMENT_ROLE_PATTERN
+
+        adapter = TypeAdapter(UserCreateRequest)
+        pattern = _re.compile(_USER_MANAGEMENT_ROLE_PATTERN)
+        # every value the legacy regex accepted must validate via the union
+        accepted = [
+            "Admin", "Registrar", "Doctor", "Nurse", "Receptionist",
+            "Cashier", "Lab", "Patient", "SuperAdmin", "Manager",
+        ] + [
+            "cardio", "cardiologist", "cardiology", "dentist", "dentistry",
+            "derma", "dermatologist", "dermatology", "doctor",
+        ]
+        for role in accepted:
+            assert pattern.match(role), f"test data drift: {role}"
+            payload = {
+                "username": f"equiv_{role}",
+                "email": f"equiv_{role}@clinic.test",
+                "password": _TEST_PASSWORD,
+                "role": role,
+            }
+            if role == "Doctor":
+                payload["doctor_profile"] = {"specialty": "cardiology"}
+            adapter.validate_python(payload)  # must not raise
+
+    def test_openapi_publishes_conditional_requirement(self):
+        """The committed OpenAPI spec must describe the Doctor variant with
+        doctor_profile REQUIRED via oneOf + role discriminator."""
+        from pathlib import Path
+
+        spec_path = Path(__file__).resolve().parents[2] / "openapi.json"
+        spec = json.loads(spec_path.read_text(encoding="utf-8"))
+
+        body = spec["paths"]["/api/v1/users/users"]["post"]["requestBody"]["content"][
+            "application/json"
+        ]["schema"]
+        one_of = body.get("oneOf")
+        assert one_of, "create request must be a oneOf of role variants"
+
+        schemas = spec["components"]["schemas"]
+        doctor_refs = [
+            ref["$ref"].rsplit("/", 1)[-1]
+            for ref in one_of
+            if "DoctorUserCreateRequest" in ref["$ref"]
+        ]
+        assert doctor_refs, "DoctorUserCreateRequest variant missing from oneOf"
+        doctor_schema = schemas[doctor_refs[0]]
+        assert "doctor_profile" in doctor_schema.get("required", []), (
+            "doctor_profile must be REQUIRED in the published Doctor variant"
+        )
+
+        non_doctor_refs = [
+            ref["$ref"].rsplit("/", 1)[-1]
+            for ref in one_of
+            if "NonDoctorUserCreateRequest" in ref["$ref"]
+        ]
+        assert non_doctor_refs
+        non_doctor_schema = schemas[non_doctor_refs[0]]
+        assert "doctor_profile" not in non_doctor_schema.get("required", [])
+        assert non_doctor_schema["properties"]["doctor_profile"]["type"] == "null"
+
+        assert body.get("discriminator", {}).get("propertyName") == "role"

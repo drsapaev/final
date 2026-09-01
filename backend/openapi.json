@@ -53575,7 +53575,39 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UserCreateRequest"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/DoctorUserCreateRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NonDoctorUserCreateRequest"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "role",
+                  "mapping": {
+                    "Doctor": "#/components/schemas/DoctorUserCreateRequest",
+                    "Admin": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "Registrar": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "Nurse": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "Receptionist": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "Cashier": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "Lab": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "Patient": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "SuperAdmin": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "Manager": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "cardio": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "cardiologist": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "cardiology": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "dentist": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "dentistry": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "derma": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "dermatologist": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "dermatology": "#/components/schemas/NonDoctorUserCreateRequest",
+                    "doctor": "#/components/schemas/NonDoctorUserCreateRequest"
+                  }
+                },
+                "title": "User Data"
               }
             }
           }
@@ -75301,6 +75333,134 @@
         "type": "object",
         "title": "DoctorUpdate"
       },
+      "DoctorUserCreateRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 3,
+            "title": "Username"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Password"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active",
+            "default": true
+          },
+          "is_superuser": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Superuser",
+            "default": false
+          },
+          "must_change_password": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Must Change Password",
+            "default": false
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "minLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "role": {
+            "type": "string",
+            "const": "Doctor",
+            "title": "Role"
+          },
+          "doctor_profile": {
+            "$ref": "#/components/schemas/DoctorProfileCreate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "email",
+          "password",
+          "role",
+          "doctor_profile"
+        ],
+        "title": "DoctorUserCreateRequest",
+        "description": "Canonical new-doctor onboarding variant (POST /users, role=Doctor).\n\ndoctor_profile is REQUIRED here and published as required in OpenAPI, so\ngenerated clients describe the conditional contract instead of relying\non the runtime validator alone (Codex P2). Legacy doctor-role spellings\nare handled by NonDoctorUserCreateRequest and keep the auto-map."
+      },
       "DoctorUserOption": {
         "properties": {
           "id": {
@@ -86727,6 +86887,153 @@
           "date"
         ],
         "title": "MorningAssignmentResponse"
+      },
+      "NonDoctorUserCreateRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 3,
+            "title": "Username"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Password"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active",
+            "default": true
+          },
+          "is_superuser": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Superuser",
+            "default": false
+          },
+          "must_change_password": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Must Change Password",
+            "default": false
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "minLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "Admin",
+              "Registrar",
+              "Nurse",
+              "Receptionist",
+              "Cashier",
+              "Lab",
+              "Patient",
+              "SuperAdmin",
+              "Manager",
+              "cardio",
+              "cardiologist",
+              "cardiology",
+              "dentist",
+              "dentistry",
+              "derma",
+              "dermatologist",
+              "dermatology",
+              "doctor"
+            ],
+            "title": "Role"
+          },
+          "doctor_profile": {
+            "type": "null",
+            "title": "Doctor Profile"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "email",
+          "password",
+          "role"
+        ],
+        "title": "NonDoctorUserCreateRequest",
+        "description": "Every non-canonical-Doctor role variant (POST /users).\n\nIncludes legacy lowercase doctor-role spellings (cardio/derma/dentist/\ndoctor/…): they keep the compatibility auto-map and must NOT carry a\ndoctor_profile — the block is rejected here instead of being silently\ndropped."
       },
       "NotificationInboxItem": {
         "properties": {
@@ -102369,140 +102676,6 @@
         ],
         "title": "UserBulkActionResponse",
         "description": "Схема ответа массовых действий"
-      },
-      "UserCreateRequest": {
-        "properties": {
-          "username": {
-            "type": "string",
-            "maxLength": 50,
-            "minLength": 3,
-            "title": "Username"
-          },
-          "email": {
-            "type": "string",
-            "maxLength": 254,
-            "minLength": 3,
-            "title": "Email"
-          },
-          "password": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 8,
-            "title": "Password"
-          },
-          "role": {
-            "type": "string",
-            "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$",
-            "title": "Role"
-          },
-          "is_active": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Is Active",
-            "default": true
-          },
-          "is_superuser": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Is Superuser",
-            "default": false
-          },
-          "must_change_password": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Must Change Password",
-            "default": false
-          },
-          "full_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 100,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Full Name"
-          },
-          "first_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "First Name"
-          },
-          "last_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Name"
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 20,
-                "minLength": 10
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
-          },
-          "doctor_profile": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DoctorProfileCreate"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "username",
-          "email",
-          "password",
-          "role"
-        ],
-        "title": "UserCreateRequest",
-        "description": "Схема создания пользователя"
       },
       "UserDataSummaryResponse": {
         "properties": {

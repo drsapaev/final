@@ -4618,6 +4618,8 @@ const uzLatn = {
     umdl_doctor_specialty: 'Mutaxassislik',
     umdl_doctor_specialty_ph: 'Mutaxassislikni tanlang',
     umdl_err_doctor_specialty_required: 'Shifokor mutaxassisligini tanlang',
+    umdl_err_doctor_price_format: 'Son kiriting, masalan 150000 yoki 150 000',
+    umdl_err_doctor_number_range: '1 dan 100 gacha butun son',
     umdl_doctor_cabinet: 'Kabinet',
     umdl_doctor_price: 'Qabul narxi',
     umdl_doctor_start_number: 'Onlayn boshlanish raqami',

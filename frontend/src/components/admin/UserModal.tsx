@@ -70,6 +70,27 @@ const ErrorMessage = ({ message }: { message?: React.ReactNode }) => (
   </div>
 );
 
+// Strict onboarding numeric parsing (Codex P2): no silent prefix-truncation
+// like parseInt("12abc") → 12. Non-empty invalid input must surface a field
+// error and block submit; the backend schema remains authoritative.
+// - integer limits: whole-number strings only, then range-checked
+// - price: explicit normalization of space/underspace thousands separators
+//   ("150 000" → 150000); anything else non-numeric stays invalid
+const WHOLE_NUMBER_RE = /^[0-9]+$/;
+const NORMALIZED_PRICE_RE = /^[0-9]+(\.[0-9]{1,2})?$/;
+
+const parseStrictWholeNumber = (raw: string): number | null => {
+  const trimmed = raw.trim();
+  if (!WHOLE_NUMBER_RE.test(trimmed)) return null;
+  return Number.parseInt(trimmed, 10);
+};
+
+const parseStrictPrice = (raw: string): number | null => {
+  const normalized = raw.trim().replace(/[\s\u00A0]/g, '');
+  if (!NORMALIZED_PRICE_RE.test(normalized)) return null;
+  return Number.parseFloat(normalized);
+};
+
 const FormField = ({ label, required, icon: Icon, error, children }: FormFieldProps) => (
   <div className="admin-mb-16">
     <label className="admin-usermodal-label">
@@ -242,6 +263,30 @@ const UserModal = ({
       newErrors.doctorSpecialty = t('admin2.umdl_err_doctor_specialty_required');
     }
 
+    // Strict numeric validation (Codex P2): partially-numeric or garbage
+    // input is a FIELD ERROR that blocks submit — never a silently dropped
+    // or prefix-truncated value. Mirrors the backend ranges exactly.
+    if (isDoctorOnboarding) {
+      const priceRaw = formData.doctorPrice.trim();
+      if (priceRaw !== '' && parseStrictPrice(priceRaw) === null) {
+        newErrors.doctorPrice = t('admin2.umdl_err_doctor_price_format');
+      }
+      const startRaw = formData.doctorStartNumber.trim();
+      if (startRaw !== '') {
+        const parsed = parseStrictWholeNumber(startRaw);
+        if (parsed === null || parsed < 1 || parsed > 100) {
+          newErrors.doctorStartNumber = t('admin2.umdl_err_doctor_number_range');
+        }
+      }
+      const maxRaw = formData.doctorMaxOnline.trim();
+      if (maxRaw !== '') {
+        const parsed = parseStrictWholeNumber(maxRaw);
+        if (parsed === null || parsed < 1 || parsed > 100) {
+          newErrors.doctorMaxOnline = t('admin2.umdl_err_doctor_number_range');
+        }
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -267,7 +312,9 @@ const UserModal = ({
 
       // doctor_profile is attached ONLY for the canonical doctor onboarding
       // path — switching Doctor → non-doctor before submit cannot leak stale
-      // form state into the payload.
+      // form state into the payload. Numeric values were range/format-checked
+      // in validateForm (strict parsing: no prefix truncation); empty fields
+      // stay omitted so backend defaults apply.
       if (isDoctorOnboarding) {
         const doctorProfile: Record<string, unknown> = {
           specialty: formData.doctorSpecialty,
@@ -275,17 +322,14 @@ const UserModal = ({
         if (formData.doctorCabinet.trim()) {
           doctorProfile.cabinet = formData.doctorCabinet.trim();
         }
-        const price = parseFloat(formData.doctorPrice);
-        if (formData.doctorPrice.trim() !== '' && Number.isFinite(price)) {
-          doctorProfile.price_default = price;
+        if (formData.doctorPrice.trim() !== '') {
+          doctorProfile.price_default = parseStrictPrice(formData.doctorPrice.trim());
         }
-        const startNumber = parseInt(formData.doctorStartNumber, 10);
-        if (formData.doctorStartNumber.trim() !== '' && Number.isFinite(startNumber)) {
-          doctorProfile.start_number_online = startNumber;
+        if (formData.doctorStartNumber.trim() !== '') {
+          doctorProfile.start_number_online = parseStrictWholeNumber(formData.doctorStartNumber.trim());
         }
-        const maxOnline = parseInt(formData.doctorMaxOnline, 10);
-        if (formData.doctorMaxOnline.trim() !== '' && Number.isFinite(maxOnline)) {
-          doctorProfile.max_online_per_day = maxOnline;
+        if (formData.doctorMaxOnline.trim() !== '') {
+          doctorProfile.max_online_per_day = parseStrictWholeNumber(formData.doctorMaxOnline.trim());
         }
         userData.doctor_profile = doctorProfile;
       }
@@ -414,31 +458,34 @@ const UserModal = ({
                   placeholder="12"
                 />
               </FormField>
-              <FormField label={t('admin2.umdl_doctor_price')}>
+              <FormField label={t('admin2.umdl_doctor_price')} error={errors.doctorPrice}>
                 <Input
                   type="text"
                   inputMode="decimal"
                   value={formData.doctorPrice}
                   onChange={(e) => handleChange('doctorPrice', e.target.value)}
                   placeholder="150000"
+                  error={!!errors.doctorPrice}
                 />
               </FormField>
-              <FormField label={t('admin2.umdl_doctor_start_number')}>
+              <FormField label={t('admin2.umdl_doctor_start_number')} error={errors.doctorStartNumber}>
                 <Input
                   type="text"
                   inputMode="numeric"
                   value={formData.doctorStartNumber}
                   onChange={(e) => handleChange('doctorStartNumber', e.target.value)}
                   placeholder="1"
+                  error={!!errors.doctorStartNumber}
                 />
               </FormField>
-              <FormField label={t('admin2.umdl_doctor_max_online')}>
+              <FormField label={t('admin2.umdl_doctor_max_online')} error={errors.doctorMaxOnline}>
                 <Input
                   type="text"
                   inputMode="numeric"
                   value={formData.doctorMaxOnline}
                   onChange={(e) => handleChange('doctorMaxOnline', e.target.value)}
                   placeholder="15"
+                  error={!!errors.doctorMaxOnline}
                 />
               </FormField>
             </div>

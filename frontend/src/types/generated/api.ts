@@ -25897,6 +25897,52 @@ export type components = {
             /** Active */
             active?: boolean | null;
         };
+        /**
+         * DoctorUserCreateRequest
+         * @description Canonical new-doctor onboarding variant (POST /users, role=Doctor).
+         *
+         *     doctor_profile is REQUIRED here and published as required in OpenAPI, so
+         *     generated clients describe the conditional contract instead of relying
+         *     on the runtime validator alone (Codex P2). Legacy doctor-role spellings
+         *     are handled by NonDoctorUserCreateRequest and keep the auto-map.
+         */
+        DoctorUserCreateRequest: {
+            /** Username */
+            username: string;
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean | null;
+            /**
+             * Is Superuser
+             * @default false
+             */
+            is_superuser: boolean | null;
+            /**
+             * Must Change Password
+             * @default false
+             */
+            must_change_password: boolean | null;
+            /** Full Name */
+            full_name?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            role: "Doctor";
+            doctor_profile: components["schemas"]["DoctorProfileCreate"];
+        };
         /** DoctorUserOption */
         DoctorUserOption: {
             /** Id */
@@ -30171,6 +30217,53 @@ export type components = {
             errors: unknown[];
             /** Date */
             date: string;
+        };
+        /**
+         * NonDoctorUserCreateRequest
+         * @description Every non-canonical-Doctor role variant (POST /users).
+         *
+         *     Includes legacy lowercase doctor-role spellings (cardio/derma/dentist/
+         *     doctor/…): they keep the compatibility auto-map and must NOT carry a
+         *     doctor_profile — the block is rejected here instead of being silently
+         *     dropped.
+         */
+        NonDoctorUserCreateRequest: {
+            /** Username */
+            username: string;
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean | null;
+            /**
+             * Is Superuser
+             * @default false
+             */
+            is_superuser: boolean | null;
+            /**
+             * Must Change Password
+             * @default false
+             */
+            must_change_password: boolean | null;
+            /** Full Name */
+            full_name?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            role: "Admin" | "Registrar" | "Nurse" | "Receptionist" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "Manager" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
+            /** Doctor Profile */
+            doctor_profile?: null;
         };
         /** NotificationInboxItem */
         NotificationInboxItem: {
@@ -36213,44 +36306,6 @@ export type components = {
             failed_users: {
                 [key: string]: unknown;
             }[];
-        };
-        /**
-         * UserCreateRequest
-         * @description Схема создания пользователя
-         */
-        UserCreateRequest: {
-            /** Username */
-            username: string;
-            /** Email */
-            email: string;
-            /** Password */
-            password: string;
-            /** Role */
-            role: string;
-            /**
-             * Is Active
-             * @default true
-             */
-            is_active: boolean | null;
-            /**
-             * Is Superuser
-             * @default false
-             */
-            is_superuser: boolean | null;
-            /**
-             * Must Change Password
-             * @default false
-             */
-            must_change_password: boolean | null;
-            /** Full Name */
-            full_name?: string | null;
-            /** First Name */
-            first_name?: string | null;
-            /** Last Name */
-            last_name?: string | null;
-            /** Phone */
-            phone?: string | null;
-            doctor_profile?: components["schemas"]["DoctorProfileCreate"] | null;
         };
         /** UserDataSummaryResponse */
         UserDataSummaryResponse: {
@@ -70022,7 +70077,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UserCreateRequest"];
+                "application/json": components["schemas"]["DoctorUserCreateRequest"] | components["schemas"]["NonDoctorUserCreateRequest"];
             };
         };
         responses: {

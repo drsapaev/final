@@ -7,10 +7,12 @@ import os
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any
+from typing import Any, Literal, Union
 
 from email_validator import EmailNotValidError
 from email_validator import validate_email as validate_email_address
+from typing_extensions import Annotated
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.config import ConfigDict
 
@@ -529,6 +531,24 @@ _USER_MANAGEMENT_ROLE_PATTERN = (
     + ")$"
 )
 
+# Roles accepted by POST /users WITHOUT a doctor_profile. Exact complement
+# of the canonical "Doctor" variant below — DOCTOR_ROLE_SPELLINGS carries
+# every legacy lowercase spelling (including the bare "doctor"), which all
+# keep the compatibility auto-map and are NOT canonical onboarding.
+_NON_DOCTOR_ROLE_VALUES: tuple[str, ...] = (
+    "Admin",
+    "Registrar",
+    "Nurse",
+    "Receptionist",
+    "Cashier",
+    "Lab",
+    "Patient",
+    "SuperAdmin",
+    "Manager",
+) + tuple(sorted(DOCTOR_ROLE_SPELLINGS))
+
+NonDoctorRoleLiteral = Literal.__getitem__(_NON_DOCTOR_ROLE_VALUES)
+
 
 class DoctorProfileCreate(BaseModel):
     """Doctor profile block for canonical new-doctor onboarding (POST /users).
@@ -549,16 +569,14 @@ class DoctorProfileCreate(BaseModel):
     max_online_per_day: int | None = Field(None, ge=1, le=100)
 
 
-class UserCreateRequest(BaseModel):
-    """Схема создания пользователя"""
+class _UserCreateCommon(BaseModel):
+    """Shared fields of the POST /users create variants (discriminated by role)."""
 
     model_config = ConfigDict(protected_namespaces=())
 
     username: str = Field(..., min_length=3, max_length=50)
     email: str = Field(..., min_length=3, max_length=254)
     password: str = Field(..., min_length=8, max_length=100)
-    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
-    role: str = Field(..., pattern=_USER_MANAGEMENT_ROLE_PATTERN)
     is_active: bool | None = True
     is_superuser: bool | None = False
     must_change_password: bool | None = False  # Требуется смена пароля при первом входе
@@ -568,35 +586,6 @@ class UserCreateRequest(BaseModel):
     first_name: str | None = Field(None, min_length=1, max_length=50)
     last_name: str | None = Field(None, min_length=1, max_length=50)
     phone: str | None = Field(None, min_length=10, max_length=20)
-
-    # Профиль врача — обязателен для role="Doctor" (canonical onboarding):
-    # новый системный врач создаётся одной операцией User+Doctor с явной
-    # канонической specialty. Для всех остальных ролей (включая legacy
-    # doctor-роли) блок запрещён.
-    doctor_profile: DoctorProfileCreate | None = None
-
-    @model_validator(mode="after")
-    def validate_doctor_profile_contract(self) -> "UserCreateRequest":
-        from app.core.specialties import DOCTOR_ONBOARDING_SPECIALTIES
-
-        if self.role == "Doctor":
-            if self.doctor_profile is None:
-                raise ValueError(
-                    "doctor_profile обязателен для role=Doctor: укажите "
-                    "каноническую специальность (например, cardiology)"
-                )
-            specialty = self.doctor_profile.specialty.strip()
-            if specialty not in DOCTOR_ONBOARDING_SPECIALTIES:
-                raise ValueError(
-                    "doctor_profile.specialty должна быть каноническим id из "
-                    "списка онбординга: "
-                    + ", ".join(DOCTOR_ONBOARDING_SPECIALTIES)
-                )
-        elif self.doctor_profile is not None:
-            raise ValueError(
-                "doctor_profile принимается только для role=Doctor"
-            )
-        return self
 
     @field_validator('password')
     @classmethod
@@ -618,6 +607,59 @@ class UserCreateRequest(BaseModel):
             v,
             allow_reserved=_allow_reserved_email_domains(),
         )
+
+
+class DoctorUserCreateRequest(_UserCreateCommon):
+    """Canonical new-doctor onboarding variant (POST /users, role=Doctor).
+
+    doctor_profile is REQUIRED here and published as required in OpenAPI, so
+    generated clients describe the conditional contract instead of relying
+    on the runtime validator alone (Codex P2). Legacy doctor-role spellings
+    are handled by NonDoctorUserCreateRequest and keep the auto-map.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    role: Literal["Doctor"]
+    doctor_profile: DoctorProfileCreate
+
+    @field_validator("doctor_profile")
+    @classmethod
+    def validate_doctor_profile_specialty(cls, v: DoctorProfileCreate) -> DoctorProfileCreate:
+        from app.core.specialties import DOCTOR_ONBOARDING_SPECIALTIES
+
+        specialty = v.specialty.strip()
+        if specialty not in DOCTOR_ONBOARDING_SPECIALTIES:
+            raise ValueError(
+                "doctor_profile.specialty должна быть каноническим id из "
+                "списка онбординга: "
+                + ", ".join(DOCTOR_ONBOARDING_SPECIALTIES)
+            )
+        return v
+
+
+class NonDoctorUserCreateRequest(_UserCreateCommon):
+    """Every non-canonical-Doctor role variant (POST /users).
+
+    Includes legacy lowercase doctor-role spellings (cardio/derma/dentist/
+    doctor/…): they keep the compatibility auto-map and must NOT carry a
+    doctor_profile — the block is rejected here instead of being silently
+    dropped.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    role: NonDoctorRoleLiteral
+    doctor_profile: None = None
+
+
+# Conditional create contract: FastAPI publishes this as oneOf with a role
+# discriminator, so OpenAPI/generated TS distinguish the Doctor variant
+# (doctor_profile REQUIRED) from every non-Doctor create.
+UserCreateRequest = Annotated[
+    Union[DoctorUserCreateRequest, NonDoctorUserCreateRequest],
+    Field(discriminator="role"),
+]
 
 
 class UserUpdateRequest(BaseModel):

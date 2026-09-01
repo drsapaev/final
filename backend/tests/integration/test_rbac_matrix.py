@@ -586,6 +586,8 @@ def test_role_pattern_covers_full_doctor_family_ssot() -> None:
     when the admin modal re-submits a stored role verbatim."""
     import re
 
+    from pydantic import TypeAdapter
+
     from app.core.roles import DOCTOR_ROLE_SPELLINGS
     from app.schemas.user_management import (
         UserCreateRequest,
@@ -607,11 +609,13 @@ def test_role_pattern_covers_full_doctor_family_ssot() -> None:
     # (probe password is assembled at runtime — a plaintext `password="..."`
     # kwarg trips GitGuardian's hardcoded-password detector on the PR scan)
     probe_password = "Pass" + "w" + "0rd!"
-    UserCreateRequest(
-        username="pattern_probe",
-        email="pattern_probe@test.com",
-        password=probe_password,
-        role="dentistry",
+    TypeAdapter(UserCreateRequest).validate_python(
+        {
+            "username": "pattern_probe",
+            "email": "pattern_probe@test.com",
+            "password": probe_password,
+            "role": "dentistry",
+        }
     )
     UserSearchRequest(role="cardiology")
 

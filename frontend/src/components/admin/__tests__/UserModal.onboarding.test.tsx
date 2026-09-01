@@ -167,3 +167,105 @@ describe('UserModal doctor onboarding', () => {
     expect(payload.doctor_profile).toBeUndefined();
   });
 });
+
+describe('UserModal onboarding numeric validation (Codex P2)', () => {
+  const selectDoctorAndSpecialty = async () => {
+    const roleTrigger = screen
+      .getAllByRole('button')
+      .find((el) => el.getAttribute('aria-haspopup') === 'listbox');
+    fireEvent.click(roleTrigger as HTMLElement);
+    const roleOptions = await screen.findAllByRole('option');
+    fireEvent.click(
+      roleOptions.find((el) => el.textContent === 'admin2.umdl_role_doctor_general') as HTMLElement,
+    );
+    await waitFor(() =>
+      expect(screen.getByText('admin2.umdl_doctor_profile_section')).toBeDefined(),
+    );
+    const specialtyTrigger = screen
+      .getAllByRole('button')
+      .filter((el) => el.getAttribute('aria-haspopup') === 'listbox')
+      .pop() as HTMLElement;
+    fireEvent.click(specialtyTrigger);
+    const specialtyOptions = await screen.findAllByRole('option');
+    fireEvent.click(
+      specialtyOptions.find((el) => el.textContent === 'admin2.umdl_spec_cardiology') as HTMLElement,
+    );
+  };
+
+  const typeIntoField = (placeholder: string, value: string) => {
+    fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value } });
+  };
+
+  it('rejects partially-numeric price input instead of truncating it', async () => {
+    render(
+      <ThemeProvider>
+        <UserModal isOpen onClose={vi.fn()} onSave={onSave} />
+      </ThemeProvider>,
+    );
+    fillBaseUserForm();
+    await selectDoctorAndSpecialty();
+    typeIntoField('150000', '150abc');
+
+    submitForm();
+    await waitFor(() =>
+      expect(screen.getByText('admin2.umdl_err_doctor_price_format')).toBeDefined(),
+    );
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('accepts space-separated price and sends the normalized number', async () => {
+    render(
+      <ThemeProvider>
+        <UserModal isOpen onClose={vi.fn()} onSave={onSave} />
+      </ThemeProvider>,
+    );
+    fillBaseUserForm();
+    await selectDoctorAndSpecialty();
+    typeIntoField('150000', '150 000');
+
+    submitForm();
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const payload = onSave.mock.calls[0][0] as {
+      doctor_profile?: { price_default?: number };
+    };
+    expect(payload.doctor_profile?.price_default).toBe(150000);
+  });
+
+  it.each(['abc', '12abc', '3.5', '0', '101'])(
+    'rejects invalid online-limit value %s',
+    async (bad) => {
+      render(
+        <ThemeProvider>
+          <UserModal isOpen onClose={vi.fn()} onSave={onSave} />
+        </ThemeProvider>,
+      );
+      fillBaseUserForm();
+      await selectDoctorAndSpecialty();
+      typeIntoField('15', bad);
+
+      submitForm();
+      await waitFor(() =>
+        expect(screen.getByText('admin2.umdl_err_doctor_number_range')).toBeDefined(),
+      );
+      expect(onSave).not.toHaveBeenCalled();
+    },
+  );
+
+  it('sends strict integers for valid limit input', async () => {
+    render(
+      <ThemeProvider>
+        <UserModal isOpen onClose={vi.fn()} onSave={onSave} />
+      </ThemeProvider>,
+    );
+    fillBaseUserForm();
+    await selectDoctorAndSpecialty();
+    typeIntoField('15', '20');
+
+    submitForm();
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const payload = onSave.mock.calls[0][0] as {
+      doctor_profile?: { max_online_per_day?: number };
+    };
+    expect(payload.doctor_profile?.max_online_per_day).toBe(20);
+  });
+});
