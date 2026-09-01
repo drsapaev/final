@@ -9869,6 +9869,31 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/doctors/specialty-vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Doctor Specialty Vocabulary
+         * @description Canonical specialty ids selectable at new-doctor onboarding.
+         *
+         *     Feeds the mandatory specialty SELECT in the Users → Add User flow.
+         *     SSOT: app/core/specialties.py DOCTOR_ONBOARDING_SPECIALTIES (pilot
+         *     bootstrap — extendable without new User roles). Labels are localized
+         *     on the frontend; this endpoint returns domain ids only.
+         */
+        get: operations["get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/doctors/{doctor_id}": {
         parameters: {
             query?: never;
@@ -25675,6 +25700,28 @@ export type components = {
             doctor_id?: number | null;
         };
         /**
+         * DoctorProfileCreate
+         * @description Doctor profile block for canonical new-doctor onboarding (POST /users).
+         *
+         *     Only accepted for role="Doctor" (canonical onboarding); legacy
+         *     doctor-role spellings keep their compatibility auto-map and must not
+         *     send this block. ``specialty`` must be a canonical onboarding id —
+         *     the incomplete sentinel ("general"), legacy dental spellings and any
+         *     free-text value are rejected.
+         */
+        DoctorProfileCreate: {
+            /** Specialty */
+            specialty: string;
+            /** Cabinet */
+            cabinet?: string | null;
+            /** Price Default */
+            price_default?: number | string | null;
+            /** Start Number Online */
+            start_number_online?: number | null;
+            /** Max Online Per Day */
+            max_online_per_day?: number | null;
+        };
+        /**
          * DoctorQueueLimit
          * @description Индивидуальный лимит для врача
          */
@@ -36203,6 +36250,7 @@ export type components = {
             last_name?: string | null;
             /** Phone */
             phone?: string | null;
+            doctor_profile?: components["schemas"]["DoctorProfileCreate"] | null;
         };
         /** UserDataSummaryResponse */
         UserDataSummaryResponse: {
@@ -55653,6 +55701,28 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    }[];
                 };
             };
         };
