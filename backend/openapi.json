@@ -28900,6 +28900,40 @@
         ]
       }
     },
+    "/api/v1/admin/doctors/specialty-vocabulary": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Doctor Specialty Vocabulary",
+        "description": "Canonical specialty ids selectable at new-doctor onboarding.\n\nFeeds the mandatory specialty SELECT in the Users → Add User flow.\nSSOT: app/core/specialties.py DOCTOR_ONBOARDING_SPECIALTIES (pilot\nbootstrap — extendable without new User roles). Labels are localized\non the frontend; this endpoint returns domain ids only.",
+        "operationId": "get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Doctor Specialty Vocabulary Api V1 Admin Doctors Specialty Vocabulary Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/doctors/{doctor_id}": {
       "get": {
         "tags": [
@@ -74782,6 +74816,76 @@
         "title": "DoctorPerformanceReportRequest",
         "description": "Запрос отчета по производительности врачей"
       },
+      "DoctorProfileCreate": {
+        "properties": {
+          "specialty": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Specialty"
+          },
+          "cabinet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet"
+          },
+          "price_default": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Default"
+          },
+          "start_number_online": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Number Online"
+          },
+          "max_online_per_day": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Online Per Day"
+          }
+        },
+        "type": "object",
+        "required": [
+          "specialty"
+        ],
+        "title": "DoctorProfileCreate",
+        "description": "Doctor profile block for canonical new-doctor onboarding (POST /users).\n\nOnly accepted for role=\"Doctor\" (canonical onboarding); legacy\ndoctor-role spellings keep their compatibility auto-map and must not\nsend this block. ``specialty`` must be a canonical onboarding id —\nthe incomplete sentinel (\"general\"), legacy dental spellings and any\nfree-text value are rejected."
+      },
       "DoctorQueueLimit": {
         "properties": {
           "doctor_id": {
@@ -102378,6 +102482,16 @@
               }
             ],
             "title": "Phone"
+          },
+          "doctor_profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoctorProfileCreate"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
