@@ -48,6 +48,9 @@
   --mac-accent-blue-strong: #0066d6;
   --mac-danger-strong: #d92c20;
   --mac-success-strong: #147a38;
+  /* CC-2: amber fill for white ink — #ff9f0a measures 2.06:1 against white;
+   * #a86200 measures 4.76:1. Same strong-family contract as above. */
+  --mac-warning-strong: #a86200;
   --mac-accent-blue-500: var(--mac-accent-blue);
   --mac-accent-blue-600: var(--mac-accent-blue-hover);
   --mac-accent-blue-700: var(--mac-accent-blue-active);
@@ -418,9 +421,12 @@
 }
 
 .mac-button--primary {
-  background: var(--mac-accent-blue);
+  /* CC-2: white-ink fill moved to the strong token (5.42:1 vs the base
+   * #007aff at 4.02:1 — axe color-contrast, e2e/a11y-baseline.json).
+   * Hover/active shades stay (#0051d5 6.69:1 / #004bb5 7.85:1 — both pass). */
+  background: var(--mac-accent-blue-strong, var(--mac-accent-blue));
   color: white;
-  border-color: var(--mac-accent-blue);
+  border-color: var(--mac-accent-blue-strong, var(--mac-accent-blue));
 }
 
 .mac-button--primary:hover {
