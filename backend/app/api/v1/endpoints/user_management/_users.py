@@ -7,6 +7,7 @@ from app.api.v1.endpoints.user_management._helpers import (
     _find_user_export_file,
     _safe_user_export_filename,
     _user_export_mime_type,
+    _USER_MANAGEMENT_ROLE_PATTERN,
     router,
 )  # noqa: F401
 
@@ -50,7 +51,11 @@ async def get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     role: str | None = Query(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
+        # Codex round-1 P2: reuse the shared vocabulary — the previous
+        # hardcoded list rejected cardio/derma/dentist/Registrar/SuperAdmin/
+        # Manager BEFORE UserSearchRequest was constructed, so ?role=cardio
+        # answered 422 while the schema advertised it as valid.
         # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     ),
     status_filter: str | None = Query(

@@ -53613,7 +53613,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
+                  "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
                 },
                 {
                   "type": "null"
@@ -102199,7 +102199,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"
@@ -102288,7 +102288,7 @@
           },
           "role": {
             "type": "string",
-            "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|derma|dentist)$",
+            "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$",
             "title": "Role"
           },
           "is_active": {
@@ -104371,7 +104371,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"
@@ -104680,7 +104680,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"
