@@ -98,6 +98,45 @@ def _unbookable_doctor_ids(
     return unbookable
 
 
+def _find_clinic_wide_duplicate(
+    db: Session,
+    doctors: list[Doctor],
+    *,
+    day,
+    queue_tag: str,
+    phone: str | None,
+    telegram_id: str | None,
+) -> tuple[OnlineQueueEntry | None, DailyQueue | None]:
+    """The patient's existing entry across ALL candidate doctors'
+    active same-day queues for ``queue_tag`` (Codex round-4 P1):
+    duplicates must be resolved BEFORE least-load routing — a retry or
+    double submit raises the first doctor's load, so routing would
+    pick a sibling and the per-queue ``check_uniqueness`` would let a
+    SECOND entry for the same patient through under another doctor."""
+    if not phone and not telegram_id:
+        return None, None
+    base = (
+        db.query(OnlineQueueEntry)
+        .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+        .filter(
+            DailyQueue.day == day,
+            DailyQueue.specialist_id.in_([d.id for d in doctors]),
+            DailyQueue.active.is_(True),
+            DailyQueue.queue_tag == queue_tag,
+            OnlineQueueEntry.status.in_(["waiting", "called"]),
+        )
+    )
+    entry = None
+    if phone:
+        entry = base.filter(OnlineQueueEntry.phone == phone).first()
+    if entry is None and telegram_id:
+        entry = base.filter(OnlineQueueEntry.telegram_id == telegram_id).first()
+    if entry is None:
+        return None, None
+    queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+    return entry, queue
+
+
 class OperationsMixin(QueueBusinessServiceMixinBase):
     """Operations methods."""
 
@@ -829,35 +868,67 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 # (waiting+called), ties break to the lowest Doctor.id.
                 # queue_tag scopes the bookability pre-check to the exact
                 # (day, doctor, tag) row the join will use (Codex round-1 P1).
-                doctor = self._pick_least_loaded_doctor(
-                    db, eligible_doctors, day, queue_tag=profile_key
+                # Codex round-4 P1: resolve the patient's EXISTING entry
+                # across the profile's candidate queues BEFORE least-load
+                # routing (see _find_clinic_wide_duplicate) — otherwise a
+                # retry lands a second entry under another doctor.
+                existing_entry, existing_queue = _find_clinic_wide_duplicate(
+                    db,
+                    eligible_doctors,
+                    day=day,
+                    queue_tag=profile_key,
+                    phone=phone,
+                    telegram_id=telegram_id,
                 )
-
-                # Если не нашли - это ошибка сопоставления профиля, а не повод
-                # подставлять случайного активного врача.
-                if not doctor:
-                    raise QueueValidationError(
-                        f"Нет активных врачей для профиля {queue_profile.title_ru or queue_profile.title}"
+                if existing_queue is not None:
+                    doctor = existing_queue.specialist or (
+                        db.query(Doctor)
+                        .filter(Doctor.id == existing_queue.specialist_id)
+                        .first()
                     )
+                    daily_queue = existing_queue
+                    queue_tag = profile_key
+                    specialist_name = (
+                        (doctor.user.full_name or doctor.user.username)
+                        if doctor and doctor.user
+                        else None
+                    )
+                    specialist_name = (
+                        specialist_name
+                        or queue_profile.title_ru
+                        or f"Врач #{existing_queue.specialist_id}"
+                    )
+                    cabinet = doctor.cabinet if doctor else None
                 else:
-                    # Нашли врача - используем его данные
-                    queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty
-                    defaults = {
-                        "start_number": doctor.start_number_online,
-                        "max_online_entries": doctor.max_online_per_day,
-                        "cabinet_number": doctor.cabinet,
-                    }
-                    daily_queue = self.get_or_create_daily_queue(
-                        db,
-                        day=day,
-                        specialist_id=doctor.id,
-                        queue_tag=queue_tag,
-                        defaults=defaults,
+                    doctor = self._pick_least_loaded_doctor(
+                        db, eligible_doctors, day, queue_tag=profile_key
                     )
-                    if doctor.user:
-                        specialist_name = doctor.user.full_name or doctor.user.username
-                    specialist_name = specialist_name or queue_profile.title_ru or f"Врач #{doctor.id}"
-                    cabinet = doctor.cabinet
+
+                    # Если не нашли - это ошибка сопоставления профиля, а не повод
+                    # подставлять случайного активного врача.
+                    if not doctor:
+                        raise QueueValidationError(
+                            f"Нет активных врачей для профиля {queue_profile.title_ru or queue_profile.title}"
+                        )
+                    else:
+                        # Нашли врача - используем его данные
+                        queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty
+                        defaults = {
+                            "start_number": doctor.start_number_online,
+                            "max_online_entries": doctor.max_online_per_day,
+                            "cabinet_number": doctor.cabinet,
+                        }
+                        daily_queue = self.get_or_create_daily_queue(
+                            db,
+                            day=day,
+                            specialist_id=doctor.id,
+                            queue_tag=queue_tag,
+                            defaults=defaults,
+                        )
+                        if doctor.user:
+                            specialist_name = doctor.user.full_name or doctor.user.username
+                        specialist_name = specialist_name or queue_profile.title_ru or f"Врач #{doctor.id}"
+                        cabinet = doctor.cabinet
             else:
                 # Legacy: specialist_id_override is Doctor.id
                 doctor = (

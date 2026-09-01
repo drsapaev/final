@@ -800,3 +800,120 @@ def test_queue_limits_aggregate_sums_per_doctor_caps(db_session) -> None:
     # enforced caps: 10 (override) + 30 (override) = 40, NOT 15 x 2 = 30
     assert by_spec["dentistry"]["aggregate_max_per_day"] == 40
     assert by_spec["derma"]["aggregate_max_per_day"] == d3.max_online_per_day
+
+
+# ===================== I. Codex round-4 regressions =====================
+
+
+@pytest.mark.queue
+def test_clinic_wide_join_retry_returns_original_entry(
+    db_session, monkeypatch
+) -> None:
+    """Codex round-4 P1: duplicates must be resolved BEFORE least-load
+    routing — the first join raises the picked doctor's load, so a retry
+    used to route to the sibling and create a SECOND entry for the same
+    patient under another doctor (per-queue check_uniqueness saw a fresh
+    queue)."""
+    fixed_now, today = _freeze_online_window(monkeypatch)
+    first = _make_doctor(db_session, "dentistry")
+    second = _make_doctor(db_session, "dentistry")
+
+    profile = QueueProfile(
+        key="stomatology",
+        title="Dental",
+        title_ru="Стоматология",
+        queue_tags=["dental", "stomatology", "dentist", "dentistry"],
+        department_key="stomatology",
+        display_order=4,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    db_session.add(profile)
+    token = _make_clinic_wide_token(
+        db_session, today, expires_at=fixed_now + timedelta(hours=2)
+    )
+    db_session.commit()
+
+    svc = QueueBusinessService()
+    phone = "+998900000555"
+    first_result = svc.join_queue_with_token(
+        db_session,
+        token_str=token.token,
+        patient_name="D-2 Retry Patient",
+        phone=phone,
+        specialist_id_override=profile.id,
+    )
+    assert first_result["entry"] is not None
+    assert first_result["duplicate"] is False
+
+    # retry: least-load would now pick the OTHER doctor (the first doctor
+    # carries 1 waiting entry)
+    retry_result = svc.join_queue_with_token(
+        db_session,
+        token_str=token.token,
+        patient_name="D-2 Retry Patient",
+        phone=phone,
+        specialist_id_override=profile.id,
+    )
+    assert retry_result["duplicate"] is True
+    assert retry_result["entry"].id == first_result["entry"].id
+    assert retry_result["entry"].queue_id == first_result["entry"].queue_id
+
+    # exactly ONE entry for the patient across all of today's queues
+    total = (
+        db_session.query(OnlineQueueEntry)
+        .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+        .filter(DailyQueue.day == today, OnlineQueueEntry.phone == phone)
+        .count()
+    )
+    assert total == 1
+
+
+@pytest.mark.queue
+def test_display_lookup_resolves_waiting_queue(db_session) -> None:
+    """Codex round-4 P1: the quick-call lookup must agree with the
+    selection half when a doctor holds several ACTIVE queues under
+    different tags — the queue holding waiting entries wins (here the
+    waiting queue even has the HIGHER id, the arbitrary-.first() case)."""
+    from app.repositories.display_websocket_api_repository import (
+        DisplayWebSocketApiRepository,
+    )
+
+    today = date.today()
+    doctor = _make_doctor(db_session, "dentistry")
+    empty = _make_loaded_queue(db_session, doctor, today, waiting=0)
+    loaded = _make_loaded_queue(db_session, doctor, today, waiting=2)
+    loaded.queue_tag = "dentistry"  # different tag, same doctor/day
+    db_session.flush()
+    assert empty.id < loaded.id  # the empty row would win a bare .first()
+
+    found = DisplayWebSocketApiRepository(db_session).get_daily_queue_for_specialist(
+        day=today, specialist_id=doctor.id
+    )
+    assert found.id == loaded.id
+
+
+@pytest.mark.queue
+def test_queue_limits_repo_prefers_active_queue(db_session) -> None:
+    """Codex round-4 P2: the limits repository resolves the doctor's
+    ACTIVE queue (deterministically) — an inactive historical row must not
+    feed usage counts or the aggregate capacity."""
+    from app.repositories.queue_limits_repository import QueueLimitsRepository
+
+    today = date.today()
+    doctor = _make_doctor(db_session, "dentistry")
+    stale = DailyQueue(
+        day=today, specialist_id=doctor.id, queue_tag="dentistry",
+        active=False, max_online_entries=30,
+    )
+    live = DailyQueue(
+        day=today, specialist_id=doctor.id, queue_tag="dentistry",
+        active=True, max_online_entries=10,
+    )
+    db_session.add_all([stale, live])
+    db_session.flush()
+
+    repo = QueueLimitsRepository(db_session)
+    found = repo.get_daily_queue(day=today, specialist_id=doctor.id)
+    assert found.id == live.id
+    assert found.max_online_entries == 10

@@ -29,14 +29,20 @@ class QueueLimitsRepository:
         return query.all()
 
     def get_daily_queue(self, *, day: date, specialist_id: int) -> DailyQueue | None:
+        """The doctor's ACTIVE queue for ``day`` (Codex round-4 P2: an
+        inactive historical row for the same day must not feed usage counts
+        or the aggregate capacity — QR joins operate on active rows).
+        Deterministic ordering when several rows match."""
         return (
             self.db.query(DailyQueue)
             .filter(
                 and_(
                     DailyQueue.day == day,
                     DailyQueue.specialist_id == specialist_id,
+                    DailyQueue.active.is_(True),
                 )
             )
+            .order_by(DailyQueue.id.asc())
             .first()
         )
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import func
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.core.specialties import specialty_variants
@@ -125,16 +125,31 @@ class DisplayWebSocketApiRepository:
         day: date,
         specialist_id: int,
     ) -> DailyQueue | None:
-        """The doctor's ACTIVE queue for ``day`` (Codex round-2 P1: the
-        quick-call lookup must agree with the selection query — patients
-        must never be called out of a same-day inactive queue; when only
-        an inactive row exists the caller's 404 is the honest answer)."""
+        """The doctor's ACTIVE same-day queue that quick-call will actually
+        serve (Codex round-2 P1: active-only; Codex round-4 P1: when the
+        doctor holds several active queues under different tags, the lookup
+        must agree with the selection half — the queue holding WAITING
+        entries wins (most waiting first, tie to the lowest queue id), so
+        the picker can never elect a doctor "because tag A has waiting
+        patients" and then fetch their empty tag B queue)."""
         return (
             self.db.query(DailyQueue)
+            .outerjoin(
+                OnlineQueueEntry,
+                and_(
+                    OnlineQueueEntry.queue_id == DailyQueue.id,
+                    OnlineQueueEntry.status == "waiting",
+                ),
+            )
             .filter(
                 DailyQueue.day == day,
                 DailyQueue.specialist_id == specialist_id,
                 DailyQueue.active.is_(True),
+            )
+            .group_by(DailyQueue.id)
+            .order_by(
+                func.count(OnlineQueueEntry.id).desc(),
+                DailyQueue.id.asc(),
             )
             .first()
         )
