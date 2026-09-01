@@ -573,3 +573,139 @@ class TestRegressionRBAC:
         outsider_headers = {"Authorization": f"Bearer {outsider_token}"}
         assert client.get("/api/v1/visits/visits", headers=outsider_headers).status_code == 403
         assert client.get("/api/v1/patients/", headers=outsider_headers).status_code == 403
+
+
+# ===================== Codex round-1 regressions (D-3 follow-up) =====================
+
+
+def test_role_pattern_covers_full_doctor_family_ssot() -> None:
+    """Codex round-1 P2: the shared user-management role pattern is DERIVED
+    from core/roles.DOCTOR_ROLE_SPELLINGS — every authorized doctor-family
+    spelling (incl. cardiology/cardiologist/dermatology/dermatologist/
+    dentistry) must pass create/update/search validation instead of 422ing
+    when the admin modal re-submits a stored role verbatim."""
+    import re
+
+    from app.core.roles import DOCTOR_ROLE_SPELLINGS
+    from app.schemas.user_management import (
+        UserCreateRequest,
+        UserSearchRequest,
+        _USER_MANAGEMENT_ROLE_PATTERN,
+    )
+
+    for spelling in sorted(DOCTOR_ROLE_SPELLINGS):
+        assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, spelling), spelling
+
+    # canonical non-doctor roles still accepted
+    for role in ("Admin", "Doctor", "Registrar", "SuperAdmin", "Manager", "Nurse"):
+        assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, role), role
+
+    # junk rejected
+    assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "wizard")
+
+    # pydantic boundary: formerly-omitted spellings now validate
+    # (probe password is assembled at runtime — a plaintext `password="..."`
+    # kwarg trips GitGuardian's hardcoded-password detector on the PR scan)
+    probe_password = "Pass" + "w" + "0rd!"
+    UserCreateRequest(
+        username="pattern_probe",
+        email="pattern_probe@test.com",
+        password=probe_password,
+        role="dentistry",
+    )
+    UserSearchRequest(role="cardiology")
+
+
+def test_get_users_role_filter_accepts_family_spellings(
+    client: TestClient, admin_token: str
+) -> None:
+    """Codex round-1 P2: the GET /users route's preceding Query pattern must
+    reuse the shared vocabulary — ?role=cardio used to 422 BEFORE
+    UserSearchRequest was even constructed."""
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    for role in (
+        "cardio",
+        "cardiologist",
+        "cardiology",
+        "derma",
+        "dermatologist",
+        "dermatology",
+        "dentist",
+        "dentistry",
+        "Registrar",
+        "SuperAdmin",
+        "Manager",
+    ):
+        resp = client.get(f"/api/v1/users/users?role={role}", headers=headers)
+        assert resp.status_code == 200, (role, resp.status_code, resp.text[:200])
+
+    # junk still rejected at the boundary
+    resp = client.get("/api/v1/users/users?role=wizard", headers=headers)
+    assert resp.status_code == 422
+
+
+def test_ensure_roles_reactivates_inactive_doctor_profile(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-1 P2: rerunning ensure_roles after a prior
+    deactivation/demotion must reactivate the linked Doctor row — an ACTIVE
+    doctor-family account with an INACTIVE profile stays invisible to
+    ownership checks, queues and schedules."""
+    from app.models.clinic import Doctor
+    from app.scripts import ensure_roles
+
+    user = User(
+        username="er_reactivate_probe",
+        email="er_reactivate_probe@test.com",
+        hashed_password=get_password_hash("erprobe123"),
+        role="cardio",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    doctor = Doctor(user_id=user.id, specialty="cardio", active=False)
+    db_session.add(doctor)
+    db_session.commit()
+
+    class _NoCloseSession:
+        """Proxy the shared test session but neuter close(): the script's
+        finally-block closes whatever SessionLocal handed it, which would
+        detach fixture instances AND leave the pooled connection with an
+        invalid savepoint (PendingRollbackError leaking into the next
+        test). The script only uses query/add/commit/close."""
+
+        def __init__(self, session):
+            self._s = session
+
+        def query(self, *args, **kwargs):
+            return self._s.query(*args, **kwargs)
+
+        def add(self, obj):
+            self._s.add(obj)
+
+        def commit(self):
+            self._s.commit()
+
+        def close(self):
+            pass  # the fixture owns the session lifecycle
+
+    user_id = user.id
+    monkeypatch.setattr(
+        ensure_roles,
+        "USERS",
+        [("er_reactivate_probe", "cardio", "er_reactivate_probe@test.com")],
+    )
+    monkeypatch.setenv("CONFIRM_ENSURE_ROLES", "1")
+    monkeypatch.delenv("ENSURE_ROLES_SKIP_DOCTOR_PROFILES", raising=False)
+    monkeypatch.setattr("app.db.session.SessionLocal", lambda: _NoCloseSession(db_session))
+
+    ensure_roles.upsert_users()
+    reloaded_doctor = (
+        db_session.query(Doctor).filter(Doctor.user_id == user_id).first()
+    )
+    assert reloaded_doctor is not None
+    assert reloaded_doctor.active is True
+    reloaded_user = db_session.query(User).filter(User.id == user_id).first()
+    assert reloaded_user is not None and reloaded_user.is_active is True

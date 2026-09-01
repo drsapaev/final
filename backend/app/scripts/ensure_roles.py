@@ -98,6 +98,17 @@ def upsert_users():
                 db.add(doctor)
                 db.commit()
                 print(f"doctor profile ensured for {username} (role={role})")
+            elif not doctor.active:
+                # Codex round-1 P2: reactivating an existing doctor-family
+                # user must also reactivate their Doctor row — otherwise
+                # rerunning this recovery/provisioning script after a prior
+                # deactivation/demotion leaves an ACTIVE account whose
+                # inactive profile is still skipped by ownership checks,
+                # queues and schedules (the lifecycle invariant the create
+                # path above already honors via active=bool(u.is_active)).
+                doctor.active = bool(u.is_active)
+                db.commit()
+                print(f"doctor profile reactivated for {username} (role={role})")
         print("ok")
     finally:
         db.close()

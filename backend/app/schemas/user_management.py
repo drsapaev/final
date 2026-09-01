@@ -13,6 +13,8 @@ from email_validator import validate_email as validate_email_address
 from pydantic import BaseModel, Field, field_validator
 from pydantic.config import ConfigDict
 
+from app.core.roles import DOCTOR_ROLE_SPELLINGS
+
 logger = logging.getLogger(__name__)
 
 
@@ -513,9 +515,17 @@ class UserAuditLogResponse(UserAuditLogBase):
 # them, so a legacy spelling could never be (re)assigned after creation.
 # The doctor-lifecycle mapping (user_mgmt DOCTOR_ROLE_DEFAULT_SPECIALTY)
 # normalizes whatever spelling arrives.
+# Codex round-1 P2: the doctor-family part is DERIVED from the IAM SSOT
+# (core/roles.DOCTOR_ROLE_SPELLINGS) instead of a smaller hardcoded subset —
+# cardiology/cardiologist/dermatology/dermatologist/dentistry are authorized
+# spellings as well, and the admin modal re-submits a stored user's role
+# verbatim, so an omitted spelling turns "edit account" into a 422.
+# sorted() keeps the generated OpenAPI contract deterministic.
 _USER_MANAGEMENT_ROLE_PATTERN = (
     "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|"
-    "SuperAdmin|Manager|cardio|derma|dentist)$"
+    "SuperAdmin|Manager|"
+    + "|".join(sorted(DOCTOR_ROLE_SPELLINGS))
+    + ")$"
 )
 
 
