@@ -377,6 +377,57 @@ export default [
               group: ['**/components/navigation/ModernTabs'],
               message: 'PR-UI-17-5 rename: ModernTabs.tsx is now Tabs.tsx (components/navigation/Tabs.tsx).',
             },
+            // Track 3-3: macos Icon wrapper decommissioned (consumer-dead after
+            // the Track 3-1/3-2 lucide migration; 0 importers, machine-verified).
+            {
+              group: ['**/components/ui/macos/Icon'],
+              message: 'Track 3-3 decommissioned module: macos/Icon.tsx deleted — use direct lucide-react imports (§3.3 canonical icon system, Icon-систем 2→1).',
+            },
+          ],
+          paths: [
+            {
+              name: '@/types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            // Track 3-3 (Codex round-1 P2): the barrel was the ACTUAL consumer
+            // route of the retired Icon (import { Icon } from '.../ui/macos').
+            // Restrict the named import from every barrel specifier used in the
+            // repo, so re-exporting Icon and importing it via the barrel fails
+            // lint — the module-path pattern above cannot see named imports.
+            ...[
+              '@/components/ui/macos',
+              './ui/macos',
+              './macos',
+              './components/ui/macos',
+              '../ui/macos',
+              '../components/ui/macos',
+              '../../ui/macos',
+              '../../components/ui/macos',
+              '../../../components/ui/macos',
+              // Track 3-3 (Codex round-1 P2, follow-up): the ui/ barrel
+              // re-exports the macos kit — cover its specifiers too.
+              '@/components/ui',
+              './ui',
+              '../ui',
+              '../../ui',
+              '../../../components/ui',
+            ].map((barrel) => ({
+              name: barrel,
+              importNames: ['Icon'],
+              message: 'Track 3-3: the macos Icon wrapper is decommissioned — import icons directly from lucide-react (§3.3, Icon-систем 2→1).',
+            })),
+            {
+              name: './Icon',
+              message: 'Track 3-3: macos/Icon.tsx is deleted — use direct lucide-react imports (§3.3).',
+            },
           ],
         },
       ],
