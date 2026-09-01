@@ -14,6 +14,10 @@ from starlette.responses import Response
 
 from app.core.observability import observability_state
 
+# Static per-process config snapshot; read once so request-path code never
+# depends on the state object's internals (tests stub the state bare).
+_SLOW_REQUEST_THRESHOLD_MS = observability_state.thresholds.latency_p95_ms
+
 logger = logging.getLogger(__name__)
 _TRACEPARENT_RE = re.compile(
     r"^[\da-f]{2}-(?P<trace_id>[\da-f]{32})-[\da-f]{16}-[\da-f]{2}$", re.IGNORECASE
@@ -106,7 +110,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                 duration_ms=duration_ms,
             )
             observability_state.evaluate_sla_alerts()
-            if duration_ms > observability_state.thresholds.latency_p95_ms:
+            if duration_ms > _SLOW_REQUEST_THRESHOLD_MS:
                 logger.warning(
                     "request.slow",
                     extra={
