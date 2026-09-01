@@ -165,3 +165,6 @@ artifacts/non_shim_endpoints.txt
 
 # Storybook static build output (PR-UI-18)
 storybook-static/
+
+# Agent session worktrees (Multi-Session Worktree & Deploy Convention)
+_wt*/
