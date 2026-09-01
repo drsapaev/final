@@ -14,6 +14,7 @@ specialty four spots historically assumed a single doctor:
   max_per_day — now the aggregate cap (max x N doctors) is exposed
   (``aggregate_max_per_day``); enforcement stays per doctor.
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -27,7 +28,6 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.queue_profile import QueueProfile
 from app.models.user import User
 from app.services.queue_svc import QueueBusinessService
-
 
 # ===================== helpers =====================
 
@@ -57,7 +57,12 @@ def _make_doctor(db_session, specialty: str) -> Doctor:
 
 
 def _make_loaded_queue(
-    db_session, doctor: Doctor, day, *, waiting: int = 0, served: int = 0,
+    db_session,
+    doctor: Doctor,
+    day,
+    *,
+    waiting: int = 0,
+    served: int = 0,
     called: int = 0,
 ) -> DailyQueue:
     queue = DailyQueue(
@@ -134,6 +139,19 @@ def _freeze_online_window(monkeypatch):
     fixed_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(
         tzinfo=None, hour=8, minute=0, second=0, microsecond=0
     )
+    # Align the frozen timestamp to the SERVER-local date: tests build
+    # fixtures with date.today() (server tz, UTC in CI), so when Tashkent
+    # is already past midnight (UTC evening/night) the frozen 08:00 date
+    # would land on server-"tomorrow" and day-level checks would mark
+    # every doctor unbookable ({ids} != set()) — pre-existing night flake.
+    from datetime import date as _date
+
+    _server_today = _date.today()
+    fixed_now = fixed_now.replace(
+        year=_server_today.year,
+        month=_server_today.month,
+        day=_server_today.day,
+    )
 
     def _fake_now(*args, **kwargs):
         tz = args[0] if args else kwargs.get("tz")
@@ -172,9 +190,10 @@ def test_pick_least_loaded_prefers_fresh_doctor(db_session) -> None:
     assert picked.id == tie_low.id
 
     # single candidate short-circuit
-    assert QueueBusinessService._pick_least_loaded_doctor(
-        db_session, [loaded], today
-    ).id == loaded.id
+    assert (
+        QueueBusinessService._pick_least_loaded_doctor(db_session, [loaded], today).id
+        == loaded.id
+    )
 
     assert QueueBusinessService._pick_least_loaded_doctor(db_session, [], today) is None
 
@@ -322,7 +341,10 @@ def test_queue_limits_aggregate_max_for_multi_doctor_specialty(db_session) -> No
     service = QueueLimitsApiService(
         db_session,
         repository=_Repo([d1, d2]),
-        get_settings=lambda _db: {"max_per_day": {"dentistry": 15}, "start_numbers": {}},
+        get_settings=lambda _db: {
+            "max_per_day": {"dentistry": 15},
+            "start_numbers": {},
+        },
     )
     rows = service.get_queue_limits(specialty="dentistry")
 
@@ -359,7 +381,6 @@ def test_pick_least_loaded_skips_opened_reception_doctor(
     """Codex round-1 P1: a same-day queue whose reception already opened
     (opened_at set) is unbookable — routing goes to the bookable sibling
     even when the opened doctor has the lower id/zero load."""
-    from app.services.queue_svc import _operations
 
     # Fixed "now": Tashkent-local 08:00 today — inside the online window
     # (>= 07:00), so the day-level check passes and the per-queue
@@ -490,7 +511,10 @@ def test_queue_limits_response_model_exposes_aggregate(db_session) -> None:
     service = QueueLimitsApiService(
         db_session,
         repository=_Repo([d1, d2]),
-        get_settings=lambda _db: {"max_per_day": {"dentistry": 15}, "start_numbers": {}},
+        get_settings=lambda _db: {
+            "max_per_day": {"dentistry": 15},
+            "start_numbers": {},
+        },
     )
     rows = service.get_queue_limits(specialty="dentistry")
 
@@ -531,7 +555,9 @@ def test_today_queues_ecg_buckets_register_visit_doctor(db_session) -> None:
     db_session.add(ecg_service)
     db_session.flush()
     db_session.add(
-        VisitService(visit_id=visit.id, service_id=ecg_service.id, name=ecg_service.name)
+        VisitService(
+            visit_id=visit.id, service_id=ecg_service.id, name=ecg_service.name
+        )
     )
     db_session.flush()
 
@@ -565,7 +591,9 @@ def test_pick_least_loaded_ignores_inactive_queue_load(db_session) -> None:
     db_session.flush()
     _make_loaded_queue(db_session, honest, today, waiting=5)
 
-    picked = QueueBusinessService._pick_least_loaded_doctor(db_session, [stale, honest], today)
+    picked = QueueBusinessService._pick_least_loaded_doctor(
+        db_session, [stale, honest], today
+    )
     # correct: 4 < 5 -> stale wins. Buggy (inactive counted): 9 > 5 -> honest.
     assert picked.id == stale.id
 
@@ -662,7 +690,9 @@ def test_display_quick_call_ignores_inactive_queues(db_session) -> None:
     assert picked.id == live.id
 
     # the lookup agrees: only an inactive row -> None; both rows -> active
-    assert repo.get_daily_queue_for_specialist(day=today, specialist_id=stale.id) is None
+    assert (
+        repo.get_daily_queue_for_specialist(day=today, specialist_id=stale.id) is None
+    )
     active_q = _make_loaded_queue(db_session, stale, today, waiting=0)
     found = repo.get_daily_queue_for_specialist(day=today, specialist_id=stale.id)
     assert found is not None and found.id == active_q.id
@@ -790,12 +820,18 @@ def test_queue_limits_aggregate_sums_per_doctor_caps(db_session) -> None:
     d2 = _make_doctor(db_session, "dentistry")
     today = date.today()
     q1 = DailyQueue(
-        day=today, specialist_id=d1.id, queue_tag="dentistry",
-        active=True, max_online_entries=10,
+        day=today,
+        specialist_id=d1.id,
+        queue_tag="dentistry",
+        active=True,
+        max_online_entries=10,
     )
     q2 = DailyQueue(
-        day=today, specialist_id=d2.id, queue_tag="dentistry",
-        active=True, max_online_entries=30,
+        day=today,
+        specialist_id=d2.id,
+        queue_tag="dentistry",
+        active=True,
+        max_online_entries=30,
     )
     db_session.add_all([q1, q2])
     db_session.flush()
@@ -805,7 +841,10 @@ def test_queue_limits_aggregate_sums_per_doctor_caps(db_session) -> None:
     service = QueueLimitsApiService(
         db_session,
         repository=_Repo([d1, d2, d3], {d1.id: [q1], d2.id: [q2], d3.id: []}),
-        get_settings=lambda _db: {"max_per_day": {"dentistry": 15}, "start_numbers": {}},
+        get_settings=lambda _db: {
+            "max_per_day": {"dentistry": 15},
+            "start_numbers": {},
+        },
     )
     rows = service.get_queue_limits(specialty="dentistry")
     by_spec = {r["specialty"]: r for r in rows}
@@ -818,9 +857,7 @@ def test_queue_limits_aggregate_sums_per_doctor_caps(db_session) -> None:
 
 
 @pytest.mark.queue
-def test_clinic_wide_join_retry_returns_original_entry(
-    db_session, monkeypatch
-) -> None:
+def test_clinic_wide_join_retry_returns_original_entry(db_session, monkeypatch) -> None:
     """Codex round-4 P1: duplicates must be resolved BEFORE least-load
     routing — the first join raises the picked doctor's load, so a retry
     used to route to the sibling and create a SECOND entry for the same
@@ -915,12 +952,18 @@ def test_queue_limits_repo_prefers_active_queue(db_session) -> None:
     today = date.today()
     doctor = _make_doctor(db_session, "dentistry")
     stale = DailyQueue(
-        day=today, specialist_id=doctor.id, queue_tag="dentistry",
-        active=False, max_online_entries=30,
+        day=today,
+        specialist_id=doctor.id,
+        queue_tag="dentistry",
+        active=False,
+        max_online_entries=30,
     )
     live = DailyQueue(
-        day=today, specialist_id=doctor.id, queue_tag="dentistry",
-        active=True, max_online_entries=10,
+        day=today,
+        specialist_id=doctor.id,
+        queue_tag="dentistry",
+        active=True,
+        max_online_entries=10,
     )
     db_session.add_all([stale, live])
     db_session.flush()
@@ -998,12 +1041,18 @@ def test_queue_limits_aggregate_enumerates_all_tagged_queues(db_session) -> None
     today = date.today()
     doctor = _make_doctor(db_session, "dentistry")
     q_tag = DailyQueue(
-        day=today, specialist_id=doctor.id, queue_tag="stomatology",
-        active=True, max_online_entries=10,
+        day=today,
+        specialist_id=doctor.id,
+        queue_tag="stomatology",
+        active=True,
+        max_online_entries=10,
     )
     q_legacy = DailyQueue(
-        day=today, specialist_id=doctor.id, queue_tag="dentistry",
-        active=True, max_online_entries=30,
+        day=today,
+        specialist_id=doctor.id,
+        queue_tag="dentistry",
+        active=True,
+        max_online_entries=30,
     )
     db_session.add_all([q_tag, q_legacy])
     db_session.flush()
