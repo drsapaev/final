@@ -51,6 +51,31 @@
   /* CC-2: amber fill for white ink — #ff9f0a measures 2.06:1 against white;
    * #a86200 measures 4.76:1. Same strong-family contract as above. */
   --mac-warning-strong: #a86200;
+  /* CC-4 (UI color-contrast track): DisplayBoard theme palettes. The board
+   * renders on shared TVs and must NOT resolve through the app-theme
+   * tokens — its light/medical entries previously mixed constant dark ink
+   * with var(--mac-bg-primary)/var(--mac-text-secondary), which flip with
+   * the viewer's app theme and rendered 1.04:1 under a dark app (axe
+   * color-contrast, e2e/a11y-baseline.json display-board:dark). The values
+   * are exactly what those tokens resolved to in the light app, so the
+   * light rendering is pixel-identical. Referenced by DisplayBoardUnified.tsx
+   * themes; kept here (canonical token file) so TSX stays hex-free
+   * (ui-baseline ratchet: tsxHex / cssHexOutsideTokens). */
+  --displayboard-light-bg: linear-gradient(135deg, #e3ebf5 0%, #b8c8da 100%);
+  --displayboard-light-card: #eef3fa;
+  --displayboard-light-ink: #1a202c;
+  --displayboard-light-ink-muted: #455568;
+  --displayboard-light-border: #b8c8da;
+  --displayboard-dark-bg: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+  --displayboard-dark-card: #2d3748;
+  --displayboard-dark-ink: #f7fafc;
+  --displayboard-dark-ink-muted: #a0aec0;
+  --displayboard-dark-border: #4a5568;
+  --displayboard-medical-bg: linear-gradient(135deg, #f0fff4 0%, rgba(48, 209, 88, 0.12) 100%);
+  --displayboard-medical-card: #eef3fa;
+  --displayboard-medical-ink: #1a202c;
+  --displayboard-medical-ink-muted: #455568;
+  --displayboard-medical-border: #c6f6d5;
   --mac-accent-blue-500: var(--mac-accent-blue);
   --mac-accent-blue-600: var(--mac-accent-blue-hover);
   --mac-accent-blue-700: var(--mac-accent-blue-active);
