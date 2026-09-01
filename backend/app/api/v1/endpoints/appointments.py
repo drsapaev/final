@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 APPOINTMENTS_PUBLIC_ERROR = "Internal server error"
 APPOINTMENT_BROAD_ACCESS_ROLES = {"Admin", "Registrar"}
+
+
 def _normalized_role_value(role: object) -> str:
     """Extract a role's string value and normalize case/whitespace.
 
@@ -42,6 +44,28 @@ def _normalized_role_value(role: object) -> str:
     'Roles.X', not the value).
     """
     return str(getattr(role, "value", role)).strip().lower()
+
+
+# RBAC SSOT (app/core/security.py require_roles) maps the persisted
+# "Receptionist" spelling to "Registrar" for compatibility: legacy rows
+# carry that spelling and every require_roles gate already treats
+# Receptionist as registrar-equivalent. The inline guards below must
+# honor the same alias (Codex round-1 P2 on the department-schedule
+# guard): broad access is therefore tested on the NORMALIZED role value
+# against the alias-expanded set, not on the raw DB spelling.
+APPOINTMENT_BROAD_ACCESS_ROLES_LOWER = frozenset(
+    spelling.lower()
+    for spelling in (*APPOINTMENT_BROAD_ACCESS_ROLES, "Receptionist")
+)
+
+
+def _has_broad_appointment_access(current_user: User) -> bool:
+    """Admin/Registrar (+registrar-equivalent Receptionist) or superuser."""
+    return (
+        _normalized_role_value(getattr(current_user, "role", None))
+        in APPOINTMENT_BROAD_ACCESS_ROLES_LOWER
+        or bool(getattr(current_user, "is_superuser", False))
+    )
 
 
 # Doctor-role spellings accepted across the repo's IAM surfaces. Codex P1
@@ -105,9 +129,7 @@ def _ensure_appointment_record_access(
     current_user: User,
 ) -> None:
     role = getattr(current_user, "role", None)
-    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
-        current_user, "is_superuser", False
-    ):
+    if _has_broad_appointment_access(current_user):
         return
 
     if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
@@ -188,9 +210,7 @@ def _scope_appointment_list_filters(
     current_user: User,
 ) -> tuple[int | None, int | None]:
     role = getattr(current_user, "role", None)
-    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
-        current_user, "is_superuser", False
-    ):
+    if _has_broad_appointment_access(current_user):
         return patient_id, doctor_id
 
     if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
@@ -829,9 +849,7 @@ def _ensure_department_schedule_access(
       per-patient PHI; patients have /appointments/patient/{patient_id}).
     """
     role = getattr(current_user, "role", None)
-    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
-        current_user, "is_superuser", False
-    ):
+    if _has_broad_appointment_access(current_user):
         return
 
     if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:

@@ -150,6 +150,48 @@ def _admin(db_session) -> User:
     return admin
 
 
+def test_department_schedule_receptionist_alias_reads_any(client, db_session):
+    """Codex round-1 P2: the RBAC SSOT (core/security.py require_roles)
+    maps the persisted 'Receptionist' spelling to 'Registrar' — the inline
+    department-schedule guard must honor the same alias instead of 403'ing
+    registrar-equivalent accounts on their raw DB spelling."""
+    dep = _department(db_session, "cardio")
+    user, doctor = _doctor_with_user(
+        db_session, specialty="cardiology", department=dep, label="rcp"
+    )
+    patient = _patient(db_session)
+    appointment = _appointment(db_session, doctor, patient, dep)
+
+    from app.models.user import User as UserModel
+
+    receptionist = (
+        db_session.query(UserModel)
+        .filter(UserModel.role == "Receptionist")
+        .first()
+    )
+    if receptionist is None:
+        receptionist = UserModel(
+            username="fu2_receptionist",
+            email="fu2-receptionist@test.com",
+            full_name="FU2 Receptionist",
+            hashed_password=get_password_hash("secret123"),
+            role="Receptionist",
+            is_active=True,
+        )
+        db_session.add(receptionist)
+        db_session.commit()
+        db_session.refresh(receptionist)
+
+    response = client.get(
+        f"/api/v1/appointments/department/{dep.key}/schedule",
+        params={"date": str(date.today() + timedelta(days=1))},
+        headers=_headers_for(receptionist),
+    )
+    assert response.status_code == 200, response.text
+    ids = [entry["id"] for entry in response.json()["appointments"]]
+    assert appointment.id in ids
+
+
 def test_department_schedule_doctor_of_same_department_allowed(client, db_session):
     dep = _department(db_session, "cardio")
     user, doctor = _doctor_with_user(
