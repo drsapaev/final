@@ -61,12 +61,10 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             request.state.request_id = request_id
 
         path = request.url.path
-        route = request.scope.get("route")
-        route_path = getattr(route, "path", path)
         status_code = 500
         client_ip = self._extract_client_ip(request)
 
-        track_metrics = route_path not in self._METRICS_EXCLUDED_PATHS
+        track_metrics = path not in self._METRICS_EXCLUDED_PATHS
 
         try:
             response = await call_next(request)
@@ -76,7 +74,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             if track_metrics:
                 observability_state.record_request(
                     method=request.method,
-                    path=route_path,
+                    path=path,
                     status_code=status_code,
                     duration_ms=duration_ms,
                 )
@@ -87,7 +85,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                     "request_id": request_id,
                     "trace_id": trace_id,
                     "method": request.method,
-                    "path": route_path,
+                    "path": path,
                     "status_code": status_code,
                     "duration_ms": round(duration_ms, 2),
                     "client_ip": client_ip,
@@ -95,6 +93,10 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             )
             raise
 
+        # The route is resolved into the scope DURING call_next, so reading it
+        # before that always yielded the raw path; after it we get the route
+        # template and metrics group by endpoint instead of URL.
+        route_path = getattr(request.scope.get("route"), "path", path)
         duration_ms = (time.perf_counter() - started_at) * 1000.0
         if track_metrics:
             observability_state.record_request(
@@ -104,6 +106,19 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                 duration_ms=duration_ms,
             )
             observability_state.evaluate_sla_alerts()
+            if duration_ms > observability_state.thresholds.latency_p95_ms:
+                logger.warning(
+                    "request.slow",
+                    extra={
+                        "request_id": request_id,
+                        "trace_id": trace_id,
+                        "method": request.method,
+                        "path": route_path,
+                        "status_code": status_code,
+                        "duration_ms": round(duration_ms, 2),
+                        "client_ip": client_ip,
+                    },
+                )
 
         response.headers["X-Trace-ID"] = trace_id
         response.headers["X-Request-ID"] = str(request_id)

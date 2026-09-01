@@ -53,7 +53,10 @@ class Alert:
     severity: AlertSeverity
     message: str
     details: dict[str, Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    # Aware UTC timestamp: naive utcnow() here made get_recent_alerts()
+    # compare naive vs aware and crash /observability/sla with 500 whenever
+    # at least one alert existed in memory (SLA guardrail went blind).
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     resolved: bool = False
     resolved_at: datetime | None = None
 
