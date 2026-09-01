@@ -214,6 +214,13 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
 
 def init_sentry() -> None:
     """Initialize Sentry for the FastAPI backend. No-op if SENTRY_DSN is unset."""
+    if os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}:
+        # Test runs (pytest conftest) load backend/.env with the production
+        # DSN; without this guard every error-level log from a local pytest
+        # session shipped straight to production Sentry (e.g. PYTHON-FASTAPI-C
+        # "RBAC role check denied" with url=http://testserver/...).
+        logger.info("[sentry] TESTING=1 — Sentry disabled for backend tests.")
+        return
     dsn = os.getenv("SENTRY_DSN", "").strip()
     if not dsn:
         logger.info("[sentry] SENTRY_DSN not set — Sentry disabled for backend.")
