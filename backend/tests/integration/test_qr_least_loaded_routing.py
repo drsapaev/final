@@ -21,17 +21,36 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.core.security import get_password_hash
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.queue_profile import QueueProfile
+from app.models.user import User
 from app.services.queue_svc import QueueBusinessService
 
 
 # ===================== helpers =====================
 
+# One argon2 hash for every helper user (hashing per doctor would add
+# ~0.1s x N to the suite).
+_D2_HASHED_PASSWORD = get_password_hash("d2load123")
+
 
 def _make_doctor(db_session, specialty: str) -> Doctor:
-    doctor = Doctor(specialty=specialty, active=True)
+    """A clinic-eligible doctor: active, linked to an ACTIVE Doctor-role
+    owner (the owner-eligibility contract the clinic-wide join applies —
+    Codex round-3 P2)."""
+    user = User(
+        username=f"d2_load_user_{db_session.query(User).count() + 1}",
+        email=f"d2_load_user_{db_session.query(User).count() + 1}@test.com",
+        hashed_password=_D2_HASHED_PASSWORD,
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.flush()
+    doctor = Doctor(user_id=user.id, specialty=specialty, active=True)
     db_session.add(doctor)
     db_session.flush()
     return doctor
@@ -258,7 +277,10 @@ def test_today_queues_payload_exposes_specialists_list(db_session) -> None:
     ids = [s["id"] for s in payload["specialists"]]
     assert ids == sorted([doctor_a.id, doctor_b.id])
     names = {s["name"] for s in payload["specialists"]}
-    assert f"Врач #{doctor_a.id}" in names and f"Врач #{doctor_b.id}" in names
+    # doctors created via _make_doctor own active Doctor-role users, so
+    # the payload carries the owner's username (full_name is None)
+    assert f"d2_load_user_{doctor_a.id}" in names
+    assert f"d2_load_user_{doctor_b.id}" in names
     # legacy fields preserved
     assert payload["specialist_id"] == doctor_a.id
 
@@ -632,3 +654,149 @@ def test_display_quick_call_ignores_inactive_queues(db_session) -> None:
     active_q = _make_loaded_queue(db_session, stale, today, waiting=0)
     found = repo.get_daily_queue_for_specialist(day=today, specialist_id=stale.id)
     assert found is not None and found.id == active_q.id
+
+
+# ===================== H. Codex round-3 regressions =====================
+
+
+@pytest.mark.queue
+def test_pick_least_loaded_scopes_load_to_joined_tag(db_session) -> None:
+    """Codex round-3 P2: the join targets the (day, doctor, TAG) row —
+    a doctor's entries under OTHER tags (a legacy 'dentistry' queue) must
+    not make their empty target-tag queue look loaded."""
+    today = date.today()
+    multi_tag = _make_doctor(db_session, "dentistry")
+    honest = _make_doctor(db_session, "dentistry")
+
+    # multi_tag: empty target-tag queue, but a loaded LEGACY-tag queue
+    _make_loaded_queue(db_session, multi_tag, today, waiting=0)
+    legacy = _make_loaded_queue(db_session, multi_tag, today, waiting=5)
+    legacy.queue_tag = "dentistry"
+    db_session.flush()
+    # honest: 1 waiting in the target tag
+    _make_loaded_queue(db_session, honest, today, waiting=1)
+
+    picked = QueueBusinessService._pick_least_loaded_doctor(
+        db_session, [multi_tag, honest], today, queue_tag="stomatology"
+    )
+    # correct: target-tag load 0 < 1 -> multi_tag wins.
+    # Buggy (unscoped load): 5 > 1 -> honest wins.
+    assert picked.id == multi_tag.id
+
+    # without a tag (legacy callers) the cross-tag load still counts
+    picked_untagged = QueueBusinessService._pick_least_loaded_doctor(
+        db_session, [multi_tag, honest], today
+    )
+    assert picked_untagged.id == honest.id
+
+
+@pytest.mark.queue
+def test_clinic_wide_join_skips_owner_ineligible_ghosts(
+    db_session, monkeypatch
+) -> None:
+    """Codex round-3 P2: the least-load ranking must not elect a legacy
+    ghost — an active Doctor whose owner is deactivated — over healthy
+    doctors (load 0 + lowest id would always win). The join applies the
+    same owner-eligibility contract as the appointment writers."""
+    fixed_now, today = _freeze_online_window(monkeypatch)
+
+    # healthy doctor with a HIGHER id (created after the ghost)
+    ghost_owner = User(
+        username="d2_ghost_owner",
+        email="d2_ghost_owner@test.com",
+        hashed_password=_D2_HASHED_PASSWORD,
+        role="Doctor",
+        is_active=False,  # deactivated owner -> ghost
+        is_superuser=False,
+    )
+    db_session.add(ghost_owner)
+    db_session.flush()
+    ghost = Doctor(user_id=ghost_owner.id, specialty="dentistry", active=True)
+    db_session.add(ghost)
+    db_session.flush()
+    healthy = _make_doctor(db_session, "dentistry")
+    assert healthy.id > ghost.id
+
+    profile = QueueProfile(
+        key="stomatology",
+        title="Dental",
+        title_ru="Стоматология",
+        queue_tags=["dental", "stomatology", "dentist", "dentistry"],
+        department_key="stomatology",
+        display_order=4,
+        is_active=True,
+        show_on_qr_page=True,
+    )
+    db_session.add(profile)
+    token = _make_clinic_wide_token(
+        db_session, today, expires_at=fixed_now + timedelta(hours=2)
+    )
+    db_session.commit()
+
+    svc = QueueBusinessService()
+    result = svc.join_queue_with_token(
+        db_session,
+        token_str=token.token,
+        patient_name="D-2 Ghost Patient",
+        phone="+998900000444",
+        specialist_id_override=profile.id,
+    )
+    assert result["entry"] is not None
+    routed = (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.day == today)
+        .filter(DailyQueue.specialist_id.in_([ghost.id, healthy.id]))
+        .all()
+    )
+    by_doctor = {q.specialist_id: q for q in routed}
+    assert healthy.id in by_doctor
+    assert result["entry"].queue_id == by_doctor[healthy.id].id
+
+
+@pytest.mark.queue
+def test_queue_limits_aggregate_sums_per_doctor_caps(db_session) -> None:
+    """Codex round-3 P2: the admin aggregate must sum the caps actually
+    enforced — today's per-queue override (max_online_entries) or the
+    doctor's own default (max_online_per_day) — not max_per_day x N."""
+    from app.services.queue_limits_api_service import QueueLimitsApiService
+
+    class _Repo:
+        def __init__(self, doctors, queues):
+            self._doctors = doctors
+            self._queues = queues  # doctor_id -> DailyQueue | None
+
+        def list_active_doctors(self, *, specialty: str | None):
+            return self._doctors
+
+        def get_daily_queue(self, *, day, specialist_id):
+            return self._queues.get(specialist_id)
+
+        def count_entries(self, *, queue_id):
+            return 0
+
+    d1 = _make_doctor(db_session, "dentistry")
+    d2 = _make_doctor(db_session, "dentistry")
+    today = date.today()
+    q1 = DailyQueue(
+        day=today, specialist_id=d1.id, queue_tag="dentistry",
+        active=True, max_online_entries=10,
+    )
+    q2 = DailyQueue(
+        day=today, specialist_id=d2.id, queue_tag="dentistry",
+        active=True, max_online_entries=30,
+    )
+    db_session.add_all([q1, q2])
+    db_session.flush()
+
+    d3 = _make_doctor(db_session, "derma")  # no queue: default 15
+
+    service = QueueLimitsApiService(
+        db_session,
+        repository=_Repo([d1, d2, d3], {d1.id: q1, d2.id: q2, d3.id: None}),
+        get_settings=lambda _db: {"max_per_day": {"dentistry": 15}, "start_numbers": {}},
+    )
+    rows = service.get_queue_limits(specialty="dentistry")
+    by_spec = {r["specialty"]: r for r in rows}
+    # enforced caps: 10 (override) + 30 (override) = 40, NOT 15 x 2 = 30
+    assert by_spec["dentistry"]["aggregate_max_per_day"] == 40
+    assert by_spec["derma"]["aggregate_max_per_day"] == d3.max_online_per_day

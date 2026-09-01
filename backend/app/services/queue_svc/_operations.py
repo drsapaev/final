@@ -11,6 +11,7 @@ from app.services.user_mgmt._base import (
     is_doctor_profile_incomplete,
 )
 from app.core.specialties import expand_queue_tags
+from app.core.roles import DOCTOR_ROLE_SPELLINGS
 
 
 def _unbookable_doctor_ids(
@@ -693,7 +694,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             return doctors[0]
 
         doctor_ids = [d.id for d in doctors]
-        load_rows = (
+        load_query = (
             db.query(
                 DailyQueue.specialist_id,
                 func.count(OnlineQueueEntry.id),
@@ -712,9 +713,14 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 DailyQueue.active.is_(True),
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
             )
-            .group_by(DailyQueue.specialist_id)
-            .all()
         )
+        if queue_tag:
+            # Codex round-3 P2: the join targets the (day, doctor, TAG) row
+            # — a doctor's entries under OTHER tags (e.g. a legacy
+            # 'dentistry' queue) must not make their empty target-tag queue
+            # look loaded.
+            load_query = load_query.filter(DailyQueue.queue_tag == queue_tag)
+        load_rows = load_query.group_by(DailyQueue.specialist_id).all()
         active_loads = {specialist_id: count for specialist_id, count in load_rows}
 
         # Codex round-1 P1: rank BOOKABLE doctors first (see docstring).
@@ -797,12 +803,22 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 # excluded: they are not clinical-eligible for specialty QR
                 # routing even if an admin ever tags a profile with
                 # "general" (defense in depth, Codex P1-D).
+                # Codex round-3 P2: the candidate query applies the SAME
+                # owner-eligibility contract as the appointment writers
+                # (services/appointment_eligibility.py): an active Doctor
+                # row whose owner is missing (decision #13 — userless rows
+                # violate the linkage contract), deactivated or demoted to
+                # a non-doctor role is a legacy ghost — and the least-load
+                # ranking would PREFER it (load 0) over healthy doctors.
                 eligible_doctors = (
                     db.query(Doctor)
+                    .join(User, Doctor.user_id == User.id)
                     .filter(
                         Doctor.active.is_(True),
                         Doctor.specialty.in_(queue_tags),
                         Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+                        User.is_active.is_(True),
+                        func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
                     )
                     .order_by(Doctor.id.asc())
                     .all()
