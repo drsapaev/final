@@ -994,7 +994,16 @@ jobs:
         PY
         alembic upgrade head
         alembic current
-    
+
+    # RLS guardrail (2026-09-02 Supabase rls_disabled_in_public incident):
+    # the upgrade above runs on a disposable PostgreSQL; every table it
+    # leaves in public must have RLS enabled. A new table without RLS
+    # fails CI here instead of surfacing days later via a vendor alert.
+    - name: 🛡️ RLS guard — все public-таблицы
+      run: |
+        cd backend
+        python ../ops/scripts/check_public_rls.py
+
     - name: 🧪 Запуск тестов
       run: |
         cd backend
