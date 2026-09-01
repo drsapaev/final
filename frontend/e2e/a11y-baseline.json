@@ -8,7 +8,5 @@
   "landing:light": ["color-contrast"],
   "landing:dark": ["color-contrast"],
   "display-board:dark": ["color-contrast"],
-  "payment-success:light": ["color-contrast"],
-  "payment-success:dark": ["color-contrast"],
   "payment-cancel:dark": ["color-contrast"]
 }

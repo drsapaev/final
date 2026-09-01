@@ -598,7 +598,9 @@ body.landing-body {
   height: 38px;
   flex: 0 0 auto;
   border-radius: 999px;
-  background: var(--mac-accent-blue);
+  /* CC-2: white-ink fill → strong token (5.42:1; base #007aff = 4.02:1,
+   * axe color-contrast on both themes). */
+  background: var(--mac-accent-blue-strong, var(--mac-accent-blue));
   color: var(--mac-text-on-accent, #fff);
   font-size: 13px;
   font-weight: 800;
