@@ -505,10 +505,12 @@ export default function PatientPickupView() {
 
             {/* Family Relations Card - hide for lab and cashier views */}
             {patient && !isLabView && !isCashierView &&
+      /* REC-3: 'receptionist' removed from the edit-allow set — the role no
+         longer resolves to registrar access (canonical spelling only). */
       <FamilyRelationsCard
         patientId={patient.id}
         patientName={`${patient.last_name} ${patient.first_name}`}
-        canEdit={['admin', 'registrar', 'receptionist'].includes(userRole)} />
+        canEdit={['admin', 'registrar'].includes(userRole)} />
 
       }
 

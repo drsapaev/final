@@ -809,7 +809,11 @@ async def user_management_health_check():
             "user_search",
             "user_statistics",
         ],
-        "supported_roles": ["Admin", "Doctor", "Nurse", "Receptionist", "Patient"],
+        # REC-1 (Receptionist deprecation): 'Receptionist' dropped from the
+        # advertised module vocabulary — canonical writes are frozen (0
+        # production rows); the backend read alias remains during the
+        # compatibility window.
+        "supported_roles": ["Admin", "Doctor", "Nurse", "Patient"],
         "supported_statuses": ["active", "inactive", "suspended", "pending", "locked"],
         "export_formats": ["csv", "excel", "json", "pdf"],
     }

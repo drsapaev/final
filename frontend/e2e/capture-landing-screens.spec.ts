@@ -84,7 +84,7 @@ function jsonResponse(body: unknown): { status: number; contentType: string; bod
 
 const registrarProfile = {
   id: 20, username: 'registrar@example.com', email: 'registrar@example.com',
-  full_name: 'Registrar User', role: 'Receptionist', is_active: true, is_superuser: false,
+  full_name: 'Registrar User', role: 'Registrar', is_active: true, is_superuser: false,
 };
 const appointmentsProfile = {
   id: 21, username: 'registrar2@example.com', email: 'registrar2@example.com',

@@ -521,8 +521,15 @@ class UserAuditLogResponse(UserAuditLogBase):
 # spellings as well, and the admin modal re-submits a stored user's role
 # verbatim, so an omitted spelling turns "edit account" into a 422.
 # sorted() keeps the generated OpenAPI contract deterministic.
+# REC-1 (Receptionist deprecation): 'Receptionist' removed from the canonical
+# write vocabulary — Registrar is the canonical front-desk role and no
+# Receptionist rows exist in production (SQL evidence 2026-09-02). The
+# backend READ alias (receptionist -> registrar in core/security.require_roles)
+# stays during the compatibility window; only NEW stored 'Receptionist'
+# writes are frozen. Update-re-submission safety: 0 stored users carry the
+# spelling, so no edit flow can re-submit it.
 _USER_MANAGEMENT_ROLE_PATTERN = (
-    "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|"
+    "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|"
     "SuperAdmin|Manager|"
     + "|".join(sorted(DOCTOR_ROLE_SPELLINGS))
     + ")$"
