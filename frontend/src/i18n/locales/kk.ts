@@ -612,6 +612,10 @@ const kk = {
     session_warning_text: 'Сессия {seconds} сек ішінде аяқталады. Сақталмаған деректерді жоғалтпау үшін ұзартыңыз.',
     session_warning_title: 'Сессия жылдам аяқталады',
     single_date: 'Күні',
+    // AXE-EXP-5: accessible names for the cashier date filter inputs
+    filter_date_single_aria: 'Төлемдер сүзгісі: күн',
+    filter_date_from_aria: 'Төлемдер сүзгісі: күннен',
+    filter_date_to_aria: 'Төлемдер сүзгісі: күнге дейін',
     start_online_payment_aria: 'Онлайн төлемді бастау',
     stats_load_failed: 'Статистиканы жүктеу сәтсіз',
     subtitle: 'Медициналық клиника • {date}',

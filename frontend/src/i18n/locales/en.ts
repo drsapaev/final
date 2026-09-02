@@ -612,6 +612,10 @@ const en = {
     session_warning_text: 'Your session expires in {seconds} sec. Extend to avoid losing unsaved data.',
     session_warning_title: 'Session expiring soon',
     single_date: 'Date',
+    // AXE-EXP-5: accessible names for the cashier date filter inputs
+    filter_date_single_aria: 'Payments filter: date',
+    filter_date_from_aria: 'Payments filter: date from',
+    filter_date_to_aria: 'Payments filter: date to',
     start_online_payment_aria: 'Start online payment',
     stats_load_failed: 'Failed to load statistics',
     subtitle: 'Medical clinic • {date}',

@@ -165,7 +165,12 @@ const MacOSTab = ({
   };
   return (
     <div className={className} style={containerStyle}>
-      <div style={{ display: 'flex', gap: currentVariant.gap || currentSize.gap }}>
+      {/* AXE-EXP-5: the tablist ARIA role on the direct parent of the
+          role="tab" buttons — previously the buttons lived in a plain flex
+          div, which fails axe aria-required-parent (a tab must be contained
+          by a tablist; flagged on cashier/admin-users/admin-family
+          surfaces). */}
+      <div style={{ display: 'flex', gap: currentVariant.gap || currentSize.gap }} role="tablist">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const IconComponent = tab.icon;
@@ -203,7 +208,10 @@ const MacOSTab = ({
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-medium)',
-                background: 'var(--mac-accent-blue)',
+                // AXE-EXP-3: white ink on the base accent was 4.01:1 — the
+                // CC-2 strong token (5.42:1) carries it (same mac-badge
+                // white-ink-fill class as Badge.tsx variants).
+                background: 'var(--mac-accent-blue-strong, var(--mac-accent-blue))',
                 color: 'white',
                 minWidth: '18px',
                 textAlign: 'center'

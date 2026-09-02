@@ -612,6 +612,10 @@ const uzLatn = {
     session_warning_text: 'Sessiya {seconds} sek ichida tugaydi. Saqlanmagan ma\'lumotlarni yo\'qotmaslik uchun uzaytiring.',
     session_warning_title: 'Sessiya tez orada tugaydi',
     single_date: 'Sana',
+    // AXE-EXP-5: accessible names for the cashier date filter inputs
+    filter_date_single_aria: "To'lovlar filtri: sana",
+    filter_date_from_aria: "To'lovlar filtri: sanadan",
+    filter_date_to_aria: "To'lovlar filtri: sanagacha",
     start_online_payment_aria: 'Onlayn to\'lovni boshlash',
     stats_load_failed: 'Statistikani yuklab bo\'lmadi',
     subtitle: 'Tibbiy klinika • {date}',
