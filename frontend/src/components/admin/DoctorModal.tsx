@@ -88,6 +88,38 @@ const DoctorModal = ({
   });
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Catalog-backed specialty options (Codex P1): the specialty written to
+  // Doctor.specialty must be an ACTIVE medical_specialties code; department
+  // keys (cardio/dental/...) are a DIFFERENT domain and now rejected by the
+  // backend write guard. Loaded from the vocabulary endpoint; on failure the
+  // select stays empty and the backend 400/503 detail surfaces on submit.
+  const [specialtyOptions, setSpecialtyOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    import('../../api/client')
+      .then(({ api }) =>
+        api.get('/admin/doctors/specialty-vocabulary').catch(() => null),
+      )
+      .then((response: { data?: Array<{ code: string; title_ru?: string | null }> } | null) => {
+        if (cancelled || !response?.data) return;
+        setSpecialtyOptions(
+          response.data.map((item) => ({
+            value: item.code,
+            label: item.title_ru || item.code,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setSpecialtyOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -280,13 +312,13 @@ const DoctorModal = ({
             <Label required className="admin-label-block-mb-8">
               {t('admin2.dmdl_label_specialty')}
             </Label>
-            {departments.length > 0 ? (
+            {specialtyOptions.length > 0 ? (
               <Select
                 value={formData.specialty}
                 onChange={(e: SelectChangeEvent) => handleChange('specialty', e.target.value)}
                 options={[
                   { value: '', label: t('admin2.dmdl_select_department_placeholder') },
-                  ...departments.map((d) => ({ value: d.value, label: d.label })),
+                  ...specialtyOptions,
                 ]}
                 size="large"
               />

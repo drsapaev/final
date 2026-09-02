@@ -371,8 +371,15 @@ def _validate_specialty_assignable(db: Session, specialty: str | None) -> None:
     deactivated specialty can no longer be assigned to new doctors.
     Historical rows keep their stored value untouched (no-cascade rule).
     """
-    if not specialty:
+    if specialty is None:
+        # Field absent / not being set — nothing to validate (Codex P2:
+        # blank strings are NOT skipped, only a genuinely unset value is).
         return
+    if not specialty.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Специальность не может быть пустой строкой.",
+        )
     catalog = MedicalSpecialtyCatalogService(db)
     try:
         if catalog.is_selectable_for_onboarding(specialty):

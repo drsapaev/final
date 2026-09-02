@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect, select
+from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
@@ -138,7 +138,10 @@ class TestCatalogReadLayer:
         assert MedicalSpecialtyCatalogService(seeded_catalog).is_selectable_for_onboarding("general") is False
 
     def test_empty_catalog_is_explicit_configuration_failure(self, db_session: Session):
-        # (14) NO hardcoded fallback: empty catalog raises
+        # (14) NO hardcoded fallback: empty catalog raises. The shared engine
+        # fixture seeds the baseline, so this test empties the table first.
+        db_session.execute(text("DELETE FROM medical_specialties"))
+        db_session.commit()
         with pytest.raises(MedicalSpecialtyCatalogError):
             MedicalSpecialtyCatalogService(db_session).list_active()
 
@@ -203,6 +206,8 @@ class TestVocabularyEndpoint:
     def test_vocabulary_empty_catalog_returns_503_configuration_error(
         self, client: TestClient, auth_headers, db_session
     ):
+        db_session.execute(text("DELETE FROM medical_specialties"))
+        db_session.commit()
         response = client.get(
             "/api/v1/admin/doctors/specialty-vocabulary", headers=auth_headers
         )
@@ -341,3 +346,22 @@ class TestVocabularyTypedContract:
             assert key in props
         assert "code" in schemas["SpecialtyVocabularyItem"].get("required", [])
         assert "title_ru" in schemas["SpecialtyVocabularyItem"].get("required", [])
+
+
+class TestBlankSpecialtyGuard:
+    """Codex P2 round 2: specialty:'' must not bypass the catalog guard."""
+
+    def test_post_doctor_blank_specialty_rejected(
+        self, client, auth_headers, seeded_catalog, test_doctor_user
+    ):
+        response = client.post(
+            "/api/v1/admin/doctors",
+            headers=auth_headers,
+            json={
+                "user_id": test_doctor_user.id,
+                "specialty": "   ",
+                "active": True,
+            },
+        )
+        assert response.status_code == 400
+        assert "пустой" in response.json()["detail"]
