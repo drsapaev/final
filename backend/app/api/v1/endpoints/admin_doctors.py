@@ -566,7 +566,13 @@ def update_doctor(
                     ),
                 )
 
-        if "specialty" in doctor.model_fields_set:
+        if "specialty" in doctor.model_fields_set and (
+            # No-cascade contract: an UNCHANGED historical value (possibly
+            # now inactive/absent in the catalog) must not block unrelated
+            # edits — only a genuine CHANGE is validated (Codex P2).
+            (doctor.specialty or "").strip()
+            != (existing_doctor.specialty or "").strip()
+        ):
             _validate_specialty_assignable(db, doctor.specialty)
 
         updated_doctor = crud_clinic.update_doctor(db, doctor_id, doctor)

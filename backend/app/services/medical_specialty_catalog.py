@@ -67,16 +67,34 @@ class MedicalSpecialtyCatalogService:
         return rows
 
     def get_by_code(self, code: str) -> MedicalSpecialty | None:
-        """Row by canonical code (active or inactive), or None."""
-        return (
-            self.db.execute(
-                select(MedicalSpecialty).where(MedicalSpecialty.code == code)
+        """Row by canonical code (active or inactive), or None.
+
+        Driver-level failures (e.g. table missing before migration 0051)
+        are wrapped into MedicalSpecialtyCatalogError so write-path callers
+        translate them to 503 instead of a generic 500 (Codex P2).
+        """
+        try:
+            return (
+                self.db.execute(
+                    select(MedicalSpecialty).where(MedicalSpecialty.code == code)
+                )
+                .scalars()
+                .first()
             )
-            .scalars()
-            .first()
-        )
+        except SQLAlchemyError as exc:
+            raise MedicalSpecialtyCatalogError(
+                "medical_specialties table is unavailable — "
+                "migration 0051 has not been applied"
+            ) from exc
 
     def is_selectable_for_onboarding(self, code: str) -> bool:
-        """True iff the code exists AND is active (new-doctor assignment)."""
+        """True iff the code exists AND is active (new-doctor assignment).
+
+        Raises MedicalSpecialtyCatalogError when the catalog has no ACTIVE
+        rows at all: that is a configuration failure (empty/missing
+        registry), not a per-code rejection — write callers must surface it
+        as 503 instead of a misleading 400 (Codex P2).
+        """
+        self.list_active()  # configuration gate: raises when unusable
         row = self.get_by_code(code)
         return bool(row and row.active)

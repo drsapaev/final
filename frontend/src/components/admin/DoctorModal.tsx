@@ -76,7 +76,7 @@ const DoctorModal = ({
   availableUsers = [],
   departments = [],
 }: DoctorModalProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT;
+  const { t: rawT, language } = useTranslation(); const t = rawT;
   const [formData, setFormData] = useState<DoctorFormState>({
     userId: '',
     specialty: '',
@@ -100,26 +100,48 @@ const DoctorModal = ({
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
+    // Locale resolution per owner spec: ru→title_ru, en→title_en,
+    // uz-Latn→title_uz, everything else (uz-Cyrl, kk, unknown) → title_ru
+    // compatibility fallback, then code (Codex P2: translations were
+    // unreachable outside the Russian locale).
+    const titleFieldForLocale: Record<string, 'title_ru' | 'title_uz' | 'title_en'> = {
+      ru: 'title_ru',
+      en: 'title_en',
+      'uz-Latn': 'title_uz',
+    };
+    const titleField =
+      titleFieldForLocale[language] ?? 'title_ru';
     import('../../api/client')
       .then(({ api }) =>
         api.get('/admin/doctors/specialty-vocabulary').catch(() => null),
       )
-      .then((response: { data?: Array<{ code: string; title_ru?: string | null }> } | null) => {
-        if (cancelled || !response?.data) return;
-        setSpecialtyOptions(
-          response.data.map((item) => ({
-            value: item.code,
-            label: item.title_ru || item.code,
-          })),
-        );
-      })
+      .then(
+        (
+          response: {
+            data?: Array<{
+              code: string;
+              title_ru?: string | null;
+              title_uz?: string | null;
+              title_en?: string | null;
+            }>;
+          } | null,
+        ) => {
+          if (cancelled || !response?.data) return;
+          setSpecialtyOptions(
+            response.data.map((item) => ({
+              value: item.code,
+              label: item[titleField] || item.title_ru || item.code,
+            })),
+          );
+        },
+      )
       .catch(() => {
         if (!cancelled) setSpecialtyOptions([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, language]);
 
   useEffect(() => {
     if (!isOpen) {

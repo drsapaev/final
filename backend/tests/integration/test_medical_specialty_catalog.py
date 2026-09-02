@@ -365,3 +365,75 @@ class TestBlankSpecialtyGuard:
         )
         assert response.status_code == 400
         assert "пустой" in response.json()["detail"]
+
+
+class TestCodexRound3:
+    def test_put_with_unchanged_historical_specialty_allows_other_edits(
+        self, client, auth_headers, seeded_catalog, test_doctor_user
+    ):
+        """Unchanged (now-deactivated) historical specialty must not block
+        unrelated edits — no-cascade contract (Codex P2 round 3)."""
+        doctor = Doctor(user_id=test_doctor_user.id, specialty="cardiology", cabinet="1", active=True)
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+        row = seeded_catalog.execute(
+            select(MedicalSpecialty).where(MedicalSpecialty.code == "cardiology")
+        ).scalar_one()
+        row.active = False
+        seeded_catalog.commit()
+
+        # UI resubmits the same specialty while editing the cabinet
+        response = client.put(
+            f"/api/v1/admin/doctors/{doctor.id}",
+            headers=auth_headers,
+            json={"specialty": "cardiology", "cabinet": "77"},
+        )
+        assert response.status_code == 200, response.text
+        seeded_catalog.refresh(doctor)
+        assert doctor.cabinet == "77"
+
+    def test_put_changing_to_deactivated_still_rejected(
+        self, client, auth_headers, seeded_catalog, test_doctor_user
+    ):
+        doctor = Doctor(user_id=test_doctor_user.id, specialty="cardiology", cabinet="1", active=True)
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+        row = seeded_catalog.execute(
+            select(MedicalSpecialty).where(MedicalSpecialty.code == "dentistry")
+        ).scalar_one()
+        row.active = False
+        seeded_catalog.commit()
+
+        response = client.put(
+            f"/api/v1/admin/doctors/{doctor.id}",
+            headers=auth_headers,
+            json={"specialty": "dentistry"},
+        )
+        assert response.status_code == 400
+
+    def test_write_path_empty_catalog_is_503_not_400(
+        self, client, auth_headers, db_session, test_doctor_user
+    ):
+        """Empty catalog is a configuration failure: POST must give 503,
+        not a misleading per-code 400 (Codex P2 round 3)."""
+        db_session.execute(text("DELETE FROM medical_specialties"))
+        db_session.commit()
+        response = client.post(
+            "/api/v1/admin/doctors",
+            headers=auth_headers,
+            json={"user_id": test_doctor_user.id, "specialty": "cardiology", "active": True},
+        )
+        assert response.status_code == 503
+
+    def test_write_path_missing_table_is_503(
+        self, client, auth_headers, db_session, test_doctor_user
+    ):
+        db_session.commit()
+        db_session.execute(text("DROP TABLE medical_specialties"))
+        db_session.commit()
+        response = client.post(
+            "/api/v1/admin/doctors",
+            headers=auth_headers,
+            json={"user_id": test_doctor_user.id, "specialty": "cardiology", "active": True},
+        )
+        assert response.status_code == 503
