@@ -1,0 +1,87 @@
+{
+  "_meta": {
+    "purpose": "AXE-EXP-1 (a11y axe audit, e2e/a11y-axe-authenticated.spec.ts) — accepted pre-existing violation rule IDs per authorized QA-harness route:theme key. The gate fails on NEW rules and on stale entries (findings that no longer reproduce must be removed from this file — the baseline must shrink, not rot).",
+    "policy": "Adding a rule here requires a documented justification. FORBIDDEN: adding a rule to make a failing audit pass without justification (Rule 13 analog). Every entry is a PRE-EXISTING finding first baselined at AXE-EXP-1 (probe on main aca7d96a8, 02.09.2026, 34 audits, 236 nodes); the shrink-only ratchet stays in force across the AXE-EXP track.",
+    "scope": "Authorized QA-harness surfaces only (e2e/support/authenticatedQa.ts): 6 role homes (admin/registrar/doctor/cashier/lab/patient) + 2 specialty surfaces (doctor-cardiology, doctor-dermatology ?tab=appointments) + 9 admin-family routes × light/dark = 34 audits. Public routes are covered by e2e/a11y-baseline.json (empty after the CC track).",
+    "resolution": "AXE-EXP-2 (app-chrome inks): the universal chrome class fixed — header search ⌘K hint chip, ⌘K command-palette trigger (undefined --mac-surface-secondary token), inactive sidebar count badge → canonical --mac-text-on-tertiary (light #455568 / dark #c7c7cc). 34→24 keys. AXE-EXP-3 (badge fills): the canonical Badge component variants carried white ink on BASE accent/status colors (primary #007aff 4.01:1, warning #ff9f0a 2.05:1, success #30d158 2.02:1, danger #ff453a 3.41:1) and the info variant had white ink on its light tint (1.33:1) — filled variants now use the CC-2 strong-token family (--mac-accent-blue-strong/--mac-danger-strong/--mac-success-strong/--mac-warning-strong), info carries a constant dark-blue ink (--mac-accent-blue-active #004bb5, 5.9:1 on the constant tint); MacOSTab badge likewise. admin-telegram went 46→0 nodes (CLEAN), doctor-cardiology/dermatology dropped color-contrast (SummaryBar badges fixed), lab badges fixed. 24→14 keys, 172→60 nodes. Remaining color-contrast (8 keys) = the AXE-EXP-4 class (inactive tab/segment inks, patient link-ink tabs, lqw controls, misc admin tertiary texts); ARIA rules = AXE-EXP-5.",
+    "probe_diagnosis": "Original seeding (AXE-EXP-1): 236 violation nodes / 34 audits — 200 color-contrast + 36 ARIA (aria-required-parent 22 MacOSTab; aria-valid-attr-value 6 SegmentedControl; aria-required-children 4 AppointmentSummaryBar; aria-prohibited-attr 2 admin-kpi-grid; label 2 cashier date input). After AXE-EXP-2 (chrome) + AXE-EXP-3 (badges): 60 nodes remain across 14 keys.",
+    "axeTags": [
+      "wcag2a",
+      "wcag2aa",
+      "wcag21a",
+      "wcag21aa"
+    ]
+  },
+  "admin-clinic-settings:dark": [
+    "color-contrast"
+  ],
+  "admin-finance:dark": [
+    "aria-required-parent"
+  ],
+  "admin-finance:light": [
+    "aria-required-parent"
+  ],
+  "admin-notifications:dark": [
+    "aria-valid-attr-value"
+  ],
+  "admin-notifications:light": [
+    "aria-valid-attr-value"
+  ],
+  "admin-services:dark": [
+    "color-contrast"
+  ],
+  "admin-users:dark": [
+    "aria-required-parent"
+  ],
+  "admin-users:light": [
+    "aria-required-parent"
+  ],
+  "admin-webhooks:dark": [
+    "aria-valid-attr-value",
+    "color-contrast"
+  ],
+  "admin-webhooks:light": [
+    "aria-valid-attr-value"
+  ],
+  "admin:dark": [
+    "aria-prohibited-attr"
+  ],
+  "admin:light": [
+    "aria-prohibited-attr"
+  ],
+  "cashier:dark": [
+    "aria-required-parent",
+    "aria-valid-attr-value",
+    "color-contrast",
+    "label"
+  ],
+  "cashier:light": [
+    "aria-required-parent",
+    "aria-valid-attr-value",
+    "label"
+  ],
+  "doctor-cardiology:dark": [
+    "aria-required-children"
+  ],
+  "doctor-cardiology:light": [
+    "aria-required-children"
+  ],
+  "doctor-dermatology:dark": [
+    "aria-required-children"
+  ],
+  "doctor-dermatology:light": [
+    "aria-required-children"
+  ],
+  "lab:dark": [
+    "color-contrast"
+  ],
+  "lab:light": [
+    "color-contrast"
+  ],
+  "patient:dark": [
+    "color-contrast"
+  ],
+  "patient:light": [
+    "color-contrast"
+  ]
+}

@@ -203,7 +203,10 @@ const MacOSTab = ({
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-medium)',
-                background: 'var(--mac-accent-blue)',
+                // AXE-EXP-3: white ink on the base accent was 4.01:1 — the
+                // CC-2 strong token (5.42:1) carries it (same mac-badge
+                // white-ink-fill class as Badge.tsx variants).
+                background: 'var(--mac-accent-blue-strong, var(--mac-accent-blue))',
                 color: 'white',
                 minWidth: '18px',
                 textAlign: 'center'

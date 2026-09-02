@@ -30,6 +30,15 @@
   --mac-text-primary: #000000;
   --mac-text-secondary: #455568;
   --mac-text-tertiary: #5d6f84;
+  /* AXE-EXP-2 (authorized-surface a11y track): ink for small text sitting
+   * ON a --mac-bg-tertiary surface (header search ⌘K hint chip, sidebar
+   * count badges, tertiary chips). Both secondary/tertiary inks fail WCAG
+   * AA on tertiary surfaces in one theme or the other (light: tertiary
+   * #5d6f84 on #d7e1ee = 3.9:1; dark: secondary #98989d on #3a3a3c =
+   * 3.95:1, tertiary #636366 = 1.89:1). Light value = text-secondary
+   * (#455568, 5.71:1 on #d7e1ee — no visual delta in light); dark value
+   * #c7c7cc = 6.74:1 on #3a3a3c. */
+  --mac-text-on-tertiary: #455568;
 
   --mac-border: #b8c8da;
   --mac-border-secondary: #cad8e7;
@@ -51,6 +60,31 @@
   /* CC-2: amber fill for white ink — #ff9f0a measures 2.06:1 against white;
    * #a86200 measures 4.76:1. Same strong-family contract as above. */
   --mac-warning-strong: #a86200;
+  /* CC-4 (UI color-contrast track): DisplayBoard theme palettes. The board
+   * renders on shared TVs and must NOT resolve through the app-theme
+   * tokens — its light/medical entries previously mixed constant dark ink
+   * with var(--mac-bg-primary)/var(--mac-text-secondary), which flip with
+   * the viewer's app theme and rendered 1.04:1 under a dark app (axe
+   * color-contrast, e2e/a11y-baseline.json display-board:dark). The values
+   * are exactly what those tokens resolved to in the light app, so the
+   * light rendering is pixel-identical. Referenced by DisplayBoardUnified.tsx
+   * themes; kept here (canonical token file) so TSX stays hex-free
+   * (ui-baseline ratchet: tsxHex / cssHexOutsideTokens). */
+  --displayboard-light-bg: linear-gradient(135deg, #e3ebf5 0%, #b8c8da 100%);
+  --displayboard-light-card: #eef3fa;
+  --displayboard-light-ink: #1a202c;
+  --displayboard-light-ink-muted: #455568;
+  --displayboard-light-border: #b8c8da;
+  --displayboard-dark-bg: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+  --displayboard-dark-card: #2d3748;
+  --displayboard-dark-ink: #f7fafc;
+  --displayboard-dark-ink-muted: #a0aec0;
+  --displayboard-dark-border: #4a5568;
+  --displayboard-medical-bg: linear-gradient(135deg, #f0fff4 0%, rgba(48, 209, 88, 0.12) 100%);
+  --displayboard-medical-card: #eef3fa;
+  --displayboard-medical-ink: #1a202c;
+  --displayboard-medical-ink-muted: #455568;
+  --displayboard-medical-border: #c6f6d5;
   --mac-accent-blue-500: var(--mac-accent-blue);
   --mac-accent-blue-600: var(--mac-accent-blue-hover);
   --mac-accent-blue-700: var(--mac-accent-blue-active);
@@ -201,6 +235,9 @@
      * #1c1c1e; on the translucent card surface it only improves. */
     --mac-text-secondary: #98989d;
     --mac-text-tertiary: #636366;
+    /* AXE-EXP-2: ink on tertiary surfaces — see the :root comment;
+     * #c7c7cc = 6.74:1 on #3a3a3c. */
+    --mac-text-on-tertiary: #c7c7cc;
 
     --mac-border: #38383a;
     --mac-border-secondary: #48484a;
@@ -236,6 +273,8 @@
   --mac-text-primary: #000000;
   --mac-text-secondary: #455568;
   --mac-text-tertiary: #5d6f84;
+  /* AXE-EXP-2: mirror of the :root definition. */
+  --mac-text-on-tertiary: #455568;
 
   --mac-border: #b8c8da;
   --mac-border-secondary: #cad8e7;
@@ -288,6 +327,8 @@
   /* CC-1: mirror of the prefers-color-scheme block — see comment above. */
   --mac-text-secondary: #98989d;
   --mac-text-tertiary: #636366;
+  /* AXE-EXP-2: mirror of the prefers-color-scheme block. */
+  --mac-text-on-tertiary: #c7c7cc;
 
   --mac-border: #38383a;
   --mac-border-secondary: #48484a;
@@ -1071,6 +1112,7 @@
     --mac-border-secondary: #000000;
     --mac-text-secondary: #000000;
     --mac-text-tertiary: #000000;
+    --mac-text-on-tertiary: #000000;
   }
 }
 

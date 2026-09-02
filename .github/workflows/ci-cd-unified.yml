@@ -816,7 +816,13 @@ jobs:
         # WCAG 2.x A/AA) gates public surfaces × light/dark with a
         # violation baseline (e2e/a11y-baseline.json — ratchet: fails on NEW
         # rules and on stale baseline entries).
-        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts --project=chromium --retries=0 2>&1 | tee ux-audit-output.txt
+        # AXE-EXP-1 (plan §4.1.24 follow-up track): a11y-axe-authenticated.spec.ts
+        # extends the same gate to the authorized QA-harness surfaces (6 role
+        # homes + 2 specialty + 9 admin-family routes × light/dark = 34 audits)
+        # with its own seeded pre-existing-findings baseline
+        # (e2e/a11y-baseline-auth.json — same shrink-only ratchet contract;
+        # remediation increments must shrink it toward zero).
+        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts e2e/a11y-axe-authenticated.spec.ts --project=chromium --retries=0 2>&1 | tee ux-audit-output.txt
       # E2E root-cause fix: removed continue-on-error. All non-fixme tests
       # must pass. Tests marked test.fixme have documented root causes and
       # are tracked for follow-up. See PR description for details.
@@ -831,16 +837,22 @@ jobs:
         # reality: if the count drops below the expected number, something
         # was skipped).
         #
-        # Expected: 93 passed, 0 skipped, 0 failed
+        # Expected: 127 passed, 0 skipped, 0 failed
         # (12 cashier + 9 registrar + 40 visual [7 state baselines + EAT +
         #  pr16-landing + 22 pr18 twelve-screen baselines] + 8 route-smoke
-        # + 12 visual-a11y + 12 a11y-axe-audit).
+        # + 12 visual-a11y + 12 a11y-axe-audit + 34 a11y-axe-authenticated).
+        # Metric integrity (§17, original → revised → methodology → reason):
+        # 93 → 127. Methodology unchanged (same CI step, count-invariant on
+        # passed tests). Reason: AXE-EXP-1 adds a11y-axe-authenticated.spec.ts
+        # (17 authorized QA-harness routes × 2 themes = 34 audits, seeded
+        # shrink-only baseline e2e/a11y-baseline-auth.json). Historical
+        # values: 93 = pre-AXE-EXP canonical count (12+9+40+8+12+12).
         # Reconciliation note: registrar-time.spec.ts (1 test) runs in its own
         # step above and is intentionally NOT counted here. Empirically
         # verified locally with `playwright --list` per file on the PR-UI-18-5
         # head. If a test is intentionally added/removed, update EXPECTED_COUNT
         # below.
-        EXPECTED_COUNT=93
+        EXPECTED_COUNT=127
         if [ ! -f ux-audit-output.txt ]; then
           echo "ERROR: ux-audit-output.txt not found. The UX Audit step may not have run."
           exit 1

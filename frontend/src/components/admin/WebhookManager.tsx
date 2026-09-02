@@ -148,7 +148,18 @@ const WebhookManager = () => {
     };
 
     loadData();
-  }, [loadWebhooks, loadSystemStats]);
+    // AXE-EXP-1 determinism fix: mount-only load. The i18n wrapper
+    // (i18n/useTranslation.ts) creates a NEW t identity on every render,
+    // so loadWebhooks (useCallback deps [t]) changes identity per render
+    // and this effect re-fired on EVERY render → infinite async load
+    // loop (loading↔loaded flicker + unbounded /webhooks/ polling; each
+    // cycle awaits a promise, so React's nested-update detector never
+    // fires). Detected by the a11y-axe-authenticated gate probe: the
+    // /admin/webhooks surface oscillated forever and no axe audit could
+    // be deterministic. Explicit refresh buttons keep calling
+    // loadWebhooks()/loadSystemStats() directly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Действия с webhook'ами
   const handleActivateWebhook = async (webhookId: string | number) => {

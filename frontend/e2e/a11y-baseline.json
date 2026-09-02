@@ -1,10 +1,9 @@
 {
   "_meta": {
     "purpose": "PR-UI-18 item 4 (a11y axe audit, e2e/a11y-axe-audit.spec.ts) — accepted pre-existing violation rule IDs per route:theme key. The gate fails on NEW rules and on stale entries (findings that no longer reproduce must be removed from this file — the baseline must shrink, not rot).",
-    "policy": "Adding a rule here requires a documented justification: these color-contrast findings are pre-existing on pixel-locked surfaces (pr16-landing + pr18 baseline PNGs); fixing them requires deliberate color-token remediation with coordinated visual-baseline re-capture — tracked as a follow-up candidate in the PR-UI-18 closure ledger. FORBIDDEN: adding a rule to make a failing audit pass without justification (Rule 13 analog).",
+    "policy": "Adding a rule here requires a documented justification. FORBIDDEN: adding a rule to make a failing audit pass without justification (Rule 13 analog).",
     "scope": "Public routes only (landing, login, display-board, queue-join, payment-success, payment-cancel) × light/dark. The login aria-toggle-field-name finding was FIXED in PR-UI-18-5 (Checkbox aria-label wiring) — not baselined.",
+    "resolution": "CC-1..CC-5 (UI color-contrast track, §4.1.24 ledger): the last accepted color-contrast entries were removed as each route became clean — queue-join:light (CC-1), payment-success:light+dark (CC-2), landing:light+dark (CC-3), display-board:dark (CC-4), payment-cancel:dark (CC-5). The baseline is now EMPTY: all 12 audits (6 routes × light/dark) run with zero WCAG 2.x A/AA violations. The shrink-only ratchet contract stays in force — any new violation fails the gate.",
     "axeTags": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
-  },
-  "display-board:dark": ["color-contrast"],
-  "payment-cancel:dark": ["color-contrast"]
+  }
 }
