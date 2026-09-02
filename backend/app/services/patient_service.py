@@ -59,9 +59,9 @@ class PatientService:
                 )
 
         has_full_name = patient_in.full_name and patient_in.full_name.strip()
-        has_individual_names = (patient_in.last_name and patient_in.last_name.strip()) or (
-            patient_in.first_name and patient_in.first_name.strip()
-        )
+        has_individual_names = (
+            patient_in.last_name and patient_in.last_name.strip()
+        ) or (patient_in.first_name and patient_in.first_name.strip())
 
         if not has_full_name and not has_individual_names:
             raise HTTPException(
@@ -176,7 +176,9 @@ class PatientService:
             old_data=None,
             new_data=new_data,
             request=request,
-            description=f"Создан пациент: {patient.last_name} {patient.first_name}",
+            # Codex round-9 P1: initial-only режим аудита — вместо ФИО
+            # идентифицируем пациента ID (AGENTS.md L390-407).
+            description=f"Создан пациент #{patient.id}",
         )
         self.db.commit()
         try:
@@ -255,7 +257,8 @@ class PatientService:
             old_data=old_data,
             new_data=new_data,
             request=request,
-            description=f"Обновлен пациент: {patient.last_name} {patient.first_name}",
+            # Codex round-9 P1: вместо ФИО — ID пациента
+            description=f"Обновлен пациент #{patient.id}",
         )
         self.db.commit()
 
@@ -278,7 +281,6 @@ class PatientService:
             )
 
         old_data, _ = extract_model_changes(patient, None)
-        patient_name = f"{patient.last_name} {patient.first_name}"
 
         try:
             patient_crud.remove(db=self.db, id=patient_id)
@@ -291,7 +293,8 @@ class PatientService:
                 old_data=old_data,
                 new_data=None,
                 request=request,
-                description=f"Удален пациент: {patient_name}",
+                # Codex round-9 P1: вместо ФИО — ID пациента
+                description=f"Удален пациент #{patient_id}",
             )
             self.db.commit()
         except Exception:

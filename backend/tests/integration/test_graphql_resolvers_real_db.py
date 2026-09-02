@@ -1224,6 +1224,64 @@ def test_graphql_round8_guards(gql_data, monkeypatch):
         s.commit()
 
 
+def test_graphql_round9_masked_audits(gql_data):
+    """Codex round-9: create/updatePatient аудит — initial-only, без ФИО
+    в description (PatientService — канонический путь REST+GraphQL)."""
+    from app.db import session as db_session_module
+    from app.models.user_profile import UserAuditLog
+
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+
+    data = _execute(
+        """
+        mutation($input: PatientInput!) {
+          createPatient(input: $input) { success patient { id } }
+        }
+        """,
+        {
+            "input": {
+                "lastName": f"SYNTHETIC-R9-{suffix}",
+                "firstName": "SYNTHETIC",
+            }
+        },
+    )
+    assert data["createPatient"]["success"] is True, data["createPatient"]
+    pid = data["createPatient"]["patient"]["id"]
+
+    data = _execute(
+        """
+        mutation($id: Int!, $input: PatientUpdateInput!) {
+          updatePatient(id: $id, input: $input) { success }
+        }
+        """,
+        {"id": pid, "input": {"address": "ул. R9, 1"}},
+    )
+    assert data["updatePatient"]["success"] is True, data["updatePatient"]
+
+    with S() as s:
+        rows = (
+            s.query(UserAuditLog)
+            .filter(
+                UserAuditLog.resource_type == "patients",
+                UserAuditLog.resource_id == pid,
+                UserAuditLog.action.in_(["CREATE", "UPDATE"]),
+            )
+            .all()
+        )
+        by_action = {r.action: r for r in rows}
+        assert "CREATE" in by_action and "UPDATE" in by_action
+        for action, row in by_action.items():
+            desc = row.description or ""
+            assert f"SYNTHETIC-R9-{suffix}" not in desc, (action, desc)
+            assert f"#{pid}" in desc, (action, desc)
+        # чистим аудит-строки (пациента удалит фикстурная очистка)
+        for r in rows:
+            s.delete(r)
+        s.commit()
+
+
 def test_sessions_are_closed_after_resolver(gql_session_factory):
     """with get_db_session() закрывает сессию: соединения не утекают."""
     _execute("{ patients { pagination { total } } }")

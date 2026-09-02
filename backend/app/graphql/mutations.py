@@ -319,10 +319,13 @@ class Mutation:
 
                 doctor = None
                 if input.doctor_id:
-                    doctor = (
-                        db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
-                    )
-                    if not doctor:
+                    # Codex P1 (round-9): per-doctor FOR UPDATE lock ДО
+                    # первого чтения врача — identity map уже держит объект
+                    # после обычного SELECT, и поздний FOR UPDATE не
+                    # перечитывает атрибуты: конкурентная деактивация врача
+                    # осталась бы незамеченной в eligibility-проверке.
+                    doctor = lock_doctor_for_slot_reservation(db, input.doctor_id)
+                    if doctor is None:
                         return AppointmentMutationResponse(
                             success=False,
                             message=t("doctor.not_found"),
@@ -330,8 +333,7 @@ class Mutation:
                         )
 
                     # SSOT: атомарная бронь слота (как в canonical endpoint) —
-                    # per-doctor FOR UPDATE lock ДО проверки занятости
-                    lock_doctor_for_slot_reservation(db, input.doctor_id)
+                    # врач уже залочен выше; eligibility читает свежую строку
                     ensure_doctor_eligible_for_appointment(db, input.doctor_id)
                     if input.appointment_time and (
                         appointment_crud.is_time_slot_occupied(
@@ -1111,13 +1113,22 @@ class Mutation:
             cabinet = None
             specialist_name = "Врач"
             with get_db_session() as db:
+                # Codex P1 (round-9): локальный день очереди по
+                # конфигурированной таймзоне — None заставлял канонический
+                # сервис падать на host date.today() (UTC-хост 19:00-24:00
+                # искал вчерашнюю очередь -> QUEUE_NOT_ACTIVE).
+                queue_settings = get_queue_settings(db)
+                timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+                queue_day = datetime.now(timezone).date()
+
                 # SSOT: with_for_update, called_by-аудит, канонические ответы;
-                # queue_tag передаётся в канонический сервис (фильтр очереди).
+                # queue_tag передаётся в канонический сервис (фильтр очереди),
+                # queue_day — локальный день (round-9).
                 result = await run_in_threadpool(
                     QRQueueService(db).call_next_patient,
                     doctor_id,
                     actor.id,
-                    None,
+                    queue_day,
                     queue_tag,
                 )
 
@@ -1224,9 +1235,16 @@ class Mutation:
                 try:
                     from app.ws.queue_ws import broadcast_queue_update
 
+                    # Codex P1 (round-9): день вызова — из ВЫБРАННОЙ очереди
+                    # (загружен при снапшоте), не host date.today().
+                    broadcast_day = (
+                        entry.queue.day
+                        if entry is not None and entry.queue is not None
+                        else queue_day
+                    )
                     broadcast_queue_update(
                         department=f"specialist_{doctor_id}",
-                        date=date.today().strftime("%Y-%m-%d"),
+                        date=broadcast_day.strftime("%Y-%m-%d"),
                         event_type="queue_update",
                         data={"action": "call_next", "entry_id": entry_id},
                     )
