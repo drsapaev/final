@@ -510,8 +510,11 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
         "{ success visit { status } } }",
         {"id": visit_id},
     )
+    # Codex P1 (round-12): 'confirmed' идёт через канонический
+    # confirmation-workflow (expire-guard, confirmed_at/by, номера
+    # очередей + активация) — сегодняшний визит активируется: open.
     assert data["updateVisitStatus"]["success"] is True, data["updateVisitStatus"]
-    assert data["updateVisitStatus"]["visit"]["status"] == "confirmed"
+    assert data["updateVisitStatus"]["visit"]["status"] == "open"
 
     # --- Codex P1 (раунд 5): repeat-guard — канонический guard корзины.
     # seed-пациент: фикстурный визит без visit_date → не eligible.
@@ -1448,6 +1451,88 @@ def test_graphql_round11(gql_data, caplog):
         # чистим аудит-строку (визит удалит фикстурная очистка)
         s.delete(row)
         s.commit()
+
+
+def test_graphql_round12(gql_data, monkeypatch):
+    """Codex round-12: callNext без тега детерминированно берёт очередь
+    с самым ранним waiting-номером; all_free-заявка шлёт нотификацию."""
+    from app.db import session as db_session_module
+    from app.graphql import mutations as gql_mutations
+    from app.services.notifications import notification_sender_service
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+
+    # --- 1) две активные очереди врача: tagged с номером 1 раньше базовой #5
+    with S() as s:
+        q2 = DailyQueue(
+            day=date.today(),
+            specialist_id=d["doctor"].id,
+            queue_tag=f"r12-{suffix}",
+            active=True,
+        )
+        s.add(q2)
+        s.flush()
+        e2 = OnlineQueueEntry(
+            queue_id=q2.id,
+            number=1,
+            patient_id=d["patient"].id,
+            status="waiting",
+        )
+        s.add(e2)
+        d["entry"].number = 5
+        s.merge(d["entry"])
+        s.commit()
+        e2_id = e2.id
+
+    data = _execute(
+        "mutation($doctorId: Int!) { callNextPatient(doctorId: $doctorId) "
+        "{ success queueEntry { id } } }",
+        {"doctorId": d["doctor"].id},
+    )
+    call = data["callNextPatient"]
+    assert call["success"] is True, call
+    # самый ранний waiting (номер 1) — в tagged-очереди, а не произвольной
+    assert call["queueEntry"]["id"] == e2_id
+
+    # --- 2) all_free без автоаппрува -> approver-нотификация после коммита
+    all_free_calls: list[dict] = []
+
+    async def _stub_all_free(**kwargs):
+        all_free_calls.append(kwargs)
+        return True
+
+    monkeypatch.setattr(
+        notification_sender_service,
+        "send_all_free_request_notification",
+        _stub_all_free,
+    )
+
+    data = _execute(
+        """
+        mutation($input: VisitInput!) {
+          createVisit(input: $input) { success visit { id } }
+        }
+        """,
+        {
+            "input": {
+                "patientId": d["patient"].id,
+                "doctorId": d["doctor"].id,
+                "discountMode": "all_free",
+                "serviceIds": [d["service"].id],
+            }
+        },
+    )
+    assert data["createVisit"]["success"] is True, data["createVisit"]
+    created_visit_id = data["createVisit"]["visit"]["id"]
+    assert len(all_free_calls) == 1, all_free_calls
+    assert all_free_calls[0]["visit"].id == created_visit_id
 
 
 def test_sessions_are_closed_after_resolver(gql_session_factory):

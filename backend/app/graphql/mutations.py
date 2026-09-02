@@ -56,6 +56,7 @@ from app.graphql.resolvers import (
     _audit_patient_access,
     appointment_to_type,
     get_db_session,
+    offloop,
     patient_to_type,
     queue_entry_to_type,
     service_to_type,
@@ -168,6 +169,7 @@ class Mutation:
             )
 
     @strawberry.mutation
+    @offloop
     def update_patient(
         self, info: strawberry.Info, id: int, input: PatientUpdateInput
     ) -> PatientMutationResponse:
@@ -241,6 +243,7 @@ class Mutation:
             )
 
     @strawberry.mutation
+    @offloop
     def delete_patient(self, info: strawberry.Info, id: int) -> MutationResponse:
         """Удалить пациента"""
         try:
@@ -309,6 +312,7 @@ class Mutation:
     # ===================== APPOINTMENT MUTATIONS =====================
 
     @strawberry.mutation
+    @offloop
     def create_appointment(
         self, info: strawberry.Info, input: AppointmentInput
     ) -> AppointmentMutationResponse:
@@ -399,6 +403,7 @@ class Mutation:
             )
 
     @strawberry.mutation
+    @offloop
     def update_appointment_status(
         self, info: strawberry.Info, id: int, status: str
     ) -> AppointmentMutationResponse:
@@ -454,6 +459,7 @@ class Mutation:
             )
 
     @strawberry.mutation
+    @offloop
     def cancel_appointment(
         self, info: strawberry.Info, id: int, reason: str | None = None
     ) -> AppointmentMutationResponse:
@@ -502,6 +508,7 @@ class Mutation:
     # ===================== VISIT MUTATIONS =====================
 
     @strawberry.mutation
+    @offloop
     def create_visit(
         self, info: strawberry.Info, input: VisitInput
     ) -> VisitMutationResponse:
@@ -664,6 +671,35 @@ class Mutation:
                 )
                 db.commit()
 
+                # Codex P2 (round-12): заявка All Free требует сигнала
+                # аппруверам — каноническая корзина шлёт
+                # send_all_free_request_notification после коммита;
+                # резолвер исполняется в worker-треде (offloop), поэтому
+                # asyncio.run доступен, как в REST-пути.
+                if (
+                    discount_mode == "all_free"
+                    and not registration_settings["all_free_auto_approve"]
+                ):
+                    try:
+                        import asyncio
+
+                        from app.services.notifications import (
+                            notification_sender_service,
+                        )
+
+                        asyncio.run(
+                            notification_sender_service.send_all_free_request_notification(
+                                db=db,
+                                visit=visit,
+                                actor_user=actor_visit,
+                            )
+                        )
+                    except Exception as notify_error:  # noqa: BLE001
+                        logger.warning(
+                            "GraphQL createVisit: all_free notification " "failed: %s",
+                            notify_error,
+                        )
+
                 return VisitMutationResponse(
                     success=True,
                     message="Визит успешно создан",
@@ -678,6 +714,7 @@ class Mutation:
             )
 
     @strawberry.mutation
+    @offloop
     def update_visit_status(
         self, info: strawberry.Info, id: int, status: str
     ) -> VisitMutationResponse:
@@ -699,11 +736,33 @@ class Mutation:
                         errors=["VISIT_NOT_FOUND"],
                     )
 
-                # SSOT: state machine жизненного цикла (терминальные статусы
-                # закрыты; timestamps и аудит ведёт канонический сервис)
-                updated = VisitLifecycleService(db).transition_status(
-                    id, status, actor, commit=True
-                )
+                # Codex P1 (round-12): 'confirmed' — канонический
+                # confirmation-workflow, а не обычный переход state machine:
+                # expire-guard, confirmed_at/confirmed_by, номера очередей
+                # для сегодняшнего визита + активация (confirmed -> open).
+                if status == "confirmed":
+                    from app.api.v1.endpoints.registrar_wizard._visits import (
+                        ConfirmVisitRequest,
+                        confirm_visit_by_registrar,
+                    )
+
+                    confirm_visit_by_registrar(
+                        visit_id=id,
+                        request=ConfirmVisitRequest(
+                            confirmed_by=f"admin_{actor.id}",
+                        ),
+                        db=db,
+                        current_user=actor,
+                    )
+                    updated = db.query(Visit).filter(Visit.id == id).first()
+                    message = "Визит подтвержден (канонический confirmation-workflow)"
+                else:
+                    # SSOT: state machine жизненного цикла (терминальные
+                    # статусы закрыты; timestamps и аудит ведёт сервис)
+                    updated = VisitLifecycleService(db).transition_status(
+                        id, status, actor, commit=True
+                    )
+                    message = "Статус визита успешно обновлен"
 
                 # M4-P0-1: ответ включает patient (PHI) — read-trail
                 if updated.patient_id:
@@ -711,7 +770,7 @@ class Mutation:
 
                 return VisitMutationResponse(
                     success=True,
-                    message="Статус визита успешно обновлен",
+                    message=message,
                     visit=visit_to_type(updated),
                 )
 
@@ -731,6 +790,7 @@ class Mutation:
     # ===================== SERVICE MUTATIONS =====================
 
     @strawberry.mutation
+    @offloop
     def create_service(self, input: ServiceInput) -> ServiceMutationResponse:
         """Создать новую услугу (SSOT: ServicesApiService.create_service)"""
         try:
@@ -779,6 +839,7 @@ class Mutation:
             )
 
     @strawberry.mutation
+    @offloop
     def update_service_price(self, id: int, price: float) -> ServiceMutationResponse:
         """Обновить цену услуги (SSOT: ServicesApiService.update_service)"""
         try:

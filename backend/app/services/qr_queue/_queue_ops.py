@@ -120,7 +120,35 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         )
         if queue_tag:
             queue_query = queue_query.filter(DailyQueue.queue_tag == queue_tag)
-        daily_queue = queue_query.first()
+        candidate_queues = queue_query.all()
+
+        # Codex P1 (round-12): без queue_tag у врача с несколькими активными
+        # tagged-очередями неупорядоченный .first() выбирал произвольную —
+        # «нет пациентов» при waiting в соседней очереди / вызов не из того
+        # workflow. Детерминированный выбор: очередь с САМЫМ ранним waiting-
+        # номером (number ASC, id ASC); при одиночной очереди поведение
+        # прежнее.
+        if not candidate_queues:
+            raise ValueError(f"Очередь не активна на дату {queue_date}")
+        if len(candidate_queues) == 1:
+            daily_queue = candidate_queues[0]
+        else:
+            earliest = (
+                self.db.query(OnlineQueueEntry)
+                .filter(
+                    OnlineQueueEntry.queue_id.in_([q.id for q in candidate_queues]),
+                    OnlineQueueEntry.status == "waiting",
+                )
+                .order_by(OnlineQueueEntry.number.asc(), OnlineQueueEntry.id.asc())
+                .first()
+            )
+            if earliest is not None:
+                daily_queue = next(
+                    q for q in candidate_queues if q.id == earliest.queue_id
+                )
+            else:
+                # waiting нигде нет — детерминированный ответ "нет пациентов"
+                daily_queue = min(candidate_queues, key=lambda q: q.id)
 
         if not daily_queue:
             raise ValueError(f"Очередь не активна на дату {queue_date}")

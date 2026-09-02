@@ -9,9 +9,30 @@ GQL-AUDIT-28 follow-up:
 """
 
 from datetime import date
+from functools import wraps
 
 import strawberry
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import or_
+
+
+def offloop(fn):
+    """Codex P2 (round-12): синхронный DB-резолвер — off event loop.
+
+    Под async GraphQLRouter Strawberry вызывает sync-резолверы inline на
+    потоке event loop: count/pagination/до 1000 строк/audit-writes/lazy-load
+    блокируют обработку ВСЕХ остальных запросов этого воркера. Обёртка
+    сохраняет сигнатуру и аннотации (functools.wraps — strawberry видит
+    исходные типы), а всё синхронное DB-действие уносит в threadpool —
+    тот же приём, что у createPatient/joinQueue/callNextPatient.
+    """
+
+    @wraps(fn)
+    async def wrapper(*args, **kwargs):
+        return await run_in_threadpool(fn, *args, **kwargs)
+
+    return wrapper
+
 
 from app.core.specialties import specialty_variants
 from app.graphql.types import (
@@ -321,6 +342,7 @@ class Query:
     # ===================== PATIENTS =====================
 
     @strawberry.field
+    @offloop
     def patients(
         self,
         info: strawberry.Info,
@@ -369,6 +391,7 @@ class Query:
             )
 
     @strawberry.field
+    @offloop
     def patient(self, info: strawberry.Info, id: int) -> PatientType | None:
         """Получить пациента по ID"""
         with get_db_session() as db:
@@ -384,6 +407,7 @@ class Query:
     # ===================== DOCTORS =====================
 
     @strawberry.field
+    @offloop
     def doctors(
         self,
         filter: DoctorFilter | None = None,
@@ -429,6 +453,7 @@ class Query:
             )
 
     @strawberry.field
+    @offloop
     def doctor(self, id: int) -> DoctorType | None:
         """Получить врача по ID"""
         with get_db_session() as db:
@@ -438,6 +463,7 @@ class Query:
     # ===================== SERVICES =====================
 
     @strawberry.field
+    @offloop
     def services(
         self,
         filter: ServiceFilter | None = None,
@@ -480,6 +506,7 @@ class Query:
             )
 
     @strawberry.field
+    @offloop
     def service(self, id: int) -> ServiceType | None:
         """Получить услугу по ID"""
         with get_db_session() as db:
@@ -489,6 +516,7 @@ class Query:
     # ===================== APPOINTMENTS =====================
 
     @strawberry.field
+    @offloop
     def appointments(
         self,
         info: strawberry.Info,
@@ -540,6 +568,7 @@ class Query:
             )
 
     @strawberry.field
+    @offloop
     def appointment(self, info: strawberry.Info, id: int) -> AppointmentType | None:
         """Получить запись по ID"""
         with get_db_session() as db:
@@ -551,6 +580,7 @@ class Query:
     # ===================== VISITS =====================
 
     @strawberry.field
+    @offloop
     def visits(
         self,
         info: strawberry.Info,
@@ -595,6 +625,7 @@ class Query:
             )
 
     @strawberry.field
+    @offloop
     def visit(self, info: strawberry.Info, id: int) -> VisitType | None:
         """Получить визит по ID"""
         with get_db_session() as db:
@@ -606,6 +637,7 @@ class Query:
     # ===================== QUEUES =====================
 
     @strawberry.field
+    @offloop
     def queue_entries(
         self,
         info: strawberry.Info,
@@ -654,6 +686,7 @@ class Query:
     # ===================== STATISTICS =====================
 
     @strawberry.field
+    @offloop
     def appointment_stats(self) -> AppointmentStats:
         """Получить статистику записей"""
         with get_db_session() as db:
@@ -675,6 +708,7 @@ class Query:
             )
 
     @strawberry.field
+    @offloop
     def visit_stats(self) -> VisitStats:
         """Получить статистику визитов"""
         with get_db_session() as db:
@@ -692,6 +726,7 @@ class Query:
             )
 
     @strawberry.field
+    @offloop
     def queue_stats(self) -> QueueStats:
         """Получить статистику очередей"""
         with get_db_session() as db:
@@ -709,6 +744,7 @@ class Query:
             )
 
     @strawberry.field
+    @offloop
     def doctor_stats(self, doctor_id: int) -> DoctorStats | None:
         """Получить статистику врача"""
         with get_db_session() as db:
