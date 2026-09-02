@@ -3,8 +3,8 @@
     "purpose": "AXE-EXP-1 (a11y axe audit, e2e/a11y-axe-authenticated.spec.ts) — accepted pre-existing violation rule IDs per authorized QA-harness route:theme key. The gate fails on NEW rules and on stale entries (findings that no longer reproduce must be removed from this file — the baseline must shrink, not rot).",
     "policy": "Adding a rule here requires a documented justification. FORBIDDEN: adding a rule to make a failing audit pass without justification (Rule 13 analog). Every entry is a PRE-EXISTING finding first baselined at AXE-EXP-1 (probe on main aca7d96a8, 02.09.2026, 34 audits, 236 nodes); the shrink-only ratchet stays in force across the AXE-EXP track.",
     "scope": "Authorized QA-harness surfaces only (e2e/support/authenticatedQa.ts): 6 role homes (admin/registrar/doctor/cashier/lab/patient) + 2 specialty surfaces (doctor-cardiology, doctor-dermatology ?tab=appointments) + 9 admin-family routes × light/dark = 34 audits. Public routes are covered by e2e/a11y-baseline.json (empty after the CC track).",
-    "resolution": "AXE-EXP-2 (app-chrome inks): the universal chrome class fixed — header search ⌘K hint chip, ⌘K command-palette trigger (undefined --mac-surface-secondary token), inactive sidebar count badge → canonical --mac-text-on-tertiary (light #455568 / dark #c7c7cc). 34→24 keys. AXE-EXP-3 (badge fills): the canonical Badge component variants carried white ink on BASE accent/status colors (primary #007aff 4.01:1, warning #ff9f0a 2.05:1, success #30d158 2.02:1, danger #ff453a 3.41:1) and the info variant had white ink on its light tint (1.33:1) — filled variants now use the CC-2 strong-token family (--mac-accent-blue-strong/--mac-danger-strong/--mac-success-strong/--mac-warning-strong), info carries a constant dark-blue ink (--mac-accent-blue-active #004bb5, 5.9:1 on the constant tint); MacOSTab badge likewise. admin-telegram went 46→0 nodes (CLEAN), doctor-cardiology/dermatology dropped color-contrast (SummaryBar badges fixed), lab badges fixed. 24→14 keys, 172→60 nodes. Remaining color-contrast (8 keys) = the AXE-EXP-4 class (inactive tab/segment inks, patient link-ink tabs, lqw controls, misc admin tertiary texts); ARIA rules = AXE-EXP-5.",
-    "probe_diagnosis": "Original seeding (AXE-EXP-1): 236 violation nodes / 34 audits — 200 color-contrast + 36 ARIA (aria-required-parent 22 MacOSTab; aria-valid-attr-value 6 SegmentedControl; aria-required-children 4 AppointmentSummaryBar; aria-prohibited-attr 2 admin-kpi-grid; label 2 cashier date input). After AXE-EXP-2 (chrome) + AXE-EXP-3 (badges): 60 nodes remain across 14 keys.",
+    "resolution": "AXE-EXP-2 (app-chrome inks): chrome class → --mac-text-on-tertiary. AXE-EXP-3 (badge fills): Badge/MacOSTab white-ink fills → CC-2 strong tokens; info tint → constant dark-blue ink. AXE-EXP-4 (tab/link inks): SegmentedControl inactive segments + patient .pp-tab inactive → on-tertiary ink; patient .pp-tab-active link → new canonical --mac-link-ink token (light #0066d6 = accent-strong, dark #5ac8fa — the CC-2-documented deferred link-ink latent class); lab .lqw-status-filter-btn-active → strong fill; .lqw-sort-label → on-tertiary; 3 admin tertiary utility classes → secondary ink. color-contrast now remains on ONE key only (admin-services:dark — a distinct root cause: --mac-card-bg/--mac-main-shell-bg have no dark values, so DataTable surfaces render light in dark theme; tracked for its own increment). Remaining ARIA rules = AXE-EXP-5.",
+    "probe_diagnosis": "Original seeding (AXE-EXP-1): 236 violation nodes / 34 audits — 200 color-contrast + 36 ARIA (aria-required-parent 22 MacOSTab; aria-valid-attr-value 6 SegmentedControl; aria-required-children 4 AppointmentSummaryBar; aria-prohibited-attr 2 admin-kpi-grid; label 2 cashier date input). After AXE-EXP-2 (chrome) + EXP-3 (badges) + EXP-4 (tab/link inks): 38 nodes remain (2 color-contrast on the card-bg dark-hole + 36 ARIA).",
     "axeTags": [
       "wcag2a",
       "wcag2aa",
@@ -12,9 +12,6 @@
       "wcag21aa"
     ]
   },
-  "admin-clinic-settings:dark": [
-    "color-contrast"
-  ],
   "admin-finance:dark": [
     "aria-required-parent"
   ],
@@ -37,8 +34,7 @@
     "aria-required-parent"
   ],
   "admin-webhooks:dark": [
-    "aria-valid-attr-value",
-    "color-contrast"
+    "aria-valid-attr-value"
   ],
   "admin-webhooks:light": [
     "aria-valid-attr-value"
@@ -52,7 +48,6 @@
   "cashier:dark": [
     "aria-required-parent",
     "aria-valid-attr-value",
-    "color-contrast",
     "label"
   ],
   "cashier:light": [
@@ -71,17 +66,5 @@
   ],
   "doctor-dermatology:light": [
     "aria-required-children"
-  ],
-  "lab:dark": [
-    "color-contrast"
-  ],
-  "lab:light": [
-    "color-contrast"
-  ],
-  "patient:dark": [
-    "color-contrast"
-  ],
-  "patient:light": [
-    "color-contrast"
   ]
 }
