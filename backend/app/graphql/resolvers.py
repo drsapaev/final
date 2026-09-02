@@ -48,7 +48,7 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit
-from app.services.patient_access_audit import log_patient_access
+from app.services.patient_access_audit import log_patient_access_many
 
 
 def get_db_session():
@@ -127,20 +127,22 @@ def _audit_patient_access(
 ) -> None:
     """M4-P0-1: каждый доступ admin-актора к PHI пациентов — в audit log.
 
-    Non-blocking (log_patient_access не бросает); пропускается, когда
-    контекста нет (прямые schema.execute_sync тесты).
+    Codex round-7 P2: батч-вариант — один COMMIT на список (раньше
+    log_patient_access коммитил на subject: perPage=1000 давал до 1000
+    последовательных транзакций + expire_on_commit reloads).
+    Non-blocking; пропускается, когда контекста нет (прямые тесты схемы).
     """
     user = getattr(info.context, "user", None) if info.context else None
     if not user:
         return
-    for pid in patient_ids:
-        log_patient_access(
-            db,
-            actor_user=user,
-            subject_patient_id=pid,
-            resource_type=resource_type,
-            action="view",
-        )
+    log_patient_access_many(
+        db,
+        actor_user=user,
+        subject_patient_ids=patient_ids,
+        resource_type=resource_type,
+        action="view",
+        request=getattr(info.context, "request", None),
+    )
 
 
 # ===================== CONVERTERS =====================

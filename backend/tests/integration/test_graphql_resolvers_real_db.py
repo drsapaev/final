@@ -882,6 +882,187 @@ def test_graphql_round6_guards(gql_data, monkeypatch):
         s.commit()
 
 
+def test_graphql_round7_guards(gql_data, monkeypatch):
+    """Codex round-7: DOCTOR_INACTIVE, терминальные записи не съедают
+    слоты, SOFT_DELETE-аудит, CALL_NEXT persistит вызывающего."""
+    from app.db import session as db_session_module
+    from app.graphql import mutations as gql_mutations
+    from app.models.user_profile import UserAuditLog
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+
+    # --- 1) DOCTOR_INACTIVE: деактивированный врач отклоняется до
+    # get_or_create_daily_queue (раньше — existence-only lookup).
+    with S() as s:
+        d["doctor"].active = False
+        s.merge(d["doctor"])
+        s.commit()
+    try:
+        data = _execute(
+            """
+            mutation($input: QueueEntryInput!) {
+              joinQueue(input: $input) { success errors }
+            }
+            """,
+            {
+                "input": {
+                    "patientId": d["patient"].id,
+                    "doctorId": d["doctor"].id,
+                }
+            },
+        )
+        join = data["joinQueue"]
+        assert join["success"] is False, join
+        assert "DOCTOR_INACTIVE" in join["errors"], join
+    finally:
+        with S() as s:
+            d["doctor"].active = True
+            s.merge(d["doctor"])
+            s.commit()
+
+    # --- 2) ёмкость очереди считает только waiting/called: served-запись
+    # не должна блокировать join при cap=1 (канонический check_queue_limits).
+    with S() as s:
+        d["entry"].status = "served"
+        s.merge(d["entry"])
+        d["queue"].max_online_entries = 1
+        s.merge(d["queue"])
+        s.commit()
+
+    data = _execute(
+        """
+        mutation($input: PatientInput!) {
+          createPatient(input: $input) { success patient { id } }
+        }
+        """,
+        {
+            "input": {
+                "lastName": f"SYNTHETIC-R7-Cap-{suffix}",
+                "firstName": "SYNTHETIC",
+            }
+        },
+    )
+    cap_patient_id = data["createPatient"]["patient"]["id"]
+
+    data = _execute(
+        """
+        mutation($input: QueueEntryInput!) {
+          joinQueue(input: $input) { success errors queueEntry { number } }
+        }
+        """,
+        {"input": {"patientId": cap_patient_id, "doctorId": d["doctor"].id}},
+    )
+    cap_join = data["joinQueue"]
+    assert cap_join["success"] is True, cap_join  # served не съедает слот
+
+    # восстанавливаем капу очереди (шаг 4 встаёт в ту же базовую очередь)
+    with S() as s:
+        d["queue"].max_online_entries = 15  # дефолт модели
+        s.merge(d["queue"])
+        s.commit()
+
+    # --- 3) SOFT_DELETE-аудит: GraphQL deletePatient пишет log_critical_change
+    data = _execute(
+        """
+        mutation($input: PatientInput!) {
+          createPatient(input: $input) { success patient { id } }
+        }
+        """,
+        {
+            "input": {
+                "lastName": f"SYNTHETIC-R7-Del-{suffix}",
+                "firstName": "SYNTHETIC",
+            }
+        },
+    )
+    orphan_id = data["createPatient"]["patient"]["id"]
+
+    data = _execute(
+        "mutation($id: Int!) { deletePatient(id: $id) { success } }",
+        {"id": orphan_id},
+    )
+    assert data["deletePatient"]["success"] is True
+
+    with S() as s:
+        soft_rows = (
+            s.query(UserAuditLog)
+            .filter(
+                UserAuditLog.action == "SOFT_DELETE",
+                UserAuditLog.resource_type == "patients",
+                UserAuditLog.resource_id == orphan_id,
+            )
+            .all()
+        )
+        assert soft_rows, "deletePatient must write critical-change audit"
+
+    # --- 4) CALL_NEXT persistит вызывающего через критичный аудит
+    data = _execute(
+        """
+        mutation($input: PatientInput!) {
+          createPatient(input: $input) { success patient { id } }
+        }
+        """,
+        {
+            "input": {
+                "lastName": f"SYNTHETIC-R7-Call-{suffix}",
+                "firstName": "SYNTHETIC",
+            }
+        },
+    )
+    call_patient_id = data["createPatient"]["patient"]["id"]
+
+    data = _execute(
+        """
+        mutation($input: QueueEntryInput!) {
+          joinQueue(input: $input) { success queueEntry { id } }
+        }
+        """,
+        {"input": {"patientId": call_patient_id, "doctorId": d["doctor"].id}},
+    )
+    call_join = data["joinQueue"]
+    assert call_join["success"] is True, call_join
+    call_entry_id = call_join["queueEntry"]["id"]
+
+    data = _execute(
+        "mutation($doctorId: Int!) { callNextPatient(doctorId: $doctorId) "
+        "{ success queueEntry { id status } } }",
+        {"doctorId": d["doctor"].id},
+    )
+    call = data["callNextPatient"]
+    assert call["success"] is True, call
+    # вызывается САМАЯ ранняя waiting-запись (не обязательно call_patient —
+    # cap-пациент из шага 2 тоже waiting) — берём id из ответа
+    called_entry_id = call["queueEntry"]["id"]
+
+    with S() as s:
+        call_rows = (
+            s.query(UserAuditLog)
+            .filter(
+                UserAuditLog.action == "CALL_NEXT",
+                UserAuditLog.resource_type == "online_queue_entries",
+                UserAuditLog.resource_id == called_entry_id,
+            )
+            .all()
+        )
+        assert call_rows, "callNextPatient must persist the caller via audit"
+        assert call_rows[0].new_values.get("called_by_user_id")
+
+    # чистим критичные аудит-строки (общая session-scoped БД)
+    with S() as s:
+        s.query(UserAuditLog).filter(
+            UserAuditLog.action.in_(["SOFT_DELETE", "CALL_NEXT"]),
+            UserAuditLog.resource_id.in_([orphan_id, called_entry_id, d["entry"].id]),
+        ).delete(synchronize_session=False)
+        s.commit()
+
+
 def test_sessions_are_closed_after_resolver(gql_session_factory):
     """with get_db_session() закрывает сессию: соединения не утекают."""
     _execute("{ patients { pagination { total } } }")

@@ -20,6 +20,7 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import func, text
 from strawberry import UNSET
 
+from app.core.audit import log_critical_change
 from app.core.i18n import t
 from app.crud import (
     online_queue as crud_queue,
@@ -262,6 +263,22 @@ class Mutation:
                 soft_delete_patient(
                     db, patient_id=id, deleted_by=actor.id if actor else None
                 )
+
+                # Codex P1 (round-7): канонический REST soft-delete пишет
+                # log_critical_change (actor, before/after) — GraphQL-удаления
+                # не выпадают из истории критичных изменений пациента.
+                log_critical_change(
+                    db=db,
+                    user_id=actor.id if actor else None,
+                    action="SOFT_DELETE",
+                    table_name="patients",
+                    row_id=id,
+                    old_data={"is_deleted": False},
+                    new_data={"is_deleted": True},
+                    request=getattr(info.context, "request", None),
+                    description=f"Мягкое удаление пациента: {patient.short_name()}",
+                )
+                db.commit()
 
                 return MutationResponse(success=True, message="Пациент успешно удален")
 
@@ -809,6 +826,17 @@ class Mutation:
                         errors=["DOCTOR_NOT_FOUND"],
                     )
 
+                # Codex P1 (round-7): existence-only lookup пропускал
+                # деактивированного врача — join создавал ему новую активную
+                # очередь и записывал пациентов в очередь без врача.
+                # Канонические селекторы очереди фильтруют Doctor.active.
+                if not doctor.active:
+                    return QueueMutationResponse(
+                        success=False,
+                        message="Врач деактивирован — запись в очередь недоступна",
+                        errors=["DOCTOR_INACTIVE"],
+                    )
+
                 today = date.today()
                 # P1: сериализуем СОЗДАНИЕ очереди на ключе (doctor, day, tag) —
                 # get_or_create_daily_queue это query-then-insert без
@@ -900,10 +928,16 @@ class Mutation:
                     )
 
                 # Лимит: считаем записи ВЫБРАННОЙ очереди (не всех очередей
-                # врача за день) и сравниваем с её же капой
+                # врача за день) и сравниваем с её же капой. Codex P1
+                # (round-7): только НЕ-терминальные статусы (waiting/called) —
+                # как в каноническом QueueBusinessService.check_queue_limits;
+                # served/cancelled не должны съедать слоты онлайн-набора.
                 online_entries_count = (
                     db.query(OnlineQueueEntry)
-                    .filter(OnlineQueueEntry.queue_id == daily_queue.id)
+                    .filter(
+                        OnlineQueueEntry.queue_id == daily_queue.id,
+                        OnlineQueueEntry.status.in_(["waiting", "called"]),
+                    )
                     .count()
                 )
 
@@ -1065,6 +1099,29 @@ class Mutation:
                     if entry_id
                     else None
                 )
+                # Codex P1 (round-7): called_by_user_id — транзиентный
+                # атрибут (mapped-колонки нет), идентичность вызывавшего
+                # терялась между сессиями. Persistим действие через
+                # канонический критичный аудит (online_queue_entries теперь
+                # в CRITICAL_TABLES). Без PHI в description (CodeQL).
+                if entry_id:
+                    log_critical_change(
+                        db=db,
+                        user_id=actor.id,
+                        action="CALL_NEXT",
+                        table_name="online_queue_entries",
+                        row_id=entry_id,
+                        old_data={"status": "waiting"},
+                        new_data={
+                            "status": "called",
+                            "called_by_user_id": actor.id,
+                        },
+                        request=getattr(info.context, "request", None),
+                        description=(
+                            "Вызов следующего пациента (GraphQL callNextPatient)"
+                        ),
+                    )
+                    db.commit()
                 if entry:
                     entry_snapshot = queue_entry_to_type(entry)
                     # M4-P0-1: снапшот включает patient (PHI) — read-trail
