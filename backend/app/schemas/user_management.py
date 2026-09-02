@@ -528,11 +528,25 @@ class UserAuditLogResponse(UserAuditLogBase):
 # stays during the compatibility window; only NEW stored 'Receptionist'
 # writes are frozen. Update-re-submission safety: 0 stored users carry the
 # spelling, so no edit flow can re-submit it.
+# Codex re-review P2 (PR #3025): the WRITE vocabulary is deliberately
+# separate from the READ/FILTER vocabulary below — the search/filter
+# surfaces must keep accepting the deprecated spelling so a compatible
+# deployment holding legacy rows can still query them (legacy reads
+# temporarily accepted; canonical writes only).
 _USER_MANAGEMENT_ROLE_PATTERN = (
     "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|"
     "SuperAdmin|Manager|"
     + "|".join(sorted(DOCTOR_ROLE_SPELLINGS))
     + ")$"
+)
+
+# Read/filter vocabulary: canonical write vocabulary PLUS the deprecated
+# 'Receptionist' spelling — used ONLY by query/filter surfaces
+# (UserSearchRequest.role, GET /users role parameter) so legacy rows in
+# compatible deployments remain queryable during the compatibility window.
+# NOT used by create/update/bulk-change-role (write freeze stays absolute).
+_USER_MANAGEMENT_ROLE_FILTER_PATTERN = (
+    _USER_MANAGEMENT_ROLE_PATTERN[:-2] + "|Receptionist)$"
 )
 
 
@@ -670,8 +684,10 @@ class UserSearchRequest(BaseModel):
 
     query: str | None = Field(None, min_length=1, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
+    # Codex re-review P2 (PR #3025): READ surface — uses the compatibility
+    # filter vocabulary so legacy 'Receptionist' rows stay queryable.
     role: str | None = Field(
-        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
+        None, pattern=_USER_MANAGEMENT_ROLE_FILTER_PATTERN
     )
     status: UserStatus | None = None
     is_active: bool | None = None

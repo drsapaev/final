@@ -8,6 +8,7 @@ from app.api.v1.endpoints.user_management._helpers import (
     _safe_user_export_filename,
     _user_export_mime_type,
     _USER_MANAGEMENT_ROLE_PATTERN,
+    _USER_MANAGEMENT_ROLE_FILTER_PATTERN,
     router,
 )  # noqa: F401
 
@@ -51,11 +52,14 @@ async def get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     role: str | None = Query(
-        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
+        None, pattern=_USER_MANAGEMENT_ROLE_FILTER_PATTERN
         # Codex round-1 P2: reuse the shared vocabulary — the previous
         # hardcoded list rejected cardio/derma/dentist/Registrar/SuperAdmin/
         # Manager BEFORE UserSearchRequest was constructed, so ?role=cardio
         # answered 422 while the schema advertised it as valid.
+        # Codex re-review P2 (PR #3025): READ surface — compatibility filter
+        # vocabulary keeps ?role=Receptionist valid for querying legacy
+        # rows during the compatibility window (writes stay canonical-only).
         # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     ),
     status_filter: str | None = Query(
@@ -809,11 +813,11 @@ async def user_management_health_check():
             "user_search",
             "user_statistics",
         ],
-        # REC-1 (Receptionist deprecation): 'Receptionist' dropped from the
-        # advertised module vocabulary — canonical writes are frozen (0
-        # production rows); the backend read alias remains during the
-        # compatibility window.
-        "supported_roles": ["Admin", "Doctor", "Nurse", "Patient"],
+        # REC-1 (Receptionist deprecation) + Codex re-review P2 (PR #3025):
+        # 'Receptionist' replaced by the canonical 'Registrar' — the module
+        # vocabulary now matches the write contract (create/update accept
+        # Registrar; deprecated spelling frozen out of writes).
+        "supported_roles": ["Admin", "Doctor", "Nurse", "Registrar", "Patient"],
         "supported_statuses": ["active", "inactive", "suspended", "pending", "locked"],
         "export_formats": ["csv", "excel", "json", "pdf"],
     }
