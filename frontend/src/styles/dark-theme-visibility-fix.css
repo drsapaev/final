@@ -84,15 +84,31 @@ body[data-theme="dark"][data-color-scheme="dark"] {
   color: var(--dark-text-primary) !important;
 }
 
-[data-theme="dark"][data-color-scheme="dark"] table,
+/* AXE-EXP-6 (a11y track): the two rules below were narrowed from the bare
+ * element selectors (`table`, `th`, `td`) to the legacy class scope
+ * (.table-wrapper / .data-table). The element selectors force-painted EVERY
+ * table in classic dark mode with --dark-card-bg (= --mac-text-primary =
+ * #ffffff — a TEXT color wired as a CARD background) plus dark ink via
+ * !important, overriding both the canonical DataTable's inline background
+ * and the per-component var()-themed dark surfaces built in PR-UI-12..15.
+ * Symptom (e2e/a11y-baseline-auth.json, admin-services:dark): the
+ * DataTable empty-state inline-ink elements (secondary-ink paragraph,
+ * white-ink mac-button) sat on the patch's WHITE surface in dark mode and
+ * failed axe color-contrast (2.87:1 / 1.11:1). Freed `<table>` elements now
+ * render transparent over their canonical card/surface in dark — the same
+ * rendered result the invalid inline color-mix always produced in LIGHT
+ * (see the DataTable.tsx AXE-EXP-6 note). Legacy .table-wrapper/.data-table
+ * consumers keep the class-scoped patch (load-bearing, unchanged). */
 [data-theme="dark"][data-color-scheme="dark"] .table-wrapper,
 [data-theme="dark"][data-color-scheme="dark"] .data-table {
   background: var(--dark-card-bg) !important;
   border: 1px solid var(--dark-border) !important;
 }
 
-[data-theme="dark"][data-color-scheme="dark"] th,
-[data-theme="dark"][data-color-scheme="dark"] td {
+[data-theme="dark"][data-color-scheme="dark"] .table-wrapper th,
+[data-theme="dark"][data-color-scheme="dark"] .table-wrapper td,
+[data-theme="dark"][data-color-scheme="dark"] .data-table th,
+[data-theme="dark"][data-color-scheme="dark"] .data-table td {
   border-color: var(--dark-border) !important;
   color: var(--dark-text-primary) !important;
 }
