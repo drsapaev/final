@@ -629,8 +629,14 @@ export default function HeaderNew() {
             padding: '4px 8px',
             fontSize: 'var(--mac-font-size-xs)',
             fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-secondary, #6b7280)',
-            background: 'var(--mac-surface-secondary, #f3f4f6)',
+            // AXE-EXP-2: the previous background var(--mac-surface-secondary,
+            // #f3f4f6) resolved to the LIGHT literal in both themes (the
+            // token is not defined anywhere) — in dark the ink fell to
+            // dark secondary #98989d on the light surface = 2.6:1. Now a
+            // themed tertiary surface + the on-tertiary ink (5.71:1 light /
+            // 6.74:1 dark).
+            color: 'var(--mac-text-on-tertiary, #455568)',
+            background: 'var(--mac-bg-tertiary, #d7e1ee)',
             border: '1px solid var(--mac-border, #d1d5db)',
             borderRadius: 'var(--mac-radius-sm)',
             cursor: 'pointer',
@@ -640,10 +646,10 @@ export default function HeaderNew() {
             transition: 'background 0.15s ease',
           }}
           onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
-            e.currentTarget.style.background = 'var(--mac-surface-hover, #e5e7eb)';
+            e.currentTarget.style.background = 'var(--mac-bg-secondary, #e3ebf5)';
           }}
           onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
-            e.currentTarget.style.background = 'var(--mac-surface-secondary, #f3f4f6)';
+            e.currentTarget.style.background = 'var(--mac-bg-tertiary, #d7e1ee)';
           }}
         >
           ⌘K

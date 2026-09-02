@@ -30,6 +30,15 @@
   --mac-text-primary: #000000;
   --mac-text-secondary: #455568;
   --mac-text-tertiary: #5d6f84;
+  /* AXE-EXP-2 (authorized-surface a11y track): ink for small text sitting
+   * ON a --mac-bg-tertiary surface (header search ⌘K hint chip, sidebar
+   * count badges, tertiary chips). Both secondary/tertiary inks fail WCAG
+   * AA on tertiary surfaces in one theme or the other (light: tertiary
+   * #5d6f84 on #d7e1ee = 3.9:1; dark: secondary #98989d on #3a3a3c =
+   * 3.95:1, tertiary #636366 = 1.89:1). Light value = text-secondary
+   * (#455568, 5.71:1 on #d7e1ee — no visual delta in light); dark value
+   * #c7c7cc = 6.74:1 on #3a3a3c. */
+  --mac-text-on-tertiary: #455568;
 
   --mac-border: #b8c8da;
   --mac-border-secondary: #cad8e7;
@@ -226,6 +235,9 @@
      * #1c1c1e; on the translucent card surface it only improves. */
     --mac-text-secondary: #98989d;
     --mac-text-tertiary: #636366;
+    /* AXE-EXP-2: ink on tertiary surfaces — see the :root comment;
+     * #c7c7cc = 6.74:1 on #3a3a3c. */
+    --mac-text-on-tertiary: #c7c7cc;
 
     --mac-border: #38383a;
     --mac-border-secondary: #48484a;
@@ -261,6 +273,8 @@
   --mac-text-primary: #000000;
   --mac-text-secondary: #455568;
   --mac-text-tertiary: #5d6f84;
+  /* AXE-EXP-2: mirror of the :root definition. */
+  --mac-text-on-tertiary: #455568;
 
   --mac-border: #b8c8da;
   --mac-border-secondary: #cad8e7;
@@ -313,6 +327,8 @@
   /* CC-1: mirror of the prefers-color-scheme block — see comment above. */
   --mac-text-secondary: #98989d;
   --mac-text-tertiary: #636366;
+  /* AXE-EXP-2: mirror of the prefers-color-scheme block. */
+  --mac-text-on-tertiary: #c7c7cc;
 
   --mac-border: #38383a;
   --mac-border-secondary: #48484a;
@@ -1096,6 +1112,7 @@
     --mac-border-secondary: #000000;
     --mac-text-secondary: #000000;
     --mac-text-tertiary: #000000;
+    --mac-text-on-tertiary: #000000;
   }
 }
 

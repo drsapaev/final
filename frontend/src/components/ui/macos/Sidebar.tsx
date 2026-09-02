@@ -341,7 +341,10 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                 {!isCollapsed && displayBadge &&
                 <span style={{
                   backgroundColor: isActive ? 'var(--mac-accent-bg)' : 'var(--mac-bg-tertiary)',
-                  color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                  // AXE-EXP-2: inactive badge ink — secondary was 3.95:1 on
+                  // the tertiary surface in dark; on-tertiary ink passes both
+                  // themes (5.71:1 light / 6.74:1 dark).
+                  color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-on-tertiary)',
                   fontSize: 'var(--mac-font-size-xs, 11px)',
                   fontWeight: 'var(--mac-font-weight-semibold, 600)',
                   padding: '2px 7px',
