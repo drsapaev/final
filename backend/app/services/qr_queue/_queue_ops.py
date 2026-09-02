@@ -125,9 +125,14 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         # Codex P1 (round-12): без queue_tag у врача с несколькими активными
         # tagged-очередями неупорядоченный .first() выбирал произвольную —
         # «нет пациентов» при waiting в соседней очереди / вызов не из того
-        # workflow. Детерминированный выбор: очередь с САМЫМ ранним waiting-
-        # номером (number ASC, id ASC); при одиночной очереди поведение
-        # прежнее.
+        # workflow. Детерминированный выбор: очередь с самым ранним waiting-
+        # кандидатом; при одиночной очереди поведение прежнее.
+        #
+        # Codex P1 (round-13): номера локальны для каждой очереди, поэтому
+        # «минимальный number» НЕ означает «самое раннее прибытие» (пациент
+        # #5, ждущий час, проигрывал свежему #1 соседней очереди). Канонический
+        # порядок вызова — как в queue_svc/_helpers.py staff_call_next_patient:
+        # priority DESC, coalesce(queue_time, created_at) ASC, id ASC.
         if not candidate_queues:
             raise ValueError(f"Очередь не активна на дату {queue_date}")
         if len(candidate_queues) == 1:
@@ -139,7 +144,14 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     OnlineQueueEntry.queue_id.in_([q.id for q in candidate_queues]),
                     OnlineQueueEntry.status == "waiting",
                 )
-                .order_by(OnlineQueueEntry.number.asc(), OnlineQueueEntry.id.asc())
+                .order_by(
+                    OnlineQueueEntry.priority.desc(),
+                    func.coalesce(
+                        OnlineQueueEntry.queue_time,
+                        OnlineQueueEntry.created_at,
+                    ).asc(),
+                    OnlineQueueEntry.id.asc(),
+                )
                 .first()
             )
             if earliest is not None:
@@ -153,7 +165,9 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         if not daily_queue:
             raise ValueError(f"Очередь не активна на дату {queue_date}")
 
-        # Находим следующего пациента в статусе "waiting"
+        # Находим следующего пациента в статусе "waiting" — тот же
+        # канонический порядок (round-13), что и при выборе очереди выше:
+        # вызван должен быть именно канонически самый ранний кандидат.
         # QUEUE-AUDIT-28 P0-7: with_for_update() — защита от race condition.
         # Раньше два врача могли одновременно вызвать одного пациента.
         next_patient = (
@@ -162,7 +176,14 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 OnlineQueueEntry.queue_id == daily_queue.id,
                 OnlineQueueEntry.status == "waiting",
             )
-            .order_by(OnlineQueueEntry.number)
+            .order_by(
+                OnlineQueueEntry.priority.desc(),
+                func.coalesce(
+                    OnlineQueueEntry.queue_time,
+                    OnlineQueueEntry.created_at,
+                ).asc(),
+                OnlineQueueEntry.id.asc(),
+            )
             .with_for_update()
             .first()
         )

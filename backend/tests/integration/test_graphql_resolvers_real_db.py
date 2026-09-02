@@ -1455,7 +1455,9 @@ def test_graphql_round11(gql_data, caplog):
 
 def test_graphql_round12(gql_data, monkeypatch):
     """Codex round-12: callNext без тега детерминированно берёт очередь
-    с самым ранним waiting-номером; all_free-заявка шлёт нотификацию."""
+    с waiting-кандидатом; all_free-заявка шлёт нотификацию.
+    Round-13 уточнение: порядок канонический (по времени прибытия),
+    а не по локальному номеру очереди."""
     from app.db import session as db_session_module
     from app.graphql import mutations as gql_mutations
     from app.services.notifications import notification_sender_service
@@ -1469,7 +1471,12 @@ def test_graphql_round12(gql_data, monkeypatch):
     suffix = d["suffix"]
     S = db_session_module.SessionLocal
 
-    # --- 1) две активные очереди врача: tagged с номером 1 раньше базовой #5
+    # --- 1) две активные очереди врача: порядок по ВРЕМЕНИ ПРИБЫТИЯ,
+    # а не по локальному номеру (round-13): #5, ждущий час, выигрывает
+    # у свежего #1 соседней tagged-очереди.
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime.now(UTC)
     with S() as s:
         q2 = DailyQueue(
             day=date.today(),
@@ -1484,12 +1491,14 @@ def test_graphql_round12(gql_data, monkeypatch):
             number=1,
             patient_id=d["patient"].id,
             status="waiting",
+            queue_time=now,  # свежий #1
         )
         s.add(e2)
         d["entry"].number = 5
+        d["entry"].queue_time = now - timedelta(hours=1)  # #5 ждёт час
         s.merge(d["entry"])
         s.commit()
-        e2_id = e2.id
+        base_entry_id = d["entry"].id
 
     data = _execute(
         "mutation($doctorId: Int!) { callNextPatient(doctorId: $doctorId) "
@@ -1498,8 +1507,9 @@ def test_graphql_round12(gql_data, monkeypatch):
     )
     call = data["callNextPatient"]
     assert call["success"] is True, call
-    # самый ранний waiting (номер 1) — в tagged-очереди, а не произвольной
-    assert call["queueEntry"]["id"] == e2_id
+    # канонический порядок: самое раннее ПРИБЫТИЕ (queue_time) —
+    # вызван #5 из базовой очереди, а не свежий #1 tagged-очереди
+    assert call["queueEntry"]["id"] == base_entry_id
 
     # --- 2) all_free без автоаппрува -> approver-нотификация после коммита
     all_free_calls: list[dict] = []
@@ -1533,6 +1543,179 @@ def test_graphql_round12(gql_data, monkeypatch):
     created_visit_id = data["createVisit"]["visit"]["id"]
     assert len(all_free_calls) == 1, all_free_calls
     assert all_free_calls[0]["visit"].id == created_visit_id
+
+
+def test_graphql_round13(gql_data, monkeypatch):
+    """Codex round-13: (1) канонический порядок вызова без тега —
+    priority DESC, затем coalesce(queue_time, created_at) ASC (номера
+    локальны для очереди и НЕ отражают порядок прибытия); (2) joinQueue
+    на пустой очереди врача со start_number_online != 1 выдаёт билет
+    со стартового номера врача, а не всегда #1."""
+    from app.db import session as db_session_module
+    from app.graphql import mutations as gql_mutations
+    from app.models.patient import Patient as PatientModel
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime.now(UTC)
+
+    # --- 0) изоляция: терминальный статус всем waiting-записям врача
+    # за сегодня (левые waiting от предыдущих тестов не должны влиять)
+    with S() as s:
+        doc_queue_ids = [
+            q.id
+            for q in s.query(DailyQueue).filter(
+                DailyQueue.specialist_id == d["doctor"].id,
+                DailyQueue.day == date.today(),
+            )
+        ]
+        s.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.queue_id.in_(doc_queue_ids),
+            OnlineQueueEntry.status == "waiting",
+        ).update({"status": "cancelled"}, synchronize_session=False)
+        s.commit()
+
+    # --- 1) старое прибытие (большой локальный номер) против свежего #1:
+    # выигрывает РАННЕЕ прибытие (e_old: ждёт час), не минимальный номер
+    with S() as s:
+        qa = DailyQueue(
+            day=date.today(),
+            specialist_id=d["doctor"].id,
+            queue_tag=f"r13a-{suffix}",
+            active=True,
+        )
+        qb = DailyQueue(
+            day=date.today(),
+            specialist_id=d["doctor"].id,
+            queue_tag=f"r13b-{suffix}",
+            active=True,
+        )
+        s.add_all([qa, qb])
+        s.flush()
+        e_old = OnlineQueueEntry(
+            queue_id=qa.id,
+            number=5,
+            patient_id=d["patient"].id,
+            status="waiting",
+            queue_time=now - timedelta(hours=1),
+        )
+        e_fresh = OnlineQueueEntry(
+            queue_id=qb.id,
+            number=1,
+            patient_id=d["patient"].id,
+            status="waiting",
+            queue_time=now,
+        )
+        s.add_all([e_old, e_fresh])
+        s.commit()
+        e_old_id = e_old.id
+
+    data = _execute(
+        "mutation($doctorId: Int!) { callNextPatient(doctorId: $doctorId) "
+        "{ success queueEntry { id } } }",
+        {"doctorId": d["doctor"].id},
+    )
+    call = data["callNextPatient"]
+    assert call["success"] is True, call
+    assert (
+        call["queueEntry"]["id"] == e_old_id
+    ), "hour-old #5 must win over freshly joined #1 in another tag"
+
+    # --- 2) priority-запись в соседней очереди обгоняет обычную (fresh) —
+    # priority DESC доминирует над временем прибытия
+    with S() as s:
+        qc = DailyQueue(
+            day=date.today(),
+            specialist_id=d["doctor"].id,
+            queue_tag=f"r13c-{suffix}",
+            active=True,
+        )
+        s.add(qc)
+        s.flush()
+        e_vip = OnlineQueueEntry(
+            queue_id=qc.id,
+            number=10,
+            patient_id=d["patient"].id,
+            status="waiting",
+            priority=2,  # VIP
+            queue_time=now,
+        )
+        s.add(e_vip)
+        s.commit()
+        e_vip_id = e_vip.id
+
+    data = _execute(
+        "mutation($doctorId: Int!) { callNextPatient(doctorId: $doctorId) "
+        "{ success queueEntry { id } } }",
+        {"doctorId": d["doctor"].id},
+    )
+    call = data["callNextPatient"]
+    assert call["success"] is True, call
+    assert (
+        call["queueEntry"]["id"] == e_vip_id
+    ), "priority entry must be called before regular waiting entries"
+
+    # --- 3) joinQueue: пустая очередь врача со start_number_online=3
+    # начинает с билета #3 (не #1), следующая — #4
+    second_patient = None
+    original_start = d["doctor"].start_number_online
+    try:
+        with S() as s:
+            second_patient = PatientModel(
+                last_name=f"SYNTHETIC-Petrov-{suffix}",
+                first_name="SYNTHETIC",
+                middle_name="SYNTHETIC",
+                phone=f"DEV-DEMO-{suffix}-2",
+                email=f"synthetic-{suffix}-2@example.com",
+            )
+            s.add(second_patient)
+            d["doctor"].start_number_online = 3
+            s.merge(d["doctor"])
+            s.commit()
+
+        data = _execute(
+            """mutation($input: QueueEntryInput!) { joinQueue(input: $input) {
+            success message queueEntry { id number } } }""",
+            {
+                "input": {
+                    "patientId": d["patient"].id,
+                    "doctorId": d["doctor"].id,
+                    "queueTag": f"r13d-{suffix}",
+                }
+            },
+        )
+        join = data["joinQueue"]
+        assert join["success"] is True, join
+        assert join["queueEntry"]["number"] == 3, join
+
+        data = _execute(
+            """mutation($input: QueueEntryInput!) { joinQueue(input: $input) {
+            success message queueEntry { id number } } }""",
+            {
+                "input": {
+                    "patientId": second_patient.id,
+                    "doctorId": d["doctor"].id,
+                    "queueTag": f"r13d-{suffix}",
+                }
+            },
+        )
+        join = data["joinQueue"]
+        assert join["success"] is True, join
+        assert join["queueEntry"]["number"] == 4, join
+    finally:
+        with S() as s:
+            doc = s.query(Doctor).filter(Doctor.id == d["doctor"].id).first()
+            if doc is not None:
+                doc.start_number_online = original_start
+                s.commit()
 
 
 def test_sessions_are_closed_after_resolver(gql_session_factory):

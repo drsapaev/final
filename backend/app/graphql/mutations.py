@@ -1072,13 +1072,21 @@ class Mutation:
                     )
 
                 # GQL-AUDIT-28 P0-3: race на выдаче номера — берём MAX(number)
-                # внутри транзакции; у DailyQueue нет счётчика current_number
-                next_number = (
-                    db.query(func.max(OnlineQueueEntry.number))
-                    .filter(OnlineQueueEntry.queue_id == daily_queue.id)
-                    .scalar()
-                    or 0
-                ) + 1
+                # внутри транзакции; у DailyQueue нет счётчика current_number.
+                # Codex P1 (round-13): пустая очередь врача со сконфигурированным
+                # start_number_online != 1 выдавала всегда билет #1. Как в
+                # каноническом calculate_next_number (queue_svc/_operations.py):
+                # max(max_number + 1, start_number), старт — настройка врача.
+                next_number = max(
+                    (
+                        db.query(func.max(OnlineQueueEntry.number))
+                        .filter(OnlineQueueEntry.queue_id == daily_queue.id)
+                        .scalar()
+                        or 0
+                    )
+                    + 1,
+                    doctor.start_number_online,
+                )
 
                 queue_entry = OnlineQueueEntry(
                     queue_id=daily_queue.id,
