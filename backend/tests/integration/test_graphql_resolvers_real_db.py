@@ -1063,6 +1063,167 @@ def test_graphql_round7_guards(gql_data, monkeypatch):
         s.commit()
 
 
+def test_graphql_round8_guards(gql_data, monkeypatch):
+    """Codex round-8: маскирование ФИО в аудите удаления, eligibility
+    владельца врача, сидирование капы врача, CREATE-аудит визита."""
+    from app.db import session as db_session_module
+    from app.graphql import mutations as gql_mutations
+    from app.models.user_profile import UserAuditLog
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+
+    # --- 1) описание SOFT_DELETE-аудита не содержит ФИО (initial-only)
+    data = _execute(
+        """
+        mutation($input: PatientInput!) {
+          createPatient(input: $input) { success patient { id } }
+        }
+        """,
+        {
+            "input": {
+                "lastName": f"SYNTHETIC-R8-Del-{suffix}",
+                "firstName": "SYNTHETIC",
+            }
+        },
+    )
+    orphan_id = data["createPatient"]["patient"]["id"]
+
+    data = _execute(
+        "mutation($id: Int!) { deletePatient(id: $id) { success } }",
+        {"id": orphan_id},
+    )
+    assert data["deletePatient"]["success"] is True
+
+    with S() as s:
+        row = (
+            s.query(UserAuditLog)
+            .filter(
+                UserAuditLog.action == "SOFT_DELETE",
+                UserAuditLog.resource_type == "patients",
+                UserAuditLog.resource_id == orphan_id,
+            )
+            .first()
+        )
+        assert row is not None
+        assert f"SYNTHETIC-R8-Del-{suffix}" not in (row.description or "")
+        assert f"#{orphan_id}" in (row.description or "")
+        # чистим аудит-строку
+        s.delete(row)
+        s.commit()
+
+    # --- 2) владелец врача неактивен -> DOCTOR_INACTIVE (канонический
+    # eligibility: active Doctor + active User с doctor-ролью)
+    with S() as s:
+        d["user"].is_active = False
+        s.merge(d["user"])
+        s.commit()
+    try:
+        data = _execute(
+            """
+            mutation($input: QueueEntryInput!) {
+              joinQueue(input: $input) { success errors }
+            }
+            """,
+            {
+                "input": {
+                    "patientId": d["patient"].id,
+                    "doctorId": d["doctor"].id,
+                    "queueTag": f"r8-{suffix}",
+                }
+            },
+        )
+        join = data["joinQueue"]
+        assert join["success"] is False, join
+        assert "DOCTOR_INACTIVE" in join["errors"], join
+    finally:
+        with S() as s:
+            d["user"].is_active = True
+            s.merge(d["user"])
+            s.commit()
+
+    # --- 3) новая очередь получает капу ВРАЧА, а не дефолт модели 15
+    with S() as s:
+        d["doctor"].max_online_per_day = 7
+        s.merge(d["doctor"])
+        s.commit()
+    try:
+        data = _execute(
+            """
+            mutation($input: QueueEntryInput!) {
+              joinQueue(input: $input) { success queueEntry { id } }
+            }
+            """,
+            {
+                "input": {
+                    "patientId": d["patient"].id,
+                    "doctorId": d["doctor"].id,
+                    "queueTag": f"r8cap-{suffix}",
+                }
+            },
+        )
+        cap_join = data["joinQueue"]
+        assert cap_join["success"] is True, cap_join
+        with S() as s:
+            q = (
+                s.query(DailyQueue)
+                .filter(
+                    DailyQueue.queue_tag == f"r8cap-{suffix}",
+                    DailyQueue.specialist_id == d["doctor"].id,
+                )
+                .first()
+            )
+            assert q is not None
+            assert q.max_online_entries == 7  # doctor.max_online_per_day
+    finally:
+        with S() as s:
+            d["doctor"].max_online_per_day = 15
+            s.merge(d["doctor"])
+            s.commit()
+
+    # --- 4) createVisit пишет CREATE критичный аудит (как канонический
+    # /visits writer)
+    data = _execute(
+        """
+        mutation($input: VisitInput!) {
+          createVisit(input: $input) { success visit { id } }
+        }
+        """,
+        {
+            "input": {
+                "patientId": d["patient"].id,
+                "doctorId": d["doctor"].id,
+                "discountMode": "none",
+                "serviceIds": [d["service"].id],
+            }
+        },
+    )
+    assert data["createVisit"]["success"] is True, data["createVisit"]
+    r8_visit_id = data["createVisit"]["visit"]["id"]
+
+    with S() as s:
+        visit_rows = (
+            s.query(UserAuditLog)
+            .filter(
+                UserAuditLog.action == "CREATE",
+                UserAuditLog.resource_type == "visits",
+                UserAuditLog.resource_id == r8_visit_id,
+            )
+            .all()
+        )
+        assert visit_rows, "createVisit must write critical-change audit"
+        # чистим аудит-строку (визит удаляется фикстурной очисткой)
+        for r in visit_rows:
+            s.delete(r)
+        s.commit()
+
+
 def test_sessions_are_closed_after_resolver(gql_session_factory):
     """with get_db_session() закрывает сессию: соединения не утекают."""
     _execute("{ patients { pagination { total } } }")

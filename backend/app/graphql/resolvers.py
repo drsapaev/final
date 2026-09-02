@@ -130,19 +130,29 @@ def _audit_patient_access(
     Codex round-7 P2: батч-вариант — один COMMIT на список (раньше
     log_patient_access коммитил на subject: perPage=1000 давал до 1000
     последовательных транзакций + expire_on_commit reloads).
-    Non-blocking; пропускается, когда контекста нет (прямые тесты схемы).
+    Codex round-8 P2: аудит пишется в ОТДЕЛЬНОЙ сессии — commit в сессии
+    результата (expire_on_commit=True в проде) инвалидировал бы загруженные
+    строки и вызвал бы reload каждого пациента + lazy-связей при конверсии
+    (тысячи запросов на perPage=1000). Non-blocking; пропускается, когда
+    контекста нет (прямые тесты схемы).
     """
     user = getattr(info.context, "user", None) if info.context else None
     if not user:
         return
-    log_patient_access_many(
-        db,
-        actor_user=user,
-        subject_patient_ids=patient_ids,
-        resource_type=resource_type,
-        action="view",
-        request=getattr(info.context, "request", None),
-    )
+    from app.db.session import SessionLocal
+
+    audit_db = SessionLocal()
+    try:
+        log_patient_access_many(
+            audit_db,
+            actor_user=user,
+            subject_patient_ids=patient_ids,
+            resource_type=resource_type,
+            action="view",
+            request=getattr(info.context, "request", None),
+        )
+    finally:
+        audit_db.close()
 
 
 # ===================== CONVERTERS =====================

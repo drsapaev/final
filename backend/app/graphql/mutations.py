@@ -20,7 +20,7 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import func, text
 from strawberry import UNSET
 
-from app.core.audit import log_critical_change
+from app.core.audit import extract_model_changes, log_critical_change
 from app.core.i18n import t
 from app.crud import (
     online_queue as crud_queue,
@@ -267,6 +267,9 @@ class Mutation:
                 # Codex P1 (round-7): канонический REST soft-delete пишет
                 # log_critical_change (actor, before/after) — GraphQL-удаления
                 # не выпадают из истории критичных изменений пациента.
+                # Codex P1 (round-8): ID уже идентифицирует запись; полное
+                # ФИО в description UserAuditLog нарушает initial-only режим
+                # аудита (AGENTS.md) — маскируем до ID.
                 log_critical_change(
                     db=db,
                     user_id=actor.id if actor else None,
@@ -276,7 +279,7 @@ class Mutation:
                     old_data={"is_deleted": False},
                     new_data={"is_deleted": True},
                     request=getattr(info.context, "request", None),
-                    description=f"Мягкое удаление пациента: {patient.short_name()}",
+                    description=f"Мягкое удаление пациента #{id}",
                 )
                 db.commit()
 
@@ -622,6 +625,25 @@ class Mutation:
                 if visit.patient_id:
                     _audit_patient_access(info, db, [visit.patient_id], "visit")
 
+                # Codex P1 (round-8): канонический /visits writer
+                # (VisitsApiService.create_visit) пишет CREATE критичный аудит —
+                # GraphQL-визиты не выпадают из обязательной истории мутаций.
+                # (PHI read-trail выше — view, не CREATE.)
+                actor_visit = getattr(info.context, "user", None)
+                _, visit_new_data = extract_model_changes(None, visit)
+                log_critical_change(
+                    db=db,
+                    user_id=actor_visit.id if actor_visit else None,
+                    action="CREATE",
+                    table_name="visits",
+                    row_id=visit.id,
+                    old_data=None,
+                    new_data=visit_new_data,
+                    request=getattr(info.context, "request", None),
+                    description="Создание визита (GraphQL createVisit)",
+                )
+                db.commit()
+
                 return VisitMutationResponse(
                     success=True,
                     message="Визит успешно создан",
@@ -826,18 +848,29 @@ class Mutation:
                         errors=["DOCTOR_NOT_FOUND"],
                     )
 
-                # Codex P1 (round-7): existence-only lookup пропускал
-                # деактивированного врача — join создавал ему новую активную
-                # очередь и записывал пациентов в очередь без врача.
-                # Канонические селекторы очереди фильтруют Doctor.active.
-                if not doctor.active:
+                # Codex P1 (round-8): канонический eligibility-предикат (SSOT,
+                # тот же, что в createAppointment): Doctor.active + завершённый
+                # профиль + владелец существует/активен/с doctor-ролью —
+                # legacy-ghost строки (active Doctor с неактивным владельцем)
+                # больше не принимают онлайн-запись.
+                try:
+                    ensure_doctor_eligible_for_appointment(db, input.doctor_id)
+                except HTTPException:
                     return QueueMutationResponse(
                         success=False,
-                        message="Врач деактивирован — запись в очередь недоступна",
+                        message="Врач недоступен для онлайн-записи",
                         errors=["DOCTOR_INACTIVE"],
                     )
 
-                today = date.today()
+                # Codex P1 (round-8): день очереди — по КОНФИГУРИРУЕМОЙ
+                # таймзоне (Asia/Tashkent), а не по host-локали (UTC-контейнеры
+                # между 19:00 и полуночью UTC получали вчерашнюю очередь).
+                queue_settings = get_queue_settings(db)
+                timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+                now_local = datetime.now(timezone)
+                today = now_local.date()
+                queue_start_hour = queue_settings.get("queue_start_hour", 7)
+
                 # P1: сериализуем СОЗДАНИЕ очереди на ключе (doctor, day, tag) —
                 # get_or_create_daily_queue это query-then-insert без
                 # unique-констрейнта; advisory lock (Postgres) закрывает гонку
@@ -853,12 +886,18 @@ class Mutation:
                         },
                     )
 
-                # SSOT: get_or_create_daily_queue (уникальность day+specialist+tag)
+                # SSOT: get_or_create_daily_queue (уникальность day+specialist+tag).
+                # Codex P1 (round-8): новая очередь получает сконфигурированную
+                # капу врача (max_online_per_day) вместо дефолта модели 15 —
+                # как канонический queue_svc flow (defaults).
                 daily_queue = crud_queue.get_or_create_daily_queue(
                     db,
                     day=today,
                     specialist_id=input.doctor_id,
                     queue_tag=input.queue_tag,
+                    defaults={
+                        "max_online_entries": doctor.max_online_per_day,
+                    },
                 )
 
                 # P1: лочим строку очереди ДО проверок дубликата/лимита и
@@ -891,18 +930,16 @@ class Mutation:
                         errors=["QUEUE_CLOSED"],
                     )
 
-                # рабочие часы (настройки клиники, timezone-aware)
-                queue_settings = get_queue_settings(db)
-                timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
-                queue_start_hour = queue_settings.get("queue_start_hour", 7)
-                if datetime.now(timezone).hour < queue_start_hour:
+                # рабочие часы: now_local/queue_start_hour вычислены выше
+                # по конфигурированной таймзоне (round-8) — тот же момент
+                # времени, что и день очереди.
+                if now_local.hour < queue_start_hour:
                     return QueueMutationResponse(
                         success=False,
                         message=f"Онлайн-запись доступна с {queue_start_hour}:00",
                         errors=["OUTSIDE_HOURS"],
                     )
 
-                # рабочие часы (настройки клиники, timezone-aware)
                 # Лимит: индивидуальный на очередь -> капа врача
 
                 # Дубликат — ПОСЛЕ блокировки очереди: параллельный второй
