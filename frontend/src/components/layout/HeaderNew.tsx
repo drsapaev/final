@@ -109,8 +109,9 @@ export default function HeaderNew() {
   const user = stateTyped.profile || stateTyped.user || null;
   const role = user?.role || user?.role_name || 'Guest';
   const roleLower = String(role).toLowerCase();
-  // Normalize receptionist to registrar for UI consistency
-  const roleNormalized = roleLower === 'receptionist' ? 'registrar' : roleLower;
+  // REC-3: receptionist->registrar normalization removed with the alias —
+  // canonical profiles carry 'registrar' directly.
+  const roleNormalized = roleLower;
   const currentRoute = getEffectiveRouteByPath(location.pathname);
 
   const isRegistrarPanel = currentRoute?.id === 'registrar-home';
@@ -354,7 +355,8 @@ export default function HeaderNew() {
             <BellIcon size={16} style={{ color: 'var(--mac-text-primary)' }} />
             {(() => {
               const role = String(user?.role || user?.role_name || '').toLowerCase();
-              const normalizedRole = role === 'receptionist' ? 'registrar' : role;
+              // REC-3: receptionist normalization removed with the alias.
+              const normalizedRole = role;
               const count = getUnreadCount(normalizedRole);
               return count > 0 ? (
                 <span style={{

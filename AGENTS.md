@@ -315,6 +315,7 @@ For risky tasks that should not execute yet, output `plan`, `dossier`, or `hando
 DB / Alembic / SQLAlchemy migrations:
 
 - Use the ownership chain `model -> schema -> migration -> tests`.
+- Never create or alter production tables via ad-hoc SQL/session DDL — every schema change ships as an Alembic revision, a creating revision must enable RLS, and new models must be imported in `backend/app/models/__init__.py` so autogenerate can see them (incident 2026-09-02: out-of-band tables stayed RLS-off until a Supabase alert; see `docs/incidents/2026-09-02-supabase-rls-disabled-in-public.md`).
 - SQLAlchemy model without a matching table/migration is migration ownership, not endpoint, webhook, status, queue, or UI ownership.
 - If the root cause is a missing table for an existing SQLAlchemy model, the first-touch patch must include a new Alembic revision under `backend/alembic/versions/`.
 - Treat the existing SQLAlchemy model and the previous Alembic revision as read-only references unless the user explicitly changes the model contract.

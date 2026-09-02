@@ -81,12 +81,13 @@ const UserManagement = () => {
   const { roleOptions: apiRoleOptions } = useRoles({ includeAll: true });
 
   // Fallback roles if API fails
+  // REC-1 (Receptionist deprecation): 'Receptionist' removed — Registrar is
+  // the canonical front-desk role; new Receptionist users are frozen out.
   const roles = apiRoleOptions.filter((r) => r.value !== '') || [
   { value: 'Admin', label: t('admin2.um_role_admin') },
   { value: 'Doctor', label: t('admin2.um_role_doctor') },
   { value: 'Nurse', label: t('admin2.um_role_nurse') },
   { value: 'Registrar', label: t('admin2.um_role_registrar') },
-  { value: 'Receptionist', label: t('admin2.um_role_receptionist') },
   { value: 'Cashier', label: t('admin2.um_role_cashier') },
   { value: 'Lab', label: t('admin2.um_role_lab') },
   { value: 'Patient', label: t('admin2.um_role_patient') }];
@@ -370,7 +371,7 @@ const UserManagement = () => {
       'Admin': 'error',
       'Doctor': 'primary',
       'Nurse': 'info',
-      'Receptionist': 'warning',
+      'Registrar': 'warning',
       'Lab': 'secondary',
       'Cashier': 'success',
       'Patient': 'default'
