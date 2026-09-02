@@ -3919,7 +3919,6 @@ const uzLatn = {
     um_role_admin: 'Administrator',
     um_role_doctor: 'Shifokor',
     um_role_nurse: 'Hamshira',
-    um_role_receptionist: 'Kutuvchi (respsionist)',
 
     um_role_registrar: 'Registrator',
     um_role_cashier: 'Kassir',
@@ -4608,7 +4607,6 @@ const uzLatn = {
     umdl_role_derma: 'Dermatolog',
     umdl_role_dentist: 'Stomatolog',
     umdl_role_nurse: 'Hamshira',
-    umdl_role_receptionist: 'Kutuvchi (respsionist)',
 
     umdl_role_registrar: 'Registrator',
     umdl_role_cashier: 'Kassir',
@@ -6322,7 +6320,7 @@ const uzLatn = {
     aw_refresh_services_title: 'Xizmatlar roʻyxatini yangilash',
     aw_access_denied_title: 'Kirish rad etildi',
     aw_insufficient_rights: 'Yetarli ruxsat yoʻq',
-    aw_insufficient_rights_description: 'Bemor yozilishlarini yaratish uchun Registrator (Receptionistni oʻz ichiga oladi) yoki Administrator roli kerak.',
+    aw_insufficient_rights_description: 'Bemor yozilishlarini yaratish uchun Registrator yoki Administrator roli kerak.',
 
     // ─── Setup.jsx (setup_) ───────────────────────────────────────────────
     setup_pw_strength_very_weak: 'Juda zaif',

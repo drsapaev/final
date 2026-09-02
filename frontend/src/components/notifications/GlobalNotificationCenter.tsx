@@ -74,7 +74,9 @@ export default function GlobalNotificationCenter() {
         }
 
         const role = String(profile.role || profile.role_name || 'unknown').toLowerCase();
-        const normalizedRole = role === 'receptionist' ? 'registrar' : role;
+        // REC-3: receptionist normalization removed with the route alias —
+        // canonical profiles carry 'registrar' directly.
+        const normalizedRole = role;
 
         setRecipientScope({
           recipientId: profile.id,

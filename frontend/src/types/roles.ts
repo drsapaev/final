@@ -71,12 +71,16 @@ export const ROLE_LEVEL: Readonly<Record<BackendRole, number>> = {
 } as const;
 
 // ============================================================================
-// Role aliases — mirror routeRegistry.js ROLE_ALIASES.
+// Role aliases — mirror routeRegistry ROLE_ALIASES.
 // Frontend-only mapping; not in backend.
+// REC-3 (Receptionist deprecation): the receptionist -> registrar alias was
+// removed — Registrar is the canonical front-desk role and the legacy
+// spelling no longer reaches registrar routes (route parity test pins the
+// deny). The nurse -> doctor alias is a separate policy decision and is
+// intentionally untouched.
 // ============================================================================
 
 export const ROLE_ALIASES: Readonly<Record<string, FrontendRoleKey>> = {
-  receptionist: 'registrar',
   nurse: 'doctor',
 } as const;
 

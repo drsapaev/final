@@ -42,6 +42,24 @@ class MigrationSummary:
     id_mismatch_updates: int
 
 
+def _normalize_legacy_role(value: Any) -> str:
+    """Canonicalize a legacy role spelling for WRITE (REC-1 write-freeze).
+
+    Codex review P1 (PR #3025): this script previously copied the legacy
+    ``role`` verbatim into the target ``users`` table, bypassing the
+    canonical schema regex — so a legacy ``Receptionist`` row could still
+    be (re)written as stored ``role='Receptionist'``. Registrar is the
+    canonical front-desk role (production rows with the deprecated
+    spelling: 0, SQL evidence 2026-09-02), so the migration now normalizes
+    the deprecated spelling on write while still READING any legacy value
+    (legacy reads temporarily accepted; canonical writes only).
+    """
+    role = str(value or "").strip()
+    if role.lower() == "receptionist":
+        return "Registrar"
+    return role or "Admin"
+
+
 def _parse_bool(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -116,7 +134,10 @@ def load_legacy_users(source_sqlite_path: Path) -> list[LegacyUserRow]:
                     email=row["email"],
                     full_name=row["full_name"],
                     hashed_password=row["hashed_password"],
-                    role=row["role"] or "Admin",
+                    # REC-1 write-freeze: normalize the deprecated legacy
+                    # spelling at the read->write boundary so BOTH the
+                    # INSERT and UPDATE paths store canonical roles.
+                    role=_normalize_legacy_role(row["role"]),
                     is_active=_parse_bool(row["is_active"]),
                     is_superuser=_parse_bool(row["is_superuser"]),
                     must_change_password=_parse_bool(row["must_change_password"]),
