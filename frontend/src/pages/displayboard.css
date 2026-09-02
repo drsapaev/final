@@ -24,8 +24,10 @@
 }
 
 .displayboard-root--contrast {
-  background: var(--mac-text-primary);
-  color: var(--mac-bg-primary);
+  /* CC-4: constant high-contrast pair — was app-theme-flipping
+   * (var(--mac-text-primary) bg / var(--mac-bg-primary) ink). */
+  background: #000000;
+  color: #ffffff;
   filter: contrast(150%);
 }
 
@@ -129,7 +131,11 @@
 }
 .displayboard-current-call--active {
   background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
-  color: var(--mac-bg-primary);
+  /* CC-4: constant white ink — var(--mac-bg-primary) flipped with the app
+   * theme (dark app → #1c1c1e on red ≈ 2:1). The call-out text is ≥1.2rem
+   * bold (large text, 3:1 floor): white measures 4.6–3.9:1 across the
+   * gradient. */
+  color: #ffffff;
   border: none;
   box-shadow: 0 8px 16px rgba(220, 53, 69, 0.3);
   transform: scale(1.02);
@@ -172,8 +178,13 @@
 .displayboard-announcements-wrap {
   margin-bottom: 30px;
 }
+/* CC-4: board surfaces use CONSTANT inks — var(--mac-bg-primary) resolved
+ * with the viewer's app theme (near-white in light, #1c1c1e in dark), which
+ * made these labels invisible on their constant colored fills under a dark
+ * app. White on the blue/red gradients measures 4.6–5.9:1; the amber
+ * warning needs dark ink (white on #ffc107 is 1.8:1). */
 .displayboard-announcement {
-  color: var(--mac-bg-primary);
+  color: #ffffff;
   padding: 15px;
   border-radius: 8px;
   margin-bottom: 10px;
@@ -186,6 +197,7 @@
 }
 .displayboard-announcement[data-announcement-type="warning"] {
   background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+  color: #1a1a1a;
 }
 
 /* ─── Queue grid + cards (driven by data-status) ─── */
@@ -229,8 +241,14 @@
   margin-bottom: 10px;
 }
 
+/* CC-4: same class — per-fill constant inks (the badge fills are constants,
+ * only the ink flipped with the app theme before). Bright amber/green need
+ * dark ink (8.4:1 / 8.6:1); red and gray carry white (4.5–4.7:1); the blue
+ * badge moves to the strong fill + white (5.42:1 — base #007aff was 4.02:1).
+ * The cancelled badge gets a constant gray so it stops flipping with the app
+ * theme (var(--mac-text-tertiary) is theme-dependent). */
 .displayboard-queue-badge {
-  color: var(--mac-bg-primary);
+  color: #1a1a1a;
   padding: 5px 10px;
   border-radius: 20px;
   font-size: 0.9rem;
@@ -238,11 +256,11 @@
   margin-bottom: 10px;
   background: var(--mac-warning);
 }
-.displayboard-queue-card[data-status="waiting"]   .displayboard-queue-badge { background: var(--mac-warning); }
-.displayboard-queue-card[data-status="called"]    .displayboard-queue-badge { background: #dc3545; }
-.displayboard-queue-card[data-status="serving"]   .displayboard-queue-badge { background: var(--mac-success, #10b981); }
-.displayboard-queue-card[data-status="completed"] .displayboard-queue-badge { background: var(--mac-accent-blue, #3b82f6); }
-.displayboard-queue-card[data-status="cancelled"] .displayboard-queue-badge { background: var(--mac-text-tertiary, #6c757d); }
+.displayboard-queue-card[data-status="waiting"]   .displayboard-queue-badge { background: var(--mac-warning); color: #1a1a1a; }
+.displayboard-queue-card[data-status="called"]    .displayboard-queue-badge { background: #dc3545; color: #ffffff; }
+.displayboard-queue-card[data-status="serving"]   .displayboard-queue-badge { background: var(--mac-success, #10b981); color: #1a1a1a; }
+.displayboard-queue-card[data-status="completed"] .displayboard-queue-badge { background: #0066d6; color: #ffffff; }
+.displayboard-queue-card[data-status="cancelled"] .displayboard-queue-badge { background: #6c757d; color: #ffffff; }
 
 .displayboard-queue-time {
   font-size: 0.8rem;

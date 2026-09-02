@@ -647,7 +647,10 @@
   border: 1px solid transparent;
   border-radius: var(--mac-radius-md);
   background: transparent;
-  color: var(--mac-text-secondary);
+  /* AXE-EXP-4: inactive tab ink — text-secondary was 3.95:1 on the
+   * tertiary panel background in dark; the on-tertiary ink passes both
+   * themes (same value as light secondary — no visual delta in light). */
+  color: var(--mac-text-on-tertiary);
   cursor: pointer;
   font-size: var(--mac-font-size-sm);
   font-weight: 400;
@@ -661,7 +664,10 @@
 
 .pp-tab-active {
   background: var(--mac-bg-primary);
-  color: var(--mac-accent);
+  /* AXE-EXP-4: active tab link ink — the base accent was 3.6:1 in light /
+   * 4.23:1 in dark; the canonical --mac-link-ink passes both (5.1:1 light /
+   * 8.97:1 dark). */
+  color: var(--mac-link-ink);
   font-weight: 600;
   border-color: var(--mac-border);
   box-shadow: var(--mac-shadow-sm);
