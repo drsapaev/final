@@ -1,9 +1,10 @@
 {
   "_meta": {
     "purpose": "AXE-EXP-1 (a11y axe audit, e2e/a11y-axe-authenticated.spec.ts) — accepted pre-existing violation rule IDs per authorized QA-harness route:theme key. The gate fails on NEW rules and on stale entries (findings that no longer reproduce must be removed from this file — the baseline must shrink, not rot).",
-    "policy": "Adding a rule here requires a documented justification. FORBIDDEN: adding a rule to make a failing audit pass without justification (Rule 13 analog). Every entry in this file is a PRE-EXISTING finding first baselined at AXE-EXP-1 (probe on main aca7d96a8, 02.09.2026, 2 consecutive probe runs, 34 audits) so the ratchet can gate remediation; the entries are expected to shrink to zero across the AXE-EXP track increments.",
-    "scope": "Authorized QA-harness surfaces only (e2e/support/authenticatedQa.ts): 6 role homes (admin/registrar/doctor/cashier/lab/patient) + 2 specialty surfaces (doctor-cardiology, doctor-dermatology ?tab=appointments) + 9 admin-family routes (users/services/appointments/system/webhooks/telegram/notifications/finance/clinic-settings) × light/dark = 34 audits. Public routes are covered by e2e/a11y-baseline.json (empty after the CC track).",
-    "probe_diagnosis": "236 violation nodes / 34 audits at seeding time. color-contrast 200 nodes (header search hint chip; ⌘K palette button dark fallback bg; sidebar badge; .mac-badge white-on-color fills; inactive tab/segment labels dark; lab lqw-* controls; misc admin texts). ARIA: aria-required-parent 22 (MacOSTab role=tab without role=tablist), aria-valid-attr-value 6 (SegmentedControl aria-controls -> non-existent panel ids), aria-required-children 4 (AppointmentSummaryBar list), aria-prohibited-attr 2 (admin-kpi-grid aria-busy on generic div), label 2 (cashier date input).",
+    "policy": "Adding a rule here requires a documented justification. FORBIDDEN: adding a rule to make a failing audit pass without justification (Rule 13 analog). Every entry is a PRE-EXISTING finding first baselined at AXE-EXP-1 (probe on main aca7d96a8, 02.09.2026, 34 audits, 236 nodes); the shrink-only ratchet stays in force across the AXE-EXP track.",
+    "scope": "Authorized QA-harness surfaces only (e2e/support/authenticatedQa.ts): 6 role homes (admin/registrar/doctor/cashier/lab/patient) + 2 specialty surfaces (doctor-cardiology, doctor-dermatology ?tab=appointments) + 9 admin-family routes × light/dark = 34 audits. Public routes are covered by e2e/a11y-baseline.json (empty after the CC track).",
+    "resolution": "AXE-EXP-2 (app-chrome inks, plan §4.1.24 follow-up track): the universal chrome class is fixed — header search ⌘K hint chip (tertiary ink on tertiary bg, 3.9:1 light / 1.89:1 dark), the ⌘K command-palette trigger (undefined --mac-surface-secondary token resolved to the light literal #f3f4f6 in dark: 2.6:1), and the inactive sidebar count badge (3.95:1 dark) — all migrated to the new canonical --mac-text-on-tertiary token (light #455568 = 5.71:1 on #d7e1ee; dark #c7c7cc = 6.74:1 on #3a3a3c; tokens.css). 10 keys dropped color-contrast entirely (registrar/doctor ×2 themes, admin-services:light, admin-appointments ×2, admin-system ×2, admin-clinic-settings:light); 4 more keys went fully CLEAN and left the baseline. Remaining color-contrast keys (13) are the AXE-EXP-3 (badge fills) / AXE-EXP-4 (tab inks, link inks, tertiary admin texts) classes; ARIA rules are AXE-EXP-5.",
+    "probe_diagnosis": "Original seeding (AXE-EXP-1): 236 violation nodes / 34 audits — 200 color-contrast (header hint chip; ⌘K palette button dark; sidebar badge; .mac-badge white-on-color fills; inactive tab/segment labels dark; lab lqw-* controls; misc admin texts) + 36 ARIA (aria-required-parent 22 MacOSTab; aria-valid-attr-value 6 SegmentedControl; aria-required-children 4 AppointmentSummaryBar; aria-prohibited-attr 2 admin-kpi-grid; label 2 cashier date input). After AXE-EXP-2: 172 nodes remain (see audit dump).",
     "axeTags": [
       "wcag2a",
       "wcag2aa",
@@ -11,44 +12,22 @@
       "wcag21aa"
     ]
   },
-  "admin-appointments:dark": [
-    "color-contrast"
-  ],
-  "admin-appointments:light": [
-    "color-contrast"
-  ],
   "admin-clinic-settings:dark": [
     "color-contrast"
   ],
-  "admin-clinic-settings:light": [
-    "color-contrast"
-  ],
   "admin-finance:dark": [
-    "aria-required-parent",
-    "color-contrast"
+    "aria-required-parent"
   ],
   "admin-finance:light": [
-    "aria-required-parent",
-    "color-contrast"
+    "aria-required-parent"
   ],
   "admin-notifications:dark": [
-    "aria-valid-attr-value",
-    "color-contrast"
+    "aria-valid-attr-value"
   ],
   "admin-notifications:light": [
-    "aria-valid-attr-value",
-    "color-contrast"
+    "aria-valid-attr-value"
   ],
   "admin-services:dark": [
-    "color-contrast"
-  ],
-  "admin-services:light": [
-    "color-contrast"
-  ],
-  "admin-system:dark": [
-    "color-contrast"
-  ],
-  "admin-system:light": [
     "color-contrast"
   ],
   "admin-telegram:dark": [
@@ -58,28 +37,23 @@
     "color-contrast"
   ],
   "admin-users:dark": [
-    "aria-required-parent",
-    "color-contrast"
+    "aria-required-parent"
   ],
   "admin-users:light": [
-    "aria-required-parent",
-    "color-contrast"
+    "aria-required-parent"
   ],
   "admin-webhooks:dark": [
     "aria-valid-attr-value",
     "color-contrast"
   ],
   "admin-webhooks:light": [
-    "aria-valid-attr-value",
-    "color-contrast"
+    "aria-valid-attr-value"
   ],
   "admin:dark": [
-    "aria-prohibited-attr",
-    "color-contrast"
+    "aria-prohibited-attr"
   ],
   "admin:light": [
-    "aria-prohibited-attr",
-    "color-contrast"
+    "aria-prohibited-attr"
   ],
   "cashier:dark": [
     "aria-required-parent",
@@ -90,7 +64,6 @@
   "cashier:light": [
     "aria-required-parent",
     "aria-valid-attr-value",
-    "color-contrast",
     "label"
   ],
   "doctor-cardiology:dark": [
@@ -109,12 +82,6 @@
     "aria-required-children",
     "color-contrast"
   ],
-  "doctor:dark": [
-    "color-contrast"
-  ],
-  "doctor:light": [
-    "color-contrast"
-  ],
   "lab:dark": [
     "color-contrast"
   ],
@@ -125,12 +92,6 @@
     "color-contrast"
   ],
   "patient:light": [
-    "color-contrast"
-  ],
-  "registrar:dark": [
-    "color-contrast"
-  ],
-  "registrar:light": [
     "color-contrast"
   ]
 }
