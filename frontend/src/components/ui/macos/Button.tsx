@@ -105,12 +105,18 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
     };
 
     // PR-UI-05: 6 canonical variants.
+    // CC-2 (UI color-contrast track): white-ink fills use the *-strong token
+    // family — the base accent #007aff / error #ff453a / success #30d158 /
+    // warning #ff9f0a measure 4.02 / 3.41 / 2.02 / 2.06:1 against white, below
+    // the WCAG AA 4.5:1 floor (axe color-contrast, e2e/a11y-baseline.json).
+    // Strong values: #0066d6 (5.42) / #d92c20 (4.85) / #147a38 (5.43) /
+    // #a86200 (4.76). Tokens come with fallbacks to the base values.
     const variantStyles: Record<string, CSSProperties> = {
       primary: {
-        backgroundColor: 'var(--mac-accent-blue)',
+        backgroundColor: 'var(--mac-accent-blue-strong, var(--mac-accent-blue))',
         color: 'white',
-        border: '1px solid #007aff',
-        boxShadow: '0 2px 8px rgba(0, 122, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.12)'
+        border: '1px solid var(--mac-accent-blue-strong, #007aff)',
+        boxShadow: '0 2px 8px rgba(0, 102, 214, 0.3), 0 1px 3px rgba(0, 0, 0, 0.12)'
       },
       secondary: {
         backgroundColor: 'rgba(0, 0, 0, 0.05)',
@@ -128,13 +134,16 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
         border: '1px solid rgba(255, 255, 255, 0.3)'
       },
       danger: {
-        backgroundColor: 'var(--mac-error)',
+        backgroundColor: 'var(--mac-danger-strong, var(--mac-error))',
         color: 'white',
-        border: '1px solid #ff3b30',
+        border: '1px solid var(--mac-danger-strong, #ff3b30)',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       link: {
         backgroundColor: 'transparent',
+        // CC-2 note: link TEXT contrast is a separate latent class (dark links
+        // need a brighter accent, not the dark fill token) — deliberately left
+        // on the base accent; no axe-flagged link findings exist.
         color: 'var(--mac-accent-blue)',
         border: 'none',
         padding: '4px 8px',
@@ -145,27 +154,27 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
     // PR-UI-05: color overrides for secondary variant (semantic coloring)
     const colorOverrides: Record<string, Partial<CSSProperties>> = {
       success: {
-        backgroundColor: 'var(--mac-success)',
+        backgroundColor: 'var(--mac-success-strong, var(--mac-success))',
         color: 'white',
-        border: '1px solid #34c759',
+        border: '1px solid var(--mac-success-strong, #34c759)',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       warning: {
-        backgroundColor: 'var(--mac-warning)',
+        backgroundColor: 'var(--mac-warning-strong, var(--mac-warning))',
         color: 'white',
-        border: '1px solid #ff9500',
+        border: '1px solid var(--mac-warning-strong, #ff9500)',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       danger: {
-        backgroundColor: 'var(--mac-error)',
+        backgroundColor: 'var(--mac-danger-strong, var(--mac-error))',
         color: 'white',
-        border: '1px solid #ff3b30',
+        border: '1px solid var(--mac-danger-strong, #ff3b30)',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       info: {
-        backgroundColor: 'var(--mac-accent-blue)',
+        backgroundColor: 'var(--mac-accent-blue-strong, var(--mac-accent-blue))',
         color: 'white',
-        border: '1px solid #007aff',
+        border: '1px solid var(--mac-accent-blue-strong, #007aff)',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       }
     };

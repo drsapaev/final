@@ -26,16 +26,20 @@ body[data-theme="dark"][data-color-scheme="dark"] {
   font-family: var(--ui-font);
 }
 
-/* Keep generic buttons readable in classic dark mode */
-[data-theme="dark"][data-color-scheme="dark"] button:not([style*="linear-gradient"]) {
-  background-color: var(--mac-text-primary);
-  border-color: var(--dark-border) !important;
-  color: var(--dark-text-primary) !important;
-}
-
-[data-theme="dark"][data-color-scheme="dark"] button * {
-  color: inherit !important;
-}
+/* CC-1 (UI color-contrast track): the two legacy button rules below were
+ * decommissioned. They forced `color: var(--dark-text-primary) !important`
+ * (= --mac-bg-secondary = #2c2c2e, a BACKGROUND value used as TEXT ink)
+ * onto every button in classic dark mode, plus `button * { color: inherit
+ * !important }` on all button descendants. The color declaration carried
+ * !important while the paired background-color did not, so canonical
+ * mac-buttons kept their inline variant backgrounds (blue / transparent /
+ * dark tint) but lost their text color to a dark gray → labels rendered
+ * at 1.04–3.47:1 across the whole app in dark mode (axe color-contrast,
+ * e2e/a11y-baseline.json). Canonical Button.tsx variants and token-driven
+ * components handle dark-mode ink correctly on their own; rule 9 of
+ * AGENTS_UI (ONE design system) wins over this legacy patch layer.
+ * The remaining rules in this file pair !important bg+color consistently
+ * and stay load-bearing for legacy surfaces. */
 
 /* Legacy inline style patching for classic dark mode only */
 [data-theme="dark"][data-color-scheme="dark"] div[style*="rgba(15, 23, 42, 0.8)"],

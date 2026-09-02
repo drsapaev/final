@@ -1,13 +1,13 @@
 {
   "version": 1,
   "description": "UI_AUDIT_PLAN.md Phase 0 baseline. Ratchet: values may only improve (decrease). To move the baseline intentionally run: node scripts/ui-baseline.mjs --write-baseline and justify the change in the PR description.",
-  "generatedAt": "2026-08-25T08:16:08.139Z",
-  "gitCommit": "f837bc966",
+  "generatedAt": "2026-09-02T10:01:53.359Z",
+  "gitCommit": "9f9bf2677",
   "metrics": {
     "tokenSourceFiles": [
       {
         "file": "src/design-system/tokens.css",
-        "definitions": 238
+        "definitions": 270
       },
       {
         "file": "src/styles/emr-tokens.css",
@@ -45,10 +45,10 @@
     "tokenSourceFileCount": 9,
     "tokenFamilies": {
       "admin": 1,
-      "other": 155,
+      "other": 165,
       "surface": 7,
       "text-legacy": 10,
-      "mac": 123,
+      "mac": 132,
       "bg-legacy": 5,
       "accent-legacy": 13,
       "landing": 3,
@@ -59,11 +59,11 @@
     "duplicateTokenNameCount": 23,
     "jsTokenSources": {
       "theme/tokens.ts": 1,
-      "theme/tokens-legacy.ts": 1,
+      "theme/tokens-legacy.ts": -1,
       "theme/tokens/ dir": 1
     },
-    "undefinedVarNameCount": 163,
-    "undefinedVarUsages": 330,
+    "undefinedVarNameCount": 153,
+    "undefinedVarUsages": 274,
     "undefinedVarNames": [
       "--accent",
       "--admin-ai",
@@ -102,6 +102,7 @@
       "--admin-grid-gap",
       "--admin-gtc",
       "--admin-h",
+      "--admin-h0",
       "--admin-jc",
       "--admin-left",
       "--admin-left1",
@@ -157,6 +158,7 @@
       "--duration-normal",
       "--font-family-sans",
       "--info-hover",
+      "--mac-accent-",
       "--mac-accent-green-hover",
       "--mac-accent-orange-hover",
       "--mac-accent-orange-soft",
@@ -168,22 +170,15 @@
       "--mac-bg-page",
       "--mac-blue-600",
       "--mac-border-hover",
-      "--mac-border-radius-lg",
-      "--mac-border-radius-md",
       "--mac-danger-600",
       "--mac-danger-bg",
-      "--mac-destructive",
       "--mac-fill-quaternary",
       "--mac-font-family",
       "--mac-font-family-mono",
       "--mac-font-mono",
-      "--mac-font-weight-normal",
       "--mac-glass-bg",
       "--mac-glass-border",
       "--mac-gradient-subtle",
-      "--mac-info",
-      "--mac-info-bg",
-      "--mac-info-border",
       "--mac-input-bg",
       "--mac-line-height-relaxed",
       "--mac-medical-cardiology",
@@ -201,16 +196,11 @@
       "--mac-shadow-color",
       "--mac-shadow-xs",
       "--mac-spacing-md",
-      "--mac-spacing-xl",
-      "--mac-success-light",
       "--mac-surface",
-      "--mac-surface-hover",
       "--mac-surface-secondary",
       "--mac-text-disabled",
       "--mac-text-inverse",
-      "--mac-text-muted",
       "--mac-warning-active",
-      "--mac-warning-light",
       "--primary-color",
       "--primary-hover",
       "--radius-base",
@@ -229,15 +219,15 @@
       "--warning-border",
       "--warning-text"
     ],
-    "varUsagesTotal": 13179,
-    "varUsagesNoFallback": 12003,
-    "cssHexOutsideTokens": 746,
-    "tsxHex": 373,
-    "tsxHexFiles": 64,
-    "inlineStyles": 2619,
-    "inlineStyleFiles": 232,
-    "cssImportant": 349,
-    "tsxImportant": 80,
+    "varUsagesTotal": 12532,
+    "varUsagesNoFallback": 11299,
+    "cssHexOutsideTokens": 743,
+    "tsxHex": 367,
+    "tsxHexFiles": 61,
+    "inlineStyles": 2432,
+    "inlineStyleFiles": 210,
+    "cssImportant": 307,
+    "tsxImportant": 47,
     "modalFilesOutsideKit": [
       "src/components/ResponsiveModal.tsx",
       "src/components/admin/AppointmentModal.tsx",
@@ -247,7 +237,6 @@
       "src/components/admin/UserModal.tsx",
       "src/components/common/ConfirmDialog.tsx",
       "src/components/common/EditPatientModal.tsx",
-      "src/components/common/Modal.tsx",
       "src/components/common/ScheduleNextModal.tsx",
       "src/components/common/SessionWarningModal.tsx",
       "src/components/dental/ToothModal.tsx",
@@ -263,18 +252,18 @@
       "src/components/registrar/ForceMajeureModal.tsx",
       "src/hooks/useModal.tsx"
     ],
-    "modalFilesOutsideKitCount": 23,
+    "modalFilesOutsideKitCount": 22,
     "kitModalImporters": 13,
     "kitDialogImporters": 14,
     "reactToastifyImporters": 45,
-    "notifyServiceImporters": 45,
+    "notifyServiceImporters": 55,
     "customToastProviderImporters": 3,
     "macTabImporters": 7,
-    "modernTabsImporters": 2,
-    "tablistRoles": 5,
+    "modernTabsImporters": 0,
+    "tablistRoles": 6,
     "macEmptyStateImporters": 0,
-    "appEmptyImporters": 43,
-    "appLoadingImporters": 10,
+    "appEmptyImporters": 42,
+    "appLoadingImporters": 9,
     "stateWrapperImporters": 2,
     "breakpointsUnique": [
       360,
@@ -298,38 +287,30 @@
     "duplicateKeyframes": [
       {
         "name": "spin",
-        "files": 17
-      },
-      {
-        "name": "pulse",
-        "files": 9
+        "files": 15
       },
       {
         "name": "fadeIn",
-        "files": 8
+        "files": 7
       },
       {
-        "name": "slideDown",
-        "files": 6
-      },
-      {
-        "name": "shimmer",
-        "files": 3
+        "name": "pulse",
+        "files": 7
       },
       {
         "name": "slideIn",
         "files": 3
       },
       {
-        "name": "fadeInUp",
-        "files": 2
-      },
-      {
-        "name": "macSlideIn",
-        "files": 2
-      },
-      {
         "name": "scaleIn",
+        "files": 2
+      },
+      {
+        "name": "shimmer",
+        "files": 2
+      },
+      {
+        "name": "slideDown",
         "files": 2
       },
       {
@@ -337,32 +318,25 @@
         "files": 2
       }
     ],
-    "duplicateKeyframesNameCount": 10,
+    "duplicateKeyframesNameCount": 8,
     "unreferencedFiles": [
-      "src/PublicApp.tsx",
       "src/api/registrarBatch.ts",
-      "src/components/AnimatedTransition.tsx",
       "src/components/LanguageTest.tsx",
-      "src/components/PWAInstallPrompt.tsx",
       "src/components/ResponsiveModal.tsx",
-      "src/components/ResponsiveTable.tsx",
       "src/components/ThemeToggle.tsx",
       "src/components/TimeInput.tsx",
-      "src/components/TwoFactorSettings.tsx",
-      "src/components/TwoFactorSetup.tsx",
       "src/components/activation/AppActivation.tsx",
       "src/components/admin/AdminSecurityDashboard.tsx",
       "src/components/admin/ServiceForm.tsx",
       "src/components/analytics/AIAnalytics.tsx",
       "src/components/analytics/DataExporter.tsx",
       "src/components/analytics/WaitTimeAnalytics.tsx",
-      "src/components/auth/RequireAuth.tsx",
-      "src/components/auth/index.ts",
       "src/components/calendar/DoctorCalendar.tsx",
       "src/components/chat/index.ts",
       "src/components/common/Loading.tsx",
-      "src/components/common/Table.tsx",
       "src/components/common/index.ts",
+      "src/components/dental/DentalReportsTab.tsx",
+      "src/components/dental/DentalTemplatesTab.tsx",
       "src/components/dermatology/PriceOverrideManager.tsx",
       "src/components/display/DisplayContentManager.tsx",
       "src/components/emr-v2/ai/AISuggestionCard.tsx",
@@ -380,38 +354,17 @@
       "src/components/examples/UnifiedButton.tsx",
       "src/components/examples/UnifiedCard.tsx",
       "src/components/filters/ModernFilters.tsx",
-      "src/components/forms/ModernForm.tsx",
-      "src/components/forms/ModernInput.tsx",
-      "src/components/forms/ModernSelect.tsx",
-      "src/components/forms/ModernTextarea.tsx",
-      "src/components/forms/ResponsiveForm.tsx",
-      "src/components/forms/index.ts",
-      "src/components/index.ts",
-      "src/components/landing/ContactCard.tsx",
-      "src/components/landing/ControlCenter.tsx",
-      "src/components/landing/LandingHero.tsx",
-      "src/components/landing/index.ts",
-      "src/components/layout/ModernContainer.tsx",
-      "src/components/layout/ModernFlex.tsx",
-      "src/components/layout/ModernGrid.tsx",
-      "src/components/layout/Nav.tsx",
-      "src/components/layout/index.ts",
       "src/components/mobile/MobileNotifications.tsx",
       "src/components/mobile/OfflineIndicator.tsx",
-      "src/components/mobile/PWAInstallPrompt.tsx",
       "src/components/mobile/QueuePositionCard.tsx",
-      "src/components/navigation/ProtectedRoute.tsx",
       "src/components/patient/WebAuthnRegistration.tsx",
-      "src/components/pwa/ConnectionStatus.tsx",
-      "src/components/pwa/PWAInstallPrompt.tsx",
-      "src/components/pwa/index.ts",
       "src/components/registrar/IntegratedDoctorSelector.tsx",
       "src/components/registrar/IntegratedServiceSelector.tsx",
       "src/components/registrar/PriceOverrideApproval.tsx",
       "src/components/security/SMSEmail2FA.tsx",
       "src/components/statistics/ModernStatisticsSimple.tsx",
-      "src/components/telegram/TelegramManager.tsx",
-      "src/components/test/ComponentTest.tsx",
+      "src/components/tables/AppointmentPagination.tsx",
+      "src/components/ui/DataTable-features/index.ts",
       "src/constants/a11yTokens.ts",
       "src/hooks/uiAnimations.ts",
       "src/hooks/useAI.tsx",
@@ -432,12 +385,9 @@
       "src/hooks/useUtils.ts",
       "src/hooks/useWebAuthn.tsx",
       "src/hooks/useWizardSettings.ts",
-      "src/pages/Activation.tsx",
       "src/pages/FileSystemPage.tsx",
-      "src/pages/Login.tsx",
       "src/pages/MobilePatientDashboard.tsx",
       "src/pages/SecurityPage.tsx",
-      "src/pages/TelegramPage.tsx",
       "src/services/index.ts",
       "src/services/payment.ts",
       "src/theme/tokens/index.ts",
@@ -464,13 +414,12 @@
       "src/utils/websocketAuth.ts",
       "src/utils/wizardTester.ts"
     ],
-    "unreferencedFileCount": 124,
-    "navCyrillicLabels": 67,
+    "unreferencedFileCount": 93,
+    "navCyrillicLabels": 0,
     "a11yCssImported": false,
     "cssFilesWithDarkSelectors": 13,
-    "prefersSchemeRootBlocks": 3,
-    "isDarkBranches": 170,
-    "inlineStyleAttributePatches": 58,
-    "inlineStyleFilesNote": "PR-UI-09e-2: +1 file (231->232) — EAT decomposition spread existing inline-style literals across EAT orchestrator + appointmentsTableColumns.tsx; usage count unchanged (2611 -> 2611, zero new literals); concurrent PR-UI-15-2..4 drift consumed prior headroom (main 230->231). Justified per ratchet policy."
+    "prefersSchemeRootBlocks": 2,
+    "isDarkBranches": 105,
+    "inlineStyleAttributePatches": 57
   }
 }
