@@ -1,3 +1,6 @@
 ## 2024-05-12 - Missing aria-busy on Complex Loading States
 **Learning:** While buttons effectively communicated their loading states via `aria-busy`, larger container components in the design system (Tables, Lists, Stat Cards) with custom loading skeletons or empty states completely lacked this attribute. This creates a confusing experience for screen reader users who aren't notified when these regions are processing or waiting for data.
 **Action:** Always add `aria-busy="true"` (or `aria-busy={loading}`) to the root container of complex UI components that handle asynchronous data loading, especially when rendering custom loading skeletons or empty states instead of standard UI elements.
+## 2026-09-02 - Communicating error states via aria-invalid
+**Learning:** Visual error states (like red borders) on form inputs, textareas, custom checkboxes, and custom selects are completely invisible to screen readers unless the `aria-invalid` attribute is used. Relying only on color to convey state is an accessibility violation.
+**Action:** Always ensure `aria-invalid={!!error}` is passed down to the underlying interactive element (e.g. `<input>`, `<textarea>`, `<button>`, `<div role="checkbox">`) within custom form controls to properly communicate error states to assistive technologies.
