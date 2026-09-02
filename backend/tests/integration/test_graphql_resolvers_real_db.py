@@ -735,6 +735,153 @@ def test_delete_patient_blocked_when_related_records_exist(gql_data):
     assert "HAS_RELATED_RECORDS" in data["deletePatient"]["errors"]
 
 
+def test_graphql_round6_guards(gql_data, monkeypatch):
+    """Codex round-6: неактивная очередь, tagged-дубликаты, пагинация,
+    аудит изменения цены — все 5 находок round-6."""
+    from app.db import session as db_session_module
+    from app.graphql import mutations as gql_mutations
+    from app.models.service_audit import ServiceAuditLog
+
+    # Time-of-day gotcha (#2992): фиксируем окно онлайн-набора.
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+
+    # --- 1) QUEUE_INACTIVE: деактивированная (active=False) очередь
+    # без opened_at отклоняется ДО вставки (get_or_create_daily_queue
+    # не фильтрует active).
+    with S() as s:
+        s.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.queue_id == d["queue"].id
+        ).update({"status": "waiting"}, synchronize_session=False)
+        d["queue"].active = False
+        s.merge(d["queue"])
+        s.commit()
+
+    try:
+        data = _execute(
+            """
+            mutation($input: QueueEntryInput!) {
+              joinQueue(input: $input) { success errors message }
+            }
+            """,
+            {
+                "input": {
+                    "patientId": d["patient"].id,
+                    "doctorId": d["doctor"].id,
+                }
+            },
+        )
+        join = data["joinQueue"]
+        assert join["success"] is False, join
+        assert "QUEUE_INACTIVE" in join["errors"], join
+    finally:
+        with S() as s:
+            d["queue"].active = True
+            s.merge(d["queue"])
+            s.commit()
+
+    # --- 2) дубликат скоупится к ВЫБРАННОЙ tagged-очереди: пациент,
+    # waiting в базовой очереди, легитимно встаёт в tagged-очередь того же
+    # врача (раньше находили ALREADY_IN_QUEUE по всем очередям врача).
+    data = _execute(
+        """
+        mutation($input: QueueEntryInput!) {
+          joinQueue(input: $input) { success queueEntry { number } }
+        }
+        """,
+        {
+            "input": {
+                "patientId": d["patient"].id,
+                "doctorId": d["doctor"].id,
+                "queueTag": f"r6-{suffix}",
+            }
+        },
+    )
+    tagged_join = data["joinQueue"]
+    assert tagged_join["success"] is True, tagged_join
+
+    # а в самой tagged-очереди второй join того же пациента — дубликат
+    data = _execute(
+        """
+        mutation($input: QueueEntryInput!) {
+          joinQueue(input: $input) { success errors }
+        }
+        """,
+        {
+            "input": {
+                "patientId": d["patient"].id,
+                "doctorId": d["doctor"].id,
+                "queueTag": f"r6-{suffix}",
+            }
+        },
+    )
+    dup = data["joinQueue"]
+    assert dup["success"] is False, dup
+    assert "ALREADY_IN_QUEUE" in dup["errors"], dup
+
+    # --- 3) пагинация: per_page=0 больше не делит на ноль (clamp до 1),
+    # гигантский per_page ограничен серверным максимумом 1000.
+    data = _execute(
+        "query { patients(pagination: { page: 1, perPage: 0 }) "
+        "{ pagination { page perPage total pages } } }"
+    )
+    assert data["patients"]["pagination"]["perPage"] == 1
+
+    data = _execute(
+        "query { patients(pagination: { page: 0, perPage: 5000 }) "
+        "{ pagination { page perPage } } }"
+    )
+    assert data["patients"]["pagination"]["page"] == 1
+    assert data["patients"]["pagination"]["perPage"] == 1000
+
+    # --- 4) updateServicePrice пишет ServiceAuditLog (канонический
+    # ServicesApiService.update_service), а не молчаливое присваивание.
+    data = _execute(
+        """
+        mutation($input: ServiceInput!) {
+          createService(input: $input) { success service { id } }
+        }
+        """,
+        {
+            "input": {
+                "name": f"Аудит-цена GQL {suffix}",
+                "code": f"AUD-{suffix}",
+                "price": 100000,
+            }
+        },
+    )
+    assert data["createService"]["success"] is True, data["createService"]
+    audit_service_id = data["createService"]["service"]["id"]
+
+    data = _execute(
+        "mutation($id: Int!) { updateServicePrice(id: $id, price: 250000) "
+        "{ success service { price } } }",
+        {"id": audit_service_id},
+    )
+    assert data["updateServicePrice"]["success"] is True, data["updateServicePrice"]
+    assert data["updateServicePrice"]["service"]["price"] == 250000.0
+
+    with S() as s:
+        audit_rows = (
+            s.query(ServiceAuditLog)
+            .filter(ServiceAuditLog.service_id == audit_service_id)
+            .all()
+        )
+        assert audit_rows, "updateServicePrice must write ServiceAuditLog"
+    # чистим аудит-строки (общая session-scoped БД)
+    with S() as s:
+        s.query(ServiceAuditLog).filter(
+            ServiceAuditLog.service_id == audit_service_id
+        ).delete(synchronize_session=False)
+        s.commit()
+
+
 def test_sessions_are_closed_after_resolver(gql_session_factory):
     """with get_db_session() закрывает сессию: соединения не утекают."""
     _execute("{ patients { pagination { total } } }")

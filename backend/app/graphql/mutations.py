@@ -721,17 +721,9 @@ class Mutation:
 
     @strawberry.mutation
     def update_service_price(self, id: int, price: float) -> ServiceMutationResponse:
-        """Обновить цену услуги"""
+        """Обновить цену услуги (SSOT: ServicesApiService.update_service)"""
         try:
             with get_db_session() as db:
-                service = db.query(Service).filter(Service.id == id).first()
-                if not service:
-                    return ServiceMutationResponse(
-                        success=False,
-                        message="Услуга не найдена",
-                        errors=["SERVICE_NOT_FOUND"],
-                    )
-
                 if price < 0:
                     return ServiceMutationResponse(
                         success=False,
@@ -739,7 +731,34 @@ class Mutation:
                         errors=["INVALID_PRICE"],
                     )
 
-                service.price = price
+                # Codex P2 (round-6): сырое присваивание service.price не
+                # писало ServiceAuditLog (старое/новое значение), поэтому
+                # GraphQL-изменения цены пропадали из истории услуг.
+                # Делегируем каноническому update-сервису REST-эндпоинта.
+                try:
+                    service = ServicesApiService(db).update_service(
+                        service_id=id,
+                        service_data={"price": price},
+                    )
+                except LookupError:
+                    return ServiceMutationResponse(
+                        success=False,
+                        message="Услуга не найдена",
+                        errors=["SERVICE_NOT_FOUND"],
+                    )
+                except ValueError as exc:
+                    return ServiceMutationResponse(
+                        success=False,
+                        message=str(exc),
+                        errors=["VALIDATION_ERROR"],
+                    )
+                except HTTPException as exc:
+                    return ServiceMutationResponse(
+                        success=False,
+                        message=str(exc.detail),
+                        errors=["VALIDATION_ERROR"],
+                    )
+
                 service.updated_at = datetime.now(UTC)
                 db.commit()
                 db.refresh(service)
@@ -825,7 +844,18 @@ class Mutation:
                 )
 
                 # Правила онлайн-набора — как в SSOT join_online_queue:
-                # приём открыт (opened_at) -> онлайн-запись закрыта
+                # приём открыт (opened_at) -> онлайн-запись закрыта.
+                # Codex P1 (round-6): get_or_create_daily_queue возвращает
+                # существующую (day, specialist, tag)-очередь БЕЗ фильтра
+                # active — деактивированную очередь нельзя набирать, даже
+                # если opened_at ещё не ставился. Отклоняем ДО вставки.
+                if not daily_queue.active:
+                    return QueueMutationResponse(
+                        success=False,
+                        message=("Очередь деактивирована. Обратитесь в регистратуру."),
+                        errors=["QUEUE_INACTIVE"],
+                    )
+
                 if daily_queue.opened_at:
                     return QueueMutationResponse(
                         success=False,
@@ -849,13 +879,14 @@ class Mutation:
 
                 # Дубликат — ПОСЛЕ блокировки очереди: параллельный второй
                 # joinQueue дождётся лока и увидит вставленную первым запись.
+                # Codex P1 (round-6): дубликат проверяется В ВЫБРАННОЙ
+                # (tagged) очереди, как в каноническом /queue/join — пациент
+                # в соседней tagged-очереди того же врача не блокирует join.
                 existing_entry = (
                     db.query(OnlineQueueEntry)
-                    .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
                     .filter(
+                        OnlineQueueEntry.queue_id == daily_queue.id,
                         OnlineQueueEntry.patient_id == input.patient_id,
-                        DailyQueue.specialist_id == input.doctor_id,
-                        DailyQueue.day == today,
                         OnlineQueueEntry.status.in_(["waiting", "called"]),
                     )
                     .first()

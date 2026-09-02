@@ -199,7 +199,9 @@ const GraphQLExplorer = () => {
 }`,
       variables: {
         'filter': {
-          'categoryCode': 'consultation',
+          // category_code — однобуквенный код (K=консультации, D, C, L, S, O);
+          // «consultation» — не валидный код: пример возвращал пустой список
+          'categoryCode': 'K',
           'active': true
         }
       }

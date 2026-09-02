@@ -349,7 +349,12 @@ class ServicesApiService:
         update_data = (
             service_data.model_dump(exclude_unset=True)
             if hasattr(service_data, "model_dump")
-            else service_data.dict(exclude_unset=True)
+            else (
+                service_data.dict(exclude_unset=True)
+                if hasattr(service_data, "dict")
+                # plain dict (GraphQL updateServicePrice) — no unset concept
+                else dict(service_data)
+            )
         )
 
         if self._should_validate_service_code_alignment(update_data, service):

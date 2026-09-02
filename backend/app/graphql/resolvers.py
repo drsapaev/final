@@ -75,6 +75,27 @@ def get_db_session():
 
 # ===================== UTILITY FUNCTIONS =====================
 
+# Codex P1 (round-6): server-side pagination bounds, comparable to the REST
+# patient endpoints (limit: Query(100, ge=1, le=500..1000)). GraphQL is an
+# admin PHI surface in the same threat model: per_page=0 used to divide by
+# zero in create_pagination_info, and an unbounded per_page materialized the
+# whole table (one PHI audit write per row).
+PAGINATION_MAX_PER_PAGE = 1000
+
+
+def _bounded_pagination(pagination: PaginationInput | None) -> tuple[int, int]:
+    """Clamp caller-supplied page/per_page to server-side bounds.
+
+    page < 1 -> 1; per_page < 1 -> 1; per_page > PAGINATION_MAX_PER_PAGE ->
+    PAGINATION_MAX_PER_PAGE. The SDL contract (nullable int defaults) is
+    unchanged — clamping happens where the values are consumed.
+    """
+    page = pagination.page if pagination else 1
+    per_page = pagination.per_page if pagination else 20
+    page = max(1, page)
+    per_page = max(1, min(per_page, PAGINATION_MAX_PER_PAGE))
+    return page, per_page
+
 
 def create_pagination_info(page: int, per_page: int, total: int) -> PaginationInfo:
     """Создать информацию о пагинации"""
@@ -301,9 +322,9 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
-            page = pagination.page if pagination else 1
-            per_page = pagination.per_page if pagination else 20
+            # Применяем пагинацию (дефолт LIMIT 20; page>=1, 1<=per_page<=1000 —
+            # не материализуем таблицу)
+            page, per_page = _bounded_pagination(pagination)
             query = apply_pagination(query, page, per_page)
 
             patients = query.all()
@@ -362,9 +383,9 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
-            page = pagination.page if pagination else 1
-            per_page = pagination.per_page if pagination else 20
+            # Применяем пагинацию (дефолт LIMIT 20; page>=1, 1<=per_page<=1000 —
+            # не материализуем таблицу)
+            page, per_page = _bounded_pagination(pagination)
             query = apply_pagination(query, page, per_page)
 
             doctors = query.all()
@@ -413,9 +434,9 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
-            page = pagination.page if pagination else 1
-            per_page = pagination.per_page if pagination else 20
+            # Применяем пагинацию (дефолт LIMIT 20; page>=1, 1<=per_page<=1000 —
+            # не материализуем таблицу)
+            page, per_page = _bounded_pagination(pagination)
             query = apply_pagination(query, page, per_page)
 
             services = query.all()
@@ -467,9 +488,9 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
-            page = pagination.page if pagination else 1
-            per_page = pagination.per_page if pagination else 20
+            # Применяем пагинацию (дефолт LIMIT 20; page>=1, 1<=per_page<=1000 —
+            # не материализуем таблицу)
+            page, per_page = _bounded_pagination(pagination)
             query = apply_pagination(query, page, per_page)
 
             appointments = query.all()
@@ -525,9 +546,9 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
-            page = pagination.page if pagination else 1
-            per_page = pagination.per_page if pagination else 20
+            # Применяем пагинацию (дефолт LIMIT 20; page>=1, 1<=per_page<=1000 —
+            # не материализуем таблицу)
+            page, per_page = _bounded_pagination(pagination)
             query = apply_pagination(query, page, per_page)
 
             visits = query.all()
@@ -579,9 +600,9 @@ class Query:
             # Подсчитываем общее количество
             total = query.count()
 
-            # Применяем пагинацию (дефолт LIMIT 20 — не материализуем таблицу)
-            page = pagination.page if pagination else 1
-            per_page = pagination.per_page if pagination else 20
+            # Применяем пагинацию (дефолт LIMIT 20; page>=1, 1<=per_page<=1000 —
+            # не материализуем таблицу)
+            page, per_page = _bounded_pagination(pagination)
             query = apply_pagination(query, page, per_page)
 
             entries = query.all()
