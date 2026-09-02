@@ -34972,6 +34972,23 @@ export type components = {
             /** Initialized */
             initialized: boolean;
         };
+        /**
+         * SpecialtyVocabularyItem
+         * @description One selectable specialty from the Medical Specialty Catalog (0051).
+         *
+         *     Typed DTO (Codex P2): a generic dict response compiled to arbitrary
+         *     maps in generated TS; this model guarantees code/titles exist.
+         */
+        SpecialtyVocabularyItem: {
+            /** Code */
+            code: string;
+            /** Title Ru */
+            title_ru: string;
+            /** Title Uz */
+            title_uz?: string | null;
+            /** Title En */
+            title_en?: string | null;
+        };
         /** StaffActionConfirmRequest */
         StaffActionConfirmRequest: {
             /** Entry Id */
@@ -55698,10 +55715,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string | null;
-                    }[];
+                    "application/json": components["schemas"]["SpecialtyVocabularyItem"][];
                 };
+            };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

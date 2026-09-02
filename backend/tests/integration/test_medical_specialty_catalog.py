@@ -212,3 +212,132 @@ class TestVocabularyEndpoint:
     def test_vocabulary_requires_admin(self, client: TestClient, seeded_catalog):
         response = client.get("/api/v1/admin/doctors/specialty-vocabulary")
         assert response.status_code in (401, 403)
+
+
+class TestWriteBoundaryGuards:
+    """Codex P1: the catalog must be enforced where specialties are WRITTEN."""
+
+    def _create_doctor_payload(self, test_doctor_user, specialty: str) -> dict:
+        return {
+            "user_id": test_doctor_user.id,
+            "specialty": specialty,
+            "active": True,
+        }
+
+    def test_post_doctor_rejects_unknown_specialty(
+        self, client, auth_headers, seeded_catalog, test_doctor_user
+    ):
+        response = client.post(
+            "/api/v1/admin/doctors",
+            headers=auth_headers,
+            json=self._create_doctor_payload(test_doctor_user, "kardio"),
+        )
+        assert response.status_code == 400
+        assert "каталоге" in response.json()["detail"]
+
+    def test_post_doctor_rejects_inactive_specialty(
+        self, client, auth_headers, seeded_catalog, test_doctor_user
+    ):
+        row = seeded_catalog.execute(
+            select(MedicalSpecialty).where(MedicalSpecialty.code == "dentistry")
+        ).scalar_one()
+        row.active = False
+        seeded_catalog.commit()
+
+        response = client.post(
+            "/api/v1/admin/doctors",
+            headers=auth_headers,
+            json=self._create_doctor_payload(test_doctor_user, "dentistry"),
+        )
+        assert response.status_code == 400
+        assert "деактивирована" in response.json()["detail"]
+
+    def test_post_doctor_accepts_active_catalog_code(
+        self, client, auth_headers, seeded_catalog, test_doctor_user, db_session
+    ):
+        response = client.post(
+            "/api/v1/admin/doctors",
+            headers=auth_headers,
+            json=self._create_doctor_payload(test_doctor_user, "cardiology"),
+        )
+        assert response.status_code == 200, response.text
+        # cleanup the created row so other tests stay isolated
+        created = response.json()
+        if created.get("id"):
+            from sqlalchemy import delete as _delete
+
+            db_session.execute(_delete(Doctor).where(Doctor.id == created["id"]))
+            db_session.commit()
+
+    def test_put_doctor_changing_to_unknown_specialty_rejected(
+        self, client, auth_headers, seeded_catalog, db_session, test_doctor_user
+    ):
+        doctor = Doctor(user_id=test_doctor_user.id, specialty="cardiology", active=True)
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+
+        response = client.put(
+            f"/api/v1/admin/doctors/{doctor.id}",
+            headers=auth_headers,
+            json={"specialty": "stomatolog"},
+        )
+        assert response.status_code == 400
+
+    def test_put_doctor_without_specialty_untouched(
+        self, client, auth_headers, seeded_catalog, test_doctor_user
+    ):
+        """Editing other fields must not re-validate the stored specialty."""
+        doctor = Doctor(user_id=test_doctor_user.id, specialty="cardiology", cabinet="1", active=True)
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+
+        response = client.put(
+            f"/api/v1/admin/doctors/{doctor.id}",
+            headers=auth_headers,
+            json={"cabinet": "42"},
+        )
+        assert response.status_code == 200, response.text
+        seeded_catalog.refresh(doctor)
+        assert doctor.cabinet == "42"
+        assert doctor.specialty == "cardiology"
+
+
+class TestMissingTableConfigurationFailure:
+    """Codex P2: a rollout ahead of migration 0051 must yield the documented
+    503, not a generic 500 from the raw driver error."""
+
+    def test_missing_table_returns_503(
+        self, client, auth_headers, db_session
+    ):
+        from sqlalchemy import text as _text
+
+        db_session.commit()  # release pending state before DDL
+        db_session.execute(_text("DROP TABLE medical_specialties"))
+        db_session.commit()
+
+        response = client.get(
+            "/api/v1/admin/doctors/specialty-vocabulary", headers=auth_headers
+        )
+        assert response.status_code == 503
+        assert "0051" in response.json()["detail"] or "миграции" in response.json()["detail"]
+
+
+class TestVocabularyTypedContract:
+    """Codex P2: typed DTO instead of arbitrary maps in OpenAPI/TS."""
+
+    def test_openapi_publishes_typed_item_schema(self):
+        import json as _json
+        from pathlib import Path as _Path
+
+        spec = _json.loads(
+            (_Path(__file__).resolve().parents[2] / "openapi.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        schemas = spec["components"]["schemas"]
+        assert "SpecialtyVocabularyItem" in schemas
+        props = schemas["SpecialtyVocabularyItem"]["properties"]
+        for key in ("code", "title_ru", "title_uz", "title_en"):
+            assert key in props
+        assert "code" in schemas["SpecialtyVocabularyItem"].get("required", [])
+        assert "title_ru" in schemas["SpecialtyVocabularyItem"].get("required", [])

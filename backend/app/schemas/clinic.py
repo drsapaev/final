@@ -129,6 +129,21 @@ class DoctorOut(DoctorBase):
     schedules: list["ScheduleOut"] = []
 
 
+class SpecialtyVocabularyItem(BaseModel):
+    """One selectable specialty from the Medical Specialty Catalog (0051).
+
+    Typed DTO (Codex P2): a generic dict response compiled to arbitrary
+    maps in generated TS; this model guarantees code/titles exist.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    code: str
+    title_ru: str
+    title_uz: str | None = None
+    title_en: str | None = None
+
+
 class DoctorUserOption(BaseModel):
     id: int
     username: str

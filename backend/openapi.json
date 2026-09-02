@@ -28915,23 +28915,16 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "type": "object"
+                    "$ref": "#/components/schemas/SpecialtyVocabularyItem"
                   },
                   "type": "array",
                   "title": "Response Get Doctor Specialty Vocabulary Api V1 Admin Doctors Specialty Vocabulary Get"
                 }
               }
             }
+          },
+          "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
           }
         },
         "security": [
@@ -99058,6 +99051,47 @@
           "initialized"
         ],
         "title": "SetupStatusOut"
+      },
+      "SpecialtyVocabularyItem": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "title_ru": {
+            "type": "string",
+            "title": "Title Ru"
+          },
+          "title_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Uz"
+          },
+          "title_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "title_ru"
+        ],
+        "title": "SpecialtyVocabularyItem",
+        "description": "One selectable specialty from the Medical Specialty Catalog (0051).\n\nTyped DTO (Codex P2): a generic dict response compiled to arbitrary\nmaps in generated TS; this model guarantees code/titles exist."
       },
       "StaffActionConfirmRequest": {
         "properties": {

@@ -10,13 +10,22 @@ configuration error, never as a silent python-tuple registry.
 from __future__ import annotations
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.medical_specialty import MedicalSpecialty
 
 
 class MedicalSpecialtyCatalogError(RuntimeError):
-    """Raised when the catalog is in an unusable configuration state."""
+    """Raised when the catalog is in an unusable configuration state.
+
+    Covers BOTH failure modes of "catalog is not a usable runtime SSOT":
+    no active rows (seed/migration never ran) and the table being entirely
+    missing (app rollout started before migration 0051) — the latter is a
+    raw SQLAlchemyError from the driver, wrapped here so the API layer can
+    translate the whole class into the documented 503 instead of a generic
+    500 (Codex P2).
+    """
 
 
 class MedicalSpecialtyCatalogService:
@@ -32,15 +41,24 @@ class MedicalSpecialtyCatalogService:
         rows: that state means migrations/seed never ran — an explicit
         configuration failure instead of a silent fallback.
         """
-        rows = list(
-            self.db.execute(
-                select(MedicalSpecialty)
-                .where(MedicalSpecialty.active.is_(True))
-                .order_by(MedicalSpecialty.sort_order.asc(), MedicalSpecialty.code.asc())
+        try:
+            rows = list(
+                self.db.execute(
+                    select(MedicalSpecialty)
+                    .where(MedicalSpecialty.active.is_(True))
+                    .order_by(
+                        MedicalSpecialty.sort_order.asc(),
+                        MedicalSpecialty.code.asc(),
+                    )
+                )
+                .scalars()
+                .all()
             )
-            .scalars()
-            .all()
-        )
+        except SQLAlchemyError as exc:
+            raise MedicalSpecialtyCatalogError(
+                "medical_specialties table is unavailable — "
+                "migration 0051 has not been applied"
+            ) from exc
         if not rows:
             raise MedicalSpecialtyCatalogError(
                 "medical_specialties catalog has no active rows — "
