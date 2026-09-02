@@ -536,15 +536,26 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     }
   };
 
+  // AXE-EXP-6 (a11y track): the variant backgrounds were repaired from
+  // `color-mix(in srgb, var(--mac-card-bg, …), var(--mac-gradient-sidebar,
+  // var(--mac-main-shell-bg)) 16%)` — a gradient is not a valid color-mix
+  // operand, so the declaration was invalid at computed-value time and
+  // rendered TRANSPARENT in BOTH themes since inception (dead-invalid
+  // code; it was additionally masked in dark by the legacy white-table
+  // patch, see dark-theme-visibility-fix.css). The explicit `transparent`
+  // preserves the rendered light-theme result EXACTLY (byte-identical
+  // computed value) and lets the canonical dark card/surface show through
+  // the table in dark mode — the DataTable's own th/td inks
+  // (--mac-table-header-text / --mac-text-primary) theme correctly for it.
   const variantStyles: Record<TableVariant, TableVariantStyle> = {
     default: {
       border: '1px solid var(--mac-border)',
-      background: 'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-primary)), var(--mac-gradient-sidebar, var(--mac-main-shell-bg)) 16%)',
+      background: 'transparent',
       headerBackground: 'var(--mac-table-header-bg)'
     },
     filled: {
       border: 'none',
-      background: 'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-secondary)), var(--mac-gradient-sidebar, var(--mac-main-shell-bg)) 16%)',
+      background: 'transparent',
       headerBackground: 'var(--mac-table-header-bg)'
     },
     minimal: {

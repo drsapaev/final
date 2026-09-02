@@ -612,6 +612,10 @@ const en = {
     session_warning_text: 'Your session expires in {seconds} sec. Extend to avoid losing unsaved data.',
     session_warning_title: 'Session expiring soon',
     single_date: 'Date',
+    // AXE-EXP-5: accessible names for the cashier date filter inputs
+    filter_date_single_aria: 'Payments filter: date',
+    filter_date_from_aria: 'Payments filter: date from',
+    filter_date_to_aria: 'Payments filter: date to',
     start_online_payment_aria: 'Start online payment',
     stats_load_failed: 'Failed to load statistics',
     subtitle: 'Medical clinic • {date}',
@@ -3914,7 +3918,6 @@ const en = {
     um_role_admin: 'Администратор',
     um_role_doctor: 'Врач',
     um_role_nurse: 'Медсестра',
-    um_role_receptionist: 'Receptionist',
 
     um_role_registrar: 'Registrar',
     um_role_cashier: 'Кассир',
@@ -4603,7 +4606,6 @@ const en = {
     umdl_role_derma: 'Дерматолог',
     umdl_role_dentist: 'Стоматолог',
     umdl_role_nurse: 'Медсестра',
-    umdl_role_receptionist: 'Receptionist',
 
     umdl_role_registrar: 'Registrar',
     umdl_role_cashier: 'Кассир',
@@ -6319,7 +6321,7 @@ const en = {
     aw_refresh_services_title: 'Обновить список услуг',
     aw_access_denied_title: 'Доступ запрещен',
     aw_insufficient_rights: 'Недостаточно прав доступа',
-    aw_insufficient_rights_description: 'Для создания записей пациентов необходима роль Регистратора (включая Receptionist) или Администратора.',
+    aw_insufficient_rights_description: 'Для создания записей пациентов необходима роль Регистратора или Администратора.',
 
     // ─── Setup.jsx (setup_) ───────────────────────────────────────────────
     setup_pw_strength_very_weak: 'Очень слабый',

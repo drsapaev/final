@@ -54,7 +54,11 @@ const cashierProfile = {
 };
 const registrarProfile = {
   id: 20, username: 'registrar@example.com', email: 'registrar@example.com',
-  full_name: 'Registrar User', role: 'Receptionist', is_active: true, is_superuser: false,
+  // REC-2 (Receptionist deprecation): canonical 'Registrar' role — the QA
+  // mock no longer exercises the legacy receptionist spelling (route alias
+  // removed in REC-3; baselines must stay pixel-identical because the app
+  // normalized the role for display/gating in both cases).
+  full_name: 'Registrar User', role: 'Registrar', is_active: true, is_superuser: false,
 };
 
 function createToken(profile: { id: number; username: string }): string {
@@ -514,11 +518,12 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
     full_name: 'Doctor User', role: 'Doctor', is_active: true, is_superuser: false,
   };
   // Appointments.tsx gates the page via <RoleGate roles={['Admin','Registrar',
-  // 'Doctor']}> — unlike the route-registry access check (routeSelectors), the
-  // page-level RoleGate does NOT apply ROLE_ALIASES, so a 'Receptionist'
-  // profile is denied there. Use the literal 'Registrar' role (pre-existing
-  // page/route gate divergence, documented in the PR body — not changed by
-  // 12-4).
+  // 'Doctor']}>. The route-registry access check (routeSelectors) and the
+  // page-level RoleGate agree on the canonical 'Registrar' spelling since
+  // REC-3 removed the receptionist route alias, so a 'Registrar' profile
+  // passes both gates. (Historical note: before REC-2/REC-3 this mock used
+  // the legacy 'Receptionist' spelling, which the route alias translated
+  // to registrar while the page gate denied it.)
   const appointmentsProfile = {
     id: 21, username: 'registrar2@example.com', email: 'registrar2@example.com',
     full_name: 'Registrar User', role: 'Registrar', is_active: true, is_superuser: false,

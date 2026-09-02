@@ -60,7 +60,13 @@ describe('UserModal role payload regression', () => {
     fireEvent.click(selectTrigger as HTMLElement);
 
     const options = await screen.findAllByRole('option');
-    const option = options.find((el) => el.textContent === 'admin2.umdl_role_receptionist');
+
+    // REC-1 (Receptionist deprecation): 'Receptionist' is frozen out of the
+    // create-role options — Registrar is the canonical front-desk role.
+    // This absence assertion is the frontend write-freeze contract.
+    expect(options.find((el) => el.textContent === 'admin2.umdl_role_receptionist')).toBeUndefined();
+
+    const option = options.find((el) => el.textContent === 'admin2.umdl_role_registrar');
     expect(option).toBeDefined();
     fireEvent.click(option as HTMLElement);
 
@@ -68,6 +74,6 @@ describe('UserModal role payload regression', () => {
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     const payload = onSave.mock.calls[0][0] as Record<string, unknown>;
-    expect(payload.role).toBe('Receptionist');
+    expect(payload.role).toBe('Registrar');
   });
 });

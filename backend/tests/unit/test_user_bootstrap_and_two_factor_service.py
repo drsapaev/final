@@ -23,7 +23,9 @@ def test_ensure_user_support_records_creates_profile_preferences_and_notificatio
         email="bootstrap@example.com",
         full_name="Bootstrap User",
         hashed_password=get_password_hash("password123"),
-        role="Receptionist",
+        # REC-1: canonical Registrar spelling (Receptionist deprecated as
+        # a stored role; fixture-only change, no assertion depends on it).
+        role="Registrar",
         is_active=True,
     )
     db_session.add(user)

@@ -612,6 +612,10 @@ const kk = {
     session_warning_text: 'Сессия {seconds} сек ішінде аяқталады. Сақталмаған деректерді жоғалтпау үшін ұзартыңыз.',
     session_warning_title: 'Сессия жылдам аяқталады',
     single_date: 'Күні',
+    // AXE-EXP-5: accessible names for the cashier date filter inputs
+    filter_date_single_aria: 'Төлемдер сүзгісі: күн',
+    filter_date_from_aria: 'Төлемдер сүзгісі: күннен',
+    filter_date_to_aria: 'Төлемдер сүзгісі: күнге дейін',
     start_online_payment_aria: 'Онлайн төлемді бастау',
     stats_load_failed: 'Статистиканы жүктеу сәтсіз',
     subtitle: 'Медициналық клиника • {date}',
@@ -3914,7 +3918,6 @@ const kk = {
     um_role_admin: 'Администратор',
     um_role_doctor: 'Врач',
     um_role_nurse: 'Медсестра',
-    um_role_receptionist: 'Ресепшионист',
 
     um_role_registrar: 'Регистратор',
     um_role_cashier: 'Кассир',
@@ -4603,7 +4606,6 @@ const kk = {
     umdl_role_derma: 'Дерматолог',
     umdl_role_dentist: 'Стоматолог',
     umdl_role_nurse: 'Медсестра',
-    umdl_role_receptionist: 'Ресепшионист',
 
     umdl_role_registrar: 'Регистратор',
     umdl_role_cashier: 'Кассир',
@@ -6319,7 +6321,7 @@ const kk = {
     aw_refresh_services_title: 'Обновить список услуг',
     aw_access_denied_title: 'Доступ запрещен',
     aw_insufficient_rights: 'Недостаточно прав доступа',
-    aw_insufficient_rights_description: 'Для создания записей пациентов необходима роль Регистратора (включая Receptionist) или Администратора.',
+    aw_insufficient_rights_description: 'Для создания записей пациентов необходима роль Регистратора или Администратора.',
 
     // ─── Setup.jsx (setup_) ───────────────────────────────────────────────
     setup_pw_strength_very_weak: 'Очень слабый',

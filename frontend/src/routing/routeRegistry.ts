@@ -12,8 +12,12 @@ export const ROUTE_SHELLS = ['landing', 'app-shell', 'fullscreen', 'callback', '
 export const ROUTE_AUTH = ['public', 'authenticated', 'role-scoped'];
 export const ROUTE_ENTRY = ['menu', 'contextual', 'direct', 'callback', 'internal'];
 
+// REC-3 (Receptionist deprecation): the receptionist alias was removed —
+// Registrar is the canonical front-desk role; legacy 'Receptionist'
+// profiles no longer reach registrar routes (route parity test pins the
+// deny; stale cached profiles are purged by clearAuthCache). The
+// nurse -> doctor alias is a separate policy decision, untouched here.
 export const ROLE_ALIASES = {
-  receptionist: 'registrar',
   nurse: 'doctor',
 };
 
