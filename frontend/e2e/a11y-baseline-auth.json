@@ -3,8 +3,8 @@
     "purpose": "AXE-EXP-1 (a11y axe audit, e2e/a11y-axe-authenticated.spec.ts) — accepted pre-existing violation rule IDs per authorized QA-harness route:theme key. The gate fails on NEW rules and on stale entries (findings that no longer reproduce must be removed from this file — the baseline must shrink, not rot).",
     "policy": "Adding a rule here requires a documented justification. FORBIDDEN: adding a rule to make a failing audit pass without justification (Rule 13 analog). Every entry is a PRE-EXISTING finding first baselined at AXE-EXP-1 (probe on main aca7d96a8, 02.09.2026, 34 audits, 236 nodes); the shrink-only ratchet stays in force across the AXE-EXP track.",
     "scope": "Authorized QA-harness surfaces only (e2e/support/authenticatedQa.ts): 6 role homes (admin/registrar/doctor/cashier/lab/patient) + 2 specialty surfaces (doctor-cardiology, doctor-dermatology ?tab=appointments) + 9 admin-family routes × light/dark = 34 audits. Public routes are covered by e2e/a11y-baseline.json (empty after the CC track).",
-    "resolution": "AXE-EXP-2 (app-chrome inks): chrome class → --mac-text-on-tertiary. AXE-EXP-3 (badge fills): Badge/MacOSTab white-ink fills → CC-2 strong tokens; info tint → constant dark-blue ink. AXE-EXP-4 (tab/link inks): SegmentedControl inactive segments + patient .pp-tab inactive → on-tertiary ink; patient .pp-tab-active link → new canonical --mac-link-ink token (light #0066d6 = accent-strong, dark #5ac8fa — the CC-2-documented deferred link-ink latent class); lab .lqw-status-filter-btn-active → strong fill; .lqw-sort-label → on-tertiary; 3 admin tertiary utility classes → secondary ink. color-contrast now remains on ONE key only (admin-services:dark — a distinct root cause: --mac-card-bg/--mac-main-shell-bg have no dark values, so DataTable surfaces render light in dark theme; tracked for its own increment). Remaining ARIA rules = AXE-EXP-5.",
-    "probe_diagnosis": "Original seeding (AXE-EXP-1): 236 violation nodes / 34 audits — 200 color-contrast + 36 ARIA (aria-required-parent 22 MacOSTab; aria-valid-attr-value 6 SegmentedControl; aria-required-children 4 AppointmentSummaryBar; aria-prohibited-attr 2 admin-kpi-grid; label 2 cashier date input). After AXE-EXP-2 (chrome) + EXP-3 (badges) + EXP-4 (tab/link inks): 38 nodes remain (2 color-contrast on the card-bg dark-hole + 36 ARIA).",
+    "resolution": "AXE-EXP-2 (app-chrome inks) → --mac-text-on-tertiary. AXE-EXP-3 (badge fills) → CC-2 strong tokens + info tint dark ink. AXE-EXP-4 (tab/link inks) → --mac-link-ink + on-tertiary + strong fill + secondary admin inks. AXE-EXP-5 (ARIA structural): MacOSTab buttons now live inside a role=tablist container (aria-required-parent, 22 nodes); SegmentedControl no longer emits dangling aria-controls references — the panel-<value> ids never existed on any consumer (aria-valid-attr-value, 6 nodes; optional controlsPrefix prop for future real panel wiring); AppointmentSummaryBar's refresh Button moved out of the role=list container (list owns only listitem badges via a display:contents wrapper — zero pixel delta; aria-required-children, 4 nodes); the admin KPI loading grid got role=status (aria-busy is prohibited on the generic role; aria-prohibited-attr, 2 nodes); the three cashier date-filter inputs got accessible names via 3 new i18n keys × 5 locales (label, 2 nodes + latent range pair). 33 of 34 audits are now CLEAN; the sole remaining entry is admin-services:dark color-contrast (2 nodes) — the DataTable-surface dark-hole (invalid color-mix with a gradient argument renders the table white in dark theme; light inks on it fail), tracked for the closing increment.",
+    "probe_diagnosis": "Original seeding (AXE-EXP-1): 236 violation nodes / 34 audits — 200 color-contrast + 36 ARIA. After AXE-EXP-2..EXP-5: 2 nodes remain (the DataTable white-in-dark surface class on admin-services:dark).",
     "axeTags": [
       "wcag2a",
       "wcag2aa",
@@ -12,59 +12,7 @@
       "wcag21aa"
     ]
   },
-  "admin-finance:dark": [
-    "aria-required-parent"
-  ],
-  "admin-finance:light": [
-    "aria-required-parent"
-  ],
-  "admin-notifications:dark": [
-    "aria-valid-attr-value"
-  ],
-  "admin-notifications:light": [
-    "aria-valid-attr-value"
-  ],
   "admin-services:dark": [
     "color-contrast"
-  ],
-  "admin-users:dark": [
-    "aria-required-parent"
-  ],
-  "admin-users:light": [
-    "aria-required-parent"
-  ],
-  "admin-webhooks:dark": [
-    "aria-valid-attr-value"
-  ],
-  "admin-webhooks:light": [
-    "aria-valid-attr-value"
-  ],
-  "admin:dark": [
-    "aria-prohibited-attr"
-  ],
-  "admin:light": [
-    "aria-prohibited-attr"
-  ],
-  "cashier:dark": [
-    "aria-required-parent",
-    "aria-valid-attr-value",
-    "label"
-  ],
-  "cashier:light": [
-    "aria-required-parent",
-    "aria-valid-attr-value",
-    "label"
-  ],
-  "doctor-cardiology:dark": [
-    "aria-required-children"
-  ],
-  "doctor-cardiology:light": [
-    "aria-required-children"
-  ],
-  "doctor-dermatology:dark": [
-    "aria-required-children"
-  ],
-  "doctor-dermatology:light": [
-    "aria-required-children"
   ]
 }

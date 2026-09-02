@@ -530,7 +530,12 @@ const AdminDashboard = () => {
 
         {/* PR-UI-11-1: 3 KPI StatCards. */}
         {statsLoading ? (
-          <div className="admin-kpi-grid" aria-label={t('admin2.adm_kpi_loading_aria')} aria-busy="true">
+          /* AXE-EXP-5: role="status" — the loading grid previously carried
+           * aria-busy + aria-label on a role-less div (axe
+           * aria-prohibited-attr: aria-busy is not permitted on the generic
+           * role). A live-region status role legitimately announces the
+           * loading state. */
+          <div className="admin-kpi-grid" role="status" aria-label={t('admin2.adm_kpi_loading_aria')} aria-busy="true">
             <Skeleton type="card" count={3} />
           </div>
         ) : statsError ? (
