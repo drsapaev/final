@@ -138,6 +138,11 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         if len(candidate_queues) == 1:
             daily_queue = candidate_queues[0]
         else:
+            # Codex P1 (round-14): скан лочит ВЫИГРАВШУЮ запись — при двух
+            # параллельных вызовах без тега второй ждёт на этом SELECT FOR
+            # UPDATE, после коммита первого его предикат (waiting)
+            # переоценивается и он берёт следующий канонический кандидат,
+            # а не «следующего из уже выбранной очереди».
             earliest = (
                 self.db.query(OnlineQueueEntry)
                 .filter(
@@ -152,6 +157,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     ).asc(),
                     OnlineQueueEntry.id.asc(),
                 )
+                .with_for_update()
                 .first()
             )
             if earliest is not None:

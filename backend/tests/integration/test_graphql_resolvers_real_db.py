@@ -36,6 +36,20 @@ from app.models.visit import Visit, VisitService
 pytestmark = pytest.mark.integration
 
 
+def _queue_day():
+    """День очереди, который используют GraphQL-мутации (TZ из настроек).
+
+    Asia/Tashkent = UTC+5: между 19:00 и 24:00 UTC день очереди уже
+    СЛЕДУЮЩИЙ относительно host-даты. Тесты должны создавать очереди
+    на тот же день, что и мутации, иначе ночные прогоны расходятся
+    (мутация ищет очередь на TZ-день, тест создал на host-день).
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    return datetime.now(ZoneInfo("Asia/Tashkent")).date()
+
+
 @pytest.fixture
 def gql_session_factory(test_db, monkeypatch):
     """Привязывает SessionLocal (используемый get_db_session) к тестовой БД."""
@@ -157,7 +171,7 @@ def gql_data(test_db, gql_session_factory, monkeypatch):
         session.flush()
 
         queue = DailyQueue(
-            day=date.today(),
+            day=_queue_day(),
             specialist_id=doctor.id,
             active=True,
         )
@@ -741,7 +755,7 @@ def test_join_queue_broadcasts_to_display_and_ws(gql_data, monkeypatch):
     assert len(ws_calls) == 1, ws_calls
     ws = ws_calls[0]
     assert ws["department"] == f"specialist_{d['doctor'].id}"
-    assert ws["date"] == date.today().strftime("%Y-%m-%d")
+    assert ws["date"] == _queue_day().strftime("%Y-%m-%d")
     assert ws["event_type"] == "queue_update"
     assert ws["data"]["action"] == "entry_added"
     assert ws["data"]["entry_id"] == entry_id
@@ -1479,7 +1493,7 @@ def test_graphql_round12(gql_data, monkeypatch):
     now = datetime.now(UTC)
     with S() as s:
         q2 = DailyQueue(
-            day=date.today(),
+            day=_queue_day(),
             specialist_id=d["doctor"].id,
             queue_tag=f"r12-{suffix}",
             active=True,
@@ -1574,7 +1588,7 @@ def test_graphql_round13(gql_data, monkeypatch):
             q.id
             for q in s.query(DailyQueue).filter(
                 DailyQueue.specialist_id == d["doctor"].id,
-                DailyQueue.day == date.today(),
+                DailyQueue.day == _queue_day(),
             )
         ]
         s.query(OnlineQueueEntry).filter(
@@ -1587,13 +1601,13 @@ def test_graphql_round13(gql_data, monkeypatch):
     # выигрывает РАННЕЕ прибытие (e_old: ждёт час), не минимальный номер
     with S() as s:
         qa = DailyQueue(
-            day=date.today(),
+            day=_queue_day(),
             specialist_id=d["doctor"].id,
             queue_tag=f"r13a-{suffix}",
             active=True,
         )
         qb = DailyQueue(
-            day=date.today(),
+            day=_queue_day(),
             specialist_id=d["doctor"].id,
             queue_tag=f"r13b-{suffix}",
             active=True,
@@ -1633,7 +1647,7 @@ def test_graphql_round13(gql_data, monkeypatch):
     # priority DESC доминирует над временем прибытия
     with S() as s:
         qc = DailyQueue(
-            day=date.today(),
+            day=_queue_day(),
             specialist_id=d["doctor"].id,
             queue_tag=f"r13c-{suffix}",
             active=True,
@@ -1724,3 +1738,141 @@ def test_sessions_are_closed_after_resolver(gql_session_factory):
     engine = gql_session_factory.kw["bind"]
     # Утечка сессий (P0-1) оставляла checked-out соединения после запроса.
     assert engine.pool.checkedout() == 0, "pool leaked connections after resolver"
+
+
+def test_graphql_round14(gql_data, monkeypatch):
+    """Codex round-14: (1) лоченный re-fetch очереди перечитывает stale
+    identity-map (populate_existing) — дезактивация между get_or_create и
+    локом видна -> QUEUE_INACTIVE; (2) отказ пост-коммит аудита createVisit
+    НЕ возвращает INTERNAL_ERROR (визит уже durable); (3) callNext: весь
+    sync-DB флоу в одном worker-треде — notify через sync-обёртку,
+    display-payload собирается в impl, отправка на event loop."""
+    from app.db import session as db_session_module
+    from app.graphql import mutations as gql_mutations
+    from app.services.display_websocket import get_display_manager
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+
+    # --- 1) populate_existing на лоченном re-fetch: дезактивация очереди
+    # между get_or_create_daily_queue и with_for_update видна мутации.
+    # Патч изолирован в context()-сабменеджере.
+    with monkeypatch.context() as m:
+        original_goc = gql_mutations.crud_queue.get_or_create_daily_queue
+
+        def _goc_deactivate(db, **kwargs):
+            queue = original_goc(db, **kwargs)
+            with S() as s2:
+                stale = s2.query(DailyQueue).filter(DailyQueue.id == queue.id).first()
+                stale.active = False
+                s2.commit()
+            return queue
+
+        m.setattr(
+            gql_mutations.crud_queue, "get_or_create_daily_queue", _goc_deactivate
+        )
+        data = _execute(
+            """mutation($input: QueueEntryInput!) { joinQueue(input: $input) {
+            success message errors queueEntry { id } } }""",
+            {
+                "input": {
+                    "patientId": d["patient"].id,
+                    "doctorId": d["doctor"].id,
+                    "queueTag": f"r14a-{suffix}",
+                }
+            },
+        )
+    join = data["joinQueue"]
+    assert join["success"] is False, join
+    assert join["errors"] == ["QUEUE_INACTIVE"], join
+
+    # --- 2) отказ пост-коммит аудита createVisit не роняет мутацию
+    def _raiser(**kwargs):
+        raise RuntimeError("audit boom")
+
+    with monkeypatch.context() as m:
+        m.setattr(gql_mutations, "log_critical_change", _raiser)
+        data = _execute(
+            """
+            mutation($input: VisitInput!) {
+              createVisit(input: $input) { success message visit { id } }
+            }
+            """,
+            {
+                "input": {
+                    "patientId": d["patient"].id,
+                    "doctorId": d["doctor"].id,
+                    "serviceIds": [d["service"].id],
+                }
+            },
+        )
+    created = data["createVisit"]
+    assert created["success"] is True, created
+    durable_visit_id = created["visit"]["id"]
+    with S() as s:
+        assert (
+            s.query(Visit).filter(Visit.id == durable_visit_id).first() is not None
+        ), "visit must be durable despite audit failure"
+
+    # --- 3) callNext: sync-notify-обёртка + display payload из impl
+    notify_calls: list = []
+
+    def _notify_recorder(db, entry, cabinet_number=None):
+        notify_calls.append((entry.id, cabinet_number))
+        return {"sent": 0}
+
+    manager = get_display_manager()
+    sent_messages: list = []
+
+    async def _send_recorder(self, call_message, board_ids=None):
+        sent_messages.append(call_message)
+
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC)
+    with S() as s:
+        q14 = DailyQueue(
+            day=_queue_day(),
+            specialist_id=d["doctor"].id,
+            queue_tag=f"r14b-{suffix}",
+            active=True,
+        )
+        s.add(q14)
+        s.flush()
+        e14 = OnlineQueueEntry(
+            queue_id=q14.id,
+            number=7,
+            patient_id=d["patient"].id,
+            status="waiting",
+            queue_time=now,
+        )
+        s.add(e14)
+        s.commit()
+        e14_id = e14.id
+
+    with monkeypatch.context() as m3:
+        m3.setattr(gql_mutations, "notify_patient_called_sync", _notify_recorder)
+        m3.setattr(type(manager), "broadcast_patient_call_data", _send_recorder)
+        data = _execute(
+            "mutation($doctorId: Int!, $tag: String) { callNextPatient(doctorId: "
+            "$doctorId, queueTag: $tag) { success message queueEntry { id number } "
+            "} }",
+            {"doctorId": d["doctor"].id, "tag": f"r14b-{suffix}"},
+        )
+    call = data["callNextPatient"]
+    assert call["success"] is True, call
+    assert call["queueEntry"]["id"] == e14_id, call
+    assert call["queueEntry"]["number"] == 7, call
+    # sync-notify вызвана ровно один раз в worker-треде
+    assert len(notify_calls) == 1, notify_calls
+    assert notify_calls[0][0] == e14_id, notify_calls
+    # display payload собран в impl и отправлен через новый метод
+    assert len(sent_messages) == 1, sent_messages
+    assert sent_messages[0]["data"]["queue_number"] == 7, sent_messages
+    assert sent_messages[0]["type"] == "patient_call", sent_messages

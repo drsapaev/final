@@ -47,7 +47,7 @@ from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.display_websocket import get_display_manager
 from app.services.patient_service import PatientService
 from app.services.qr_queue import QRQueueService
-from app.services.queue_position_notifications import get_queue_position_service
+from app.services.queue_position_notifications import notify_patient_called_sync
 from app.services.services_api_service import ServicesApiService
 from app.services.visit_lifecycle_service import VisitLifecycleService
 
@@ -644,32 +644,46 @@ class Mutation:
                     log=True,
                 )
 
-                # M4-P0-1: visit_to_type включает patient (PHI) — read-trail
-                if visit.patient_id:
-                    _audit_patient_access(info, db, [visit.patient_id], "visit")
+                # Codex P1 (round-14): create_visit уже ЗАКОММИТИЛ визит
+                # (SSOT crud) — отказ read-trail/аудита/второго коммита
+                # НЕ должен возвращать INTERNAL_ERROR: клиентский ретрай
+                # создал бы дубликат клинической/биллинговой записи.
+                # Неблокирующая семантика: rollback + warning + success.
+                try:
+                    # M4-P0-1: visit_to_type включает patient (PHI) — read-trail
+                    if visit.patient_id:
+                        _audit_patient_access(info, db, [visit.patient_id], "visit")
 
-                # Codex P1 (round-8): канонический /visits writer
-                # (VisitsApiService.create_visit) пишет CREATE критичный аудит —
-                # GraphQL-визиты не выпадают из обязательной истории мутаций.
-                # (PHI read-trail выше — view, не CREATE.)
-                actor_visit = getattr(info.context, "user", None)
-                # Codex P1 (round-11): снапшот визита может содержать
-                # клинический текст (notes — full-redact по AGENTS.md) —
-                # маскируем каноническим pii_masker ДО записи аудита.
-                _, visit_new_data = extract_model_changes(None, visit)
-                visit_new_data = mask_pii(visit_new_data)
-                log_critical_change(
-                    db=db,
-                    user_id=actor_visit.id if actor_visit else None,
-                    action="CREATE",
-                    table_name="visits",
-                    row_id=visit.id,
-                    old_data=None,
-                    new_data=visit_new_data,
-                    request=getattr(info.context, "request", None),
-                    description="Создание визита (GraphQL createVisit)",
-                )
-                db.commit()
+                    # Codex P1 (round-8): канонический /visits writer
+                    # (VisitsApiService.create_visit) пишет CREATE критичный
+                    # аудит — GraphQL-визиты не выпадают из обязательной
+                    # истории мутаций. (PHI read-trail выше — view, не CREATE.)
+                    actor_visit = getattr(info.context, "user", None)
+                    # Codex P1 (round-11): снапшот визита может содержать
+                    # клинический текст (notes — full-redact по AGENTS.md) —
+                    # маскируем каноническим pii_masker ДО записи аудита.
+                    _, visit_new_data = extract_model_changes(None, visit)
+                    visit_new_data = mask_pii(visit_new_data)
+                    log_critical_change(
+                        db=db,
+                        user_id=actor_visit.id if actor_visit else None,
+                        action="CREATE",
+                        table_name="visits",
+                        row_id=visit.id,
+                        old_data=None,
+                        new_data=visit_new_data,
+                        request=getattr(info.context, "request", None),
+                        description="Создание визита (GraphQL createVisit)",
+                    )
+                    db.commit()
+                except Exception as audit_error:  # noqa: BLE001
+                    logger.warning(
+                        "GraphQL createVisit: post-commit audit failed "
+                        "(visit %s is durable): %s",
+                        visit.id,
+                        audit_error,
+                    )
+                    db.rollback()
 
                 # Codex P2 (round-12): заявка All Free требует сигнала
                 # аппруверам — каноническая корзина шлёт
@@ -921,7 +935,18 @@ class Mutation:
                         errors=["PATIENT_NOT_FOUND"],
                     )
 
-                doctor = db.query(Doctor).filter(Doctor.id == input.doctor_id).first()
+                # Codex P1 (round-14): лочим строку врача на момент загрузки
+                # и обновляем атрибуты из БД (populate_existing) —
+                # параллельная деактивация блокируется до коммита мутации,
+                # а закоммиченная ДО лока видна свежими атрибутами; лок
+                # удерживается до финальной вставки (хелперы ниже не коммитят).
+                doctor = (
+                    db.query(Doctor)
+                    .filter(Doctor.id == input.doctor_id)
+                    .with_for_update()
+                    .populate_existing()
+                    .first()
+                )
                 if not doctor:
                     return QueueMutationResponse(
                         success=False,
@@ -984,10 +1009,17 @@ class Mutation:
                 # P1: лочим строку очереди ДО проверок дубликата/лимита и
                 # выдачи номера — параллельные joinQueue выстраиваются здесь
                 # и заново проходят проверки после блокировки.
+                # Codex P1 (round-14): get_or_create_daily_queue уже положил
+                # очередь в identity map — with_for_update без refresh вернул
+                # бы ЗАКЭШИРОВАННЫЙ инстанс со stale active/opened_at и пациент
+                # попал бы в закрытую/деактивированную очередь.
+                # populate_existing принудительно перечитывает атрибуты из
+                # залоченной строки.
                 daily_queue = (
                     db.query(DailyQueue)
                     .filter(DailyQueue.id == daily_queue.id)
                     .with_for_update()
+                    .populate_existing()
                     .first()
                 )
 
@@ -1178,27 +1210,31 @@ class Mutation:
 
         return response
 
-    @strawberry.mutation
-    async def call_next_patient(
-        self,
-        info: strawberry.Info,
-        doctor_id: int,
-        queue_tag: str | None = None,
-    ) -> QueueMutationResponse:
-        """Вызвать следующего пациента (SSOT: QRQueueService.call_next_patient
-        + уведомления/бродкасты, как в canonical qr_queue endpoint)."""
+    @staticmethod
+    def _call_next_patient_impl(
+        info: strawberry.Info, doctor_id: int, queue_tag: str | None
+    ) -> dict:
+        """Синхронная транзакция callNextPatient (запускается в threadpool).
+
+        Codex P2 (round-14): весь синхронный DB-флоу — настройки очереди,
+        канонический вызов, критичный аудит, снапшот PHI, post-commit
+        push-уведомление и сборка display-payload — исполняется в ОДНОМ
+        worker-треде (run_in_threadpool); на event loop остаётся только
+        network-отправка (broadcast) и формирование ответа.
+        """
         actor = getattr(info.context, "user", None) if info.context else None
         if not actor:
-            return QueueMutationResponse(
-                success=False,
-                message=t("error.unauthorized"),
-                errors=["UNAUTHENTICATED"],
-            )
+            return {"success": False, "unauthorized": True}
         try:
-            entry_snapshot = None
-            entry_id = None
-            cabinet = None
-            specialist_name = "Врач"
+            payload: dict = {
+                "success": False,
+                "message": "Нет пациентов в очереди",
+                "entry_id": None,
+                "snapshot": None,
+                "cabinet": None,
+                "broadcast_day": None,
+                "display_message": None,
+            }
             with get_db_session() as db:
                 # Codex P1 (round-9): локальный день очереди по
                 # конфигурированной таймзоне — None заставлял канонический
@@ -1207,26 +1243,25 @@ class Mutation:
                 queue_settings = get_queue_settings(db)
                 timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
                 queue_day = datetime.now(timezone).date()
+                payload["broadcast_day"] = queue_day
 
                 # SSOT: with_for_update, called_by-аудит, канонические ответы;
                 # queue_tag передаётся в канонический сервис (фильтр очереди),
                 # queue_day — локальный день (round-9).
-                result = await run_in_threadpool(
-                    QRQueueService(db).call_next_patient,
-                    doctor_id,
-                    actor.id,
-                    queue_day,
-                    queue_tag,
+                result = QRQueueService(db).call_next_patient(
+                    doctor_id, actor.id, queue_day, queue_tag
                 )
 
                 if not result.get("success"):
-                    return QueueMutationResponse(
-                        success=False,
-                        message=result.get("message", "Нет пациентов в очереди"),
-                        errors=["NO_PATIENTS_IN_QUEUE"],
+                    payload["message"] = result.get(
+                        "message", "Нет пациентов в очереди"
                     )
+                    return payload
 
+                payload["success"] = True
                 entry_id = result.get("patient", {}).get("id")
+                payload["entry_id"] = entry_id
+                payload["message"] = result.get("message") or "Пациент вызван"
                 entry = (
                     db.query(OnlineQueueEntry)
                     .filter(OnlineQueueEntry.id == entry_id)
@@ -1258,103 +1293,151 @@ class Mutation:
                     )
                     db.commit()
                 if entry:
-                    entry_snapshot = queue_entry_to_type(entry)
+                    payload["snapshot"] = queue_entry_to_type(entry)
                     # M4-P0-1: снапшот включает patient (PHI) — read-trail
                     if entry.patient_id:
                         _audit_patient_access(
                             info, db, [entry.patient_id], "cabinet_summary"
                         )
                     if entry.queue:
-                        cabinet = entry.queue.cabinet_number or (
+                        payload["cabinet"] = entry.queue.cabinet_number or (
                             entry.queue.specialist.cabinet
                             if entry.queue.specialist
                             else None
                         )
+                        # Codex P1 (round-9): день вызова — из ВЫБРАННОЙ очереди
+                        # (загружен при снапшоте), не host date.today().
+                        payload["broadcast_day"] = entry.queue.day
 
-            # --- Side effects (canonical qr_queue endpoint semantics) ---
-            if entry_id:
-                # 1) push-уведомление пациенту
-                try:
-                    with get_db_session() as db2:
-                        notify_service = get_queue_position_service(db2)
-                        entry2 = (
-                            db2.query(OnlineQueueEntry)
-                            .filter(OnlineQueueEntry.id == entry_id)
-                            .first()
+                    # --- post-commit side effects с sync-DB (в этом же worker) ---
+                    # 1) push-уведомление пациенту: sync-обёртка (asyncio.run
+                    # в worker-треде — канонический механизм round-11/12),
+                    # чтобы re-fetch/настройки не исполнялись на event loop.
+                    try:
+                        notify_patient_called_sync(
+                            db, entry, cabinet_number=payload["cabinet"]
                         )
-                        if entry2:
-                            await notify_service.notify_patient_called(
-                                entry2, cabinet_number=cabinet
-                            )
-                except Exception as e:  # noqa: BLE001 — non-blocking
-                    logger.warning(
-                        "GraphQL callNext: notify_patient_called failed: %s", e
-                    )
-
-                # 2) TV-табло — payload строится и отправляется, ПОКА
-                # сессия открыта (entry3.queue/specialist — lazy-load;
-                # после закрытия сессии был бы DetachedInstanceError)
-                try:
-                    manager = get_display_manager()
-                    with get_db_session() as db3:
-                        entry3 = (
-                            db3.query(OnlineQueueEntry)
-                            .filter(OnlineQueueEntry.id == entry_id)
-                            .first()
+                    except Exception as e:  # noqa: BLE001 — non-blocking
+                        logger.warning(
+                            "GraphQL callNext: notify_patient_called failed: %s", e
                         )
-                        if entry3:
-                            specialist_name = (
-                                entry3.queue.specialist.user.full_name
-                                if entry3.queue
-                                and entry3.queue.specialist
-                                and entry3.queue.specialist.user
-                                else "Врач"
-                            )
-                            await manager.broadcast_patient_call(
-                                queue_entry=entry3,
-                                doctor_name=specialist_name,
-                                cabinet=cabinet,
-                            )
-                except Exception as e:  # noqa: BLE001 — non-blocking
-                    logger.warning("GraphQL callNext: display broadcast failed: %s", e)
 
-                # 3) админский WS /ws/queue
-                try:
-                    from app.ws.queue_ws import broadcast_queue_update
-
-                    # Codex P1 (round-9): день вызова — из ВЫБРАННОЙ очереди
-                    # (загружен при снапшоте), не host date.today().
-                    broadcast_day = (
-                        entry.queue.day
-                        if entry is not None and entry.queue is not None
-                        else queue_day
-                    )
-                    broadcast_queue_update(
-                        department=f"specialist_{doctor_id}",
-                        date=broadcast_day.strftime("%Y-%m-%d"),
-                        event_type="queue_update",
-                        data={"action": "call_next", "entry_id": entry_id},
-                    )
-                except Exception as e:  # noqa: BLE001 — non-blocking
-                    logger.warning("GraphQL callNext: queue WS broadcast failed: %s", e)
-
-            return QueueMutationResponse(
-                success=True,
-                message=(
-                    f"Вызван пациент под номером {entry_snapshot.number}"
-                    if entry_snapshot
-                    else (result.get("message") or "Пациент вызван")
-                ),
-                queue_entry=entry_snapshot,
-            )
-
+                    # 2) TV-табло — payload собирается при открытой сессии
+                    # (lazy queue/specialist), отправка — на event loop.
+                    try:
+                        specialist_name = (
+                            entry.queue.specialist.user.full_name
+                            if entry.queue
+                            and entry.queue.specialist
+                            and entry.queue.specialist.user
+                            else "Врач"
+                        )
+                        payload[
+                            "display_message"
+                        ] = get_display_manager().build_patient_call_message(
+                            entry, specialist_name, payload["cabinet"]
+                        )
+                    except Exception as e:  # noqa: BLE001 — non-blocking
+                        logger.warning(
+                            "GraphQL callNext: display payload build failed: %s", e
+                        )
+            return payload
         except ValueError as exc:
-            return QueueMutationResponse(
-                success=False, message=str(exc), errors=["QUEUE_NOT_ACTIVE"]
-            )
+            return {
+                "success": False,
+                "queue_not_active": True,
+                "message": str(exc),
+            }
         except Exception:
+            logger.exception("GraphQL callNext: impl failure")
+            return {"success": False, "internal": True}
+
+    @strawberry.mutation
+    async def call_next_patient(
+        self,
+        info: strawberry.Info,
+        doctor_id: int,
+        queue_tag: str | None = None,
+    ) -> QueueMutationResponse:
+        """Вызвать следующего пациента (SSOT: QRQueueService.call_next_patient
+        + уведомления/бродкасты, как в canonical qr_queue endpoint)."""
+        actor = getattr(info.context, "user", None) if info.context else None
+        if not actor:
+            return QueueMutationResponse(
+                success=False,
+                message=t("error.unauthorized"),
+                errors=["UNAUTHENTICATED"],
+            )
+
+        # Codex P2 (round-14): вся транзакция — в одном worker-треде.
+        payload = await run_in_threadpool(
+            Mutation._call_next_patient_impl, info, doctor_id, queue_tag
+        )
+
+        if payload.get("unauthorized"):
+            return QueueMutationResponse(
+                success=False,
+                message=t("error.unauthorized"),
+                errors=["UNAUTHENTICATED"],
+            )
+        if payload.get("queue_not_active"):
+            return QueueMutationResponse(
+                success=False,
+                message=payload.get("message") or "Очередь не активна",
+                errors=["QUEUE_NOT_ACTIVE"],
+            )
+        if payload.get("internal"):
             return QueueMutationResponse(
                 success=False,
                 message=t("error.internal"),
                 errors=["INTERNAL_ERROR"],
             )
+        if not payload["success"]:
+            return QueueMutationResponse(
+                success=False,
+                message=payload.get("message", "Нет пациентов в очереди"),
+                errors=["NO_PATIENTS_IN_QUEUE"],
+            )
+
+        entry_id = payload["entry_id"]
+        entry_snapshot = payload["snapshot"]
+
+        # --- Side effects (canonical qr_queue endpoint semantics) ---
+        if entry_id:
+            # 1) push-уведомление уже отправлено в impl (worker-тред).
+
+            # 2) TV-табло — только network-отправка собранного payload.
+            if payload.get("display_message"):
+                try:
+                    manager = get_display_manager()
+                    await manager.broadcast_patient_call_data(
+                        payload["display_message"]
+                    )
+                except Exception as e:  # noqa: BLE001 — non-blocking
+                    logger.warning("GraphQL callNext: display broadcast failed: %s", e)
+
+            # 3) админский WS /ws/queue
+            try:
+                from app.ws.queue_ws import broadcast_queue_update
+
+                broadcast_day = payload.get("broadcast_day")
+                broadcast_queue_update(
+                    department=f"specialist_{doctor_id}",
+                    date=(
+                        broadcast_day.strftime("%Y-%m-%d") if broadcast_day else None
+                    ),
+                    event_type="queue_update",
+                    data={"action": "call_next", "entry_id": entry_id},
+                )
+            except Exception as e:  # noqa: BLE001 — non-blocking
+                logger.warning("GraphQL callNext: queue WS broadcast failed: %s", e)
+
+        return QueueMutationResponse(
+            success=True,
+            message=(
+                f"Вызван пациент под номером {entry_snapshot.number}"
+                if entry_snapshot
+                else (payload.get("message") or "Пациент вызван")
+            ),
+            queue_entry=entry_snapshot,
+        )
