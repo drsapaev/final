@@ -156,6 +156,7 @@ from .refund_deposit import (
     RefundType,
 )
 from .role_permission import Permission, Role, UserGroup, UserPermissionOverride
+from .salary_history import SalaryHistory, SalaryPayment
 
 # from .dermatology_photos import DermatologyPhoto
 # from .telegram import TelegramConfig, TelegramUser, TelegramMessage, TelegramTemplate

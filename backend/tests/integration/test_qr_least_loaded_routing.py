@@ -580,8 +580,12 @@ def test_unbookable_honors_persisted_online_cap(db_session, monkeypatch) -> None
 
     # inside the online window (pre-07:00 runs would mark EVERY doctor
     # unbookable at the day level and mask the per-queue cap assertions)
-    _freeze_online_window(monkeypatch)
-    today = date.today()
+    # `today` MUST come from the frozen clock: date.today() follows the
+    # process timezone (UTC on CI runners), which skews a day behind the
+    # frozen Asia/Tashkent now for runs between 19:00-24:00 UTC and made
+    # _unbookable_doctor_ids flag every doctor as past-day unbookable
+    # (CI flake, assert {2} == set()).
+    _, today = _freeze_online_window(monkeypatch)
 
     # cap=2, 2 waiting -> unbookable (buggy code: 2 < 15 -> bookable)
     small = _make_doctor(db_session, "dentistry")
