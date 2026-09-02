@@ -165,7 +165,12 @@ const MacOSTab = ({
   };
   return (
     <div className={className} style={containerStyle}>
-      <div style={{ display: 'flex', gap: currentVariant.gap || currentSize.gap }}>
+      {/* AXE-EXP-5: the tablist ARIA role on the direct parent of the
+          role="tab" buttons — previously the buttons lived in a plain flex
+          div, which fails axe aria-required-parent (a tab must be contained
+          by a tablist; flagged on cashier/admin-users/admin-family
+          surfaces). */}
+      <div style={{ display: 'flex', gap: currentVariant.gap || currentSize.gap }} role="tablist">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const IconComponent = tab.icon;

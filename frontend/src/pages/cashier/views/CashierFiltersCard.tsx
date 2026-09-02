@@ -122,6 +122,10 @@ const CashierFiltersCard = ({
           type="date"
           value={selectedDate}
           onChange={(e) => onSelectedDateChange(e.target.value)}
+          /* AXE-EXP-5: form controls need an accessible name (axe `label`
+           * rule — the date input had none; same latent class for the
+           * range pair below). */
+          aria-label={tI18n('cashier.filter_date_single_aria')}
           className="cashier-min-w-160" />
 
           {/* UX Audit #1.4: Quick date presets replace single "Сегодня" button.
@@ -144,6 +148,7 @@ const CashierFiltersCard = ({
           type="date"
           value={dateFrom}
           onChange={(e) => onDateFromChange(e.target.value)}
+          aria-label={tI18n('cashier.filter_date_from_aria')}
           className="cashier-min-w-140" />
 
           <span className="cashier-date-sep">—</span>
@@ -152,6 +157,7 @@ const CashierFiltersCard = ({
           type="date"
           value={dateTo}
           onChange={(e) => onDateToChange(e.target.value)}
+          aria-label={tI18n('cashier.filter_date_to_aria')}
           className="cashier-min-w-140" />
 
           <SegmentedControl

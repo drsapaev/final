@@ -622,6 +622,10 @@ const ru = {
     search_example_name: 'Иванов',
     all_statuses: 'Все статусы',
     single_date: 'Одна дата',
+    // AXE-EXP-5: accessible names for the cashier date filter inputs
+    filter_date_single_aria: 'Фильтр платежей: дата',
+    filter_date_from_aria: 'Фильтр платежей: дата с',
+    filter_date_to_aria: 'Фильтр платежей: дата по',
     date_mode_range: 'Диапазон',
     date_preset_aria: 'Быстрый выбор даты',
     date_range_preset_aria: 'Быстрый выбор диапазона дат',

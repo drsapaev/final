@@ -556,6 +556,10 @@ const uzCyrl = {
     search_example_name: 'Иванов',
     all_statuses: 'Все статусы',
     single_date: 'Одна дата',
+    // AXE-EXP-5: accessible names for the cashier date filter inputs
+    filter_date_single_aria: 'Тўловлар филтри: санa',
+    filter_date_from_aria: 'Тўловлар филтри: санадан',
+    filter_date_to_aria: 'Тўловлар филтри: санагача',
     date_mode_range: 'Диапазон',
     date_preset_aria: 'Быстрый выбор даты',
     date_range_preset_aria: 'Быстрый выбор диапазона дат',
