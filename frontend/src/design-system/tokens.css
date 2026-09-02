@@ -39,6 +39,16 @@
    * (#455568, 5.71:1 on #d7e1ee — no visual delta in light); dark value
    * #c7c7cc = 6.74:1 on #3a3a3c. */
   --mac-text-on-tertiary: #455568;
+  /* AXE-EXP-4 (authorized-surface a11y track): canonical dual-theme LINK
+   * ink — text-level accent usage (active tab labels, links) on neutral
+   * surfaces. The base accent fails BOTH themes as text: light #007aff =
+   * 4.02:1 on white / 3.6:1 on #eef3fa; dark #007aff = 4.23:1 on #1c1c1e.
+   * The CC-2 strong family can't serve dark text either (#0066d6 = 2.99:1
+   * on #1c1c1e). Light value = --mac-accent-blue-strong #0066d6 (5.42:1
+   * on white, 5.1:1 on #eef3fa); dark value = #5ac8fa (macOS light blue:
+   * 8.97:1 on #1c1c1e, 7.4:1 on #2c2c2e). Documented since CC-2 as the
+   * deferred link-ink latent class. */
+  --mac-link-ink: #0066d6;
 
   --mac-border: #b8c8da;
   --mac-border-secondary: #cad8e7;
@@ -238,6 +248,9 @@
     /* AXE-EXP-2: ink on tertiary surfaces — see the :root comment;
      * #c7c7cc = 6.74:1 on #3a3a3c. */
     --mac-text-on-tertiary: #c7c7cc;
+    /* AXE-EXP-4: link ink — see the :root comment; #5ac8fa = 8.97:1 on
+     * #1c1c1e / 7.4:1 on #2c2c2e. */
+    --mac-link-ink: #5ac8fa;
 
     --mac-border: #38383a;
     --mac-border-secondary: #48484a;
@@ -275,6 +288,8 @@
   --mac-text-tertiary: #5d6f84;
   /* AXE-EXP-2: mirror of the :root definition. */
   --mac-text-on-tertiary: #455568;
+  /* AXE-EXP-4: mirror of the :root definition. */
+  --mac-link-ink: #0066d6;
 
   --mac-border: #b8c8da;
   --mac-border-secondary: #cad8e7;
@@ -329,6 +344,8 @@
   --mac-text-tertiary: #636366;
   /* AXE-EXP-2: mirror of the prefers-color-scheme block. */
   --mac-text-on-tertiary: #c7c7cc;
+  /* AXE-EXP-4: mirror of the prefers-color-scheme block. */
+  --mac-link-ink: #5ac8fa;
 
   --mac-border: #38383a;
   --mac-border-secondary: #48484a;
@@ -1113,6 +1130,7 @@
     --mac-text-secondary: #000000;
     --mac-text-tertiary: #000000;
     --mac-text-on-tertiary: #000000;
+    --mac-link-ink: #000000;
   }
 }
 

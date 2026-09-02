@@ -94,7 +94,11 @@ const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>
     borderRadius: '6px',
     border: 'none',
     background: 'transparent',
-    color: 'var(--mac-text-secondary)',
+    // AXE-EXP-4: inactive segment ink — text-secondary was 3.95:1 on the
+    // container's tertiary background in dark; the on-tertiary ink passes
+    // both themes (5.71:1 light — same value as light secondary, no visual
+    // delta / 6.74:1 dark).
+    color: 'var(--mac-text-on-tertiary)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     transition: 'all 160ms cubic-bezier(0.2,0.8,0.2,1)',
     fontWeight: '500',

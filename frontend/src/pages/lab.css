@@ -367,8 +367,10 @@
 }
 
 .lqw-status-filter-btn-active {
-  border-color: var(--mac-accent);
-  background: var(--mac-accent);
+  /* AXE-EXP-4: white ink on the base accent was 4.01:1 — the CC-2 strong
+   * token carries the fill (5.42:1, theme-independent constant). */
+  border-color: var(--mac-accent-blue-strong, var(--mac-accent));
+  background: var(--mac-accent-blue-strong, var(--mac-accent));
   color: white;
   font-weight: 600;
 }
@@ -381,7 +383,9 @@
 
 .lqw-sort-label {
   font-size: var(--mac-font-size-xs);
-  color: var(--mac-text-tertiary);
+  /* AXE-EXP-4: tertiary ink on the tertiary background was 3.9:1 light /
+   * 1.89:1 dark; the on-tertiary ink passes both themes. */
+  color: var(--mac-text-on-tertiary);
 }
 
 .lqw-sort-select {
