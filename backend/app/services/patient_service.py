@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import extract_model_changes, log_critical_change
 from app.core.i18n import t  # noqa: F401
+from app.core.pii_masker import mask_pii
 from app.crud.patient import (
     normalize_patient_name,
     validate_birthdate,
@@ -166,7 +167,12 @@ class PatientService:
                 detail="Ошибка сохранения: имя пациента не было сохранено",
             )
 
+        # Codex round-10 P1: JSON-снапшоты аудита хранят PHI в plaintext —
+        # маскируем каноническим pii_masker (AGENTS.md L390-407).
+        # extract_model_changes возвращает КОРТЕЖ (old, new) — маскируем
+        # ПОСЛЕ распаковки (mask_pii не рекурсирует в tuple).
         _, new_data = extract_model_changes(None, patient)
+        new_data = mask_pii(new_data)
         log_critical_change(
             db=self.db,
             user_id=current_user.id,
@@ -243,11 +249,15 @@ class PatientService:
                     detail="Пациент с таким номером телефона уже существует",
                 )
 
+        # Codex round-10 P1: маскируем PHI в old-снапшоте (см. create;
+        # extract_model_changes -> кортеж, маскируем после распаковки).
         old_data, _ = extract_model_changes(patient, None)
+        old_data = mask_pii(old_data)
         patient = patient_crud.update(db=self.db, db_obj=patient, obj_in=patient_in)
         self.db.refresh(patient)
 
         _, new_data = extract_model_changes(None, patient)
+        new_data = mask_pii(new_data)
         log_critical_change(
             db=self.db,
             user_id=current_user.id,
@@ -280,7 +290,9 @@ class PatientService:
                 status_code=400, detail="Нельзя удалить пациента с активными записями"
             )
 
+        # Codex round-10 P1: маскируем PHI в old-снапшоте (см. create).
         old_data, _ = extract_model_changes(patient, None)
+        old_data = mask_pii(old_data)
 
         try:
             patient_crud.remove(db=self.db, id=patient_id)

@@ -1282,6 +1282,81 @@ def test_graphql_round9_masked_audits(gql_data):
         s.commit()
 
 
+def test_graphql_round10(gql_data):
+    """Codex round-10: PHI маскируется в JSON-снапшотах аудита;
+    soft-deleted пациент не отдаёт PHI в nested-результатах."""
+    from app.db import session as db_session_module
+    from app.models.user_profile import UserAuditLog
+
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+
+    # --- 1) снапшоты new_values/old_values маскируются (pii_masker)
+    data = _execute(
+        """
+        mutation($input: PatientInput!) {
+          createPatient(input: $input) { success patient { id } }
+        }
+        """,
+        {
+            "input": {
+                "lastName": f"SYNTHETIC-R10-{suffix}",
+                "firstName": "SYNTHETIC",
+                "phone": f"+99890{str(int(suffix, 16) % 10**7).zfill(7)}",
+                "email": f"r10-{suffix}@example.com",
+            }
+        },
+    )
+    assert data["createPatient"]["success"] is True, data["createPatient"]
+    pid = data["createPatient"]["patient"]["id"]
+
+    with S() as s:
+        row = (
+            s.query(UserAuditLog)
+            .filter(
+                UserAuditLog.action == "CREATE",
+                UserAuditLog.resource_type == "patients",
+                UserAuditLog.resource_id == pid,
+            )
+            .first()
+        )
+        assert row is not None
+        nv = row.new_values or {}
+        # ФИО — инициалы, не plaintext
+        assert nv.get("last_name") != f"SYNTHETIC-R10-{suffix}"
+        assert nv.get("last_name", "").endswith(".")
+        # телефон замаскирован (•••), не исходный
+        assert "•" in (nv.get("phone") or "")
+        assert nv.get("phone") != f"+99890{str(int(suffix, 16) % 10**7).zfill(7)}"
+        # email маскирован
+        assert (nv.get("email") or "").startswith("r")
+        assert "•" in (nv.get("email") or "")
+        # чистим аудит-строку
+        s.delete(row)
+        s.commit()
+
+    # --- 2) soft-deleted пациент скрыт из nested (appointments.items.patient)
+    with S() as s:
+        d["patient"].is_deleted = True
+        s.merge(d["patient"])
+        s.commit()
+    try:
+        data = _execute(
+            "query { appointments { items { id patient { id fullName phone } } } }"
+        )
+        items = data["appointments"]["items"]
+        target = next((i for i in items if i["id"] == d["appointment"].id), None)
+        assert target is not None
+        # запись осталась (история), но PHI пациента подавлено
+        assert target["patient"] is None
+    finally:
+        with S() as s:
+            d["patient"].is_deleted = False
+            s.merge(d["patient"])
+            s.commit()
+
+
 def test_sessions_are_closed_after_resolver(gql_session_factory):
     """with get_db_session() закрывает сессию: соединения не утекают."""
     _execute("{ patients { pagination { total } } }")

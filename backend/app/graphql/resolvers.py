@@ -225,7 +225,14 @@ def appointment_to_type(appointment: Appointment) -> AppointmentType:
     """Конвертировать Appointment в AppointmentType"""
     return AppointmentType(
         id=appointment.id,
-        patient=(patient_to_type(appointment.patient) if appointment.patient else None),
+        # Codex round-10 P2: soft-deleted пациент (историческая запись)
+        # не отдаёт PHI в nested-результатах — patient=None, как у
+        # отсутствующей связи.
+        patient=(
+            patient_to_type(appointment.patient)
+            if appointment.patient and not appointment.patient.is_deleted
+            else None
+        ),
         doctor=doctor_to_type(appointment.doctor) if appointment.doctor else None,
         appointment_date=appointment.appointment_date,
         appointment_time=appointment.appointment_time,
@@ -247,7 +254,14 @@ def visit_to_type(visit: Visit) -> VisitType:
     """Конвертировать Visit в VisitType"""
     return VisitType(
         id=visit.id,
-        patient=patient_to_type(visit.patient) if visit.patient else None,
+        # Codex round-10 P2: soft-deleted пациент (историческая запись)
+        # не отдаёт PHI в nested-результатах — patient=None, как у
+        # отсутствующей связи.
+        patient=(
+            patient_to_type(visit.patient)
+            if visit.patient and not visit.patient.is_deleted
+            else None
+        ),
         doctor=doctor_to_type(visit.doctor) if visit.doctor else None,
         visit_date=visit.visit_date,
         visit_time=visit.visit_time,
@@ -280,7 +294,14 @@ def queue_entry_to_type(entry: OnlineQueueEntry) -> QueueEntryType:
     return QueueEntryType(
         id=entry.id,
         queue=daily_queue_to_type(entry.queue) if entry.queue else None,
-        patient=patient_to_type(entry.patient) if entry.patient else None,
+        # Codex round-10 P2: soft-deleted пациент (историческая запись)
+        # не отдаёт PHI в nested-результатах — patient=None, как у
+        # отсутствующей связи.
+        patient=(
+            patient_to_type(entry.patient)
+            if entry.patient and not entry.patient.is_deleted
+            else None
+        ),
         number=entry.number,
         status=entry.status,
         source=entry.source,
