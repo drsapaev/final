@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 from app.db import session as db_session_module
 from app.graphql.schema import GraphQLContext, schema
 from app.models.appointment import Appointment
-from app.models.clinic import Doctor
+from app.models.clinic import ClinicSettings, Doctor
 from app.models.notification import (
     NotificationDelivery,
     NotificationSettings,
@@ -108,6 +108,18 @@ def gql_data(test_db, gql_session_factory):
         session.add(service)
         session.flush()
 
+        # Codex P1 (раунд 5): канонический прайсинг применяется только к
+        # is_consultation=True (benefit/repeat) — нужна консультация.
+        consult_service = Service(
+            name=f"Приём GQL {suffix}",
+            code=f"GQLC-{suffix}",
+            price=100000,
+            active=True,
+            is_consultation=True,
+        )
+        session.add(consult_service)
+        session.flush()
+
         appointment = Appointment(
             patient_id=patient.id,
             doctor_id=doctor.id,
@@ -146,6 +158,7 @@ def gql_data(test_db, gql_session_factory):
             doctor=doctor,
             patient=patient,
             service=service,
+            consult_service=consult_service,
             appointment=appointment,
             visit=visit,
             queue=queue,
@@ -352,6 +365,12 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
             "input": {
                 "lastName": f"SYNTHETIC-Petrov-{suffix}",
                 "firstName": "SYNTHETIC",
+                # форматно-валидный (+998XXXXXXXXX), но синтетический номер
+                # (цифры из hex-суффикса; нули в середине) — каноническая
+                # валидация PatientService пропускает, а фейковость видна
+                # в репо (codex round-1: никаких реалистичных +998-фикстур).
+                "phone": f"+99890{str(int(suffix, 16) % 10**7).zfill(7)}",
+                "email": f"petrov-{suffix}@example.com",
             }
         },
     )
@@ -360,12 +379,16 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
     linked_patient_id = created["patient"]["id"]
     assert created["patient"]["fullName"].startswith(f"SYNTHETIC-Petrov-{suffix}")
 
-    # --- updatePatient ---
+    # --- updatePatient: частичное обновление ТОЛЬКО address ---
+    # Codex P1 (раунд 5): опущенные поля (UNSET) не должны затирать
+    # существующие телефон/email — раньше они уходили в PatientUpdate как
+    # None и CRUDBase.update обнулял их.
+    created_phone = created["patient"]["phone"]
     data = _execute(
         """
         mutation($id: Int!, $input: PatientUpdateInput!) {
           updatePatient(id: $id, input: $input) {
-            success patient { id address }
+            success patient { id address phone email }
           }
         }
         """,
@@ -373,6 +396,9 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
     )
     assert data["updatePatient"]["success"] is True
     assert data["updatePatient"]["patient"]["address"] == "ул. Тестовая, 1"
+    # опущенные поля выжили (не затёрты None)
+    assert data["updatePatient"]["patient"]["phone"] == created_phone
+    assert data["updatePatient"]["patient"]["email"] == f"petrov-{suffix}@example.com"
 
     # --- createService / updateServicePrice ---
     data = _execute(
@@ -466,6 +492,115 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
     assert data["updateVisitStatus"]["success"] is True, data["updateVisitStatus"]
     assert data["updateVisitStatus"]["visit"]["status"] == "confirmed"
 
+    # --- Codex P1 (раунд 5): repeat-guard — канонический guard корзины.
+    # seed-пациент: фикстурный визит без visit_date → не eligible.
+    data = _execute(
+        """
+        mutation($input: VisitInput!) {
+          createVisit(input: $input) { success message errors }
+        }
+        """,
+        {
+            "input": {
+                "patientId": d["patient"].id,
+                "doctorId": d["doctor"].id,
+                "discountMode": "repeat",
+                "serviceIds": [d["consult_service"].id],
+            }
+        },
+    )
+    repeat_guard = data["createVisit"]
+    assert repeat_guard["success"] is False, repeat_guard
+    assert "REPEAT_VISIT_NOT_ELIGIBLE" in repeat_guard["errors"]
+
+    # --- Codex P1 (раунд 5): канонический прайсинг ДО персистенса.
+    # repeat: repeat_visit_discount=20 (ClinicSettings) → 80% от 100000.
+    # benefit: benefit_consultation_free=True (дефолт) → 0.
+    settings_owned = False
+    # gql_session_factory уже пропатчил SessionLocal на тестовую БД —
+    # саму фикстуру вызывать напрямую нельзя (pytest forbids).
+    from app.db import session as db_session_module
+
+    with db_session_module.SessionLocal() as s:
+        row = (
+            s.query(ClinicSettings)
+            .filter(ClinicSettings.key == "repeat_visit_discount")
+            .first()
+        )
+        if row is None:
+            s.add(ClinicSettings(key="repeat_visit_discount", value="20"))
+            settings_owned = True
+        else:
+            row.value = "20"
+        s.commit()
+
+    try:
+        data = _execute(
+            """
+            mutation($input: VisitInput!) {
+              createVisit(input: $input) { success visit { id } }
+            }
+            """,
+            {
+                "input": {
+                    "patientId": linked_patient_id,
+                    "doctorId": d["doctor"].id,
+                    "discountMode": "repeat",
+                    "serviceIds": [d["consult_service"].id],
+                }
+            },
+        )
+        assert data["createVisit"]["success"] is True, data["createVisit"]
+        repeat_visit_id = data["createVisit"]["visit"]["id"]
+
+        data = _execute(
+            """
+            mutation($input: VisitInput!) {
+              createVisit(input: $input) { success visit { id } }
+            }
+            """,
+            {
+                "input": {
+                    "patientId": linked_patient_id,
+                    "doctorId": d["doctor"].id,
+                    "discountMode": "benefit",
+                    "serviceIds": [d["consult_service"].id],
+                }
+            },
+        )
+        assert data["createVisit"]["success"] is True, data["createVisit"]
+        benefit_visit_id = data["createVisit"]["visit"]["id"]
+
+        with db_session_module.SessionLocal() as s:
+            repeat_vs = (
+                s.query(VisitService)
+                .filter(VisitService.visit_id == repeat_visit_id)
+                .first()
+            )
+            assert repeat_vs is not None
+            assert float(repeat_vs.price) == 80000.0  # 100000 - 20%
+            benefit_vs = (
+                s.query(VisitService)
+                .filter(VisitService.visit_id == benefit_visit_id)
+                .first()
+            )
+            assert benefit_vs is not None
+            assert float(benefit_vs.price) == 0.0  # льгота: консультация 0
+    finally:
+        # не контаминировать общую session-scoped БД
+        with db_session_module.SessionLocal() as s:
+            row = (
+                s.query(ClinicSettings)
+                .filter(ClinicSettings.key == "repeat_visit_discount")
+                .first()
+            )
+            if row is not None:
+                if settings_owned:
+                    s.delete(row)
+                else:
+                    row.value = None
+                s.commit()
+
     # --- joinQueue / callNextPatient (свежий пациент — seed-пациент
     # уже waiting, словили бы ALREADY_IN_QUEUE) ---
     data = _execute(
@@ -513,6 +648,80 @@ def test_graphql_mutations_succeed_against_real_db(gql_data, monkeypatch):
         {"id": orphan_id},
     )
     assert data["deletePatient"]["success"] is True
+
+
+def test_join_queue_broadcasts_to_display_and_ws(gql_data, monkeypatch):
+    """Codex P2 (раунд 5): успешный joinQueue broadcast-ит queue.created
+    на TV-табло и entry_added в админский /ws/queue — как канонический
+    REST /queue/join."""
+    import app.ws.queue_ws as queue_ws_module
+    from app.graphql import mutations as gql_mutations
+
+    # Time-of-day gotcha (#2992): фиксируем окно онлайн-набора.
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+
+    display_calls: list[dict] = []
+    ws_calls: list[dict] = []
+
+    class _StubDisplayManager:
+        async def broadcast_queue_update(self, *, queue_entry, event_type):
+            display_calls.append({"entry_id": queue_entry.id, "event_type": event_type})
+
+    monkeypatch.setattr(
+        gql_mutations, "get_display_manager", lambda: _StubDisplayManager()
+    )
+
+    def _fake_ws_broadcast(**kwargs):
+        ws_calls.append(kwargs)
+
+    monkeypatch.setattr(queue_ws_module, "broadcast_queue_update", _fake_ws_broadcast)
+
+    d = gql_data
+    suffix = d["suffix"]
+
+    # свежий пациент (seed уже waiting — словили бы ALREADY_IN_QUEUE)
+    data = _execute(
+        """
+        mutation($input: PatientInput!) {
+          createPatient(input: $input) { success patient { id } }
+        }
+        """,
+        {
+            "input": {
+                "lastName": f"SYNTHETIC-Broadcast-{suffix}",
+                "firstName": "SYNTHETIC",
+            }
+        },
+    )
+    patient_id = data["createPatient"]["patient"]["id"]
+
+    data = _execute(
+        """
+        mutation($input: QueueEntryInput!) {
+          joinQueue(input: $input) { success queueEntry { id number } }
+        }
+        """,
+        {"input": {"patientId": patient_id, "doctorId": d["doctor"].id}},
+    )
+    join = data["joinQueue"]
+    assert join["success"] is True, join
+    entry_id = join["queueEntry"]["id"]
+
+    # 1) TV-табло получила queue.created для новой записи
+    assert display_calls == [{"entry_id": entry_id, "event_type": "queue.created"}]
+    # 2) админский WS получил entry_added в комнату врача
+    assert len(ws_calls) == 1, ws_calls
+    ws = ws_calls[0]
+    assert ws["department"] == f"specialist_{d['doctor'].id}"
+    assert ws["date"] == date.today().strftime("%Y-%m-%d")
+    assert ws["event_type"] == "queue_update"
+    assert ws["data"]["action"] == "entry_added"
+    assert ws["data"]["entry_id"] == entry_id
+    assert ws["data"]["number"] == join["queueEntry"]["number"]
 
 
 def test_delete_patient_blocked_when_related_records_exist(gql_data):

@@ -9,6 +9,7 @@ passport_series, queue_date, current_number и т.д.).
 from datetime import date, datetime, time
 
 import strawberry
+from strawberry import UNSET
 
 
 @strawberry.type
@@ -160,18 +161,25 @@ class PatientInput:
 
 @strawberry.input
 class PatientUpdateInput:
-    """Входные данные для обновления пациента"""
+    """Входные данные для обновления пациента.
 
-    last_name: str | None = None
-    first_name: str | None = None
-    middle_name: str | None = None
-    phone: str | None = None
-    email: str | None = None
-    birth_date: date | None = None
-    sex: str | None = None
-    address: str | None = None
-    doc_type: str | None = None
-    doc_number: str | None = None
+    Codex P1: дефолт UNSET (а не None) — опущенное поле в Python даёт
+    UNSET и НЕ попадает в PatientUpdate, поэтому частичный update
+    (только address) не затирает телефон/email/документ и т.д.
+    Явно переданный null по-прежнему очищает поле (None). SDL-тип поля
+    остаётся nullable — контракт для клиентов не меняется.
+    """
+
+    last_name: str | None = UNSET
+    first_name: str | None = UNSET
+    middle_name: str | None = UNSET
+    phone: str | None = UNSET
+    email: str | None = UNSET
+    birth_date: date | None = UNSET
+    sex: str | None = UNSET
+    address: str | None = UNSET
+    doc_type: str | None = UNSET
+    doc_number: str | None = UNSET
 
 
 @strawberry.input

@@ -98,7 +98,6 @@ class ServicesApiService:
                 ),
             )
 
-
     @staticmethod
     def _should_validate_service_code_alignment(
         change_set: dict[str, Any],
@@ -165,13 +164,16 @@ class ServicesApiService:
             new_service=new_service,
             comment=comment,
         )
+
     def list_service_categories(self, *, active: bool | None):
         return self.repository.list_service_categories(active=active)
 
     def create_service_category(self, *, category_data) -> ServiceCategory:
         existing = self.repository.get_service_category_by_code(category_data.code)
         if existing:
-            raise ValueError(f"Category with code '{category_data.code}' already exists")
+            raise ValueError(
+                f"Category with code '{category_data.code}' already exists"
+            )
 
         payload = (
             category_data.model_dump()
@@ -184,7 +186,9 @@ class ServicesApiService:
         self.repository.refresh(category)
         return category
 
-    def update_service_category(self, *, category_id: int, category_data) -> ServiceCategory:
+    def update_service_category(
+        self, *, category_id: int, category_data
+    ) -> ServiceCategory:
         category = self.repository.get_service_category(category_id)
         if not category:
             raise LookupError("Category not found")
@@ -197,7 +201,9 @@ class ServicesApiService:
         if "code" in update_data and update_data["code"] != category.code:
             existing = self.repository.get_service_category_by_code(update_data["code"])
             if existing:
-                raise ValueError(f"Category with code '{update_data['code']}' already exists")
+                raise ValueError(
+                    f"Category with code '{update_data['code']}' already exists"
+                )
 
         for field, value in update_data.items():
             setattr(category, field, value)
@@ -231,11 +237,17 @@ class ServicesApiService:
         limit: int,
         offset: int,
     ):
-        rows = self.repository.list_services(q=q, active=active, limit=limit, offset=offset)
+        rows = self.repository.list_services(
+            q=q, active=active, limit=limit, offset=offset
+        )
         if category_id is not None:
-            rows = [row for row in rows if getattr(row, "category_id", None) == category_id]
+            rows = [
+                row for row in rows if getattr(row, "category_id", None) == category_id
+            ]
         if department:
-            rows = [row for row in rows if getattr(row, "department", None) == department]
+            rows = [
+                row for row in rows if getattr(row, "department", None) == department
+            ]
         return rows
 
     def get_queue_groups_payload(self) -> dict[str, Any]:
@@ -282,10 +294,17 @@ class ServicesApiService:
         return self.repository.get_service(service_id)
 
     def create_service(self, *, service_data):
+        # Pydantic-schema (REST) OR plain dict (GraphQL createService) --
+        # codex round-4: the GraphQL mutation delegates here with a dict
+        # payload (name/code/price/unit/currency/category_code).
         payload = (
             service_data.model_dump()
             if hasattr(service_data, "model_dump")
-            else service_data.dict()
+            else (
+                service_data.dict()
+                if hasattr(service_data, "dict")
+                else dict(service_data)
+            )
         )
 
         canonical_code = self._normalize_service_code_payload(payload)
@@ -356,8 +375,10 @@ class ServicesApiService:
                 category_specialty = category.specialty
 
             if validation_payload.get("category_code"):
-                validation_payload["category_code"] = self._normalize_category_code_value(
-                    validation_payload["category_code"]
+                validation_payload["category_code"] = (
+                    self._normalize_category_code_value(
+                        validation_payload["category_code"]
+                    )
                 )
 
             self._validate_service_code_prefix_alignment(
