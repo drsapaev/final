@@ -22,6 +22,7 @@ from strawberry import UNSET
 
 from app.core.audit import extract_model_changes, log_critical_change
 from app.core.i18n import t
+from app.core.pii_masker import mask_pii
 from app.crud import (
     online_queue as crud_queue,
 )
@@ -90,10 +91,23 @@ class Mutation:
     # ===================== PATIENT MUTATIONS =====================
 
     @strawberry.mutation
-    def create_patient(
+    async def create_patient(
         self, info: strawberry.Info, input: PatientInput
     ) -> PatientMutationResponse:
-        """Создать нового пациента (SSOT: PatientService.create_patient)."""
+        """Создать нового пациента (SSOT: PatientService.create_patient).
+
+        Codex P2 (round-11): сервис вызывает asyncio.run для канонической
+        нотификации — синхронный резолвер исполняется в активном event loop,
+        asyncio.run падал с RuntimeError и нотификация молча пропускалась.
+        DB-часть в worker-треде (нет активного loop) — нотификация
+        доставляется, как в REST-пути.
+        """
+        return await run_in_threadpool(Mutation._create_patient_impl, info, input)
+
+    @staticmethod
+    def _create_patient_impl(
+        info: strawberry.Info, input: PatientInput
+    ) -> PatientMutationResponse:
         actor = getattr(info.context, "user", None) if info.context else None
         if not actor:
             return PatientMutationResponse(
@@ -632,7 +646,11 @@ class Mutation:
                 # GraphQL-визиты не выпадают из обязательной истории мутаций.
                 # (PHI read-trail выше — view, не CREATE.)
                 actor_visit = getattr(info.context, "user", None)
+                # Codex P1 (round-11): снапшот визита может содержать
+                # клинический текст (notes — full-redact по AGENTS.md) —
+                # маскируем каноническим pii_masker ДО записи аудита.
                 _, visit_new_data = extract_model_changes(None, visit)
+                visit_new_data = mask_pii(visit_new_data)
                 log_critical_change(
                     db=db,
                     user_id=actor_visit.id if actor_visit else None,

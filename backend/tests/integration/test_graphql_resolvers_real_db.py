@@ -10,6 +10,7 @@
 """
 
 import asyncio
+import json
 import uuid
 from datetime import date
 from types import SimpleNamespace
@@ -52,8 +53,28 @@ gql_data_ctx: dict = {}
 
 
 @pytest.fixture
-def gql_data(test_db, gql_session_factory):
+def gql_data(test_db, gql_session_factory, monkeypatch):
     """Seed реальных строк в тестовую БД; очистка в finally."""
+    # Codex round-11 фикс: createPatient теперь ДОСТАВЛЯЕТ каноническую
+    # нотификацию (worker-тред без event loop) — реальные deliveries
+    # контаминировали общую session-scoped БД (contract-тесты считали
+    # строки). Async-заглушка сохраняет механизм (asyncio.run в треде
+    # работает, "skipped due runtime context" не появляется), но не пишет
+    # deliveries.
+    from app.services.notifications import notification_sender_service
+
+    sent_notifications: list[dict] = []
+
+    async def _stub_send_patient_registered(**kwargs):
+        sent_notifications.append(kwargs)
+        return True
+
+    monkeypatch.setattr(
+        notification_sender_service,
+        "send_patient_registered_notification",
+        _stub_send_patient_registered,
+    )
+
     session = gql_session_factory()
     suffix = uuid.uuid4().hex[:8]
     created: dict = {}
@@ -1355,6 +1376,78 @@ def test_graphql_round10(gql_data):
             d["patient"].is_deleted = False
             s.merge(d["patient"])
             s.commit()
+
+
+def test_graphql_round11(gql_data, caplog):
+    """Codex round-11: регистрация-нотификация не скипается (worker-тред,
+    без активного event loop); visit-снапшот аудита маскируется."""
+    import logging
+
+    from app.db import session as db_session_module
+    from app.models.user_profile import UserAuditLog
+
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+
+    # --- 1) createPatient из async-резолвера: canonical delivery НЕ скипается
+    with caplog.at_level(logging.WARNING, logger="app.services.patient_service"):
+        data = _execute(
+            """
+            mutation($input: PatientInput!) {
+              createPatient(input: $input) { success patient { id } }
+            }
+            """,
+            {
+                "input": {
+                    "lastName": f"SYNTHETIC-R11-{suffix}",
+                    "firstName": "SYNTHETIC",
+                }
+            },
+        )
+    assert data["createPatient"]["success"] is True, data["createPatient"]
+    assert not any(
+        "skipped due runtime context" in (r.getMessage() or "") for r in caplog.records
+    ), "patient-registered delivery must not be skipped for GraphQL creates"
+
+    # --- 2) visit-снапшот: clinical notes -> [REDACTED] в new_values
+    data = _execute(
+        """
+        mutation($input: VisitInput!) {
+          createVisit(input: $input) { success visit { id } }
+        }
+        """,
+        {
+            "input": {
+                "patientId": d["patient"].id,
+                "doctorId": d["doctor"].id,
+                "discountMode": "none",
+                "serviceIds": [d["service"].id],
+                "notes": f"Жалобы R11 {suffix}: боль, тел +998901112233",
+            }
+        },
+    )
+    assert data["createVisit"]["success"] is True, data["createVisit"]
+    r11_visit_id = data["createVisit"]["visit"]["id"]
+
+    with S() as s:
+        row = (
+            s.query(UserAuditLog)
+            .filter(
+                UserAuditLog.action == "CREATE",
+                UserAuditLog.resource_type == "visits",
+                UserAuditLog.resource_id == r11_visit_id,
+            )
+            .first()
+        )
+        assert row is not None
+        nv = row.new_values or {}
+        # notes — full-redact; текст/телефон не в plaintext
+        assert nv.get("notes") == "[REDACTED]", nv.get("notes")
+        assert suffix not in json.dumps(nv, ensure_ascii=False, default=str)
+        # чистим аудит-строку (визит удалит фикстурная очистка)
+        s.delete(row)
+        s.commit()
 
 
 def test_sessions_are_closed_after_resolver(gql_session_factory):
