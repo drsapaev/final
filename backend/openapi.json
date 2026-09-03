@@ -28771,16 +28771,6 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
           "503": {
             "content": {
               "application/json": {
@@ -28790,6 +28780,16 @@
               }
             },
             "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -29042,16 +29042,6 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
           "503": {
             "content": {
               "application/json": {
@@ -29061,6 +29051,16 @@
               }
             },
             "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       },
@@ -99079,6 +99079,19 @@
         ],
         "title": "SetupStatusOut"
       },
+      "ServiceUnavailableDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ServiceUnavailableDetail"
+      },
       "SpecialtyVocabularyItem": {
         "properties": {
           "code": {
@@ -109264,19 +109277,6 @@
         ],
         "title": "UserProfileResponse",
         "description": "Схема ответа профиля пользователя"
-      },
-      "ServiceUnavailableDetail": {
-        "properties": {
-          "detail": {
-            "type": "string",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "required": [
-          "detail"
-        ],
-        "title": "ServiceUnavailableDetail"
       }
     },
     "securitySchemes": {

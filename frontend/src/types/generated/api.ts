@@ -34972,6 +34972,11 @@ export type components = {
             /** Initialized */
             initialized: boolean;
         };
+        /** ServiceUnavailableDetail */
+        ServiceUnavailableDetail: {
+            /** Detail */
+            detail: string;
+        };
         /**
          * SpecialtyVocabularyItem
          * @description One selectable specialty from the Medical Specialty Catalog (0051).
@@ -38567,11 +38572,6 @@ export type components = {
              * Format: date-time
              */
             updated_at: string;
-        };
-        /** ServiceUnavailableDetail */
-        ServiceUnavailableDetail: {
-            /** Detail */
-            detail: string;
         };
     };
     responses: never;
