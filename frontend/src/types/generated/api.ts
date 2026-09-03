@@ -34769,6 +34769,19 @@ export type components = {
              */
             limit: number;
         };
+        /**
+         * ServiceUnavailableDetail
+         * @description Body of the documented catalog 503 (Codex round-6 P2).
+         *
+         *     FastAPI's HTTPException payload is ``{"detail": ...}``; declaring this
+         *     model on the affected operations gives generated clients a typed error
+         *     shape instead of ``content?: never`` for the configuration-failure
+         *     response shared by GET specialty-vocabulary, POST and PUT /admin/doctors.
+         */
+        ServiceUnavailableDetail: {
+            /** Detail */
+            detail: string;
+        };
         /** ServiceUpdate */
         ServiceUpdate: {
             /** Code */
@@ -34971,11 +34984,6 @@ export type components = {
         SetupStatusOut: {
             /** Initialized */
             initialized: boolean;
-        };
-        /** ServiceUnavailableDetail */
-        ServiceUnavailableDetail: {
-            /** Detail */
-            detail: string;
         };
         /**
          * SpecialtyVocabularyItem

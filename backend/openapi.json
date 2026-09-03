@@ -28772,14 +28772,14 @@
             }
           },
           "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceUnavailableDetail"
                 }
               }
-            },
-            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -28934,14 +28934,14 @@
             }
           },
           "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceUnavailableDetail"
                 }
               }
-            },
-            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+            }
           }
         },
         "security": [
@@ -29043,14 +29043,14 @@
             }
           },
           "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceUnavailableDetail"
                 }
               }
-            },
-            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -98440,6 +98440,20 @@
         "title": "ServiceSearchRequest",
         "description": "Запрос поиска услуг"
       },
+      "ServiceUnavailableDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ServiceUnavailableDetail",
+        "description": "Body of the documented catalog 503 (Codex round-6 P2).\n\nFastAPI's HTTPException payload is ``{\"detail\": ...}``; declaring this\nmodel on the affected operations gives generated clients a typed error\nshape instead of ``content?: never`` for the configuration-failure\nresponse shared by GET specialty-vocabulary, POST and PUT /admin/doctors."
+      },
       "ServiceUpdate": {
         "properties": {
           "code": {
@@ -99078,19 +99092,6 @@
           "initialized"
         ],
         "title": "SetupStatusOut"
-      },
-      "ServiceUnavailableDetail": {
-        "properties": {
-          "detail": {
-            "type": "string",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "required": [
-          "detail"
-        ],
-        "title": "ServiceUnavailableDetail"
       },
       "SpecialtyVocabularyItem": {
         "properties": {
