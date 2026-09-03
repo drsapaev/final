@@ -126,7 +126,14 @@ const DoctorModal = ({
             }>;
           } | null,
         ) => {
-          if (cancelled || !response?.data) return;
+          if (cancelled) return;
+          // Catalog unavailable (network error / 503): clear the previous
+          // options instead of leaving a stale, selectable list that only
+          // fails on save (Codex P2 round 5).
+          if (!response?.data) {
+            setSpecialtyOptions([]);
+            return;
+          }
           setSpecialtyOptions(
             response.data.map((item) => ({
               value: item.code,
