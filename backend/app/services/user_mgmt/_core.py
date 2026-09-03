@@ -5,7 +5,10 @@ from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
 )
 from app.services.user_mgmt._base import *  # noqa: F401, F403
-from app.services.user_mgmt._base import UserManagementServiceMixinBase
+from app.services.user_mgmt._base import (
+    DoctorSpecialtyNotSelectableError,
+    UserManagementServiceMixinBase,
+)
 
 
 class CoreMixin(UserManagementServiceMixinBase):
@@ -421,6 +424,15 @@ class CoreMixin(UserManagementServiceMixinBase):
             db.commit()
             return True, "Пользователь успешно обновлен"
 
+        except DoctorSpecialtyNotSelectableError as e:
+            # Codex #3010 follow-up P1: the promotion reactivates a Doctor
+            # profile whose stored specialty is not a selectable catalog
+            # code — surface the REMEDIATION message instead of the generic
+            # internal-error fallback (the role change is rejected, nothing
+            # is activated).
+            db.rollback()
+            logger.warning("Role change rejected by catalog guard: %s", e)
+            return False, str(e)
         except Exception as e:
             db.rollback()
             logger.error(f"Error updating user: {e}")

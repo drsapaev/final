@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session  # noqa: F401
 from app.core.security import get_password_hash  # noqa: F401
 from app.core.specialties import (
     INCOMPLETE_DOCTOR_SPECIALTY,  # noqa: F401 — SSOT: core/specialties (D-1)
+    canonical_specialty,
 )
 from app.models.clinic import Doctor  # noqa: F401
 from app.models.user import User  # noqa: F401
@@ -121,6 +122,48 @@ def is_doctor_profile_incomplete(specialty: str | None) -> bool:
     # doctor passes booking eligibility and the eligible_only selectors.
     return (not cleaned) or cleaned == INCOMPLETE_DOCTOR_SPECIALTY
 
+
+class DoctorSpecialtyNotSelectableError(Exception):
+    """Raised when a role promotion would (re)activate a Doctor profile
+    whose specialty is not a selectable catalog code.
+
+    Codex #3010 follow-up P1: the role-change lifecycle is the shared
+    provisioning path — a deactivated catalog specialty must never be
+    carried into an ACTIVE doctor profile (active-only queue/doctor
+    selectors would return it). The account-level role change stays
+    rejected (not silently degraded): the admin first assigns a valid
+    specialty through the validated /admin/doctors boundary.
+    """
+
+    def __init__(self, specialty: str) -> None:
+        self.specialty = specialty
+        super().__init__(
+            "Профиль врача хранит специальность, недоступную в каталоге "
+            f"('{specialty}'): назначьте действующую специальность через "
+            "административный контур врачей (PUT /admin/doctors/{id}) "
+            "перед повторной активацией врачебной роли."
+        )
+
+
+def _mapped_specialty_selectable(db: Session, specialty: str) -> bool:
+    """Catalog-guard helper shared by role-change provisioning paths.
+
+    An UNUSABLE catalog (missing table / empty seed →
+    ``MedicalSpecialtyCatalogError``) carries no deactivation information —
+    keep the historical mapping rather than failing the operation (same
+    trade-off as the provisioning auto-map in _core.py).
+    """
+    from app.services.medical_specialty_catalog import (
+        MedicalSpecialtyCatalogError,
+        MedicalSpecialtyCatalogService,
+    )
+
+    try:
+        return MedicalSpecialtyCatalogService(db).is_selectable_for_onboarding(
+            specialty
+        )
+    except MedicalSpecialtyCatalogError:
+        return True
 
 
 class UserManagementServiceMixinBase:
@@ -247,6 +290,24 @@ class UserManagementServiceMixinBase:
                 specialty = DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
                     new_role, INCOMPLETE_DOCTOR_SPECIALTY
                 )
+                # Codex #3010 follow-up P1: the role-change lifecycle is the
+                # SHARED provisioning path (create and promotion must not
+                # drift) — a role-mapped specialty that is no longer a
+                # selectable catalog code (deactivated row) must not receive
+                # a fresh ACTIVE doctor profile; provision the INCOMPLETE
+                # sentinel instead (account still onboards, the profile
+                # requires assignment through the validated boundary).
+                if (
+                    specialty != INCOMPLETE_DOCTOR_SPECIALTY
+                    and not _mapped_specialty_selectable(db, specialty)
+                ):
+                    logger.warning(
+                        "Role promotion downgraded mapped specialty: catalog "
+                        "code %s is not selectable — incomplete profile "
+                        "requires assignment via /admin/doctors",
+                        specialty,
+                    )
+                    specialty = INCOMPLETE_DOCTOR_SPECIALTY
                 values = {
                     "user_id": user.id,
                     "specialty": specialty,
@@ -295,6 +356,26 @@ class UserManagementServiceMixinBase:
                     is_doctor_profile_incomplete(doctor.specialty),
                 )
             elif not existing.active and user.is_active:
+                # Codex #3010 follow-up P1: activation carries the STORED
+                # specialty into a new active assignment. A non-selectable
+                # REAL code (deactivated row / unknown value) must not be
+                # reactivated — reject the role change with a descriptive
+                # error so the admin assigns a valid specialty first. The
+                # incomplete sentinel stays allowed: it is not bookable and
+                # active-only selectors exclude it, and blocking it would
+                # break the mechanical promote→demote→promote cycle.
+                stored_specialty = (existing.specialty or "").strip()
+                # D-1: legacy dental-family spellings (stomatology/dental/
+                # dentist) are the SAME specialty as the catalog's canonical
+                # 'dentistry' — check selectability of the CANONICAL form so
+                # a pre-0049 legacy row is not falsely rejected.
+                stored_canonical = canonical_specialty(stored_specialty)
+                if (
+                    stored_canonical
+                    and stored_canonical != INCOMPLETE_DOCTOR_SPECIALTY
+                    and not _mapped_specialty_selectable(db, stored_canonical)
+                ):
+                    raise DoctorSpecialtyNotSelectableError(stored_specialty)
                 existing.active = True
                 db.flush()
                 logger.info(

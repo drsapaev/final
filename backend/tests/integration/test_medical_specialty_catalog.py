@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
 from app.models.medical_specialty import MedicalSpecialty
+from app.models.user import User
 from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
     MedicalSpecialtyCatalogService,
@@ -588,5 +589,233 @@ class TestActivationLoopholeFollowUp:
             f"/api/v1/admin/doctors/{doctor.id}",
             headers=auth_headers,
             json={"specialty": "cardiology", "active": True},
+        )
+        assert response.status_code == 200, response.text
+
+
+class TestRoleChangePromotionGuard:
+    """Codex #3010 follow-up P1: the role-change lifecycle
+    (PUT /users/users/{id}) is the SHARED doctor-provisioning path —
+    fresh inserts and reactivations must respect the catalog SSOT exactly
+    like the POST /users auto-map, so a deactivated specialty can never be
+    carried into an ACTIVE doctor profile."""
+
+    def _make_registrar_with_inactive_profile(
+        self, seeded_catalog, specialty: str
+    ):
+        from app.core.security import get_password_hash
+        from app.models.user import User
+
+        user = User(
+            username=f"promo_{specialty}_{id(self) % 100000}",
+            email=f"promo-{specialty}-{id(self) % 100000}@test.com",
+            full_name="Promotion Guard",
+            hashed_password=get_password_hash("secret123"),
+            role="Registrar",
+            is_active=True,
+        )
+        seeded_catalog.add(user)
+        seeded_catalog.commit()
+        seeded_catalog.refresh(user)
+
+        doctor = Doctor(
+            user_id=user.id, specialty=specialty, active=False
+        )
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+        seeded_catalog.refresh(doctor)
+        return user, doctor
+
+    def _deactivate(self, seeded_catalog, code: str):
+        row = (
+            seeded_catalog.query(MedicalSpecialty)
+            .filter(MedicalSpecialty.code == code)
+            .first()
+        )
+        row.active = False
+        seeded_catalog.commit()
+        return row
+
+    def test_promotion_to_legacy_role_with_deactivated_specialty_provisions_sentinel(
+        self, client, auth_headers, seeded_catalog, db_session
+    ):
+        row = self._deactivate(seeded_catalog, "dermatology")
+        try:
+            user = User(
+                username="promo_derma_downgrade",
+                email="promo-derma-downgrade@test.com",
+                full_name="Promotion Downgrade",
+                hashed_password="x",
+                role="Registrar",
+                is_active=True,
+            )
+            seeded_catalog.add(user)
+            seeded_catalog.commit()
+            seeded_catalog.refresh(user)
+
+            response = client.put(
+                f"/api/v1/users/users/{user.id}",
+                json={"role": "derma"},
+                headers=auth_headers,
+            )
+            assert response.status_code == 200, response.text
+
+            doctor = (
+                db_session.query(Doctor)
+                .filter(Doctor.user_id == user.id)
+                .first()
+            )
+            assert doctor is not None
+            # the deactivated mapped code is NOT provisioned as a fresh
+            # active profile — the incomplete sentinel requires assignment
+            # through the validated /admin/doctors boundary
+            assert doctor.specialty == "general"
+        finally:
+            row.active = True
+            seeded_catalog.commit()
+
+    def test_promotion_to_legacy_role_with_active_specialty_keeps_mapping(
+        self, client, auth_headers, seeded_catalog, db_session
+    ):
+        user = User(
+            username="promo_derma_active",
+            email="promo-derma-active@test.com",
+            full_name="Promotion Active",
+            hashed_password="x",
+            role="Registrar",
+            is_active=True,
+        )
+        seeded_catalog.add(user)
+        seeded_catalog.commit()
+        seeded_catalog.refresh(user)
+
+        response = client.put(
+            f"/api/v1/users/users/{user.id}",
+            json={"role": "derma"},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        doctor = (
+            db_session.query(Doctor)
+            .filter(Doctor.user_id == user.id)
+            .first()
+        )
+        assert doctor is not None
+        assert doctor.specialty == "dermatology"
+        assert doctor.active is True
+
+    def test_reactivation_with_deactivated_stored_specialty_rejects_role_change(
+        self, client, auth_headers, seeded_catalog, db_session
+    ):
+        user, doctor = self._make_registrar_with_inactive_profile(
+            seeded_catalog, "dermatology"
+        )
+        row = self._deactivate(seeded_catalog, "dermatology")
+        try:
+            response = client.put(
+                f"/api/v1/users/users/{user.id}",
+                json={"role": "derma"},
+                headers=auth_headers,
+            )
+            # the role change is rejected with the remediation message —
+            # nothing is activated, the stored specialty is untouched
+            assert response.status_code == 400, response.text
+            assert "недоступную в каталоге" in response.json()["detail"]
+            db_session.expire_all()
+            stored = (
+                db_session.query(Doctor)
+                .filter(Doctor.id == doctor.id)
+                .one()
+            )
+            assert stored.active is False
+            assert stored.specialty == "dermatology"
+        finally:
+            row.active = True
+            seeded_catalog.commit()
+
+    def test_reactivation_with_sentinel_stored_specialty_succeeds(
+        self, client, auth_headers, seeded_catalog, db_session
+    ):
+        # promote -> demote -> promote cycle: a mechanically provisioned
+        # 'general' profile stays reactivatable (not bookable, excluded
+        # from active-only selectors, so no catalog danger)
+        user, doctor = self._make_registrar_with_inactive_profile(
+            seeded_catalog, "general"
+        )
+        response = client.put(
+            f"/api/v1/users/users/{user.id}",
+            json={"role": "Doctor"},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        db_session.expire_all()
+        reactivated = (
+            db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+        )
+        assert reactivated.active is True
+        assert reactivated.specialty == "general"
+
+    def test_activation_only_payload_with_deactivated_stored_specialty_rejected(
+        self, client, auth_headers, seeded_catalog, db_session, test_doctor_user
+    ):
+        # Codex #3010 round-6 P1: {"active": true} WITHOUT a specialty in
+        # the payload must not bypass the catalog gate
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="dermatology",
+            active=False,
+        )
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+        row = self._deactivate(seeded_catalog, "dermatology")
+        try:
+            response = client.put(
+                f"/api/v1/admin/doctors/{doctor.id}",
+                headers=auth_headers,
+                json={"active": True},
+            )
+            assert response.status_code == 400, response.text
+            db_session.expire_all()
+            stored = (
+                db_session.query(Doctor)
+                .filter(Doctor.id == doctor.id)
+                .one()
+            )
+            assert stored.active is False
+        finally:
+            row.active = True
+            seeded_catalog.commit()
+
+    def test_activation_only_payload_with_sentinel_rejected(
+        self, client, auth_headers, seeded_catalog, test_doctor_user
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=False,
+        )
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+
+        response = client.put(
+            f"/api/v1/admin/doctors/{doctor.id}",
+            headers=auth_headers,
+            json={"active": True},
+        )
+        assert response.status_code == 400, response.text
+
+    def test_activation_only_payload_with_active_catalog_code_succeeds(
+        self, client, auth_headers, seeded_catalog, test_doctor_user
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id, specialty="cardiology", active=False
+        )
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+
+        response = client.put(
+            f"/api/v1/admin/doctors/{doctor.id}",
+            headers=auth_headers,
+            json={"active": True},
         )
         assert response.status_code == 200, response.text

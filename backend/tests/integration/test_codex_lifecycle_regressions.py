@@ -285,9 +285,14 @@ class TestActiveDoctorOwnerGuard:
     def test_put_admin_doctors_active_over_active_doctor_role_ok(
         self, client, db_session, auth_headers
     ):
-        """Control: the normal path (active doctor-role owner) still works."""
+        """Control: the normal path (active doctor-role owner) still works.
+
+        Fixture uses the post-0049 canonical 'dentistry' — the #3010
+        round-6 P1 activation gate validates the STORED specialty even for
+        activation-only payloads, and legacy dental aliases ('stomatology')
+        are deliberately rejected there (assign a catalog code instead)."""
         user = _make_user(db_session, "ghost_ok", role="Doctor")
-        doctor = _make_doctor(db_session, user, "stomatology", active=False)
+        doctor = _make_doctor(db_session, user, "dentistry", active=False)
 
         response = client.put(
             f"/api/v1/admin/doctors/{doctor.id}",
