@@ -79,7 +79,7 @@ class RegistrarNotificationService:
             self.db.query(User)
             .filter(
                 and_(
-                    func.lower(User.role).in_(["registrar", "receptionist"]),
+                    func.lower(User.role) == "registrar",  # E-4: receptionist alias removed
                     User.is_active == True,
                 )
             )
@@ -90,7 +90,7 @@ class RegistrarNotificationService:
         """Получает регистраторов по отделению"""
         query = self.db.query(User).filter(
             and_(
-                func.lower(User.role).in_(["registrar", "receptionist"]),
+                func.lower(User.role) == "registrar",  # E-4: receptionist alias removed
                 User.is_active == True,
             )
         )

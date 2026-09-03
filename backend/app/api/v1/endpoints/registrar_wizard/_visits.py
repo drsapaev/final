@@ -734,11 +734,11 @@ REGISTRAR_COMMAND_ROLE_BY_ACTION = {
         "dentist",
         "lab",
     },
-    "cancel": {"admin", "registrar", "cashier", "receptionist", "doctor"},
+    "cancel": {"admin", "registrar", "cashier", "doctor"},
 }
 
 REGISTRAR_SUPPORTED_RECORD_KINDS = {"visit", "online_queue", "appointment"}
-REGISTRAR_APPOINTMENT_WORKFLOW_ROLES = {"admin", "registrar", "receptionist"}
+REGISTRAR_APPOINTMENT_WORKFLOW_ROLES = {"admin", "registrar"}
 
 
 def _registrar_user_role_names(user: User | None) -> set[str]:
@@ -1412,7 +1412,7 @@ def complete_visit(
     visit_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
+        require_roles("Admin", "Registrar", "Cashier", "Doctor")
     ),
 ):
     """Завершить запись из таблицы visits"""
@@ -1507,7 +1507,6 @@ def run_registrar_record_action(
             "Admin",
             "Registrar",
             "Cashier",
-            "Receptionist",
             "Doctor",
             "cardio",
             "cardiology",
