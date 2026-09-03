@@ -42,10 +42,17 @@ CRITICAL_ROLES = {
 }
 
 # Роли с административными правами
+# M-1 (Manager deprecation): Roles.MANAGER removed — Manager is a deprecated
+# legacy/synthetic role (production: 1 automated row, 0 human users) and must
+# not be treated as administrative anywhere. Caller evidence before the
+# change (exhaustive repo search, app + tests): is_admin_role()/ADMIN_ROLES
+# had ZERO call sites, so removal is behavior-neutral at runtime; the set is
+# now consistent with the M-1D grant removal (no Manager admin-equivalence).
+# Roles.MANAGER itself stays in the enum above for read compatibility until
+# the post-deploy ops cleanup + M-2.
 ADMIN_ROLES = {
     Roles.ADMIN,
     Roles.SUPER_ADMIN,
-    Roles.MANAGER,
 }
 
 # Роли врачей
@@ -117,6 +124,12 @@ STAFF_ROLES = {
     Roles.NURSE,
     Roles.RECEPTIONIST,
 }
+
+# NOTE (M-1): get_role_hierarchy keeps the legacy Roles.MANAGER: 8 entry —
+# the hierarchy map is a descriptive level table, not a grant: it is only
+# consulted via has_role_permission(), which has zero external callers
+# (verified by exhaustive search). Manager's privileges are governed by the
+# require_roles() grant lists, all of which dropped Manager in M-1D.
 
 
 def is_admin_role(role: str) -> bool:

@@ -5259,6 +5259,7 @@ const ru = {
     dmdl_user_inactive_suffix: ' • неактивен',
     dmdl_err_user_required: 'Нужно выбрать существующий аккаунт пользователя',
     dmdl_err_specialty_required: 'Специальность обязательна',
+    dmdl_specialty_historical: 'историческая специальность',
     dmdl_err_specialty_format: 'Только латинские буквы в нижнем регистре, цифры и _ (например: cardiology)',
     dmdl_err_price_number: 'Цена должна быть числом',
     dmdl_err_start_number: 'Стартовый номер должен быть числом',
@@ -5639,6 +5640,8 @@ const ru = {
 
     // ─── GraphQLExplorer (admin2.gql2_*) ───
     gql2_example_full_name: 'Иванов Иван Иванович',
+    gql2_example_last_name: 'Иванов',
+    gql2_example_first_name: 'Иван',
     gql2_example_notes: 'Первичная консультация',
 
     // ─── DisplayBoardSettings (admin2.db2_*) ───

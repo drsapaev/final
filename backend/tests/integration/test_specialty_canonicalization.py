@@ -19,6 +19,8 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import asyncio
+
 import pytest
 import sqlalchemy as sa
 
@@ -1234,8 +1236,12 @@ def test_graphql_doctors_filter_matches_family(db_session, monkeypatch) -> None:
     canonical = _family_doctor(db_session, "dentistry")
 
     for query_value in ("stomatology", "dental", "dentistry", "dentist"):
-        page = gql_resolvers.Query().doctors(
-            filter=DoctorFilter(specialty=query_value), pagination=None
+        # Codex round-12: резолвер теперь async (offloop threadpool) —
+        # вызываем через asyncio.run; get_db_session всё ещё пропатчен.
+        page = asyncio.run(
+            gql_resolvers.Query().doctors(
+                filter=DoctorFilter(specialty=query_value), pagination=None
+            )
         )
         assert isinstance(page, PaginatedDoctors)
         ids = {item.id for item in page.items}

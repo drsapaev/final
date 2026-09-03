@@ -423,6 +423,13 @@ def test_create_active_userless_doctor_rejected(client, db_session, auth_headers
 def test_create_inactive_userless_doctor_allowed_for_history(
     client, db_session, auth_headers
 ):
+    # Medical Specialty Catalog (0051) is the write-boundary SSOT: even a
+    # historical inactive row must carry a canonical ACTIVE catalog code.
+    from app.services.medical_specialty_seed import seed_medical_specialties
+
+    seed_medical_specialties(db_session.connection())
+    db_session.commit()
+
     response = client.post(
         "/api/v1/admin/doctors",
         json={"specialty": "dentistry", "active": False},

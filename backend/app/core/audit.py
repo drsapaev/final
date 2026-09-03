@@ -2,6 +2,7 @@
 Система аудит-логирования для критичных операций.
 Автоматически логирует все изменения в критичных таблицах.
 """
+
 import hashlib
 import json
 from typing import Any
@@ -22,6 +23,10 @@ CRITICAL_TABLES = {
     "appointments",
     "prescriptions",
     "lab_results",
+    # Codex round-7 P1: GraphQL callNextPatient persistit the caller via
+    # the critical audit (called_by_user_id is a transient attribute with
+    # no mapped column — caller identity was lost between sessions)
+    "online_queue_entries",
     "unknown",  # Для логирования 403 на неизвестных ресурсах
 }
 
@@ -197,7 +202,9 @@ def log_critical_change(
     return audit_log
 
 
-def extract_model_changes(old_instance: Any, new_instance: Any) -> tuple[dict | None, dict | None]:
+def extract_model_changes(
+    old_instance: Any, new_instance: Any
+) -> tuple[dict | None, dict | None]:
     """
     Извлечь изменения между старым и новым экземпляром модели.
 
@@ -253,4 +260,3 @@ def extract_model_changes(old_instance: Any, new_instance: Any) -> tuple[dict | 
                 pass
 
     return old_dict, new_dict
-

@@ -98,7 +98,6 @@ class ServicesApiService:
                 ),
             )
 
-
     @staticmethod
     def _should_validate_service_code_alignment(
         change_set: dict[str, Any],
@@ -148,8 +147,10 @@ class ServicesApiService:
             "department_key": service.department_key,
         }
 
-    def _log_service_creation(self, service: Service) -> None:
-        self.repository.log_service_creation(service=service)
+    def _log_service_creation(
+        self, service: Service, user_id: int | None = None
+    ) -> None:
+        self.repository.log_service_creation(service=service, user_id=user_id)
 
     def _log_service_update(
         self,
@@ -157,21 +158,29 @@ class ServicesApiService:
         service_id: int,
         old_service: Service,
         new_service: Service,
+        user_id: int | None = None,
         comment: str | None = None,
     ) -> None:
+        # Codex round-15 P2: user_id -- attribution of the service audit to
+        # the authenticated actor (GraphQL updateServicePrice); None keeps
+        # the legacy behaviour for callers without an actor.
         self.repository.log_service_update(
             service_id=service_id,
             old_service=old_service,
             new_service=new_service,
+            user_id=user_id,
             comment=comment,
         )
+
     def list_service_categories(self, *, active: bool | None):
         return self.repository.list_service_categories(active=active)
 
     def create_service_category(self, *, category_data) -> ServiceCategory:
         existing = self.repository.get_service_category_by_code(category_data.code)
         if existing:
-            raise ValueError(f"Category with code '{category_data.code}' already exists")
+            raise ValueError(
+                f"Category with code '{category_data.code}' already exists"
+            )
 
         payload = (
             category_data.model_dump()
@@ -184,7 +193,9 @@ class ServicesApiService:
         self.repository.refresh(category)
         return category
 
-    def update_service_category(self, *, category_id: int, category_data) -> ServiceCategory:
+    def update_service_category(
+        self, *, category_id: int, category_data
+    ) -> ServiceCategory:
         category = self.repository.get_service_category(category_id)
         if not category:
             raise LookupError("Category not found")
@@ -197,7 +208,9 @@ class ServicesApiService:
         if "code" in update_data and update_data["code"] != category.code:
             existing = self.repository.get_service_category_by_code(update_data["code"])
             if existing:
-                raise ValueError(f"Category with code '{update_data['code']}' already exists")
+                raise ValueError(
+                    f"Category with code '{update_data['code']}' already exists"
+                )
 
         for field, value in update_data.items():
             setattr(category, field, value)
@@ -231,11 +244,17 @@ class ServicesApiService:
         limit: int,
         offset: int,
     ):
-        rows = self.repository.list_services(q=q, active=active, limit=limit, offset=offset)
+        rows = self.repository.list_services(
+            q=q, active=active, limit=limit, offset=offset
+        )
         if category_id is not None:
-            rows = [row for row in rows if getattr(row, "category_id", None) == category_id]
+            rows = [
+                row for row in rows if getattr(row, "category_id", None) == category_id
+            ]
         if department:
-            rows = [row for row in rows if getattr(row, "department", None) == department]
+            rows = [
+                row for row in rows if getattr(row, "department", None) == department
+            ]
         return rows
 
     def get_queue_groups_payload(self) -> dict[str, Any]:
@@ -281,11 +300,18 @@ class ServicesApiService:
     def get_service(self, *, service_id: int):
         return self.repository.get_service(service_id)
 
-    def create_service(self, *, service_data):
+    def create_service(self, *, service_data, user_id: int | None = None):
+        # Pydantic-schema (REST) OR plain dict (GraphQL createService) --
+        # codex round-4: the GraphQL mutation delegates here with a dict
+        # payload (name/code/price/unit/currency/category_code).
         payload = (
             service_data.model_dump()
             if hasattr(service_data, "model_dump")
-            else service_data.dict()
+            else (
+                service_data.dict()
+                if hasattr(service_data, "dict")
+                else dict(service_data)
+            )
         )
 
         canonical_code = self._normalize_service_code_payload(payload)
@@ -318,10 +344,12 @@ class ServicesApiService:
         self.repository.add(service)
         self.repository.commit()
         self.repository.refresh(service)
-        self._log_service_creation(service)
+        self._log_service_creation(service, user_id=user_id)
         return service
 
-    def update_service(self, *, service_id: int, service_data):
+    def update_service(
+        self, *, service_id: int, service_data, user_id: int | None = None
+    ):
         service = self.repository.get_service(service_id)
         if not service:
             raise LookupError("Service not found")
@@ -330,7 +358,12 @@ class ServicesApiService:
         update_data = (
             service_data.model_dump(exclude_unset=True)
             if hasattr(service_data, "model_dump")
-            else service_data.dict(exclude_unset=True)
+            else (
+                service_data.dict(exclude_unset=True)
+                if hasattr(service_data, "dict")
+                # plain dict (GraphQL updateServicePrice) — no unset concept
+                else dict(service_data)
+            )
         )
 
         if self._should_validate_service_code_alignment(update_data, service):
@@ -356,8 +389,10 @@ class ServicesApiService:
                 category_specialty = category.specialty
 
             if validation_payload.get("category_code"):
-                validation_payload["category_code"] = self._normalize_category_code_value(
-                    validation_payload["category_code"]
+                validation_payload["category_code"] = (
+                    self._normalize_category_code_value(
+                        validation_payload["category_code"]
+                    )
                 )
 
             self._validate_service_code_prefix_alignment(
@@ -392,6 +427,7 @@ class ServicesApiService:
             service_id=service.id,
             old_service=old_service,
             new_service=service,
+            user_id=user_id,
         )
         return service
 

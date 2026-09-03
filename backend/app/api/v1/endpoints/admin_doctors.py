@@ -21,9 +21,15 @@ from app.schemas.clinic import (
     DoctorUserOption,
     ScheduleCreate,
     ScheduleOut,
+    ServiceUnavailableDetail,
+    SpecialtyVocabularyItem,
     WeeklyScheduleUpdate,
 )
 from app.services.admin_doctors_stats_service import AdminDoctorsStatsService
+from app.services.medical_specialty_catalog import (
+    MedicalSpecialtyCatalogError,
+    MedicalSpecialtyCatalogService,
+)
 from app.services.user_mgmt._base import (
     DOCTOR_PROFILE_ROLES,
     is_doctor_profile_incomplete,
@@ -227,6 +233,51 @@ def get_doctors_stats(
     return _get_doctors_stats_payload(db)
 
 
+@router.get(
+    "/doctors/specialty-vocabulary",
+    response_model=list[SpecialtyVocabularyItem],
+    responses={
+        503: {
+            "model": ServiceUnavailableDetail,
+            "description": (
+                "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+            ),
+        }
+    },
+)
+def get_doctor_specialty_vocabulary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Medical specialty catalog — codes selectable at new-doctor onboarding.
+
+    Runtime SSOT is the ``medical_specialties`` table (migration 0051);
+    there is deliberately NO hardcoded fallback. Ordering: sort_order,
+    then code (deterministic). Frontend label resolution per owner spec:
+    locale → catalog translation → title_ru → code (the ru titles are a
+    compatibility fallback for kk/uz-Cyrl, not a translation claim).
+    """
+    try:
+        rows = MedicalSpecialtyCatalogService(db).list_active()
+    except MedicalSpecialtyCatalogError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Каталог медицинских специальностей не настроен: "
+                "выполните миграции БД (baseline seed 0051)."
+            ),
+        ) from exc
+    return [
+        SpecialtyVocabularyItem(
+            code=row.code,
+            title_ru=row.title_ru,
+            title_uz=row.title_uz,
+            title_en=row.title_en,
+        )
+        for row in rows
+    ]
+
+
 @router.get("/doctors/{doctor_id}", response_model=DoctorOut)
 def get_doctor(
     doctor_id: int,
@@ -312,7 +363,63 @@ def _validate_active_doctor_has_user(user_id: int | None, active: bool) -> None:
         )
 
 
-@router.post("/doctors", response_model=DoctorOut)
+
+
+def _validate_specialty_assignable(db: Session, specialty: str | None) -> None:
+    """Catalog write-boundary (Codex P1): any NEW specialty assignment through
+    the admin doctors API must reference an ACTIVE catalog code (migration
+    0051). Unknown codes, legacy dental aliases and the "general" sentinel
+    are rejected with 400 — the catalog is the runtime SSOT, and a
+    deactivated specialty can no longer be assigned to new doctors.
+    Historical rows keep their stored value untouched (no-cascade rule).
+    """
+    if specialty is None:
+        # Field absent / not being set — nothing to validate (Codex P2:
+        # blank strings are NOT skipped, only a genuinely unset value is).
+        return
+    if not specialty.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Специальность не может быть пустой строкой.",
+        )
+    catalog = MedicalSpecialtyCatalogService(db)
+    try:
+        if catalog.is_selectable_for_onboarding(specialty):
+            return
+    except MedicalSpecialtyCatalogError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Каталог медицинских специальностей не настроен: "
+                "выполните миграции БД (baseline seed 0051)."
+            ),
+        ) from exc
+    existing = catalog.get_by_code(specialty)
+    detail = (
+        f"Специальность '{specialty}' деактивирована в каталоге — "
+        "назначение новым врачам недоступно."
+        if existing
+        else (
+            f"Специальность '{specialty}' отсутствует в каталоге "
+            "(medical_specialties). Доступные коды — см. "
+            "/admin/doctors/specialty-vocabulary."
+        )
+    )
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+@router.post(
+    "/doctors",
+    response_model=DoctorOut,
+    responses={
+        503: {
+            "model": ServiceUnavailableDetail,
+            "description": (
+                "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+            ),
+        }
+    },
+)
 def create_doctor(
     doctor: DoctorCreate,
     db: Session = Depends(get_db),
@@ -335,6 +442,8 @@ def create_doctor(
                     detail="Пользователь уже привязан к другому врачу",
                 )
 
+        _validate_specialty_assignable(db, doctor.specialty)
+
         new_doctor = crud_clinic.create_doctor(db, doctor)
         return _serialize_doctor(db, new_doctor)
     except HTTPException:
@@ -353,7 +462,18 @@ def create_doctor(
         raise _admin_doctors_http_error(exc, "create_doctor") from exc
 
 
-@router.put("/doctors/{doctor_id}", response_model=DoctorOut)
+@router.put(
+    "/doctors/{doctor_id}",
+    response_model=DoctorOut,
+    responses={
+        503: {
+            "model": ServiceUnavailableDetail,
+            "description": (
+                "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+            ),
+        }
+    },
+)
 def update_doctor(
     doctor_id: int,
     doctor: DoctorUpdate,
@@ -469,6 +589,27 @@ def update_doctor(
                         "профиль."
                     ),
                 )
+
+        specialty_payload_present = "specialty" in doctor.model_fields_set
+        specialty_changed = specialty_payload_present and (
+            (doctor.specialty or "").strip()
+            != (existing_doctor.specialty or "").strip()
+        )
+        resulting_active = (
+            doctor.active if "active" in doctor.model_fields_set else existing_doctor.active
+        )
+        activating_inactive_profile = resulting_active and not existing_doctor.active
+        if specialty_changed or (
+            # No-cascade contract: an UNCHANGED historical value (possibly
+            # now inactive/absent in the catalog) must not block unrelated
+            # edits — only a genuine CHANGE is validated (Codex P2). The one
+            # exception is ACTIVATION of an inactive profile: carrying an
+            # unchanged non-assignable specialty (deactivated code or the
+            # incomplete sentinel) into an ACTIVE doctor is a NEW assignment
+            # and must pass the catalog (round-6 follow-up).
+            specialty_payload_present and activating_inactive_profile
+        ):
+            _validate_specialty_assignable(db, doctor.specialty)
 
         updated_doctor = crud_clinic.update_doctor(db, doctor_id, doctor)
         if not updated_doctor:

@@ -139,6 +139,68 @@ class DisplayWebSocketManager:
         if disconnected:
             logger.info(f"Удалено {len(disconnected)} отключенных соединений")
 
+    def build_patient_call_message(
+        self,
+        queue_entry: OnlineQueueEntry,
+        doctor_name: str,
+        cabinet: str = None,
+    ) -> dict:
+        """Собрать payload вызова пациента (синхронно, может обращаться к
+        lazy-отношениям queue_entry — вызывать при открытой сессии).
+
+        Codex P2 (round-14): сборка payload отделена от отправки, чтобы
+        GraphQL-мутация могла собрать сообщение в worker-треде (сессия
+        открыта там), а на event loop осталась только network-отправка.
+        """
+        return {
+            "type": "patient_call",
+            "data": {
+                "id": queue_entry.id,
+                "queue_entry_id": queue_entry.id,
+                "queue_number": queue_entry.number,
+                "patient_name": self._format_patient_name(queue_entry.patient_name),
+                "doctor_name": doctor_name,
+                "cabinet": cabinet or "Каб. не указан",
+                "specialty": (
+                    queue_entry.queue.specialist.specialty
+                    if queue_entry.queue.specialist
+                    else "Врач"
+                ),
+                "called_at": (
+                    queue_entry.called_at.isoformat()
+                    if queue_entry.called_at
+                    else datetime.now(UTC).isoformat()
+                ),
+                "urgency": "normal",  # normal, urgent, emergency
+            },
+            "display_duration": 30,  # Секунды показа
+            "sound_enabled": True,
+            "voice_text": f"Пациент номер {queue_entry.number}, пройдите в {cabinet or 'кабинет врача'}",
+        }
+
+    async def broadcast_patient_call_data(
+        self,
+        call_message: dict,
+        board_ids: list[str] = None,
+    ) -> None:
+        """Отправить ПРЕДВАРИТЕЛЬНО СОБРАННЫЙ payload вызова на табло."""
+        try:
+            # Если не указаны конкретные табло, отправляем на все активные
+            if not board_ids:
+                board_ids = list(self.connections.keys())
+
+            # Отправляем на указанные табло
+            for board_id in board_ids:
+                await self.broadcast_to_board(board_id, call_message)
+
+            logger.info(
+                f"Вызов пациента #{call_message['data']['queue_number']} "
+                f"отправлен на {len(board_ids)} табло"
+            )
+
+        except Exception as e:
+            logger.error(f"Ошибка трансляции вызова пациента: {e}")
+
     async def broadcast_patient_call(
         self,
         queue_entry: OnlineQueueEntry,
@@ -148,31 +210,9 @@ class DisplayWebSocketManager:
     ) -> None:
         """Трансляция вызова пациента на табло"""
         try:
-            call_message = {
-                "type": "patient_call",
-                "data": {
-                    "id": queue_entry.id,
-                    "queue_entry_id": queue_entry.id,
-                    "queue_number": queue_entry.number,
-                    "patient_name": self._format_patient_name(queue_entry.patient_name),
-                    "doctor_name": doctor_name,
-                    "cabinet": cabinet or "Каб. не указан",
-                    "specialty": (
-                        queue_entry.queue.specialist.specialty
-                        if queue_entry.queue.specialist
-                        else "Врач"
-                    ),
-                    "called_at": (
-                        queue_entry.called_at.isoformat()
-                        if queue_entry.called_at
-                        else datetime.now(UTC).isoformat()
-                    ),
-                    "urgency": "normal",  # normal, urgent, emergency
-                },
-                "display_duration": 30,  # Секунды показа
-                "sound_enabled": True,
-                "voice_text": f"Пациент номер {queue_entry.number}, пройдите в {cabinet or 'кабинет врача'}",
-            }
+            call_message = self.build_patient_call_message(
+                queue_entry, doctor_name, cabinet
+            )
 
             # Если не указаны конкретные табло, отправляем на все активные
             if not board_ids:

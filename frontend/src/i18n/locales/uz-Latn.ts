@@ -5136,6 +5136,7 @@ const uzLatn = {
     dmdl_user_inactive_suffix: ' • nofaol',
     dmdl_err_user_required: 'Mavjud foydalanuvchi hisobini tanlash kerak',
     dmdl_err_specialty_required: 'Mutaxassislik majburiy',
+    dmdl_specialty_historical: 'tarixiy mutaxassislik',
     dmdl_err_specialty_format: 'Faqat kichik lotin harflari, raqamlar va _ (masalan: cardiology)',
     dmdl_err_price_number: "Narx raqam bo'lishi kerak",
     dmdl_err_start_number: "Boshlang'ich raqam raqam bo'lishi kerak",
@@ -5516,6 +5517,8 @@ const uzLatn = {
 
     // ─── GraphQLExplorer (admin2.gql2_*) ───
     gql2_example_full_name: "Ivanov Ivan Ivanovich",
+    gql2_example_last_name: "Ivanov",
+    gql2_example_first_name: "Ivan",
     gql2_example_notes: "Boshlang'ich konsultatsiya",
 
     // ─── DisplayBoardSettings (admin2.db2_*) ───
