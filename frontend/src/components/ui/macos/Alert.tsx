@@ -59,6 +59,7 @@ const Alert = ({
   style = {},
   ...props
 }: AlertProps) => {
+  const { t } = useTranslation();
   // If type is provided (MacOSAlert API), use it as severity
   const effectiveSeverity = type || severity;
   const Icon = typeIcons[effectiveSeverity] || Info;
@@ -98,7 +99,7 @@ const Alert = ({
         {dismissible && (
           <button
             onClick={onDismiss}
-            aria-label="Закрыть"
+            aria-label={t('common.close')}
             style={{
               border: 'none',
               background: 'transparent',
