@@ -123,6 +123,15 @@ def is_doctor_profile_incomplete(specialty: str | None) -> bool:
     return (not cleaned) or cleaned == INCOMPLETE_DOCTOR_SPECIALTY
 
 
+# Codex #3031 round-3 P2: single remediation wording shared by the
+# single-user (update_user) and bulk (bulk_action_users) catalog gates —
+# the same configuration message the POST /users boundary documents.
+MEDICAL_SPECIALTY_CATALOG_REMEDIATION = (
+    "Каталог медицинских специальностей не настроен: "
+    "выполните миграции БД (baseline seed 0051)."
+)
+
+
 class DoctorSpecialtyNotSelectableError(Exception):
     """Raised when a role promotion would (re)activate a Doctor profile
     whose specialty is not a selectable catalog code.
@@ -213,6 +222,37 @@ class UserManagementServiceMixinBase:
                     reason,
                 )
                 return 0
+            # Codex #3031 round-3 P1: the shared mirror is ALSO the
+            # activation-only path (update_user {"is_active": true} and bulk
+            # activate) — enforce the same catalog contract the promotion
+            # path enforces: a profile whose stored specialty is a
+            # deactivated/unknown catalog code must not become ACTIVE
+            # through a plain reactivation either. Validate every profile
+            # ABOUT to flip inactive->active (the UPDATE below skips rows
+            # already in the requested state). D-1: legacy dental-family
+            # spellings normalize via canonical_specialty; the INCOMPLETE
+            # sentinel stays allowed (not bookable, excluded from
+            # active-only selectors — the mechanical promote->demote->promote
+            # cycle stays green). The probe runs on a HEALTHY catalog (the
+            # SELECT succeeds), so this error is pure Python and never
+            # aborts the transaction; an UNUSABLE catalog raises
+            # MedicalSpecialtyCatalogError from the probe itself —
+            # update_user translates it into the remediation 400, and
+            # bulk_action_users pre-flights it (round-3 P2) before any
+            # per-user work.
+            for row in (
+                db.query(Doctor)
+                .filter(Doctor.user_id == user_id, Doctor.active.is_(False))
+                .all()
+            ):
+                stored_specialty = (row.specialty or "").strip()
+                stored_canonical = canonical_specialty(stored_specialty)
+                if (
+                    stored_canonical
+                    and stored_canonical != INCOMPLETE_DOCTOR_SPECIALTY
+                    and not _mapped_specialty_selectable(db, stored_canonical)
+                ):
+                    raise DoctorSpecialtyNotSelectableError(stored_specialty)
 
         values: dict[str, object] = {"active": active}
         if detach_owner:

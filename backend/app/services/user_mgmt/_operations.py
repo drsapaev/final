@@ -1,8 +1,15 @@
 """Operations mixin for UserManagementService. Split from user_management_service.py."""
 from __future__ import annotations
 
+from app.services.medical_specialty_catalog import (
+    MedicalSpecialtyCatalogError,
+    MedicalSpecialtyCatalogService,
+)
 from app.services.user_mgmt._base import *  # noqa: F401, F403
-from app.services.user_mgmt._base import UserManagementServiceMixinBase
+from app.services.user_mgmt._base import (
+    MEDICAL_SPECIALTY_CATALOG_REMEDIATION,
+    UserManagementServiceMixinBase,
+)
 
 
 class OperationsMixin(UserManagementServiceMixinBase):
@@ -87,6 +94,43 @@ class OperationsMixin(UserManagementServiceMixinBase):
             processed_count = 0
             failed_count = 0
             failed_users = []
+
+            # Codex #3031 round-3 P2: catalog probes inside the lifecycle
+            # helpers are SELECTs — when the catalog is UNUSABLE (migration
+            # 0051 missing / empty seed) PostgreSQL marks the transaction
+            # aborted BEFORE MedicalSpecialtyCatalogError reaches the
+            # per-user except below, so continuing the loop and committing
+            # would collapse the whole batch into the generic internal
+            # error. Configuration failures are handled OUTSIDE the loop:
+            # probe the catalog once up front and fail the batch with the
+            # remediation wording while the transaction is still clean.
+            # Per-user failures AFTER a healthy probe are pure-Python
+            # validation errors (DoctorSpecialtyNotSelectableError — raised
+            # without touching the DB) and stay safely catchable per user.
+            if action_data.action in ("activate", "change_role"):
+                try:
+                    MedicalSpecialtyCatalogService(db).list_active()
+                except MedicalSpecialtyCatalogError:
+                    db.rollback()
+                    logger.warning(
+                        "Bulk %s blocked: specialty catalog unavailable",
+                        action_data.action,
+                    )
+                    return (
+                        False,
+                        MEDICAL_SPECIALTY_CATALOG_REMEDIATION,
+                        {
+                            "processed_count": 0,
+                            "failed_count": len(action_data.user_ids),
+                            "failed_users": [
+                                {
+                                    "user_id": user_id,
+                                    "error": MEDICAL_SPECIALTY_CATALOG_REMEDIATION,
+                                }
+                                for user_id in action_data.user_ids
+                            ],
+                        },
+                    )
 
             for user_id in action_data.user_ids:
                 try:

@@ -6,6 +6,7 @@ from app.services.medical_specialty_catalog import (
 )
 from app.services.user_mgmt._base import *  # noqa: F401, F403
 from app.services.user_mgmt._base import (
+    MEDICAL_SPECIALTY_CATALOG_REMEDIATION,
     DoctorSpecialtyNotSelectableError,
     UserManagementServiceMixinBase,
 )
@@ -441,10 +442,7 @@ class CoreMixin(UserManagementServiceMixinBase):
             # POST /users catalog boundary documents.
             db.rollback()
             logger.warning("Role change blocked: specialty catalog unavailable (%s)", e)
-            return False, (
-                "Каталог медицинских специальностей не настроен: "
-                "выполните миграции БД (baseline seed 0051)."
-            )
+            return False, MEDICAL_SPECIALTY_CATALOG_REMEDIATION
         except Exception as e:
             db.rollback()
             logger.error(f"Error updating user: {e}")
