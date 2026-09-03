@@ -40,7 +40,7 @@ psutil>=5.9.0,<7.0.0
 strawberry-graphql>=0.315.5
 
 # Background task queue — replaces Celery stub. arq is asyncio-native.
-arq>=0.26.0,<0.27
+arq>=0.26.0,<0.29
 
 # XML parsing security — defusedxml protects against XXE attacks
 defusedxml>=0.7.1,<0.8
