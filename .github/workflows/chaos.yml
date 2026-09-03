@@ -16,7 +16,7 @@ jobs:
 
     # Phase 1: failure injection → Phase 2: recovery → Phase 3: post-recovery verification
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -102,7 +102,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Create failure issue
         uses: ./.github/actions/notify-failure
         with:
