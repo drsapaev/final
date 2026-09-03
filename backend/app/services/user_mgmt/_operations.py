@@ -95,19 +95,44 @@ class OperationsMixin(UserManagementServiceMixinBase):
             failed_count = 0
             failed_users = []
 
-            # Codex #3031 round-3 P2: catalog probes inside the lifecycle
-            # helpers are SELECTs — when the catalog is UNUSABLE (migration
-            # 0051 missing / empty seed) PostgreSQL marks the transaction
-            # aborted BEFORE MedicalSpecialtyCatalogError reaches the
-            # per-user except below, so continuing the loop and committing
-            # would collapse the whole batch into the generic internal
-            # error. Configuration failures are handled OUTSIDE the loop:
-            # probe the catalog once up front and fail the batch with the
-            # remediation wording while the transaction is still clean.
-            # Per-user failures AFTER a healthy probe are pure-Python
-            # validation errors (DoctorSpecialtyNotSelectableError — raised
-            # without touching the DB) and stay safely catchable per user.
-            if action_data.action in ("activate", "change_role"):
+            # Codex #3031 round-3 P2 (narrowed per round-4 P2): catalog probes
+            # inside the lifecycle helpers are SELECTs — when the catalog is
+            # UNUSABLE (migration 0051 missing / empty seed) PostgreSQL marks
+            # the transaction aborted BEFORE MedicalSpecialtyCatalogError
+            # reaches the per-user except below, so continuing the loop and
+            # committing would collapse the whole batch into the generic
+            # internal error. Configuration failures are handled OUTSIDE the
+            # loop: probe the catalog once up front and fail the batch with
+            # the remediation wording while the transaction is still clean.
+            # The pre-flight is limited to batches that can actually reach a
+            # probe: bulk activate only when the batch targets a
+            # doctor-family account that still has an INACTIVE Doctor profile
+            # to reactivate; bulk change_role only on PROMOTION to a
+            # doctor-family role (demotions and same-role no-ops deactivate
+            # or no-op without querying the catalog), so non-doctor IAM
+            # recovery never depends on the onboarding catalog. Per-user
+            # failures AFTER a healthy probe are pure-Python validation
+            # errors (DoctorSpecialtyNotSelectableError — raised without
+            # touching the DB) and stay safely catchable per user.
+            if action_data.action == "activate":
+                needs_catalog = (
+                    db.query(Doctor.id)
+                    .join(User, User.id == Doctor.user_id)
+                    .filter(
+                        User.id.in_(action_data.user_ids),
+                        User.role.in_(DOCTOR_PROFILE_ROLES),
+                        Doctor.active.is_(False),
+                    )
+                    .first()
+                    is not None
+                )
+            elif action_data.action == "change_role":
+                needs_catalog = bool(action_data.role) and (
+                    action_data.role in DOCTOR_PROFILE_ROLES
+                )
+            else:
+                needs_catalog = False
+            if needs_catalog:
                 try:
                     MedicalSpecialtyCatalogService(db).list_active()
                 except MedicalSpecialtyCatalogError:
@@ -143,12 +168,28 @@ class OperationsMixin(UserManagementServiceMixinBase):
                         continue
 
                     if action_data.action == "activate":
-                        user.is_active = True
-                        if user.profile:
-                            user.profile.status = UserStatus.ACTIVE
-                        self._sync_doctor_active(
-                            db, user_id, True, reason="bulk_activate"
-                        )
+                        # Codex #3031 round-4 P1: capture the pre-mutation
+                        # state — if the shared-mirror catalog guard rejects
+                        # this user, the per-user catch below records the
+                        # failure and the batch CONTINUES; without an
+                        # explicit restore the already-assigned is_active /
+                        # profile.status would survive the final commit and
+                        # the account reported as failed would still be
+                        # activated.
+                        prev_is_active = user.is_active
+                        prev_status = user.profile.status if user.profile else None
+                        try:
+                            user.is_active = True
+                            if user.profile:
+                                user.profile.status = UserStatus.ACTIVE
+                            self._sync_doctor_active(
+                                db, user_id, True, reason="bulk_activate"
+                            )
+                        except Exception:
+                            user.is_active = prev_is_active
+                            if user.profile and prev_status is not None:
+                                user.profile.status = prev_status
+                            raise
                     elif action_data.action == "deactivate":
                         user.is_active = False
                         if user.profile:
@@ -165,16 +206,25 @@ class OperationsMixin(UserManagementServiceMixinBase):
                     elif action_data.action == "change_role":
                         if action_data.role and action_data.role != user.role:
                             old_role = user.role
-                            user.role = action_data.role
-                            # Lifecycle invariant: bulk role changes follow the
-                            # SAME transition contract as update_user —
-                            # promotion provisions/reactivates the linked
-                            # Doctor profile, demotion deactivates it (history
-                            # preserved). No direct role writes bypassing the
-                            # contract.
-                            self._apply_role_change_doctor_lifecycle(
-                                db, user, old_role, action_data.role
-                            )
+                            # Codex #3031 round-4 P1: same restore contract —
+                            # if the lifecycle's catalog guard rejects the
+                            # promotion, the assigned role must not survive
+                            # the final commit of a batch that reports this
+                            # user as failed.
+                            try:
+                                user.role = action_data.role
+                                # Lifecycle invariant: bulk role changes follow the
+                                # SAME transition contract as update_user —
+                                # promotion provisions/reactivates the linked
+                                # Doctor profile, demotion deactivates it (history
+                                # preserved). No direct role writes bypassing the
+                                # contract.
+                                self._apply_role_change_doctor_lifecycle(
+                                    db, user, old_role, action_data.role
+                                )
+                            except Exception:
+                                user.role = old_role
+                                raise
                     elif action_data.action == "delete":
                         # Проверяем, что не удаляем последнего администратора
                         if user.role == "Admin" and user.is_superuser:

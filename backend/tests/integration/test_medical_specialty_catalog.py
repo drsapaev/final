@@ -1046,6 +1046,13 @@ class TestActivationOnlyCatalogGuard:
                 db_session.query(Doctor).filter(Doctor.id == good_doctor.id).one()
             )
             assert good_row.active is True
+            # Codex round-4 P1: the failed item's ALREADY-ASSIGNED mutations
+            # (user.is_active, profile status) must not survive the final
+            # commit of a batch that reports the item as failed
+            bad_owner = db_session.query(User).filter(User.id == bad_user.id).one()
+            assert bad_owner.is_active is False
+            good_owner = db_session.query(User).filter(User.id == good_user.id).one()
+            assert good_owner.is_active is True
         finally:
             row.active = True
             seeded_catalog.commit()
@@ -1082,3 +1089,124 @@ class TestActivationOnlyCatalogGuard:
         db_session.expire_all()
         probe = db_session.query(User).filter(User.id == user.id).one()
         assert probe.role == "Doctor"
+
+    def test_bulk_activate_non_doctor_batch_skips_catalog(
+        self, client, auth_headers, seeded_catalog, db_session, monkeypatch
+    ):
+        """Codex round-4 P2: non-doctor IAM recovery must not depend on the
+        onboarding catalog — bulk activate of accounts that cannot reach a
+        catalog probe succeeds even when the catalog is unusable."""
+        from app.core.security import get_password_hash
+        from app.services.medical_specialty_catalog import (
+            MedicalSpecialtyCatalogError,
+            MedicalSpecialtyCatalogService,
+        )
+
+        def _raise(self_db):
+            raise MedicalSpecialtyCatalogError("catalog probe failed")
+
+        monkeypatch.setattr(MedicalSpecialtyCatalogService, "list_active", _raise)
+        registrar = User(
+            username=f"actguard_plain_{id(self) % 100000}",
+            email=f"actguard-plain-{id(self) % 100000}@test.com",
+            full_name="Plain Registrar",
+            hashed_password=get_password_hash("secret123"),
+            role="Registrar",
+            is_active=False,
+        )
+        seeded_catalog.add(registrar)
+        seeded_catalog.commit()
+        seeded_catalog.refresh(registrar)
+
+        response = client.post(
+            "/api/v1/users/users/bulk-action",
+            json={"user_ids": [registrar.id], "action": "activate"},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["processed_count"] == 1
+        db_session.expire_all()
+        activated = db_session.query(User).filter(User.id == registrar.id).one()
+        assert activated.is_active is True
+
+    def test_bulk_change_role_demotion_skips_catalog(
+        self, client, auth_headers, seeded_catalog, db_session, monkeypatch
+    ):
+        """Codex round-4 P2: a safety-improving doctor DEMOTION must not
+        depend on the onboarding catalog (deactivation never probes)."""
+        from app.services.medical_specialty_catalog import (
+            MedicalSpecialtyCatalogError,
+            MedicalSpecialtyCatalogService,
+        )
+
+        def _raise(self_db):
+            raise MedicalSpecialtyCatalogError("catalog probe failed")
+
+        monkeypatch.setattr(MedicalSpecialtyCatalogService, "list_active", _raise)
+        user, doctor = self._make_doctor_with_inactive_profile(
+            seeded_catalog, "cardiology", index=4
+        )
+        user.is_active = True
+        seeded_catalog.commit()
+
+        response = client.post(
+            "/api/v1/users/users/bulk-action",
+            json={
+                "user_ids": [user.id],
+                "action": "change_role",
+                "role": "Registrar",
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["processed_count"] == 1
+        db_session.expire_all()
+        demoted = db_session.query(User).filter(User.id == user.id).one()
+        assert demoted.role == "Registrar"
+        reactivated_doctor = (
+            db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+        )
+        # demotion deactivates the profile (ghost-doctor prevention) without
+        # any catalog dependency
+        assert reactivated_doctor.active is False
+
+    def test_bulk_change_role_rejected_promotion_restores_role(
+        self, client, auth_headers, seeded_catalog, db_session
+    ):
+        """Codex round-4 P1: when the lifecycle catalog guard rejects a bulk
+        promotion, the already-assigned role must not survive the final
+        commit of a batch that reports the user as failed."""
+        user, doctor = TestRoleChangePromotionGuard()._make_registrar_with_inactive_profile(
+            seeded_catalog, "dermatology"
+        )
+        row = self._deactivate(seeded_catalog, "dermatology")
+        try:
+            response = client.post(
+                "/api/v1/users/users/bulk-action",
+                json={
+                    "user_ids": [user.id],
+                    "action": "change_role",
+                    "role": "derma",
+                },
+                headers=auth_headers,
+            )
+            assert response.status_code == 200, response.text
+            payload = response.json()
+            assert payload["success"] is True
+            assert payload["failed_count"] == 1
+            failed = payload["failed_users"][0]
+            assert failed["user_id"] == user.id
+            assert "недоступную в каталоге" in failed["error"]
+            db_session.expire_all()
+            owner = db_session.query(User).filter(User.id == user.id).one()
+            # the derma assignment was restored — no failed-promotion grant
+            assert owner.role == "Registrar"
+            stored = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+            assert stored.active is False
+        finally:
+            row.active = True
+            seeded_catalog.commit()
