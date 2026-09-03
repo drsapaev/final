@@ -41,7 +41,7 @@ jobs:
       # (CI-only database with synthetic data).
       DEV_DEMO_PASSCODE: load-ci-demo-passcode
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -49,7 +49,7 @@ jobs:
           node-version: '20'
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -267,7 +267,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Create failure issue
         uses: ./.github/actions/notify-failure
         with:

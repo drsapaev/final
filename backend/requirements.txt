@@ -1,4 +1,4 @@
-fastapi>=0.121,<0.141
+fastapi>=0.121,<0.142
 uvicorn[standard]>=0.29,<0.52
 pydantic>=2.7,<2.13
 pydantic-settings>=2.14.1,<2.15
@@ -36,7 +36,7 @@ protobuf>=5.29.6,<6.0.0
 pillow>=12.2.0,<13.0.0
 aiogram>=3.28.2,<4.0.0
 pandas>=3.0.3,<4.0.0
-psutil>=5.9.0,<6.0.0
+psutil>=5.9.0,<7.0.0
 strawberry-graphql>=0.315.5
 
 # Background task queue — replaces Celery stub. arq is asyncio-native.
