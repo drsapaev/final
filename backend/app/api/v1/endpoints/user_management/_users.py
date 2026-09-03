@@ -68,13 +68,24 @@ async def create_user(
                 ),
             ) from catalog_error
         if not selectable:
+            # Codex round-9 P2: the operation's declared 422 body is
+            # HTTPValidationError (detail = array of {loc, msg, type}) — a
+            # plain-string detail would break generated clients decoding the
+            # documented schema, so return the standard validation-error
+            # array shape instead.
             raise _HTTPException(
                 status_code=422,
-                detail=(
-                    f"doctor_profile.specialty '{requested_specialty}' должна "
-                    "быть активным кодом из каталога специальностей "
-                    "(/admin/doctors/specialty-vocabulary)."
-                ),
+                detail=[
+                    {
+                        "loc": ["body", "doctor_profile", "specialty"],
+                        "msg": (
+                            f"Специальность '{requested_specialty}' должна "
+                            "быть активным кодом из каталога специальностей "
+                            "(/admin/doctors/specialty-vocabulary)."
+                        ),
+                        "type": "value_error",
+                    }
+                ],
             )
 
     try:

@@ -73,10 +73,20 @@ interface FormFieldProps {
   icon?: React.ComponentType<{ className?: string }>;
   error?: string;
   children?: React.ReactNode;
+  // Codex round-9 P2 (a11y): associate the visible label with its control
+  // (htmlFor/id) and the error message with the field (aria-describedby).
+  htmlFor?: string;
+  errorId?: string;
 }
 
-const ErrorMessage = ({ message }: { message?: React.ReactNode }) => (
-  <div className="admin-field-error-xs">
+const ErrorMessage = ({
+  message,
+  id,
+}: {
+  message?: React.ReactNode;
+  id?: string;
+}) => (
+  <div className="admin-field-error-xs" id={id}>
     <AlertCircle className="admin-icon-12" />
     {message}
   </div>
@@ -108,9 +118,17 @@ const parseStrictPrice = (raw: string): number | null => {
 // instead of a rolled-back onboarding transaction with a generic 400.
 const MAX_DOCTOR_PRICE = 99_999_999.99;
 
-const FormField = ({ label, required, icon: Icon, error, children }: FormFieldProps) => (
+const FormField = ({
+  label,
+  required,
+  icon: Icon,
+  error,
+  children,
+  htmlFor,
+  errorId,
+}: FormFieldProps) => (
   <div className="admin-mb-16">
-    <label className="admin-usermodal-label">
+    <label className="admin-usermodal-label" htmlFor={htmlFor}>
       {label} {required && <span className="admin-required-asterisk">*</span>}
     </label>
     <div className="admin-pos-relative">
@@ -119,7 +137,7 @@ const FormField = ({ label, required, icon: Icon, error, children }: FormFieldPr
       )}
       {children}
     </div>
-    {error && <ErrorMessage message={error} />}
+    {error && <ErrorMessage message={error} id={errorId} />}
   </div>
 );
 
@@ -541,42 +559,77 @@ const UserModal = ({
               )}
             </FormField>
             <div className="admin-doctor-onboarding-grid">
-              <FormField label={t('admin2.umdl_doctor_cabinet')}>
+              <FormField
+                label={t('admin2.umdl_doctor_cabinet')}
+                htmlFor="user-modal-doctor-cabinet"
+              >
                 <Input
+                  id="user-modal-doctor-cabinet"
                   type="text"
                   value={formData.doctorCabinet}
                   onChange={(e) => handleChange('doctorCabinet', e.target.value)}
                   placeholder="12"
                 />
               </FormField>
-              <FormField label={t('admin2.umdl_doctor_price')} error={errors.doctorPrice}>
+              <FormField
+                label={t('admin2.umdl_doctor_price')}
+                error={errors.doctorPrice}
+                htmlFor="user-modal-doctor-price"
+                errorId="user-modal-doctor-price-error"
+              >
                 <Input
+                  id="user-modal-doctor-price"
                   type="text"
                   inputMode="decimal"
                   value={formData.doctorPrice}
                   onChange={(e) => handleChange('doctorPrice', e.target.value)}
                   placeholder="150000"
                   error={!!errors.doctorPrice}
+                  aria-describedby={
+                    errors.doctorPrice ? 'user-modal-doctor-price-error' : undefined
+                  }
                 />
               </FormField>
-              <FormField label={t('admin2.umdl_doctor_start_number')} error={errors.doctorStartNumber}>
+              <FormField
+                label={t('admin2.umdl_doctor_start_number')}
+                error={errors.doctorStartNumber}
+                htmlFor="user-modal-doctor-start-number"
+                errorId="user-modal-doctor-start-number-error"
+              >
                 <Input
+                  id="user-modal-doctor-start-number"
                   type="text"
                   inputMode="numeric"
                   value={formData.doctorStartNumber}
                   onChange={(e) => handleChange('doctorStartNumber', e.target.value)}
                   placeholder="1"
                   error={!!errors.doctorStartNumber}
+                  aria-describedby={
+                    errors.doctorStartNumber
+                      ? 'user-modal-doctor-start-number-error'
+                      : undefined
+                  }
                 />
               </FormField>
-              <FormField label={t('admin2.umdl_doctor_max_online')} error={errors.doctorMaxOnline}>
+              <FormField
+                label={t('admin2.umdl_doctor_max_online')}
+                error={errors.doctorMaxOnline}
+                htmlFor="user-modal-doctor-max-online"
+                errorId="user-modal-doctor-max-online-error"
+              >
                 <Input
+                  id="user-modal-doctor-max-online"
                   type="text"
                   inputMode="numeric"
                   value={formData.doctorMaxOnline}
                   onChange={(e) => handleChange('doctorMaxOnline', e.target.value)}
                   placeholder="15"
                   error={!!errors.doctorMaxOnline}
+                  aria-describedby={
+                    errors.doctorMaxOnline
+                      ? 'user-modal-doctor-max-online-error'
+                      : undefined
+                  }
                 />
               </FormField>
             </div>
