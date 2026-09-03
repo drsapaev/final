@@ -433,6 +433,18 @@ class CoreMixin(UserManagementServiceMixinBase):
             db.rollback()
             logger.warning("Role change rejected by catalog guard: %s", e)
             return False, str(e)
+        except MedicalSpecialtyCatalogError as e:
+            # Codex #3031 round-1: an UNUSABLE catalog must not degrade into
+            # the generic internal-error fallback — on PostgreSQL the failed
+            # catalog SELECT aborts the transaction, so propagate the
+            # configuration failure as the same remediation message the
+            # POST /users catalog boundary documents.
+            db.rollback()
+            logger.warning("Role change blocked: specialty catalog unavailable (%s)", e)
+            return False, (
+                "Каталог медицинских специальностей не настроен: "
+                "выполните миграции БД (baseline seed 0051)."
+            )
         except Exception as e:
             db.rollback()
             logger.error(f"Error updating user: {e}")

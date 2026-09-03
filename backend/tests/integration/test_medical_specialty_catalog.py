@@ -819,3 +819,104 @@ class TestRoleChangePromotionGuard:
             json={"active": True},
         )
         assert response.status_code == 200, response.text
+
+
+class TestRoleActivationRaceAndCatalogPropagation:
+    """Codex #3031 round-1: the is_active mirror (_sync_doctor_active) runs
+    BEFORE the role-change lifecycle — a simultaneous {"role": "derma",
+    "is_active": true} on an inactive user activates the stored profile
+    first, so the promotion guard must validate whenever the user is active,
+    not only when the lifecycle itself performs the reactivation. An UNUSABLE
+    catalog must propagate as a configuration error, not the generic 400."""
+
+    def test_simultaneous_role_and_activation_validates_stored_specialty(
+        self, client, auth_headers, seeded_catalog, db_session
+    ):
+        # codex's exact scenario: INACTIVE non-doctor user with an inactive
+        # Doctor row is updated in ONE request with both role and is_active
+        from app.core.security import get_password_hash
+
+        user = User(
+            username="promo_race_derma",
+            email="promo-race-derma@test.com",
+            full_name="Race Guard",
+            hashed_password=get_password_hash("secret123"),
+            role="Registrar",
+            is_active=False,
+        )
+        seeded_catalog.add(user)
+        seeded_catalog.commit()
+        seeded_catalog.refresh(user)
+        doctor = Doctor(user_id=user.id, specialty="dermatology", active=False)
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+        seeded_catalog.refresh(doctor)
+
+        row = TestRoleChangePromotionGuard()._deactivate(seeded_catalog, "dermatology")
+        try:
+            response = client.put(
+                f"/api/v1/users/users/{user.id}",
+                json={"role": "derma", "is_active": True},
+                headers=auth_headers,
+            )
+            assert response.status_code == 400, response.text
+            assert "недоступную в каталоге" in response.json()["detail"]
+            db_session.expire_all()
+            stored = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+            # the earlier _sync_doctor_active activation is rolled back —
+            # the profile stays inactive and the owner keeps the old role
+            assert stored.active is False
+            assert stored.specialty == "dermatology"
+            owner = db_session.query(User).filter(User.id == user.id).one()
+            assert owner.role == "Registrar"
+            assert owner.is_active is False
+        finally:
+            row.active = True
+            seeded_catalog.commit()
+
+    def test_simultaneous_role_and_activation_with_sentinel_succeeds(
+        self, client, auth_headers, seeded_catalog, db_session
+    ):
+        user, doctor = TestRoleChangePromotionGuard()._make_registrar_with_inactive_profile(
+            seeded_catalog, "general"
+        )
+        response = client.put(
+            f"/api/v1/users/users/{user.id}",
+            json={"role": "Doctor", "is_active": True},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        db_session.expire_all()
+        reactivated = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+        assert reactivated.active is True
+        assert reactivated.specialty == "general"
+
+    def test_catalog_unavailable_propagates_as_configuration_error(
+        self, client, auth_headers, seeded_catalog, db_session, monkeypatch
+    ):
+        from app.services.medical_specialty_catalog import (
+            MedicalSpecialtyCatalogError,
+            MedicalSpecialtyCatalogService,
+        )
+
+        def _raise(self, code):
+            raise MedicalSpecialtyCatalogError("catalog probe failed")
+
+        monkeypatch.setattr(
+            MedicalSpecialtyCatalogService,
+            "is_selectable_for_onboarding",
+            _raise,
+        )
+        user, doctor = TestRoleChangePromotionGuard()._make_registrar_with_inactive_profile(
+            seeded_catalog, "dermatology"
+        )
+        response = client.put(
+            f"/api/v1/users/users/{user.id}",
+            json={"role": "Doctor"},
+            headers=auth_headers,
+        )
+        # the configuration failure surfaces with the SAME remediation
+        # message the POST /users catalog boundary documents — not the
+        # generic "Внутренняя ошибка"
+        assert response.status_code == 400, response.text
+        assert "не настроен" in response.json()["detail"]

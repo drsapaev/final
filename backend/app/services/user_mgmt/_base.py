@@ -148,22 +148,22 @@ class DoctorSpecialtyNotSelectableError(Exception):
 def _mapped_specialty_selectable(db: Session, specialty: str) -> bool:
     """Catalog-guard helper shared by role-change provisioning paths.
 
-    An UNUSABLE catalog (missing table / empty seed →
-    ``MedicalSpecialtyCatalogError``) carries no deactivation information —
-    keep the historical mapping rather than failing the operation (same
-    trade-off as the provisioning auto-map in _core.py).
+    RAISES ``MedicalSpecialtyCatalogError`` when the catalog is UNUSABLE
+    (missing table / empty seed) instead of swallowing it: on PostgreSQL a
+    failed catalog SELECT has already aborted the transaction, so a
+    swallowed fallback would only defer the failure to the next statement
+    (InFailedSqlTransaction → generic 400). Propagating lets update_user
+    answer with the configuration-remediation message. (The POST /users
+    legacy auto-map keeps a different, owner-pinned trade-off — historical
+    mapping on an unusable catalog — out of scope here.)
     """
     from app.services.medical_specialty_catalog import (
-        MedicalSpecialtyCatalogError,
         MedicalSpecialtyCatalogService,
     )
 
-    try:
-        return MedicalSpecialtyCatalogService(db).is_selectable_for_onboarding(
-            specialty
-        )
-    except MedicalSpecialtyCatalogError:
-        return True
+    return MedicalSpecialtyCatalogService(db).is_selectable_for_onboarding(
+        specialty
+    )
 
 
 class UserManagementServiceMixinBase:
@@ -355,36 +355,43 @@ class UserManagementServiceMixinBase:
                     doctor.specialty,
                     is_doctor_profile_incomplete(doctor.specialty),
                 )
-            elif not existing.active and user.is_active:
-                # Codex #3010 follow-up P1: activation carries the STORED
-                # specialty into a new active assignment. A non-selectable
-                # REAL code (deactivated row / unknown value) must not be
-                # reactivated — reject the role change with a descriptive
-                # error so the admin assigns a valid specialty first. The
-                # incomplete sentinel stays allowed: it is not bookable and
-                # active-only selectors exclude it, and blocking it would
-                # break the mechanical promote→demote→promote cycle.
+            else:
+                # Codex #3031 round-1: a promotion carries the stored
+                # specialty into an ACTIVE profile whether activation
+                # happens HERE or already happened earlier in the same
+                # transaction — update_user mirrors is_active via
+                # _sync_doctor_active BEFORE the role-change block, and on
+                # a simultaneous {"role": "derma", "is_active": true} the
+                # owner-role probe sees the NEW doctor-family role and
+                # activates the row first. Validate whenever the user is
+                # active. A non-selectable REAL code (deactivated row /
+                # unknown value) must not reach an ACTIVE profile — reject
+                # the role change with a descriptive error so the admin
+                # assigns a valid specialty first. D-1: legacy dental-family
+                # spellings are normalized before the check (pre-0049 rows
+                # are the SAME specialty as the catalog's 'dentistry'). The
+                # sentinel stays allowed: not bookable and excluded from
+                # active-only selectors, so blocking it would break the
+                # mechanical promote→demote→promote cycle.
                 stored_specialty = (existing.specialty or "").strip()
-                # D-1: legacy dental-family spellings (stomatology/dental/
-                # dentist) are the SAME specialty as the catalog's canonical
-                # 'dentistry' — check selectability of the CANONICAL form so
-                # a pre-0049 legacy row is not falsely rejected.
                 stored_canonical = canonical_specialty(stored_specialty)
                 if (
-                    stored_canonical
+                    user.is_active
+                    and stored_canonical
                     and stored_canonical != INCOMPLETE_DOCTOR_SPECIALTY
                     and not _mapped_specialty_selectable(db, stored_canonical)
                 ):
                     raise DoctorSpecialtyNotSelectableError(stored_specialty)
-                existing.active = True
-                db.flush()
-                logger.info(
-                    "Doctor profile reactivated on role promotion: user_id=%s "
-                    "role=%s doctor_id=%s",
-                    user.id,
-                    new_role,
-                    existing.id,
-                )
+                if not existing.active and user.is_active:
+                    existing.active = True
+                    db.flush()
+                    logger.info(
+                        "Doctor profile reactivated on role promotion: user_id=%s "
+                        "role=%s doctor_id=%s",
+                        user.id,
+                        new_role,
+                        existing.id,
+                    )
         else:
             self._sync_doctor_active(
                 db,
