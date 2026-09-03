@@ -37,7 +37,10 @@
    * #5d6f84 on #d7e1ee = 3.9:1; dark: secondary #98989d on #3a3a3c =
    * 3.95:1, tertiary #636366 = 1.89:1). Light value = text-secondary
    * (#455568, 5.71:1 on #d7e1ee — no visual delta in light); dark value
-   * #c7c7cc = 6.74:1 on #3a3a3c. */
+   * #c7c7cc = 6.74:1 on #3a3a3c.
+   * ELEV (elevated-debt closure): the dark secondary later moved to
+   * #a6a6ad (4.69:1 on #3a3a3c), so this token now carries headroom,
+   * not a floor — kept for semantic clarity and small-text margin. */
   --mac-text-on-tertiary: #455568;
   /* AXE-EXP-4 (authorized-surface a11y track): canonical dual-theme LINK
    * ink — text-level accent usage (active tab labels, links) on neutral
@@ -242,8 +245,16 @@
     /* CC-1: #8e8e93 → #98989d — muted ink was 4.27:1 on --mac-bg-content
      * (#2c2c2e), below the WCAG AA 4.5:1 floor (axe color-contrast on the
      * landing dark shell). #98989d measures 4.85:1 on #2c2c2e and 5.93:1 on
-     * #1c1c1e; on the translucent card surface it only improves. */
-    --mac-text-secondary: #98989d;
+     * #1c1c1e; on the translucent card surface it only improves.
+     * ELEV (elevated-debt closure, follow-up to the CC deviation note):
+     * #98989d measured only 3.95:1 on the elevated surface --mac-bg-tertiary
+     * (#3a3a3c) — documented as the CC-track residual debt. #a6a6ad is the
+     * originally authorized muted ink: 7.03:1 on #1c1c1e, 5.76:1 on #2c2c2e
+     * and 4.69:1 on #3a3a3c — WCAG AA holds on every canonical dark
+     * surface, removing the need for per-surface secondary inks.
+     * Pinned by styles/__tests__/darkThemeInk.contract.test.ts (both dark
+     * blocks, window + content + elevated). */
+    --mac-text-secondary: #a6a6ad;
     --mac-text-tertiary: #636366;
     /* AXE-EXP-2: ink on tertiary surfaces — see the :root comment;
      * #c7c7cc = 6.74:1 on #3a3a3c. */
@@ -339,8 +350,10 @@
   --mac-bg-quaternary: #48484a;
 
   --mac-text-primary: #ffffff;
-  /* CC-1: mirror of the prefers-color-scheme block — see comment above. */
-  --mac-text-secondary: #98989d;
+  /* CC-1 mirror + ELEV elevated-debt closure — see the prefers-color-scheme
+   * block for the full rationale (#a6a6ad: 7.03/5.76/4.69 on
+   * #1c1c1e/#2c2c2e/#3a3a3c). */
+  --mac-text-secondary: #a6a6ad;
   --mac-text-tertiary: #636366;
   /* AXE-EXP-2: mirror of the prefers-color-scheme block. */
   --mac-text-on-tertiary: #c7c7cc;
