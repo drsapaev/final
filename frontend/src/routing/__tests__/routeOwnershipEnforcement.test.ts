@@ -10,7 +10,8 @@ describe('routing anti-regression enforcement', () => {
   it('keeps legacy consumers free from hand-maintained route tables', () => {
     const routeRegistry = read('src/routing/routeRegistry.ts');
 
-    expect(read('src/components/layout/Nav.tsx')).not.toContain('const routes = [');
+    // PR-UI-17-2: Nav.tsx assertions removed — dead component deleted
+    // (0 live importers after pages/Activation.tsx decommission).
     expect(read('src/constants/routes.ts')).not.toContain('const routeMap =');
     expect(routeRegistry).not.toContain('component: \'AdminPanel\'');
   });
@@ -18,6 +19,5 @@ describe('routing anti-regression enforcement', () => {
   it('uses the routing subsystem as the route source of truth', () => {
     expect(read('src/App.tsx')).toContain('from \'./routing/routeRegistry');
     expect(read('src/App.tsx')).toContain('ROUTE_REGISTRY.map');
-    expect(read('src/components/layout/Nav.tsx')).toContain('getVisibleRoutesForShell');
   });
 });

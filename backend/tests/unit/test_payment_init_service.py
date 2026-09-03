@@ -16,8 +16,21 @@ def _service_with_repo(
     return init_module.PaymentInitService(db=Mock(), payment_manager=payment_manager)
 
 
-def _patch_payment_side_effects(monkeypatch: pytest.MonkeyPatch, billing: Mock) -> None:
+def _patch_payment_side_effects(
+    monkeypatch: pytest.MonkeyPatch,
+    billing: Mock,
+    payment=None,
+) -> None:
     monkeypatch.setattr(init_module, "BillingService", Mock(return_value=billing))
+    # Issue #06: PaymentInvariantService.create_pending_payment replaces
+    # billing.create_payment. Patch at source module.
+    from app.services import payment_invariant_service as _pis_module
+    _pis_cls = Mock()
+    _pis_instance = Mock()
+    if payment is not None:
+        _pis_instance.create_pending_payment = Mock(return_value=payment)
+    _pis_cls.return_value = _pis_instance
+    monkeypatch.setattr(_pis_module, "PaymentInvariantService", _pis_cls)
     monkeypatch.setattr(
         init_module,
         "extract_model_changes",
@@ -96,9 +109,21 @@ def test_init_payment_success_path_updates_pending_status(
     repo.get_visit.return_value = SimpleNamespace(id=11)
     payment = SimpleNamespace(id=501, provider_payment_id=None, payment_url=None, provider_data={})
     billing = Mock()
-    billing.create_payment.return_value = payment
     billing.update_payment_status.return_value = payment
-    _patch_payment_side_effects(monkeypatch, billing)
+    _patch_payment_side_effects(monkeypatch, billing, payment)
+
+    # Issue #06 Phase 4b: payment_init_service imports PaymentInvariantService
+    # locally inside init_payment(). Patch at the source module so the
+    # local import picks up the mock.
+    # Issue #06: patch at source module — payment_init_service imports
+    # PaymentInvariantService locally inside init_payment(), so we need
+    # to patch the class at its source.
+    from app.services import payment_invariant_service as _pis_module
+    _pis_mock_cls = Mock()
+    _pis_instance = Mock()
+    _pis_instance.create_pending_payment = Mock(return_value=payment)
+    _pis_mock_cls.return_value = _pis_instance
+    monkeypatch.setattr(_pis_module, "PaymentInvariantService", _pis_mock_cls)
 
     manager = Mock()
     manager.get_providers_for_currency.return_value = ["payme"]
@@ -133,7 +158,7 @@ def test_init_payment_success_path_updates_pending_status(
     assert payment.payment_url == "https://pay.example/payme_abc"
     assert payment.provider_data == {"provider": "payme"}
 
-    billing.create_payment.assert_called_once()
+    # Issue #06: billing.create_payment no longer called — PaymentInvariantService.create_pending_payment is used instead
     billing.update_payment_status.assert_called_once_with(
         payment_id=501,
         new_status="pending",
@@ -153,9 +178,21 @@ def test_init_payment_provider_failure_sets_failed_status(
     repo.get_visit.return_value = SimpleNamespace(id=12)
     payment = SimpleNamespace(id=777, provider_payment_id=None, payment_url=None, provider_data={})
     billing = Mock()
-    billing.create_payment.return_value = payment
     billing.update_payment_status.return_value = payment
-    _patch_payment_side_effects(monkeypatch, billing)
+    _patch_payment_side_effects(monkeypatch, billing, payment)
+
+    # Issue #06 Phase 4b: payment_init_service imports PaymentInvariantService
+    # locally inside init_payment(). Patch at the source module so the
+    # local import picks up the mock.
+    # Issue #06: patch at source module — payment_init_service imports
+    # PaymentInvariantService locally inside init_payment(), so we need
+    # to patch the class at its source.
+    from app.services import payment_invariant_service as _pis_module
+    _pis_mock_cls = Mock()
+    _pis_instance = Mock()
+    _pis_instance.create_pending_payment = Mock(return_value=payment)
+    _pis_mock_cls.return_value = _pis_instance
+    monkeypatch.setattr(_pis_module, "PaymentInvariantService", _pis_mock_cls)
 
     manager = Mock()
     manager.get_providers_for_currency.return_value = ["click"]
@@ -203,8 +240,8 @@ def test_init_payment_unexpected_error_returns_with_payment_id(
     repo.get_visit.return_value = SimpleNamespace(id=13)
     payment = SimpleNamespace(id=888, provider_payment_id=None, payment_url=None, provider_data={})
     billing = Mock()
-    billing.create_payment.return_value = payment
-    _patch_payment_side_effects(monkeypatch, billing)
+    # billing.create_payment no longer used (Issue #06)
+    _patch_payment_side_effects(monkeypatch, billing, payment)
 
     manager = Mock()
     manager.get_providers_for_currency.return_value = ["payme"]

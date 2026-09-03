@@ -201,13 +201,120 @@ class TestPatientAccessAuditService:
 class TestClientIpExtraction:
     """Tests for _get_client_ip() helper."""
 
-    def test_get_client_ip_from_x_forwarded_for(self):
-        """IP extracted from X-Forwarded-For header (first IP)."""
+    def test_get_client_ip_ignores_xff_from_untrusted_peer(self):
+        """X-Forwarded-For from a NON-trusted peer is ignored (spoof guard,
+        Codex round-4 P2): the audit row records the direct peer instead of
+        the attacker-controlled header value."""
         request = MagicMock()
-        request.headers = {"x-forwarded-for": "203.0.113.50, 70.41.0.1, 150.95.2.2"}
+        request.headers = {"x-forwarded-for": "203.0.113.50, 70.41.0.1"}
+        request.client = MagicMock()
+        request.client.host = "192.168.1.100"
+
+        ip = _get_client_ip(request)
+        assert ip == "192.168.1.100"
+
+    def test_get_client_ip_honors_xff_from_trusted_proxy(self, monkeypatch):
+        """X-Forwarded-For is honored ONLY when the direct peer is a trusted
+        proxy (rate_limiter PR-34 semantics) — the RIGHTMOST validated entry
+        wins (client IP as seen by the nearest trusted hop)."""
+        from app.core import rate_limiter as rate_limiter_module
+
+        monkeypatch.setattr(rate_limiter_module, "TRUSTED_PROXIES", {"10.0.0.9"})
+        request = MagicMock()
+        request.headers = {"X-Forwarded-For": "203.0.113.50, 70.41.0.1"}
+        request.client = MagicMock()
+        request.client.host = "10.0.0.9"
+
+        ip = _get_client_ip(request)
+        assert ip == "70.41.0.1"
+
+    def test_get_client_ip_rightmost_survives_client_supplied_xff_prefix(
+        self, monkeypatch
+    ):
+        """Cloudflare Tunnel contour (Codex P2, Cloudflare deploy runbook):
+        the edge APPENDS the connecting client IP to any client-supplied
+        X-Forwarded-For prefix, so the LEFTMOST entry is attacker-chosen.
+        The audit row must record the rightmost (edge-observed) entry —
+        the only non-forgeable one on this contour."""
+        from app.core import rate_limiter as rate_limiter_module
+
+        monkeypatch.setattr(
+            rate_limiter_module, "TRUSTED_PROXIES", {"127.0.0.1", "::1"}
+        )
+        request = MagicMock()
+        # Attacker sent "6.6.6.6" themselves; Cloudflare appended the real
+        # connecting IP "203.0.113.50"; cloudflared forwarded loopback.
+        request.headers = {"X-Forwarded-For": "6.6.6.6, 203.0.113.50"}
+        request.client = MagicMock()
+        request.client.host = "127.0.0.1"
 
         ip = _get_client_ip(request)
         assert ip == "203.0.113.50"
+
+    def test_get_client_ip_single_entry_xff_nginx_overwrite_chain(self, monkeypatch):
+        """nginx contour (ops template overwrites XFF with $remote_addr):
+        a single-entry chain resolves to that entry — rightmost == leftmost."""
+        from app.core import rate_limiter as rate_limiter_module
+
+        monkeypatch.setattr(rate_limiter_module, "TRUSTED_PROXIES", {"127.0.0.1"})
+        request = MagicMock()
+        request.headers = {"X-Forwarded-For": "203.0.113.77"}
+        request.client = MagicMock()
+        request.client.host = "127.0.0.1"
+
+        ip = _get_client_ip(request)
+        assert ip == "203.0.113.77"
+
+    def test_get_client_ip_multi_hop_chain_recovers_client_ip(self, monkeypatch):
+        """Codex P2 round-7 (#2966): with two reverse-proxy hops the direct
+        peer is the LAST hop and the rightmost XFF entry is that hop's view
+        (the previous hop), not the client. The walk must skip trusted-hop
+        entries and recover the client IP — otherwise every user behind the
+        hop shares one rate-limit budget and audit rows record the proxy."""
+        from app.core import rate_limiter as rate_limiter_module
+
+        monkeypatch.setattr(
+            rate_limiter_module, "TRUSTED_PROXIES", {"10.0.0.2", "10.0.0.1"}
+        )
+        request = MagicMock()
+        # proxy2 -> backend (direct peer), proxy1 -> proxy2, client -> proxy1
+        request.headers = {"X-Forwarded-For": "203.0.113.50, 10.0.0.1"}
+        request.client = MagicMock()
+        request.client.host = "10.0.0.2"
+
+        ip = _get_client_ip(request)
+        assert ip == "203.0.113.50"
+
+    def test_get_client_ip_all_trusted_chain_falls_back_to_peer(self, monkeypatch):
+        """Every chain entry being a trusted proxy means there is nothing
+        attributable beyond the direct peer — record the peer, not a hop."""
+        from app.core import rate_limiter as rate_limiter_module
+
+        monkeypatch.setattr(
+            rate_limiter_module, "TRUSTED_PROXIES", {"10.0.0.2", "10.0.0.1"}
+        )
+        request = MagicMock()
+        request.headers = {"X-Forwarded-For": "10.0.0.1"}
+        request.client = MagicMock()
+        request.client.host = "10.0.0.2"
+
+        ip = _get_client_ip(request)
+        assert ip == "10.0.0.2"
+
+    def test_get_client_ip_malformed_rightmost_falls_back_to_peer(self, monkeypatch):
+        """Strict fallback: a malformed RIGHTMOST entry must record the direct
+        peer, NOT a leftward entry — everything left of a malformed hop is
+        client-controlled again."""
+        from app.core import rate_limiter as rate_limiter_module
+
+        monkeypatch.setattr(rate_limiter_module, "TRUSTED_PROXIES", {"127.0.0.1"})
+        request = MagicMock()
+        request.headers = {"X-Forwarded-For": "203.0.113.50, not-an-ip"}
+        request.client = MagicMock()
+        request.client.host = "127.0.0.1"
+
+        ip = _get_client_ip(request)
+        assert ip == "127.0.0.1"
 
     def test_get_client_ip_from_client_host(self):
         """IP extracted from request.client.host when no X-Forwarded-For."""
@@ -226,9 +333,10 @@ class TestClientIpExtraction:
 
     def test_get_client_ip_returns_none_on_exception(self):
         """Returns None when request access raises."""
+        from unittest.mock import PropertyMock
+
         request = MagicMock()
-        request.headers = MagicMock()
-        request.headers.get = MagicMock(side_effect=Exception("header access failed"))
+        type(request).client = PropertyMock(side_effect=Exception("peer access failed"))
 
         ip = _get_client_ip(request)
         assert ip is None

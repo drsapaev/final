@@ -1,6 +1,7 @@
 
-import { Button, Icon } from '../ui/macos';
+import { Button } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import { Download, GitBranch, Lock, Printer, Send } from 'lucide-react';
 
 interface LabReportActionsBarProps {
   saving?: boolean;
@@ -61,11 +62,11 @@ export default function LabReportActionsBar({
       {showPrimaryGroup && (
         <>
           <Button variant="outline" onClick={onSaveDraft} disabled={saving || !canSaveDraft}>
-            <Icon name="square.and.arrow.down" size={16} />
+            <Download size={16} aria-hidden="true" />
             {busyAction === 'save' ? t('actions.saving') : t('actions.save_draft')}
           </Button>
           <Button variant="primary" onClick={onFinalize} disabled={saving || !canFinalize}>
-            <Icon name="lock.circle" size={16} />
+            <Lock size={16} aria-hidden="true" />
             {busyAction === 'finalize' ? t('actions.finalizing') : t('actions.finalize')}
           </Button>
         </>
@@ -73,19 +74,19 @@ export default function LabReportActionsBar({
       {showSecondaryGroup && (
         <>
           <Button variant="outline" onClick={onRevise} disabled={saving || !canRevise} title={t('actions.revise_title')}>
-            <Icon name="arrow.triangle.branch" size={16} />
+            <GitBranch size={16} aria-hidden="true" />
             {/* L-L-2 fix: сокращён текст кнопки для tablet-friendly layout.
                 Полное название доступно в title-атрибуте. */}
             {busyAction === 'revise' ? t('actions.revising') : t('actions.revise')}
           </Button>
           <Button variant="outline" onClick={onPrint} disabled={saving || !canPrint}>
-            <Icon name="printer" size={16} />
+            <Printer size={16} aria-hidden="true" />
             {busyAction === 'print' ? t('actions.printing') : t('actions.print')}
           </Button>
           {/* P1 fix: Notify patient via Telegram — only for finalized/printed reports */}
           {canNotify && (
-            <Button variant="success" onClick={onNotify} disabled={saving || busyAction === 'notify'}>
-              <Icon name="paperplane" size={16} />
+            <Button variant="secondary" color="success" onClick={onNotify} disabled={saving || busyAction === 'notify'}>
+              <Send size={16} aria-hidden="true" />
               {busyAction === 'notify' ? t('actions.notifying') : t('actions.notify_patient')}
             </Button>
           )}

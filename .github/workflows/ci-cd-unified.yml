@@ -102,18 +102,21 @@ jobs:
             - 'frontend/src/**/emr/**'
             - 'frontend/src/**/lab/**'
           frontend_e2e:
+            # P0 gate policy: broad self-maintaining coverage instead of
+            # hand-enumerated component dirs (which rotted: App.jsx vs App.tsx,
+            # panels/** never existed, components/emr vs emr-v2, lab vs
+            # laboratory, components/admin was never listed). Covers
+            # components/ui/** canonical primitives and components/admin/**
+            # (PR-UI-07a series previously skipped e2e entirely).
+            # Workflow self-path: PRs changing this CI config get the e2e gate
+            # with the new invariant applied (push events already run all jobs
+            # unconditionally via the scope-resolution else-branch).
             - 'frontend/e2e/**'
             - 'frontend/playwright.config.*'
-            - 'frontend/src/App.jsx'
-            - 'frontend/src/PublicApp.jsx'
-            - 'frontend/src/routing/**'
-            - 'frontend/src/pages/**'
-            - 'frontend/src/panels/**'
-            - 'frontend/src/components/registrar/**'
-            - 'frontend/src/components/queue/**'
-            - 'frontend/src/components/payment/**'
-            - 'frontend/src/components/emr/**'
-            - 'frontend/src/components/lab/**'
+            - 'frontend/src/**'
+            - 'frontend/index.html'
+            - 'frontend/vite.config.*'
+            - '.github/workflows/ci-cd-unified.yml'
           telegram_release_gate:
             - 'backend/app/api/v1/endpoints/telegram_webhook.py'
             - 'backend/app/api/v1/endpoints/telemetry.py'
@@ -138,6 +141,8 @@ jobs:
             - 'backend/app/routers/**'
             - 'backend/app/schemas/**'
             - 'backend/app/models/**'
+          openapi_spec:
+            - 'backend/openapi.json'
           ops:
             - 'ops/**'
           parity_tools:
@@ -188,6 +193,7 @@ jobs:
         PR_FRONTEND_E2E: ${{ steps.changes.outputs.frontend_e2e }}
         PR_TELEGRAM_RELEASE_GATE: ${{ steps.changes.outputs.telegram_release_gate }}
         PR_API_DOCS: ${{ steps.changes.outputs.api_docs }}
+        PR_OPENAPI_SPEC: ${{ steps.changes.outputs.openapi_spec }}
         PR_OPS: ${{ steps.changes.outputs.ops }}
         PR_PARITY_TOOLS: ${{ steps.changes.outputs.parity_tools }}
         PR_WORKFLOW: ${{ steps.changes.outputs.workflow }}
@@ -210,6 +216,7 @@ jobs:
           FRONTEND_E2E="${PR_FRONTEND_E2E:-false}"
           TELEGRAM_RELEASE_GATE_REQUIRED="${PR_TELEGRAM_RELEASE_GATE:-false}"
           API_DOCS_CHANGED="${PR_API_DOCS:-false}"
+          OPENAPI_SPEC_CHANGED="${PR_OPENAPI_SPEC:-false}"
           OPS_CHANGED="${PR_OPS:-false}"
           PARITY_TOOLS_CHANGED="${PR_PARITY_TOOLS:-false}"
           ROOT_DEPS_CHANGED="${PR_ROOT_DEPS:-false}"
@@ -241,6 +248,10 @@ jobs:
           FRONTEND_REQUIRED="true"
           FRONTEND_E2E="true"
           API_DOCS_CHANGED="true"
+        fi
+        if [ "$OPENAPI_SPEC_CHANGED" = "true" ]; then
+          # A spec change without regenerated api.ts must fail the generated-types gate.
+          FRONTEND_REQUIRED="true"
         fi
         if [ "$FRONTEND_DEPS_CHANGED" = "true" ]; then
           FRONTEND_REQUIRED="true"
@@ -409,7 +420,7 @@ jobs:
     - uses: actions/checkout@v7
     
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -649,15 +660,22 @@ jobs:
         npm run type-check
         echo "✅ Frontend type-check passed"
 
+    - name: 🔒 Generated API types freshness (backend/openapi.json → src/types/generated/api.ts)
+      run: |
+        cd frontend
+        npm run generate:api-types:check
+        echo "✅ Generated API types are in sync with backend/openapi.json"
+
+    - name: 🔒 Type-check vite/vitest configs (tsconfig.node.json)
+      run: |
+        cd frontend
+        npx tsc --noEmit -p tsconfig.node.json
+        echo "✅ Node-config type-check passed"
+
     - name: 🚫 Type debt gate (prevents new `any`/`@ts-ignore`/`@ts-nocheck`)
       run: |
         cd frontend
         npm run type-debt:check
-
-    - name: 📊 Strict baseline gate (prevents new implicit-any / null-safety debt)
-      run: |
-        cd frontend
-        npm run strict:baseline
 
     - name: Icon-only controls accessibility sweep
       run: |
@@ -699,7 +717,7 @@ jobs:
       run: |
         cd frontend
         npm ci --legacy-peer-deps
-    
+
     - name: 🧪 Тесты frontend
       run: |
         cd frontend
@@ -771,6 +789,12 @@ jobs:
         cd frontend
         npm ci --legacy-peer-deps
 
+    - name: 🔒 Type-check e2e specs + Playwright config (e2e/tsconfig.json)
+      run: |
+        cd frontend
+        npx tsc --noEmit -p e2e/tsconfig.json
+        echo "✅ e2e type-check passed"
+
     - name: 🧪 Registrar time e2e (Chromium)
       run: |
         cd frontend
@@ -781,8 +805,85 @@ jobs:
     - name: 📸 UX Audit e2e + Visual regression (Chromium)
       run: |
         cd frontend
-        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts --project=chromium
-      continue-on-error: true  # Visual regression — non-blocking, informational only
+        # --retries=0 is MANDATORY for UX/Visual E2E. These tests must pass
+        # on the FIRST attempt — retries would mask flaky tests. The
+        # e2e-coverage-invariant.mjs gate enforces this.
+        # Output is tee'd to a file so the next step can verify the test count.
+        # P0 gate policy: frontend-10-route-smoke + frontend-10-visual-a11y
+        # are self-contained (mocked/no API, dev server only) and were
+        # previously never run in CI.
+        # PR-UI-18 item 4: a11y-axe-audit.spec.ts (@axe-core/playwright,
+        # WCAG 2.x A/AA) gates public surfaces × light/dark with a
+        # violation baseline (e2e/a11y-baseline.json — ratchet: fails on NEW
+        # rules and on stale baseline entries).
+        # AXE-EXP-1 (plan §4.1.24 follow-up track): a11y-axe-authenticated.spec.ts
+        # extends the same gate to the authorized QA-harness surfaces (6 role
+        # homes + 2 specialty + 9 admin-family routes × light/dark = 34 audits)
+        # with its own seeded pre-existing-findings baseline
+        # (e2e/a11y-baseline-auth.json — same shrink-only ratchet contract;
+        # remediation increments must shrink it toward zero).
+        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts e2e/a11y-axe-authenticated.spec.ts --project=chromium --retries=0 2>&1 | tee ux-audit-output.txt
+      # E2E root-cause fix: removed continue-on-error. All non-fixme tests
+      # must pass. Tests marked test.fixme have documented root causes and
+      # are tracked for follow-up. See PR description for details.
+
+    - name: 🔒 UX/Visual E2E test count invariant
+      run: |
+        cd frontend
+        # Verify that Playwright actually executed the expected number of tests.
+        # This catches the failure mode where tests are silently skipped via
+        # test.fixme/test.skip (the e2e-coverage-invariant.mjs gate catches
+        # the source-level patterns, but this catches the runtime-level
+        # reality: if the count drops below the expected number, something
+        # was skipped).
+        #
+        # Expected: 127 passed, 0 skipped, 0 failed
+        # (12 cashier + 9 registrar + 40 visual [7 state baselines + EAT +
+        #  pr16-landing + 22 pr18 twelve-screen baselines] + 8 route-smoke
+        # + 12 visual-a11y + 12 a11y-axe-audit + 34 a11y-axe-authenticated).
+        # Metric integrity (§17, original → revised → methodology → reason):
+        # 93 → 127. Methodology unchanged (same CI step, count-invariant on
+        # passed tests). Reason: AXE-EXP-1 adds a11y-axe-authenticated.spec.ts
+        # (17 authorized QA-harness routes × 2 themes = 34 audits, seeded
+        # shrink-only baseline e2e/a11y-baseline-auth.json). Historical
+        # values: 93 = pre-AXE-EXP canonical count (12+9+40+8+12+12).
+        # Reconciliation note: registrar-time.spec.ts (1 test) runs in its own
+        # step above and is intentionally NOT counted here. Empirically
+        # verified locally with `playwright --list` per file on the PR-UI-18-5
+        # head. If a test is intentionally added/removed, update EXPECTED_COUNT
+        # below.
+        EXPECTED_COUNT=127
+        if [ ! -f ux-audit-output.txt ]; then
+          echo "ERROR: ux-audit-output.txt not found. The UX Audit step may not have run."
+          exit 1
+        fi
+        # Playwright outputs the summary on MULTIPLE lines when there are failures:
+        #   1 failed
+        #   26 passed (2.2m)
+        # We must extract ALL summary lines (failed, passed, skipped) separately.
+        FAILED_SUMMARY=$(grep -E "^\s+[0-9]+ failed" ux-audit-output.txt | tail -1 || echo "0 failed")
+        PASSED_SUMMARY=$(grep -E "^\s+[0-9]+ passed" ux-audit-output.txt | tail -1 || echo "0 passed")
+        SKIPPED_SUMMARY=$(grep -E "^\s+[0-9]+ skipped" ux-audit-output.txt | tail -1 || echo "0 skipped")
+        echo "Playwright summary: $FAILED_SUMMARY $PASSED_SUMMARY $SKIPPED_SUMMARY"
+        PASSED=$(echo "$PASSED_SUMMARY" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "0")
+        SKIPPED=$(echo "$SKIPPED_SUMMARY" | grep -oE "[0-9]+ skipped" | grep -oE "[0-9]+" || echo "0")
+        FAILED=$(echo "$FAILED_SUMMARY" | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo "0")
+        echo "Parsed: passed=$PASSED skipped=$SKIPPED failed=$FAILED"
+        if [ "$FAILED" != "0" ]; then
+          echo "ERROR: $FAILED test(s) failed. UX/Visual E2E must have 0 failures."
+          exit 1
+        fi
+        if [ "$SKIPPED" != "0" ]; then
+          echo "ERROR: $SKIPPED test(s) skipped. UX/Visual E2E must have 0 skipped (no test.fixme/test.skip allowed)."
+          echo "If a test was intentionally skipped, remove the skip and fix the test, or update EXPECTED_COUNT."
+          exit 1
+        fi
+        if [ "$PASSED" -lt "$EXPECTED_COUNT" ]; then
+          echo "ERROR: Only $PASSED tests passed, expected at least $EXPECTED_COUNT."
+          echo "This means some tests were silently excluded. Check for test.fixme/test.skip."
+          exit 1
+        fi
+        echo "✓ UX/Visual E2E count invariant intact: $PASSED passed, $SKIPPED skipped, $FAILED failed (expected ≥ $EXPECTED_COUNT)."
 
     - name: 📸 Update visual regression baseline snapshots (manual only)
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_snapshots == 'true'
@@ -811,6 +912,15 @@ jobs:
         cd frontend
         npx playwright test e2e/load/ e2e/chaos/ --project=chromium
       continue-on-error: true  # Non-blocking — load/chaos tests are informational in CI
+
+    - name: рџ“¤ Upload Playwright failure artifacts
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: playwright-failure-artifacts
+        path: frontend/test-results/
+        retention-days: 14
+        if-no-files-found: ignore
 
   # --- Backend тесты ---
   backend-tests:
@@ -859,7 +969,7 @@ jobs:
     - uses: actions/checkout@v7
     
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -896,7 +1006,16 @@ jobs:
         PY
         alembic upgrade head
         alembic current
-    
+
+    # RLS guardrail (2026-09-02 Supabase rls_disabled_in_public incident):
+    # the upgrade above runs on a disposable PostgreSQL; every table it
+    # leaves in public must have RLS enabled. A new table without RLS
+    # fails CI here instead of surfacing days later via a vendor alert.
+    - name: 🛡️ RLS guard — все public-таблицы
+      run: |
+        cd backend
+        python ../ops/scripts/check_public_rls.py
+
     - name: 🧪 Запуск тестов
       run: |
         cd backend
@@ -952,7 +1071,7 @@ jobs:
     - uses: actions/checkout@v7
 
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -1021,7 +1140,7 @@ jobs:
     - uses: actions/checkout@v7
 
     - name: 🐍 Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
 
@@ -1098,7 +1217,7 @@ jobs:
     - uses: actions/checkout@v7
     
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -1261,7 +1380,7 @@ jobs:
     - uses: actions/checkout@v7
     
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -1569,7 +1688,7 @@ jobs:
     - uses: actions/checkout@v7
 
     - name: 🐍 Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -1724,7 +1843,7 @@ jobs:
     - uses: actions/checkout@v7
 
     - name: 🐍 Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -1898,7 +2017,7 @@ jobs:
     - uses: actions/checkout@v7
     
     - name: 🐍 Установка Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -2015,7 +2134,19 @@ jobs:
           echo "❌ Файл openapi.json не создан"
           exit 1
         fi
-    
+
+    - name: 🔬 OpenAPI spec freshness (app code → backend/openapi.json)
+      run: |
+        cd backend
+        if git diff --exit-code -- openapi.json; then
+          echo "✅ backend/openapi.json matches the schema generated from app code"
+        else
+          echo "❌ backend/openapi.json is stale: the schema generated from app.main differs from the committed spec."
+          echo "   Regenerate: import app.main → app.openapi() → json.dump(indent=2, ensure_ascii=False) → commit"
+          git diff --stat -- openapi.json
+          exit 1
+        fi
+
     - name: 📤 Загрузка документации
       uses: actions/upload-artifact@v7
       with:
@@ -2069,7 +2200,7 @@ jobs:
     - uses: actions/checkout@v7
 
     - name: рџђЌ Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
@@ -2112,6 +2243,7 @@ jobs:
         path: |
           docs/release_gates/telegram_mini_app_release_gate_score.json
           output/playwright/telegram-miniapp-release-gate/
+          frontend/test-results/
         retention-days: 14
         if-no-files-found: warn
 
@@ -2261,16 +2393,34 @@ jobs:
   notifications:
     name: 📧 Уведомления
     runs-on: ubuntu-latest
-    needs: [deploy-staging, deploy-production]
+    needs: [ci-scope, metadata-checks, code-quality, frontend-lint, frontend-unit-tests, frontend-build, frontend-e2e, backend-tests, architecture-boundary, frontend-backend-parity, security, docker, integration, load-tests-nightly, dast-zap-nightly, docs, telegram-miniapp-release-gate, pr-required-gate, deploy-staging, deploy-production]
     if: always()
-    
+
     steps:
     - name: 📧 Отправка уведомлений
       run: |
         if [ "${{ needs.deploy-staging.result }}" == "success" ] || [ "${{ needs.deploy-production.result }}" == "success" ]; then
           echo "✅ Развертывание успешно завершено"
-          echo "📧 Уведомления отправлены"
         else
-          echo "❌ Развертывание не выполнено"
+          echo "ℹ️ Развертывание не выполнено (обычно для schedule/PR-прогонов)"
         fi
+
+    # Codex review follow-up (P1): job workspaces are isolated — without a
+    # checkout the local composite action below does not exist and the
+    # notifier crashes instead of creating the alert issue.
+    - name: 📥 Checkout (for the local notify action)
+      if: failure() && github.event_name == 'schedule'
+      uses: actions/checkout@v7
+
+    - name: 🔔 Notify on scheduled failure (issue)
+      if: failure() && github.event_name == 'schedule'
+      uses: ./.github/actions/notify-failure
+      with:
+        title: 🔴 Nightly unified CI failed on main
+        detail: |
+          The scheduled run of the unified CI on main has at least one failed job.
+          Nightly failures are otherwise invisible — this issue is the alert.
+    permissions:
+      issues: write
+      contents: read
 

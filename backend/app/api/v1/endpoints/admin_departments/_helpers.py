@@ -13,6 +13,7 @@ from sqlalchemy import func  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.api.deps import get_db, require_roles  # noqa: F401
+from app.core.specialties import canonical_specialty, expand_queue_tags, specialty_variants
 from app.models.appointment import Appointment  # noqa: F401
 from app.models.clinic import ClinicSettings, Doctor, ServiceCategory  # noqa: F401
 from app.models.department import (  # noqa: F401
@@ -141,6 +142,55 @@ def _ensure_clinic_setting(
     return True
 
 
+def _reconcile_queue_setting_aliases(
+    db: Session, prefix: str, department_key: str
+) -> None:
+    """D-1 (Codex round-4 P1): collapse legacy alias rows of a dental-family
+    department onto the single canonical settings row.
+
+    ``_ensure_department_integrations`` historically wrote
+    ``<prefix><department.key>`` — for the dental department that is the
+    ALIAS ``start_number_dental`` alongside the canonical
+    ``start_number_dentistry`` written by migration 0049 / the queue
+    settings screen. ``get_queue_settings`` maps every family spelling to
+    the same dictionary key in an unordered query, so the stale alias can
+    override the value the queue-limit services enforce. Reconciliation:
+    if no canonical row exists, the oldest alias row is renamed IN PLACE
+    (category/audit columns survive — same contract as migration 0049);
+    remaining alias rows are deleted. Non-dental keys pass through
+    unchanged (canonical_specialty is identity for them).
+    """
+    canonical_suffix = canonical_specialty(department_key)
+    if not canonical_suffix or canonical_suffix == department_key:
+        return
+    canonical_key = f"{prefix}{canonical_suffix}"
+    alias_keys = [
+        f"{prefix}{spelling}"
+        for spelling in specialty_variants(department_key)
+        if spelling != canonical_suffix
+    ]
+    aliases = (
+        db.query(ClinicSettings)
+        .filter(ClinicSettings.key.in_(alias_keys))
+        .order_by(ClinicSettings.id.asc())
+        .all()
+    )
+    if not aliases:
+        return
+    canonical_row = (
+        db.query(ClinicSettings)
+        .filter(ClinicSettings.key == canonical_key)
+        .first()
+    )
+    if canonical_row is None:
+        oldest = aliases[0]
+        oldest.key = canonical_key
+        aliases = aliases[1:]
+    for alias in aliases:
+        db.delete(alias)
+    db.flush()
+
+
 def _ensure_department_integrations(
     db: Session,
     department: Department,
@@ -197,8 +247,16 @@ def _ensure_department_integrations(
         integration_result["registration_settings_created"] = True
 
     # Clinic queue settings (start numbers / limits)
-    start_number_key = f"start_number_{department.key}"
-    max_per_day_key = f"max_per_day_{department.key}"
+    # D-1: the settings segment is the CANONICAL specialty value — the
+    # dental department key 'dental' must write start_number_dentistry,
+    # not an alias row that collapses onto the same dictionary key at
+    # read time (Codex round-4 P1).
+    canonical_segment = canonical_specialty(department.key) or department.key
+    start_number_key = f"start_number_{canonical_segment}"
+    max_per_day_key = f"max_per_day_{canonical_segment}"
+
+    _reconcile_queue_setting_aliases(db, "start_number_", department.key)
+    _reconcile_queue_setting_aliases(db, "max_per_day_", department.key)
 
     if _ensure_clinic_setting(
         db,
@@ -313,7 +371,10 @@ def _ensure_department_integrations(
             key=department.key,
             title=department.name_ru or department.key,
             title_ru=department.name_ru or department.key,
-            queue_tags=[department.key],
+            # D-1 (Codex round-5 P1): carry every accepted spelling — a
+            # dental-family department key ('dental') must not produce a
+            # tag list blind to canonical 'dentistry' doctors after 0049.
+            queue_tags=expand_queue_tags([department.key]),
             department_key=department.key,
             display_order=department.display_order,
             is_active=department.active,
@@ -409,19 +470,34 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
             integrations["queue_prefix"] = department.queue_settings.queue_prefix
             integrations["max_daily_queue"] = department.queue_settings.max_daily_queue
 
-        start_setting = (
-            db.query(ClinicSettings)
-            .filter(ClinicSettings.key == f"start_number_{department.key}")
-            .first()
-        )
+        # D-1: the integration overview must see the canonical row first
+        # (post-0049 the dental department stores start_number_dentistry)
+        # and still fall back to legacy alias rows on unmigrated data.
+        canonical_segment = canonical_specialty(department.key) or department.key
+
+        def _pick_queue_setting(prefix: str) -> ClinicSettings | None:
+            candidates = [f"{prefix}{canonical_segment}"]
+            candidates += [
+                f"{prefix}{spelling}"
+                for spelling in specialty_variants(department.key)
+                if spelling != canonical_segment
+            ]
+            rows = (
+                db.query(ClinicSettings)
+                .filter(ClinicSettings.key.in_(candidates))
+                .order_by(ClinicSettings.id.asc())
+                .all()
+            )
+            if not rows:
+                return None
+            by_key = {row.key: row for row in rows}
+            return by_key.get(candidates[0]) or rows[0]
+
+        start_setting = _pick_queue_setting("start_number_")
         if start_setting is not None:
             integrations["start_number"] = start_setting.value
 
-        max_setting = (
-            db.query(ClinicSettings)
-            .filter(ClinicSettings.key == f"max_per_day_{department.key}")
-            .first()
-        )
+        max_setting = _pick_queue_setting("max_per_day_")
         if max_setting is not None:
             integrations["max_per_day"] = max_setting.value
 

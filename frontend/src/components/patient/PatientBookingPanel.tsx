@@ -2,9 +2,7 @@
 import type { HttpApiError } from '../../types/errors';
 import { extractDetailReason } from '../../utils/error-utils';
 import { useState } from 'react';
-import {
-  Badge, Button, Icon, Input, Textarea,
-} from '../ui/macos';
+import { Badge, Button, Input, Textarea } from '../ui/macos';
 import { api } from '../../api/client';
 import {
   readTelegramMiniAppInitData,
@@ -16,6 +14,7 @@ import {
 import PanelEmptyState from './PanelEmptyState';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { AlertTriangle, Calendar, CheckCircle2, FileText } from 'lucide-react';
 
 interface BookingAppointment {
   appointment_date?: string;
@@ -37,7 +36,7 @@ interface BookingCreatedResponse {
  * L-H-1 fix: все строки на русском (были на английском).
  * L-H-2 fix: Tailwind classes заменены на CSS-классы .pp-*
  * L-H-5 fix: добавлен skeleton-loading при preview/create.
- * L-H-8 fix: lucide-direct icons заменены на macos <Icon>.
+ * L-H-8 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3).
  * L-M-11 fix: date-input имеет min=today (запрет past-dates на клиенте).
  *
  * Форма записи на приём через Telegram Mini App identity.
@@ -63,7 +62,7 @@ function PatientBookingPanel() {
   if (!initData) {
     return (
       <PanelEmptyState
-        icon="calendar"
+        icon={Calendar}
         title={t('patient.pat_book_missing_init_title')}
         description={t('patient.pat_book_missing_init_desc')}
       />
@@ -196,13 +195,13 @@ function PatientBookingPanel() {
 
           {createdBooking && (
             <div className="pp-grid-span-2 pp-message pp-message--success" role="status">
-              <Icon name="checkmark.circle" size={16} />
+              <CheckCircle2 size={16} aria-hidden="true" />
               {t('patient.pat_book_created', { id: createdBooking.appointment_id })}
             </div>
           )}
           {bookingError && (
             <div className="pp-grid-span-2 pp-message pp-message--error" role="alert">
-              <Icon name="exclamationmark.triangle" size={16} />
+              <AlertTriangle size={16} aria-hidden="true" />
               {bookingError}
             </div>
           )}
@@ -215,7 +214,7 @@ function PatientBookingPanel() {
               loading={bookingStatus === 'previewing'}
               onClick={previewBooking}
             >
-              <Icon name="doc.text" size={16} />
+              <FileText size={16} aria-hidden="true" />
               {t('patient.pat_book_preview_button')}
             </Button>
             <Button
@@ -225,7 +224,7 @@ function PatientBookingPanel() {
               loading={bookingStatus === 'creating'}
               onClick={createBooking}
             >
-              <Icon name="calendar" size={16} />
+              <Calendar size={16} aria-hidden="true" />
               {t('patient.pat_book_book_button')}
             </Button>
           </div>

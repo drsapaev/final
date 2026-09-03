@@ -82,8 +82,53 @@ let refreshPromise: Promise<string | null> | null = null;
 let pendingRequestsQueue: Array<(value: string | null) => void> = [];
 
 /**
+ * Core refresh call. Caller must hold the single-flight mutex
+ * (refreshPromise) — see refreshTokenIfNeeded / forceRefreshToken.
+ * @returns {Promise<string|null>} New access token or null on failure
+ */
+async function performTokenRefresh(): Promise<string | null> {
+  const refreshToken = tokenManager.getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    logger.log('🔄 Refreshing access token...');
+    const response = await axios.post(buildApiUrl('/authentication/refresh'), {
+      refresh_token: refreshToken
+    });
+
+    if (response.data && response.data.access_token) {
+      const newToken = response.data.access_token;
+      tokenManager.setAccessToken(newToken);
+      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      // AUTH-REAUDIT-28: backend rotates refresh tokens on each /refresh —
+      // persist the new one so future refreshes work.
+      if (response.data.refresh_token) {
+        tokenManager.setRefreshToken(response.data.refresh_token);
+      }
+      logger.log('✅ Token refreshed successfully');
+
+      // Notify all pending requests
+      pendingRequestsQueue.forEach(resolve => resolve(newToken));
+      pendingRequestsQueue = [];
+
+      return newToken;
+    }
+    pendingRequestsQueue.forEach(resolve => resolve(null));
+    pendingRequestsQueue = [];
+    return null;
+  } catch (err) {
+    logger.warn('❌ Token refresh failed:', err);
+    // Notify pending requests of failure
+    pendingRequestsQueue.forEach(resolve => resolve(null));
+    pendingRequestsQueue = [];
+    return null;
+  }
+}
+
+/**
  * Refresh token with single-flight pattern.
  * All concurrent callers wait for the same promise, preventing multiple refresh calls.
+ * Proactive: only refreshes when the access token is missing or expiring soon.
  * @returns {Promise<string|null>} New access token or null on failure
  */
 async function refreshTokenIfNeeded(): Promise<string | null> {
@@ -102,44 +147,49 @@ async function refreshTokenIfNeeded(): Promise<string | null> {
   }
 
   // ✅ Start single refresh operation
-  refreshPromise = (async () => {
-    try {
-      logger.log('🔄 Token expiring soon, refreshing...');
-      const response = await axios.post(buildApiUrl('/authentication/refresh'), {
-        refresh_token: refreshToken
-      });
-
-      if (response.data && response.data.access_token) {
-        const newToken = response.data.access_token;
-        tokenManager.setAccessToken(newToken);
-        api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-        // AUTH-REAUDIT-28: backend rotates refresh tokens on each /refresh —
-        // persist the new one so future refreshes work.
-        if (response.data.refresh_token) {
-          tokenManager.setRefreshToken(response.data.refresh_token);
-        }
-        logger.log('✅ Token refreshed successfully');
-
-        // Notify all pending requests
-        pendingRequestsQueue.forEach(resolve => resolve(newToken));
-        pendingRequestsQueue = [];
-
-        return newToken;
-      }
-      return null;
-    } catch (err) {
-      logger.warn('❌ Token refresh failed:', err);
-      // Notify pending requests of failure
-      pendingRequestsQueue.forEach(resolve => resolve(null));
-      pendingRequestsQueue = [];
-      return null;
-    } finally {
-      // ✅ Reset mutex after completion
-      refreshPromise = null;
-    }
-  })();
+  refreshPromise = performTokenRefresh().finally(() => {
+    // ✅ Reset mutex after completion
+    refreshPromise = null;
+  });
 
   return refreshPromise;
+}
+
+/**
+ * Reactive single-flight refresh (401 recovery): refresh regardless of the
+ * local expiry heuristic. Shares the same mutex as refreshTokenIfNeeded so
+ * a burst of 401s triggers exactly one /authentication/refresh call.
+ */
+async function forceRefreshToken(): Promise<string | null> {
+  if (refreshPromise !== null) {
+    logger.log('🔄 Reactive refresh already in progress, waiting...');
+    return refreshPromise;
+  }
+  refreshPromise = performTokenRefresh().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
+// Endpoints that bootstrap or replace the session themselves — a 401/403
+// from these must never trigger the reactive refresh/retry path.
+const AUTH_BOOTSTRAP_SUFFIXES = [
+  '/auth/login',
+  '/authentication/login',
+  '/auth/refresh',
+  '/authentication/refresh',
+  '/auth/csrf-token',
+  '/auth/password-reset',
+  '/authentication/password-reset',
+  '/password-reset',
+  '/password-reset/confirm',
+  '/auth/logout',
+  '/authentication/logout'
+];
+
+function isAuthBootstrapEndpoint(url: string | undefined): boolean {
+  const raw = String(url || '');
+  return AUTH_BOOTSTRAP_SUFFIXES.some((suffix) => raw.endsWith(suffix));
 }
 
 // ✅ SECURITY: Get CSRF token from cookie
@@ -263,9 +313,71 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 
 // ✅ SECURITY: Handle 401 responses - log but don't auto-clear tokens
 // (prevents race condition where 401 during login transition clears new token)
+
+// #05 Tier 1: Detect CSRF rejection from the backend.
+// The backend sets `X-CSRF-Status: rejected` header and returns
+// { "detail": "CSRF validation failed", "reason": "missing_cookie|missing_header|mismatch" }
+// when CSRF validation fails. This is distinct from a regular 403
+// (permission denied) and should trigger automatic token refresh + retry,
+// NOT logout.
+function isCSRFRejection(error: AxiosError): boolean {
+  if (error.response?.status !== 403) return false;
+  const headers = error.response?.headers;
+  if (headers) {
+    const csrfStatus = headers['x-csrf-status'] || headers['X-CSRF-Status'];
+    if (csrfStatus === 'rejected') return true;
+  }
+  const data = error.response?.data as Record<string, unknown> | undefined;
+  if (data && typeof data === 'object') {
+    const reason = data.reason;
+    if (typeof reason === 'string' && ['missing_cookie', 'missing_header', 'mismatch'].includes(reason)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
+    // Reactive 401 recovery: one single-flight refresh + retry for requests
+    // that went out WITH an Authorization header. Auth bootstrap endpoints
+    // are exempt; anonymous requests stay untouched (route guards decide).
+    // On refresh failure the session is cleared ONLY when the failed token
+    // is still the current one — clearing blindly would wipe a freshly
+    // logged-in session during the login transition (see NOTE below).
+    if (
+      error.response?.status === 401 &&
+      error.config &&
+      !isAuthBootstrapEndpoint(error.config.url)
+    ) {
+      const config = error.config as InternalAxiosRequestConfig & {
+        _retriedAfterRefresh?: boolean;
+      };
+      const hadAuthHeader = !!config.headers?.Authorization;
+      const failedToken = String(config.headers?.Authorization || '')
+        .replace(/^Bearer\s+/i, '');
+      const currentToken = tokenManager.getAccessToken();
+      const refreshToken = tokenManager.getRefreshToken();
+
+      if (hadAuthHeader && refreshToken && !config._retriedAfterRefresh) {
+        config._retriedAfterRefresh = true;
+        logger.warn('🔒 401 received — single-flight refresh + retry', {
+          url: config.url
+        });
+        const newToken = await forceRefreshToken();
+        if (newToken) {
+          config.headers.set('Authorization', `Bearer ${newToken}`);
+          return api.request(config);
+        }
+        // Session is dead only if no newer session took its place meanwhile.
+        if (!currentToken || failedToken === currentToken) {
+          logger.warn('🔒 Token refresh failed — clearing session');
+          tokenManager.clearAll();
+          delete api.defaults.headers.common['Authorization'];
+        }
+      }
+    }
     if (error.response?.status === 401) {
       logger.warn('🔒 Unauthorized response received', {
         url: error.config?.url,
@@ -283,6 +395,33 @@ api.interceptors.response.use(
         cooldownMs: GLOBAL_RATE_LIMIT_COOLDOWN_MS
       });
     }
+
+    // #05 Tier 1: CSRF 403 recovery — refresh token and retry exactly once.
+    // This handles CSRF cookie drift (8h expiry, multi-tab, subdomain mixup).
+    // The backend provides "recovery": "GET /auth/csrf-token" hint.
+    if (isCSRFRejection(error) && error.config) {
+      const config = error.config as InternalAxiosRequestConfig & { _csrfRetried?: boolean };
+      if (!config._csrfRetried) {
+        config._csrfRetried = true;
+        logger.info('[FIX:CSRF] CSRF rejection detected — refreshing token and retrying once', {
+          url: config.url,
+        });
+        // Reset cached state so ensureCSRFToken() will re-fetch.
+        csrfEndpointUnavailable = false;
+        csrfTokenPromise = null;
+        const newToken = await ensureCSRFToken();
+        if (newToken) {
+          config.headers.set('X-CSRF-Token', newToken);
+          return api.request(config);
+        }
+        logger.warn('[FIX:CSRF] Could not obtain new CSRF token — rejecting request');
+      } else {
+        logger.warn('[FIX:CSRF] CSRF retry already attempted — not retrying again', {
+          url: config.url,
+        });
+      }
+    }
+
     return Promise.reject(error);
   }
 );
@@ -483,6 +622,8 @@ export {
   clearToken,
   me,
   login,
+  ensureCSRFToken,
+  isCSRFRejection,
 };
 
 export default apiClient;

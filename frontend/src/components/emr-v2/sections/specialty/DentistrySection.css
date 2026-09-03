@@ -27,8 +27,8 @@
 }
 
 .dentistry-tab.active {
-    color: var(--mac-blue-500);
-    border-bottom-color: var(--mac-blue-500);
+    color: var(--mac-accent-blue-500);
+    border-bottom-color: var(--mac-accent-blue-500);
 }
 
 .dentistry-tab:disabled {
@@ -50,7 +50,7 @@
     padding: 16px;
     background: var(--mac-bg-secondary);
     border-radius: var(--mac-radius-md);
-    border-left: 3px solid var(--mac-blue-500);
+    border-left: 3px solid var(--mac-accent-blue-500);
 }
 
 .dentistry-periodontal-info p {
@@ -91,7 +91,7 @@
 
 .dentistry-checkbox:hover:not(:has(input:disabled)) {
     background: var(--mac-bg-tertiary);
-    border-color: var(--mac-blue-500);
+    border-color: var(--mac-accent-blue-500);
 }
 
 .dentistry-checkbox input[type="checkbox"] {
@@ -100,7 +100,7 @@
 }
 
 .dentistry-checkbox input[type="checkbox"]:checked+span {
-    color: var(--mac-blue-500);
+    color: var(--mac-accent-blue-500);
     font-weight: 500;
 }
 
@@ -115,7 +115,7 @@
     padding: 12px;
     background: var(--mac-bg-secondary);
     border-radius: var(--mac-radius-md);
-    border-left: 3px solid var(--mac-blue-500);
+    border-left: 3px solid var(--mac-accent-blue-500);
 }
 
 .dentistry-radiographs-note p {
@@ -196,7 +196,7 @@
 
 .pocket-depth-input:focus {
     outline: none;
-    border-color: var(--mac-blue-500);
+    border-color: var(--mac-accent-blue-500);
 }
 
 .pocket-depth-input:disabled {

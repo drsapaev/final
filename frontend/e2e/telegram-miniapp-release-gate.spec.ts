@@ -1,6 +1,50 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp: {
+        initData: string;
+        initDataUnsafe: { user: { language_code: string } };
+        ready(): void;
+        expand(): void;
+        close(): void;
+      };
+    };
+  }
+}
+
+interface MiniAppOnboardingRequest {
+  status: string;
+  contactName: string;
+  contactPhone: string;
+  desiredService: string;
+  desiredBranch: string;
+  desiredDate: string;
+  desiredTime: string;
+  note: string;
+  reviewMessage: string;
+}
+
+interface MiniAppManifest {
+  language: { code: string };
+  scope: { type: string };
+  onboarding?: { request: MiniAppOnboardingRequest | null };
+  capabilities: Record<string, Record<string, unknown>>;
+}
+
+interface MiniAppScenario {
+  name: string;
+  query: string;
+  auth: string;
+  manifest?: MiniAppManifest;
+  manifestErrorReason?: string;
+  cabinetSummary?: ReturnType<typeof buildLinkedCabinetSummary>;
+  expectedTexts: string[];
+}
 
 const repoRoot = path.resolve(process.cwd(), '..');
 const artifactsDir = path.join(repoRoot, 'output', 'playwright', 'telegram-miniapp-release-gate');
@@ -12,7 +56,7 @@ const MINI_APP_VIEWPORTS = [
   { width: 1920, height: 1080 },
 ];
 
-const MINI_APP_SCENARIOS = [
+const MINI_APP_SCENARIOS: MiniAppScenario[] = [
   {
     name: 'onboarding-new',
     query: '?section=appointments',
@@ -279,7 +323,7 @@ test('TelegramManager duplicate review modal 1280', async ({ page }) => {
   });
 });
 
-function buildOnboardingManifest(status) {
+function buildOnboardingManifest(status: string) {
   const request = status === 'not_found'
     ? null
     : {
@@ -354,8 +398,8 @@ function buildLinkedCabinetSummary() {
   };
 }
 
-function monitorRuntimeErrors(page) {
-  const errors = [];
+function monitorRuntimeErrors(page: Page): string[] {
+  const errors: string[] = [];
   page.on('pageerror', (error) => {
     errors.push(`pageerror:${error.message}`);
   });
@@ -378,7 +422,7 @@ function monitorRuntimeErrors(page) {
   return errors;
 }
 
-async function installMiniAppMocks(page, scenario) {
+async function installMiniAppMocks(page: Page, scenario: MiniAppScenario) {
   if (scenario.auth === 'telegram') {
     await page.addInitScript(() => {
       window.Telegram = {
@@ -455,7 +499,7 @@ async function installMiniAppMocks(page, scenario) {
   });
 }
 
-async function installAdminMocks(page) {
+async function installAdminMocks(page: Page) {
   const token = createJwt(ADMIN_PROFILE);
   await page.addInitScript(({ authToken, profile }) => {
     window.sessionStorage.setItem('auth_token', authToken);
@@ -500,6 +544,27 @@ async function installAdminMocks(page) {
   });
 
   await page.route('**/api/v1/messages/unread', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ unread_count: 0 }),
+    });
+  });
+
+  // FOLLOWUP-12 investigation: NotificationCenter / GlobalNotificationCenter
+  // (added in PR #2439 "make header bell functional across ALL panels") call
+  // these endpoints on mount. Without mocks, Vite proxy returns ECONNREFUSED
+  // (backend not running in CI), which produces console errors caught by
+  // monitorRuntimeErrors(page), failing expect(errors).toEqual([]).
+  await page.route('**/api/v1/notifications/inbox**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], total: 0, unread_count: 0 }),
+    });
+  });
+
+  await page.route('**/api/v1/notifications/unread-count**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -608,8 +673,8 @@ async function installAdminMocks(page) {
   });
 }
 
-function createJwt(profile) {
-  const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+function createJwt(profile: typeof ADMIN_PROFILE) {
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
   const now = Math.floor(Date.now() / 1000);
   return [
     encode({ alg: 'HS256', typ: 'JWT' }),
@@ -623,7 +688,7 @@ function createJwt(profile) {
   ].join('.');
 }
 
-async function waitForMiniAppScenario(page, scenario) {
+async function waitForMiniAppScenario(page: Page, scenario: MiniAppScenario) {
   await expect(page.locator('main')).toBeVisible();
   await expect(page.locator('h1')).toBeVisible();
   await expect.poll(async () => {
@@ -638,7 +703,7 @@ async function waitForMiniAppScenario(page, scenario) {
   }).toBe(true);
 }
 
-async function expectNoHorizontalOverflow(page) {
+async function expectNoHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,
@@ -647,7 +712,7 @@ async function expectNoHorizontalOverflow(page) {
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
 }
 
-async function expectNoSensitiveText(page) {
+async function expectNoSensitiveText(page: Page) {
   const text = await page.locator('body').innerText();
   expect(text).not.toMatch(/pma_[a-z0-9_]+|pmo_[a-z0-9_]+|entryToken=|AxiosError|Traceback|diagnosis|lab details|paymentId|invoiceId/i);
 }

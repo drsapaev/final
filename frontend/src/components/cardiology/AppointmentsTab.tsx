@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { Calendar } from 'lucide-react';
-import { MacOSCard, Skeleton, MacOSEmptyState } from '../ui/macos';
+import { Card, Skeleton, AppEmpty } from '../ui/macos';
 import AppointmentSummaryBar from '../doctor/AppointmentSummaryBar';
 import EnhancedAppointmentsTable from '../tables/EnhancedAppointmentsTable';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -39,7 +39,7 @@ export function AppointmentsTab({
   const { t: rawT } = useTranslation(); const t = rawT;
   return (
     <div style={{ width: '100%', maxWidth: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
-      <MacOSCard className="cardio-card-fullwidth">
+      <Card className="cardio-card-fullwidth">
         <div className="cardio-appointments-header">
           <h3 className="cardio-appointments-title">
             <Calendar size={20} className="cardio-icon-mr" style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-accent)' }} />
@@ -57,7 +57,7 @@ export function AppointmentsTab({
         {appointmentsLoading ? (
           <Skeleton type="table" count={5} />
         ) : appointments.length === 0 ? (
-          <MacOSEmptyState type="calendar" title={t('cardio.cardio_appt_empty_title')} description={t('cardio.cardio_appt_empty_desc')} />
+          <AppEmpty title={t('cardio.cardio_appt_empty_title')} description={t('cardio.cardio_appt_empty_desc')} />
         ) : (
           <EnhancedAppointmentsTable
             data={appointments as never[]}
@@ -73,7 +73,7 @@ export function AppointmentsTab({
             onActionClick={onActionClick}
           />
         )}
-      </MacOSCard>
+      </Card>
     </div>
   );
 }

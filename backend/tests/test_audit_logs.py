@@ -22,11 +22,9 @@ from app.models.visit import Visit
 def test_audit_log_create_patient(client: TestClient, db: Session, admin_user: User, admin_password: str):
     """Тест: создание пациента должно логироваться"""
     # Получаем токен
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    token = response.json()["access_token"]
+    from tests.conftest import mint_access_token
+
+    token = mint_access_token(admin_user)
 
     # Создаем пациента
     patient_data = {
@@ -34,7 +32,7 @@ def test_audit_log_create_patient(client: TestClient, db: Session, admin_user: U
         "first_name": "Пациент",
         "birth_date": "1990-01-01",
         "sex": "M",
-        "phone": "+998901234999",
+        "phone": "+998900000125",
     }
 
     response = client.post(
@@ -66,11 +64,9 @@ def test_audit_log_create_patient(client: TestClient, db: Session, admin_user: U
 def test_audit_log_update_patient(client: TestClient, db: Session, admin_user: User, test_patient: Patient, admin_password: str):
     """Тест: обновление пациента должно логироваться"""
     # Получаем токен
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    token = response.json()["access_token"]
+    from tests.conftest import mint_access_token
+
+    token = mint_access_token(admin_user)
 
     # Обновляем пациента
     update_data = {
@@ -104,11 +100,9 @@ def test_audit_log_update_patient(client: TestClient, db: Session, admin_user: U
 def test_audit_log_delete_patient(client: TestClient, db: Session, admin_user: User, test_patient: Patient, admin_password: str):
     """Тест: удаление пациента должно логироваться"""
     # Получаем токен
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    token = response.json()["access_token"]
+    from tests.conftest import mint_access_token
+
+    token = mint_access_token(admin_user)
 
     patient_id = test_patient.id
 
@@ -136,11 +130,9 @@ def test_audit_log_delete_patient(client: TestClient, db: Session, admin_user: U
 def test_audit_log_create_payment_init(client: TestClient, db: Session, admin_user: User, test_patient: Patient, admin_password: str):
     """Тест: инициализация платежа через /payments/init должна логироваться"""
     # Логин админа
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    token = response.json()["access_token"]
+    from tests.conftest import mint_access_token
+
+    token = mint_access_token(admin_user)
 
     # Создаем визит для пациента
     visit = Visit(
@@ -230,11 +222,9 @@ def test_log_critical_change_non_critical_table(db: Session, admin_user: User):
 def test_audit_log_request_id(client: TestClient, db: Session, admin_user: User, admin_password: str):
     """Тест: каждый запрос должен иметь уникальный request_id"""
     # Получаем токен
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    token = response.json()["access_token"]
+    from tests.conftest import mint_access_token
+
+    token = mint_access_token(admin_user)
 
     # Создаем несколько пациентов
     patient_ids = []

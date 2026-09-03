@@ -294,7 +294,7 @@
 }
 
 .cashier-session-warning-card {
-  background: var(--mac-surface, white);
+  background: var(--mac-bg-primary);
   border: 1px solid var(--mac-border, #d8dde8);
   border-radius: 12px;
   padding: 24px;

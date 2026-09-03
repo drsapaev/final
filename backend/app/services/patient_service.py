@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import extract_model_changes, log_critical_change
 from app.core.i18n import t  # noqa: F401
+from app.core.pii_masker import mask_pii
 from app.crud.patient import (
     normalize_patient_name,
     validate_birthdate,
@@ -59,9 +60,9 @@ class PatientService:
                 )
 
         has_full_name = patient_in.full_name and patient_in.full_name.strip()
-        has_individual_names = (patient_in.last_name and patient_in.last_name.strip()) or (
-            patient_in.first_name and patient_in.first_name.strip()
-        )
+        has_individual_names = (
+            patient_in.last_name and patient_in.last_name.strip()
+        ) or (patient_in.first_name and patient_in.first_name.strip())
 
         if not has_full_name and not has_individual_names:
             raise HTTPException(
@@ -111,11 +112,16 @@ class PatientService:
         normalized_first_name = (name_parts["first_name"] or "").strip()
         normalized_middle_name = name_parts.get("middle_name")
 
+        # Codex round-16 P1: имена пациента -- PII (AGENTS.md L391-408),
+        # в debug-лог попадают только длины/факт наличия, не значения
+        # (тот же принцип, что и для doc_number в round-15).
         logger.debug(
-            "Нормализация имени пациента: full_name=%s, last_name=%s, first_name=%s",
-            patient_in.full_name,
-            patient_in.last_name,
-            patient_in.first_name,
+            "Нормализация имени пациента: full_name_len=%d, last_name_len=%d, "
+            "first_name_len=%d, middle_name_present=%s",
+            len(patient_in.full_name or ""),
+            len(patient_in.last_name or ""),
+            len(patient_in.first_name or ""),
+            bool(normalized_middle_name),
         )
 
         if not normalized_last_name:
@@ -132,11 +138,16 @@ class PatientService:
         if patient_in.birth_date and not validate_birthdate(patient_in.birth_date):
             raise HTTPException(status_code=400, detail="Некорректная дата рождения")
 
+        # Codex round-15 P1: doc_number -- full-redact PII (AGENTS.md
+        # L390-407); сам номер в лог не попадает НИ В КАКОМ виде (ни
+        # сырым, ни маскированным -- CodeQL flagged the masked variant as
+        # clear-text logging, т.к. поток значения непрозрачен маске):
+        # логируем только тип документа и факт его наличия.
         logger.debug(
             "[FIX:ADM-05] Persisting patient document fields",
             extra={
                 "doc_type": patient_in.doc_type,
-                "doc_number": patient_in.doc_number,
+                "has_doc_number": patient_in.doc_number is not None,
             },
         )
 
@@ -166,7 +177,12 @@ class PatientService:
                 detail="Ошибка сохранения: имя пациента не было сохранено",
             )
 
+        # Codex round-10 P1: JSON-снапшоты аудита хранят PHI в plaintext —
+        # маскируем каноническим pii_masker (AGENTS.md L390-407).
+        # extract_model_changes возвращает КОРТЕЖ (old, new) — маскируем
+        # ПОСЛЕ распаковки (mask_pii не рекурсирует в tuple).
         _, new_data = extract_model_changes(None, patient)
+        new_data = mask_pii(new_data)
         log_critical_change(
             db=self.db,
             user_id=current_user.id,
@@ -176,7 +192,9 @@ class PatientService:
             old_data=None,
             new_data=new_data,
             request=request,
-            description=f"Создан пациент: {patient.last_name} {patient.first_name}",
+            # Codex round-9 P1: initial-only режим аудита — вместо ФИО
+            # идентифицируем пациента ID (AGENTS.md L390-407).
+            description=f"Создан пациент #{patient.id}",
         )
         self.db.commit()
         try:
@@ -241,11 +259,31 @@ class PatientService:
                     detail="Пациент с таким номером телефона уже существует",
                 )
 
+        # Codex round-15 P1: дубликат doc_number при обновлении -- тот же
+        # контракт, что и при создании (patients.doc_number без unique-
+        # констрейнта; поиск по документу через .first() стал бы
+        # неоднозначным). Исключаем текущего пациента (unchanged value).
+        if patient_in.doc_number and patient_in.doc_number != patient.doc_number:
+            existing_by_doc = (
+                self.db.query(Patient)
+                .filter(Patient.doc_number == patient_in.doc_number)
+                .first()
+            )
+            if existing_by_doc and existing_by_doc.id != patient_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Пациент с таким номером документа уже зарегистрирован",
+                )
+
+        # Codex round-10 P1: маскируем PHI в old-снапшоте (см. create;
+        # extract_model_changes -> кортеж, маскируем после распаковки).
         old_data, _ = extract_model_changes(patient, None)
+        old_data = mask_pii(old_data)
         patient = patient_crud.update(db=self.db, db_obj=patient, obj_in=patient_in)
         self.db.refresh(patient)
 
         _, new_data = extract_model_changes(None, patient)
+        new_data = mask_pii(new_data)
         log_critical_change(
             db=self.db,
             user_id=current_user.id,
@@ -255,7 +293,8 @@ class PatientService:
             old_data=old_data,
             new_data=new_data,
             request=request,
-            description=f"Обновлен пациент: {patient.last_name} {patient.first_name}",
+            # Codex round-9 P1: вместо ФИО — ID пациента
+            description=f"Обновлен пациент #{patient.id}",
         )
         self.db.commit()
 
@@ -277,8 +316,9 @@ class PatientService:
                 status_code=400, detail="Нельзя удалить пациента с активными записями"
             )
 
+        # Codex round-10 P1: маскируем PHI в old-снапшоте (см. create).
         old_data, _ = extract_model_changes(patient, None)
-        patient_name = f"{patient.last_name} {patient.first_name}"
+        old_data = mask_pii(old_data)
 
         try:
             patient_crud.remove(db=self.db, id=patient_id)
@@ -291,7 +331,8 @@ class PatientService:
                 old_data=old_data,
                 new_data=None,
                 request=request,
-                description=f"Удален пациент: {patient_name}",
+                # Codex round-9 P1: вместо ФИО — ID пациента
+                description=f"Удален пациент #{patient_id}",
             )
             self.db.commit()
         except Exception:

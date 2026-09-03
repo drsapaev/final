@@ -27,14 +27,14 @@ import {
   UserPlus } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   SegmentedControl,
-  MacOSStatCard,
+  StatCard,
   Input,
   Select,
-  MacOSEmptyState,
+  AppEmpty,
   Skeleton,
   Modal,
 } from '../ui/macos';
@@ -148,7 +148,18 @@ const WebhookManager = () => {
     };
 
     loadData();
-  }, [loadWebhooks, loadSystemStats]);
+    // AXE-EXP-1 determinism fix: mount-only load. The i18n wrapper
+    // (i18n/useTranslation.ts) creates a NEW t identity on every render,
+    // so loadWebhooks (useCallback deps [t]) changes identity per render
+    // and this effect re-fired on EVERY render → infinite async load
+    // loop (loading↔loaded flicker + unbounded /webhooks/ polling; each
+    // cycle awaits a promise, so React's nested-update detector never
+    // fires). Detected by the a11y-axe-authenticated gate probe: the
+    // /admin/webhooks surface oscillated forever and no axe audit could
+    // be deterministic. Explicit refresh buttons keep calling
+    // loadWebhooks()/loadSystemStats() directly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Действия с webhook'ами
   const handleActivateWebhook = async (webhookId: string | number) => {
@@ -289,28 +300,28 @@ const WebhookManager = () => {
       {/* Статистика */}
       {stats &&
       <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_total')}
           value={String((stats as Record<string, unknown>)?.total_webhooks ?? "")}
           icon={Globe}
           color="blue" />
 
           
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_active')}
           value={String((stats as Record<string, unknown>)?.active_webhooks ?? "")}
           icon={CheckCircle}
           color="green" />
 
           
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_calls_24h')}
           value={String(((stats as Record<string, unknown>)?.recent_24h as Record<string, unknown>)?.total_calls ?? "")}
           icon={Activity}
           color="orange" />
 
           
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.wh_stat_success_rate')}
           value={`${Number(((stats as Record<string, unknown>)?.recent_24h as Record<string, unknown>)?.success_rate ?? 0).toFixed(1) ?? '0'}%`}
           icon={Zap}
@@ -336,7 +347,7 @@ const WebhookManager = () => {
       {activeTab === 'webhooks' &&
       <div className="flex flex-col gap-4">
           {/* Фильтры */}
-          <MacOSCard className="p-4">
+          <Card className="p-4">
             <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
@@ -396,12 +407,12 @@ const WebhookManager = () => {
                 </Button>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Список webhook'ов */}
           <div className="flex flex-col gap-4">
             {filteredWebhooks.map((webhook) =>
-          <MacOSCard key={String(webhook.id ?? "")} className="p-6">
+          <Card key={String(webhook.id ?? "")} className="p-6">
                 <div className="admin-flex-ai-start-jc-between">
                   <div className="admin-flex-1">
                     <div className="admin-flex-ai-center-gap-12-mb-8">
@@ -521,12 +532,12 @@ const WebhookManager = () => {
                     </Button>
                   </div>
                 </div>
-              </MacOSCard>
+              </Card>
           )}
           </div>
 
           {filteredWebhooks.length === 0 &&
-        <MacOSEmptyState
+        <AppEmpty
           icon={Globe}
           title={t('admin2.wh_empty_title')}
           description={
@@ -540,8 +551,7 @@ const WebhookManager = () => {
                   {t('admin2.wh_create_btn')}
                   </Button> :
           null
-          }
-          iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} />
+          } />
 
         }
         </div>
@@ -567,7 +577,7 @@ const WebhookManager = () => {
           </div>
 
           {/* Фильтры для вызовов */}
-          <MacOSCard className="p-4">
+          <Card className="p-4">
             <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
@@ -604,12 +614,12 @@ const WebhookManager = () => {
 
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Список вызовов */}
           <div className="flex flex-col gap-2">
             {calls.map((call) =>
-          <MacOSCard key={call.id} className="p-4">
+          <Card key={call.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="admin-flex-1">
                     <div className="admin-flex-ai-center-gap-12-mb-8">
@@ -647,16 +657,15 @@ const WebhookManager = () => {
                 }
                   </div>
                 </div>
-              </MacOSCard>
+              </Card>
           )}
           </div>
 
           {calls.length === 0 &&
-        <MacOSEmptyState
+        <AppEmpty
           icon={Activity}
           title={t('admin2.wh_calls_empty_title')}
-          description={selectedWebhook ? t('admin2.wh_calls_empty_desc_with_webhook') : t('admin2.wh_calls_empty_desc_no_webhook')}
-          iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} />
+          description={selectedWebhook ? t('admin2.wh_calls_empty_desc_with_webhook') : t('admin2.wh_calls_empty_desc_no_webhook')} />
 
         }
         </div>
@@ -683,28 +692,28 @@ const WebhookManager = () => {
 
           {/* Статистика событий */}
           <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_event_types_total')}
             value={new Set(webhooks.flatMap((w) => w.events)).size}
             icon={Clock}
             color="blue" />
 
             
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_active_events')}
             value={webhooks.filter((w) => w.is_active).flatMap((w) => w.events).length}
             icon={CheckCircle}
             color="green" />
 
             
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_patient_events')}
             value={webhooks.flatMap((w) => w.events ?? []).filter((e) => e.includes('patient')).length}
             icon={Users}
             color="orange" />
 
             
-            <MacOSStatCard
+            <StatCard
             title={t('admin2.wh_stat_payment_events')}
             value={webhooks.flatMap((w) => w.events ?? []).filter((e) => e.includes('payment')).length}
             icon={CreditCard}
@@ -713,7 +722,7 @@ const WebhookManager = () => {
           </div>
 
           {/* Список типов событий */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <h3 className="admin-lg-semi-primary-m-0016px0">
               {t('admin2.wh_event_types_heading')}
             </h3>
@@ -732,7 +741,7 @@ const WebhookManager = () => {
               name: t('admin2.wh_event_name_patient_updated'),
               description: t('admin2.wh_event_desc_patient_updated'),
               icon: Edit,
-              color: 'var(--mac-info)'
+              color: 'var(--mac-accent)'
             },
             {
               type: 'appointment.created',
@@ -746,7 +755,7 @@ const WebhookManager = () => {
               name: t('admin2.wh_event_name_appointment_updated'),
               description: t('admin2.wh_event_desc_appointment_updated'),
               icon: Edit,
-              color: 'var(--mac-info)'
+              color: 'var(--mac-accent)'
             },
             {
               type: 'visit.completed',
@@ -810,7 +819,7 @@ const WebhookManager = () => {
 
             })}
             </div>
-          </MacOSCard>
+          </Card>
         </div>
       }
 

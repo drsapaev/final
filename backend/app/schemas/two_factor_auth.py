@@ -199,6 +199,9 @@ class TwoFactorSetupRequest(BaseModel):
     recovery_phone: str | None = Field(None, max_length=20)
     device_name: str | None = Field(None, max_length=100)
     device_type: str | None = Field(None, pattern="^(mobile|desktop|tablet)$")
+    # Двухстадийная аутентификация: одноразовый токен из login-ответа
+    # (критичная роль без 2FA). Альтернатива Bearer JWT для уже вошедших.
+    enrollment_token: str | None = Field(None, max_length=128)
 
 
 class TwoFactorVerifyRequest(BaseModel):
@@ -235,6 +238,9 @@ class TwoFactorVerifySetupRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     totp_code: str = Field(..., min_length=6, max_length=6)
+    # Двухстадийная аутентификация: одноразовый токен из login-ответа.
+    # При успешной верификации обменивается на нормальные токены.
+    enrollment_token: str | None = Field(None, max_length=128)
 
 
 class TwoFactorRecoveryVerifyRequest(BaseModel):
@@ -309,7 +315,7 @@ class TwoFactorRecoveryResponse(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    recovery_token: str
+    recovery_token: str | None = None  # None: токен уходит только в канал доставки
     expires_at: datetime
     message: str
 

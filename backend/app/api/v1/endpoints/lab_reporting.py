@@ -788,9 +788,16 @@ def create_lab_order(
             if doctor and visit.doctor_id != doctor.id:
                 raise HTTPException(status_code=403, detail="Нет доступа к этому визиту")
 
+        # LabReportTemplate has no stored published_version_id attribute;
+        # resolve it from versions exactly like _template_summary_out does.
+        published = max(
+            (v for v in template.versions if v.status == "PUBLISHED"),
+            key=lambda item: item.version_no,
+            default=None,
+        )
         version = None
-        if template.published_version_id:
-            version = service.get_template_version(template.published_version_id)
+        if published is not None:
+            version = service.repository.get_template_version(published.id)
         if not version and template.versions:
             version = template.versions[-1]
         if not version:

@@ -226,6 +226,133 @@ class TestSanitizeEventMultiplePii:
         assert "j•••@example.com" in value
 
 
+class TestSanitizeEventLogentryScrubbing:
+    """LoggingIntegration puts the raw LogRecord message/args into
+    ``event["logentry"]``. The app's ``PIIMaskingFilter`` runs on the
+    stdout handler only, so ``sanitize_event`` is the only scrubbing
+    layer for this field."""
+
+    def test_scrubs_phone_in_logentry_formatted(self):
+        event = {
+            "logentry": {
+                "message": "visit failed for patient",
+                "params": None,
+                "formatted": "visit failed for patient +998901234567",
+            }
+        }
+        sanitize_event(event)
+        assert "+998901234567" not in event["logentry"]["formatted"]
+        assert "+998901•••567" in event["logentry"]["formatted"]
+
+    def test_scrubs_patient_dict_in_logentry_params(self):
+        """Dict args with PII keys must be key-redacted, not just regex-masked."""
+        event = {
+            "logentry": {
+                "message": "failed to save visit for %s",
+                "params": [
+                    {
+                        "phone": "+998901234567",
+                        "first_name": "Иван",
+                        "last_name": "Иванов",
+                        "diagnosis": "acute appendicitis",
+                    }
+                ],
+            }
+        }
+        sanitize_event(event)
+        params = event["logentry"]["params"][0]
+        assert params["phone"] == "+998901•••567"
+        assert params["first_name"] == "И."
+        assert params["last_name"] == "И."
+        assert params["diagnosis"] == "[REDACTED]"
+
+    def test_scrubs_all_logentry_string_fields(self):
+        event = {
+            "logentry": {
+                "message": "PHI_TEST_MARKER phone=+998901234567",
+                "formatted": "PHI_TEST_MARKER email=john@example.com",
+            }
+        }
+        sanitize_event(event)
+        assert "+998901234567" not in event["logentry"]["message"]
+        assert "john@example.com" not in event["logentry"]["formatted"]
+
+    def test_event_with_non_dict_logentry(self):
+        """Defensive: malformed logentry must not raise."""
+        event = {"logentry": "not-a-dict"}
+        sanitize_event(event)
+        assert event["logentry"] == "not-a-dict"
+
+    def test_event_without_logentry_unchanged(self):
+        event = {"message": "no logentry here"}
+        sanitize_event(event)
+        assert "logentry" not in event
+
+
+class TestSanitizeEventBreadcrumbsShape:
+    """Real Sentry SDK ships breadcrumbs as {"values": [...]}; the sanitizer
+    must handle that shape (previously it iterated the dict's keys and raised
+    TypeError, sending the event unscrubbed via the before_send fallback)."""
+
+    def test_scrubs_phone_in_breadcrumbs_dict_values_shape(self):
+        event = {
+            "breadcrumbs": {
+                "values": [
+                    {"message": "db query", "data": {"phone": "+998901234567"}},
+                    {"message": "cache write", "data": {"diagnosis": "flu"}},
+                ]
+            }
+        }
+        sanitize_event(event)
+        crumbs = event["breadcrumbs"]["values"]
+        assert crumbs[0]["data"]["phone"] == "+998901•••567"
+        assert crumbs[1]["data"]["diagnosis"] == "[REDACTED]"
+
+    def test_breadcrumbs_bare_list_still_scrubbed(self):
+        event = {"breadcrumbs": [{"data": {"phone": "+998901234567"}}]}
+        sanitize_event(event)
+        assert event["breadcrumbs"][0]["data"]["phone"] == "+998901•••567"
+
+    def test_breadcrumbs_with_string_crumb_does_not_raise(self):
+        """Non-dict crumbs (e.g. plain strings) must not crash the sanitizer."""
+        event = {
+            "breadcrumbs": {"values": ["raw string crumb +998901234567", {"data": {}}]}
+        }
+        sanitize_event(event)
+        assert "+998901234567" not in str(event["breadcrumbs"])
+
+    def test_breadcrumbs_non_dict_non_list_does_not_raise(self):
+        event = {"breadcrumbs": "phone=+998901234567"}
+        sanitize_event(event)
+        assert "+998901234567" not in event["breadcrumbs"]
+
+    def test_scrubs_phone_in_breadcrumb_message(self):
+        """Breadcrumb messages carry raw log lines (logging integration)
+        — a primary PHI carrier, found by the synthetic-PHI E2E probe."""
+        event = {
+            "breadcrumbs": {
+                "values": [
+                    {"message": "visit failed for +998901234567 john@example.com", "data": {}}
+                ]
+            }
+        }
+        sanitize_event(event)
+        msg = event["breadcrumbs"]["values"][0]["message"]
+        assert "+998901234567" not in msg
+        assert "john@example.com" not in msg
+        assert "+998901•••567" in msg
+
+    def test_scrubs_breadcrumb_message_in_bare_list_shape(self):
+        event = {"breadcrumbs": [{"message": "PHI_TEST_MARKER iin=12345678901234"}]}
+        sanitize_event(event)
+        assert "12345678901234" not in event["breadcrumbs"][0]["message"]
+
+    def test_non_string_breadcrumb_message_untouched(self):
+        event = {"breadcrumbs": {"values": [{"message": None, "data": {}}]}}
+        sanitize_event(event)
+        assert event["breadcrumbs"]["values"][0]["message"] is None
+
+
 class TestSanitizeEventUnicode:
     def test_preserves_unicode_around_pii(self):
         """Cyrillic text around PII must not be corrupted.

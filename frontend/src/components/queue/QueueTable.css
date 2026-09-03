@@ -3,6 +3,19 @@
  *
  * UX Audit Registrar #3: все inline-стили из QueueTable.jsx перенесены сюда.
  * Использует macos design tokens (--mac-*) для полной light/dark theme support.
+ *
+ * PR-UI-09c-2: migrated QueueTable from native <table> to canonical DataTable.
+ * - Removed dead table-render classes (.qt-table, .qt-table-header-row,
+ *   .qt-table-th, .qt-table-row, .qt-table-row-called) — DataTable renders
+ *   its own <table>/<thead>/<tbody>/<tr>/<td> structure.
+ * - Removed padding from inner wrapper classes (.qt-table-cell-*) — DataTable's
+ *   <td> already provides 12px 16px padding for size="md"; inner spans/divs
+ *   now only carry text-styling (color, font-weight, font-family). Prevents
+ *   double-padding regression (Codex P2 #2 on commit 7c804e4d1).
+ * - "called" row highlight moved to <td>-targeted :has() rule with !important
+ *   — canonical DataTable sets inline `background: transparent` on both <tr>
+ *   and <td> via rowStyle()/cellStyle(); external CSS can only override via
+ *   !important without modifying DataTable. (Codex P2 #1 on commit 7c804e4d1).
  */
 
 /* Empty / loading / error states (4 варианта: selectDoctor, loading, queueNotFound, queueEmpty) */
@@ -33,92 +46,81 @@
     margin: 0 auto var(--mac-spacing-3);
 }
 
-/* Table container */
+/* Table container — wrapper around canonical DataTable */
 .qt-table-container {
     overflow-x: auto;
     margin-top: var(--mac-spacing-4);
 }
 
-.qt-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--mac-font-size-base);
-}
-
-/* Header */
-.qt-table-header-row {
-    border-bottom: 1px solid var(--mac-border);
-    background-color: var(--mac-bg-tertiary);
-}
-
-.qt-table-th {
-    padding: var(--mac-spacing-3) var(--mac-spacing-4);
-    text-align: left;
-    font-weight: var(--mac-font-weight-semibold);
-    color: var(--mac-text-primary);
-    white-space: nowrap;
-}
-
-.qt-table-th-right {
-    padding: var(--mac-spacing-3) var(--mac-spacing-4);
-    text-align: right;
-    font-weight: var(--mac-font-weight-semibold);
-    color: var(--mac-text-primary);
-    white-space: nowrap;
-}
-
-/* Body rows */
-.qt-table-row {
-    border-bottom: 1px solid var(--mac-border);
-    transition: background-color var(--mac-duration-normal) var(--mac-ease);
-    background-color: transparent;
-}
-
-.qt-table-row-called {
-    border-bottom: 1px solid var(--mac-border);
-    transition: background-color var(--mac-duration-normal) var(--mac-ease);
-    background-color: color-mix(in srgb, var(--mac-accent-blue, #007aff) 5%, transparent);
-}
-
-.qt-table-row:hover,
-.qt-table-row-called:hover {
-    background-color: var(--mac-bg-tertiary);
-}
-
-/* Cells */
+/* PR-UI-09c-2: Inner cell wrappers — text-styling only (NO padding).
+ * DataTable's <td> already provides 12px 16px padding (size="md"); adding
+ * padding here would cause double-padding regression. */
 .qt-table-cell-number {
-    padding: var(--mac-spacing-3) var(--mac-spacing-4);
     color: var(--mac-text-primary);
     font-weight: var(--mac-font-weight-semibold);
     font-size: var(--mac-font-size-lg);
 }
 
 .qt-table-cell-primary {
-    padding: var(--mac-spacing-3) var(--mac-spacing-4);
     color: var(--mac-text-primary);
 }
 
 .qt-table-cell-phone {
-    padding: var(--mac-spacing-3) var(--mac-spacing-4);
     color: var(--mac-text-secondary);
     font-family: monospace;
 }
 
 .qt-table-cell-secondary {
-    padding: var(--mac-spacing-3) var(--mac-spacing-4);
     color: var(--mac-text-secondary);
 }
 
-.qt-table-cell-status {
-    padding: var(--mac-spacing-3) var(--mac-spacing-4);
-}
-
 .qt-table-cell-actions {
-    padding: var(--mac-spacing-3) var(--mac-spacing-4);
     text-align: right;
 }
 
 /* Status badge icon */
 .qt-status-badge-icon {
     margin-right: var(--mac-spacing-1);
+}
+
+/* PR-UI-09c-2: Source badge (QR / Desk) — replaces inline style={{...}} blocks
+ * in the original QueueTable.tsx (UX Audit #3.4 — same pattern as
+ * RefundRequestsTable migration). Uses macos design tokens for full
+ * light/dark theme support. */
+.qt-source-badge {
+    display: inline-block;
+    margin-left: var(--mac-spacing-1);
+    padding: 1px 6px;
+    border-radius: var(--mac-radius-sm, 4px);
+    font-size: var(--mac-font-size-xs, 10px);
+    font-weight: var(--mac-font-weight-semibold, 600);
+    line-height: 1.4;
+}
+
+.qt-source-badge-qr {
+    background: rgba(139, 92, 246, 0.15);
+    color: #7c3aed;
+}
+
+.qt-source-badge-desk {
+    background: rgba(100, 116, 139, 0.15);
+    color: #475569;
+    font-weight: var(--mac-font-weight-medium, 500);
+}
+
+/* PR-UI-09c-2: "called" row highlight — uses box-shadow (not background-color)
+ * because canonical DataTable applies inline `background: transparent` on BOTH
+ * <tr> (via rowStyle()) AND <td> (via cellStyle()), which would override any
+ * external CSS background-color rule without !important. To avoid the
+ * ratchet regression on cssImportant, we use `box-shadow: inset 0 0 0 9999px`
+ * which DataTable does NOT set inline — external CSS rule applies cleanly.
+ * The :has() selector targets rows containing the .qt-called-marker badge
+ * (rendered in actions cell when status === 'called'). Supported in
+ * Chromium 105+ (Playwright's target). */
+.qt-table-container tr:has(.qt-called-marker) td {
+    box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--mac-accent-blue, #007aff) 5%, transparent);
+}
+
+.qt-table-container tr:has(.qt-called-marker):hover td {
+    box-shadow: inset 0 0 0 9999px var(--mac-bg-tertiary);
 }

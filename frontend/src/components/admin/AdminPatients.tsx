@@ -9,8 +9,8 @@ import notify from '../../services/notify';
 import {
   Badge,
   Button,
-  MacOSCard,
-  MacOSEmptyState,
+  Card,
+  AppEmpty,
   Input,
   Skeleton,
   Select,
@@ -194,7 +194,7 @@ const AdminPatients = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <MacOSCard
+      <Card
         variant="default"
         shadow="none"
         className="admin-patients-header-card"
@@ -278,7 +278,7 @@ const AdminPatients = () => {
           {loading ? (
             <Skeleton type="table" count={5} />
           ) : error ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={RefreshCw}
               title={t('admin2.ap_load_error_title')}
               description={t('admin2.ap_load_error_desc')}
@@ -289,7 +289,7 @@ const AdminPatients = () => {
               }
             />
           ) : patients.length === 0 ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={Users}
               title={t('admin2.ap_empty_title')}
               description={
@@ -411,7 +411,7 @@ const AdminPatients = () => {
           </div>
           )}
         </div>
-      </MacOSCard>
+      </Card>
 
       <PatientModal
         isOpen={patientModal.isOpen}

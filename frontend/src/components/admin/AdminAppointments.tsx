@@ -11,9 +11,9 @@ import { useTranslation } from '../../i18n/useTranslation';
 import {
   Badge,
   Button,
-  MacOSCard,
-  MacOSStatCard,
-  MacOSEmptyState,
+  Card,
+  StatCard,
+  AppEmpty,
   Input,
   Skeleton,
   Select,
@@ -168,8 +168,8 @@ const getDoctorOptionLabel = (doctor: Doctor, t: AdminTranslationFn): string => 
   return flags.length > 0 ? `${name} • ${flags.join(' • ')}` : name;
 };
 
-// UX Audit Admin #3.6: локальный StatCard заменён на MacOSStatCard (统一 API).
-// Старый StatCard удалён, используется MacOSStatCard напрямую в render.
+// UX Audit Admin #3.6: локальный StatCard заменён на StatCard (统一 API).
+// Старый StatCard удалён, используется StatCard напрямую в render.
 
 
 const AdminAppointments = () => {
@@ -278,13 +278,13 @@ const AdminAppointments = () => {
       <div
         className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16"
       >
-        <MacOSStatCard title={t('admin2.appt_stat_total')} value={appointments.length} icon={Calendar} color="blue" />
-        <MacOSStatCard title={t('admin2.appt_stat_today')} value={todayAppointments.length} icon={Clock} color="green" />
-        <MacOSStatCard title={t('admin2.appt_stat_tomorrow')} value={tomorrowAppointments.length} icon={Calendar} color="purple" />
-        <MacOSStatCard title={t('admin2.appt_stat_pending')} value={statusStats.pending || 0} icon={Clock} color="orange" />
+        <StatCard title={t('admin2.appt_stat_total')} value={appointments.length} icon={Calendar} color="blue" />
+        <StatCard title={t('admin2.appt_stat_today')} value={todayAppointments.length} icon={Clock} color="green" />
+        <StatCard title={t('admin2.appt_stat_tomorrow')} value={tomorrowAppointments.length} icon={Calendar} color="purple" />
+        <StatCard title={t('admin2.appt_stat_pending')} value={statusStats.pending || 0} icon={Clock} color="orange" />
       </div>
 
-      <MacOSCard
+      <Card
         variant="default"
         shadow="none"
         className="admin-bg-bg-primary-bd-1px-solid-var-mac-bo-p-24"
@@ -384,7 +384,7 @@ const AdminAppointments = () => {
           {loading ? (
             <Skeleton type="table" count={5} />
           ) : error ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={RefreshCw}
               title={t('admin2.appt_load_error_title')}
               description={t('admin2.appt_load_error_desc')}
@@ -395,7 +395,7 @@ const AdminAppointments = () => {
               }
             />
           ) : appointments.length === 0 ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={Calendar}
               title={t('admin2.appt_empty_title')}
               description={
@@ -560,7 +560,7 @@ const AdminAppointments = () => {
           </div>
           )}
         </div>
-      </MacOSCard>
+      </Card>
 
       <AppointmentModal
         isOpen={appointmentModal.isOpen}

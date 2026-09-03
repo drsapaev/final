@@ -171,7 +171,7 @@ class TestMigrationService:
                     "number": 1,
                     "patient_id": None,
                     "patient_name": "Test Patient",
-                    "phone": "+998901234567",
+                    "phone": "+998900000121",
                     "telegram_id": None,
                     "visit_id": None,
                     "source": "test",

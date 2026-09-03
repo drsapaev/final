@@ -573,8 +573,6 @@ const QueueJoin = () => {
 
   const glassCardStyle = {
     background: 'var(--mac-card-bg)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
     borderRadius: 'var(--mac-radius-xl)',
     boxShadow: 'var(--mac-main-shell-shadow)',
     border: '1px solid var(--mac-card-border)',

@@ -7,6 +7,7 @@ from datetime import date
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.core.specialties import specialty_variants
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
@@ -20,18 +21,28 @@ class QueueLimitsRepository:
     def list_active_doctors(self, *, specialty: str | None) -> list[Doctor]:
         query = self.db.query(Doctor).filter(Doctor.active.is_(True))
         if specialty:
-            query = query.filter(Doctor.specialty == specialty)
+            # D-1 canonical vocabulary: any dental-family spelling must
+            # find canonical rows too (e.g. /admin/queue-limits filtered
+            # by the legacy profile key "stomatology" must still see
+            # "dentistry" doctors after migration 0049 — Codex round-3 P1).
+            query = query.filter(Doctor.specialty.in_(specialty_variants(specialty)))
         return query.all()
 
     def get_daily_queue(self, *, day: date, specialist_id: int) -> DailyQueue | None:
+        """The doctor's ACTIVE queue for ``day`` (Codex round-4 P2: an
+        inactive historical row for the same day must not feed usage counts
+        or the aggregate capacity — QR joins operate on active rows).
+        Deterministic ordering when several rows match."""
         return (
             self.db.query(DailyQueue)
             .filter(
                 and_(
                     DailyQueue.day == day,
                     DailyQueue.specialist_id == specialist_id,
+                    DailyQueue.active.is_(True),
                 )
             )
+            .order_by(DailyQueue.id.asc())
             .first()
         )
 
@@ -40,6 +51,23 @@ class QueueLimitsRepository:
             self.db.query(OnlineQueueEntry)
             .filter(OnlineQueueEntry.queue_id == queue_id)
             .count()
+        )
+
+    def list_active_daily_queues(self, *, day: date, specialist_id: int) -> list[DailyQueue]:
+        """ALL active same-day queues of the doctor (Codex round-5 P2: a
+        doctor may hold several active queues under different tags — the
+        aggregate capacity must enumerate every enforced cap)."""
+        return (
+            self.db.query(DailyQueue)
+            .filter(
+                and_(
+                    DailyQueue.day == day,
+                    DailyQueue.specialist_id == specialist_id,
+                    DailyQueue.active.is_(True),
+                )
+            )
+            .order_by(DailyQueue.id.asc())
+            .all()
         )
 
     def get_doctor(self, doctor_id: int) -> Doctor | None:

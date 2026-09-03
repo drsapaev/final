@@ -368,7 +368,7 @@ def test_update_profile_returns_200(client, db_session) -> None:
             "full_name": "Updated Name",
             "birth_date": "1985-05-05",
             "address": "New Address",
-            "emergency_contact": "+998901234567",
+            "emergency_contact": "+998900000121",
             "allergies": "Penicillin",
             "chronic_conditions": "Asthma",
         },

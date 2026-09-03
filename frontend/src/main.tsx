@@ -8,7 +8,7 @@ import App from './App';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
-import './theme/macos-tokens.css';
+import './design-system/tokens.css';
 import './styles/macos.css';
 import './components/admin/admin.css';
 import { bootstrapStoredColorScheme } from './theme/colorScheme';
@@ -33,12 +33,9 @@ if (!rootEl) {
   document.body.appendChild(el);
   createRoot(el).render(
     <React.StrictMode>
-      <BrowserRouter
-        future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true
-        }}
-      >
+      {/* react-router-dom v7: флаги v7_startTransition/v7_relativeSplatPath
+          стали поведением по умолчанию, проп future удалён */}
+      <BrowserRouter>
         <App />
       </BrowserRouter>
     </React.StrictMode>
@@ -46,12 +43,9 @@ if (!rootEl) {
 } else {
   createRoot(rootEl).render(
     <React.StrictMode>
-      <BrowserRouter
-        future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true
-        }}
-      >
+      {/* react-router-dom v7: флаги v7_startTransition/v7_relativeSplatPath
+          стали поведением по умолчанию, проп future удалён */}
+      <BrowserRouter>
         <App />
       </BrowserRouter>
     </React.StrictMode>

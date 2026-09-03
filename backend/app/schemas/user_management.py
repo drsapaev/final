@@ -13,6 +13,8 @@ from email_validator import validate_email as validate_email_address
 from pydantic import BaseModel, Field, field_validator
 from pydantic.config import ConfigDict
 
+from app.core.roles import DOCTOR_ROLE_SPELLINGS
+
 logger = logging.getLogger(__name__)
 
 
@@ -507,6 +509,58 @@ class UserAuditLogResponse(UserAuditLogBase):
 
 # Схемы для управления пользователями
 
+# Single shared role vocabulary for UserCreateRequest AND UserUpdateRequest
+# (D-3 RBAC unification): the two patterns used to drift — creation accepted
+# the legacy doctor spellings (cardio/derma/dentist) while updates forbade
+# them, so a legacy spelling could never be (re)assigned after creation.
+# The doctor-lifecycle mapping (user_mgmt DOCTOR_ROLE_DEFAULT_SPECIALTY)
+# normalizes whatever spelling arrives.
+# Codex round-1 P2: the doctor-family part is DERIVED from the IAM SSOT
+# (core/roles.DOCTOR_ROLE_SPELLINGS) instead of a smaller hardcoded subset —
+# cardiology/cardiologist/dermatology/dermatologist/dentistry are authorized
+# spellings as well, and the admin modal re-submits a stored user's role
+# verbatim, so an omitted spelling turns "edit account" into a 422.
+# sorted() keeps the generated OpenAPI contract deterministic.
+# REC-1 (Receptionist deprecation): 'Receptionist' removed from the canonical
+# write vocabulary — Registrar is the canonical front-desk role and no
+# Receptionist rows exist in production (SQL evidence 2026-09-02). The
+# backend READ alias (receptionist -> registrar in core/security.require_roles)
+# stays during the compatibility window; only NEW stored 'Receptionist'
+# writes are frozen. Update-re-submission safety: 0 stored users carry the
+# spelling, so no edit flow can re-submit it.
+# Codex re-review P2 (PR #3025): the WRITE vocabulary is deliberately
+# separate from the READ/FILTER vocabulary below — the search/filter
+# surfaces must keep accepting the deprecated spelling so a compatible
+# deployment holding legacy rows can still query them (legacy reads
+# temporarily accepted; canonical writes only).
+# M-1 (Manager deprecation): 'Manager' removed from the canonical write
+# vocabulary — Manager is a deprecated legacy/synthetic role (production
+# inventory 2026-09-03: exactly 1 row, the automated smoke_manager account;
+# 0 real human users), so no NEW stored 'Manager' users may be created,
+# bulk-assigned or role-changed. Unlike Receptionist there is NO canonical
+# successor role and NO backend alias (privileged grants were removed in
+# M-1D instead). Update-re-submission safety: the single legacy row
+# (smoke_manager) is owned by the post-deploy ops step (DEACTIVATE, not
+# DELETE); an admin edit that re-submits role='Manager' for it now 422s by
+# design — the freeze is the enforcement, ops deactivation is the cleanup.
+_USER_MANAGEMENT_ROLE_PATTERN = (
+    "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|"
+    "SuperAdmin|"
+    + "|".join(sorted(DOCTOR_ROLE_SPELLINGS))
+    + ")$"
+)
+
+# Read/filter vocabulary: canonical write vocabulary PLUS the deprecated
+# 'Receptionist' and 'Manager' spellings — used ONLY by query/filter surfaces
+# (UserSearchRequest.role, GET /users role parameter) so legacy rows in
+# compatible deployments remain queryable during the compatibility window
+# (M-1: production carries 1 stored 'Manager' row — smoke_manager — that
+# must stay visible/queryable until the ops deactivation).
+# NOT used by create/update/bulk-change-role (write freeze stays absolute).
+_USER_MANAGEMENT_ROLE_FILTER_PATTERN = (
+    _USER_MANAGEMENT_ROLE_PATTERN[:-2] + "|Receptionist|Manager)$"
+)
+
 
 class UserCreateRequest(BaseModel):
     """Схема создания пользователя"""
@@ -517,7 +571,7 @@ class UserCreateRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=254)
     password: str = Field(..., min_length=8, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
-    role: str = Field(..., pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|derma|dentist)$")
+    role: str = Field(..., pattern=_USER_MANAGEMENT_ROLE_PATTERN)
     is_active: bool | None = True
     is_superuser: bool | None = False
     must_change_password: bool | None = False  # Требуется смена пароля при первом входе
@@ -559,7 +613,7 @@ class UserUpdateRequest(BaseModel):
     email: str | None = Field(None, min_length=3, max_length=254)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str | None = Field(
-        None, pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
     )
     is_active: bool | None = None
     is_superuser: bool | None = None
@@ -600,6 +654,11 @@ class UserResponse(BaseModel):
     preferences: UserPreferencesResponse | None = None
     notification_settings: UserNotificationSettingsResponse | None = None
 
+    # Lifecycle (decision #5): None = no linked Doctor row; True = linked
+    # Doctor profile still has the auto-create placeholder specialty
+    # ("general") and must be completed by an admin.
+    doctor_profile_incomplete: bool | None = None
+
 
 class UserListResponse(BaseModel):
     """Схема ответа списка пользователей"""
@@ -637,8 +696,10 @@ class UserSearchRequest(BaseModel):
 
     query: str | None = Field(None, min_length=1, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
+    # Codex re-review P2 (PR #3025): READ surface — uses the compatibility
+    # filter vocabulary so legacy 'Receptionist' rows stay queryable.
     role: str | None = Field(
-        None, pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_FILTER_PATTERN
     )
     status: UserStatus | None = None
     is_active: bool | None = None
@@ -662,7 +723,7 @@ class UserBulkActionRequest(BaseModel):
     )
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str | None = Field(
-        None, pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
     )
     reason: str | None = Field(None, max_length=500)
 

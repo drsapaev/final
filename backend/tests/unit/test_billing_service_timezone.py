@@ -60,7 +60,7 @@ class TestBillingServiceTimezone:
         other_patient = Patient(
             first_name="Other",
             last_name="Patient",
-            phone="+998901111111",
+            phone="+998900000110",
         )
         db_session.add(other_patient)
         db_session.commit()
@@ -90,7 +90,7 @@ class TestBillingServiceTimezone:
         other_patient = Patient(
             first_name="Other",
             last_name="Patient",
-            phone="+998902222222",
+            phone="+998900000134",
         )
         appointment = Appointment(
             patient_id=test_patient.id,

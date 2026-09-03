@@ -72,7 +72,13 @@ class DentalApiService:
         doctor = self.repository.get_doctor_by_user_id(user.id)
         if not doctor:
             raise DentalApiDomainError(404, "Врач не найден")
-        if doctor.specialty not in ["stomatology", "dental"]:
+        # Vocabulary note: the system provisions dentists with different
+        # specialty spellings — queue machinery seeds 'stomatology'
+        # (service_mapping.py), user provisioning & dev_seed create
+        # 'dentistry' (user_mgmt/_core.py), departments use 'dental'. All
+        # three denote the same dental clinician, so all are accepted here.
+        # (Repo-wide canonical vocabulary is a separate pending decision.)
+        if doctor.specialty not in ("stomatology", "dental", "dentistry"):
             raise DentalApiDomainError(
                 403,
                 "Только стоматолог может указывать цену после лечения",

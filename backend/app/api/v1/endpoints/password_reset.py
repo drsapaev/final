@@ -237,7 +237,7 @@ async def validate_reset_token(
     try:
         password_reset_service = get_password_reset_service()
 
-        result = password_reset_service.validate_reset_token(token)
+        result = password_reset_service.validate_reset_token(db, token)
 
         if result["valid"]:
             return {
@@ -264,13 +264,14 @@ async def validate_reset_token(
 
 @router.get("/statistics", response_model=dict[str, Any])
 async def get_password_reset_statistics(
-    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"]))
+    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
+    db: Session = Depends(get_db),
 ):
     """Статистика сброса паролей (только для администраторов)"""
     try:
         password_reset_service = get_password_reset_service()
 
-        stats = password_reset_service.get_statistics()
+        stats = password_reset_service.get_statistics(db)
 
         return {"statistics": stats, "timestamp": datetime.now().isoformat()}
 

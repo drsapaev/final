@@ -63,7 +63,7 @@ def _create_queue_entry(db_session, *, doctor: Doctor, status: str) -> OnlineQue
         queue_id=queue.id,
         number=1,
         patient_name="Guarded Patient",
-        phone="+998901555555",
+        phone="+998900000131",
         source="desk",
         status=status,
     )

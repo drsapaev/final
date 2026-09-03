@@ -63,7 +63,7 @@ def test_apply_benefit_rejects_visit_from_another_patient(
     db_session, test_patient, test_visit
 ):
     other_patient = _create_patient(
-        db_session, first_name="BenefitOther", phone="+998901010101"
+        db_session, first_name="BenefitOther", phone="+998900000105"
     )
     patient_benefit = _create_verified_patient_benefit(
         db_session, other_patient.id
@@ -86,7 +86,7 @@ def test_earn_loyalty_points_rejects_appointment_from_another_patient(
     db_session, test_patient
 ):
     other_patient = _create_patient(
-        db_session, first_name="LoyaltyOther", phone="+998902020202"
+        db_session, first_name="LoyaltyOther", phone="+998900000133"
     )
     appointment = Appointment(
         patient_id=test_patient.id,
@@ -115,7 +115,7 @@ def test_redeem_loyalty_points_rejects_visit_from_another_patient(
     db_session, test_patient, test_visit
 ):
     other_patient = _create_patient(
-        db_session, first_name="RedeemOther", phone="+998903030303"
+        db_session, first_name="RedeemOther", phone="+998900000135"
     )
     program = _create_loyalty_program(db_session)
     patient_loyalty = PatientLoyalty(

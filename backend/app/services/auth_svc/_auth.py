@@ -111,7 +111,7 @@ class AuthMixin(AuthenticationServiceMixinBase):
             db.query(UserSession).filter(
                 UserSession.user_id == user.id,
                 UserSession.revoked == False,
-            ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
+            ).update({"revoked": True})
 
             db.commit()
 
@@ -164,7 +164,7 @@ class AuthMixin(AuthenticationServiceMixinBase):
             db.query(UserSession).filter(
                 UserSession.user_id == user.id,
                 UserSession.revoked == False,
-            ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
+            ).update({"revoked": True})
 
             db.commit()
 

@@ -36,6 +36,40 @@ interface UserModalProps {
   loading?: boolean;
 }
 
+// Форм-обёртки вынесены на уровень модуля: компоненты, определённые ВНУТРИ
+// UserModal, пересоздавали свой тип на каждом рендере — React размонтировал
+// поддерево вместе с <input>, и после первой же введённой буквы пропадал
+// фокус/каретка (приходилось кликать в поле заново на каждый символ).
+interface FormFieldProps {
+  label?: React.ReactNode;
+  required?: boolean;
+  icon?: React.ComponentType<{ className?: string }>;
+  error?: string;
+  children?: React.ReactNode;
+}
+
+const ErrorMessage = ({ message }: { message?: React.ReactNode }) => (
+  <div className="admin-field-error-xs">
+    <AlertCircle className="admin-icon-12" />
+    {message}
+  </div>
+);
+
+const FormField = ({ label, required, icon: Icon, error, children }: FormFieldProps) => (
+  <div className="admin-mb-16">
+    <label className="admin-usermodal-label">
+      {label} {required && <span className="admin-required-asterisk">*</span>}
+    </label>
+    <div className="admin-pos-relative">
+      {Icon && (
+        <Icon className="admin-usermodal-field-icon" />
+      )}
+      {children}
+    </div>
+    {error && <ErrorMessage message={error} />}
+  </div>
+);
+
 const UserModal = ({
   isOpen,
   onClose,
@@ -60,6 +94,9 @@ const UserModal = ({
   const { roleOptions: apiRoleOptions } = useRoles({ includeAll: false });
 
   // Fallback roles if API fails
+  // REC-1 (Receptionist deprecation): 'Receptionist' removed from the
+  // create/edit role options — Registrar is the canonical front-desk role
+  // (0 production Receptionist rows, SQL evidence 2026-09-02).
   const roleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
     { value: 'Admin', label: t('admin2.umdl_role_admin') },
     { value: 'Doctor', label: t('admin2.umdl_role_doctor_general') },
@@ -67,7 +104,7 @@ const UserModal = ({
     { value: 'derma', label: t('admin2.umdl_role_derma') },
     { value: 'dentist', label: t('admin2.umdl_role_dentist') },
     { value: 'Nurse', label: t('admin2.umdl_role_nurse') },
-    { value: 'Receptionist', label: t('admin2.umdl_role_receptionist') },
+    { value: 'Registrar', label: t('admin2.umdl_role_registrar') },
     { value: 'Cashier', label: t('admin2.umdl_role_cashier') },
     { value: 'Lab', label: t('admin2.umdl_role_lab') },
     { value: 'Patient', label: t('admin2.umdl_role_patient') }
@@ -167,39 +204,10 @@ const UserModal = ({
     }
   };
 
-  // Error message component
-  const ErrorMessage = ({ message }: { message?: React.ReactNode }) => (
-    <div className="admin-field-error-xs">
-      <AlertCircle className="admin-icon-12" />
-      {message}
-    </div>
-  );
 
 
   // audit/strict: removed self-referencing propTypes spread
 
-  // Form field wrapper with icon
-  interface FormFieldProps {
-    label?: React.ReactNode;
-    required?: boolean;
-    icon?: React.ComponentType<{ className?: string }>;
-    error?: string;
-    children?: React.ReactNode;
-  }
-  const FormField = ({ label, required, icon: Icon, error, children }: FormFieldProps) => (
-    <div className="admin-mb-16">
-      <label className="admin-usermodal-label">
-        {label} {required && <span className="admin-required-asterisk">*</span>}
-      </label>
-      <div className="admin-pos-relative">
-        {Icon && (
-          <Icon className="admin-usermodal-field-icon" />
-        )}
-        {children}
-      </div>
-      {error && <ErrorMessage message={error} />}
-    </div>
-  );
 
 
 // audit/strict: removed self-referencing propTypes spread
@@ -261,7 +269,7 @@ const UserModal = ({
         <FormField label={t('admin2.umdl_field_role')} icon={Shield}>
           <Select
             value={formData.role}
-            onChange={(value) => handleChange('role', value)}
+            onValueChange={(value) => handleChange('role', value)}
             options={roleOptions}
             size="large"
             className="admin-input-pl-40"

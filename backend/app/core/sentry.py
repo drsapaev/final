@@ -1,8 +1,15 @@
 """
 Backend Sentry initialization.
 
-Mirrors frontend/src/services/sentry.js PII scrubbing. Initializes Sentry
-for FastAPI + SQLAlchemy + asyncPG. No-op if SENTRY_DSN env var is unset.
+Initializes Sentry for FastAPI + SQLAlchemy + asyncPG. No-op if
+SENTRY_DSN env var is unset.
+
+PII scrubbing for Sentry events is handled by ``sanitize_event()``, which
+delegates to ``mask_pii()`` from ``pii_masker.py`` — the single source of
+truth for backend PII patterns (``PII_FIELD_PATTERNS``). Frontend has its
+own ``MEDICAL_PII_KEYS`` list in ``frontend/src/services/sentry.ts``
+(separate concern, more aggressive — covers auth tokens and payment
+fields per BS-57).
 
 Usage (called from app/main.py):
     from app.core.sentry import init_sentry
@@ -18,43 +25,6 @@ from typing import Any
 from app.core.pii_masker import mask_pii
 
 logger = logging.getLogger(__name__)
-
-# Same field-name list as frontend/src/services/sentry.js + backend/app/core/pii_masker.py.
-# Keep all three in sync.
-MEDICAL_PII_KEYS = [
-    "iin", "passport_number", "passport_series", "ssn", "national_id",
-    "doc_number", "doc_series",
-    "phone", "phone_number", "mobile", "email",
-    "diagnosis", "diagnoses", "icd10", "icd10_code", "icd10_codes",
-    "complaints", "complaint", "examination",
-    "prescription", "prescriptions", "medications", "medication",
-    "allergies", "allergy",
-    "visit_reason", "patient_name", "patient_full_name", "doctor_notes",
-    "notes", "anamnesis", "anamnesis_morbida",
-    "first_name", "last_name", "middle_name", "full_name", "name",
-    "birth_date", "date_of_birth", "dob",
-    "address", "street_address", "home_address",
-]
-
-
-def _scrub_pii(data: Any) -> Any:
-    """Recursively redact PII keys from a dict/list structure.
-
-    .. note::
-        ``before_send`` now uses ``mask_pii()`` from ``pii_masker.py`` which
-        combines key-based redaction with regex-based string scrubbing.
-        ``_scrub_pii`` is retained for backward compatibility and any
-        callers outside ``before_send``. Removal is deferred to a separate
-        cleanup PR after this security fix is verified in production.
-    """
-    if data is None:
-        return None
-    if isinstance(data, dict):
-        return {k: ("[REDACTED]" if k.lower() in MEDICAL_PII_KEYS else _scrub_pii(v)) for k, v in data.items()}
-    if isinstance(data, list):
-        return [_scrub_pii(item) for item in data]
-    return data
-
 
 # Standard Sentry contexts as documented by Sentry:
 # https://docs.sentry.io/platforms/python/enriching-events/contexts/
@@ -131,7 +101,9 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
 
     Fields scrubbed:
     - ``event["request"]`` — request body, headers, query string
-    - ``event["breadcrumbs"][*]["data"]`` — breadcrumb payloads
+    - ``event["breadcrumbs"]`` — ``values[*].data`` payloads and
+      ``values[*].message`` (raw formatted log lines recorded by the
+      logging integration on subsequent events)
     - ``event["extra"]`` — extra context
     - ``event["contexts"]`` — ALL contexts are scrubbed; for standard
       Sentry contexts (runtime, os, device, etc.), known diagnostic
@@ -141,6 +113,11 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
       contain phone/email/IIN/passport from bound SQL params
     - ``event["exception"]["values"][*]["stacktrace"]["frames"][*]["vars"]``
       — frame local variables, may contain patient objects
+    - ``event["logentry"]`` — ``message``, ``params``, ``formatted`` from
+      ``LoggingIntegration`` (ERROR-level logs). The ``PIIMaskingFilter``
+      in ``logging_config.py`` is attached to the app's own stdout
+      handler, NOT to the root logger, so Sentry's logging handler sees
+      the raw LogRecord; this is the only scrubbing layer for logentry.
 
     Missing fields are skipped silently — this function must not raise on
     events with partial structure (e.g. ``{}`` or ``{"exception": {}}``).
@@ -149,10 +126,32 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
         event["request"] = mask_pii(event["request"])
 
     if "breadcrumbs" in event:
-        event["breadcrumbs"] = [
-            {**b, "data": mask_pii(b.get("data", {}))}
-            for b in event["breadcrumbs"]
-        ]
+        # Sentry event protocol ships breadcrumbs as {"values": [...]};
+        # tolerate both that dict and a bare list, preserve the container
+        # shape, and skip non-dict crumbs.
+        crumbs = event["breadcrumbs"]
+
+        def _scrumb(b: Any) -> Any:
+            if not isinstance(b, dict):
+                return mask_pii(b)
+            scrubbed = {**b, "data": mask_pii(b.get("data", {}))}
+            message = scrubbed.get("message")
+            if isinstance(message, str):
+                # Breadcrumb messages carry raw formatted log lines: the
+                # logging integration records every log record as a
+                # breadcrumb on subsequent events, so PHI logged anywhere
+                # surfaces here on the next captured error.
+                scrubbed["message"] = mask_pii(message)
+            return scrubbed
+
+        if isinstance(crumbs, dict):
+            values = crumbs.get("values", [])
+            if isinstance(values, list):
+                crumbs["values"] = [_scrumb(b) for b in values]
+        elif isinstance(crumbs, list):
+            event["breadcrumbs"] = [_scrumb(b) for b in crumbs]
+        else:
+            event["breadcrumbs"] = mask_pii(crumbs)
 
     if "extra" in event:
         event["extra"] = mask_pii(event["extra"])
@@ -170,6 +169,23 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
             }
         else:
             event["contexts"] = mask_pii(contexts)
+
+    if "logentry" in event:
+        logentry = event["logentry"]
+        if isinstance(logentry, dict):
+            # LoggingIntegration puts the raw record message/args here.
+            # PIIMaskingFilter runs on the app's stdout handler only, so
+            # without this block PHI in logger.error(...)/logger.exception(...)
+            # arguments reaches Sentry unscrubbed.
+            message = logentry.get("message")
+            if isinstance(message, str):
+                logentry["message"] = mask_pii(message)
+            params = logentry.get("params")
+            if params is not None:
+                logentry["params"] = mask_pii(params)
+            formatted = logentry.get("formatted")
+            if isinstance(formatted, str):
+                logentry["formatted"] = mask_pii(formatted)
 
     exception = event.get("exception")
     if isinstance(exception, dict):
@@ -198,6 +214,13 @@ def sanitize_event(event: dict[str, Any]) -> dict[str, Any]:
 
 def init_sentry() -> None:
     """Initialize Sentry for the FastAPI backend. No-op if SENTRY_DSN is unset."""
+    if os.getenv("TESTING", "").strip().lower() in {"1", "true", "yes", "on"}:
+        # Test runs (pytest conftest) load backend/.env with the production
+        # DSN; without this guard every error-level log from a local pytest
+        # session shipped straight to production Sentry (e.g. PYTHON-FASTAPI-C
+        # "RBAC role check denied" with url=http://testserver/...).
+        logger.info("[sentry] TESTING=1 — Sentry disabled for backend tests.")
+        return
     dsn = os.getenv("SENTRY_DSN", "").strip()
     if not dsn:
         logger.info("[sentry] SENTRY_DSN not set — Sentry disabled for backend.")
@@ -212,6 +235,13 @@ def init_sentry() -> None:
             from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
         except ImportError:
             AsyncPGIntegration = None  # older sentry-sdk
+        except Exception:
+            # sentry_sdk.integrations.DidNotEnable — raised when asyncpg is
+            # not installed. This app uses psycopg, so the integration is
+            # optional; DidNotEnable is not an ImportError subclass and
+            # previously crashed init_sentry() (and app startup) whenever
+            # SENTRY_DSN was set on a psycopg-only host.
+            AsyncPGIntegration = None
     except ImportError:
         logger.warning(
             "[sentry] sentry-sdk not installed. "

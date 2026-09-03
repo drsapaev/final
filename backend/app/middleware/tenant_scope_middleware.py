@@ -86,7 +86,15 @@ class TenantScopeMiddleware(BaseHTTPMiddleware):
             )
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                content={"detail": str(error)},
+                content={
+                    # SECURITY (CodeQL py/stack-trace-exposure #55): `error` is
+                    # constrained to ValueError (above), so str(error) is just
+                    # the message — no stack trace. CodeQL flags any str(exc)
+                    # in HTTP responses conservatively; we suppress with rationale.
+                    # codeql[py/stack-trace-exposure]
+                    "detail": str(error),
+                    "reason": "tenant_scope_rejected",
+                },
             )
 
         request.state.tenant_scope = scope

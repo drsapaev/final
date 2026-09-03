@@ -1,7 +1,8 @@
 
-import { Button, Icon } from '../../ui/macos';
+import { Button } from '../../ui/macos';
 import { useTranslation } from '@/i18n/useTranslation';
 import { safeJsonParse } from '../../../utils/safeJsonParse';
+import { Plus, Trash2 } from 'lucide-react';
 
 /**
  * L-H-6 fix: ReferenceRuleEditor выделен в отдельный файл (~290 строк).
@@ -173,7 +174,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: R
       <div className="ltw-flex-between">
         <span className="ltw-fw-600 ltw-text-14">{t('misc.rre_norm_rules')}</span>
         <Button variant="outline" size="small" onClick={addCase}>
-          <Icon name="plus" size={12} />
+          <Plus size={12} aria-hidden="true" />
           {t('misc.rre_add_condition')}
         </Button>
       </div>
@@ -191,7 +192,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: R
             <div className="ltw-flex-between">
               <span className="ltw-text-13 ltw-fw-500">{t('misc.rre_condition_n', { n: caseIndex + 1 })}</span>
               <Button variant="ghost" size="small" onClick={() => removeCase(caseIndex)} aria-label={t('misc.rre_remove_condition')}>
-                <Icon name="trash" size={12} />
+                <Trash2 size={12} aria-hidden="true" />
               </Button>
             </div>
 

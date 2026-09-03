@@ -15,8 +15,14 @@ from pathlib import Path
 LOGGER = logging.getLogger("frontend_api_inventory")
 
 API_REQUEST_CALL_PATTERN = re.compile(r"\bapiRequest\s*\(", re.IGNORECASE)
+# Optional TypeScript generic type argument after the method name, e.g.
+# `api.get<UserDto>(...)`. Without this group, typed calls are silently
+# skipped because the regex requires `(` immediately after the method.
+# `(?:<[^>]*>)?` matches one optional `<...>` clause; nested generics
+# like `api.get<Page<T>>(...)` are not currently present in the codebase
+# (verified) and would require a non-regex parser to balance correctly.
 AXIOS_METHOD_CALL_PATTERN = re.compile(
-    r"\bapi\.(?P<method>get|post|put|patch|delete|options|head)\s*\(",
+    r"\bapi\.(?P<method>get|post|put|patch|delete|options|head)\s*(?:<[^>]*>)?\s*\(",
     re.IGNORECASE,
 )
 SINGLE_QUOTE_LITERAL = re.compile(r"^'([^'\\]|\\.)*'$")
@@ -266,10 +272,14 @@ def _collect_api_method_calls(
 
 def collect_frontend_calls(frontend_root: Path) -> list[ApiCall]:
     targets: list[Path] = []
-    targets.extend(sorted((frontend_root / "api").glob("*.js")))
-    targets.extend(sorted((frontend_root / "services").glob("*.js")))
-    targets.extend(sorted((frontend_root / "hooks").rglob("*.js")))
-    targets.extend(sorted((frontend_root / "hooks").rglob("*.jsx")))
+    # Frontend fully migrated to TypeScript in commit f2c868a1 (2026-07-20):
+    # .js → .ts, .jsx → .tsx. The original glob only matched *.js/*.jsx
+    # which returned 0 files post-migration, causing parity gate to see
+    # 0 frontend API calls and report 0% coverage for 14 days.
+    for ext in ("*.js", "*.jsx", "*.ts", "*.tsx"):
+        targets.extend(sorted((frontend_root / "api").glob(ext)))
+        targets.extend(sorted((frontend_root / "services").glob(ext)))
+        targets.extend(sorted((frontend_root / "hooks").rglob(ext)))
 
     seen: set[str] = set()
     calls: list[ApiCall] = []

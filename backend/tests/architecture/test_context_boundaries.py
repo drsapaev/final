@@ -25,6 +25,22 @@ _TEMP_ALLOWED_CROSS_CONTEXT_IMPORTS: set[tuple[str, str]] = {
     ("app.services.payment_init_service", "app.services.queue_service"),
     ("app.services.payment_webhook", "app.services.visit_payment_integration"),
     ("app.services.visit_confirmation_service", "app.services.queue_service"),
+    # Issue #06: centralized domain invariants — services now import
+    # VisitLifecycleService and PaymentInvariantService for canonical
+    # status transitions and payment creation. These are temporary
+    # allowlist entries pending context-facade extraction.
+    ("app.services.provider_webhook_service", "app.services.billing_service"),
+    ("app.services.confirmation_security", "app.services.visit_lifecycle_service"),
+    ("app.services.morning_assignment", "app.services.visit_lifecycle_service"),
+    ("app.services.telegram_staff_action_adapter_service", "app.services.visit_lifecycle_service"),
+    ("app.services.visit_confirmation_service", "app.services.visit_lifecycle_service"),
+    ("app.services.batch_patient_service", "app.services.visit_lifecycle_service"),
+    ("app.services.payment_init_service", "app.services.payment_invariant_service"),
+    ("app.services.payment_create_service", "app.services.payment_invariant_service"),
+    # Gate C bypass fix: these services now delegate visit status transitions
+    # to VisitLifecycleService instead of direct mutation.
+    ("app.services.morning_assignment_api_service", "app.services.visit_lifecycle_service"),
+    ("app.services.registrar_wizard_queue_assignment_service", "app.services.visit_lifecycle_service"),
 }
 
 

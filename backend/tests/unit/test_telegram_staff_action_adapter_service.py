@@ -30,7 +30,7 @@ def _linked_queue_entry(db_session, *, visit_id: int, test_doctor, test_patient)
         number=7,
         patient_id=test_patient.id,
         patient_name="Adapter Patient",
-        phone="+998901234567",
+        phone="+998900000121",
         source="desk",
         status="waiting",
     )
@@ -43,7 +43,7 @@ def _other_patient_queue_entry(db_session, *, visit_id: int, test_doctor):
     other_patient = Patient(
         first_name="Other",
         last_name="Queue",
-        phone="+998901239998",
+        phone="+998900000126",
     )
     db_session.add(other_patient)
     db_session.flush()
@@ -88,8 +88,8 @@ def test_staff_cancel_visit_adapter_mutates_visit_and_queue_with_audit(
 
     assert result["success"] is True
     assert result["action"] == "staff_cancel_visit"
-    assert test_visit.status == "cancelled"
-    assert entry.status == "cancelled"
+    assert test_visit.status == "canceled"  # Issue #06: normalized from British to American
+    assert entry.status == "cancelled"  # queue entry keeps British spelling
     assert wrong_owner_entry.status == "waiting"
     assert result["queue"]["queue_time_preserved"] is True
     assert _audit_actions(db_session) == [

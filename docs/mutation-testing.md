@@ -44,7 +44,7 @@ npm install --save-dev @stryker-mutator/core @stryker-mutator/vitest-runner
 ```
 
 ### Configuration
-Already in `frontend/stryker.config.mjs`:
+Already in `frontend/stryker.conf.mjs`:
 - Mutates: state machines (4 files) + invariants (4 files) + mappers (3 files)
 - Test runner: vitest
 - Threshold: >= 70% mutation score (break below 70%)

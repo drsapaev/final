@@ -215,8 +215,17 @@ def start_queue_visit(
             changed_at = datetime.now(UTC)
             queue_entry.status = "in_progress"
             queue_entry.updated_at = changed_at
+            # Issue #06 Phase 3: delegate visit status transition to
+            # VisitLifecycleService for state machine validation + row lock.
+            # Only the Visit.status goes through the service; the
+            # queue_entry.status is a separate concern (queue_svc domain).
             if linked_visit:
-                linked_visit.status = "in_progress"
+                from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                linked_visit = VisitLifecycleService(db).start_visit(
+                    visit_id=linked_visit.id,
+                    current_user=current_user,
+                )
                 linked_visit.updated_at = changed_at
 
             logger.info(
@@ -380,7 +389,31 @@ def _ensure_specialty_queue(
             "entries": [],
             "doctor": None,
             "doctor_id": doctor_id,
+            # D-2: per-doctor representation — a specialty bucket may
+            # contain entries of SEVERAL doctors; the legacy single-doctor
+            # slot above is kept for response compatibility.
+            "doctors": {},
         }
+
+
+def _register_bucket_doctor(bucket: dict, doctor: Any) -> None:
+    """D-2: accumulate EVERY doctor seen in the bucket so the payload can
+    expose the full per-doctor set (id/name/cabinet) instead of relying on
+    the arbitrary first-doctor slot."""
+    if not doctor or not getattr(doctor, "id", None):
+        return
+    doctors = bucket.setdefault("doctors", {})
+    if doctor.id in doctors:
+        return
+    user = getattr(doctor, "user", None)
+    name = None
+    if user:
+        name = getattr(user, "full_name", None) or getattr(user, "username", None)
+    doctors[doctor.id] = {
+        "id": doctor.id,
+        "name": name or f"Врач #{doctor.id}",
+        "cabinet": getattr(doctor, "cabinet", None),
+    }
 
 
 def _get_visit_queue_time(
@@ -496,6 +529,7 @@ def _process_online_queue_entries(
         if doctor and doctor.id:
             bucket["doctor"] = doctor
             bucket["doctor_id"] = doctor.id
+        _register_bucket_doctor(bucket, doctor)
 
         entry_time = (
             online_entry.queue_time
@@ -609,6 +643,7 @@ def _process_legacy_appointments(
             appointment_doctor = getattr(appointment, 'doctor', None)
             if appointment_doctor:
                 queues_by_specialty[specialty]["doctor"] = appointment_doctor
+        _register_bucket_doctor(queues_by_specialty[specialty], getattr(appointment, 'doctor', None))
 
 
 
@@ -718,6 +753,12 @@ def _build_queue_payload(
     entries: list,
 ) -> dict:
     """R-22 Phase 4: Build the final queue payload wrapper with stats."""
+    # D-2: per-doctor specialists list, deterministic by id; the legacy
+    # single-doctor fields stay for response compatibility.
+    specialists = [
+        queue_data.get("doctors", {})[doctor_id]
+        for doctor_id in sorted(queue_data.get("doctors", {}).keys())
+    ]
     return {
         "queue_id": queue_number,
         "specialist_id": queue_data["doctor_id"],
@@ -726,6 +767,7 @@ def _build_queue_payload(
             if queue_data.get("doctor") and queue_data["doctor"].user
             else f"Специалист #{queue_data['doctor_id']}"
         ),
+        "specialists": specialists,
         "specialty": specialty,
         "timezone": "Asia/Tashkent",
         "cabinet": queue_data["doctor"].cabinet if queue_data.get("doctor") else "N/A",

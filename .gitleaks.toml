@@ -63,6 +63,36 @@ paths = [
   '''docs/archives/.*\.md''',
   # MCP server descriptions may contain example tokens
   '''mcp-servers/.*\.py''',
+  # ---- History-only paths (2026-08-15 triage of the 437-finding backlog) ----
+  # Files deleted from HEAD; findings remain in git history only. The HEAD
+  # tree scans clean. Full remediation (history purge + dev credential
+  # rotation) is a separate destructive decision — see PR #2765 notes.
+  # POLICY NOTE (AUTHENTICATION_SECURITY_POLICY.md forbids broad global
+  # allowlist growth): every entry below is an EXACT historical filename,
+  # so any NEW file (even with a similar name) is still scanned.
+  # Committed test-run logs with dev-session Bearer tokens (exact names).
+  '''backend/pytest_(tests_log(_2)?|full_log_2|final_log|patient_payment_log)\.txt''',
+  '''backend/backend_test_log_[345]\.txt''',
+  # .venv committed once in history; matches are upstream public code of
+  # these exact packages (ecdsa/passlib test vectors, sqlalchemy plugin...).
+  '''backend/\.venv/Lib/site-packages/(ecdsa|jose|passlib|rsa|setuptools|sqlalchemy|websocket)/.*''',
+  # Generated QA evidence with dev-session artifacts (AGENTS.md: output/ is
+  # generated evidence); exact historical filenames.
+  '''output/playwright/(doc-04-console\.txt|lab-05-live-ui-login-followup-v2\.json|lab-05-live-ui-open-report-v3\.json|lab-06-live-ui-history-v4\.json|reg-01-login-debug\.json|reg-02-cycle-2\.json|reg-02-cycle-2-fixed2\.json|task4-chat-diagnostic/diagnostic\.json|inspect_derma_(endpoints|queues)\.ps1)''',
+  '''output/(cashier-print-recon|print-flow-live-check|print-flow-recon)\.mjs''',
+  # Deleted root-level dev scripts with hardcoded dev JWTs (exact names).
+  '''test_api\.py''',
+  '''test_registration_(api|creation|endpoint)\.py''',
+  '''backend/get_services\.py''',
+  # CI temp junk committed once (bandit report with embedded dev tokens).
+  '''_tmp_artifacts_22278525949/bandit\.json''',
+  # Deleted dev-session token store.
+  '''profile_tokens\.json''',
+  # Deleted dev notes with pasted tokens/logs.
+  '''Fixing New Service Queue Time\.md''',
+  '''PROBLEMS_RESOLVED_REPORT\.md''',
+  # Deleted API-docs service whose curl examples carried placeholder tokens.
+  '''backend/app/services/api_documentation_api_service\.py''',
 ]
 
 # Allowlist specific regex patterns that gitleaks tends to flag in medical code
@@ -71,6 +101,12 @@ regexes = [
   '''clinic_ci_only_password''',
   # Example JWT tokens used in docs/tests
   '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ\.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c''',
+  # Documentation placeholder in curl examples (api_documentation service).
+  '''Bearer YOUR_TOKEN''',
+  # generic-api-key false positives on non-secret literals (verified against
+  # the JSON report: the captured "secrets" are an assignment and prose).
+  '''docs_url=None''',
+  '''EMR/lab/patient''',
 ]
 
 # ---------------------------------------------------------------------------
@@ -85,16 +121,21 @@ tags = ["key", "telegram"]
 [[rules]]
 id = "click-uz-merchant"
 description = "Click.uz merchant/user ID + secret combo"
-# Match Click.uz credential patterns: env-style secret values or merchant
-# identifiers, but NOT the public API base URL `https://api.click.uz/v2`
-# (which is a public documentation endpoint, not a secret).
-regex = '''CLICK_SECRET_KEY|CLICK_MERCHANT_USER_ID|CLICK_SERVICE_ID|CLICK_SECRET\s*[:=]'''
+# Match actual credential ASSIGNMENTS (name + quoted literal value), but NOT:
+# - bare identifier references (pydantic Field declarations like
+#   `CLICK_SECRET_KEY: str | None = Field(default=None)`)
+# - settings attribute reads (`app_settings.CLICK_MERCHANT_ID`)
+# - the public API base URL `https://api.click.uz/v2`
+# The old bare-name regex fired 12 times on declarations with zero literals.
+regex = '''(CLICK_SECRET_KEY|CLICK_MERCHANT_USER_ID|CLICK_SERVICE_ID|CLICK_SECRET)\s*[:=]\s*["'][^"'\n]{4,}["']'''
 tags = ["key", "payment"]
 
 [[rules]]
 id = "payme-merchant"
 description = "Payme merchant credentials"
-regex = '''PAYME_KEY|PAYME_MERCHANT_ID|PAYME_END_POINT'''
+# Same fix as click-uz-merchant: require a quoted literal value; bare
+# identifier declarations are not secrets.
+regex = '''(PAYME_KEY|PAYME_MERCHANT_ID|PAYME_END_POINT)\s*[:=]\s*["'][^"'\n]{3,}["']'''
 tags = ["key", "payment"]
 
 [[rules]]

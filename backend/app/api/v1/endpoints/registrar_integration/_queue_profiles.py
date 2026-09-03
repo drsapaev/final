@@ -6,7 +6,35 @@ from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_integration._helpers import (
     _raise_registrar_internal_error,
 )  # noqa: F401
+from app.core.specialties import (
+    DENTAL_FAMILY_SPELLINGS,
+    canonical_specialty,
+    expand_queue_tags,
+)
 from app.schemas.misc_endpoints import ReorderQueueProfilesRequest
+
+
+def _canonical_profile_tags(tags: list[str] | None, profile_key: str) -> list[str]:
+    """D-1 (Codex round-6/7): the tags a QueueProfile write path persists.
+
+    - omitted/empty tags fall back to ``[profile_key]``;
+    - a dental-family key must always contribute to the expansion (unless
+      the submitted tags already contain a family spelling), so family
+      profiles stay canonical-covered even when the admin sets unrelated
+      tags;
+    - NON-dental profiles keep EXACTLY the tags the admin submitted — the
+      key is never silently re-added after an explicit removal.
+    """
+    tag_list = [t for t in (tags or []) if t]
+    if not tag_list:
+        return expand_queue_tags([profile_key])
+    key_is_family = (profile_key or "").strip().lower() in DENTAL_FAMILY_SPELLINGS
+    tags_are_family = any(
+        (t or "").strip().lower() in DENTAL_FAMILY_SPELLINGS for t in tag_list
+    )
+    if key_is_family and not tags_are_family:
+        tag_list.append(profile_key)
+    return expand_queue_tags(tag_list)
 
 
 @router.get("/queues/profiles", response_model=dict[str, Any])
@@ -56,6 +84,10 @@ def get_queue_profiles(
                         "icon": p.get("icon"),
                         "color": p.get("color"),
                         "order": p.get("order", 0),
+                        # D-1: canonical clinic_settings segment this
+                        # profile's start_number_*/max_per_day_* rows live
+                        # under (QueueSettings screen reads/edits by it).
+                        "settings_key": canonical_specialty(p["key"]),
                     }
                     for p in INITIAL_QUEUE_PROFILES
                 ],
@@ -76,6 +108,12 @@ def get_queue_profiles(
                     "order": p.display_order,  # API returns as 'order' for frontend compatibility
                     "is_active": p.is_active,
                     "show_on_qr_page": getattr(p, 'show_on_qr_page', True),  # Handle missing column
+                    # D-1: canonical clinic_settings segment this profile's
+                    # start_number_*/max_per_day_* rows live under (the
+                    # profile key itself may be a legacy machinery value —
+                    # e.g. "stomatology" — while settings rows are stored
+                    # under the canonical "dentistry" after migration 0049).
+                    "settings_key": canonical_specialty(p.key),
                 }
                 for p in profiles
             ],
@@ -99,11 +137,11 @@ def get_queue_profiles(
                     "icon": p.get("icon"),
                     "color": p.get("color"),
                     "order": p.get("order", 0),
+                    "settings_key": canonical_specialty(p["key"]),
                 }
                 for p in INITIAL_QUEUE_PROFILES
             ],
             "source": "fallback_error",
-            "error": str(e),
         }
 
 
@@ -179,7 +217,6 @@ def get_queue_profiles_public(
                 {"id": 4, "specialty": "lab", "specialty_display": "Лаборатория", "icon": "🔬", "color": "#34C759"},
             ],
             "source": "fallback_error",
-            "error": str(e),
         }
 
 
@@ -256,7 +293,10 @@ def create_queue_profile(
             key=profile_data.key,
             title=profile_data.title,
             title_ru=profile_data.title_ru,
-            queue_tags=profile_data.queue_tags,
+            # D-1 (Codex round-6 P1): a dental-family profile must never be
+            # persisted with tags blind to the canonical spelling (see
+            # _canonical_profile_tags for the exact contract).
+            queue_tags=_canonical_profile_tags(profile_data.queue_tags, profile_data.key),
             department_key=profile_data.department_key,
             display_order=profile_data.display_order,
             is_active=profile_data.is_active,
@@ -319,6 +359,10 @@ def update_queue_profile(
         # Update fields (only those provided)
         update_data = profile_data.dict(exclude_unset=True)
         for field, value in update_data.items():
+            if field == "queue_tags":
+                # D-1 (Codex round-6 P1): same contract as creation (see
+                # _canonical_profile_tags).
+                value = _canonical_profile_tags(value, profile.key)
             if hasattr(profile, field):
                 setattr(profile, field, value)
 

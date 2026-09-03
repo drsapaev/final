@@ -6,7 +6,6 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
@@ -345,87 +344,17 @@ class LabNotificationService:
         Returns:
             Статистика отправленных напоминаний
         """
-        try:
-            target_date = datetime.now(UTC) + timedelta(days=days_before)
-
-            # Находим заказы с датой повторного анализа
-            upcoming_followups = (
-                self.db.query(LabOrder)
-                .filter(
-                    LabOrder.follow_up_date.isnot(None),
-                    LabOrder.follow_up_date >= datetime.now(UTC),
-                    LabOrder.follow_up_date <= target_date,
-                    or_(
-                        LabOrder.follow_up_reminded == False,
-                        LabOrder.follow_up_reminded.is_(None),
-                    ),
-                )
-                .all()
-            )
-
-            reminders_sent = 0
-
-            for order in upcoming_followups:
-                patient = self.db.query(Patient).filter(Patient.id == order.patient_id).first()
-
-                if patient:
-                    days_until = (_as_aware_utc(order.follow_up_date) - datetime.now(UTC)).days
-
-                    message = f"""
-📅 Напоминание о повторном анализе
-
-Уважаемый(ая) {patient.short_name()},
-
-Напоминаем, что через {days_until} дней ({order.follow_up_date.strftime('%d.%m.%Y')}) вам необходимо сдать повторный анализ.
-
-Пожалуйста, запишитесь на приём заранее.
-
-С уважением,
-Ваша клиника
-                    """.strip()
-
-                    # Отправляем напоминание
-                    if patient.user_id:
-                        user = self.db.query(User).filter(User.id == patient.user_id).first()
-                        if user:
-                            canonical_created = await notification_sender_service.send_queue_position_event_notification(
-                                db=self.db,
-                                recipient=user,
-                                event_type="diagnostics_return_needed",
-                                title="Напоминание о повторном анализе",
-                                message=f"Через {days_until} дней запланирован повторный анализ.",
-                                metadata={
-                                    "order_id": order.id,
-                                    "patient_id": order.patient_id,
-                                    "follow_up_date": order.follow_up_date.isoformat(),
-                                    "days_until": days_until,
-                                },
-                            )
-
-                            telegram_sent = False
-                            if hasattr(user, 'telegram_id') and user.telegram_id:
-                                tg_response = await notification_sender_service.send_telegram_message(
-                                    user_id=user.telegram_id,
-                                    message=message,
-                                )
-                                telegram_sent = bool(tg_response.get("success"))
-
-                            if canonical_created or telegram_sent:
-                                reminders_sent += 1
-
-                    order.follow_up_reminded = True
-                    order.follow_up_reminded_at = datetime.now(UTC)
-
-            self.db.commit()
-
-            return {
-                "upcoming_followups": len(upcoming_followups),
-                "reminders_sent": reminders_sent,
-            }
-
-        except Exception as e:
-            logger.error(f"Error sending follow-up reminders: {e}")
-            return {"error": str(e)}
+        # FEATURE WITHOUT DATA LAYER: LabOrder.follow_up_date /
+        # follow_up_reminded никогда не существовали — ни в модели, ни в
+        # одной миграции. Пока планировщик падал до запуска (ghost-метод,
+        # #2849), баг был латентным; рабочий тик стал ловить AttributeError
+        # на каждом прогоне (Sentry). Повторные напоминания требуют сначала
+        # продуктового решения и колонки/миграции — учёт в #2775.
+        logger.info(
+            "Follow-up reminders skipped: no data layer "
+            "(LabOrder.follow_up_date does not exist)"
+        )
+        return {"skipped": "LabOrder.follow_up_date column does not exist"}
 
 
 async def run_lab_notifications(db: Session) -> dict[str, Any]:

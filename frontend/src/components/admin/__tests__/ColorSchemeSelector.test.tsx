@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ColorSchemeSelector from '../ColorSchemeSelector';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { MacOSThemeProvider } from '@/theme/macosTheme';
 
 const { apiMock } = vi.hoisted(() => ({
   apiMock: {
@@ -17,11 +16,9 @@ vi.mock('../../../api/client.ts', () => ({
 
 function renderSelector() {
   return render(
-    <MacOSThemeProvider>
-      <ThemeProvider>
+          <ThemeProvider>
         <ColorSchemeSelector />
       </ThemeProvider>
-    </MacOSThemeProvider>
   );
 }
 
@@ -43,18 +40,14 @@ describe('ColorSchemeSelector', () => {
     });
   });
 
-  it('renders the shared theme catalog copy and applies a selected custom scheme', async () => {
+  it('renders the shared theme catalog copy with 3 standard schemes', async () => {
     renderSelector();
 
     expect(screen.getByText('Что именно меняет настройка')).toBeInTheDocument();
-    expect(screen.getByText(/Accent сейчас:/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Полупрозрачная стеклянная/i }));
-
-    await waitFor(() => {
-      expect(document.documentElement.getAttribute('data-color-scheme')).toBe('glass');
-      expect(screen.getByText('Премиальная')).toBeInTheDocument();
-      expect(screen.getAllByText('Стекло').length).toBeGreaterThan(0);
-    });
+    // PR-UI-02: custom schemes (vibrant/glass/gradient) deleted.
+    // Only 3 standard schemes remain: light, dark, auto.
+    expect(screen.getAllByText('Светлая').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Темная').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Авто').length).toBeGreaterThan(0);
   });
 });

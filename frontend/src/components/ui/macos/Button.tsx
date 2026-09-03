@@ -1,12 +1,18 @@
 import React, { type ReactNode, type CSSProperties, type MouseEvent } from 'react';
 import { useTranslation } from '@/i18n/useTranslation';
 
-type ButtonVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'destructive' | 'error' | 'ghost' | 'outline' | 'link' | string;
+// PR-UI-05: narrowed from 11 variants to 6.
+// Removed: default (-> secondary), success (-> secondary + color), warning (-> secondary + color),
+// destructive (-> danger), error (-> danger).
+// Semantic coloring now via `color` prop on secondary variant.
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger' | 'link' | string;
+type ButtonColor = 'default' | 'success' | 'warning' | 'danger' | 'info';
 type ButtonSize = 'small' | 'default' | 'large' | 'sm' | 'md' | 'lg' | string;
 
 interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style' | 'onClick'> {
   children?: ReactNode;
   variant?: ButtonVariant;
+  color?: ButtonColor;
   size?: ButtonSize;
   disabled?: boolean;
   loading?: boolean;
@@ -16,7 +22,6 @@ interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
   startIcon?: ReactNode;
   endIcon?: ReactNode;
-  color?: string;
   icon?: ReactNode;
   label?: ReactNode;
   action?: ReactNode;
@@ -42,7 +47,8 @@ interface SizeStyle extends CSSProperties {
  */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   children,
-  variant = 'default',
+  variant = 'secondary',
+  color = 'default',
   size = 'default',
   disabled = false,
   loading = false,
@@ -98,61 +104,46 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
       }
     };
 
-    const variantStyles: Record<ButtonVariant, CSSProperties> = {
-      default: {
+    // PR-UI-05: 6 canonical variants.
+    // CC-2 (UI color-contrast track): white-ink fills use the *-strong token
+    // family — the base accent #007aff / error #ff453a / success #30d158 /
+    // warning #ff9f0a measure 4.02 / 3.41 / 2.02 / 2.06:1 against white, below
+    // the WCAG AA 4.5:1 floor (axe color-contrast, e2e/a11y-baseline.json).
+    // Strong values: #0066d6 (5.42) / #d92c20 (4.85) / #147a38 (5.43) /
+    // #a86200 (4.76). Tokens come with fallbacks to the base values.
+    const variantStyles: Record<string, CSSProperties> = {
+      primary: {
+        backgroundColor: 'var(--mac-accent-blue-strong, var(--mac-accent-blue))',
+        color: 'white',
+        border: '1px solid var(--mac-accent-blue-strong, #007aff)',
+        boxShadow: '0 2px 8px rgba(0, 102, 214, 0.3), 0 1px 3px rgba(0, 0, 0, 0.12)'
+      },
+      secondary: {
         backgroundColor: 'rgba(0, 0, 0, 0.05)',
         color: 'var(--mac-text-primary)',
         border: '1px solid rgba(0, 0, 0, 0.1)'
       },
-      primary: {
-        backgroundColor: 'var(--mac-accent-blue)',
-        color: 'white',
-        border: '1px solid #007aff',
-        boxShadow: '0 2px 8px rgba(0, 122, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.12)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)'
-      },
-      secondary: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        color: 'var(--mac-text-primary)',
-        border: '1px solid rgba(255, 255, 255, 0.15)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)'
-      },
-      success: {
-        backgroundColor: 'var(--mac-success)',
-        color: 'white',
-        border: '1px solid #34c759',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
-      },
-      warning: {
-        backgroundColor: 'var(--mac-warning)',
-        color: 'white',
-        border: '1px solid #ff9500',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
-      },
-      danger: {
-        backgroundColor: 'var(--mac-error)',
-        color: 'white',
-        border: '1px solid #ff3b30',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
-      },
       ghost: {
         backgroundColor: 'transparent',
         color: 'var(--mac-text-primary)',
-        border: '1px solid transparent',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)'
+        border: '1px solid transparent'
       },
       outline: {
         backgroundColor: 'transparent',
         color: 'var(--mac-text-primary)',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)'
+        border: '1px solid rgba(255, 255, 255, 0.3)'
+      },
+      danger: {
+        backgroundColor: 'var(--mac-danger-strong, var(--mac-error))',
+        color: 'white',
+        border: '1px solid var(--mac-danger-strong, #ff3b30)',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       link: {
         backgroundColor: 'transparent',
+        // CC-2 note: link TEXT contrast is a separate latent class (dark links
+        // need a brighter accent, not the dark fill token) — deliberately left
+        // on the base accent; no axe-flagged link findings exist.
         color: 'var(--mac-accent-blue)',
         border: 'none',
         padding: '4px 8px',
@@ -160,10 +151,40 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
       }
     };
 
+    // PR-UI-05: color overrides for secondary variant (semantic coloring)
+    const colorOverrides: Record<string, Partial<CSSProperties>> = {
+      success: {
+        backgroundColor: 'var(--mac-success-strong, var(--mac-success))',
+        color: 'white',
+        border: '1px solid var(--mac-success-strong, #34c759)',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+      },
+      warning: {
+        backgroundColor: 'var(--mac-warning-strong, var(--mac-warning))',
+        color: 'white',
+        border: '1px solid var(--mac-warning-strong, #ff9500)',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+      },
+      danger: {
+        backgroundColor: 'var(--mac-danger-strong, var(--mac-error))',
+        color: 'white',
+        border: '1px solid var(--mac-danger-strong, #ff3b30)',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+      },
+      info: {
+        backgroundColor: 'var(--mac-accent-blue-strong, var(--mac-accent-blue))',
+        color: 'white',
+        border: '1px solid var(--mac-accent-blue-strong, #007aff)',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+      }
+    };
+
     return {
       ...baseStyles,
       ...sizeStyles[size],
       ...variantStyles[variant],
+      // PR-UI-05: apply color overrides when variant is secondary
+      ...(color !== 'default' && (variant === 'secondary' || !variantStyles[variant]) ? colorOverrides[color] : {}),
       ...(fullWidth && { width: '100%' }),
       ...(disabled && {
         opacity: 0.5,

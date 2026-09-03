@@ -8,6 +8,7 @@ import logging
 import uuid
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
@@ -227,7 +228,11 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "validation_error",
                 "message": "Ошибка валидации запроса",
-                "detail": exc.errors(),
+                # exc.errors() can carry non-JSON-serializable objects in ctx
+                # (e.g. the ValueError raised by a custom validator) - passing
+                # it raw made JSONResponse itself raise, surfacing as a 500
+                # from the security-middleware catch-all instead of a 422.
+                "detail": jsonable_encoder(exc.errors()),
             },
         )
 
@@ -237,6 +242,19 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         """
         Обработка всех остальных необработанных исключений
+
+        SECURITY (CodeQL py/stack-trace-exposure #1175, #1176, and ~26
+        downstream false-positive alerts): the previous implementation included
+        `str(exc)` in the response body when `logger.level <= logging.DEBUG`.
+        This created an info-leak vector: setting `LOG_LEVEL=DEBUG` (e.g. for
+        troubleshooting) would cause ALL unhandled exceptions to surface their
+        message to the client, including stack-trace fragments from
+        SQLAlchemy, pg_dump, Jinja2, etc.
+
+        Fix: never include exception details in the HTTP response, regardless
+        of log level. The full exception (with stack trace) is logged
+        server-side via `exc_info=True`; the client receives only a generic
+        message and a `request_id` for cross-referencing with server logs.
         """
         request_id = _get_request_id(request)
         logger.error(
@@ -253,10 +271,6 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "error": "internal_server_error",
                 "message": "Внутренняя ошибка сервера",
                 "request_id": request_id,
-                "detail": (
-                    str(exc)
-                    if logger.level <= logging.DEBUG
-                    else "Обратитесь к администратору"
-                ),
+                "detail": "Обратитесь к администратору",
             },
         )

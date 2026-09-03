@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Clinic OS - Logo Mark (32x32 monogram)
+
+  PR-UI-10 - Branding + Logo + Favicon
+  - Minimalist medical teal (#0d9488) + white
+  - Scalable: 32x32 base, designed for favicon / app icon / header mark
+  - Design: rounded square badge in medical teal containing a white "C"
+    letterform whose inner edge traces a stylized heartbeat/pulse line
+    (medical clinic + OS = clinic operating system; pulse = alive / data flow)
+
+  This file is the canonical source for:
+  - public/favicon.ico fallback (older browsers; modern browsers consume
+    the SVG directly via index.html link rel="icon" type="image/svg+xml")
+  - public/manifest.json icons[0].src = "/brand/logo-mark.svg" (maskable)
+  - Header brand mark (HeaderNew.tsx)
+
+  Color tokens used:
+  - #0d9488 (medical teal; matches mac-accent direction per AGENTS_UI section 9;
+    note: tokens.css currently still aliases mac-accent to #007aff (macOS
+    blue legacy); the teal target is a downstream token migration that
+    PR-UI-10 does NOT perform - only the brand SVGs use teal here)
+  - #ffffff (white mark interior)
+  - #14b8a6 (lighter teal accent for the pulse line)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Clinic OS">
+  <rect x="0" y="0" width="32" height="32" rx="7" ry="7" fill="#0d9488"/>
+  <path d="M 22 9.5 A 9 9 0 1 0 22 22.5" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 21 14 L 23 14 L 24 11 L 26 18 L 27 14 L 29 14" fill="none" stroke="#14b8a6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

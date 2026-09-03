@@ -6,8 +6,13 @@ const rootDir = path.resolve(process.cwd(), '..');
 const artifactsDir = path.join(rootDir, 'output', 'playwright');
 const storageStateFile = path.join(artifactsDir, 'cardio-storage.json');
 
+interface StorageStateOrigin {
+  origin: string;
+  localStorage: { name: string; value: string }[];
+}
+
 function readCardioAuth() {
-  const storageState = JSON.parse(fs.readFileSync(storageStateFile, 'utf8'));
+  const storageState = JSON.parse(fs.readFileSync(storageStateFile, 'utf8')) as { origins: StorageStateOrigin[] };
   const appOrigin = storageState.origins.find((origin) => origin.origin === 'http://localhost:5173');
   const localStorageItems = new Map((appOrigin?.localStorage || []).map((item) => [item.name, item.value]));
   return {
@@ -28,7 +33,7 @@ test.use({
 
 test('CARD-01/CARD-02 live fix on temp 5175/18001 stack', async ({ page }) => {
   const auth = readCardioAuth();
-  const networkUrls = [];
+  const networkUrls: string[] = [];
   const interpretation = `Playwright CARD-01 ${Date.now()}`;
 
   page.on('request', (request) => {

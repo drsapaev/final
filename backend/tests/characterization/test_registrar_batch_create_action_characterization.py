@@ -65,7 +65,7 @@ def _create_existing_entry(
         number=number,
         patient_id=patient_id,
         patient_name="Characterization Patient",
-        phone="+998901234567",
+        phone="+998900000121",
         source=source,
         status=status,
     )
@@ -103,7 +103,7 @@ def _create_other_patient(db_session) -> Patient:
     patient = Patient(
         first_name="Other",
         last_name="Batch",
-        phone="+998901110022",
+        phone="+998900000109",
         birth_date=date(1991, 1, 1),
     )
     db_session.add(patient)
@@ -347,7 +347,7 @@ def test_registrar_batch_update_rejects_visit_for_other_patient(
                 {
                     "id": unrelated_visit.id,
                     "action": "update",
-                    "status": "cancelled",
+                    "status": "canceled",
                 }
             ]
         },
@@ -394,7 +394,7 @@ def test_registrar_batch_update_rejects_ambiguous_untyped_entry_id(
                 {
                     "id": collision_id,
                     "action": "update",
-                    "status": "cancelled",
+                    "status": "canceled",
                 }
             ]
         },
@@ -444,7 +444,7 @@ def test_registrar_batch_update_uses_typed_visit_when_ids_collide(
                     "id": collision_id,
                     "entry_type": "visit",
                     "action": "update",
-                    "status": "cancelled",
+                    "status": "canceled",
                 }
             ]
         },
@@ -454,7 +454,7 @@ def test_registrar_batch_update_uses_typed_visit_when_ids_collide(
     db_session.refresh(queue_entry)
     db_session.refresh(visit)
     assert queue_entry.status == "waiting"
-    assert visit.status == "cancelled"
+    assert visit.status in ("canceled", "cancelled")  # Issue #06: state machine normalizes to "canceled"
 
 
 @pytest.mark.integration
@@ -497,6 +497,6 @@ def test_registrar_batch_cancel_all_uses_typed_actions_when_ids_collide(
     assert payload["cancelled_count"] == 2
     db_session.refresh(queue_entry)
     db_session.refresh(visit)
-    assert queue_entry.status == "cancelled"
+    assert queue_entry.status in ("canceled", "cancelled")  # Issue #06: state machine normalizes to "canceled"
     assert queue_entry.cancel_reason == "collision bulk cancel"
-    assert visit.status == "cancelled"
+    assert visit.status in ("canceled", "cancelled")  # Issue #06: state machine normalizes to "canceled"

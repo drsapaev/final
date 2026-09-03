@@ -27,7 +27,10 @@ from app.services.derma_api_service import DermaApiDomainError, DermaApiService
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 logger = logging.getLogger(__name__)
-DERMA_ROLES = ("Admin", "Doctor", "derma", "dermatology")
+# D-3 RBAC unification: "dermatologist" covers the lowercase/capitalized
+# alias (require_roles is case-insensitive) — provisioned Dermatologist-role
+# accounts must not 403 on their own specialty panel (parity with cardio.py).
+DERMA_ROLES = ("Admin", "Doctor", "derma", "dermatology", "dermatologist")
 DERMA_ADMIN_ROLES = {"Admin"}
 
 

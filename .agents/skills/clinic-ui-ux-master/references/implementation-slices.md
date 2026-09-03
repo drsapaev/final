@@ -108,7 +108,7 @@ Too broad:
 
 - `redesign frontend`
 - `modernize all panels`
-- `replace MUI everywhere`
+- `migrate every legacy class in one pass`
 - `clean all inline styles`
 - `new design system`
 

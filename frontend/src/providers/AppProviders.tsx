@@ -2,7 +2,6 @@ import { TranslationProvider } from '../i18n/useTranslation';
 import { AppDataProvider } from '../contexts/AppDataContext';
 import { ChatProvider } from '../contexts/ChatContext';
 import { ToastProvider } from '../components/common/Toast';
-import { ModalProvider } from '../components/common/Modal';
 import { FormProvider } from '../components/common/Form';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import { NotificationPrompt } from '../components/chat/NotificationPrompt';
@@ -22,12 +21,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
             <ToastProvider>
               <NotificationCenterProvider>
                 <NotificationWebSocketProvider>
-                  <ModalProvider>
-                    <FormProvider>
-                      {children}
-                      <NotificationPrompt />
-                    </FormProvider>
-                  </ModalProvider>
+                  <FormProvider>
+                    {children}
+                    <NotificationPrompt />
+                  </FormProvider>
                 </NotificationWebSocketProvider>
               </NotificationCenterProvider>
             </ToastProvider>

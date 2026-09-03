@@ -2,7 +2,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from "react";
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
@@ -10,7 +10,7 @@ import {
   Select,
   Textarea,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
 } from '../ui/macos';
 import {
   Plus,
@@ -507,8 +507,7 @@ const DynamicPricingManager = () => {
       {/* Список правил */}
       <div className="admin-grid-gap-16">
         {pricingRules.length === 0 ?
-      <MacOSEmptyState
-        type="rule"
+      <AppEmpty
         title={t('admin2.dp_rules_empty_title')}
         description={t('admin2.dp_rules_empty_desc')}
         action={
@@ -520,7 +519,7 @@ const DynamicPricingManager = () => {
 
 
       pricingRules.map((rule) =>
-      <MacOSCard key={rule.id} className="p-0">
+      <Card key={rule.id} className="p-0">
               <div className="admin-card-header-flex-start">
                 <div className="admin-flex-1">
                   <div className="admin-card-title-badges">
@@ -596,14 +595,14 @@ const DynamicPricingManager = () => {
                   </Button>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       )
       }
       </div>
 
       {/* Форма создания правила */}
       {showCreateRule &&
-    <MacOSCard className="p-6">
+    <Card className="p-6">
           <div className="admin-card-header-between">
             <h4 className="admin-section-h3-m0">
               {t('admin2.dp_create_rule_form_title')}
@@ -742,7 +741,7 @@ const DynamicPricingManager = () => {
               {t('admin2.dp_create_btn')}
             </Button>
           </div>
-        </MacOSCard>
+        </Card>
     }
     </div>;
 
@@ -771,8 +770,7 @@ const DynamicPricingManager = () => {
       {/* Список пакетов */}
       <div className="admin-grid-gap-16">
         {servicePackages.length === 0 ?
-      <MacOSEmptyState
-        type="package"
+      <AppEmpty
         title={t('admin2.dp_packages_empty_title')}
         description={t('admin2.dp_packages_empty_desc')}
         action={
@@ -784,7 +782,7 @@ const DynamicPricingManager = () => {
 
 
       servicePackages.map((pkg) =>
-      <MacOSCard key={pkg.id} className="p-0">
+      <Card key={pkg.id} className="p-0">
               <div className="admin-card-header-flex-start">
                 <div className="admin-flex-1">
                   <div className="admin-card-title-badges">
@@ -853,14 +851,14 @@ const DynamicPricingManager = () => {
                   </Button>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       )
       }
       </div>
 
       {/* Форма создания пакета */}
       {showCreatePackage &&
-    <MacOSCard className="p-6">
+    <Card className="p-6">
           <div className="admin-card-header-between">
             <h4 className="admin-section-h3-m0">
               {t('admin2.dp_create_package_form_title')}
@@ -953,7 +951,7 @@ const DynamicPricingManager = () => {
               {t('admin2.dp_create_btn')}
             </Button>
           </div>
-        </MacOSCard>
+        </Card>
     }
     </div>;
 
@@ -971,7 +969,7 @@ const DynamicPricingManager = () => {
 
       {analytics ?
     <div className="admin-grid-auto-300">
-          <MacOSCard className="p-0">
+          <Card className="p-0">
             <div className="admin-card-title-badges">
               <TrendingUp size={20} color="var(--mac-accent)" />
               <h4 className="admin-rule-header">
@@ -987,9 +985,9 @@ const DynamicPricingManager = () => {
                 end: (() => { const ed = (analytics.period as { end_date?: string })?.end_date; return ed ? new Date(ed).toLocaleDateString() : ''; })()
               })}
             </p>
-          </MacOSCard>
+          </Card>
 
-          <MacOSCard className="p-0">
+          <Card className="p-0">
             <div className="admin-card-title-badges">
               <Settings size={20} color="var(--mac-purple)" />
               <h4 className="admin-rule-header">
@@ -1002,9 +1000,9 @@ const DynamicPricingManager = () => {
             <p className="admin-stats-label">
               {t('admin2.dp_analytics_active_rules_sub')}
             </p>
-          </MacOSCard>
+          </Card>
 
-          <MacOSCard className="p-0">
+          <Card className="p-0">
             <div className="admin-card-title-badges">
               <Package size={20} color="var(--mac-orange)" />
               <h4 className="admin-rule-header">
@@ -1017,18 +1015,17 @@ const DynamicPricingManager = () => {
             <p className="admin-stats-label">
               {t('admin2.dp_analytics_active_packages_sub')}
             </p>
-          </MacOSCard>
+          </Card>
         </div> :
 
-    <MacOSEmptyState
-      type="analytics"
+    <AppEmpty
       title={t('admin2.dp_analytics_empty_title')}
       description={t('admin2.dp_analytics_empty_desc')} />
 
     }
 
       {analytics?.rules_statistics ?
-    <MacOSCard className="p-4">
+    <Card className="p-4">
           <h4 className="admin-rule-header mb-4">
             {t('admin2.dp_analytics_rules_stats')}
           </h4>
@@ -1049,11 +1046,11 @@ const DynamicPricingManager = () => {
               </div>
         )}
           </div>
-        </MacOSCard> : null
+        </Card> : null
     }
 
       {analytics?.packages_statistics ?
-    <MacOSCard className="p-4">
+    <Card className="p-4">
           <h4 className="admin-rule-header mb-4">
             {t('admin2.dp_analytics_packages_stats')}
           </h4>
@@ -1074,7 +1071,7 @@ const DynamicPricingManager = () => {
               </div>
         )}
           </div>
-        </MacOSCard> : null
+        </Card> : null
     }
     </div>;
 
@@ -1112,7 +1109,7 @@ const DynamicPricingManager = () => {
               style={{
                 '--admin-tab-border': isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
                 '--admin-tab-color': isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
-                '--admin-tab-weight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)'
+                '--admin-tab-weight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-regular)'
               } as CSSProperties}>
               
               <Icon size={16} />

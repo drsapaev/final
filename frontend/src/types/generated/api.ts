@@ -444,6 +444,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/visits/visits/{visit_id}/force-reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin override: reopen a closed/canceled visit (H-3 break-glass) */
+        post: operations["force_reopen_visit_api_v1_visits_visits__visit_id__force_reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/visits/{visit_id}/reschedule": {
         parameters: {
             query?: never;
@@ -872,6 +889,32 @@ export type paths = {
          * @description Get single department by ID
          */
         get: operations["get_department_api_v1_departments__department_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/payment-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Payment Methods
+         * @description Get available payment methods for the clinic.
+         *
+         *     Returns a list of payment methods with value, label, and icon_name.
+         *     Frontend maps icon_name to a lucide-react icon component.
+         *
+         *     Per-clinic configuration: if clinic_settings has key="payment_methods",
+         *     returns that value. Otherwise returns hardcoded defaults.
+         */
+        get: operations["get_payment_methods_api_v1_payments_payment_methods_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1319,6 +1362,235 @@ export type paths = {
          * @description Получение информации о визите по токену (без подтверждения).
          */
         get: operations["get_visit_info_by_token_api_v1_visits_info__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/register/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Register Begin
+         * @description Begin passkey registration (M4-P1-4).
+         *
+         *     Requires existing patient authentication (initData in body).
+         *     Returns WebAuthn registration options for navigator.credentials.create().
+         */
+        post: operations["webauthn_register_begin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/register/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Register Finish
+         * @description Finish passkey registration (M4-P1-4).
+         *
+         *     Verifies browser response and stores credential.
+         */
+        post: operations["webauthn_register_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/login/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Login Begin
+         * @description Begin passkey authentication (M4-P1-4).
+         *
+         *     Returns WebAuthn authentication options for navigator.credentials.get().
+         */
+        post: operations["webauthn_login_begin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/login/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Login Finish
+         * @description Finish passkey authentication (M4-P1-4).
+         *
+         *     Verifies assertion and issues JWT.
+         */
+        post: operations["webauthn_login_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/credentials/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn List Credentials
+         * @description List active passkeys for the authenticated patient (M4-P1-4).
+         */
+        post: operations["webauthn_list_credentials"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webauthn/credentials/{credential_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Webauthn Deactivate Credential
+         * @description Deactivate a passkey (M4-P1-4).
+         */
+        post: operations["webauthn_deactivate_credential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/security/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Security Dashboard
+         * @description M5.6: Security dashboard — recent logins, downloads, suspicious IPs.
+         */
+        get: operations["admin_security_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/security/compliance/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compliance Report
+         * @description M5.10: Automated compliance report — 8 checks.
+         */
+        get: operations["admin_compliance_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/security/secrets/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Secrets Status
+         * @description M5.8: Secrets rotation status.
+         */
+        get: operations["admin_secrets_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/security/backup/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Backup Verify
+         * @description M5.9: Record a backup verification event.
+         */
+        post: operations["admin_backup_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/security/backup/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Backup Status
+         * @description M5.9: Check backup status.
+         */
+        get: operations["admin_backup_status"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4141,7 +4413,7 @@ export type paths = {
          * Get Webhooks
          * @description Получает список webhook'ов с фильтрацией
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhooks_api_v1_webhooks__get"];
         put?: never;
@@ -4149,7 +4421,7 @@ export type paths = {
          * Create Webhook
          * @description Создает новый webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["create_webhook_api_v1_webhooks__post"];
         delete?: never;
@@ -4169,14 +4441,14 @@ export type paths = {
          * Get Webhook
          * @description Получает webhook по ID со статистикой
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_api_v1_webhooks__webhook_id__get"];
         /**
          * Update Webhook
          * @description Обновляет webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         put: operations["update_webhook_api_v1_webhooks__webhook_id__put"];
         post?: never;
@@ -4184,7 +4456,7 @@ export type paths = {
          * Delete Webhook
          * @description Удаляет webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         delete: operations["delete_webhook_api_v1_webhooks__webhook_id__delete"];
         options?: never;
@@ -4205,7 +4477,7 @@ export type paths = {
          * Activate Webhook
          * @description Активирует webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["activate_webhook_api_v1_webhooks__webhook_id__activate_post"];
         delete?: never;
@@ -4227,7 +4499,7 @@ export type paths = {
          * Deactivate Webhook
          * @description Деактивирует webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["deactivate_webhook_api_v1_webhooks__webhook_id__deactivate_post"];
         delete?: never;
@@ -4249,7 +4521,7 @@ export type paths = {
          * Test Webhook
          * @description Тестирует webhook отправкой тестового события
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["test_webhook_api_v1_webhooks__webhook_id__test_post"];
         delete?: never;
@@ -4269,7 +4541,7 @@ export type paths = {
          * Get Webhook Calls
          * @description Получает вызовы webhook'а
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_calls_api_v1_webhooks__webhook_id__calls_get"];
         put?: never;
@@ -4291,7 +4563,7 @@ export type paths = {
          * Get Webhook Call
          * @description Получает детали вызова webhook'а
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_call_api_v1_webhooks_calls__call_id__get"];
         put?: never;
@@ -4313,7 +4585,7 @@ export type paths = {
          * Get System Webhook Stats
          * @description Получает общую статистику системы webhook'ов
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         get: operations["get_system_webhook_stats_api_v1_webhooks_system_stats_get"];
         put?: never;
@@ -4335,7 +4607,7 @@ export type paths = {
          * Get Webhook Stats
          * @description Получает статистику webhook'а
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_stats_api_v1_webhooks__webhook_id__stats_get"];
         put?: never;
@@ -4359,7 +4631,7 @@ export type paths = {
          * Webhook Bulk Action
          * @description Выполняет массовое действие над webhook'ами
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["webhook_bulk_action_api_v1_webhooks_bulk_action_post"];
         delete?: never;
@@ -4381,7 +4653,7 @@ export type paths = {
          * Trigger Webhook Event
          * @description Триггерит событие для всех подписанных webhook'ов
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["trigger_webhook_event_api_v1_webhooks_events_trigger_post"];
         delete?: never;
@@ -9597,6 +9869,32 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/doctors/specialty-vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Doctor Specialty Vocabulary
+         * @description Medical specialty catalog — codes selectable at new-doctor onboarding.
+         *
+         *     Runtime SSOT is the ``medical_specialties`` table (migration 0051);
+         *     there is deliberately NO hardcoded fallback. Ordering: sort_order,
+         *     then code (deterministic). Frontend label resolution per owner spec:
+         *     locale → catalog translation → title_ru → code (the ru titles are a
+         *     compatibility fallback for kk/uz-Cyrl, not a translation claim).
+         */
+        get: operations["get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/doctors/{doctor_id}": {
         parameters: {
             query?: never;
@@ -12473,7 +12771,11 @@ export type paths = {
         put?: never;
         /**
          * Setup Two Factor Auth
-         * @description Настроить 2FA для текущего пользователя
+         * @description Настроить 2FA для текущего пользователя.
+         *
+         *     Авторизация: Bearer JWT (уже вошедший) ИЛИ одноразовый
+         *     enrollment_token из login-ответа (двухстадийная аутентификация
+         *     для критичных ролей без 2FA).
          */
         post: operations["setup_two_factor_auth_api_v1_2fa_setup_post"];
         delete?: never;
@@ -12496,6 +12798,10 @@ export type paths = {
          * @description Верифицировать настройку TOTP.
          *
          *     SECURITY (AUTH-REAUDIT-28): totp_code перенесён из query-param в body.
+         *
+         *     Двухстадийная аутентификация: при авторизации через enrollment_token
+         *     успешная верификация завершает enrollment — токен отзывается
+         *     (одноразовость) и выдаются нормальные access/refresh токены.
          */
         post: operations["verify_totp_setup_api_v1_2fa_verify_setup_post"];
         delete?: never;
@@ -12557,7 +12863,12 @@ export type paths = {
         put?: never;
         /**
          * Request Two Factor Recovery
-         * @description Запросить восстановление 2FA
+         * @description Запросить восстановление 2FA.
+         *
+         *     Токен ДОСТАВЛЯЕТСЯ по настроенному каналу (email через SMTP-провайдера).
+         *     Доставка выполняется до записи в БД: при сбое провайдера не остаётся
+         *     «повисшего» невыданного токена (HTTP 502, можно безопасно повторить).
+         *     Прежние неотработанные токены сжигаются — действующий всегда один.
          */
         post: operations["request_two_factor_recovery_api_v1_2fa_recovery_request_post"];
         delete?: never;
@@ -13248,6 +13559,84 @@ export type paths = {
          * @description Reject an onboarding request with a safe patient-facing reason.
          */
         post: operations["telegram_registrar_reject_patient_onboarding_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/mini-app/auth/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange Mini App Auth
+         * @description Exchange Telegram Mini App initData for short-lived JWT.
+         *
+         *     M4-P0-2: Secure alternative to per-request initData replay.
+         *     - initData validated ONCE (max_age=5min, replay protection)
+         *     - Returns JWT access_token (15 min) + refresh_token (7 days)
+         *     - Subsequent requests should use Authorization: Bearer <access_token>
+         *
+         *     Request body: { "init_data": "<Telegram.WebApp.initData>" }
+         */
+        post: operations["telegram_mini_app_auth_exchange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/mini-app/sessions/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List Mini App Patient Sessions
+         * @description List active patient sessions (M4-P0-3).
+         *
+         *     Returns active sessions for the authenticated patient, including
+         *     IP, user-agent, and creation timestamp. Uses initData for auth
+         *     (backward compat — will be replaced by JWT in future).
+         *
+         *     Request body: { "init_data": "<Telegram.WebApp.initData>" }
+         */
+        post: operations["telegram_mini_app_patient_sessions_list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/telegram/mini-app/sessions/revoke-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke All Mini App Patient Sessions
+         * @description Revoke all patient sessions except the current one (M4-P0-3).
+         *
+         *     Used when patient suspects their phone is stolen or wants to
+         *     log out from all other devices.
+         *
+         *     Request body: { "init_data": "<Telegram.WebApp.initData>" }
+         */
+        post: operations["telegram_mini_app_patient_sessions_revoke_all"];
         delete?: never;
         options?: never;
         head?: never;
@@ -19949,7 +20338,7 @@ export type paths = {
          * Get Refund Requests
          * @description Получить список заявок на возврат
          *
-         *     Доступно: Admin, Cashier, Manager
+         *     Доступно: Admin, Cashier
          */
         get: operations["get_refund_requests_api_v1_force_majeure_refund_requests_get"];
         put?: never;
@@ -19971,7 +20360,7 @@ export type paths = {
          * Get Refund Request
          * @description Получить заявку на возврат по ID
          *
-         *     Доступно: Admin, Cashier, Manager
+         *     Доступно: Admin, Cashier
          */
         get: operations["get_refund_request_api_v1_force_majeure_refund_requests__request_id__get"];
         put?: never;
@@ -20000,7 +20389,7 @@ export type paths = {
          *     - reject: Отклонить заявку
          *     - complete: Завершить (деньги возвращены)
          *
-         *     Доступно: Admin, Cashier, Manager
+         *     Доступно: Admin, Cashier
          */
         post: operations["process_refund_request_api_v1_force_majeure_refund_requests__request_id__process_post"];
         delete?: never;
@@ -21231,23 +21620,6 @@ export type paths = {
          *     Public endpoint (no auth) — safe to expose to uptime monitors.
          */
         get: operations["detailed_health_api_v1_health_detailed_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/_routes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Routes */
-        get: operations["_routes__routes_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -22936,16 +23308,6 @@ export type components = {
             common_updates?: components["schemas"]["CommonUpdates"] | null;
         };
         /**
-         * StructuredErrorResponse
-         * @description Structured error response for batch operations.
-         */
-        StructuredErrorResponse: {
-            /** Code */
-            code: string;
-            /** Message */
-            message: string;
-        };
-        /**
          * BatchUpdateResponse
          * @description Ответ на batch-обновление
          */
@@ -22964,10 +23326,7 @@ export type components = {
             } | null;
             /** Error */
             error?: string | null;
-            /**
-             * Error Code
-             * @description Machine-readable error code from the first failed entry
-             */
+            /** Error Code */
             error_code?: string | null;
         };
         /** BenefitCreate */
@@ -23273,43 +23632,6 @@ export type components = {
         Body_validate_emr_data_api_v1_emr_ai_validate_post: {
             emr_data: components["schemas"]["EmrAiEmrDataRequest"];
             template_structure: components["schemas"]["EmrAiTemplateDataRequest"];
-        };
-        /**
-         * BookAppointmentRequest
-         * @description Запрос на запись к врачу для API
-         */
-        BookAppointmentRequest: {
-            /**
-             * Doctor Id
-             * @description ID врача
-             */
-            doctor_id: number;
-            /**
-             * Appointment Date
-             * Format: date
-             * @description Дата записи (YYYY-MM-DD)
-             */
-            appointment_date: string;
-            /**
-             * Specialty
-             * @description Специализация
-             */
-            specialty: string;
-            /**
-             * Patient Id
-             * @description ID пациента
-             */
-            patient_id?: number | null;
-            /**
-             * Patient Fio
-             * @description ФИО пациента
-             */
-            patient_fio?: string | null;
-            /**
-             * Patient Phone
-             * @description Телефон пациента
-             */
-            patient_phone?: string | null;
         };
         /** BranchCreate */
         BranchCreate: {
@@ -26503,10 +26825,7 @@ export type components = {
             status: "updated" | "cancelled" | "created" | "error";
             /** Error */
             error?: string | null;
-            /**
-             * Error Code
-             * @description Machine-readable error code (e.g. ambiguous_entry_id, entry_not_found)
-             */
+            /** Error Code */
             error_code?: string | null;
         };
         /** EquipmentCreate */
@@ -27466,6 +27785,19 @@ export type components = {
              * @default true
              */
             send_notifications: boolean;
+        };
+        /** ForceReopenRequest */
+        ForceReopenRequest: {
+            /**
+             * Target Status
+             * @description Non-terminal target status: open | in_progress | completed
+             */
+            target_status: string;
+            /**
+             * Reason
+             * @description Operational reason for the override (≥10 chars). Logged.
+             */
+            reason: string;
         };
         /**
          * FullUpdateOnlineEntryRequest
@@ -29156,6 +29488,13 @@ export type components = {
              * @default false
              */
             must_change_password: boolean;
+            /**
+             * Requires 2Fa Setup
+             * @default false
+             */
+            requires_2fa_setup: boolean;
+            /** Enrollment Token */
+            enrollment_token?: string | null;
         };
         /**
          * LogoutRequest
@@ -29640,6 +29979,42 @@ export type components = {
             nonce?: string | null;
         };
         /**
+         * MobileBookAppointmentRequest
+         * @description Запрос на запись к врачу
+         */
+        MobileBookAppointmentRequest: {
+            /**
+             * Doctor Id
+             * @description ID врача
+             */
+            doctor_id: number;
+            /**
+             * Preferred Date
+             * @description Предпочтительная дата (YYYY-MM-DD)
+             */
+            preferred_date: string;
+            /**
+             * Preferred Time
+             * @description Предпочтительное время (HH:MM)
+             */
+            preferred_time?: string | null;
+            /**
+             * Complaint
+             * @description Жалобы
+             */
+            complaint?: string | null;
+            /**
+             * Services
+             * @description ID услуг
+             */
+            services?: number[];
+            /**
+             * Notes
+             * @description Дополнительные заметки
+             */
+            notes?: string | null;
+        };
+        /**
          * MobileLoginRequest
          * @description Запрос мобильной аутентификации
          */
@@ -29675,6 +30050,11 @@ export type components = {
              * @description JWT токен
              */
             access_token: string;
+            /**
+             * Refresh Token
+             * @description Refresh token для продления сессии (использовать с /mobile/auth/refresh)
+             */
+            refresh_token?: string | null;
             /**
              * Token Type
              * @description Тип токена
@@ -32426,6 +32806,8 @@ export type components = {
             current_usage: number;
             /** Doctors Count */
             doctors_count: number;
+            /** Aggregate Max Per Day */
+            aggregate_max_per_day: number;
             /** Last Updated */
             last_updated: string | null;
         };
@@ -34387,6 +34769,19 @@ export type components = {
              */
             limit: number;
         };
+        /**
+         * ServiceUnavailableDetail
+         * @description Body of the documented catalog 503 (Codex round-6 P2).
+         *
+         *     FastAPI's HTTPException payload is ``{"detail": ...}``; declaring this
+         *     model on the affected operations gives generated clients a typed error
+         *     shape instead of ``content?: never`` for the configuration-failure
+         *     response shared by GET specialty-vocabulary, POST and PUT /admin/doctors.
+         */
+        ServiceUnavailableDetail: {
+            /** Detail */
+            detail: string;
+        };
         /** ServiceUpdate */
         ServiceUpdate: {
             /** Code */
@@ -34590,6 +34985,23 @@ export type components = {
             /** Initialized */
             initialized: boolean;
         };
+        /**
+         * SpecialtyVocabularyItem
+         * @description One selectable specialty from the Medical Specialty Catalog (0051).
+         *
+         *     Typed DTO (Codex P2): a generic dict response compiled to arbitrary
+         *     maps in generated TS; this model guarantees code/titles exist.
+         */
+        SpecialtyVocabularyItem: {
+            /** Code */
+            code: string;
+            /** Title Ru */
+            title_ru: string;
+            /** Title Uz */
+            title_uz?: string | null;
+            /** Title En */
+            title_en?: string | null;
+        };
         /** StaffActionConfirmRequest */
         StaffActionConfirmRequest: {
             /** Entry Id */
@@ -34634,6 +35046,26 @@ export type components = {
             measurements_today: number;
             /** Measurements This Week */
             measurements_this_week: number;
+        };
+        /**
+         * StructuredErrorResponse
+         * @description Structured error response for batch operations.
+         *
+         *     Returned as HTTP 400 detail when error_code is present (e.g.
+         *     ambiguous_entry_id, entry_not_found). When error_code is None,
+         *     the detail is a plain string for backward compatibility.
+         */
+        StructuredErrorResponse: {
+            /**
+             * Code
+             * @description Machine-readable error code
+             */
+            code: string;
+            /**
+             * Message
+             * @description Human-readable error message
+             */
+            message: string;
         };
         /**
          * SuggestICD10IntegrationRequest
@@ -35423,7 +35855,7 @@ export type components = {
          */
         TwoFactorRecoveryResponse: {
             /** Recovery Token */
-            recovery_token: string;
+            recovery_token?: string | null;
             /**
              * Expires At
              * Format: date-time
@@ -35455,6 +35887,8 @@ export type components = {
             device_name?: string | null;
             /** Device Type */
             device_type?: string | null;
+            /** Enrollment Token */
+            enrollment_token?: string | null;
         };
         /**
          * TwoFactorSetupResponse
@@ -35570,6 +36004,8 @@ export type components = {
         TwoFactorVerifySetupRequest: {
             /** Totp Code */
             totp_code: string;
+            /** Enrollment Token */
+            enrollment_token?: string | null;
         };
         /**
          * UnreadCountResponse
@@ -36458,6 +36894,8 @@ export type components = {
             profile?: components["schemas"]["app__schemas__user_management__UserProfileResponse"] | null;
             preferences?: components["schemas"]["UserPreferencesResponse"] | null;
             notification_settings?: components["schemas"]["UserNotificationSettingsResponse"] | null;
+            /** Doctor Profile Incomplete */
+            doctor_profile_incomplete?: boolean | null;
         };
         /**
          * UserSearchRequest
@@ -37813,6 +38251,11 @@ export type components = {
             department_id?: number | null;
             /** Department */
             department?: string | null;
+            /**
+             * Profile Incomplete
+             * @default false
+             */
+            profile_incomplete: boolean;
             /** User */
             user?: {
                 [key: string]: unknown;
@@ -38935,6 +39378,41 @@ export interface operations {
             };
         };
     };
+    force_reopen_visit_api_v1_visits_visits__visit_id__force_reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForceReopenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     reschedule_visit_api_v1_visits__visit_id__reschedule_post: {
         parameters: {
             query: {
@@ -39709,6 +40187,28 @@ export interface operations {
             };
         };
     };
+    get_payment_methods_api_v1_payments_payment_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     get_available_providers_api_v1_payments_providers_get: {
         parameters: {
             query?: {
@@ -40426,6 +40926,249 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    webauthn_register_begin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    webauthn_register_finish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    webauthn_login_begin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    webauthn_login_finish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    webauthn_list_credentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    webauthn_deactivate_credential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_security_dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    admin_compliance_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    admin_secrets_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    admin_backup_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    admin_backup_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -45931,7 +46674,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    };
+                    }[];
                 };
             };
             /** @description Validation Error */
@@ -54910,6 +55653,15 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
         };
     };
     get_available_doctor_users_api_v1_admin_doctors_available_users_get: {
@@ -54966,6 +55718,35 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialtyVocabularyItem"][];
+                };
+            };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
                 };
             };
         };
@@ -55032,6 +55813,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
                 };
             };
         };
@@ -56289,7 +57079,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BookAppointmentRequest"];
+                "application/json": components["schemas"]["MobileBookAppointmentRequest"];
             };
         };
         responses: {
@@ -61093,6 +61883,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    telegram_mini_app_auth_exchange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    telegram_mini_app_patient_sessions_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    telegram_mini_app_patient_sessions_revoke_all: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -73855,6 +74711,15 @@ export interface operations {
                     "application/json": components["schemas"]["BatchUpdateResponse"];
                 };
             };
+            /** @description Batch operation failed — structured error with code and message */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructuredErrorResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75166,26 +76031,6 @@ export interface operations {
         };
     };
     detailed_health_api_v1_health_detailed_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    _routes__routes_get: {
         parameters: {
             query?: never;
             header?: never;

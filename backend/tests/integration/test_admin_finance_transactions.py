@@ -7,12 +7,9 @@ from app.models.patient import Patient
 
 
 def _login_admin(client, admin_user, admin_password):
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    assert response.status_code == 200, response.text
-    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+    from tests.conftest import mint_access_token
+
+    return {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
 
 
 def _login_registrar(client, registrar_user):
@@ -36,7 +33,7 @@ def test_admin_finance_transactions_crud_roundtrip(
         first_name="Тест",
         last_name="Финансов",
         middle_name="Пациент",
-        phone="+998901234567",
+        phone="+998900000121",
         email="finance.patient@test.com",
         birth_date=None,
     )

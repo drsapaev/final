@@ -1,6 +1,6 @@
 
 import { memo } from 'react';
-import { Badge, Icon } from '../ui/macos';
+import { Badge } from '../ui/macos';
 import {
   formatLabStatus,
   formatPaymentStatus,
@@ -10,6 +10,7 @@ import {
 
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+import { FileText } from 'lucide-react';
 
 interface QueueCardAppointment {
   patient_fio?: string;
@@ -103,7 +104,7 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }: Queue
           </details>
         </div>
         <Badge variant={appointment.report_instance_id ? 'success' : 'info'}>
-          <Icon name="doc.text" size={12} />
+          <FileText size={12} aria-hidden="true" />
           {appointment.report_instance_id ? t('queue.report_exists') : t('queue.report_new')}
         </Badge>
       </div>

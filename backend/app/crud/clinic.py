@@ -4,10 +4,15 @@ CRUD операции для управления клиникой в админ
 
 from typing import Any
 
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
+from app.core.specialties import (
+    canonical_specialty,
+    specialty_variants,
+)
 from app.models.clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
+from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
 from app.schemas.clinic import (
     ClinicSettingsCreate,
     ClinicSettingsUpdate,
@@ -168,15 +173,40 @@ def update_ticket_print_settings(
 
 
 def get_doctors(
-    db: Session, skip: int = 0, limit: int = 100, active_only: bool = False
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    active_only: bool = False,
+    eligible_only: bool = False,
 ) -> list[Doctor]:
-    """Получить список врачей"""
+    """Получить список врачей
+
+    ``eligible_only`` (Codex round-7 P2): apply the incomplete-profile
+    predicate IN THE DATABASE QUERY so pagination cannot crowd eligible
+    doctors out of the result (filtering the "general" sentinel AFTER the
+    row cap omitted eligible doctors beyond the cap while the caller's
+    limit allowed more rows).
+
+    Deterministic ordering (doctor id ascending) — the registrar doctor
+    selector and the admin doctor list render this list as-is, so an
+    undefined row order would reshuffle doctors of the same specialty
+    between calls/pages (from #2967).
+    """
     query = db.query(Doctor)
 
     if active_only:
         query = query.filter(Doctor.active == True)
+    if eligible_only:
+        # Codex round-9 P2: blank/whitespace specialties are incomplete
+        # too (is_doctor_profile_incomplete normalizes), so the SQL
+        # predicate must exclude them as well — trim(NULL) is NULL and
+        # NULL != '' is not true, so NULL rows are excluded implicitly.
+        query = query.filter(
+            func.trim(Doctor.specialty) != '',
+            Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+        )
 
-    return query.offset(skip).limit(limit).all()
+    return query.order_by(Doctor.id.asc()).offset(skip).limit(limit).all()
 
 
 def get_doctor_by_id(db: Session, doctor_id: int) -> Doctor | None:
@@ -189,18 +219,48 @@ def get_doctor_by_user_id(db: Session, user_id: int) -> Doctor | None:
     return db.query(Doctor).filter(Doctor.user_id == user_id).first()
 
 
-def get_doctors_by_specialty(db: Session, specialty: str) -> list[Doctor]:
-    """Получить врачей по специальности"""
+def get_doctors_by_specialty(
+    db: Session, specialty: str, eligible_only: bool = False
+) -> list[Doctor]:
+    """Получить врачей по специальности
+
+    ``eligible_only`` hides the incomplete-profile sentinel ("general")
+    from patient-facing selectors — see get_doctors.
+
+    D-1 canonical vocabulary: ``specialty`` matches via
+    ``specialty_variants`` (any dental-family spelling finds every
+    family row), so callers filtering by "dental" also see canonical
+    "dentistry" doctors and vice versa.
+    """
+    predicates = [
+        Doctor.specialty.in_(specialty_variants(specialty)),
+        Doctor.active == True,
+    ]
+    if eligible_only:
+        predicates += [
+            func.trim(Doctor.specialty) != '',
+            Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+        ]
     return (
         db.query(Doctor)
-        .filter(and_(Doctor.specialty == specialty, Doctor.active == True))
+        .filter(and_(*predicates))
+        .order_by(Doctor.id.asc())
         .all()
     )
 
 
 def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
-    """Создать врача"""
-    db_doctor = Doctor(**doctor.model_dump())
+    """Создать врача
+
+    D-1: ``specialty`` is normalized at the write boundary — any
+    dental-family spelling ("dental" from the DoctorModal department
+    dropdown, legacy "stomatology"/"dentist") is stored canonically as
+    "dentistry" (core/specialties.canonical_specialty).
+    """
+    data = doctor.model_dump()
+    if "specialty" in data:
+        data["specialty"] = canonical_specialty(data["specialty"])
+    db_doctor = Doctor(**data)
     db.add(db_doctor)
     db.commit()
     db.refresh(db_doctor)
@@ -216,6 +276,9 @@ def update_doctor(
         return None
 
     for field, value in doctor.model_dump(exclude_unset=True).items():
+        if field == "specialty":
+            # D-1: canonicalize on update too (PUT /admin/doctors path).
+            value = canonical_specialty(value)
         setattr(db_doctor, field, value)
 
     db.commit()
@@ -396,10 +459,13 @@ def get_queue_settings(db: Session) -> dict[str, Any]:
             result["auto_close_time"] = setting.value
         elif setting.key.startswith("start_number_"):
             specialty = setting.key.replace("start_number_", "")
-            result["start_numbers"][specialty] = setting.value
+            # D-1: legacy rows may carry any dental-family suffix; expose
+            # the canonical segment so the settings screen reads a single
+            # key regardless of which spelling a deployment stored.
+            result["start_numbers"][canonical_specialty(specialty)] = setting.value
         elif setting.key.startswith("max_per_day_"):
             specialty = setting.key.replace("max_per_day_", "")
-            result["max_per_day"][specialty] = setting.value
+            result["max_per_day"][canonical_specialty(specialty)] = setting.value
 
     return result
 
@@ -421,12 +487,15 @@ def update_queue_settings(
     # Стартовые номера по специальностям
     if "start_numbers" in settings:
         for specialty, number in settings["start_numbers"].items():
-            updates[f"start_number_{specialty}"] = number
+            # D-1: normalize the specialty segment — a screen editing by a
+            # legacy profile key ("stomatology") must not resurrect a row
+            # runtime code (keyed by doctor.specialty) ignores.
+            updates[f"start_number_{canonical_specialty(specialty)}"] = number
 
     # Лимиты по специальностям
     if "max_per_day" in settings:
         for specialty, limit in settings["max_per_day"].items():
-            updates[f"max_per_day_{specialty}"] = limit
+            updates[f"max_per_day_{canonical_specialty(specialty)}"] = limit
 
     # Массовое обновление
     update_settings_batch(db, "queue", updates, user_id)
@@ -456,7 +525,9 @@ def search_doctors(
     query = db.query(Doctor).filter(Doctor.active == True)  # noqa: E712
 
     if specialty:
-        query = query.filter(Doctor.specialty == specialty)
+        # D-1 canonical vocabulary: any dental-family spelling finds every
+        # family row (mobile /doctors/search contract).
+        query = query.filter(Doctor.specialty.in_(specialty_variants(specialty)))
 
     if name:
         # Name lives on the linked User; join via user_id.

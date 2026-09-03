@@ -13,7 +13,7 @@ def _all_free_response(approval_status: str) -> AllFreeVisitResponse:
         id=1,
         patient_id=2,
         patient_name="Demo Patient",
-        patient_phone="+998901234567",
+        patient_phone="+998900000121",
         services=["Consultation"],
         total_original_amount=Decimal("150000.00"),
         doctor_name="Demo Doctor",

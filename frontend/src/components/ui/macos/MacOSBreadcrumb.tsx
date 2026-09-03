@@ -57,7 +57,7 @@ const MacOSBreadcrumb = ({
 
   const itemStyle = (isLast: boolean) => ({
     color: isLast ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
-    fontWeight: isLast ? 'var(--mac-font-weight-medium)' : 'var(--mac-font-weight-normal)',
+    fontWeight: isLast ? 'var(--mac-font-weight-medium)' : 'var(--mac-font-weight-regular)',
     cursor: isLast ? 'default' : 'pointer',
     textDecoration: 'none',
     transition: 'color var(--mac-duration-normal) var(--mac-ease)',

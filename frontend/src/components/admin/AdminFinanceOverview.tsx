@@ -14,10 +14,10 @@ import {
 } from 'lucide-react';
 
 import {
-  Card as MacOSCard,
+  Card,
   Badge,
   Button,
-  MacOSEmptyState,
+  AppEmpty,
   Input,
   Skeleton,
   Select,
@@ -188,7 +188,7 @@ const AdminFinanceOverview = () => {
   return (
     <div className="flex flex-col gap-6">
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
@@ -200,9 +200,9 @@ const AdminFinanceOverview = () => {
             </div>
             <DollarSign className="admin-w-32-h-32-success" />
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
@@ -214,9 +214,9 @@ const AdminFinanceOverview = () => {
             </div>
             <CreditCard className="admin-w-32-h-32-error" />
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
@@ -228,9 +228,9 @@ const AdminFinanceOverview = () => {
             </div>
             <Calendar className="admin-w-32-h-32-col-dyn" style={{ '--admin-col0': financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)' } as CSSProperties} />
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
@@ -242,10 +242,10 @@ const AdminFinanceOverview = () => {
             </div>
             <Receipt className="admin-w-32-h-32-accent" />
           </div>
-        </MacOSCard>
+        </Card>
       </div>
 
-      <MacOSCard variant="default" className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-0">
+      <Card variant="default" className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-0">
         <div className="admin-p-16-d-flex-ai-center-jc-between-mb-24">
           <h2 className="admin-fs-20-fw-600-primary-m-0">
             {t('admin2.fo_finance_accounting')}
@@ -309,7 +309,7 @@ const AdminFinanceOverview = () => {
           {financeLoading ? (
             <Skeleton type="table" count={5} />
           ) : financeError ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={CreditCard}
               title={t('admin2.fo_error_title')}
               description={t('admin2.fo_error_desc')}
@@ -321,7 +321,7 @@ const AdminFinanceOverview = () => {
               )}
             />
           ) : transactions.length === 0 ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={CreditCard}
               title={t('admin2.fo_empty_title')}
               description={financeSearchTerm || filterType || filterCategory || filterDateRange || financeFilterStatus
@@ -454,7 +454,7 @@ const AdminFinanceOverview = () => {
           </div>
           )}
         </div>
-      </MacOSCard>
+      </Card>
 
       <FinanceModal
         isOpen={financeModal.isOpen}

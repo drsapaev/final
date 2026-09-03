@@ -33,6 +33,12 @@ from app.schemas.webhook import (
 )
 from app.services.webhook_service import get_webhook_service
 
+# M-1 (Manager deprecation): every grant list below dropped Roles.MANAGER —
+# the deprecated role keeps zero webhook privileges. Grant collapse rule:
+# [ADMIN, MANAGER] -> [ADMIN]; [ADMIN, MANAGER, REGISTRAR] -> [ADMIN,
+# REGISTRAR] (Registrar is a live product contract, read/list surfaces).
+# No other role was widened as compensation.
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -45,12 +51,12 @@ async def create_webhook(
     *,
     db: Session = Depends(get_db),
     webhook_in: WebhookCreate,
-    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    current_user: User = Depends(require_roles([Roles.ADMIN])),
 ):
     """
     Создает новый webhook
 
-    Требует роль: ADMIN или DEVELOPER
+    Требует роль: ADMIN
     """
     try:
         webhook = crud_webhook.create(
@@ -79,19 +85,20 @@ async def get_webhooks(
     status_filter: WebhookStatus | None = None,
     event_type: str | None = None,
     current_user: User = Depends(
-        require_roles([Roles.ADMIN, Roles.MANAGER, Roles.REGISTRAR])
+        require_roles([Roles.ADMIN, Roles.REGISTRAR])
     ),
 ):
     """
     Получает список webhook'ов с фильтрацией
 
-    Требует роль: ADMIN, DEVELOPER или REGISTRAR
+    Требует роль: ADMIN или REGISTRAR
     """
     try:
         # Обычные пользователи видят только свои webhook'и
+        # M-1: Manager removed — Admin sees all, everyone else sees own
         created_by = (
             None
-            if current_user.role in [Roles.ADMIN, Roles.MANAGER]
+            if current_user.role in [Roles.ADMIN]
             else current_user.id
         )
 
@@ -132,13 +139,13 @@ async def get_webhook(
     db: Session = Depends(get_db),
     webhook_id: int,
     current_user: User = Depends(
-        require_roles([Roles.ADMIN, Roles.MANAGER, Roles.REGISTRAR])
+        require_roles([Roles.ADMIN, Roles.REGISTRAR])
     ),
 ):
     """
     Получает webhook по ID со статистикой
 
-    Требует роль: ADMIN, DEVELOPER или REGISTRAR
+    Требует роль: ADMIN или REGISTRAR
     """
     webhook = crud_webhook.get(db=db, id=webhook_id)
     if not webhook:
@@ -148,7 +155,7 @@ async def get_webhook(
 
     # Проверяем права доступа
     if (
-        current_user.role not in [Roles.ADMIN, Roles.MANAGER]
+        current_user.role not in [Roles.ADMIN]
         and webhook.created_by != current_user.id
     ):
         raise HTTPException(
@@ -176,12 +183,12 @@ async def update_webhook(
     db: Session = Depends(get_db),
     webhook_id: int,
     webhook_in: WebhookUpdate,
-    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    current_user: User = Depends(require_roles([Roles.ADMIN])),
 ):
     """
     Обновляет webhook
 
-    Требует роль: ADMIN или DEVELOPER
+    Требует роль: ADMIN
     """
     webhook = crud_webhook.get(db=db, id=webhook_id)
     if not webhook:
@@ -216,12 +223,12 @@ async def delete_webhook(
     *,
     db: Session = Depends(get_db),
     webhook_id: int,
-    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    current_user: User = Depends(require_roles([Roles.ADMIN])),
 ):
     """
     Удаляет webhook
 
-    Требует роль: ADMIN или DEVELOPER
+    Требует роль: ADMIN
     """
     webhook = crud_webhook.get(db=db, id=webhook_id)
     if not webhook:
@@ -259,12 +266,12 @@ async def activate_webhook(
     *,
     db: Session = Depends(get_db),
     webhook_id: int,
-    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    current_user: User = Depends(require_roles([Roles.ADMIN])),
 ):
     """
     Активирует webhook
 
-    Требует роль: ADMIN или DEVELOPER
+    Требует роль: ADMIN
     """
     webhook = crud_webhook.get(db=db, id=webhook_id)
     if not webhook:
@@ -291,12 +298,12 @@ async def deactivate_webhook(
     *,
     db: Session = Depends(get_db),
     webhook_id: int,
-    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    current_user: User = Depends(require_roles([Roles.ADMIN])),
 ):
     """
     Деактивирует webhook
 
-    Требует роль: ADMIN или DEVELOPER
+    Требует роль: ADMIN
     """
     webhook = crud_webhook.get(db=db, id=webhook_id)
     if not webhook:
@@ -328,12 +335,12 @@ async def test_webhook(
     webhook_id: int,
     test_request: WebhookTestRequest,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    current_user: User = Depends(require_roles([Roles.ADMIN])),
 ):
     """
     Тестирует webhook отправкой тестового события
 
-    Требует роль: ADMIN или DEVELOPER
+    Требует роль: ADMIN
     """
     webhook = crud_webhook.get(db=db, id=webhook_id)
     if not webhook:
@@ -392,13 +399,13 @@ async def get_webhook_calls(
     limit: int = 100,
     status_filter: WebhookCallStatus | None = None,
     current_user: User = Depends(
-        require_roles([Roles.ADMIN, Roles.MANAGER, Roles.REGISTRAR])
+        require_roles([Roles.ADMIN, Roles.REGISTRAR])
     ),
 ):
     """
     Получает вызовы webhook'а
 
-    Требует роль: ADMIN, DEVELOPER или REGISTRAR
+    Требует роль: ADMIN или REGISTRAR
     """
     webhook = crud_webhook.get(db=db, id=webhook_id)
     if not webhook:
@@ -408,7 +415,7 @@ async def get_webhook_calls(
 
     # Проверяем права доступа
     if (
-        current_user.role not in [Roles.ADMIN, Roles.MANAGER]
+        current_user.role not in [Roles.ADMIN]
         and webhook.created_by != current_user.id
     ):
         raise HTTPException(
@@ -439,13 +446,13 @@ async def get_webhook_call(
     db: Session = Depends(get_db),
     call_id: int,
     current_user: User = Depends(
-        require_roles([Roles.ADMIN, Roles.MANAGER, Roles.REGISTRAR])
+        require_roles([Roles.ADMIN, Roles.REGISTRAR])
     ),
 ):
     """
     Получает детали вызова webhook'а
 
-    Требует роль: ADMIN, DEVELOPER или REGISTRAR
+    Требует роль: ADMIN или REGISTRAR
     """
     call = crud_webhook_call.get(db=db, id=call_id)
     if not call:
@@ -456,7 +463,7 @@ async def get_webhook_call(
     # Проверяем права доступа через webhook
     webhook = crud_webhook.get(db=db, id=call.webhook_id)
     if (
-        current_user.role not in [Roles.ADMIN, Roles.MANAGER]
+        current_user.role not in [Roles.ADMIN]
         and webhook
         and webhook.created_by != current_user.id
     ):
@@ -475,12 +482,12 @@ async def get_webhook_call(
 async def get_system_webhook_stats(
     *,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    current_user: User = Depends(require_roles([Roles.ADMIN])),
 ):
     """
     Получает общую статистику системы webhook'ов
 
-    Требует роль: ADMIN или DEVELOPER
+    Требует роль: ADMIN
     """
     try:
         webhook_service = get_webhook_service(db)
@@ -501,13 +508,13 @@ async def get_webhook_stats(
     db: Session = Depends(get_db),
     webhook_id: int,
     current_user: User = Depends(
-        require_roles([Roles.ADMIN, Roles.MANAGER, Roles.REGISTRAR])
+        require_roles([Roles.ADMIN, Roles.REGISTRAR])
     ),
 ):
     """
     Получает статистику webhook'а
 
-    Требует роль: ADMIN, DEVELOPER или REGISTRAR
+    Требует роль: ADMIN или REGISTRAR
     """
     webhook = crud_webhook.get(db=db, id=webhook_id)
     if not webhook:
@@ -517,7 +524,7 @@ async def get_webhook_stats(
 
     # Проверяем права доступа
     if (
-        current_user.role not in [Roles.ADMIN, Roles.MANAGER]
+        current_user.role not in [Roles.ADMIN]
         and webhook.created_by != current_user.id
     ):
         raise HTTPException(
@@ -537,12 +544,12 @@ async def webhook_bulk_action(
     *,
     db: Session = Depends(get_db),
     bulk_action: WebhookBulkAction,
-    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    current_user: User = Depends(require_roles([Roles.ADMIN])),
 ):
     """
     Выполняет массовое действие над webhook'ами
 
-    Требует роль: ADMIN или DEVELOPER
+    Требует роль: ADMIN
     """
     processed = 0
     failed = 0
@@ -597,12 +604,12 @@ async def trigger_webhook_event(
     db: Session = Depends(get_db),
     event: WebhookEventCreate,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    current_user: User = Depends(require_roles([Roles.ADMIN])),
 ):
     """
     Триггерит событие для всех подписанных webhook'ов
 
-    Требует роль: ADMIN или DEVELOPER
+    Требует роль: ADMIN
     """
     try:
         webhook_service = get_webhook_service(db)

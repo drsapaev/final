@@ -105,5 +105,7 @@ async def test_connect_replaces_existing_connection_and_closes_old_socket(monkey
 
     assert connected is True
     assert existing.closed is True
-    assert replacement.accepted is True
+    # ASGI-контракт: хендлер вызывает accept() ДО connect() — менеджер не
+    # должен принимать хендшейк повторно (double accept = protocol error).
+    assert replacement.accepted is False
     assert chat_manager.active_connections[42] is replacement

@@ -18,7 +18,7 @@ import {
   AlertCircle } from
 'lucide-react';
 import {
-  MacOSCard, Button, Skeleton,
+  Card, Button, Skeleton,
   Input } from '../ui/macos';
 
 import logger from '../../utils/logger';
@@ -67,8 +67,6 @@ const DoctorServiceSelector = ({
   className = ''
 }: DoctorServiceSelectorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
-  // Проверяем демо-режим в самом начале
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
   const [serviceSearch, setServiceSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -98,15 +96,6 @@ const DoctorServiceSelector = ({
   };
 
   const loadServices = useCallback(async () => {
-    // Проверяем демо-режим только по пути
-    const isDemoMode = window.location.pathname.includes('/medilab-demo');
-
-    if (isDemoMode) {
-      logger.log('DoctorServiceSelector: Skipping loadServices in demo mode');
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       setError('');
@@ -209,25 +198,20 @@ const DoctorServiceSelector = ({
     }
   };
 
-  if (isDemoMode) {
-    logger.log('DoctorServiceSelector: Skipping render in demo mode');
-    return null;
-  }
-
   if (loading) {
     return (
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-6)' }}>
         <Skeleton />
-      </MacOSCard>);
+      </Card>);
 
   }
 
   if (error) {
     return (
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)', display: 'flex', alignItems: 'center', color: 'var(--mac-red-600)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-6)', display: 'flex', alignItems: 'center', color: 'var(--mac-red-600)' }}>
         <AlertCircle size={20} style={{ marginRight: 'var(--mac-spacing-2)' }} />
         <span>{error}</span>
-      </MacOSCard>);
+      </Card>);
 
   }
 
@@ -235,7 +219,7 @@ const DoctorServiceSelector = ({
     <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
       {/* Итоговая информация */}
       {selectedServices.length > 0 &&
-      <MacOSCard style={{
+      <Card style={{
         padding: 'var(--mac-spacing-4)',
         background: 'linear-gradient(135deg, var(--mac-success-bg) 0%, var(--mac-success-bg-light) 100%)',
         border: '1px solid var(--mac-success-border)'
@@ -261,7 +245,7 @@ const DoctorServiceSelector = ({
               <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
-              color: 'var(--mac-info)'
+              color: 'var(--mac-accent)'
             }}>{getTotalDuration()}</div>
               <div style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -282,12 +266,12 @@ const DoctorServiceSelector = ({
             }}>{t('misc.dss_stoimost')}</div>
             </div>
           </div>
-        </MacOSCard>
+        </Card>
       }
 
       {/* Выбранные услуги */}
       {selectedServices.length > 0 &&
-      <MacOSCard style={{ padding: 'var(--mac-spacing-4)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-4)' }}>
           <h3 style={{
           fontSize: 'var(--mac-font-size-lg)',
           fontWeight: 'var(--mac-font-weight-medium)',
@@ -386,11 +370,9 @@ const DoctorServiceSelector = ({
                 }}
                 onFocus={(e: React.FocusEvent<HTMLElement>) => {
                   e.currentTarget.style.borderColor = 'var(--mac-accent)';
-                  e.currentTarget.style.boxShadow = 'var(--mac-focus-ring)';
                 }}
                 onBlur={(e: React.FocusEvent<HTMLElement>) => {
                   e.currentTarget.style.borderColor = 'var(--mac-border)';
-                  e.currentTarget.style.boxShadow = 'none';
                 }}
                 min="0" /> :
 
@@ -421,7 +403,7 @@ const DoctorServiceSelector = ({
               </div>
           )}
           </div>
-        </MacOSCard>
+        </Card>
       }
 
       {/* Доступные услуги */}
@@ -431,7 +413,7 @@ const DoctorServiceSelector = ({
           const categoryName = categoryNames[categoryCode] || categoryData.category.name_ru;
 
           return (
-            <MacOSCard key={categoryCode} style={{ padding: 'var(--mac-spacing-4)' }}>
+            <Card key={categoryCode} style={{ padding: 'var(--mac-spacing-4)' }}>
               <h3 style={{
                 fontSize: 'var(--mac-font-size-lg)',
                 fontWeight: 'var(--mac-font-weight-medium)',
@@ -440,7 +422,7 @@ const DoctorServiceSelector = ({
                 alignItems: 'center',
                 color: 'var(--mac-text-primary)'
               }}>
-                <CategoryIcon size={20} style={{ marginRight: 'var(--mac-spacing-2)', color: 'var(--mac-info)' }} />
+                <CategoryIcon size={20} style={{ marginRight: 'var(--mac-spacing-2)', color: 'var(--mac-accent)' }} />
                 {categoryName}
               </h3>
 
@@ -459,8 +441,8 @@ const DoctorServiceSelector = ({
                         justifyContent: 'space-between',
                         padding: 'var(--mac-spacing-3)',
                         borderRadius: 'var(--mac-radius-lg)',
-                        border: `1px solid ${isSelected ? 'var(--mac-info-border)' : 'var(--mac-border)'}`,
-                        backgroundColor: isSelected ? 'var(--mac-info-bg)' : 'var(--mac-bg-secondary)',
+                        border: `1px solid ${isSelected ? 'var(--mac-accent-blue)' : 'var(--mac-border)'}`,
+                        backgroundColor: isSelected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-secondary)',
                         cursor: 'pointer',
                         transition: 'all var(--mac-duration-normal) var(--mac-ease)'
                       }}
@@ -483,7 +465,7 @@ const DoctorServiceSelector = ({
                       
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         {isSelected ?
-                        <CheckCircle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-info)' }} /> :
+                        <CheckCircle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-accent)' }} /> :
 
                         <Circle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-text-tertiary)' }} />
                         }
@@ -529,13 +511,13 @@ const DoctorServiceSelector = ({
 
                 })}
               </div>
-            </MacOSCard>);
+            </Card>);
 
         })}
       </div>
 
       {Object.keys(services).length === 0 &&
-      <MacOSCard style={{ padding: '32px', textAlign: 'center' }}>
+      <Card style={{ padding: '32px', textAlign: 'center' }}>
           <Package size={48} style={{
           margin: '0 auto 16px auto',
           color: 'var(--mac-text-tertiary)'
@@ -553,7 +535,7 @@ const DoctorServiceSelector = ({
         }}>
             Добавьте услуги для специальности «{specialty}» в админ панели
           </p>
-        </MacOSCard>
+        </Card>
       }
     </div>);
 

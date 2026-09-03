@@ -13,7 +13,10 @@ interface TabIconProps {
 interface TabDefinition {
   id: TabId;
   label: ReactNode;
-  icon?: ComponentType<TabIconProps> | string;
+  /** Track 3-1: icon accepts a component reference (e.g. lucide-react).
+   * The legacy `| string` union member was a type-lie: a raw string would
+   * render as an unknown DOM element; no consumer ever passed one. */
+  icon?: ComponentType<TabIconProps>;
   badge?: ReactNode;
   disabled?: boolean;
 }
@@ -109,7 +112,7 @@ const MacOSTab = ({
     border: 'none',
     borderRadius: variant === 'filled' ? 'var(--mac-radius-sm)' : variant === 'pills' ? 'var(--mac-radius-lg)' : '0',
     fontSize: currentSize.fontSize,
-    fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+    fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-regular)',
     color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
     background: variant === 'filled' ? (isActive ? 'var(--mac-bg-primary)' : 'transparent') : 'transparent',
     cursor: 'pointer',
@@ -162,7 +165,12 @@ const MacOSTab = ({
   };
   return (
     <div className={className} style={containerStyle}>
-      <div style={{ display: 'flex', gap: currentVariant.gap || currentSize.gap }}>
+      {/* AXE-EXP-5: the tablist ARIA role on the direct parent of the
+          role="tab" buttons — previously the buttons lived in a plain flex
+          div, which fails axe aria-required-parent (a tab must be contained
+          by a tablist; flagged on cashier/admin-users/admin-family
+          surfaces). */}
+      <div style={{ display: 'flex', gap: currentVariant.gap || currentSize.gap }} role="tablist">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const IconComponent = tab.icon;
@@ -200,7 +208,10 @@ const MacOSTab = ({
                 borderRadius: 'var(--mac-radius-sm)',
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-medium)',
-                background: 'var(--mac-accent-blue)',
+                // AXE-EXP-3: white ink on the base accent was 4.01:1 — the
+                // CC-2 strong token (5.42:1) carries it (same mac-badge
+                // white-ink-fill class as Badge.tsx variants).
+                background: 'var(--mac-accent-blue-strong, var(--mac-accent-blue))',
                 color: 'white',
                 minWidth: '18px',
                 textAlign: 'center'

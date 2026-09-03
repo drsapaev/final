@@ -25,13 +25,24 @@ describe('api runtime resolution', () => {
     vi.unstubAllGlobals();
   });
 
-  it('prefers current browser origin over build-time env', () => {
+  it('respects an explicitly configured VITE_API_BASE_URL over the browser origin', () => {
+    // CONTRACT (ops/vps/frontend.env.sample): setting VITE_API_BASE_URL is an
+    // intentional separate-API-origin switch (e.g. frontend on Vercel, API on
+    // a tunnel/VPS) and must win over same-origin inference.
     vi.stubEnv('VITE_API_BASE_URL', 'https://staging.example.com');
+    vi.stubGlobal('window', { location: { origin: 'https://clinic.example.com' } });
+
+    expect(getApiOrigin()).toBe('https://staging.example.com');
+    expect(getApiBaseUrl()).toBe('https://staging.example.com/api/v1');
+    expect(buildApiUrl('/patients')).toBe('https://staging.example.com/api/v1/patients');
+    expect(buildWsUrl('/ws/chat')).toBe('wss://staging.example.com/ws/chat');
+  });
+
+  it('prefers the browser origin when no API env is configured (same-origin deploys)', () => {
     vi.stubGlobal('window', { location: { origin: 'https://clinic.example.com' } });
 
     expect(getApiOrigin()).toBe('https://clinic.example.com');
     expect(getApiBaseUrl()).toBe('https://clinic.example.com/api/v1');
-    expect(buildApiUrl('/patients')).toBe('https://clinic.example.com/api/v1/patients');
   });
 
   it('falls back to the canonical backend origin for localhost browser origins', () => {

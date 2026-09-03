@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 const VIEWPORTS = [
   { name: 'desktop', width: 1440, height: 900 },
@@ -14,14 +15,14 @@ const PUBLIC_EVIDENCE_ROUTES = [
   { path: '/payment/cancel', name: 'payment-cancel' },
 ];
 
-async function clearAuthState(page) {
+async function clearAuthState(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
 }
 
-async function expectMountedApp(page) {
+async function expectMountedApp(page: Page) {
   await expect(page.locator('#root')).toBeVisible();
   await expect.poll(
     async () => (await page.locator('body').innerText()).trim().length,
@@ -29,7 +30,7 @@ async function expectMountedApp(page) {
   ).toBeGreaterThan(0);
 }
 
-async function expectNoHorizontalOverflow(page) {
+async function expectNoHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,
@@ -38,7 +39,7 @@ async function expectNoHorizontalOverflow(page) {
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
 }
 
-async function expectIconButtonsNamed(page) {
+async function expectIconButtonsNamed(page: Page) {
   const unnamedIconButtons = await page.locator('button').evaluateAll((buttons) =>
     buttons
       .map((button, index) => {
@@ -59,7 +60,7 @@ async function expectIconButtonsNamed(page) {
   expect(unnamedIconButtons).toEqual([]);
 }
 
-async function expectKeyboardFocus(page) {
+async function expectKeyboardFocus(page: Page) {
   const focusableCount = await page.locator(
     'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
   ).count();

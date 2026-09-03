@@ -431,7 +431,7 @@ class TestDoctorGeneralQueue:
             first_name="Петр",
             last_name="Смирнов",
             middle_name="Тестовый",
-            phone="+998909999999",
+            phone="+998900000150",
             birth_date=date(1988, 5, 5),
             address="Тестовый адрес 2",
         )
@@ -519,7 +519,7 @@ class TestDoctorGeneralQueue:
             first_name="Collision",
             last_name="Queue",
             middle_name="Patient",
-            phone="+998901111111",
+            phone="+998900000110",
             birth_date=date(1985, 4, 4),
             address="Queue patient address",
         )
@@ -596,7 +596,7 @@ class TestDoctorGeneralQueue:
             first_name="Unrelated",
             last_name="Visit",
             middle_name="Collision",
-            phone="+998901222222",
+            phone="+998900000117",
             birth_date=date(1982, 6, 6),
             address="Unrelated visit address",
         )
@@ -965,7 +965,7 @@ class TestDoctorGeneralQueue:
             first_name="Other",
             last_name="Visit",
             middle_name="Doctor",
-            phone="+998901333333",
+            phone="+998900000128",
             birth_date=date(1984, 7, 7),
             address="Other doctor visit address",
         )
@@ -1040,7 +1040,7 @@ class TestDoctorGeneralQueue:
             first_name="Other",
             last_name="Appointment",
             middle_name="Doctor",
-            phone="+998901444444",
+            phone="+998900000130",
             birth_date=date(1986, 8, 8),
             address="Other doctor appointment address",
         )

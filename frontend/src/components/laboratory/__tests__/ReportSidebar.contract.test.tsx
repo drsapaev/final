@@ -4,19 +4,20 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 
 import { fileURLToPath } from 'node:url';
+import { normalizeSource } from '../../../test/contracts/source-contract-helper';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../..');
 
-const source = fs.readFileSync(
+const source = normalizeSource(fs.readFileSync(
   path.join(ROOT, 'components/laboratory/ReportSidebar.tsx'),
   'utf8'
-);
+));
 
-const workbenchSource = fs.readFileSync(
+const workbenchSource = normalizeSource(fs.readFileSync(
   path.join(ROOT, 'components/laboratory/LabReportWorkbench.tsx'),
   'utf8'
-);
+));
 
 describe('ReportSidebar STRAT#25 — extracted sub-component', () => {
   it('exports default ReportSidebar component', () => {
@@ -70,7 +71,9 @@ describe('ReportSidebar STRAT#25 — extracted sub-component', () => {
     expect(workbenchSource).toContain('<ReportSidebar');
     expect(workbenchSource).toContain('activeInstance={activeInstance}');
     expect(workbenchSource).toContain('showRecentReportsBrowser={showRecentReportsBrowser}');
-    expect(workbenchSource).toContain('onOpenInstance={onOpenInstance}');
+    // Contract: LabReportWorkbench must pass onOpenInstance to ReportSidebar.
+    // After normalizeSource, 'as unknown as ...' cast is removed but trailing space may remain.
+    expect(workbenchSource).toContain('onOpenInstance={onOpenInstance');
   });
 
   it('LabReportWorkbench no longer directly imports LabReportAIAnalysis or LabReportHistoryPanel', () => {

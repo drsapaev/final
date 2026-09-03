@@ -52,9 +52,7 @@
  *   badge rendered above the history table (parent-defined, closes over dataSource / paginationInfo)
  */
 import React from 'react';
-import {
-  Button, Card, CardHeader, CardContent, Badge, Icon, Input,
-} from '@/components/ui/macos';
+import { Button, Card, CardHeader, CardContent, Badge, Input } from '@/components/ui/macos';
 import { AnimatedTransition } from '@/components/ui';
 import ModernStatistics from '@/components/statistics/ModernStatistics';
 import EnhancedAppointmentsTable from '@/components/tables/EnhancedAppointmentsTable';
@@ -62,6 +60,7 @@ import { getLocalDateString, getYesterdayDateString } from '@/utils/dateUtils';
 import logger from '@/utils/logger';
 import notify from '@/services/notify';
 import tokenManager from '@/utils/tokenManager';
+import { ArrowUpDown, Bell, Calendar, CheckCircle2, CreditCard, Eye, FileText, KeyRound, ListFilter, Lock, Plus, RotateCw, Search, Share, User } from 'lucide-react';
 
 // === Domain types ===
 // WelcomeView is a registrar-facing dashboard. Most state lives in the
@@ -186,7 +185,7 @@ const WelcomeView = React.memo(({
           <AnimatedTransition type="slide" direction="up" delay={200}>
             <h1 className="registrar-hero-title">
               {t('welcome')} в панель регистратора!
-              <Icon name="person" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+              <User size={20} style={{ color: 'var(--mac-accent-blue)' }} aria-hidden="true" />
             </h1>
           </AnimatedTransition>
           <AnimatedTransition type="fade" delay={300}>
@@ -319,7 +318,7 @@ const WelcomeView = React.memo(({
                     aria-label="Create new appointment"
                     className="registrar-flex" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
 
-                      <Icon name="plus" size="small" style={{ color: 'white' }} />
+                      <Plus size={16} style={{ color: 'white' }} aria-hidden="true" />
                       {t('new_appointment')}
                     </Button>
 
@@ -331,7 +330,7 @@ const WelcomeView = React.memo(({
                     aria-label="Open payment module"
                     className="registrar-flex">
 
-                      <Icon name="creditcard" size="small" />
+                      <CreditCard size={16} aria-hidden="true" />
                       Модуль оплаты
                     </Button>
 
@@ -347,7 +346,7 @@ const WelcomeView = React.memo(({
                     }}
                     className="registrar-flex">
 
-                      <Icon name="square.and.arrow.up" size="small" />
+                      <Share size={16} aria-hidden="true" />
                       {t('export_csv')}
                     </Button>
                 </div>
@@ -355,7 +354,7 @@ const WelcomeView = React.memo(({
               {/* Фильтры и навигация */}
                 <div className="registrar-surface-toolbar">
                   <h3 className="registrar-subsection-heading">
-                    <Icon name="line.3.horizontal.decrease" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+                    <ListFilter size={20} style={{ color: 'var(--mac-accent-blue)' }} aria-hidden="true" />
                     Фильтры и навигация
                   </h3>
 
@@ -373,7 +372,7 @@ const WelcomeView = React.memo(({
                     }}
                     className="registrar-flex">
 
-                      <Icon name="calendar" size="small" className={showCalendar ? 'registrar-text-white' : 'registrar-text-primary'} />
+                      <Calendar size={16} className={showCalendar ? 'registrar-text-white' : 'registrar-text-primary'} aria-hidden="true" />
                       Календарь
                     </Button>
 
@@ -383,13 +382,13 @@ const WelcomeView = React.memo(({
                     onClick={() => setSearchParams({})}
                     className="registrar-flex">
 
-                      <Icon name="eye" size="small" />
+                      <Eye size={16} aria-hidden="true" />
                       Все записи
                     </Button>
 
                     <details className="registrar-overflow-menu">
                       <summary className="registrar-overflow-trigger" aria-label="Дополнительные фильтры и действия">
-                        <Icon name="plus" size="small" aria-hidden="true" />
+                        <Plus size={16} aria-hidden="true" />
                         Ещё
                       </summary>
                       <div className="registrar-overflow-popover" role="menu">
@@ -398,7 +397,7 @@ const WelcomeView = React.memo(({
                           className="registrar-overflow-item"
                           onClick={() => setSearchParams({ status: 'queued' })}
                           role="menuitem">
-                          <Icon name="checkmark.circle" size="small" aria-hidden="true" />
+                          <CheckCircle2 size={16} aria-hidden="true" />
                           Активная очередь
                         </button>
                         <button
@@ -406,7 +405,7 @@ const WelcomeView = React.memo(({
                           className="registrar-overflow-item"
                           onClick={() => setSearchParams({ status: 'paid_pending' })}
                           role="menuitem">
-                          <Icon name="creditcard" size="small" aria-hidden="true" />
+                          <CreditCard size={16} aria-hidden="true" />
                           Ожидают оплаты
                         </button>
                         <button
@@ -414,7 +413,7 @@ const WelcomeView = React.memo(({
                           className="registrar-overflow-item"
                           onClick={() => navigate('/registrar/queue')}
                           role="menuitem">
-                          <Icon name="bell" size="small" aria-hidden="true" />
+                          <Bell size={16} aria-hidden="true" />
                           Онлайн-очередь
                         </button>
                         <button
@@ -422,7 +421,7 @@ const WelcomeView = React.memo(({
                           className="registrar-overflow-item"
                           onClick={() => {loadAppointments({ source: 'manual_refresh_button' });notify.success(t('misc.data_updated'));}}
                           role="menuitem">
-                          <Icon name="arrow.clockwise" size="small" aria-hidden="true" />
+                          <RotateCw size={16} aria-hidden="true" />
                           Обновить данные
                         </button>
                       </div>
@@ -434,7 +433,7 @@ const WelcomeView = React.memo(({
                 <div className="registrar-info-card" style={{ padding: 'var(--mac-spacing-5)', boxShadow: 'var(--mac-shadow-sm)' }}>
                       <div className="registrar-flex-col">
                         <label className="registrar-picker-label">
-                          <Icon name="magnifyingglass" size="small" style={{ color: 'var(--mac-text-secondary)' }} />
+                          <Search size={16} style={{ color: 'var(--mac-text-secondary)' }} aria-hidden="true" />
                           Выберите дату для просмотра истории:
                         </label>
                         <Input
@@ -511,12 +510,12 @@ const WelcomeView = React.memo(({
           <div>
             <div className="registrar-flex-between" style={{ marginBottom: 'var(--mac-spacing-4)' }}>
               <h3 className="registrar-history-heading">
-                <Icon name="eye" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+                <Eye size={20} style={{ color: 'var(--mac-accent-blue)' }} aria-hidden="true" />
                 История записей
               </h3>
               {showCalendar &&
             <Badge variant="secondary" className="registrar-badge-date">
-                  <Icon name="magnifyingglass" size="small" />
+                  <Search size={16} aria-hidden="true" />
                   {new Date(historyDate).toLocaleDateString(
                     // PR-51: locale-aware date formatting (was hardcoded ru-RU)
                     language === 'ru' ? 'ru-RU' : language === 'en' ? 'en-US' : 'uz-UZ',
@@ -550,8 +549,8 @@ const WelcomeView = React.memo(({
               {/* the macOS design system (components/ui/macos) first. */}
               <div className="registrar-empty-icon-lg">
                       {!tokenManager.hasToken() ?
-                <Icon name="lock" size="large" /> :
-                <Icon name="doc.text" size="large" />}
+                <Lock size={24} aria-hidden="true" /> :
+                <FileText size={24} aria-hidden="true" />}
                     </div>
                     <h3 className="registrar-empty-heading" style={{ color: textColor }}>
                       {!tokenManager.hasToken() ? 'Сессия истекла' : 'Очередь пуста'}
@@ -572,7 +571,7 @@ const WelcomeView = React.memo(({
                   }}
                   className="registrar-btn-lg registrar-btn-accent">
 
-                          <Icon name="key" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />Войти снова
+                          <KeyRound size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} aria-hidden="true" />Войти снова
                         </button>
 
                         <button
@@ -582,7 +581,7 @@ const WelcomeView = React.memo(({
                   }}
                   className="registrar-btn-lg registrar-btn-success">
 
-                          <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />Обновить данные
+                          <ArrowUpDown size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} aria-hidden="true" />Обновить данные
                         </button>
 
                         {/* UX Audit R-2.2: кнопка «Перезапустить приложение» удалена —
@@ -611,7 +610,7 @@ const WelcomeView = React.memo(({
                 disabled={!tokenManager.hasToken()}
                 className="registrar-btn-cta">
 
-                      <Icon name="plus" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />Создать первую запись
+                      <Plus size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} aria-hidden="true" />Создать первую запись
                     </Button>
                   </div>
             }

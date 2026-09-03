@@ -9,6 +9,7 @@ import noHardcodedColors from './scripts/no-hardcoded-colors.js';
 import noDomainTypeDuplication from './scripts/no-domain-type-duplication.js';
 import noDtoImportInComponents from './scripts/no-dto-import-in-components.js';
 import noApiLooseReturn from './scripts/no-api-loose-return.js';
+import noFakeTimersWithoutCleanup from './scripts/no-fake-timers-without-cleanup.js';
 
 export default [
   js.configs.recommended,
@@ -24,6 +25,7 @@ export default [
           'no-domain-type-duplication': noDomainTypeDuplication,
           'no-dto-import-in-components': noDtoImportInComponents,
           'no-api-loose-return': noApiLooseReturn,
+          'no-fake-timers-without-cleanup': noFakeTimersWithoutCleanup,
         },
       },
     },
@@ -55,6 +57,10 @@ export default [
       'custom/no-domain-type-duplication': 'error',
       'custom/no-dto-import-in-components': 'error',
       'custom/no-api-loose-return': 'error',
+
+      // Custom: require vi.useRealTimers() when vi.useFakeTimers() is used
+      // Prevents vitest process hang in singleFork mode (commit 9706ecda)
+      'custom/no-fake-timers-without-cleanup': 'error',
 
       // React правила
       ...react.configs.recommended.rules,
@@ -315,6 +321,114 @@ export default [
         {
           selector: "TSInterfaceDeclaration[id.name=/DTO$/]",
           message: 'DTO-shaped interfaces (suffix DTO) are not allowed in types/domain/. Use types/api.ts for DTOs.',
+        },
+      ],
+    },
+  },
+  {
+    // PR-UI-17-5 (plan §PR-UI-17 item 9): forbidden-imports register for
+    // decommissioned modules. Re-importing any PR-UI-17-deleted surface is a
+    // regression and fails lint at ERROR level. The generated-OpenAPI paths
+    // from the warn-level block above are merged here (promoted to error —
+    // verified 0 current violations at promotion time) because this later
+    // block overrides the rule for all files.
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@/types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+          ],
+          patterns: [
+            // PR-UI-17-1: MediLabDemo demo perimeter
+            {
+              group: ['**/pages/MediLabDemo', '**/components/medical', '**/components/medical/**', '**/components/Icon', '**/assets/iconsMap'],
+              message: 'PR-UI-17-1 decommissioned module: MediLabDemo page, medical/ components, legacy Icon + iconsMap were deleted (dead demo perimeter).',
+            },
+            // PR-UI-17-2: zero-importer dead files
+            {
+              group: ['**/components/forms/Modern*', '**/components/forms/ResponsiveForm', '**/components/forms', '**/components/layout/Modern*', '**/components/layout/Nav', '**/components/layout/index', '**/styles/cursor-effects', '**/PublicApp', '**/pages/Login', '**/pages/Activation'],
+              message: 'PR-UI-17-2 decommissioned module: dead forms/, layout/Modern*, Nav, cursor-effects.css, PublicApp/Login, Activation page were deleted (0 runtime importers).',
+            },
+            // PR-UI-17-3: telegram dead pair + M-8 dead duplicates
+            {
+              group: ['**/components/telegram', '**/components/telegram/**', '**/pages/TelegramPage', '**/components/TwoFactorSettings', '**/components/TwoFactorSetup', '**/components/PWAInstallPrompt', '**/components/mobile/PWAInstallPrompt', '**/components/pwa/PWAInstallPrompt', '**/components/pwa/index', '**/components/pwa/ConnectionStatus', '**/components/auth/RequireAuth', '**/components/auth/index', '**/components/navigation/ProtectedRoute', '**/components/index'],
+              message: 'PR-UI-17-3 decommissioned module: dead telegram pair, dead 2FA/PWA/role-guard duplicates and their barrels were deleted (M-8).',
+            },
+            // PR-UI-17-4: legacy tokens
+            {
+              group: ['**/theme/tokens-legacy'],
+              message: 'PR-UI-17-4 decommissioned module: tokens-legacy.ts deleted; ThemeContext owns the values privately (contexts/themeLegacyTokens.ts).',
+            },
+            // PR-UI-17-5: renamed component (old name must not come back)
+            {
+              group: ['**/components/navigation/ModernTabs'],
+              message: 'PR-UI-17-5 rename: ModernTabs.tsx is now Tabs.tsx (components/navigation/Tabs.tsx).',
+            },
+            // Track 3-3: macos Icon wrapper decommissioned (consumer-dead after
+            // the Track 3-1/3-2 lucide migration; 0 importers, machine-verified).
+            {
+              group: ['**/components/ui/macos/Icon'],
+              message: 'Track 3-3 decommissioned module: macos/Icon.tsx deleted — use direct lucide-react imports (§3.3 canonical icon system, Icon-систем 2→1).',
+            },
+          ],
+          paths: [
+            {
+              name: '@/types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            // Track 3-3 (Codex round-1 P2): the barrel was the ACTUAL consumer
+            // route of the retired Icon (import { Icon } from '.../ui/macos').
+            // Restrict the named import from every barrel specifier used in the
+            // repo, so re-exporting Icon and importing it via the barrel fails
+            // lint — the module-path pattern above cannot see named imports.
+            ...[
+              '@/components/ui/macos',
+              './ui/macos',
+              './macos',
+              './components/ui/macos',
+              '../ui/macos',
+              '../components/ui/macos',
+              '../../ui/macos',
+              '../../components/ui/macos',
+              '../../../components/ui/macos',
+              // Track 3-3 (Codex round-1 P2, follow-up): the ui/ barrel
+              // re-exports the macos kit — cover its specifiers too.
+              '@/components/ui',
+              './ui',
+              '../ui',
+              '../../ui',
+              '../../../components/ui',
+            ].map((barrel) => ({
+              name: barrel,
+              importNames: ['Icon'],
+              message: 'Track 3-3: the macos Icon wrapper is decommissioned — import icons directly from lucide-react (§3.3, Icon-систем 2→1).',
+            })),
+            {
+              name: './Icon',
+              message: 'Track 3-3: macos/Icon.tsx is deleted — use direct lucide-react imports (§3.3).',
+            },
+          ],
         },
       ],
     },

@@ -25,7 +25,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import { MacOSEmptyState } from '../ui/macos';
+import { AppEmpty } from '../ui/macos';
 import { Skeleton } from '../ui/macos';
 import { Button } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -96,10 +96,10 @@ export function StateWrapper({
     const errObj = error as { message?: string; toString?: () => string };
     const errMsg = typeof error === 'string' ? error : (errObj?.message || errObj?.toString?.() || 'Неизвестная ошибка');
     return (
-      <MacOSEmptyState
-        icon={<AlertCircle size={36} style={{ color: 'var(--mac-error, #ff3b30)' }} />}
+      <AppEmpty
+        icon={<AlertCircle size={36} style={{ color: 'var(--mac-error, #ff3b30)', width: 36, height: 36, opacity: 1 }} />}
         title={errorTitle}
-        message={errMsg}
+        description={errMsg}
         action={
           onRetry ? (
             <Button variant="outline" size="default" onClick={onRetry}>
@@ -115,11 +115,11 @@ export function StateWrapper({
   // Empty state (and never had data)
   if (isEmpty && !hasHadDataRef.current) {
     return (
-      <MacOSEmptyState
+      <AppEmpty
         icon={emptyIcon}
         title={emptyTitle}
-        message={emptyMessage}
-        action={emptyAction ? String(emptyAction) : undefined}
+        description={emptyMessage}
+        action={emptyAction ?? undefined}
       />
     );
   }

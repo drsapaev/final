@@ -250,7 +250,7 @@ def test_staff_cancel_visit_queue_link_preserves_queue_time(db_session):
         first,
         doctor_id=daily_queue.specialist_id,
         target_day=target_day,
-        phone="+998901001001",
+        phone="+998900000103",
     )
 
     result = QueueBusinessService().staff_cancel_visit_queue_link(
@@ -281,7 +281,7 @@ def test_staff_move_visit_queue_link_preserves_queue_time(db_session):
         first,
         doctor_id=daily_queue.specialist_id,
         target_day=target_day,
-        phone="+998901001002",
+        phone="+998900000104",
     )
 
     result = QueueBusinessService().staff_move_visit_queue_link(

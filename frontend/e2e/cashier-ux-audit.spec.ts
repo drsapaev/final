@@ -17,7 +17,7 @@
 
 import { test, expect } from '@playwright/test';
 
-function base64UrlEncode(value) {
+function base64UrlEncode(value: unknown): string {
   return Buffer.from(JSON.stringify(value))
     .toString('base64')
     .replace(/=/g, '')
@@ -25,7 +25,7 @@ function base64UrlEncode(value) {
     .replace(/\//g, '_');
 }
 
-function createJwt(payload) {
+function createJwt(payload: Record<string, unknown>): string {
   return `${base64UrlEncode({ alg: 'HS256', typ: 'JWT' })}.${base64UrlEncode(payload)}.sig`;
 }
 
@@ -46,7 +46,7 @@ const accessToken = createJwt({
   exp: Math.floor(Date.now() / 1000) + 3600,
 });
 
-function jsonResponse(body) {
+function jsonResponse(body: unknown): { status: number; contentType: string; body: string } {
   return {
     status: 200,
     contentType: 'application/json; charset=utf-8',
@@ -61,7 +61,7 @@ const samplePendingPayment = {
   patient_last_name: 'Иванов',
   patient_first_name: 'Иван',
   patient_name: 'Иванов Иван Иванович',
-  patient_phone: '+998901234567',
+  patient_phone: '+998900000000',
   total_amount: 150000,
   remaining_amount: 150000,
   status: 'pending',
@@ -108,6 +108,12 @@ test.describe('UX Audit Cashier — new interactions', () => {
       sessionStorage.setItem('user', JSON.stringify(profile));
     }, { token: accessToken, profile: cashierProfile });
 
+    // Mock WebSocket to prevent ECONNREFUSED noise (no backend in E2E).
+    // The frontend opens several WS connections on page load
+    // (NotificationWebSocketContext, useQueueWebSocket, etc.). Without
+    // this mock, Vite WS proxy logs ECONNREFUSED repeatedly.
+    await page.routeWebSocket('**/*', ws => { ws.close(); });
+
     await page.route('**/api/v1/**', async (route) => {
       const url = new URL(route.request().url());
       const { pathname } = url;
@@ -124,6 +130,8 @@ test.describe('UX Audit Cashier — new interactions', () => {
         await route.fulfill(jsonResponse({
           success: true,
           data: [samplePendingPayment],
+          items: [samplePendingPayment],
+          total: 1, page: 1, size: 20, pages: 1,
           pagination: { pages: 1, total: 1 },
         }));
         return;
@@ -132,6 +140,8 @@ test.describe('UX Audit Cashier — new interactions', () => {
         await route.fulfill(jsonResponse({
           success: true,
           data: [sampleHistoryPayment],
+          items: [sampleHistoryPayment],
+          total: 1, page: 1, size: 20, pages: 1,
           pagination: { pages: 1, total: 1 },
         }));
         return;
@@ -204,7 +214,10 @@ test.describe('UX Audit Cashier — new interactions', () => {
     await page.waitForTimeout(2000);
 
     const searchInput = page.locator('#cashier-search-input').first();
-    await expect(searchInput).toHaveAttribute('placeholder', /имя пациента.*ID.*телефон/i);
+    // Actual i18n placeholder: 'Поиск по пациенту, телефону, ID…'
+    // (cashier.search_placeholder in src/i18n/locales/ru.ts L518)
+    // Regex accepts both 'пациент' (current) and 'ФИО' (legacy) for forward-compat.
+    await expect(searchInput).toHaveAttribute('placeholder', /пациент.*телефон.*ID|ФИО.*телефон.*ID/i);
   });
 
   // ========================================================================
@@ -343,13 +356,36 @@ test.describe('UX Audit Cashier — new interactions', () => {
   // Test 8: Empty state on pending tab (R-4.3)
   // ========================================================================
   test('pending tab shows actionable empty state when no data', async ({ page }) => {
-    // Override to return empty pending payments
+    // Override to return empty pending payments.
+    // IMPORTANT: Playwright 1.62 route matching is first-registered-wins.
+    // The beforeEach catch-all already handles /cashier/pending-payments.
+    // To override, we must unroute the catch-all first, then re-register
+    // both the specific override AND a new catch-all for other paths.
+    await page.unroute('**/api/v1/**');
     await page.route('**/api/v1/cashier/pending-payments', async (route) => {
       await route.fulfill(jsonResponse({
         success: true,
         data: [],
+        items: [],
+        total: 0, page: 1, size: 20, pages: 1,
         pagination: { pages: 1, total: 0 },
       }));
+    });
+    // Re-register catch-all for other API paths (auth, setup, etc.)
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const { pathname } = url;
+      if (pathname === '/api/v1/setup/status') { await route.fulfill(jsonResponse({ initialized: true })); return; }
+      if (pathname === '/api/v1/auth/me') { await route.fulfill(jsonResponse(cashierProfile)); return; }
+      if (pathname === '/api/v1/cashier/payments') {
+        await route.fulfill(jsonResponse({ success: true, data: [], items: [], total: 0, page: 1, size: 20, pages: 1, pagination: { pages: 1, total: 0 } }));
+        return;
+      }
+      if (pathname === '/api/v1/cashier/stats') {
+        await route.fulfill(jsonResponse({ total_amount: 0, cash_amount: 0, card_amount: 0, pending_count: 0, pending_amount: 0, paid_count: 0, cancelled_count: 0 }));
+        return;
+      }
+      await route.fulfill(jsonResponse({ success: true }));
     });
 
     await page.goto('/cashier');
@@ -368,12 +404,15 @@ test.describe('UX Audit Cashier — new interactions', () => {
     await page.goto('/cashier');
     await page.waitForTimeout(3000);
 
-    // Click «Касса» button on pending payment row
-    const cashButton = page.locator('button').filter({ hasText: /^Касса$/ }).first();
+    // Click «Касса» button on pending payment row (NOT the nav button).
+    // There are 2 buttons with text 'Касса': nav sidebar button (index 2)
+    // and row action button (index 20). We must click the ROW button.
+    // Scope to the table actions cell to avoid the nav button.
+    const cashButton = page.locator('.cashier-table button').filter({ hasText: /^Касса$/ }).first();
     await cashButton.click();
     await page.waitForTimeout(1000);
 
-    // CashPaymentModal should be open
+    // CashPaymentModal should be open (MUI Dialog renders with role="dialog")
     const modal = page.locator('[role="dialog"]').first();
     await expect(modal).toBeVisible({ timeout: 5000 });
 
@@ -395,7 +434,9 @@ test.describe('UX Audit Cashier — new interactions', () => {
     await page.goto('/cashier');
     await page.waitForTimeout(3000);
 
-    await page.locator('button').filter({ hasText: /^Касса$/ }).first().click();
+    // Click «Касса» button on pending payment ROW (not nav button).
+    // See test above for explanation of the scoped selector.
+    await page.locator('.cashier-table button').filter({ hasText: /^Касса$/ }).first().click();
     await page.waitForTimeout(1000);
 
     const modal = page.locator('[role="dialog"]').first();

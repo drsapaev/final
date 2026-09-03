@@ -119,9 +119,43 @@ class DoctorOut(DoctorBase):
     department_id: int | None = None
     department: str | None = None
 
+    # Lifecycle (decision #5): True = the profile still carries the auto-create
+    # placeholder specialty ("general") instead of a real canonical specialty —
+    # admin must complete it ("Profile incomplete / Specialty required").
+    profile_incomplete: bool = False
+
     # Связанные данные
     user: dict[str, Any] | None = None
     schedules: list["ScheduleOut"] = []
+
+
+class ServiceUnavailableDetail(BaseModel):
+    """Body of the documented catalog 503 (Codex round-6 P2).
+
+    FastAPI's HTTPException payload is ``{"detail": ...}``; declaring this
+    model on the affected operations gives generated clients a typed error
+    shape instead of ``content?: never`` for the configuration-failure
+    response shared by GET specialty-vocabulary, POST and PUT /admin/doctors.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    detail: str
+
+
+class SpecialtyVocabularyItem(BaseModel):
+    """One selectable specialty from the Medical Specialty Catalog (0051).
+
+    Typed DTO (Codex P2): a generic dict response compiled to arbitrary
+    maps in generated TS; this model guarantees code/titles exist.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    code: str
+    title_ru: str
+    title_uz: str | None = None
+    title_en: str | None = None
 
 
 class DoctorUserOption(BaseModel):

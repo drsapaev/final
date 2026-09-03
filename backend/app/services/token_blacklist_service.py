@@ -10,6 +10,7 @@
 import logging
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.models.authentication import TokenBlacklist
@@ -93,29 +94,27 @@ class TokenBlacklistService:
             True если токен в черном списке
         """
         try:
-            # 1) Точный jti
-            entry = db.query(TokenBlacklist).filter(
-                TokenBlacklist.jti == jti
-            ).first()
-            if entry is not None:
-                return True
+            # Perf (#2772): two sequential SELECTs (jti + sentinel)
+            # were 2 network roundtrips (~400-800ms on remote DB).
+            # One OR query - same semantics, 1 roundtrip.
+            from datetime import datetime as _dt
 
-            # 2) Sentinel "отозвать все токены пользователя"
+            conditions = [TokenBlacklist.jti == jti]
             if user_id is not None:
-                from datetime import datetime as _dt
-                sentinel = (
-                    db.query(TokenBlacklist)
-                    .filter(
+                conditions.append(
+                    and_(
                         TokenBlacklist.user_id == user_id,
                         TokenBlacklist.reason.like("all_user_tokens:%"),
                         TokenBlacklist.expires_at > _dt.utcnow(),
                     )
-                    .first()
                 )
-                if sentinel is not None:
-                    return True
 
-            return False
+            entry = (
+                db.query(TokenBlacklist)
+                .filter(or_(*conditions))
+                .first()
+            )
+            return entry is not None
         except Exception as e:
             logger.error(f"Error checking blacklist for {jti}: {e}")
             return False
