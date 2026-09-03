@@ -5135,6 +5135,7 @@ const kk = {
     dmdl_user_inactive_suffix: ' • неактивен',
     dmdl_err_user_required: 'Нужно выбрать существующий аккаунт пользователя',
     dmdl_err_specialty_required: 'Специальность обязательна',
+    dmdl_specialty_historical: 'историческая специальность',
     dmdl_err_specialty_format: 'Только латинские буквы в нижнем регистре, цифры и _ (например: cardiology)',
     dmdl_err_price_number: 'Цена должна быть числом',
     dmdl_err_start_number: 'Стартовый номер должен быть числом',

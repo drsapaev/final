@@ -5136,6 +5136,7 @@ const uzLatn = {
     dmdl_user_inactive_suffix: ' • nofaol',
     dmdl_err_user_required: 'Mavjud foydalanuvchi hisobini tanlash kerak',
     dmdl_err_specialty_required: 'Mutaxassislik majburiy',
+    dmdl_specialty_historical: 'tarixiy mutaxassislik',
     dmdl_err_specialty_format: 'Faqat kichik lotin harflari, raqamlar va _ (masalan: cardiology)',
     dmdl_err_price_number: "Narx raqam bo'lishi kerak",
     dmdl_err_start_number: "Boshlang'ich raqam raqam bo'lishi kerak",

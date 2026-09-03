@@ -341,6 +341,21 @@ const DoctorModal = ({
                 options={[
                   { value: '', label: t('admin2.dmdl_select_department_placeholder') },
                   ...specialtyOptions,
+                  // Editing a doctor whose stored specialty is inactive/absent
+                  // from the active catalog: keep the value visible as a
+                  // clearly-marked historical option so unrelated edits do not
+                  // look like a blank/reassigned specialty (the backend accepts
+                  // the unchanged historical value — no-cascade contract).
+                  ...(doctor?.specialty &&
+                  doctor.specialty === formData.specialty &&
+                  !specialtyOptions.some((o) => o.value === formData.specialty)
+                    ? [
+                        {
+                          value: doctor.specialty,
+                          label: `${doctor.specialty} (${t('admin2.dmdl_specialty_historical')})`,
+                        },
+                      ]
+                    : []),
                 ]}
                 size="large"
               />
