@@ -1,4 +1,5 @@
 """GraphQL query depth limiting to prevent DoS."""
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,8 @@ def validate_query_depth(query: str, max_depth: int = MAX_QUERY_DEPTH) -> bool:
         elif char == "}":
             depth -= 1
     if max_found > max_depth:
-        logger.warning("GraphQL query rejected: depth %d exceeds max %d", max_found, max_depth)
+        logger.warning(
+            "GraphQL query rejected: depth %d exceeds max %d", max_found, max_depth
+        )
         return False
     return True

@@ -5515,6 +5515,8 @@ const en = {
 
     // ─── GraphQLExplorer (admin2.gql2_*) ───
     gql2_example_full_name: 'Иванов Иван Иванович',
+    gql2_example_last_name: 'Иванов',
+    gql2_example_first_name: 'Иван',
     gql2_example_notes: 'Первичная консультация',
 
     // ─── DisplayBoardSettings (admin2.db2_*) ───

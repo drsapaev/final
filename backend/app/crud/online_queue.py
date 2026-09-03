@@ -583,9 +583,7 @@ def join_online_queue_multiple(
 # ===================== ОТКРЫТИЕ ПРИЕМА =====================
 
 
-def open_daily_queue(
-    db: Session, day: date, specialist_id: int
-) -> dict[str, Any]:
+def open_daily_queue(db: Session, day: date, specialist_id: int) -> dict[str, Any]:
     """
     Открытие приема и закрытие онлайн-набора
     Из detail.md стр. 253: POST /api/online-queue/open?day&specialist_id
@@ -831,6 +829,7 @@ def get_or_create_daily_queue(
     cabinet_number: str | None = None,
     cabinet_floor: int | None = None,
     cabinet_building: str | None = None,
+    defaults: dict | None = None,
 ) -> DailyQueue:
     """
     Получить или создать дневную очередь с поддержкой queue_tag и информации о кабинете
@@ -840,12 +839,17 @@ def get_or_create_daily_queue(
     """
     doctor_exists = db.query(Doctor).filter(Doctor.id == specialist_id).first()
     if not doctor_exists:
-        raise ValueError(f"Doctor with id {specialist_id} does not exist in doctors table")
+        raise ValueError(
+            f"Doctor with id {specialist_id} does not exist in doctors table"
+        )
 
     actual_specialist_id = doctor_exists.id
 
     # Ищем очередь с учетом queue_tag
-    query_filters = [DailyQueue.day == day, DailyQueue.specialist_id == actual_specialist_id]
+    query_filters = [
+        DailyQueue.day == day,
+        DailyQueue.specialist_id == actual_specialist_id,
+    ]
 
     if queue_tag:
         query_filters.append(DailyQueue.queue_tag == queue_tag)
@@ -860,6 +864,10 @@ def get_or_create_daily_queue(
             if doctor_exists.cabinet:
                 cabinet_number = doctor_exists.cabinet
 
+        # Codex round-8 P1: defaults сидируются при СОЗДАНИИ (как в
+        # каноническом queue_svc flow) — GraphQL joinQueue передаёт
+        # max_online_entries=doctor.max_online_per_day, иначе капа
+        # врача недостижима за дефолтом модели 15.
         daily_queue = DailyQueue(
             day=day,
             specialist_id=actual_specialist_id,
@@ -868,6 +876,7 @@ def get_or_create_daily_queue(
             cabinet_floor=cabinet_floor,
             cabinet_building=cabinet_building,
             active=True,
+            **(defaults or {}),
         )
         db.add(daily_queue)
         db.commit()
