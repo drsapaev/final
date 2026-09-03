@@ -15,7 +15,11 @@ from app.services.analytics import AnalyticsService
 
 router = APIRouter()
 
-FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
+# M-1 (Manager deprecation): 'manager' removed from this role set —
+# the deprecated role loses all financial/KPI/predictive/revenue/export and
+# specialized-panel privileges. Admin keeps the surface unchanged; no role
+# was widened as compensation.
+FINANCIAL_ANALYTICS_ROLES = ["admin"]
 
 
 def _parse_date_range(start_date: str, end_date: str) -> tuple[datetime, datetime]:
