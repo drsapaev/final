@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
 from app.models.user import User
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from app.schemas.user_management import UserCreateRequest
 from app.services.user_mgmt._operations import get_user_management_service
@@ -325,3 +325,26 @@ class TestConditionalCreateContract:
         assert non_doctor_schema["properties"]["doctor_profile"]["type"] == "null"
 
         assert body.get("discriminator", {}).get("propertyName") == "role"
+
+
+def test_doctor_profile_price_precision_contract():
+    """Codex round-6 P2: doctors.price_default is Numeric(10, 2) —
+    DoctorProfileCreate rejects values beyond the column precision with a
+    field-level 422 (no driver overflow rolling back the onboarding txn)."""
+    from decimal import Decimal
+
+    from app.schemas.user_management import DoctorProfileCreate
+
+    # boundary values pass
+    ok = DoctorProfileCreate(specialty="cardiology", price_default=Decimal("99999999.99"))
+    assert ok.price_default == Decimal("99999999.99")
+    ok2 = DoctorProfileCreate(specialty="cardiology", price_default=Decimal("0"))
+    assert ok2.price_default == Decimal("0")
+    # more than 2 decimal places -> validation error
+    with pytest.raises(ValidationError):
+        DoctorProfileCreate(specialty="cardiology", price_default=Decimal("100.555"))
+    # 9 integer digits -> beyond Numeric(10,2) -> validation error
+    with pytest.raises(ValidationError):
+        DoctorProfileCreate(specialty="cardiology", price_default=Decimal("100000000"))
+    # None stays legal (price optional)
+    assert DoctorProfileCreate(specialty="cardiology").price_default is None

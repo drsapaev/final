@@ -1,6 +1,6 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { User, Mail, Lock, Shield, Save, AlertCircle, Stethoscope } from 'lucide-react';
 import { Modal } from '../ui/macos';
 import { Button } from '../ui/macos';
@@ -48,8 +48,20 @@ const LEGACY_DOCTOR_ROLE_VALUES = new Set([
   'cardiology', 'dermatology', 'dentistry',
 ]);
 
-const isLegacyDoctorRoleValue = (value: string) =>
-  LEGACY_DOCTOR_ROLE_VALUES.has(String(value).trim().toLowerCase());
+// Case-sensitive guard: the bare lowercase spelling "doctor" is a backend
+// compatibility value (POST /users accepts it via NonDoctorUserCreateRequest
+// with NO linked Doctor profile — DOCTOR_PROFILE_ROLES excludes it), so it
+// must never be offered for onboarding. The canonical "Doctor" (exact) is the
+// only doctor-family value that enables the profile block (isDoctorOnboarding
+// compares === 'Doctor'), so it is explicitly preserved here. Any other
+// case-variant ("DOCTOR", "DoCtOr", …) is not accepted by either backend
+// create variant and is hidden as well.
+const isLegacyDoctorRoleValue = (value: string) => {
+  const v = String(value).trim();
+  if (v === 'Doctor') return false;
+  if (v.toLowerCase() === 'doctor') return true;
+  return LEGACY_DOCTOR_ROLE_VALUES.has(v.toLowerCase());
+};
 
 // Форм-обёртки вынесены на уровень модуля: компоненты, определённые ВНУТРИ
 // UserModal, пересоздавали свой тип на каждом рендере — React размонтировал
@@ -91,6 +103,11 @@ const parseStrictPrice = (raw: string): number | null => {
   return Number.parseFloat(normalized);
 };
 
+// Codex round-6 P2: doctors.price_default is Numeric(10, 2) — mirror the
+// column precision in the form so an oversized value is a field error
+// instead of a rolled-back onboarding transaction with a generic 400.
+const MAX_DOCTOR_PRICE = 99_999_999.99;
+
 const FormField = ({ label, required, icon: Icon, error, children }: FormFieldProps) => (
   <div className="admin-mb-16">
     <label className="admin-usermodal-label">
@@ -130,7 +147,14 @@ const UserModal = ({
   });
   const [errors, setErrors] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [specialtyOptions, setSpecialtyOptions] = useState<{ value: string; label: string }[]>([]);
+  // Codex round-6 P2: store raw CODES and translate at render time —
+  // labels computed at fetch time stayed in the fetch locale after the
+  // admin switches the interface language while the modal is open.
+  const [specialtyCodes, setSpecialtyCodes] = useState<string[]>([]);
+  // Vocabulary load failures are surfaced (Codex P2): a silent empty select
+  // blocks doctor onboarding with a misleading "select specialty" error.
+  const [specialtyLoadError, setSpecialtyLoadError] = useState(false);
+  const [specialtyReloadTick, setSpecialtyReloadTick] = useState(0);
 
   // Load roles from API (Phase 4: DB-driven roles - completed)
   const { roleOptions: apiRoleOptions } = useRoles({ includeAll: false });
@@ -161,11 +185,24 @@ const UserModal = ({
 
   const isDoctorOnboarding = !user && formData.role === 'Doctor';
 
+  // Labels resolved at RENDER time (locale-aware, Codex round-6 P2):
+  // switching the interface language while the modal is open immediately
+  // re-renders the dropdown in the new locale without re-fetching.
+  const specialtyOptions = useMemo(
+    () =>
+      specialtyCodes.map((code) => ({
+        value: code,
+        label: t(`admin2.umdl_spec_${code}`),
+      })),
+    [specialtyCodes, t],
+  );
+
   // Canonical specialty vocabulary for the onboarding block (Admin-only
   // endpoint; SSOT lives in backend app/core/specialties.py).
   useEffect(() => {
     if (!isOpen || user) return;
     let cancelled = false;
+    setSpecialtyLoadError(false);
     api
       .get('/admin/doctors/specialty-vocabulary')
       .then((response: { data?: unknown }) => {
@@ -174,25 +211,25 @@ const UserModal = ({
           ? (data as Array<{ code?: string }>)
           : ((data as { items?: Array<{ code?: string }> })?.items ?? []);
         if (!cancelled) {
-          setSpecialtyOptions(
+          setSpecialtyCodes(
             items
               .filter((item) => Boolean(item?.code))
-              .map((item) => ({
-                value: String(item.code),
-                label: t(`admin2.umdl_spec_${item.code}`),
-              }))
+              .map((item) => String(item.code))
           );
         }
       })
       .catch((fetchError: unknown) => {
-        if (!cancelled) setSpecialtyOptions([]);
+        if (!cancelled) {
+          setSpecialtyCodes([]);
+          setSpecialtyLoadError(true);
+        }
         logger.error('Error fetching doctor specialty vocabulary:', fetchError);
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, user]);
+  }, [isOpen, user, specialtyReloadTick]);
 
   // Инициализация формы при открытии
   useEffect(() => {
@@ -272,6 +309,11 @@ const UserModal = ({
       const priceRaw = formData.doctorPrice.trim();
       if (priceRaw !== '' && parseStrictPrice(priceRaw) === null) {
         newErrors.doctorPrice = t('admin2.umdl_err_doctor_price_format');
+      } else if (
+        priceRaw !== '' &&
+        (parseStrictPrice(priceRaw) as number) > MAX_DOCTOR_PRICE
+      ) {
+        newErrors.doctorPrice = t('admin2.umdl_err_doctor_price_max');
       }
       const startRaw = formData.doctorStartNumber.trim();
       if (startRaw !== '') {
@@ -450,6 +492,19 @@ const UserModal = ({
                 ]}
                 size="large"
               />
+              {specialtyLoadError && (
+                <div className="admin-field-error-xs admin-flex-center-8">
+                  <AlertCircle className="admin-icon-12" />
+                  <span>{t('admin2.umdl_spec_load_error')}</span>
+                  <button
+                    type="button"
+                    className="admin-field-error-xs admin-retry-link"
+                    onClick={() => setSpecialtyReloadTick((n) => n + 1)}
+                  >
+                    {t('admin2.umdl_spec_retry')}
+                  </button>
+                </div>
+              )}
             </FormField>
             <div className="admin-doctor-onboarding-grid">
               <FormField label={t('admin2.umdl_doctor_cabinet')}>
