@@ -156,12 +156,17 @@ class ServicesApiService:
         service_id: int,
         old_service: Service,
         new_service: Service,
+        user_id: int | None = None,
         comment: str | None = None,
     ) -> None:
+        # Codex round-15 P2: user_id -- attribution of the service audit to
+        # the authenticated actor (GraphQL updateServicePrice); None keeps
+        # the legacy behaviour for callers without an actor.
         self.repository.log_service_update(
             service_id=service_id,
             old_service=old_service,
             new_service=new_service,
+            user_id=user_id,
             comment=comment,
         )
 
@@ -340,7 +345,9 @@ class ServicesApiService:
         self._log_service_creation(service)
         return service
 
-    def update_service(self, *, service_id: int, service_data):
+    def update_service(
+        self, *, service_id: int, service_data, user_id: int | None = None
+    ):
         service = self.repository.get_service(service_id)
         if not service:
             raise LookupError("Service not found")
@@ -418,6 +425,7 @@ class ServicesApiService:
             service_id=service.id,
             old_service=old_service,
             new_service=service,
+            user_id=user_id,
         )
         return service
 

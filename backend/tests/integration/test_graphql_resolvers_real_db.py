@@ -1876,3 +1876,246 @@ def test_graphql_round14(gql_data, monkeypatch):
     assert len(sent_messages) == 1, sent_messages
     assert sent_messages[0]["data"]["queue_number"] == 7, sent_messages
     assert sent_messages[0]["type"] == "patient_call", sent_messages
+
+
+def test_graphql_round15(gql_data, monkeypatch, caplog):
+    """Codex round-15: (1) joinQueue повторно проверяет eligibility врача
+    ПОСЛЕ коммита создания очереди (внутренний commit отпускает лок строки
+    врача и advisory-лок); (2) отказ критичного аудита callNext после
+    durably-закоммиченного перехода waiting->called НЕ возвращает
+    INTERNAL_ERROR (retry клиента вызвал бы второго пациента); (3)
+    createPatient: doc_number в debug-логе маскируется (full-redact);
+    (4) updatePatient отклоняет дубликат doc_number другого пациента
+    (unchanged value разрешён); (5) createVisit без visitDate дефолтит
+    дату на день конфигурированной таймзоны, а не host-день; (6)
+    updateServicePrice атрибутирует ServiceAuditLog аутентифицированному
+    актору (user_id), а не None."""
+    import logging
+    from datetime import UTC, datetime
+    from zoneinfo import ZoneInfo
+
+    from app.db import session as db_session_module
+    from app.graphql import mutations as gql_mutations
+    from app.models.service_audit import ServiceAuditLog
+    from app.services.display_websocket import get_display_manager
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+
+    # --- 1) joinQueue: дезактивация врача в окне внутреннего коммита
+    # get_or_create_daily_queue -> повторная eligibility-проверка видит
+    # свежее состояние и отклоняет join (DOCTOR_INACTIVE).
+    with monkeypatch.context() as m:
+        original_goc = gql_mutations.crud_queue.get_or_create_daily_queue
+
+        def _goc_deactivate_doctor(db, **kwargs):
+            queue = original_goc(db, **kwargs)
+            with S() as s2:
+                d2 = s2.query(Doctor).filter(Doctor.id == d["doctor"].id).first()
+                d2.active = False
+                s2.commit()
+            return queue
+
+        m.setattr(
+            gql_mutations.crud_queue,
+            "get_or_create_daily_queue",
+            _goc_deactivate_doctor,
+        )
+        data = _execute(
+            """mutation($input: QueueEntryInput!) { joinQueue(input: $input) {
+            success message errors queueEntry { id } } }""",
+            {
+                "input": {
+                    "patientId": d["patient"].id,
+                    "doctorId": d["doctor"].id,
+                    "queueTag": f"r15a-{suffix}",
+                }
+            },
+        )
+    join = data["joinQueue"]
+    assert join["success"] is False, join
+    assert join["errors"] == ["DOCTOR_INACTIVE"], join
+    with S() as s:
+        queue_id = (
+            s.query(DailyQueue)
+            .filter(
+                DailyQueue.day == _queue_day(),
+                DailyQueue.queue_tag == f"r15a-{suffix}",
+            )
+            .first()
+            .id
+        )
+        assert (
+            s.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == queue_id)
+            .count()
+            == 0
+        ), "талон недоступному врачу выдан не должен быть"
+
+    # --- 2) callNext: отказ пост-коммит аудита сохраняет success
+    def _raiser(**kwargs):
+        raise RuntimeError("audit boom")
+
+    notify_calls: list = []
+
+    def _notify_recorder(db, entry, cabinet_number=None):
+        notify_calls.append(entry.id)
+        return {"sent": 0}
+
+    manager = get_display_manager()
+
+    async def _send_recorder(self, call_message, board_ids=None):
+        return None
+
+    now = datetime.now(UTC)
+    with S() as s:
+        q15 = DailyQueue(
+            day=_queue_day(),
+            specialist_id=d["doctor"].id,
+            queue_tag=f"r15b-{suffix}",
+            active=True,
+        )
+        s.add(q15)
+        s.flush()
+        e15 = OnlineQueueEntry(
+            queue_id=q15.id,
+            number=11,
+            patient_id=d["patient"].id,
+            status="waiting",
+            queue_time=now,
+        )
+        s.add(e15)
+        s.commit()
+        e15_id = e15.id
+
+    with monkeypatch.context() as m:
+        m.setattr(gql_mutations, "log_critical_change", _raiser)
+        m.setattr(gql_mutations, "notify_patient_called_sync", _notify_recorder)
+        m.setattr(type(manager), "broadcast_patient_call_data", _send_recorder)
+        data = _execute(
+            "mutation($doctorId: Int!, $tag: String) { callNextPatient(doctorId: "
+            "$doctorId, queueTag: $tag) { success message queueEntry { id number } "
+            "} }",
+            {"doctorId": d["doctor"].id, "tag": f"r15b-{suffix}"},
+        )
+    call = data["callNextPatient"]
+    assert call["success"] is True, call
+    assert call["queueEntry"]["id"] == e15_id, call
+    # уведомления не пропущены (durably вызванному пациенту они доставлены)
+    assert notify_calls == [e15_id], notify_calls
+    with S() as s:
+        assert (
+            s.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == e15_id).first()
+            is not None
+        )
+
+    # --- 3) createPatient: doc_number в debug-логе маскируется
+    doc_number = f"AA{int(suffix, 16) % 10**10:010d}"
+    with caplog.at_level(logging.DEBUG, logger="app.services.patient_service"):
+        data = _execute(
+            """
+            mutation($input: PatientInput!) {
+              createPatient(input: $input) { success patient { id } }
+            }
+            """,
+            {
+                "input": {
+                    "lastName": f"SYNTHETIC-R15-{suffix}",
+                    "firstName": "SYNTHETIC",
+                    "phone": f"+99877{str(int(suffix, 16) % 10**7).zfill(7)}",
+                    "docType": "passport",
+                    "docNumber": doc_number,
+                }
+            },
+        )
+    created = data["createPatient"]
+    assert created["success"] is True, created
+    r15_patient_id = created["patient"]["id"]
+    doc_records = [r for r in caplog.records if "[FIX:ADM-05]" in r.getMessage()]
+    assert doc_records, "debug-лог документа ожидается"
+    assert doc_records[-1].__dict__["doc_number"] == "[REDACTED]"
+    assert doc_number not in caplog.text
+
+    # --- 4) updatePatient: дубликат doc_number другого пациента -> 400;
+    # неизменённое значение того же пациента разрешено.
+    data = _execute(
+        """
+        mutation($id: Int!, $input: PatientUpdateInput!) {
+          updatePatient(id: $id, input: $input) { success errors message }
+        }
+        """,
+        {
+            "id": d["patient"].id,
+            "input": {"docType": "passport", "docNumber": doc_number},
+        },
+    )
+    upd = data["updatePatient"]
+    assert upd["success"] is False, upd
+    assert upd["errors"] == ["DOC_NUMBER_EXISTS"], upd
+
+    data = _execute(
+        """
+        mutation($id: Int!, $input: PatientUpdateInput!) {
+          updatePatient(id: $id, input: $input) { success errors patient { id } }
+        }
+        """,
+        {
+            "id": r15_patient_id,
+            "input": {"docType": "passport", "docNumber": doc_number},
+        },
+    )
+    assert data["updatePatient"]["success"] is True, data["updatePatient"]
+
+    # --- 5) createVisit без visitDate -> день конфигурированной таймзоны
+    data = _execute(
+        """
+        mutation($input: VisitInput!) {
+          createVisit(input: $input) { success visit { id visitDate } }
+        }
+        """,
+        {
+            "input": {
+                "patientId": d["patient"].id,
+                "doctorId": d["doctor"].id,
+                "serviceIds": [d["service"].id],
+            }
+        },
+    )
+    visit = data["createVisit"]
+    assert visit["success"] is True, visit
+    tz_day = datetime.now(ZoneInfo("Asia/Tashkent")).date()
+    assert visit["visit"] is not None
+    with S() as s:
+        v15 = s.query(Visit).filter(Visit.id == visit["visit"]["id"]).first()
+        assert v15 is not None
+        assert v15.visit_date == tz_day, (
+            f"visitDate={v15.visit_date}, TZ-day={tz_day} — дефолт должен "
+            "браться из конфигурированной таймзоны, а не host date.today()"
+        )
+
+    # --- 6) updateServicePrice: ServiceAuditLog.user_id == актор
+    data = _execute(
+        "mutation($id: Int!) { updateServicePrice(id: $id, price: 275000) "
+        "{ success service { id price } } }",
+        {"id": d["service"].id},
+    )
+    price = data["updateServicePrice"]
+    assert price["success"] is True, price
+    admin = gql_data_ctx["admin_user"]
+    with S() as s:
+        audit_row = (
+            s.query(ServiceAuditLog)
+            .filter(ServiceAuditLog.service_id == d["service"].id)
+            .order_by(ServiceAuditLog.id.desc())
+            .first()
+        )
+        assert audit_row is not None, "service audit row expected"
+        assert (
+            audit_row.user_id == admin.id
+        ), f"audit user_id={audit_row.user_id}, expected {admin.id}"

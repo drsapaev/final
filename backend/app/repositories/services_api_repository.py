@@ -128,6 +128,7 @@ class ServicesApiRepository:
         service_id: int,
         old_service: Service,
         new_service: Service,
+        user_id: int | None = None,
         comment: str | None = None,
     ) -> None:
         try:
@@ -135,6 +136,7 @@ class ServicesApiRepository:
                 service_id=service_id,
                 old_service=old_service,
                 new_service=new_service,
+                user_id=user_id,
                 comment=comment,
             )
         except Exception as exc:

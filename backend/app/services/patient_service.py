@@ -133,12 +133,16 @@ class PatientService:
         if patient_in.birth_date and not validate_birthdate(patient_in.birth_date):
             raise HTTPException(status_code=400, detail="Некорректная дата рождения")
 
+        # Codex round-15 P1: doc_number -- full-redact PII (AGENTS.md
+        # L390-407); debug-лог не должен содержать сырой номер документа.
         logger.debug(
             "[FIX:ADM-05] Persisting patient document fields",
-            extra={
-                "doc_type": patient_in.doc_type,
-                "doc_number": patient_in.doc_number,
-            },
+            extra=mask_pii(
+                {
+                    "doc_type": patient_in.doc_type,
+                    "doc_number": patient_in.doc_number,
+                }
+            ),
         )
 
         validated_patient = PatientCreate(
@@ -247,6 +251,22 @@ class PatientService:
                 raise HTTPException(
                     status_code=400,
                     detail="Пациент с таким номером телефона уже существует",
+                )
+
+        # Codex round-15 P1: дубликат doc_number при обновлении -- тот же
+        # контракт, что и при создании (patients.doc_number без unique-
+        # констрейнта; поиск по документу через .first() стал бы
+        # неоднозначным). Исключаем текущего пациента (unchanged value).
+        if patient_in.doc_number and patient_in.doc_number != patient.doc_number:
+            existing_by_doc = (
+                self.db.query(Patient)
+                .filter(Patient.doc_number == patient_in.doc_number)
+                .first()
+            )
+            if existing_by_doc and existing_by_doc.id != patient_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Пациент с таким номером документа уже зарегистрирован",
                 )
 
         # Codex round-10 P1: маскируем PHI в old-снапшоте (см. create;

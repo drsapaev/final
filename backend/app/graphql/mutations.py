@@ -232,6 +232,11 @@ class Mutation:
                 return PatientMutationResponse(
                     success=False, message=detail, errors=["PHONE_EXISTS"]
                 )
+            if "документа" in detail:
+                # Codex P1 (round-15): дубликат doc_number при обновлении
+                return PatientMutationResponse(
+                    success=False, message=detail, errors=["DOC_NUMBER_EXISTS"]
+                )
             return PatientMutationResponse(
                 success=False, message=detail, errors=["VALIDATION_ERROR"]
             )
@@ -620,11 +625,25 @@ class Mutation:
                     )
 
                 # SSOT: единая функция create_visit
+                # Codex P1 (round-15): опущенный visitDate на UTC-хосте между
+                # 19:00 и полуночью должен дефолтиться на день КЛИНИКИ по
+                # конфигурированной таймзоне — normalize_visit_payload
+                # подставляет host date.today(), который в этом окне уже
+                # «вчера» для клиники (Asia/Tashkent), и визит попадает на
+                # неверный день (подтверждение раскидает его по очередям
+                # прошедшего дня). Считаем дефолт здесь, до делегации.
+                visit_date = input.visit_date
+                if visit_date is None:
+                    visit_date = datetime.now(
+                        ZoneInfo(
+                            get_queue_settings(db).get("timezone", "Asia/Tashkent")
+                        )
+                    ).date()
                 visit = create_visit(
                     db=db,
                     patient_id=input.patient_id,
                     doctor_id=input.doctor_id,
-                    visit_date=input.visit_date,
+                    visit_date=visit_date,
                     visit_time=input.visit_time,
                     discount_mode=discount_mode,
                     notes=input.notes,
@@ -854,8 +873,19 @@ class Mutation:
 
     @strawberry.mutation
     @offloop
-    def update_service_price(self, id: int, price: float) -> ServiceMutationResponse:
+    def update_service_price(
+        self, info: strawberry.Info, id: int, price: float
+    ) -> ServiceMutationResponse:
         """Обновить цену услуги (SSOT: ServicesApiService.update_service)"""
+        # Codex P2 (round-15): аудит изменения цены должен указывать
+        # аутентифицированного админа (ServiceAuditLog.user_id), а не None.
+        actor = getattr(info.context, "user", None) if info.context else None
+        if not actor:
+            return ServiceMutationResponse(
+                success=False,
+                message=t("error.unauthorized"),
+                errors=["UNAUTHENTICATED"],
+            )
         try:
             with get_db_session() as db:
                 if price < 0:
@@ -869,10 +899,12 @@ class Mutation:
                 # писало ServiceAuditLog (старое/новое значение), поэтому
                 # GraphQL-изменения цены пропадали из истории услуг.
                 # Делегируем каноническому update-сервису REST-эндпоинта.
+                # Codex P2 (round-15): user_id — атрибуция аудита актору.
                 try:
                     service = ServicesApiService(db).update_service(
                         service_id=id,
                         service_data={"price": price},
+                        user_id=actor.id,
                     )
                 except LookupError:
                     return ServiceMutationResponse(
@@ -1005,6 +1037,38 @@ class Mutation:
                         "max_online_entries": doctor.max_online_per_day,
                     },
                 )
+
+                # Codex P1 (round-15): get_or_create_daily_queue КОММИТИТ при
+                # создании очереди (и при обновлении кабинета) — внутренний
+                # commit завершает транзакцию и ОТПУСКАЕТ лок строки врача и
+                # advisory-лок; параллельная деактивация врача может
+                # закоммититься в этом окне, и без повторной проверки пациент
+                # попал бы в очередь уже недоступного врача. Пере-захватываем
+                # лок строки врача (populate_existing -> свежие атрибуты) и
+                # повторяем канонический eligibility-предикат; лок держится до
+                # финального коммита вставки талона (порядок локов
+                # doctor -> queue сохраняется — дедлоков нет).
+                doctor = (
+                    db.query(Doctor)
+                    .filter(Doctor.id == input.doctor_id)
+                    .with_for_update()
+                    .populate_existing()
+                    .first()
+                )
+                if not doctor:
+                    return QueueMutationResponse(
+                        success=False,
+                        message=t("doctor.not_found"),
+                        errors=["DOCTOR_NOT_FOUND"],
+                    )
+                try:
+                    ensure_doctor_eligible_for_appointment(db, input.doctor_id)
+                except HTTPException:
+                    return QueueMutationResponse(
+                        success=False,
+                        message="Врач недоступен для онлайн-записи",
+                        errors=["DOCTOR_INACTIVE"],
+                    )
 
                 # P1: лочим строку очереди ДО проверок дубликата/лимита и
                 # выдачи номера — параллельные joinQueue выстраиваются здесь
@@ -1274,31 +1338,54 @@ class Mutation:
                 # терялась между сессиями. Persistим действие через
                 # канонический критичный аудит (online_queue_entries теперь
                 # в CRITICAL_TABLES). Без PHI в description (CodeQL).
+                # Codex P1 (round-15): QRQueueService.call_next_patient уже
+                # ЗАКОММИТИЛ переход waiting->called (_queue_ops) — отказ
+                # критичного аудита/коммита ПОСЛЕ этого НЕ должен
+                # возвращать INTERNAL_ERROR (retry клиента вызвал бы
+                # ВТОРОГО пациента, пока первый остаётся durably called) и
+                # не должен пропускать уведомления. Аудит — best-effort:
+                # rollback + warning, success-ответ сохраняется.
                 if entry_id:
-                    log_critical_change(
-                        db=db,
-                        user_id=actor.id,
-                        action="CALL_NEXT",
-                        table_name="online_queue_entries",
-                        row_id=entry_id,
-                        old_data={"status": "waiting"},
-                        new_data={
-                            "status": "called",
-                            "called_by_user_id": actor.id,
-                        },
-                        request=getattr(info.context, "request", None),
-                        description=(
-                            "Вызов следующего пациента (GraphQL callNextPatient)"
-                        ),
-                    )
-                    db.commit()
+                    try:
+                        log_critical_change(
+                            db=db,
+                            user_id=actor.id,
+                            action="CALL_NEXT",
+                            table_name="online_queue_entries",
+                            row_id=entry_id,
+                            old_data={"status": "waiting"},
+                            new_data={
+                                "status": "called",
+                                "called_by_user_id": actor.id,
+                            },
+                            request=getattr(info.context, "request", None),
+                            description=(
+                                "Вызов следующего пациента (GraphQL callNextPatient)"
+                            ),
+                        )
+                        db.commit()
+                    except Exception as audit_exc:  # noqa: BLE001 — non-fatal by design
+                        logger.warning(
+                            "GraphQL callNext: critical audit failed after committed "
+                            "call (transition preserved): %s",
+                            audit_exc,
+                        )
+                        db.rollback()
                 if entry:
                     payload["snapshot"] = queue_entry_to_type(entry)
                     # M4-P0-1: снапшот включает patient (PHI) — read-trail
+                    # (round-15: non-fatal — read-trail не влияет на исход
+                    # уже закоммиченного вызова)
                     if entry.patient_id:
-                        _audit_patient_access(
-                            info, db, [entry.patient_id], "cabinet_summary"
-                        )
+                        try:
+                            _audit_patient_access(
+                                info, db, [entry.patient_id], "cabinet_summary"
+                            )
+                        except Exception as trail_exc:  # noqa: BLE001 — non-fatal
+                            logger.warning(
+                                "GraphQL callNext: patient access trail failed: %s",
+                                trail_exc,
+                            )
                     if entry.queue:
                         payload["cabinet"] = entry.queue.cabinet_number or (
                             entry.queue.specialist.cabinet
