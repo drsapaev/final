@@ -37,7 +37,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     full_name: Mapped[str | None] = mapped_column(String(100), default=None)
-    email: Mapped[str | None] = mapped_column(String(120), default=None)
+    email: Mapped[str | None] = mapped_column(String(120), default=None, unique=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     # Least privilege: users created without an explicit role get
     # minimal permissions, not Admin.
