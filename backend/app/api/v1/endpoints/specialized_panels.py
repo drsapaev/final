@@ -17,7 +17,11 @@ from app.services.specialized_panels_api_service import (
 
 router = APIRouter()
 
-FINANCIAL_SPECIALIZED_PANEL_ROLES = ("Admin", "Manager")
+# M-1 (Manager deprecation): 'manager' removed from this role set —
+# the deprecated role loses all financial/KPI/predictive/revenue/export and
+# specialized-panel privileges. Admin keeps the surface unchanged; no role
+# was widened as compensation.
+FINANCIAL_SPECIALIZED_PANEL_ROLES = ("Admin",)
 
 
 @router.get("/cardiology/patients", response_model=dict[str, Any])

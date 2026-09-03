@@ -7,15 +7,25 @@ analytics scenario with SYNTHETIC-tagged data only (repo synthetic data policy).
 
 Steps:
   1.  GET  /api/v1/health
-  2.  login smoke_registrar / smoke_doctor / smoke_manager (+ optional TOTP)
+  2.  login smoke_registrar / smoke_doctor (+ optional TOTP)
   3.  POST /api/v1/patients/                        (registrar)
   4.  GET  /api/v1/registrar/doctors                (registrar)
   5.  POST /api/v1/visits/visits                    (doctor)
   6.  GET  /api/v1/lab/templates                    (doctor)
   7.  POST /api/v1/lab/orders                       (doctor)
   8.  POST /api/v1/payments/                        (cashier via TOTP, optional)
-  9.  GET  /api/v1/advanced-analytics/doctors/performance (manager)
+  9.  GET  /api/v1/analytics/visualization/doctors/performance (doctor)
   10. GET  /api/v1/registrar/queues/today            (registrar)
+
+M-1 (Manager deprecation): step 9 was repointed from the deprecated
+Manager-role smoke account + advanced-analytics endpoint to the canonical
+smoke_doctor + analytics/visualization endpoint. Coverage change: OLD
+asserted privileged financial/advanced analytics endpoint availability
+under the deprecated Manager role; NEW asserts the production analytics
+pipeline (advanced analytics service -> visualization charts -> DB
+aggregation) availability under the canonical Doctor role. Admin-only
+advanced-analytics coverage lives in the backend integration suite
+(test_manager_deprecation.py + test_analytics_contracts.py).
 
 Accounts must exist first (backend/app/scripts/ensure_smoke_users.py).
 Credentials come from backend/.env: SMOKE_USER_PASSWORD, optional
@@ -239,7 +249,6 @@ def main() -> int:
     accounts = [
         ("smoke_registrar", ""),
         ("smoke_doctor", ""),
-        ("smoke_manager", ""),
     ]
     if CASHIER_USERNAME and CASHIER_TOTP_SECRET:
         accounts.append((CASHIER_USERNAME, CASHIER_TOTP_SECRET))
@@ -250,7 +259,6 @@ def main() -> int:
 
     reg = tokens.get("smoke_registrar", "")
     doc = tokens.get("smoke_doctor", "")
-    mgr = tokens.get("smoke_manager", "")
 
     # 3. patient create (registrar) ----------------------------------------
     patient_id = None
@@ -356,12 +364,16 @@ def main() -> int:
         else:
             record("payment create", "FAIL", f"HTTP {status}: {json.dumps(body, ensure_ascii=False)[:200]}")
 
-    # 9. doctor analytics (manager) — known User.fio bug lives here --------
+    # 9. doctor performance analytics (doctor) ----------------------------
+    # M-1: repointed from the deprecated Manager account + /analytics/
+    # advanced/doctors/performance to the canonical doctor-authorized
+    # visualization surface. See the module docstring for the recorded
+    # coverage change.
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     status, body = http(
         "GET",
-        f"/api/v1/analytics/advanced/doctors/performance?start_date={today}&end_date={today}",
-        token=mgr,
+        f"/api/v1/analytics/visualization/doctors/performance?start_date={today}&end_date={today}",
+        token=doc,
     )
     record("analytics doctors/performance", "PASS" if status == 200 else "FAIL",
            f"GET -> {status}" + ("" if status == 200 else " (doctors analytics endpoint broken?)"))
