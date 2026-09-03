@@ -42,10 +42,19 @@ CRITICAL_ROLES = {
 }
 
 # Роли с административными правами
+# M-1 (Manager deprecation): Manager removed from ADMIN_ROLES — it is a
+# deprecated legacy/synthetic role, not a canonical admin role. Safety
+# proof (repo-wide grep, 2026-09-03): ADMIN_ROLES has exactly one consumer
+# (is_admin_role below) and is_admin_role itself has zero callers outside
+# roles.py — the change is behavior-neutral today and keeps a future caller
+# from accidentally treating a legacy Manager account as administrative.
+# Roles.MANAGER stays in the enum above so the surviving production row
+# (smoke_manager) still deserializes/authenticates during the compatibility
+# window (authentication is NOT authorization: no require_roles gate
+# admits Manager anymore).
 ADMIN_ROLES = {
     Roles.ADMIN,
     Roles.SUPER_ADMIN,
-    Roles.MANAGER,
 }
 
 # Роли врачей

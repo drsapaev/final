@@ -20,7 +20,8 @@ from app.services.analytics_visualization_service import (
 
 router = APIRouter()
 
-FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
+# M-1 (Manager deprecation): admin-only financial surface
+FINANCIAL_ANALYTICS_ROLES = ["admin"]
 
 
 @router.get("/dashboard", response_model=dict[str, Any])

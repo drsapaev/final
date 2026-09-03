@@ -66,6 +66,12 @@ describe('UserModal role payload regression', () => {
     // This absence assertion is the frontend write-freeze contract.
     expect(options.find((el) => el.textContent === 'admin2.umdl_role_receptionist')).toBeUndefined();
 
+    // M-1 (Manager deprecation): 'Manager' is frozen out of the create-role
+    // options — it is a deprecated legacy/synthetic role, not a product role.
+    // Absence assertion = frontend write-freeze contract (fallback list);
+    // the API-driven path is covered by the backend write-pattern tests.
+    expect(options.find((el) => el.textContent === 'admin2.umdl_role_manager')).toBeUndefined();
+
     const option = options.find((el) => el.textContent === 'admin2.umdl_role_registrar');
     expect(option).toBeDefined();
     fireEvent.click(option as HTMLElement);

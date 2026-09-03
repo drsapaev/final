@@ -533,20 +533,31 @@ class UserAuditLogResponse(UserAuditLogBase):
 # surfaces must keep accepting the deprecated spelling so a compatible
 # deployment holding legacy rows can still query them (legacy reads
 # temporarily accepted; canonical writes only).
+# M-1 (Manager deprecation): 'Manager' removed from the canonical WRITE
+# vocabulary — Manager is a deprecated legacy/synthetic role, not a product
+# role. Production holds exactly one legacy row (smoke_manager, id=20,
+# SQL evidence 2026-09-02) scheduled for post-deploy deactivation; new
+# Manager writes (create / update / bulk change_role) are frozen. Read
+# compatibility for the surviving row is preserved via the FILTER pattern
+# below. Update-re-submission note: the only stored Manager row is the
+# synthetic smoke account an admin does not edit; an edit attempt that
+# re-submits role=Manager 422s by design (write-freeze semantics — change
+# the role or use the ops deactivation path instead).
 _USER_MANAGEMENT_ROLE_PATTERN = (
     "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|"
-    "SuperAdmin|Manager|"
+    "SuperAdmin|"
     + "|".join(sorted(DOCTOR_ROLE_SPELLINGS))
     + ")$"
 )
 
 # Read/filter vocabulary: canonical write vocabulary PLUS the deprecated
-# 'Receptionist' spelling — used ONLY by query/filter surfaces
+# 'Receptionist' and 'Manager' spellings — used ONLY by query/filter surfaces
 # (UserSearchRequest.role, GET /users role parameter) so legacy rows in
-# compatible deployments remain queryable during the compatibility window.
-# NOT used by create/update/bulk-change-role (write freeze stays absolute).
+# production (smoke_manager) and compatible deployments remain queryable
+# during the compatibility window. NOT used by create/update/bulk-change-role
+# (write freeze stays absolute).
 _USER_MANAGEMENT_ROLE_FILTER_PATTERN = (
-    _USER_MANAGEMENT_ROLE_PATTERN[:-2] + "|Receptionist)$"
+    _USER_MANAGEMENT_ROLE_PATTERN[:-2] + "|Receptionist|Manager)$"
 )
 
 

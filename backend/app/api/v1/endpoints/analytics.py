@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 ANALYTICS_PUBLIC_ERROR = "Internal server error"
 CLINICAL_ANALYTICS_ROLES = ["admin", "doctor", "nurse"]
-FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
+# M-1 (Manager deprecation): admin-only financial surface
+FINANCIAL_ANALYTICS_ROLES = ["admin"]
 
 
 def _build_payment_provider_payload(

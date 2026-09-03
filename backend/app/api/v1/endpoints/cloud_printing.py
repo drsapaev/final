@@ -583,7 +583,7 @@ async def test_printer(
 async def get_printing_statistics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получить статистику печати"""
     try:

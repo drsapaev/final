@@ -136,7 +136,7 @@ async def list_backups(    limit: int = Query(default=100, ge=1, le=500, descrip
     offset: int = Query(default=0, ge=0, description="Смещение"),
 db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получает список всех бэкапов"""
     try:
@@ -154,7 +154,7 @@ async def get_backup_info(
     backup_name: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получает информацию о конкретном бэкапе"""
     try:
@@ -231,7 +231,7 @@ async def delete_backup(
 @router.get("/monitoring/health", response_model=dict[str, Any])
 async def get_system_health(
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получает общее состояние системы"""
     try:
@@ -247,7 +247,7 @@ async def get_system_health(
 @router.get("/monitoring/metrics/system", response_model=dict[str, Any])
 async def get_system_metrics(
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получает системные метрики"""
     try:
@@ -263,7 +263,7 @@ async def get_system_metrics(
 @router.get("/monitoring/metrics/application", response_model=dict[str, Any])
 async def get_application_metrics(
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получает метрики приложения"""
     try:
@@ -280,7 +280,7 @@ async def get_application_metrics(
 async def get_metrics_history(
     hours: int = Query(24, ge=1, le=168, description="Количество часов истории"),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получает историю метрик"""
     try:
@@ -302,7 +302,7 @@ async def get_metrics_history(
 async def get_metrics_summary(
     hours: int = Query(24, ge=1, le=168, description="Количество часов для анализа"),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получает сводку метрик за период"""
     try:
@@ -320,7 +320,7 @@ async def get_alerts(
     severity: str | None = Query(None, pattern="^(critical|warning|info)$"),
     limit: int = Query(100, ge=1, le=1000),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получает список алертов"""
     try:

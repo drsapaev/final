@@ -2,7 +2,14 @@
 
 Created for the nightly functional smoke (scripts/nightly_functional_smoke.py).
 2FA is enforced at login for Admin and Cashier, so the smoke uses non-critical
-roles that can authenticate with password only: Registrar, Doctor, Manager.
+roles that can authenticate with password only: Registrar, Doctor.
+
+M-1 (Manager deprecation): 'smoke_manager' is NO LONGER provisioned —
+Manager is a deprecated legacy/synthetic role (canonical write-freeze).
+If a legacy smoke_manager row already exists, this script does NOT touch it:
+no create, no password re-pin, no role change, no deactivation — the row is
+an explicit post-deploy ops decision (recommended: is_active true -> false,
+keeping audit/history; never delete).
 
 Accounts are tagged [SYNTHETIC-SMOKE] per the repo synthetic data policy.
 The password comes from SMOKE_USER_PASSWORD (backend/.env) — never hardcoded.
@@ -29,9 +36,12 @@ from app.models.user import User  # type: ignore[attr-defined]  # noqa: E402
 SMOKE_USERS = [
     # (username, role, email) — roles must NOT be in CRITICAL_2FA_ROLES
     # (Admin/Cashier) so password-only login works.
+    # M-1 (Manager deprecation): smoke_manager removed from provisioning.
+    # Manager is a deprecated legacy/synthetic role: no new accounts, no
+    # password re-pin, no role re-pin. The loop below only iterates this
+    # list, so an existing legacy smoke_manager row is left untouched.
     ("smoke_registrar", "Registrar", "smoke.registrar@synthetic.invalid"),
     ("smoke_doctor", "Doctor", "smoke.doctor@synthetic.invalid"),
-    ("smoke_manager", "Manager", "smoke.manager@synthetic.invalid"),
 ]
 
 

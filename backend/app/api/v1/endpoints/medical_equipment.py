@@ -590,7 +590,7 @@ async def get_device_statistics(
 async def get_equipment_overview(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получить общую статистику оборудования"""
     try:

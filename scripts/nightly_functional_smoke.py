@@ -7,15 +7,27 @@ analytics scenario with SYNTHETIC-tagged data only (repo synthetic data policy).
 
 Steps:
   1.  GET  /api/v1/health
-  2.  login smoke_registrar / smoke_doctor / smoke_manager (+ optional TOTP)
+  2.  login smoke_registrar / smoke_doctor (+ optional cashier TOTP)
   3.  POST /api/v1/patients/                        (registrar)
   4.  GET  /api/v1/registrar/doctors                (registrar)
   5.  POST /api/v1/visits/visits                    (doctor)
   6.  GET  /api/v1/lab/templates                    (doctor)
   7.  POST /api/v1/lab/orders                       (doctor)
   8.  POST /api/v1/payments/                        (cashier via TOTP, optional)
-  9.  GET  /api/v1/advanced-analytics/doctors/performance (manager)
+  9.  GET  /api/v1/analytics/visualization/doctors/performance (doctor)
   10. GET  /api/v1/registrar/queues/today            (registrar)
+
+M-1 (Manager deprecation) coverage change for step 9:
+  OLD: privileged financial/advanced analytics endpoint availability —
+       login smoke_manager (deprecated legacy/synthetic Manager role,
+       password-only) and GET /api/v1/analytics/advanced/doctors/performance.
+  NEW: production analytics pipeline + DB aggregation availability under
+       the canonical Doctor role —
+       GET /api/v1/analytics/visualization/doctors/performance.
+The admin-only advanced endpoint stays covered by CI/integration tests,
+not by a production password-only privileged smoke. The smoke_manager
+login is dropped: the account is scheduled for post-deploy deactivation
+(audit/history is preserved; row is never touched by this repo).
 
 Accounts must exist first (backend/app/scripts/ensure_smoke_users.py).
 Credentials come from backend/.env: SMOKE_USER_PASSWORD, optional
@@ -236,10 +248,12 @@ def main() -> int:
            f"GET /api/v1/health -> {status}")
 
     # 2. logins ------------------------------------------------------------
+    # M-1 (Manager deprecation): smoke_manager is no longer provisioned or
+    # used by the nightly smoke — the analytics probe now runs under the
+    # canonical Doctor role (see step 9).
     accounts = [
         ("smoke_registrar", ""),
         ("smoke_doctor", ""),
-        ("smoke_manager", ""),
     ]
     if CASHIER_USERNAME and CASHIER_TOTP_SECRET:
         accounts.append((CASHIER_USERNAME, CASHIER_TOTP_SECRET))
@@ -250,7 +264,6 @@ def main() -> int:
 
     reg = tokens.get("smoke_registrar", "")
     doc = tokens.get("smoke_doctor", "")
-    mgr = tokens.get("smoke_manager", "")
 
     # 3. patient create (registrar) ----------------------------------------
     patient_id = None
@@ -356,14 +369,17 @@ def main() -> int:
         else:
             record("payment create", "FAIL", f"HTTP {status}: {json.dumps(body, ensure_ascii=False)[:200]}")
 
-    # 9. doctor analytics (manager) — known User.fio bug lives here --------
+    # 9. doctor analytics (doctor) -----------------------------------------
+    # M-1: repointed from the manager-gated advanced endpoint to the
+    # canonical-Doctor visualization endpoint — same production analytics
+    # pipeline + DB aggregation, no deprecated Manager credentials.
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     status, body = http(
         "GET",
-        f"/api/v1/analytics/advanced/doctors/performance?start_date={today}&end_date={today}",
-        token=mgr,
+        f"/api/v1/analytics/visualization/doctors/performance?start_date={today}&end_date={today}",
+        token=doc,
     )
-    record("analytics doctors/performance", "PASS" if status == 200 else "FAIL",
+    record("analytics visualization doctors/performance", "PASS" if status == 200 else "FAIL",
            f"GET -> {status}" + ("" if status == 200 else " (doctors analytics endpoint broken?)"))
 
     # 10. queue today (registrar) ------------------------------------------

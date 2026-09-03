@@ -16,7 +16,8 @@ from app.services.analytics import AnalyticsService
 router = APIRouter()
 
 CLINICAL_ADVANCED_ANALYTICS_ROLES = ["admin", "doctor", "nurse"]
-FINANCIAL_ADVANCED_ANALYTICS_ROLES = ["admin", "manager"]
+# M-1 (Manager deprecation): admin-only financial surface
+FINANCIAL_ADVANCED_ANALYTICS_ROLES = ["admin"]
 
 
 @router.get("/kpi", response_model=dict[str, Any])

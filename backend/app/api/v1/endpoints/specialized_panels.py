@@ -17,7 +17,9 @@ from app.services.specialized_panels_api_service import (
 
 router = APIRouter()
 
-FINANCIAL_SPECIALIZED_PANEL_ROLES = ("Admin", "Manager")
+# M-1 (Manager deprecation): Manager removed — the financial analytics
+# surface is Admin-only; clinical panels keep their Admin/Doctor gates.
+FINANCIAL_SPECIALIZED_PANEL_ROLES = ("Admin",)
 
 
 @router.get("/cardiology/patients", response_model=dict[str, Any])

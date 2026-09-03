@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
+# M-1 (Manager deprecation): admin-only financial surface
+FINANCIAL_ANALYTICS_ROLES = ["admin"]
 
 
 def _parse_date_range(start_date: str, end_date: str) -> tuple[datetime, datetime]:

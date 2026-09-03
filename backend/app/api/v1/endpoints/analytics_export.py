@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 
 ANALYTICS_EXPORT_PUBLIC_ERROR = "Internal server error"
 CLINICAL_ANALYTICS_EXPORT_ROLES = ["admin", "doctor", "nurse"]
-FINANCIAL_ANALYTICS_EXPORT_ROLES = ["admin", "manager"]
+# M-1 (Manager deprecation): admin-only financial surface
+FINANCIAL_ANALYTICS_EXPORT_ROLES = ["admin"]
 
 
 @router.get("/formats", response_model=dict[str, Any])

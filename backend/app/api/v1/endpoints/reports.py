@@ -115,7 +115,7 @@ async def generate_patient_report(
     request: PatientReportRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR])),
 ):
     """Генерирует отчет по пациентам"""
     try:
@@ -160,7 +160,7 @@ async def generate_appointments_report(
     request: AppointmentReportRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR])),
 ):
     """Генерирует отчет по записям"""
     try:
@@ -206,7 +206,7 @@ async def generate_financial_report(
     request: FinancialReportRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Генерирует финансовый отчет"""
     try:
@@ -251,7 +251,7 @@ async def generate_queue_report(
     request: QueueReportRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR])),
 ):
     """Generate a queue report."""
     try:
@@ -296,7 +296,7 @@ async def generate_doctor_performance_report(
     request: DoctorPerformanceReportRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Generate a doctor performance report."""
     try:
@@ -345,7 +345,7 @@ async def get_daily_summary(
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR])),
 ):
     """Получает ежедневную сводку"""
     try:
@@ -372,7 +372,7 @@ async def get_daily_summary(
 async def get_available_reports(    limit: int = Query(default=100, ge=1, le=500, description="Количество записей"),
     offset: int = Query(default=0, ge=0, description="Смещение"),
 current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR])),
 ):
     """Получает список доступных типов отчетов"""
     try:
@@ -418,7 +418,7 @@ async def list_report_files(    limit: int = Query(default=100, ge=1, le=500, de
     offset: int = Query(default=0, ge=0, description="Смещение"),
 db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR])),
 ):
     """Получает список файлов отчетов"""
     try:
@@ -461,7 +461,7 @@ async def download_report_file(
     filename: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR])),
 ):
     """Download a generated report file."""
     try:

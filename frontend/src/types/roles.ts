@@ -36,8 +36,15 @@ export const CRITICAL_ROLES: readonly BackendRole[] = [
   'Admin', 'Registrar', 'Lab', 'Doctor', 'Cashier', 'cardio', 'derma', 'dentist',
 ] as const;
 
+// M-1 (Manager deprecation): Manager removed from ADMIN_ROLES — it is a
+// deprecated legacy/synthetic role, not a canonical admin role. Safety
+// proof (repo-wide grep, 2026-09-03): isAdminRole has zero consumers, and
+// RoleGuard/Health use their own 'Admin'-only checks, so the change is
+// behavior-neutral. 'Manager' STAYS in the BackendRole union / isBackendRole /
+// ROLE_LEVEL so the surviving production row (smoke_manager) still type-checks
+// on read during the compatibility window (M-2 removes the vocabulary).
 export const ADMIN_ROLES: readonly BackendRole[] = [
-  'Admin', 'SuperAdmin', 'Manager',
+  'Admin', 'SuperAdmin',
 ] as const;
 
 export const DOCTOR_ROLES: readonly BackendRole[] = [

@@ -597,8 +597,17 @@ def test_role_pattern_covers_full_doctor_family_ssot() -> None:
         assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, spelling), spelling
 
     # canonical non-doctor roles still accepted
-    for role in ("Admin", "Doctor", "Registrar", "SuperAdmin", "Manager", "Nurse"):
+    for role in ("Admin", "Doctor", "Registrar", "SuperAdmin", "Nurse"):
         assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, role), role
+
+    # M-1 (Manager deprecation): write vocabulary freezes 'Manager' —
+    # new/updated/bulk-changed role=Manager is rejected; the FILTER
+    # vocabulary keeps accepting it for read compatibility while the
+    # legacy production row (smoke_manager) survives.
+    assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "Manager")
+    from app.schemas.user_management import _USER_MANAGEMENT_ROLE_FILTER_PATTERN
+
+    assert re.match(_USER_MANAGEMENT_ROLE_FILTER_PATTERN, "Manager")
 
     # junk rejected
     assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "wizard")
@@ -634,6 +643,8 @@ def test_get_users_role_filter_accepts_family_spellings(
         "dentistry",
         "Registrar",
         "SuperAdmin",
+        # M-1: 'Manager' stays READ-compatible on filter surfaces (legacy
+        # smoke_manager row must remain queryable during the window).
         "Manager",
     ):
         resp = client.get(f"/api/v1/users/users?role={role}", headers=headers)
