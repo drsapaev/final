@@ -2,9 +2,10 @@
 Сервис восстановления паролей
 """
 
+import hashlib
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from app.core.config import settings
 from app.core.pii_masker import mask_pii_text
 from app.core.security import get_password_hash, verify_password
 from app.crud import user as crud_user
+from app.models.authentication import PasswordResetToken
 from app.services.email_sms_enhanced import EmailSMSEnhancedService
 from app.services.phone_verification_service import get_phone_verification_service
 
@@ -38,28 +40,48 @@ class PasswordResetService:
     def __init__(self):
         self.phone_verification = get_phone_verification_service()
         self.email_service = EmailSMSEnhancedService()
-        self.reset_tokens = {}  # В production использовать Redis
         self.token_ttl_hours = 1  # Токены действуют 1 час
 
     def generate_reset_token(self) -> str:
         """Генерация токена сброса пароля"""
         return secrets.token_urlsafe(32)
 
-    def _get_token_key(self, token: str) -> str:
-        """Получение ключа для хранения токена"""
-        return f"password_reset:{token}"
+    # Хранение в password_reset_tokens (было: dict в памяти процесса —
+    # каждый рестарт/деплой убивал все высланные ссылки, TOKEN_NOT_FOUND).
+    # В БД хранится sha256-hex токена (сырой bearer-токен в БД не кладём;
+    # 64 hex-символа точно вписываются в String(64)).
 
-    def _clean_expired_tokens(self):
-        """Очистка истекших токенов"""
-        now = datetime.now()
-        expired_keys = []
+    @staticmethod
+    def _hash_token(token: str) -> str:
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
-        for key, data in self.reset_tokens.items():
-            if data.get('expires_at') and now > data['expires_at']:
-                expired_keys.append(key)
+    @staticmethod
+    def _aware(dt: datetime) -> datetime:
+        # SQLite round-trips tz-aware values as naive; PG keeps them aware.
+        # Normalize before python-side comparisons.
+        return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
-        for key in expired_keys:
-            del self.reset_tokens[key]
+    def _store_reset_token(self, db: Session, raw_token: str, user_id: int) -> None:
+        # Opportunistic cleanup: истёкшие строки больше не нужны.
+        db.query(PasswordResetToken).filter(
+            PasswordResetToken.expires_at < datetime.now(UTC)
+        ).delete(synchronize_session=False)
+        db.add(
+            PasswordResetToken(
+                user_id=user_id,
+                token=self._hash_token(raw_token),
+                expires_at=datetime.now(UTC) + timedelta(hours=self.token_ttl_hours),
+                used=False,
+            )
+        )
+        db.commit()
+
+    def _find_token_row(self, db: Session, raw_token: str) -> PasswordResetToken | None:
+        return (
+            db.query(PasswordResetToken)
+            .filter(PasswordResetToken.token == self._hash_token(raw_token))
+            .first()
+        )
 
     async def initiate_phone_reset(self, db: Session, phone: str) -> dict[str, Any]:
         """Инициация сброса пароля по телефону"""
@@ -132,15 +154,8 @@ class PasswordResetService:
             reset_token = self.generate_reset_token()
             expires_at = datetime.now() + timedelta(hours=self.token_ttl_hours)
 
-            # Сохраняем токен
-            token_key = self._get_token_key(reset_token)
-            self.reset_tokens[token_key] = {
-                "user_id": user.id,
-                "email": email,
-                "created_at": datetime.now(),
-                "expires_at": expires_at,
-                "used": False,
-            }
+            # Сохраняем токен в БД (переживает рестарты/деплои)
+            self._store_reset_token(db, reset_token, user.id)
 
             # Формируем ссылку для сброса
             reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
@@ -270,17 +285,10 @@ class PasswordResetService:
             reset_token = self.generate_reset_token()
             expires_at = datetime.now() + timedelta(hours=self.token_ttl_hours)
 
-            # Сохраняем токен
-            token_key = self._get_token_key(reset_token)
-            self.reset_tokens[token_key] = {
-                "user_id": user.id,
-                "phone": phone,
-                "created_at": datetime.now(),
-                "expires_at": expires_at,
-                "used": False,
-            }
+            # Сохраняем токен в БД (переживает рестарты/деплои)
+            self._store_reset_token(db, reset_token, user.id)
 
-            logger.info(f"Reset token generated for phone {phone}")
+            logger.info("Reset token generated after phone verification")
 
             return {
                 "success": True,
@@ -298,23 +306,17 @@ class PasswordResetService:
     ) -> dict[str, Any]:
         """Сброс пароля с использованием токена"""
         try:
-            # Очищаем истекшие токены
-            self._clean_expired_tokens()
+            token_row = self._find_token_row(db, token)
 
-            token_key = self._get_token_key(token)
-
-            if token_key not in self.reset_tokens:
+            if token_row is None:
                 return {
                     "success": False,
                     "error": "Токен не найден или истек",
                     "error_code": "TOKEN_NOT_FOUND",
                 }
 
-            token_data = self.reset_tokens[token_key]
-
             # Проверяем истечение
-            if datetime.now() > token_data['expires_at']:
-                del self.reset_tokens[token_key]
+            if datetime.now(UTC) > self._aware(token_row.expires_at):
                 return {
                     "success": False,
                     "error": "Токен истек",
@@ -322,17 +324,19 @@ class PasswordResetService:
                 }
 
             # Проверяем, не использован ли токен
-            if token_data.get('used'):
+            if token_row.used:
                 return {
                     "success": False,
                     "error": "Токен уже использован",
                     "error_code": "TOKEN_ALREADY_USED",
                 }
 
+            user_id = token_row.user_id
+
             # Проверяем пользователя
             # get_user is a ghost name (Sentry PYTHON-FASTAPI-10); the
             # crud.user module exposes get(db, id).
-            user = crud_user.get(db, id=token_data['user_id'])
+            user = crud_user.get(db, id=user_id)
             if not user:
                 return {
                     "success": False,
@@ -367,9 +371,11 @@ class PasswordResetService:
             db.refresh(user)
 
             if user.id:
-                # Помечаем токен как использованный
-                token_data['used'] = True
-                token_data['used_at'] = datetime.now()
+                # Помечаем токен как использованный (в той же транзакции,
+                # что и смена пароля)
+                token_row.used = True
+                token_row.used_at = datetime.now(UTC)
+                db.commit()
 
                 logger.info(f"Password reset completed for user {user.id}")
 
@@ -389,31 +395,26 @@ class PasswordResetService:
             logger.error(f"Error resetting password with token: {e}")
             return {"success": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
 
-    def validate_reset_token(self, token: str) -> dict[str, Any]:
+    def validate_reset_token(self, db: Session, token: str) -> dict[str, Any]:
         """Проверка валидности токена сброса"""
         try:
-            self._clean_expired_tokens()
+            token_row = self._find_token_row(db, token)
 
-            token_key = self._get_token_key(token)
-
-            if token_key not in self.reset_tokens:
+            if token_row is None:
                 return {
                     "valid": False,
                     "error": "Токен не найден",
                     "error_code": "TOKEN_NOT_FOUND",
                 }
 
-            token_data = self.reset_tokens[token_key]
-
-            if datetime.now() > token_data['expires_at']:
-                del self.reset_tokens[token_key]
+            if datetime.now(UTC) > self._aware(token_row.expires_at):
                 return {
                     "valid": False,
                     "error": "Токен истек",
                     "error_code": "TOKEN_EXPIRED",
                 }
 
-            if token_data.get('used'):
+            if token_row.used:
                 return {
                     "valid": False,
                     "error": "Токен уже использован",
@@ -422,10 +423,13 @@ class PasswordResetService:
 
             return {
                 "valid": True,
-                "user_id": token_data['user_id'],
-                "expires_at": token_data['expires_at'].isoformat(),
+                "user_id": token_row.user_id,
+                "expires_at": token_row.expires_at.isoformat(),
                 "time_left_minutes": int(
-                    (token_data['expires_at'] - datetime.now()).total_seconds() / 60
+                    (
+                        self._aware(token_row.expires_at) - datetime.now(UTC)
+                    ).total_seconds()
+                    / 60
                 ),
             }
 
@@ -433,29 +437,25 @@ class PasswordResetService:
             logger.error(f"Error validating reset token: {e}")
             return {"valid": False, "error": str(e), "error_code": "INTERNAL_ERROR"}
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self, db: Session) -> dict[str, Any]:
         """Статистика сброса паролей"""
         try:
-            self._clean_expired_tokens()
+            now = datetime.now(UTC)
+            base = db.query(PasswordResetToken)
+            total_tokens = base.count()
+            used_tokens = base.filter(PasswordResetToken.used == True).count()  # noqa: E712
+            active_tokens = base.filter(
+                PasswordResetToken.used == False,  # noqa: E712
+                PasswordResetToken.expires_at > now,
+            ).count()
 
-            total_tokens = len(self.reset_tokens)
-            used_tokens = sum(
-                1 for data in self.reset_tokens.values() if data.get('used', False)
-            )
-            active_tokens = total_tokens - used_tokens
-
-            by_method = {"phone": 0, "email": 0}
-            for data in self.reset_tokens.values():
-                if 'phone' in data:
-                    by_method['phone'] += 1
-                elif 'email' in data:
-                    by_method['email'] += 1
-
+            # Метод (email/phone) в строках не хранится — старый словарь в
+            # памяти знал его, БД нет; потребителей поля нет (проверено).
             return {
                 "total_tokens": total_tokens,
                 "active_tokens": active_tokens,
                 "used_tokens": used_tokens,
-                "by_method": by_method,
+                "by_method": {"phone": 0, "email": 0},
                 "settings": {"token_ttl_hours": self.token_ttl_hours},
             }
 
