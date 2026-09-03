@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.crud.appointment import appointment as appointment_crud
+from app.models.department import Department
 from app.models.setting import Setting
 from app.repositories.appointments_api_repository import AppointmentsApiRepository
 from app.schemas import appointment as appointment_schemas
@@ -359,6 +360,7 @@ from app.api import (  # noqa: E402  # manual-review: conditional import after c
 from app.models.user import (  # noqa: E402  # manual-review: conditional import after config — intentional
     User,  # noqa: E402  # manual-review: conditional import after config — intentional
 )
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.online_queue import (  # noqa: E402  # manual-review: conditional import after config — intentional
     _broadcast,
     get_or_create_day,
@@ -435,6 +437,9 @@ def create_appointment(
     current_user: User = Depends(deps.get_current_user),
 ):
     del current_user
+    # Atomic slot reservation (Codex P1 round-7): per-doctor FOR UPDATE lock
+    # before the occupancy check — concurrent same-slot writers serialize.
+    lock_doctor_for_slot_reservation(db, appointment_in.doctor_id)
     if appointment_crud.is_time_slot_occupied(
         db,
         doctor_id=appointment_in.doctor_id,
@@ -508,6 +513,9 @@ def update_appointment(
         new_date = appointment_in.appointment_date or appointment.appointment_date
         new_time = appointment_in.appointment_time or appointment.appointment_time
         new_doctor_id = appointment_in.doctor_id or appointment.doctor_id
+        # Atomic slot reservation (Codex P1 round-7): per-doctor FOR UPDATE
+        # lock before the occupancy check.
+        lock_doctor_for_slot_reservation(db, new_doctor_id)
         if appointment_crud.is_time_slot_occupied(
             db,
             doctor_id=new_doctor_id,
@@ -559,7 +567,25 @@ def get_department_schedule(
     current_user: User = Depends(deps.get_current_user),
 ):
     del current_user
-    return appointment_crud.get_department_schedule(db, department=department, date=date)
+    # Codex round-2 P2: resolve the department like the canonical endpoint
+    # does — by KEY first (all-numeric keys are legal per
+    # DepartmentCreate), numeric-id lookup only as a fallback — then pass
+    # the resolved department_id to the repaired crud method (the old
+    # department= keyword no longer exists and would raise TypeError).
+    department_row = (
+        db.query(Department).filter(Department.key == department).first()
+    )
+    if department_row is None and department.strip().isdigit():
+        department_row = (
+            db.query(Department)
+            .filter(Department.id == int(department.strip()))
+            .first()
+        )
+    if department_row is None:
+        return []
+    return appointment_crud.get_department_schedule(
+        db, department_id=department_row.id, date=date
+    )
 
 
 @router.post(

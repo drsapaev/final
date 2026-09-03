@@ -39,7 +39,7 @@ const registrarProfile = {
   username: 'registrar@example.com',
   email: 'registrar@example.com',
   full_name: 'Registrar User',
-  role: 'Receptionist',
+  role: 'Registrar',
   is_active: true,
   is_superuser: false,
 };

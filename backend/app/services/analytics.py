@@ -7,6 +7,7 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
+from app.core.specialties import specialty_variants
 from app.models.patient import Patient
 from app.models.payment_webhook import PaymentWebhook
 from app.models.service import Service
@@ -376,8 +377,12 @@ class AnalyticsService:
         )
 
         if department:
+            # D-1 canonical vocabulary: a dental-family department key
+            # ('dental') must match canonical 'dentistry' doctors after
+            # 0049 (Codex round-5 P2 — exact join filter silently
+            # returned no queues).
             queue_query = queue_query.join(DailyQueue.specialist).filter(
-                Doctor.specialty == department
+                Doctor.specialty.in_(specialty_variants(department))
             )
 
         queues = queue_query.all()

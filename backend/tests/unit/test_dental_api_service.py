@@ -65,6 +65,98 @@ class TestDentalApiService:
         assert exc_info.value.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("specialty", ["stomatology", "dental", "dentistry"])
+    async def test_create_dental_price_override_accepts_all_dental_specialty_vocabularies(
+        self, specialty
+    ):
+        """Every dental specialty spelling provisioned by the system passes.
+
+        'dentistry' is what user provisioning (user_mgmt/_core.py) and
+        dev_seed actually write into doctors.specialty for dentists — it must
+        not be rejected by the dental-only guard.
+        """
+
+        class Repository:
+            def get_visit(self, visit_id):
+                return SimpleNamespace(id=visit_id, patient_id=20, doctor_id=7)
+
+            def get_service(self, service_id):
+                return SimpleNamespace(
+                    id=service_id,
+                    allow_doctor_price_override=True,
+                    price=Decimal("120"),
+                )
+
+            def get_doctor_by_user_id(self, user_id):
+                return SimpleNamespace(id=7, specialty=specialty, user=None)
+
+            def get_doctor(self, doctor_id):
+                return None
+
+            def add(self, obj):
+                self.created = obj
+
+            def commit(self):
+                pass
+
+            def refresh(self, obj):
+                obj.id = 55
+
+            def list_registrars(self):
+                return []
+
+        repository = Repository()
+        service = DentalApiService(db=None, repository=repository)
+
+        result = await service.create_dental_price_override(
+            override_data=SimpleNamespace(
+                visit_id=1,
+                service_id=2,
+                new_price=Decimal("100"),
+                reason="reason",
+                details=None,
+            ),
+            user=SimpleNamespace(id=10),
+        )
+        assert result is not None
+        assert repository.created.doctor_id == 7
+
+    @pytest.mark.asyncio
+    async def test_create_dental_price_override_rejects_non_dental_specialty(self):
+        """A non-dental doctor must still be rejected (403)."""
+
+        class Repository:
+            def get_visit(self, visit_id):
+                return SimpleNamespace(id=visit_id, patient_id=20, doctor_id=7)
+
+            def get_service(self, service_id):
+                return SimpleNamespace(
+                    id=service_id,
+                    allow_doctor_price_override=True,
+                    price=Decimal("120"),
+                )
+
+            def get_doctor_by_user_id(self, user_id):
+                return SimpleNamespace(id=7, specialty="cardiology", user=None)
+
+            def get_doctor(self, doctor_id):
+                return None
+
+        service = DentalApiService(db=None, repository=Repository())
+        with pytest.raises(DentalApiDomainError) as exc_info:
+            await service.create_dental_price_override(
+                override_data=SimpleNamespace(
+                    visit_id=1,
+                    service_id=2,
+                    new_price=Decimal("100"),
+                    reason="reason",
+                    details=None,
+                ),
+                user=SimpleNamespace(id=10),
+            )
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
     async def test_create_dental_price_override_accepts_owned_visit(self):
         class Repository:
             def get_visit(self, visit_id):

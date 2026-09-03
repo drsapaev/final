@@ -10,13 +10,8 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 // so they can save their work instead of losing it to a silent 401.
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useCardiologistHotkeys } from '../hooks/useCardiologistHotkeys';
-// S-M-2 fix: replace lucide-direct with macos <Icon>
-import {
-  Card,
-  Button,
-  Checkbox,
-  Input,
-  Icon } from '../components/ui/macos';
+// S-M-2 (история, ОТМЕНЕО Track 3-2): macos-Icon обёртка → lucide refs (§3.3)
+import { Card, Button, Checkbox, Input } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './cardiology.css';
@@ -44,6 +39,7 @@ import { useConfirm } from '../components/common/ConfirmDialog';
 import tokenManager from '../utils/tokenManager';
 import { countAppointmentsByStatuses, SPECIALTY_KEYS, getAllPatientServices, makeEnsureCanonicalVisitId } from '../utils/doctorPanelShared';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
+import { Download, Settings } from 'lucide-react';
 
 const API_V1_BASE = getApiBaseUrl();
 const CARDIOLOGY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
@@ -1163,14 +1159,6 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     }
   }, [selectedPatient, authRefreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Проверяем демо-режим после всех хуков
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
-
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    return null;
-  }
-
   // Обработка AI предложений
   const handleAISuggestion = (type: string, suggestion: unknown) => {
     if (type === 'icd10') {
@@ -2007,7 +1995,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
           className="cardio-settings-fab"
           aria-label={tI18n('cardio.cardio_panel_settings_open_aria')}>
 
-          <Icon name="gear" size={18} />
+          <Settings size={18} aria-hidden="true" />
         </button>
         {(activeTab === 'visit' || activeTab === 'blood') && settingsOpen &&
         <Card className="cardio-settings-card">
@@ -2040,7 +2028,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
                 // the values are stored.
                 notify.success(tI18n('cardio.settings_saved'));
                 setSettingsOpen(false);
-              }}><Icon name="square.and.arrow.down" size={16} className="cardio-icon-mr" />{tI18n('cardio.cardio_panel_save')}</Button>
+              }}><Download size={16} className="cardio-icon-mr" aria-hidden="true" />{tI18n('cardio.cardio_panel_save')}</Button>
             </div>
           </Card>
         }

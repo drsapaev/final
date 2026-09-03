@@ -94,6 +94,9 @@ const UserModal = ({
   const { roleOptions: apiRoleOptions } = useRoles({ includeAll: false });
 
   // Fallback roles if API fails
+  // REC-1 (Receptionist deprecation): 'Receptionist' removed from the
+  // create/edit role options — Registrar is the canonical front-desk role
+  // (0 production Receptionist rows, SQL evidence 2026-09-02).
   const roleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
     { value: 'Admin', label: t('admin2.umdl_role_admin') },
     { value: 'Doctor', label: t('admin2.umdl_role_doctor_general') },
@@ -101,7 +104,7 @@ const UserModal = ({
     { value: 'derma', label: t('admin2.umdl_role_derma') },
     { value: 'dentist', label: t('admin2.umdl_role_dentist') },
     { value: 'Nurse', label: t('admin2.umdl_role_nurse') },
-    { value: 'Receptionist', label: t('admin2.umdl_role_receptionist') },
+    { value: 'Registrar', label: t('admin2.umdl_role_registrar') },
     { value: 'Cashier', label: t('admin2.umdl_role_cashier') },
     { value: 'Lab', label: t('admin2.umdl_role_lab') },
     { value: 'Patient', label: t('admin2.umdl_role_patient') }
@@ -266,7 +269,7 @@ const UserModal = ({
         <FormField label={t('admin2.umdl_field_role')} icon={Shield}>
           <Select
             value={formData.role}
-            onChange={(value) => handleChange('role', value)}
+            onValueChange={(value) => handleChange('role', value)}
             options={roleOptions}
             size="large"
             className="admin-input-pl-40"

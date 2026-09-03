@@ -7,10 +7,11 @@ import statistics
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, desc, func
+from sqlalchemy import and_, case, desc, func
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
+from app.models.clinic import Doctor
 from app.models.emr import EMR
 from app.models.patient import Patient
 from app.models.payment import Payment
@@ -194,20 +195,23 @@ class AdvancedAnalyticsService:
                 filters.append(Appointment.department == department)
 
             # Статистика по врачам
+            # appointments.doctor_id -> doctors.id (FK), имя и specialty живут
+            # в Doctor/User (User.fio/User.specialty не существуют — Sentry
+            # PYTHON-FASTAPI-12)
             doctor_stats = (
                 db.query(
-                    User.id,
-                    User.fio,
-                    User.specialty,
+                    Doctor.id.label('doctor_id'),
+                    User.full_name,
+                    Doctor.specialty,
                     func.count(Appointment.id).label('total_appointments'),
                     func.sum(
-                        func.case((Appointment.status == "completed", 1), else_=0)
+                        case((Appointment.status == "completed", 1), else_=0)
                     ).label('completed_appointments'),
                     func.sum(
-                        func.case((Appointment.status == "cancelled", 1), else_=0)
+                        case((Appointment.status == "cancelled", 1), else_=0)
                     ).label('cancelled_appointments'),
                     func.avg(
-                        func.case(
+                        case(
                             (
                                 Appointment.status == "completed",
                                 func.extract(
@@ -220,9 +224,10 @@ class AdvancedAnalyticsService:
                         )
                     ).label('avg_visit_duration_hours'),
                 )
-                .join(Appointment, User.id == Appointment.doctor_id)
+                .join(Appointment, Doctor.id == Appointment.doctor_id)
+                .outerjoin(User, Doctor.user_id == User.id)
                 .filter(and_(*filters))
-                .group_by(User.id, User.fio, User.specialty)
+                .group_by(Doctor.id, User.full_name, Doctor.specialty)
                 .all()
             )
 
@@ -241,8 +246,8 @@ class AdvancedAnalyticsService:
 
                 doctor_performance.append(
                     {
-                        "doctor_id": stat.id,
-                        "doctor_name": stat.fio,
+                        "doctor_id": stat.doctor_id,
+                        "doctor_name": stat.full_name,
                         "specialty": stat.specialty,
                         "total_appointments": stat.total_appointments,
                         "completed_appointments": stat.completed_appointments,
@@ -322,7 +327,7 @@ class AdvancedAnalyticsService:
             # Возрастные группы
             age_groups = (
                 db.query(
-                    func.case(
+                    case(
                         (
                             func.extract('year', func.age(Patient.birth_date)) < 18,
                             'under_18',

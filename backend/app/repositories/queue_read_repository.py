@@ -7,6 +7,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.core.specialties import specialty_variants
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service import Service
@@ -28,7 +29,11 @@ class QueueReadRepository:
     def list_active_doctors(self, *, specialty: str | None) -> list[Doctor]:
         query = self.db.query(Doctor).filter(Doctor.active.is_(True))
         if specialty:
-            query = query.filter(Doctor.specialty == specialty)
+            # D-1 canonical vocabulary: any dental-family spelling must
+            # find canonical rows too (e.g. /admin/queue-status filtered
+            # by the legacy profile key "stomatology" must still see
+            # "dentistry" doctors after migration 0049 — Codex round-3 P1).
+            query = query.filter(Doctor.specialty.in_(specialty_variants(specialty)))
         return query.all()
 
     def list_daily_queues(

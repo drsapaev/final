@@ -106,9 +106,18 @@ class PayloadMixin(LabReportingServiceMixinBase):
     def ensure_default_templates(self) -> None:
         logger.info("[LAB] ensure_default_templates seeding pilot templates")
         seeded_count = 0
+        # Perf (#2977): one batched lookup replaces a get_template_by_code
+        # roundtrip per definition; latest-version checks below still use
+        # the dedicated fully-loaded repository query.
+        templates_by_code = {
+            template.code: template
+            for template in self.repository.list_templates_by_codes(
+                [definition["code"] for definition in DEFAULT_LAB_TEMPLATE_DEFINITIONS]
+            )
+        }
         for definition in DEFAULT_LAB_TEMPLATE_DEFINITIONS:
             template_signature = self._seed_definition_signature(definition)
-            template = self.repository.get_template_by_code(definition["code"])
+            template = templates_by_code.get(definition["code"])
             if not template:
                 template = LabReportTemplate(
                     code=definition["code"],
@@ -207,22 +216,33 @@ class PayloadMixin(LabReportingServiceMixinBase):
     def ensure_default_template_bindings(self) -> None:
         logger.info("[LAB] ensure_default_template_bindings seeding workflow mappings")
         touched = 0
+        # Perf (#2977): 100 binding definitions previously cost two SELECTs
+        # each (template existence + binding lookup) on every resolve call;
+        # both are now single batched queries diffed in memory.
+        binding_template_codes = sorted(
+            {definition["template_code"] for definition in DEFAULT_LAB_TEMPLATE_BINDING_DEFINITIONS}
+        )
+        binding_templates = {
+            template.code: template
+            for template in self.repository.list_templates_by_codes(binding_template_codes)
+        }
+        existing_bindings = {
+            (binding.service_code, binding.template_code): binding
+            for binding in self.repository.list_service_bindings()
+        }
         for definition in DEFAULT_LAB_TEMPLATE_BINDING_DEFINITIONS:
             service_code = normalize_service_code(definition["service_code"])
             template_code = definition["template_code"]
             if not service_code:
                 continue
-            if not self.repository.get_template_by_code(template_code):
+            if template_code not in binding_templates:
                 logger.warning(
                     "[LAB] skipping template binding seed service_code=%s template_code=%s because template is missing",
                     service_code,
                     template_code,
                 )
                 continue
-            binding = self.repository.get_service_binding(
-                service_code=service_code,
-                template_code=template_code,
-            )
+            binding = existing_bindings.get((service_code, template_code))
             if binding is None:
                 binding = LabTemplateServiceBinding(
                     service_code=service_code,

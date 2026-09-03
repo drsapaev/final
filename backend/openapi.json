@@ -12374,7 +12374,7 @@
           "webhooks"
         ],
         "summary": "Create Webhook",
-        "description": "Создает новый webhook\n\nТребует роль: ADMIN или DEVELOPER",
+        "description": "Создает новый webhook\n\nТребует роль: ADMIN",
         "operationId": "create_webhook_api_v1_webhooks__post",
         "security": [
           {
@@ -12419,7 +12419,7 @@
           "webhooks"
         ],
         "summary": "Get Webhooks",
-        "description": "Получает список webhook'ов с фильтрацией\n\nТребует роль: ADMIN, DEVELOPER или REGISTRAR",
+        "description": "Получает список webhook'ов с фильтрацией\n\nТребует роль: ADMIN или REGISTRAR",
         "operationId": "get_webhooks_api_v1_webhooks__get",
         "security": [
           {
@@ -12510,7 +12510,7 @@
           "webhooks"
         ],
         "summary": "Get Webhook",
-        "description": "Получает webhook по ID со статистикой\n\nТребует роль: ADMIN, DEVELOPER или REGISTRAR",
+        "description": "Получает webhook по ID со статистикой\n\nТребует роль: ADMIN или REGISTRAR",
         "operationId": "get_webhook_api_v1_webhooks__webhook_id__get",
         "security": [
           {
@@ -12556,7 +12556,7 @@
           "webhooks"
         ],
         "summary": "Update Webhook",
-        "description": "Обновляет webhook\n\nТребует роль: ADMIN или DEVELOPER",
+        "description": "Обновляет webhook\n\nТребует роль: ADMIN",
         "operationId": "update_webhook_api_v1_webhooks__webhook_id__put",
         "security": [
           {
@@ -12612,7 +12612,7 @@
           "webhooks"
         ],
         "summary": "Delete Webhook",
-        "description": "Удаляет webhook\n\nТребует роль: ADMIN или DEVELOPER",
+        "description": "Удаляет webhook\n\nТребует роль: ADMIN",
         "operationId": "delete_webhook_api_v1_webhooks__webhook_id__delete",
         "security": [
           {
@@ -12662,7 +12662,7 @@
           "webhooks"
         ],
         "summary": "Activate Webhook",
-        "description": "Активирует webhook\n\nТребует роль: ADMIN или DEVELOPER",
+        "description": "Активирует webhook\n\nТребует роль: ADMIN",
         "operationId": "activate_webhook_api_v1_webhooks__webhook_id__activate_post",
         "security": [
           {
@@ -12710,7 +12710,7 @@
           "webhooks"
         ],
         "summary": "Deactivate Webhook",
-        "description": "Деактивирует webhook\n\nТребует роль: ADMIN или DEVELOPER",
+        "description": "Деактивирует webhook\n\nТребует роль: ADMIN",
         "operationId": "deactivate_webhook_api_v1_webhooks__webhook_id__deactivate_post",
         "security": [
           {
@@ -12758,7 +12758,7 @@
           "webhooks"
         ],
         "summary": "Test Webhook",
-        "description": "Тестирует webhook отправкой тестового события\n\nТребует роль: ADMIN или DEVELOPER",
+        "description": "Тестирует webhook отправкой тестового события\n\nТребует роль: ADMIN",
         "operationId": "test_webhook_api_v1_webhooks__webhook_id__test_post",
         "security": [
           {
@@ -12816,7 +12816,7 @@
           "webhooks"
         ],
         "summary": "Get Webhook Calls",
-        "description": "Получает вызовы webhook'а\n\nТребует роль: ADMIN, DEVELOPER или REGISTRAR",
+        "description": "Получает вызовы webhook'а\n\nТребует роль: ADMIN или REGISTRAR",
         "operationId": "get_webhook_calls_api_v1_webhooks__webhook_id__calls_get",
         "security": [
           {
@@ -12900,7 +12900,7 @@
           "webhooks"
         ],
         "summary": "Get Webhook Call",
-        "description": "Получает детали вызова webhook'а\n\nТребует роль: ADMIN, DEVELOPER или REGISTRAR",
+        "description": "Получает детали вызова webhook'а\n\nТребует роль: ADMIN или REGISTRAR",
         "operationId": "get_webhook_call_api_v1_webhooks_calls__call_id__get",
         "security": [
           {
@@ -12948,7 +12948,7 @@
           "webhooks"
         ],
         "summary": "Get System Webhook Stats",
-        "description": "Получает общую статистику системы webhook'ов\n\nТребует роль: ADMIN или DEVELOPER",
+        "description": "Получает общую статистику системы webhook'ов\n\nТребует роль: ADMIN",
         "operationId": "get_system_webhook_stats_api_v1_webhooks_system_stats_get",
         "responses": {
           "200": {
@@ -12975,7 +12975,7 @@
           "webhooks"
         ],
         "summary": "Get Webhook Stats",
-        "description": "Получает статистику webhook'а\n\nТребует роль: ADMIN, DEVELOPER или REGISTRAR",
+        "description": "Получает статистику webhook'а\n\nТребует роль: ADMIN или REGISTRAR",
         "operationId": "get_webhook_stats_api_v1_webhooks__webhook_id__stats_get",
         "security": [
           {
@@ -13023,7 +13023,7 @@
           "webhooks"
         ],
         "summary": "Webhook Bulk Action",
-        "description": "Выполняет массовое действие над webhook'ами\n\nТребует роль: ADMIN или DEVELOPER",
+        "description": "Выполняет массовое действие над webhook'ами\n\nТребует роль: ADMIN",
         "operationId": "webhook_bulk_action_api_v1_webhooks_bulk_action_post",
         "requestBody": {
           "content": {
@@ -13070,7 +13070,7 @@
           "webhooks"
         ],
         "summary": "Trigger Webhook Event",
-        "description": "Триггерит событие для всех подписанных webhook'ов\n\nТребует роль: ADMIN или DEVELOPER",
+        "description": "Триггерит событие для всех подписанных webhook'ов\n\nТребует роль: ADMIN",
         "operationId": "trigger_webhook_event_api_v1_webhooks_events_trigger_post",
         "requestBody": {
           "content": {
@@ -13779,8 +13779,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
                   "title": "Response Get Doctor Schedule Api V1 Appointments Doctor  Doctor Id  Schedule Get"
                 }
               }
@@ -28768,6 +28771,16 @@
               }
             }
           },
+          "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -28897,6 +28910,47 @@
         ]
       }
     },
+    "/api/v1/admin/doctors/specialty-vocabulary": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Doctor Specialty Vocabulary",
+        "description": "Medical specialty catalog — codes selectable at new-doctor onboarding.\n\nRuntime SSOT is the ``medical_specialties`` table (migration 0051);\nthere is deliberately NO hardcoded fallback. Ordering: sort_order,\nthen code (deterministic). Frontend label resolution per owner spec:\nlocale → catalog translation → title_ru → code (the ru titles are a\ncompatibility fallback for kk/uz-Cyrl, not a translation claim).",
+        "operationId": "get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SpecialtyVocabularyItem"
+                  },
+                  "type": "array",
+                  "title": "Response Get Doctor Specialty Vocabulary Api V1 Admin Doctors Specialty Vocabulary Get"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/doctors/{doctor_id}": {
       "get": {
         "tags": [
@@ -28984,6 +29038,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/app__schemas__clinic__DoctorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
                 }
               }
             }
@@ -31024,7 +31088,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BookAppointmentRequest"
+                "$ref": "#/components/schemas/MobileBookAppointmentRequest"
               }
             }
           },
@@ -53610,7 +53674,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
+                  "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor|Receptionist|Manager)$"
                 },
                 {
                   "type": "null"
@@ -60500,7 +60564,7 @@
           "force-majeure"
         ],
         "summary": "Get Refund Requests",
-        "description": "Получить список заявок на возврат\n\nДоступно: Admin, Cashier, Manager",
+        "description": "Получить список заявок на возврат\n\nДоступно: Admin, Cashier",
         "operationId": "get_refund_requests_api_v1_force_majeure_refund_requests_get",
         "security": [
           {
@@ -60602,7 +60666,7 @@
           "force-majeure"
         ],
         "summary": "Get Refund Request",
-        "description": "Получить заявку на возврат по ID\n\nДоступно: Admin, Cashier, Manager",
+        "description": "Получить заявку на возврат по ID\n\nДоступно: Admin, Cashier",
         "operationId": "get_refund_request_api_v1_force_majeure_refund_requests__request_id__get",
         "security": [
           {
@@ -60650,7 +60714,7 @@
           "force-majeure"
         ],
         "summary": "Process Refund Request",
-        "description": "Обработать заявку на возврат\n\nДействия:\n- approve: Одобрить заявку\n- reject: Отклонить заявку\n- complete: Завершить (деньги возвращены)\n\nДоступно: Admin, Cashier, Manager",
+        "description": "Обработать заявку на возврат\n\nДействия:\n- approve: Одобрить заявку\n- reject: Отклонить заявку\n- complete: Завершить (деньги возвращены)\n\nДоступно: Admin, Cashier",
         "operationId": "process_refund_request_api_v1_force_majeure_refund_requests__request_id__process_post",
         "security": [
           {
@@ -69031,70 +69095,6 @@
           "template_structure"
         ],
         "title": "Body_validate_emr_data_api_v1_emr_ai_validate_post"
-      },
-      "BookAppointmentRequest": {
-        "properties": {
-          "doctor_id": {
-            "type": "integer",
-            "title": "Doctor Id",
-            "description": "ID врача"
-          },
-          "appointment_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Appointment Date",
-            "description": "Дата записи (YYYY-MM-DD)"
-          },
-          "specialty": {
-            "type": "string",
-            "title": "Specialty",
-            "description": "Специализация"
-          },
-          "patient_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Id",
-            "description": "ID пациента"
-          },
-          "patient_fio": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Fio",
-            "description": "ФИО пациента"
-          },
-          "patient_phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Phone",
-            "description": "Телефон пациента"
-          }
-        },
-        "type": "object",
-        "required": [
-          "doctor_id",
-          "appointment_date",
-          "specialty"
-        ],
-        "title": "BookAppointmentRequest",
-        "description": "Запрос на запись к врачу для API"
       },
       "BranchCreate": {
         "properties": {
@@ -86328,6 +86328,71 @@
         "title": "MobileAttestRequest",
         "description": "Request body for POST /mobile/attest.\n\nP0-6d FIX: previously this endpoint accepted ``request: dict[str, Any]``\nwith no validation. Now Pydantic enforces:\n\n- ``platform`` is one of ``android`` / ``ios`` (required).\n- ``integrity_token`` is required for Android (max 32KB — Play\n  Integrity tokens are typically ~1-2KB but we leave headroom).\n- ``device_token`` is required for iOS (max 32KB — Device Check\n  tokens are similarly small).\n- ``package_name`` / ``bundle_id`` are optional identifier strings\n  capped at 200 chars.\n- ``nonce`` is an optional replay-protection string capped at 256\n  chars.\n\nThe handler still performs the conditional token-presence checks\nso the error messages remain identical to the pre-fix behavior."
       },
+      "MobileBookAppointmentRequest": {
+        "properties": {
+          "doctor_id": {
+            "type": "integer",
+            "title": "Doctor Id",
+            "description": "ID врача"
+          },
+          "preferred_date": {
+            "type": "string",
+            "title": "Preferred Date",
+            "description": "Предпочтительная дата (YYYY-MM-DD)"
+          },
+          "preferred_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Time",
+            "description": "Предпочтительное время (HH:MM)"
+          },
+          "complaint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complaint",
+            "description": "Жалобы"
+          },
+          "services": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Services",
+            "description": "ID услуг"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Дополнительные заметки"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doctor_id",
+          "preferred_date"
+        ],
+        "title": "MobileBookAppointmentRequest",
+        "description": "Запрос на запись к врачу"
+      },
       "MobileLoginRequest": {
         "properties": {
           "phone": {
@@ -93248,6 +93313,10 @@
             "type": "integer",
             "title": "Doctors Count"
           },
+          "aggregate_max_per_day": {
+            "type": "integer",
+            "title": "Aggregate Max Per Day"
+          },
           "last_updated": {
             "anyOf": [
               {
@@ -93269,6 +93338,7 @@
           "enabled",
           "current_usage",
           "doctors_count",
+          "aggregate_max_per_day",
           "last_updated"
         ],
         "title": "QueueLimitResponse",
@@ -98370,6 +98440,20 @@
         "title": "ServiceSearchRequest",
         "description": "Запрос поиска услуг"
       },
+      "ServiceUnavailableDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ServiceUnavailableDetail",
+        "description": "Body of the documented catalog 503 (Codex round-6 P2).\n\nFastAPI's HTTPException payload is ``{\"detail\": ...}``; declaring this\nmodel on the affected operations gives generated clients a typed error\nshape instead of ``content?: never`` for the configuration-failure\nresponse shared by GET specialty-vocabulary, POST and PUT /admin/doctors."
+      },
       "ServiceUpdate": {
         "properties": {
           "code": {
@@ -99008,6 +99092,47 @@
           "initialized"
         ],
         "title": "SetupStatusOut"
+      },
+      "SpecialtyVocabularyItem": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "title_ru": {
+            "type": "string",
+            "title": "Title Ru"
+          },
+          "title_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Uz"
+          },
+          "title_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "title_ru"
+        ],
+        "title": "SpecialtyVocabularyItem",
+        "description": "One selectable specialty from the Medical Specialty Catalog (0051).\n\nTyped DTO (Codex P2): a generic dict response compiled to arbitrary\nmaps in generated TS; this model guarantees code/titles exist."
       },
       "StaffActionConfirmRequest": {
         "properties": {
@@ -102190,7 +102315,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"
@@ -102279,7 +102404,7 @@
           },
           "role": {
             "type": "string",
-            "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|derma|dentist)$",
+            "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$",
             "title": "Role"
           },
           "is_active": {
@@ -104319,6 +104444,17 @@
                 "type": "null"
               }
             ]
+          },
+          "doctor_profile_incomplete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Profile Incomplete"
           }
         },
         "type": "object",
@@ -104351,7 +104487,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor|Receptionist|Manager)$"
               },
               {
                 "type": "null"
@@ -104660,7 +104796,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"
@@ -108217,6 +108353,11 @@
               }
             ],
             "title": "Department"
+          },
+          "profile_incomplete": {
+            "type": "boolean",
+            "title": "Profile Incomplete",
+            "default": false
           },
           "user": {
             "anyOf": [

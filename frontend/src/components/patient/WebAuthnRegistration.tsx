@@ -1,11 +1,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
-} from '../ui/macos';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Alert, Input } from '../ui/macos';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { Plus, ShieldCheck, Trash2 } from 'lucide-react';
 
 /**
  * WebAuthn Registration UI — P5 frontend integration.
@@ -72,7 +71,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
     <Card variant="filled" padding="none">
       <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '12px 16px' }}>
         <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Icon name="lock.shield" size={20} />
+          <ShieldCheck size={20} aria-hidden="true" />
           {t('patient.pat_web_title')}
         </CardTitle>
       </CardHeader>
@@ -94,7 +93,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
             loading={isRegistering}
             disabled={isRegistering}
           >
-            <Icon name="plus" size={16} />
+            <Plus size={16} aria-hidden="true" />
             {isRegistering ? t('patient.pat_web_registering') : t('patient.pat_web_add_passkey')}
           </Button>
         </div>
@@ -145,7 +144,7 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
                   size="small"
                   onClick={() => handleDeactivate(cred.id)}
                 >
-                  <Icon name="trash" size={14} />
+                  <Trash2 size={14} aria-hidden="true" />
                   {t('patient.pat_web_delete')}
                 </Button>
               </div>

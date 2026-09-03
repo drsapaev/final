@@ -2,6 +2,7 @@ import React from 'react';
 import '@testing-library/jest-dom';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Brain, Users } from 'lucide-react';
 import i18n from '@/i18n';
 import Sidebar from '../Sidebar';
 
@@ -38,7 +39,7 @@ describe('PR-UI-19 (C-6): Sidebar labelKey i18n resolution', () => {
     await act(async () => {
       await i18n.changeLanguage('ru');
     });
-    render(<Sidebar items={[{ id: 'queue', labelKey: 'nav.queue', icon: 'person.2' }]} activeItem="queue" />);
+    render(<Sidebar items={[{ id: 'queue', labelKey: 'nav.queue', icon: Users }]} activeItem="queue" />);
 
     expect(screen.getByRole('button', { name: 'Очередь' })).toBeInTheDocument();
 
@@ -55,7 +56,7 @@ describe('PR-UI-19 (C-6): Sidebar labelKey i18n resolution', () => {
       await i18n.changeLanguage('en');
     });
     const { unmount } = render(
-      <Sidebar items={[{ id: 'patients', labelKey: 'nav.patients', icon: 'person.2' }]} />
+      <Sidebar items={[{ id: 'patients', labelKey: 'nav.patients', icon: Users }]} />
     );
     expect(screen.getByRole('button', { name: 'Patients' })).toBeInTheDocument();
     unmount();
@@ -63,7 +64,7 @@ describe('PR-UI-19 (C-6): Sidebar labelKey i18n resolution', () => {
     await act(async () => {
       await i18n.changeLanguage('uz-Latn');
     });
-    render(<Sidebar items={[{ id: 'patients', labelKey: 'nav.patients', icon: 'person.2' }]} />);
+    render(<Sidebar items={[{ id: 'patients', labelKey: 'nav.patients', icon: Users }]} />);
     expect(screen.getByRole('button', { name: 'Bemorlar' })).toBeInTheDocument();
   });
 
@@ -87,7 +88,7 @@ describe('PR-UI-19 (C-6): Sidebar labelKey i18n resolution', () => {
     const aiItem = {
       id: 'ai',
       labelKey: 'nav.ai_assistant',
-      icon: 'brain',
+      icon: Brain,
       badgeKey: 'nav.ai_disclaimer_badge',
       tooltipKey: 'nav.ai_disclaimer_aria',
       ariaLabelKey: 'nav.ai_disclaimer_aria',

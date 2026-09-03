@@ -119,13 +119,6 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     status: 'correct'
   },
   
-  'src/components/common/Modal.jsx': {
-    purpose: 'Система модальных окон',
-    currentLocation: 'src/components/common/',
-    recommendedLocation: 'src/components/common/',
-    status: 'correct'
-  },
-  
   'src/components/common/Form.jsx': {
     purpose: 'Система форм с валидацией',
     currentLocation: 'src/components/common/',
@@ -137,22 +130,6 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     purpose: 'Ролевые ограничения доступа',
     currentLocation: 'src/components/common/',
     recommendedLocation: 'src/components/common/',
-    status: 'correct'
-  },
-
-  // Аутентификация
-  'src/components/auth/RequireAuth.jsx': {
-    purpose: 'Ролевые ограничения маршрутов',
-    currentLocation: 'src/components/auth/',
-    recommendedLocation: 'src/components/auth/',
-    status: 'correct'
-  },
-
-  // Навигация
-  'src/components/navigation/ProtectedRoute.jsx': {
-    purpose: 'Защищенные маршруты',
-    currentLocation: 'src/components/navigation/',
-    recommendedLocation: 'src/components/navigation/',
     status: 'correct'
   },
 
@@ -299,13 +276,6 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     status: 'correct'
   },
   
-  'src/styles/cursor-effects.css': {
-    purpose: 'Эффекты курсора',
-    currentLocation: 'src/styles/',
-    recommendedLocation: 'src/styles/',
-    status: 'correct'
-  },
-  
   'src/styles/full-width.css': {
     purpose: 'Полноширинные стили',
     currentLocation: 'src/styles/',
@@ -315,20 +285,6 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
   
   'src/styles/responsive.css': {
     purpose: 'Адаптивные стили',
-    currentLocation: 'src/styles/',
-    recommendedLocation: 'src/styles/',
-    status: 'correct'
-  },
-  
-  'src/styles/sidebar-buttons.css': {
-    purpose: 'Стили кнопок сайдбара',
-    currentLocation: 'src/styles/',
-    recommendedLocation: 'src/styles/',
-    status: 'correct'
-  },
-  
-  'src/styles/unified-sidebar.css': {
-    purpose: 'Унифицированные стили сайдбара',
     currentLocation: 'src/styles/',
     recommendedLocation: 'src/styles/',
     status: 'correct'
@@ -447,24 +403,8 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     issues: ['Следует переместить в src/pages/public/']
   },
   
-  'src/pages/Login.jsx': {
-    purpose: 'Страница входа',
-    currentLocation: 'src/pages/',
-    recommendedLocation: 'src/pages/auth/',
-    status: 'needs_move',
-    issues: ['Следует переместить в src/pages/auth/']
-  },
-  
   'src/pages/UserSelect.jsx': {
     purpose: 'Выбор пользователя',
-    currentLocation: 'src/pages/',
-    recommendedLocation: 'src/pages/auth/',
-    status: 'needs_move',
-    issues: ['Следует переместить в src/pages/auth/']
-  },
-  
-  'src/pages/Activation.jsx': {
-    purpose: 'Активация',
     currentLocation: 'src/pages/',
     recommendedLocation: 'src/pages/auth/',
     status: 'needs_move',
@@ -513,14 +453,6 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
     recommendedLocation: 'src/pages/mobile/',
     status: 'needs_move',
     issues: ['Следует переместить в src/pages/mobile/']
-  },
-  
-  'src/pages/MediLabDemo.jsx': {
-    purpose: 'Демо MediLab',
-    currentLocation: 'src/pages/',
-    recommendedLocation: 'src/pages/demo/',
-    status: 'needs_move',
-    issues: ['Следует переместить в src/pages/demo/']
   },
   
   'src/pages/NewApp.jsx': {
@@ -666,12 +598,6 @@ export function getRecommendedStructure(): Record<string, string[]> {
       'Table.jsx',
       'RoleGuard.jsx'
     ],
-    'src/components/auth/': [
-      'RequireAuth.jsx'
-    ],
-    'src/components/navigation/': [
-      'ProtectedRoute.jsx'
-    ],
     'src/components/layout/': [
       'Header.jsx',
       'Sidebar.jsx',
@@ -724,15 +650,12 @@ export function getRecommendedStructure(): Record<string, string[]> {
       'DisplayBoardUnified.jsx'
     ],
     'src/pages/auth/': [
-      'Login.jsx',
-      'UserSelect.jsx',
-      'Activation.jsx'
+      'UserSelect.jsx'
     ],
     'src/pages/mobile/': [
       'MobilePatientDashboard.jsx'
     ],
     'src/pages/demo/': [
-      'MediLabDemo.jsx',
       'NewApp.jsx',
       'AppOld.jsx',
       'AppNew.jsx'
@@ -752,11 +675,8 @@ export function getRecommendedStructure(): Record<string, string[]> {
       'admin.css',
       'admin-dark-theme.css',
       'animations.css',
-      'cursor-effects.css',
       'full-width.css',
-      'responsive.css',
-      'sidebar-buttons.css',
-      'unified-sidebar.css'
+      'responsive.css'
     ],
     'src/utils/': [
       'themeChecker.js',

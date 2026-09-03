@@ -86,7 +86,13 @@ async def me(current_user: User = Depends(get_current_user)):
         from app.models.clinic import Doctor
         db = SessionLocal()
         try:
-            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+            # Only an ACTIVE Doctor profile is advertised for panel routing:
+            # a deactivated doctor must not be routed into clinical panels.
+            doctor = (
+                db.query(Doctor)
+                .filter(Doctor.user_id == current_user.id, Doctor.active == True)  # noqa: E712
+                .first()
+            )
             if doctor:
                 specialty = doctor.specialty
                 doctor_id = doctor.id

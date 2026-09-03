@@ -1,6 +1,9 @@
 """Core mixin for UserManagementService. Split from user_management_service.py."""
 from __future__ import annotations
 
+from app.services.medical_specialty_catalog import (
+    MedicalSpecialtyCatalogError,
+)
 from app.services.user_mgmt._base import *  # noqa: F401, F403
 from app.services.user_mgmt._base import UserManagementServiceMixinBase
 
@@ -239,26 +242,54 @@ class CoreMixin(UserManagementServiceMixinBase):
             # registrar doctor selector, and schedules until admin manually
             # links them via AdminDoctors → "Add doctor" → pick user.
             doctor_created = False
-            if user_data.role in ("Doctor", "Cardiologist", "Dermatologist", "Dentist", "cardio", "derma", "dentist"):
+            if user_data.role in DOCTOR_PROFILE_ROLES:
                 existing_doctor = (
                     db.query(Doctor)
                     .filter(Doctor.user_id == user.id)
                     .first()
                 )
                 if not existing_doctor:
-                    # PR-26: map role to specialty including lowercase cardio/derma/dentist
-                    specialty_map = {
-                        "Doctor": "general",
-                        "Cardiologist": "cardiology",
-                        "Dermatologist": "dermatology",
-                        "Dentist": "dentistry",
-                        "cardio": "cardiology",
-                        "derma": "dermatology",
-                        "dentist": "dentistry",
-                    }
+                    # PR-26: map role to specialty including lowercase cardio/derma/dentist.
+                    # "Doctor" -> "general" is the INCOMPLETE sentinel (decision #5):
+                    # the profile is provisioned mechanically; admin must complete
+                    # the real specialty (see is_doctor_profile_incomplete).
+                    mapped_specialty = DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
+                        user_data.role, INCOMPLETE_DOCTOR_SPECIALTY
+                    )
+                    # Codex round-6 P1: the legacy role auto-map must respect the
+                    # runtime catalog SSOT — a DEACTIVATED catalog specialty must
+                    # not receive a fresh ACTIVE doctor profile (it would appear
+                    # in downstream doctor/queue selectors). If the mapped code is
+                    # not selectable, provision the INCOMPLETE sentinel instead:
+                    # the account still onboards, and the profile requires
+                    # assignment through the validated boundary (POST/PUT
+                    # /admin/doctors with catalog validation). An UNUSABLE catalog
+                    # (missing table / empty seed -> MedicalSpecialtyCatalogError)
+                    # carries no deactivation information — keep the historical
+                    # mapping rather than failing user creation.
+                    if mapped_specialty != INCOMPLETE_DOCTOR_SPECIALTY:
+                        try:
+                            from app.services.medical_specialty_catalog import (
+                                MedicalSpecialtyCatalogService,
+                            )
+
+                            selectable = MedicalSpecialtyCatalogService(
+                                db
+                            ).is_selectable_for_onboarding(mapped_specialty)
+                        except MedicalSpecialtyCatalogError:
+                            selectable = True
+                        if not selectable:
+                            logger.warning(
+                                "Auto-provisioning downgraded role %s: catalog "
+                                "specialty %s is not selectable — incomplete "
+                                "profile requires assignment via /admin/doctors",
+                                user_data.role,
+                                mapped_specialty,
+                            )
+                            mapped_specialty = INCOMPLETE_DOCTOR_SPECIALTY
                     new_doctor = Doctor(
                         user_id=user.id,
-                        specialty=specialty_map.get(user_data.role, "general"),
+                        specialty=mapped_specialty,
                         active=user_data.is_active,
                     )
                     db.add(new_doctor)
@@ -293,6 +324,8 @@ class CoreMixin(UserManagementServiceMixinBase):
 
             # Обновляем основные поля
             update_data = user_data.model_dump(exclude_unset=True)
+            old_is_active = user.is_active
+            old_role = user.role
 
             target_is_active = update_data.get("is_active", user.is_active)
             target_role = update_data.get("role", user.role)
@@ -362,6 +395,24 @@ class CoreMixin(UserManagementServiceMixinBase):
                         if hasattr(user.profile, field):
                             setattr(user.profile, field, value)
 
+            # Ghost-doctor prevention: mirror is_active onto Doctor profile
+            if "is_active" in update_data and user.is_active != old_is_active:
+                self._sync_doctor_active(
+                    db,
+                    user_id,
+                    user.is_active,
+                    reason="update_user_is_active",
+                )
+
+            # Lifecycle invariant: role=Doctor-family <-> active linked Doctor
+            # profile. Promotion provisions/reactivates the linked Doctor row;
+            # demotion deactivates it (history preserved). Legacy roles are
+            # handled by the same contract (see _apply_role_change_doctor_lifecycle).
+            if "role" in update_data and user.role != old_role:
+                self._apply_role_change_doctor_lifecycle(
+                    db, user, old_role, user.role
+                )
+
             # Логируем обновление
             self._log_user_action(
                 db, user_id, "update", "Пользователь обновлен", updated_by
@@ -423,6 +474,18 @@ class CoreMixin(UserManagementServiceMixinBase):
             # Логируем удаление
             self._log_user_action(
                 db, user_id, "delete", "Пользователь удален", deleted_by
+            )
+
+            # Ghost-doctor prevention: a deleted owner must not leave an
+            # ACTIVE clinical Doctor profile behind (FK SET NULL will keep
+            # the row). Deactivate BEFORE the delete in the same transaction;
+            # historical visits/EMR/audit keep referencing the Doctor row.
+            self._sync_doctor_active(
+                db,
+                user_id,
+                False,
+                reason="owner_user_deleted",
+                detach_owner=True,
             )
 
             # Удаляем пользователя (каскадное удаление)
@@ -554,6 +617,19 @@ class CoreMixin(UserManagementServiceMixinBase):
                     ),
                 }
 
+            # Doctor profile completeness (decision #5 — admin must see
+            # "Profile incomplete / Specialty required"). None = no linked
+            # Doctor row; True = linked profile still has the auto-create
+            # placeholder specialty ("general") and must be completed.
+            doctor_row = (
+                db.query(Doctor).filter(Doctor.user_id == user.id).first()
+            )
+            profile_data["doctor_profile_incomplete"] = (
+                is_doctor_profile_incomplete(doctor_row.specialty)
+                if doctor_row is not None
+                else None
+            )
+
             return profile_data
 
         except Exception as e:
@@ -625,6 +701,15 @@ class CoreMixin(UserManagementServiceMixinBase):
 
             # Формируем результат
             result = []
+            page_user_ids = [u.id for u in users]
+            doctor_by_user_id: dict[int, Doctor] = {}
+            if page_user_ids:
+                doctor_rows = (
+                    db.query(Doctor)
+                    .filter(Doctor.user_id.in_(page_user_ids))
+                    .all()
+                )
+                doctor_by_user_id = {d.user_id: d for d in doctor_rows}
             for user in users:
                 user_data = {
                     "id": user.id,
@@ -663,6 +748,14 @@ class CoreMixin(UserManagementServiceMixinBase):
                             "last_login": user.profile.last_login,
                             "last_activity": user.profile.last_activity,
                         }
+                    )
+
+                # Doctor profile completeness flag (decision #5): one batched
+                # query for the whole page, no N+1. None = no linked Doctor row.
+                doctor_row = doctor_by_user_id.get(user.id)
+                if doctor_row is not None:
+                    user_data["doctor_profile_incomplete"] = (
+                        is_doctor_profile_incomplete(doctor_row.specialty)
                     )
 
                 result.append(user_data)

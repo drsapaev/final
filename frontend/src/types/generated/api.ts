@@ -4413,7 +4413,7 @@ export type paths = {
          * Get Webhooks
          * @description Получает список webhook'ов с фильтрацией
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhooks_api_v1_webhooks__get"];
         put?: never;
@@ -4421,7 +4421,7 @@ export type paths = {
          * Create Webhook
          * @description Создает новый webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["create_webhook_api_v1_webhooks__post"];
         delete?: never;
@@ -4441,14 +4441,14 @@ export type paths = {
          * Get Webhook
          * @description Получает webhook по ID со статистикой
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_api_v1_webhooks__webhook_id__get"];
         /**
          * Update Webhook
          * @description Обновляет webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         put: operations["update_webhook_api_v1_webhooks__webhook_id__put"];
         post?: never;
@@ -4456,7 +4456,7 @@ export type paths = {
          * Delete Webhook
          * @description Удаляет webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         delete: operations["delete_webhook_api_v1_webhooks__webhook_id__delete"];
         options?: never;
@@ -4477,7 +4477,7 @@ export type paths = {
          * Activate Webhook
          * @description Активирует webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["activate_webhook_api_v1_webhooks__webhook_id__activate_post"];
         delete?: never;
@@ -4499,7 +4499,7 @@ export type paths = {
          * Deactivate Webhook
          * @description Деактивирует webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["deactivate_webhook_api_v1_webhooks__webhook_id__deactivate_post"];
         delete?: never;
@@ -4521,7 +4521,7 @@ export type paths = {
          * Test Webhook
          * @description Тестирует webhook отправкой тестового события
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["test_webhook_api_v1_webhooks__webhook_id__test_post"];
         delete?: never;
@@ -4541,7 +4541,7 @@ export type paths = {
          * Get Webhook Calls
          * @description Получает вызовы webhook'а
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_calls_api_v1_webhooks__webhook_id__calls_get"];
         put?: never;
@@ -4563,7 +4563,7 @@ export type paths = {
          * Get Webhook Call
          * @description Получает детали вызова webhook'а
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_call_api_v1_webhooks_calls__call_id__get"];
         put?: never;
@@ -4585,7 +4585,7 @@ export type paths = {
          * Get System Webhook Stats
          * @description Получает общую статистику системы webhook'ов
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         get: operations["get_system_webhook_stats_api_v1_webhooks_system_stats_get"];
         put?: never;
@@ -4607,7 +4607,7 @@ export type paths = {
          * Get Webhook Stats
          * @description Получает статистику webhook'а
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_stats_api_v1_webhooks__webhook_id__stats_get"];
         put?: never;
@@ -4631,7 +4631,7 @@ export type paths = {
          * Webhook Bulk Action
          * @description Выполняет массовое действие над webhook'ами
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["webhook_bulk_action_api_v1_webhooks_bulk_action_post"];
         delete?: never;
@@ -4653,7 +4653,7 @@ export type paths = {
          * Trigger Webhook Event
          * @description Триггерит событие для всех подписанных webhook'ов
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["trigger_webhook_event_api_v1_webhooks_events_trigger_post"];
         delete?: never;
@@ -9861,6 +9861,32 @@ export type paths = {
         };
         /** Get Doctors Stats */
         get: operations["get_doctors_stats_api_v1_admin_doctors_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/doctors/specialty-vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Doctor Specialty Vocabulary
+         * @description Medical specialty catalog — codes selectable at new-doctor onboarding.
+         *
+         *     Runtime SSOT is the ``medical_specialties`` table (migration 0051);
+         *     there is deliberately NO hardcoded fallback. Ordering: sort_order,
+         *     then code (deterministic). Frontend label resolution per owner spec:
+         *     locale → catalog translation → title_ru → code (the ru titles are a
+         *     compatibility fallback for kk/uz-Cyrl, not a translation claim).
+         */
+        get: operations["get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -20312,7 +20338,7 @@ export type paths = {
          * Get Refund Requests
          * @description Получить список заявок на возврат
          *
-         *     Доступно: Admin, Cashier, Manager
+         *     Доступно: Admin, Cashier
          */
         get: operations["get_refund_requests_api_v1_force_majeure_refund_requests_get"];
         put?: never;
@@ -20334,7 +20360,7 @@ export type paths = {
          * Get Refund Request
          * @description Получить заявку на возврат по ID
          *
-         *     Доступно: Admin, Cashier, Manager
+         *     Доступно: Admin, Cashier
          */
         get: operations["get_refund_request_api_v1_force_majeure_refund_requests__request_id__get"];
         put?: never;
@@ -20363,7 +20389,7 @@ export type paths = {
          *     - reject: Отклонить заявку
          *     - complete: Завершить (деньги возвращены)
          *
-         *     Доступно: Admin, Cashier, Manager
+         *     Доступно: Admin, Cashier
          */
         post: operations["process_refund_request_api_v1_force_majeure_refund_requests__request_id__process_post"];
         delete?: never;
@@ -23606,43 +23632,6 @@ export type components = {
         Body_validate_emr_data_api_v1_emr_ai_validate_post: {
             emr_data: components["schemas"]["EmrAiEmrDataRequest"];
             template_structure: components["schemas"]["EmrAiTemplateDataRequest"];
-        };
-        /**
-         * BookAppointmentRequest
-         * @description Запрос на запись к врачу для API
-         */
-        BookAppointmentRequest: {
-            /**
-             * Doctor Id
-             * @description ID врача
-             */
-            doctor_id: number;
-            /**
-             * Appointment Date
-             * Format: date
-             * @description Дата записи (YYYY-MM-DD)
-             */
-            appointment_date: string;
-            /**
-             * Specialty
-             * @description Специализация
-             */
-            specialty: string;
-            /**
-             * Patient Id
-             * @description ID пациента
-             */
-            patient_id?: number | null;
-            /**
-             * Patient Fio
-             * @description ФИО пациента
-             */
-            patient_fio?: string | null;
-            /**
-             * Patient Phone
-             * @description Телефон пациента
-             */
-            patient_phone?: string | null;
         };
         /** BranchCreate */
         BranchCreate: {
@@ -29990,6 +29979,42 @@ export type components = {
             nonce?: string | null;
         };
         /**
+         * MobileBookAppointmentRequest
+         * @description Запрос на запись к врачу
+         */
+        MobileBookAppointmentRequest: {
+            /**
+             * Doctor Id
+             * @description ID врача
+             */
+            doctor_id: number;
+            /**
+             * Preferred Date
+             * @description Предпочтительная дата (YYYY-MM-DD)
+             */
+            preferred_date: string;
+            /**
+             * Preferred Time
+             * @description Предпочтительное время (HH:MM)
+             */
+            preferred_time?: string | null;
+            /**
+             * Complaint
+             * @description Жалобы
+             */
+            complaint?: string | null;
+            /**
+             * Services
+             * @description ID услуг
+             */
+            services?: number[];
+            /**
+             * Notes
+             * @description Дополнительные заметки
+             */
+            notes?: string | null;
+        };
+        /**
          * MobileLoginRequest
          * @description Запрос мобильной аутентификации
          */
@@ -32781,6 +32806,8 @@ export type components = {
             current_usage: number;
             /** Doctors Count */
             doctors_count: number;
+            /** Aggregate Max Per Day */
+            aggregate_max_per_day: number;
             /** Last Updated */
             last_updated: string | null;
         };
@@ -34742,6 +34769,19 @@ export type components = {
              */
             limit: number;
         };
+        /**
+         * ServiceUnavailableDetail
+         * @description Body of the documented catalog 503 (Codex round-6 P2).
+         *
+         *     FastAPI's HTTPException payload is ``{"detail": ...}``; declaring this
+         *     model on the affected operations gives generated clients a typed error
+         *     shape instead of ``content?: never`` for the configuration-failure
+         *     response shared by GET specialty-vocabulary, POST and PUT /admin/doctors.
+         */
+        ServiceUnavailableDetail: {
+            /** Detail */
+            detail: string;
+        };
         /** ServiceUpdate */
         ServiceUpdate: {
             /** Code */
@@ -34944,6 +34984,23 @@ export type components = {
         SetupStatusOut: {
             /** Initialized */
             initialized: boolean;
+        };
+        /**
+         * SpecialtyVocabularyItem
+         * @description One selectable specialty from the Medical Specialty Catalog (0051).
+         *
+         *     Typed DTO (Codex P2): a generic dict response compiled to arbitrary
+         *     maps in generated TS; this model guarantees code/titles exist.
+         */
+        SpecialtyVocabularyItem: {
+            /** Code */
+            code: string;
+            /** Title Ru */
+            title_ru: string;
+            /** Title Uz */
+            title_uz?: string | null;
+            /** Title En */
+            title_en?: string | null;
         };
         /** StaffActionConfirmRequest */
         StaffActionConfirmRequest: {
@@ -36837,6 +36894,8 @@ export type components = {
             profile?: components["schemas"]["app__schemas__user_management__UserProfileResponse"] | null;
             preferences?: components["schemas"]["UserPreferencesResponse"] | null;
             notification_settings?: components["schemas"]["UserNotificationSettingsResponse"] | null;
+            /** Doctor Profile Incomplete */
+            doctor_profile_incomplete?: boolean | null;
         };
         /**
          * UserSearchRequest
@@ -38192,6 +38251,11 @@ export type components = {
             department_id?: number | null;
             /** Department */
             department?: string | null;
+            /**
+             * Profile Incomplete
+             * @default false
+             */
+            profile_incomplete: boolean;
             /** User */
             user?: {
                 [key: string]: unknown;
@@ -46610,7 +46674,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    };
+                    }[];
                 };
             };
             /** @description Validation Error */
@@ -55589,6 +55653,15 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
         };
     };
     get_available_doctor_users_api_v1_admin_doctors_available_users_get: {
@@ -55645,6 +55718,35 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialtyVocabularyItem"][];
+                };
+            };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
                 };
             };
         };
@@ -55711,6 +55813,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
                 };
             };
         };
@@ -56968,7 +57079,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BookAppointmentRequest"];
+                "application/json": components["schemas"]["MobileBookAppointmentRequest"];
             };
         };
         responses: {

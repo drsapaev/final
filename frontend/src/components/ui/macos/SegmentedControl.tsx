@@ -21,6 +21,12 @@ interface SegmentedControlProps extends Omit<React.HTMLAttributes<HTMLDivElement
   className?: string;
   style?: CSSProperties;
   label?: ReactNode;
+  /** AXE-EXP-5: optional prefix for aria-controls panel ids. NO consumer
+   * renders `panel-<value>` containers today — the hardcoded reference
+   * was a dangling id on every usage (axe aria-valid-attr-value, flagged
+   * on cashier/admin-webhooks/admin-notifications surfaces). Only wire
+   * this when the consumer actually renders matching panel ids. */
+  controlsPrefix?: string;
 }
 
 interface SegmentedStyle extends CSSProperties {
@@ -51,6 +57,7 @@ const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>
   variant = 'default',
   className = '',
   style = {},
+  controlsPrefix,
   ...props
 }, ref) => {
   void variant;
@@ -94,7 +101,11 @@ const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>
     borderRadius: '6px',
     border: 'none',
     background: 'transparent',
-    color: 'var(--mac-text-secondary)',
+    // AXE-EXP-4: inactive segment ink — text-secondary was 3.95:1 on the
+    // container's tertiary background in dark; the on-tertiary ink passes
+    // both themes (5.71:1 light — same value as light secondary, no visual
+    // delta / 6.74:1 dark).
+    color: 'var(--mac-text-on-tertiary)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     transition: 'all 160ms cubic-bezier(0.2,0.8,0.2,1)',
     fontWeight: '500',
@@ -137,7 +148,9 @@ const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>
             type="button"
             role="tab"
             aria-selected={isActive}
-            aria-controls={`panel-${String(optionValue)}`}
+            // AXE-EXP-5: aria-controls is emitted ONLY when the consumer
+            // declares a real panel prefix — see controlsPrefix docs above.
+            {...(controlsPrefix ? { 'aria-controls': `${controlsPrefix}-${String(optionValue)}` } : {})}
             className="mac-segment"
             style={{
               ...segmentStyles,

@@ -22,10 +22,19 @@ def get_available_specialists(
 
         from app.models.clinic import Doctor
 
-        # Получаем всех активных врачей с eager loading user relationship
+        # Получаем всех активных врачей с eager loading user relationship.
+        # Incomplete ("general" sentinel) profiles are excluded as well:
+        # this is a PATIENT-facing selector for QR self-registration — the
+        # same lifecycle eligibility contract as the queue join itself
+        # (Codex round-2 P2: a promoted Doctor with the placeholder
+        # specialty must not appear selectable and then dead-end on join).
+        from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
         doctors = (
             db.query(Doctor)
-            .filter(Doctor.active == True)
+            .filter(
+                Doctor.active == True,  # noqa: E712
+                Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+            )
             .options(joinedload(Doctor.user))
             .offset(offset)
             .limit(limit)

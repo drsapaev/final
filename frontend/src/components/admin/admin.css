@@ -4433,7 +4433,10 @@
 }
 
 .admin-tertiary-xs-m-8px000-maxw-720 {
-  color: var(--mac-text-tertiary);
+  /* AXE-EXP-4: tertiary ink was 2.59:1 on the dark clinic-settings card
+   * composite; secondary ink is the canonical muted ink for card surfaces
+   * (5.6:1 dark composite, 6+:1 light cards). */
+  color: var(--mac-text-secondary);
   font-size: var(--mac-font-size-xs);
   margin: 8px 0 0 0;
   max-width: 720px;
@@ -4576,7 +4579,9 @@
 
 .admin-xs-tertiary-mt-4-m-4px000 {
   font-size: var(--mac-font-size-xs);
-  color: var(--mac-text-tertiary);
+  /* AXE-EXP-4: tertiary ink was 2.59:1 on the dark clinic-settings card
+   * composite; secondary ink is the canonical muted ink for card surfaces. */
+  color: var(--mac-text-secondary);
   margin-top: 4px;
   margin: 4px 0 0 0;
 }
@@ -12463,10 +12468,18 @@
    Sprint 7b: Shared table wrapper — macOS native appearance
    Rounded corners, clipped overflow, subtle shadow.
    Usage: <div className="admin-table-wrapper"><table>...</table></div>
+
+   Mobile (#2988): overflow was `hidden`, which CLIPPED the trailing
+   Actions column on phones (7-column tables exceed the viewport and
+   nothing could scroll). The wrapper now scrolls horizontally itself
+   and tables keep a readable min-width, so trailing action buttons
+   stay reachable by swiping on narrow screens.
    ============================================ */
 .admin-table-wrapper {
   border-radius: var(--mac-radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--mac-border);
   background: var(--mac-bg-primary);
   box-shadow: var(--mac-shadow-sm);
@@ -12474,6 +12487,7 @@
 
 .admin-table-wrapper table {
   margin: 0;
+  min-width: 880px;
 }
 
 .admin-table-wrapper thead {
