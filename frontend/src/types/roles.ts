@@ -37,7 +37,10 @@ export const CRITICAL_ROLES: readonly BackendRole[] = [
 ] as const;
 
 export const ADMIN_ROLES: readonly BackendRole[] = [
-  'Admin', 'SuperAdmin', 'Manager',
+  // M-1 (Manager deprecation): 'Manager' removed — mirrors backend
+  // core/roles.py ADMIN_ROLES (zero callers on either side, verified by
+  // exhaustive search; removal is behavior-neutral).
+  'Admin', 'SuperAdmin',
 ] as const;
 
 export const DOCTOR_ROLES: readonly BackendRole[] = [

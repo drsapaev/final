@@ -599,8 +599,11 @@ def test_role_pattern_covers_full_doctor_family_ssot() -> None:
         assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, spelling), spelling
 
     # canonical non-doctor roles still accepted
-    for role in ("Admin", "Doctor", "Registrar", "SuperAdmin", "Manager", "Nurse"):
+    # M-1 (Manager deprecation): 'Manager' moved from the WRITE vocabulary to
+    # the read/filter compatibility vocabulary — write surfaces 422 it now.
+    for role in ("Admin", "Doctor", "Registrar", "SuperAdmin", "Nurse"):
         assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, role), role
+    assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "Manager")
 
     # junk rejected
     assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "wizard")

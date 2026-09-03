@@ -4413,7 +4413,7 @@ export type paths = {
          * Get Webhooks
          * @description Получает список webhook'ов с фильтрацией
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhooks_api_v1_webhooks__get"];
         put?: never;
@@ -4421,7 +4421,7 @@ export type paths = {
          * Create Webhook
          * @description Создает новый webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["create_webhook_api_v1_webhooks__post"];
         delete?: never;
@@ -4441,14 +4441,14 @@ export type paths = {
          * Get Webhook
          * @description Получает webhook по ID со статистикой
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_api_v1_webhooks__webhook_id__get"];
         /**
          * Update Webhook
          * @description Обновляет webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         put: operations["update_webhook_api_v1_webhooks__webhook_id__put"];
         post?: never;
@@ -4456,7 +4456,7 @@ export type paths = {
          * Delete Webhook
          * @description Удаляет webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         delete: operations["delete_webhook_api_v1_webhooks__webhook_id__delete"];
         options?: never;
@@ -4477,7 +4477,7 @@ export type paths = {
          * Activate Webhook
          * @description Активирует webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["activate_webhook_api_v1_webhooks__webhook_id__activate_post"];
         delete?: never;
@@ -4499,7 +4499,7 @@ export type paths = {
          * Deactivate Webhook
          * @description Деактивирует webhook
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["deactivate_webhook_api_v1_webhooks__webhook_id__deactivate_post"];
         delete?: never;
@@ -4521,7 +4521,7 @@ export type paths = {
          * Test Webhook
          * @description Тестирует webhook отправкой тестового события
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["test_webhook_api_v1_webhooks__webhook_id__test_post"];
         delete?: never;
@@ -4541,7 +4541,7 @@ export type paths = {
          * Get Webhook Calls
          * @description Получает вызовы webhook'а
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_calls_api_v1_webhooks__webhook_id__calls_get"];
         put?: never;
@@ -4563,7 +4563,7 @@ export type paths = {
          * Get Webhook Call
          * @description Получает детали вызова webhook'а
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_call_api_v1_webhooks_calls__call_id__get"];
         put?: never;
@@ -4585,7 +4585,7 @@ export type paths = {
          * Get System Webhook Stats
          * @description Получает общую статистику системы webhook'ов
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         get: operations["get_system_webhook_stats_api_v1_webhooks_system_stats_get"];
         put?: never;
@@ -4607,7 +4607,7 @@ export type paths = {
          * Get Webhook Stats
          * @description Получает статистику webhook'а
          *
-         *     Требует роль: ADMIN, DEVELOPER или REGISTRAR
+         *     Требует роль: ADMIN или REGISTRAR
          */
         get: operations["get_webhook_stats_api_v1_webhooks__webhook_id__stats_get"];
         put?: never;
@@ -4631,7 +4631,7 @@ export type paths = {
          * Webhook Bulk Action
          * @description Выполняет массовое действие над webhook'ами
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["webhook_bulk_action_api_v1_webhooks_bulk_action_post"];
         delete?: never;
@@ -4653,7 +4653,7 @@ export type paths = {
          * Trigger Webhook Event
          * @description Триггерит событие для всех подписанных webhook'ов
          *
-         *     Требует роль: ADMIN или DEVELOPER
+         *     Требует роль: ADMIN
          */
         post: operations["trigger_webhook_event_api_v1_webhooks_events_trigger_post"];
         delete?: never;
@@ -20338,7 +20338,7 @@ export type paths = {
          * Get Refund Requests
          * @description Получить список заявок на возврат
          *
-         *     Доступно: Admin, Cashier, Manager
+         *     Доступно: Admin, Cashier
          */
         get: operations["get_refund_requests_api_v1_force_majeure_refund_requests_get"];
         put?: never;
@@ -20360,7 +20360,7 @@ export type paths = {
          * Get Refund Request
          * @description Получить заявку на возврат по ID
          *
-         *     Доступно: Admin, Cashier, Manager
+         *     Доступно: Admin, Cashier
          */
         get: operations["get_refund_request_api_v1_force_majeure_refund_requests__request_id__get"];
         put?: never;
@@ -20389,7 +20389,7 @@ export type paths = {
          *     - reject: Отклонить заявку
          *     - complete: Завершить (деньги возвращены)
          *
-         *     Доступно: Admin, Cashier, Manager
+         *     Доступно: Admin, Cashier
          */
         post: operations["process_refund_request_api_v1_force_majeure_refund_requests__request_id__process_post"];
         delete?: never;

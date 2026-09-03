@@ -53,6 +53,16 @@ def _normalize_legacy_role(value: Any) -> str:
     spelling: 0, SQL evidence 2026-09-02), so the migration now normalizes
     the deprecated spelling on write while still READING any legacy value
     (legacy reads temporarily accepted; canonical writes only).
+
+    M-1 (Manager deprecation): 'Manager' is deliberately NOT remapped.
+    Receptionist had a canonical successor (Registrar), Manager has none,
+    and the M-1 no-alias rule forbids mapping it to Admin or any other
+    privileged role — a silent promotion would be a security defect. A
+    legacy 'Manager' row is therefore PRESERVED VERBATIM: this is legacy
+    data preservation, not a new grant (all Manager privileges were
+    removed from the RBAC layer in M-1D, so a migrated row carries zero
+    authorization). New 'Manager' writes through the canonical API
+    schemas remain frozen (422).
     """
     role = str(value or "").strip()
     if role.lower() == "receptionist":

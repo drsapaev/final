@@ -536,9 +536,19 @@ class UserAuditLogResponse(UserAuditLogBase):
 # surfaces must keep accepting the deprecated spelling so a compatible
 # deployment holding legacy rows can still query them (legacy reads
 # temporarily accepted; canonical writes only).
+# M-1 (Manager deprecation): 'Manager' removed from the canonical write
+# vocabulary — Manager is a deprecated legacy/synthetic role (production
+# inventory 2026-09-03: exactly 1 row, the automated smoke_manager account;
+# 0 real human users), so no NEW stored 'Manager' users may be created,
+# bulk-assigned or role-changed. Unlike Receptionist there is NO canonical
+# successor role and NO backend alias (privileged grants were removed in
+# M-1D instead). Update-re-submission safety: the single legacy row
+# (smoke_manager) is owned by the post-deploy ops step (DEACTIVATE, not
+# DELETE); an admin edit that re-submits role='Manager' for it now 422s by
+# design — the freeze is the enforcement, ops deactivation is the cleanup.
 _USER_MANAGEMENT_ROLE_PATTERN = (
     "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|"
-    "SuperAdmin|Manager|"
+    "SuperAdmin|"
     + "|".join(sorted(DOCTOR_ROLE_SPELLINGS))
     + ")$"
 )
@@ -562,12 +572,14 @@ _NON_DOCTOR_ROLE_VALUES: tuple[str, ...] = (
 ) + tuple(sorted(DOCTOR_ROLE_SPELLINGS))
 
 # Read/filter vocabulary: canonical write vocabulary PLUS the deprecated
-# 'Receptionist' spelling — used ONLY by query/filter surfaces
+# 'Receptionist' and 'Manager' spellings — used ONLY by query/filter surfaces
 # (UserSearchRequest.role, GET /users role parameter) so legacy rows in
-# compatible deployments remain queryable during the compatibility window.
+# compatible deployments remain queryable during the compatibility window
+# (M-1: production carries 1 stored 'Manager' row — smoke_manager — that
+# must stay visible/queryable until the ops deactivation).
 # NOT used by create/update/bulk-change-role (write freeze stays absolute).
 _USER_MANAGEMENT_ROLE_FILTER_PATTERN = (
-    _USER_MANAGEMENT_ROLE_PATTERN[:-2] + "|Receptionist)$"
+    _USER_MANAGEMENT_ROLE_PATTERN[:-2] + "|Receptionist|Manager)$"
 )
 
 
