@@ -573,6 +573,26 @@ _USER_MANAGEMENT_ROLE_FILTER_PATTERN = (
 
 NonDoctorRoleLiteral = Literal.__getitem__(_NON_DOCTOR_ROLE_VALUES)
 
+# Codex round-10 P2: Decimal JSON schema publishes a number|string anyOf.
+# `multipleOf` (from json_schema_extra) and `maximum` (from le) only bind
+# the NUMBER branch; the STRING branch used the default permissive pattern
+# and advertised values ("1.234", "999999999.99") that Pydantic then
+# rejected with 422 — a schema-valid request could still fail. This hook
+# pins the string branch to the Numeric(10, 2) column precision: at most 8
+# integer digits, at most 2 fractional digits, no sign other than a
+# leading "+". Every string matching it converts to a Decimal that passes
+# ge=0 / le=99999999.99 / the two-decimal scale validator.
+_PRICE_STRING_PATTERN = r"^[+]?[0-9]{1,8}(\.[0-9]{1,2})?$"
+
+
+def _pin_price_string_branch(schema: dict) -> None:
+    # Round-8 contract: publish the two-decimal scale for client-side
+    # pre-validation (asserted by test_openapi_contract.py).
+    schema.setdefault("multipleOf", 0.01)
+    for sub in schema.get("anyOf", []):
+        if isinstance(sub, dict) and sub.get("type") == "string":
+            sub["pattern"] = _PRICE_STRING_PATTERN
+
 
 class DoctorProfileCreate(BaseModel):
     """Doctor profile block for canonical new-doctor onboarding (POST /users).
@@ -596,11 +616,17 @@ class DoctorProfileCreate(BaseModel):
     # maximum (from le) plus multipleOf 0.01 documents the two-decimal
     # scale enforced by validate_price_precision, so contract-generated
     # clients can pre-validate payloads without a 422 round-trip.
+    # Codex round-10 P2: `multipleOf` is ignored for string instances and
+    # `maximum` lands only on the number branch, so the published string
+    # pattern still accepted values ("1.234", "999999999.99") that Pydantic
+    # then rejected with 422. The string branch below is pinned to the
+    # Numeric(10, 2) precision: at most 8 integer digits and 2 fractional
+    # digits, so every schema-valid payload survives the range/scale check.
     price_default: Decimal | None = Field(
         None,
         ge=0,
         le=Decimal("99999999.99"),
-        json_schema_extra={"multipleOf": 0.01},
+        json_schema_extra=_pin_price_string_branch,
     )
     start_number_online: int | None = Field(None, ge=1, le=100)
     max_online_per_day: int | None = Field(None, ge=1, le=100)

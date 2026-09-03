@@ -534,8 +534,11 @@ const UserModal = ({
               label={t('admin2.umdl_doctor_specialty')}
               required
               error={errors.doctorSpecialty}
+              htmlFor="user-modal-doctor-specialty"
+              errorId="user-modal-doctor-specialty-error"
             >
               <Select
+                id="user-modal-doctor-specialty"
                 value={formData.doctorSpecialty}
                 onValueChange={(value) => handleChange('doctorSpecialty', value)}
                 options={[
@@ -543,6 +546,14 @@ const UserModal = ({
                   ...specialtyOptions,
                 ]}
                 size="large"
+                aria-label={t('admin2.umdl_doctor_specialty')}
+                aria-required="true"
+                aria-invalid={errors.doctorSpecialty ? true : undefined}
+                aria-describedby={
+                  errors.doctorSpecialty
+                    ? 'user-modal-doctor-specialty-error'
+                    : undefined
+                }
               />
               {specialtyLoadError && (
                 <div className="admin-field-error-xs admin-flex-center-8">

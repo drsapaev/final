@@ -302,3 +302,12 @@ def test_openapi_user_create_publishes_catalog_503_and_price_bounds(
     assert number_branch["maximum"] == 99999999.99
     assert number_branch["minimum"] == 0.0
     assert price_schema["multipleOf"] == 0.01
+
+    # Codex round-10 P2: `multipleOf` is ignored for string instances and
+    # `maximum` only binds the number branch — the string branch must carry
+    # its own pattern pinned to the Numeric(10, 2) precision so every
+    # schema-valid payload survives Pydantic's range/scale validation.
+    string_branch = next(
+        branch for branch in price_schema["anyOf"] if branch.get("type") == "string"
+    )
+    assert string_branch["pattern"] == r"^[+]?[0-9]{1,8}(\.[0-9]{1,2})?$"

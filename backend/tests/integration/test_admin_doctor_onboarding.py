@@ -348,3 +348,34 @@ def test_doctor_profile_price_precision_contract():
         DoctorProfileCreate(specialty="cardiology", price_default=Decimal("100000000"))
     # None stays legal (price optional)
     assert DoctorProfileCreate(specialty="cardiology").price_default is None
+
+
+def test_doctor_profile_price_string_branch_contract():
+    """Codex round-10 P2: the published JSON schema advertises
+    price_default as number|string. The string branch is pinned to the
+    Numeric(10, 2) precision (^[+]?[0-9]{1,8}(\\.[0-9]{1,2})?$), so every
+    schema-valid string converts to a Decimal that passes the range and
+    scale validation — no schema-valid request can receive a 422."""
+    from decimal import Decimal
+
+    from app.schemas.user_management import _PRICE_STRING_PATTERN, DoctorProfileCreate
+
+    # strings the published pattern admits convert cleanly
+    ok = DoctorProfileCreate(specialty="cardiology", price_default="150000")
+    assert ok.price_default == Decimal("150000")
+    ok2 = DoctorProfileCreate(specialty="cardiology", price_default="+99999999.99")
+    assert ok2.price_default == Decimal("99999999.99")
+
+    # strings the pattern must reject — and Pydantic does reject them:
+    # three decimals (scale), 9 integer digits (range), negative (ge=0)
+    for bad in ("1.234", "999999999.99", "-5", "100000000"):
+        with pytest.raises(ValidationError):
+            DoctorProfileCreate(specialty="cardiology", price_default=bad)
+
+    # belt and braces: the pattern itself rejects the same values
+    import re
+
+    for bad in ("1.234", "999999999.99", "-5", "100000000"):
+        assert re.match(_PRICE_STRING_PATTERN, bad) is None, bad
+    for good in ("150000", "99999999.99", "0.01", "+150000"):
+        assert re.match(_PRICE_STRING_PATTERN, good), good
