@@ -292,18 +292,32 @@ class Mutation:
                 # Codex P1 (round-8): ID уже идентифицирует запись; полное
                 # ФИО в description UserAuditLog нарушает initial-only режим
                 # аудита (AGENTS.md) — маскируем до ID.
-                log_critical_change(
-                    db=db,
-                    user_id=actor.id if actor else None,
-                    action="SOFT_DELETE",
-                    table_name="patients",
-                    row_id=id,
-                    old_data={"is_deleted": False},
-                    new_data={"is_deleted": True},
-                    request=getattr(info.context, "request", None),
-                    description=f"Мягкое удаление пациента #{id}",
-                )
-                db.commit()
+                # Codex P1 (round-16): soft_delete_patient уже ЗАКОММИТИЛА
+                # удаление (crud/patient.py) -- отказ критичного аудита или
+                # его коммита после этого НЕ должен возвращать
+                # INTERNAL_ERROR (пациент исчез, а клиент получил бы
+                # ошибку). Аудит -- best-effort: rollback + warning,
+                # success-ответ сохраняется.
+                try:
+                    log_critical_change(
+                        db=db,
+                        user_id=actor.id if actor else None,
+                        action="SOFT_DELETE",
+                        table_name="patients",
+                        row_id=id,
+                        old_data={"is_deleted": False},
+                        new_data={"is_deleted": True},
+                        request=getattr(info.context, "request", None),
+                        description=f"Мягкое удаление пациента #{id}",
+                    )
+                    db.commit()
+                except Exception as audit_exc:  # noqa: BLE001 -- non-fatal by design
+                    logger.warning(
+                        "GraphQL deletePatient: critical audit failed after durable "
+                        "soft delete (deletion preserved): %s",
+                        audit_exc,
+                    )
+                    db.rollback()
 
                 return MutationResponse(success=True, message="Пациент успешно удален")
 
@@ -824,8 +838,19 @@ class Mutation:
 
     @strawberry.mutation
     @offloop
-    def create_service(self, input: ServiceInput) -> ServiceMutationResponse:
+    def create_service(
+        self, info: strawberry.Info, input: ServiceInput
+    ) -> ServiceMutationResponse:
         """Создать новую услугу (SSOT: ServicesApiService.create_service)"""
+        # Codex P2 (round-16): аудит создания услуги указывает
+        # аутентифицированного админа (как в updateServicePrice).
+        actor = getattr(info.context, "user", None) if info.context else None
+        if not actor:
+            return ServiceMutationResponse(
+                success=False,
+                message=t("error.unauthorized"),
+                errors=["UNAUTHENTICATED"],
+            )
         try:
             with get_db_session() as db:
                 # Codex P1: сырое Service(...) пропускало нормализацию кода,
@@ -841,7 +866,8 @@ class Mutation:
                             "unit": input.unit,
                             "currency": input.currency,
                             "category_code": input.category_code,
-                        }
+                        },
+                        user_id=actor.id,
                     )
                 except ValueError as exc:
                     # канонический сервис: дубликат кода

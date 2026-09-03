@@ -112,9 +112,13 @@ class ServicesApiRepository:
             "ui_type": None,
         }
 
-    def log_service_creation(self, service: Service) -> None:
+    def log_service_creation(
+        self, service: Service, user_id: int | None = None
+    ) -> None:
         try:
-            ServiceAuditService(self.db).log_service_creation(service=service)
+            ServiceAuditService(self.db).log_service_creation(
+                service=service, user_id=user_id
+            )
         except Exception as exc:
             logger.warning(
                 "Service audit creation failed after service commit: service_id=%s error=%s",

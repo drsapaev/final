@@ -2123,3 +2123,172 @@ def test_graphql_round15(gql_data, monkeypatch, caplog):
         assert (
             audit_row.user_id == admin.id
         ), f"audit user_id={audit_row.user_id}, expected {admin.id}"
+
+
+def test_graphql_round16(gql_data, gql_session_factory, test_db, monkeypatch, caplog):
+    """Codex round-16: (1) имена пациента в debug-логе нормализации заменены
+    длинами (PII, AGENTS.md L391-408); (2) отказ пост-коммит аудита
+    deletePatient НЕ возвращает INTERNAL_ERROR после durably-коммита
+    soft delete; (3) createService атрибутирует ServiceAuditLog актору;
+    (4) дневные счётчики статистики считаются по дне конфигурированной
+    таймзоны; (5) appointments eager-грузит patient/doctor/doctor.user
+    (нет N+1 на странице)."""
+    import logging
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from sqlalchemy import event
+
+    from app.db import session as db_session_module
+    from app.graphql import mutations as gql_mutations
+    from app.models.service_audit import ServiceAuditLog
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    d = gql_data
+    suffix = d["suffix"]
+    S = db_session_module.SessionLocal
+
+    # --- 1) createPatient: нормализация имени логирует ТОЛЬКО длины
+    raw_last = f"SYNTHETIC-R16-{suffix}"
+    with caplog.at_level(logging.DEBUG, logger="app.services.patient_service"):
+        data = _execute(
+            """
+            mutation($input: PatientInput!) {
+              createPatient(input: $input) { success patient { id } }
+            }
+            """,
+            {
+                "input": {
+                    "lastName": raw_last,
+                    "firstName": "SYNTHETIC16",
+                    "phone": f"+99871{str(int(suffix, 16) % 10**7).zfill(7)}",
+                }
+            },
+        )
+    created = data["createPatient"]
+    assert created["success"] is True, created
+    r16_patient_id = created["patient"]["id"]
+    norm_records = [r for r in caplog.records if "Нормализация имени" in r.getMessage()]
+    assert norm_records, "debug-лог нормализации ожидается"
+    assert "SYNTHETIC16" not in norm_records[0].getMessage()
+    assert raw_last not in caplog.text, "сырая фамилия попала в лог"
+
+    # --- 2) deletePatient: отказ аудита сохраняет success (soft delete
+    # уже durably закоммичен внутри crud)
+    def _raiser(**kwargs):
+        raise RuntimeError("audit boom")
+
+    with monkeypatch.context() as m:
+        m.setattr(gql_mutations, "log_critical_change", _raiser)
+        data = _execute(
+            "mutation($id: Int!) { deletePatient(id: $id) { success errors message } }",
+            {"id": r16_patient_id},
+        )
+    deleted = data["deletePatient"]
+    assert deleted["success"] is True, deleted
+    with S() as s:
+        row = s.query(Patient).filter(Patient.id == r16_patient_id).first()
+        assert row is not None and row.is_deleted is True
+
+    # --- 3) createService: ServiceAuditLog.user_id == актор
+    data = _execute(
+        """
+        mutation($input: ServiceInput!) {
+          createService(input: $input) { success service { id code } }
+        }
+        """,
+        {
+            "input": {
+                "name": f"R16 Service {suffix}",
+                "code": f"R16S-{suffix}",
+                "price": 50000,
+            }
+        },
+    )
+    svc = data["createService"]
+    assert svc["success"] is True, svc
+    admin = gql_data_ctx["admin_user"]
+    with S() as s:
+        audit_row = (
+            s.query(ServiceAuditLog)
+            .filter(ServiceAuditLog.service_id == svc["service"]["id"])
+            .order_by(ServiceAuditLog.id.desc())
+            .first()
+        )
+        assert audit_row is not None and audit_row.action == "create"
+        assert (
+            audit_row.user_id == admin.id
+        ), f"audit user_id={audit_row.user_id}, expected {admin.id}"
+
+    # --- 4) дневные счётчики статистики — по TZ-дню (та же формула, что
+    # и у мутаций; регрессия на date.today() ловится в ночном окне
+    # 19:00-24:00 UTC)
+    tz_day = datetime.now(ZoneInfo("Asia/Tashkent")).date()
+    with S() as s:
+        v16 = Visit(
+            patient_id=d["patient"].id,
+            doctor_id=d["doctor"].id,
+            status="scheduled",
+            visit_date=tz_day,
+        )
+        s.add(v16)
+        s.commit()
+    data = _execute(
+        "query($docId: Int!) { visitStats { total today } "
+        "doctorStats(doctorId: $docId) { totalVisits todayVisits } }",
+        {"docId": d["doctor"].id},
+    )
+    assert data["visitStats"]["today"] >= 1, data["visitStats"]
+    assert data["doctorStats"]["todayVisits"] >= 1, data["doctorStats"]
+
+    # --- 5) appointments: eager-load (нет N+1 по patient на страницу)
+    with S() as s:
+        for i in range(15):
+            p = Patient(
+                last_name=f"SYNTHETIC-R16P-{suffix}-{i}",
+                first_name="SYNTHETIC",
+                middle_name="SYNTHETIC",
+                phone=f"DEV-R16-{suffix}-{i}",
+            )
+            s.add(p)
+            s.flush()
+            s.add(
+                Appointment(
+                    patient_id=p.id,
+                    doctor_id=d["doctor"].id,
+                    appointment_date=tz_day,
+                    status="scheduled",
+                )
+            )
+        s.commit()
+
+    counter = {"selects": 0}
+
+    def _count(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            counter["selects"] += 1
+
+    bind = (
+        gql_session_factory.kw["bind"]
+        if hasattr(gql_session_factory, "kw")
+        else test_db
+    )
+    event.listen(bind, "before_cursor_execute", _count)
+    try:
+        data = _execute(
+            """query { appointments(pagination: { page: 1, perPage: 1000 }) {
+                 items { id patient { id } doctor { id } } pagination { total } } }"""
+        )
+    finally:
+        event.remove(bind, "before_cursor_execute", _count)
+    items = data["appointments"]["items"]
+    assert data["appointments"]["pagination"]["total"] >= 15
+    assert len(items) >= 15
+    # без eager-load: 1 + ~3*N ленивых SELECT-ов; с selectinload — константа
+    assert (
+        counter["selects"] <= 10
+    ), f"N+1: {counter['selects']} SELECTs на страницу из {len(items)} строк"

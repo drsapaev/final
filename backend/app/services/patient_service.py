@@ -112,11 +112,16 @@ class PatientService:
         normalized_first_name = (name_parts["first_name"] or "").strip()
         normalized_middle_name = name_parts.get("middle_name")
 
+        # Codex round-16 P1: имена пациента -- PII (AGENTS.md L391-408),
+        # в debug-лог попадают только длины/факт наличия, не значения
+        # (тот же принцип, что и для doc_number в round-15).
         logger.debug(
-            "Нормализация имени пациента: full_name=%s, last_name=%s, first_name=%s",
-            patient_in.full_name,
-            patient_in.last_name,
-            patient_in.first_name,
+            "Нормализация имени пациента: full_name_len=%d, last_name_len=%d, "
+            "first_name_len=%d, middle_name_present=%s",
+            len(patient_in.full_name or ""),
+            len(patient_in.last_name or ""),
+            len(patient_in.first_name or ""),
+            bool(normalized_middle_name),
         )
 
         if not normalized_last_name:

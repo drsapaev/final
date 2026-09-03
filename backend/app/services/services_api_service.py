@@ -147,8 +147,10 @@ class ServicesApiService:
             "department_key": service.department_key,
         }
 
-    def _log_service_creation(self, service: Service) -> None:
-        self.repository.log_service_creation(service=service)
+    def _log_service_creation(
+        self, service: Service, user_id: int | None = None
+    ) -> None:
+        self.repository.log_service_creation(service=service, user_id=user_id)
 
     def _log_service_update(
         self,
@@ -298,7 +300,7 @@ class ServicesApiService:
     def get_service(self, *, service_id: int):
         return self.repository.get_service(service_id)
 
-    def create_service(self, *, service_data):
+    def create_service(self, *, service_data, user_id: int | None = None):
         # Pydantic-schema (REST) OR plain dict (GraphQL createService) --
         # codex round-4: the GraphQL mutation delegates here with a dict
         # payload (name/code/price/unit/currency/category_code).
@@ -342,7 +344,7 @@ class ServicesApiService:
         self.repository.add(service)
         self.repository.commit()
         self.repository.refresh(service)
-        self._log_service_creation(service)
+        self._log_service_creation(service, user_id=user_id)
         return service
 
     def update_service(

@@ -8,12 +8,14 @@ GQL-AUDIT-28 follow-up:
   number, doc_type/doc_number и т.д. — см. types.py).
 """
 
-from datetime import date
+from datetime import date, datetime
 from functools import wraps
+from zoneinfo import ZoneInfo
 
 import strawberry
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import or_
+from sqlalchemy.orm import selectinload
 
 
 def offloop(fn):
@@ -35,6 +37,7 @@ def offloop(fn):
 
 
 from app.core.specialties import specialty_variants
+from app.crud.clinic import get_queue_settings
 from app.graphql.types import (
     AppointmentFilter,
     AppointmentStats,
@@ -525,7 +528,14 @@ class Query:
     ) -> PaginatedAppointments:
         """Получить список записей"""
         with get_db_session() as db:
-            query = db.query(Appointment)
+            # Codex P2 (round-16): конвертер страницы читает
+            # appointment.patient, appointment.doctor и doctor.user --
+            # без eager-load страница perPage=1000 порождала ~3000
+            # ленивых SELECT-ов (N+1).
+            query = db.query(Appointment).options(
+                selectinload(Appointment.patient),
+                selectinload(Appointment.doctor).selectinload(Doctor.user),
+            )
 
             # Применяем фильтры
             if filter:
@@ -685,6 +695,16 @@ class Query:
 
     # ===================== STATISTICS =====================
 
+    @staticmethod
+    def _clinic_today(db) -> date:
+        """Codex P2 (round-16): календарный день КЛИНИКИ по
+        конфигурированной таймзоне (тот же SSOT, что у мутаций очередей) —
+        host date.today() на UTC-хосте между 19:00 и полуночью уже «вчера»
+        для Asia/Tashkent, и дневные счётчики показывали устаревшие итоги.
+        """
+        tz_name = get_queue_settings(db).get("timezone", "Asia/Tashkent")
+        return datetime.now(ZoneInfo(tz_name)).date()
+
     @strawberry.field
     @offloop
     def appointment_stats(self) -> AppointmentStats:
@@ -693,7 +713,7 @@ class Query:
             total = db.query(Appointment).count()
             today = (
                 db.query(Appointment)
-                .filter(Appointment.appointment_date == date.today())
+                .filter(Appointment.appointment_date == Query._clinic_today(db))
                 .count()
             )
 
@@ -713,7 +733,11 @@ class Query:
         """Получить статистику визитов"""
         with get_db_session() as db:
             total = db.query(Visit).count()
-            today = db.query(Visit).filter(Visit.visit_date == date.today()).count()
+            today = (
+                db.query(Visit)
+                .filter(Visit.visit_date == Query._clinic_today(db))
+                .count()
+            )
 
             return VisitStats(
                 total=total,
@@ -760,7 +784,7 @@ class Query:
                 db.query(Appointment)
                 .filter(
                     Appointment.doctor_id == doctor_id,
-                    Appointment.appointment_date == date.today(),
+                    Appointment.appointment_date == Query._clinic_today(db),
                 )
                 .count()
             )
@@ -768,7 +792,7 @@ class Query:
                 db.query(Visit)
                 .filter(
                     Visit.doctor_id == doctor_id,
-                    Visit.visit_date == date.today(),
+                    Visit.visit_date == Query._clinic_today(db),
                 )
                 .count()
             )
