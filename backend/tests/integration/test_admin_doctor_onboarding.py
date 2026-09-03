@@ -267,8 +267,10 @@ class TestConditionalCreateContract:
         adapter = TypeAdapter(UserCreateRequest)
         pattern = _re.compile(_USER_MANAGEMENT_ROLE_PATTERN)
         # every value the legacy regex accepted must validate via the union
+        # REC-1 (main): 'Receptionist' is write-frozen (filter-only), so it
+        # is intentionally absent from the create union.
         accepted = [
-            "Admin", "Registrar", "Doctor", "Nurse", "Receptionist",
+            "Admin", "Registrar", "Doctor", "Nurse",
             "Cashier", "Lab", "Patient", "SuperAdmin", "Manager",
         ] + [
             "cardio", "cardiologist", "cardiology", "dentist", "dentistry",

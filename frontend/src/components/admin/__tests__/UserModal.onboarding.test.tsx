@@ -159,7 +159,9 @@ describe('UserModal doctor onboarding', () => {
     );
     fillBaseUserForm();
     const options = await openRoleSelect();
-    fireEvent.click(options.find((el) => el.textContent === 'admin2.umdl_role_receptionist') as HTMLElement);
+    // REC-1: Receptionist is write-frozen — Registrar is the canonical
+    // non-doctor role exercised here.
+    fireEvent.click(options.find((el) => el.textContent === 'admin2.umdl_role_registrar') as HTMLElement);
     submitForm();
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
