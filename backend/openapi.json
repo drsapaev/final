@@ -28780,6 +28780,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            },
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
           }
         }
       }
@@ -28924,6 +28934,13 @@
             }
           },
           "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            },
             "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
           }
         },
@@ -29034,6 +29051,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            },
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
           }
         }
       },
@@ -109237,6 +109264,19 @@
         ],
         "title": "UserProfileResponse",
         "description": "Схема ответа профиля пользователя"
+      },
+      "ServiceUnavailableDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ServiceUnavailableDetail"
       }
     },
     "securitySchemes": {

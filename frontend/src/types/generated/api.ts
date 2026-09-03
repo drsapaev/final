@@ -38568,6 +38568,11 @@ export type components = {
              */
             updated_at: string;
         };
+        /** ServiceUnavailableDetail */
+        ServiceUnavailableDetail: {
+            /** Detail */
+            detail: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -55640,6 +55645,15 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
         };
     };
     get_available_doctor_users_api_v1_admin_doctors_available_users_get: {
@@ -55723,7 +55737,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
             };
         };
     };
@@ -55789,6 +55805,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
                 };
             };
         };

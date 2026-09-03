@@ -347,6 +347,32 @@ class TestVocabularyTypedContract:
         assert "code" in schemas["SpecialtyVocabularyItem"].get("required", [])
         assert "title_ru" in schemas["SpecialtyVocabularyItem"].get("required", [])
 
+    def test_openapi_typed_503_on_all_catalog_affected_operations(self):
+        """Codex round-6 P2: the documented 503 (catalog not configured) is
+        declared with a SHARED error-body model on GET specialty-vocabulary,
+        POST /admin/doctors and PUT /admin/doctors/{doctor_id} — generated
+        clients type the error shape instead of `content?: never`."""
+        import json as _json
+        from pathlib import Path as _Path
+
+        spec = _json.loads(
+            (_Path(__file__).resolve().parents[2] / "openapi.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        schemas = spec["components"]["schemas"]
+        assert "ServiceUnavailableDetail" in schemas
+        assert schemas["ServiceUnavailableDetail"]["required"] == ["detail"]
+        ref = "#/components/schemas/ServiceUnavailableDetail"
+        for path, method in (
+            ("/api/v1/admin/doctors/specialty-vocabulary", "get"),
+            ("/api/v1/admin/doctors", "post"),
+            ("/api/v1/admin/doctors/{doctor_id}", "put"),
+        ):
+            declared = spec["paths"][path][method]["responses"]["503"]
+            schema = declared["content"]["application/json"]["schema"]
+            assert schema["$ref"] == ref, (path, method)
+
 
 class TestBlankSpecialtyGuard:
     """Codex P2 round 2: specialty:'' must not bypass the catalog guard."""
@@ -437,3 +463,90 @@ class TestCodexRound3:
             json={"user_id": test_doctor_user.id, "specialty": "cardiology", "active": True},
         )
         assert response.status_code == 503
+
+
+class TestUserRoleProvisioningCatalogGuard:
+    """Codex round-6 P1: legacy doctor-role auto-provisioning (POST /users
+    with role cardio/derma/dentist) respects the runtime catalog — a
+    DEACTIVATED specialty must not receive a fresh ACTIVE doctor profile;
+    the provisioning downgrades to the incomplete sentinel and the admin
+    assigns a real specialty through the validated boundary."""
+
+    def _create_role_user(self, client, auth_headers, role: str) -> dict:
+        import uuid as _uuid
+
+        suffix = _uuid.uuid4().hex[:8]
+        response = client.post(
+            "/api/v1/users/users",
+            headers=auth_headers,
+            json={
+                "username": f"r6-{role}-{suffix}",
+                "email": f"r6-{role}-{suffix}@example.com",
+                "password": "StrongPass123",
+                "role": role,
+            },
+        )
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    def _cleanup_user(self, db_session: Session, user_id: int) -> None:
+        from app.models.user import User
+        from app.models.user_profile import UserAuditLog
+
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == user_id).first()
+        if doctor:
+            db_session.delete(doctor)
+        audit = db_session.query(UserAuditLog).filter(
+            UserAuditLog.user_id == user_id
+        )
+        for row in audit:
+            db_session.delete(row)
+        user = db_session.query(User).filter(User.id == user_id).first()
+        if user:
+            db_session.delete(user)
+        db_session.commit()
+
+    def test_active_catalog_specialty_keeps_historical_mapping(
+        self, client, auth_headers, seeded_catalog, db_session
+    ):
+        payload = self._create_role_user(client, auth_headers, "derma")
+        try:
+            doctor = (
+                db_session.query(Doctor)
+                .filter(Doctor.user_id == payload["id"])
+                .first()
+            )
+            assert doctor is not None
+            assert doctor.specialty == "dermatology"
+        finally:
+            self._cleanup_user(db_session, payload["id"])
+
+    def test_deactivated_catalog_specialty_downgrades_provisioning(
+        self, client, auth_headers, seeded_catalog, db_session
+    ):
+        row = (
+            db_session.query(MedicalSpecialty)
+            .filter(MedicalSpecialty.code == "dermatology")
+            .first()
+        )
+        assert row is not None
+        row.active = False
+        db_session.commit()
+        try:
+            payload = self._create_role_user(client, auth_headers, "derma")
+            try:
+                doctor = (
+                    db_session.query(Doctor)
+                    .filter(Doctor.user_id == payload["id"])
+                    .first()
+                )
+                assert doctor is not None
+                # the deactivated catalog specialty is NOT provisioned as a
+                # fresh active profile — the incomplete sentinel requires
+                # assignment through the validated boundary instead
+                assert doctor.specialty == "general"
+            finally:
+                self._cleanup_user(db_session, payload["id"])
+        finally:
+            row.active = True
+            db_session.commit()

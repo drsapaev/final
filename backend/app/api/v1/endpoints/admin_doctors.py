@@ -21,6 +21,7 @@ from app.schemas.clinic import (
     DoctorUserOption,
     ScheduleCreate,
     ScheduleOut,
+    ServiceUnavailableDetail,
     SpecialtyVocabularyItem,
     WeeklyScheduleUpdate,
 )
@@ -237,9 +238,10 @@ def get_doctors_stats(
     response_model=list[SpecialtyVocabularyItem],
     responses={
         503: {
+            "model": ServiceUnavailableDetail,
             "description": (
                 "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
-            )
+            ),
         }
     },
 )
@@ -406,7 +408,18 @@ def _validate_specialty_assignable(db: Session, specialty: str | None) -> None:
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
 
-@router.post("/doctors", response_model=DoctorOut)
+@router.post(
+    "/doctors",
+    response_model=DoctorOut,
+    responses={
+        503: {
+            "model": ServiceUnavailableDetail,
+            "description": (
+                "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+            ),
+        }
+    },
+)
 def create_doctor(
     doctor: DoctorCreate,
     db: Session = Depends(get_db),
@@ -449,7 +462,18 @@ def create_doctor(
         raise _admin_doctors_http_error(exc, "create_doctor") from exc
 
 
-@router.put("/doctors/{doctor_id}", response_model=DoctorOut)
+@router.put(
+    "/doctors/{doctor_id}",
+    response_model=DoctorOut,
+    responses={
+        503: {
+            "model": ServiceUnavailableDetail,
+            "description": (
+                "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+            ),
+        }
+    },
+)
 def update_doctor(
     doctor_id: int,
     doctor: DoctorUpdate,
