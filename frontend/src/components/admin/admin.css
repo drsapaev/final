@@ -4433,7 +4433,10 @@
 }
 
 .admin-tertiary-xs-m-8px000-maxw-720 {
-  color: var(--mac-text-tertiary);
+  /* AXE-EXP-4: tertiary ink was 2.59:1 on the dark clinic-settings card
+   * composite; secondary ink is the canonical muted ink for card surfaces
+   * (5.6:1 dark composite, 6+:1 light cards). */
+  color: var(--mac-text-secondary);
   font-size: var(--mac-font-size-xs);
   margin: 8px 0 0 0;
   max-width: 720px;
@@ -4576,7 +4579,9 @@
 
 .admin-xs-tertiary-mt-4-m-4px000 {
   font-size: var(--mac-font-size-xs);
-  color: var(--mac-text-tertiary);
+  /* AXE-EXP-4: tertiary ink was 2.59:1 on the dark clinic-settings card
+   * composite; secondary ink is the canonical muted ink for card surfaces. */
+  color: var(--mac-text-secondary);
   margin-top: 4px;
   margin: 4px 0 0 0;
 }

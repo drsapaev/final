@@ -136,12 +136,14 @@ const UserModal = ({
   const { roleOptions: apiRoleOptions } = useRoles({ includeAll: false });
 
   // Fallback roles if API fails
+  // REC-1 (Receptionist deprecation): 'Receptionist' removed from the
+  // create/edit role options — Registrar is the canonical front-desk role
+  // (0 production Receptionist rows, SQL evidence 2026-09-02).
   const baseRoleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
     { value: 'Admin', label: t('admin2.umdl_role_admin') },
     { value: 'Doctor', label: t('admin2.umdl_role_doctor_general') },
     { value: 'Nurse', label: t('admin2.umdl_role_nurse') },
     { value: 'Registrar', label: t('admin2.umdl_role_registrar') },
-    { value: 'Receptionist', label: t('admin2.umdl_role_receptionist') },
     { value: 'Cashier', label: t('admin2.umdl_role_cashier') },
     { value: 'Lab', label: t('admin2.umdl_role_lab') },
     { value: 'Patient', label: t('admin2.umdl_role_patient') }

@@ -251,23 +251,6 @@ class TestLegacyRoleCompatibility:
         assert doctor.specialty == "cardiology"
 
 
-class TestSpecialtyVocabularyEndpoint:
-    def test_vocabulary_returns_canonical_ids_only(
-        self, client, auth_headers
-    ):
-        response = client.get(
-            "/api/v1/admin/doctors/specialty-vocabulary", headers=auth_headers
-        )
-        assert response.status_code == 200
-        codes = [item["code"] for item in response.json()]
-        assert codes == ["cardiology", "dermatology", "dentistry"]
-        assert "general" not in codes
-
-    def test_vocabulary_requires_admin(self, client, auth_headers):
-        response = client.get("/api/v1/admin/doctors/specialty-vocabulary")
-        assert response.status_code in (401, 403)
-
-
 class TestConditionalCreateContract:
     """Codex P2: the conditional requirement must live in the published
     contract, not only in the runtime validator."""

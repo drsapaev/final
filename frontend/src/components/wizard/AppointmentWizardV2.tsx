@@ -230,7 +230,9 @@ const AppointmentWizardV2 = ({
 }: WizardProps) => {
   // Проверка прав доступа
   const { hasRole } = useRoleAccess();
-  const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
+  // REC-3: 'Receptionist' dropped from the wizard allow-list — the route
+  // alias is gone and the canonical spelling is 'Registrar'.
+  const hasRegistrarAccess = hasRole(['Admin', 'Registrar']);
 
   // i18n: unified translation hook — required for all t('misc.aw_*') calls below.
   const { t: rawT } = useTranslation();

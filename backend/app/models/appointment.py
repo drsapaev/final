@@ -11,6 +11,7 @@ from app.db.base_class import Base
 if TYPE_CHECKING:
     from app.models.clinic import Doctor
     from app.models.department import Department
+    from app.models.patient import Patient
 
 
 class Appointment(Base):
@@ -21,13 +22,13 @@ class Appointment(Base):
         Integer,
         ForeignKey("patients.id", ondelete="RESTRICT"),
         nullable=False,
-        index=True
+        index=True,
     )  # ✅ FIX: Appointments must always reference a patient (medical domain requirement)
     doctor_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("doctors.id", ondelete="SET NULL"),
         nullable=True,
-        index=True
+        index=True,
     )  # ✅ SECURITY: SET NULL to preserve appointment if doctor deleted
     department_id: Mapped[int | None] = mapped_column(
         Integer,
@@ -79,3 +80,6 @@ class Appointment(Base):
     # PR-3: Added doctor relationship so mobile_api endpoints can read
     # appointment.doctor without a separate CRUD lookup.
     doctor: Mapped[Doctor | None] = relationship("Doctor", foreign_keys=[doctor_id])
+    # GQL-AUDIT-28 follow-up: patient relationship for the GraphQL layer
+    # (mirrors the doctor relationship above; no back_populates needed).
+    patient: Mapped[Patient | None] = relationship("Patient", foreign_keys=[patient_id])

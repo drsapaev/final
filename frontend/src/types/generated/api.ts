@@ -9878,12 +9878,13 @@ export type paths = {
         };
         /**
          * Get Doctor Specialty Vocabulary
-         * @description Canonical specialty ids selectable at new-doctor onboarding.
+         * @description Medical specialty catalog — codes selectable at new-doctor onboarding.
          *
-         *     Feeds the mandatory specialty SELECT in the Users → Add User flow.
-         *     SSOT: app/core/specialties.py DOCTOR_ONBOARDING_SPECIALTIES (pilot
-         *     bootstrap — extendable without new User roles). Labels are localized
-         *     on the frontend; this endpoint returns domain ids only.
+         *     Runtime SSOT is the ``medical_specialties`` table (migration 0051);
+         *     there is deliberately NO hardcoded fallback. Ordering: sort_order,
+         *     then code (deterministic). Frontend label resolution per owner spec:
+         *     locale → catalog translation → title_ru → code (the ru titles are a
+         *     compatibility fallback for kk/uz-Cyrl, not a translation claim).
          */
         get: operations["get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get"];
         put?: never;
@@ -30261,7 +30262,7 @@ export type components = {
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            role: "Admin" | "Registrar" | "Nurse" | "Receptionist" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "Manager" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
+            role: "Admin" | "Registrar" | "Nurse" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "Manager" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
             /** Doctor Profile */
             doctor_profile?: null;
         };
@@ -34883,6 +34884,19 @@ export type components = {
              */
             limit: number;
         };
+        /**
+         * ServiceUnavailableDetail
+         * @description Body of the documented catalog 503 (Codex round-6 P2).
+         *
+         *     FastAPI's HTTPException payload is ``{"detail": ...}``; declaring this
+         *     model on the affected operations gives generated clients a typed error
+         *     shape instead of ``content?: never`` for the configuration-failure
+         *     response shared by GET specialty-vocabulary, POST and PUT /admin/doctors.
+         */
+        ServiceUnavailableDetail: {
+            /** Detail */
+            detail: string;
+        };
         /** ServiceUpdate */
         ServiceUpdate: {
             /** Code */
@@ -35085,6 +35099,23 @@ export type components = {
         SetupStatusOut: {
             /** Initialized */
             initialized: boolean;
+        };
+        /**
+         * SpecialtyVocabularyItem
+         * @description One selectable specialty from the Medical Specialty Catalog (0051).
+         *
+         *     Typed DTO (Codex P2): a generic dict response compiled to arbitrary
+         *     maps in generated TS; this model guarantees code/titles exist.
+         */
+        SpecialtyVocabularyItem: {
+            /** Code */
+            code: string;
+            /** Title Ru */
+            title_ru: string;
+            /** Title Uz */
+            title_uz?: string | null;
+            /** Title En */
+            title_en?: string | null;
         };
         /** StaffActionConfirmRequest */
         StaffActionConfirmRequest: {
@@ -55700,6 +55731,15 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
         };
     };
     get_available_doctor_users_api_v1_admin_doctors_available_users_get: {
@@ -55775,9 +55815,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    }[];
+                    "application/json": components["schemas"]["SpecialtyVocabularyItem"][];
+                };
+            };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
                 };
             };
         };
@@ -55844,6 +55891,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
                 };
             };
         };

@@ -612,6 +612,10 @@ const kk = {
     session_warning_text: 'Сессия {seconds} сек ішінде аяқталады. Сақталмаған деректерді жоғалтпау үшін ұзартыңыз.',
     session_warning_title: 'Сессия жылдам аяқталады',
     single_date: 'Күні',
+    // AXE-EXP-5: accessible names for the cashier date filter inputs
+    filter_date_single_aria: 'Төлемдер сүзгісі: күн',
+    filter_date_from_aria: 'Төлемдер сүзгісі: күннен',
+    filter_date_to_aria: 'Төлемдер сүзгісі: күнге дейін',
     start_online_payment_aria: 'Онлайн төлемді бастау',
     stats_load_failed: 'Статистиканы жүктеу сәтсіз',
     subtitle: 'Медициналық клиника • {date}',
@@ -3914,7 +3918,6 @@ const kk = {
     um_role_admin: 'Администратор',
     um_role_doctor: 'Врач',
     um_role_nurse: 'Медсестра',
-    um_role_receptionist: 'Ресепшионист',
 
     um_role_registrar: 'Регистратор',
     um_role_cashier: 'Кассир',
@@ -4607,7 +4610,6 @@ const kk = {
     umdl_role_derma: 'Дерматолог',
     umdl_role_dentist: 'Стоматолог',
     umdl_role_nurse: 'Медсестра',
-    umdl_role_receptionist: 'Ресепшионист',
 
     umdl_role_registrar: 'Регистратор',
     umdl_role_cashier: 'Кассир',
@@ -5151,6 +5153,7 @@ const kk = {
     dmdl_user_inactive_suffix: ' • неактивен',
     dmdl_err_user_required: 'Нужно выбрать существующий аккаунт пользователя',
     dmdl_err_specialty_required: 'Специальность обязательна',
+    dmdl_specialty_historical: 'историческая специальность',
     dmdl_err_specialty_format: 'Только латинские буквы в нижнем регистре, цифры и _ (например: cardiology)',
     dmdl_err_price_number: 'Цена должна быть числом',
     dmdl_err_start_number: 'Стартовый номер должен быть числом',
@@ -5531,6 +5534,8 @@ const kk = {
 
     // ─── GraphQLExplorer (admin2.gql2_*) ───
     gql2_example_full_name: 'Иванов Иван Иванович',
+    gql2_example_last_name: 'Иванов',
+    gql2_example_first_name: 'Иван',
     gql2_example_notes: 'Первичная консультация',
 
     // ─── DisplayBoardSettings (admin2.db2_*) ───
@@ -6335,7 +6340,7 @@ const kk = {
     aw_refresh_services_title: 'Обновить список услуг',
     aw_access_denied_title: 'Доступ запрещен',
     aw_insufficient_rights: 'Недостаточно прав доступа',
-    aw_insufficient_rights_description: 'Для создания записей пациентов необходима роль Регистратора (включая Receptionist) или Администратора.',
+    aw_insufficient_rights_description: 'Для создания записей пациентов необходима роль Регистратора или Администратора.',
 
     // ─── Setup.jsx (setup_) ───────────────────────────────────────────────
     setup_pw_strength_very_weak: 'Очень слабый',

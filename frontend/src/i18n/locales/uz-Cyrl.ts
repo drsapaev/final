@@ -556,6 +556,10 @@ const uzCyrl = {
     search_example_name: 'Иванов',
     all_statuses: 'Все статусы',
     single_date: 'Одна дата',
+    // AXE-EXP-5: accessible names for the cashier date filter inputs
+    filter_date_single_aria: 'Тўловлар филтри: санa',
+    filter_date_from_aria: 'Тўловлар филтри: санадан',
+    filter_date_to_aria: 'Тўловлар филтри: санагача',
     date_mode_range: 'Диапазон',
     date_preset_aria: 'Быстрый выбор даты',
     date_range_preset_aria: 'Быстрый выбор диапазона дат',
@@ -3925,7 +3929,6 @@ const uzCyrl = {
     um_role_admin: 'Администратор',
     um_role_doctor: 'Врач',
     um_role_nurse: 'Медсестра',
-    um_role_receptionist: 'Ресепшионист',
 
     um_role_registrar: 'Регистратор',
     um_role_cashier: 'Кассир',
@@ -4618,7 +4621,6 @@ const uzCyrl = {
     umdl_role_derma: 'Дерматолог',
     umdl_role_dentist: 'Стоматолог',
     umdl_role_nurse: 'Медсестра',
-    umdl_role_receptionist: 'Ресепшионист',
 
     umdl_role_registrar: 'Регистратор',
     umdl_role_cashier: 'Кассир',
@@ -5162,6 +5164,7 @@ const uzCyrl = {
     dmdl_user_inactive_suffix: ' • неактивен',
     dmdl_err_user_required: 'Нужно выбрать существующий аккаунт пользователя',
     dmdl_err_specialty_required: 'Специальность обязательна',
+    dmdl_specialty_historical: 'историческая специальность',
     dmdl_err_specialty_format: 'Только латинские буквы в нижнем регистре, цифры и _ (например: cardiology)',
     dmdl_err_price_number: 'Цена должна быть числом',
     dmdl_err_start_number: 'Стартовый номер должен быть числом',
@@ -5542,6 +5545,8 @@ const uzCyrl = {
 
     // ─── GraphQLExplorer (admin2.gql2_*) ───
     gql2_example_full_name: 'Иванов Иван Иванович',
+    gql2_example_last_name: 'Иванов',
+    gql2_example_first_name: 'Иван',
     gql2_example_notes: 'Первичная консультация',
 
     // ─── DisplayBoardSettings (admin2.db2_*) ───
@@ -6346,7 +6351,7 @@ const uzCyrl = {
     aw_refresh_services_title: 'Обновить список услуг',
     aw_access_denied_title: 'Доступ запрещен',
     aw_insufficient_rights: 'Недостаточно прав доступа',
-    aw_insufficient_rights_description: 'Для создания записей пациентов необходима роль Регистратора (включая Receptionist) или Администратора.',
+    aw_insufficient_rights_description: 'Для создания записей пациентов необходима роль Регистратора или Администратора.',
 
     // ─── Setup.jsx (setup_) ───────────────────────────────────────────────
     setup_pw_strength_very_weak: 'Очень слабый',

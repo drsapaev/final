@@ -28771,6 +28771,16 @@
               }
             }
           },
+          "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -28906,7 +28916,7 @@
           "admin"
         ],
         "summary": "Get Doctor Specialty Vocabulary",
-        "description": "Canonical specialty ids selectable at new-doctor onboarding.\n\nFeeds the mandatory specialty SELECT in the Users → Add User flow.\nSSOT: app/core/specialties.py DOCTOR_ONBOARDING_SPECIALTIES (pilot\nbootstrap — extendable without new User roles). Labels are localized\non the frontend; this endpoint returns domain ids only.",
+        "description": "Medical specialty catalog — codes selectable at new-doctor onboarding.\n\nRuntime SSOT is the ``medical_specialties`` table (migration 0051);\nthere is deliberately NO hardcoded fallback. Ordering: sort_order,\nthen code (deterministic). Frontend label resolution per owner spec:\nlocale → catalog translation → title_ru → code (the ru titles are a\ncompatibility fallback for kk/uz-Cyrl, not a translation claim).",
         "operationId": "get_doctor_specialty_vocabulary_api_v1_admin_doctors_specialty_vocabulary_get",
         "responses": {
           "200": {
@@ -28915,13 +28925,20 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": {
-                      "type": "string"
-                    },
-                    "type": "object"
+                    "$ref": "#/components/schemas/SpecialtyVocabularyItem"
                   },
                   "type": "array",
                   "title": "Response Get Doctor Specialty Vocabulary Api V1 Admin Doctors Specialty Vocabulary Get"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
                 }
               }
             }
@@ -29021,6 +29038,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/app__schemas__clinic__DoctorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
                 }
               }
             }
@@ -53590,7 +53617,6 @@
                     "Admin": "#/components/schemas/NonDoctorUserCreateRequest",
                     "Registrar": "#/components/schemas/NonDoctorUserCreateRequest",
                     "Nurse": "#/components/schemas/NonDoctorUserCreateRequest",
-                    "Receptionist": "#/components/schemas/NonDoctorUserCreateRequest",
                     "Cashier": "#/components/schemas/NonDoctorUserCreateRequest",
                     "Lab": "#/components/schemas/NonDoctorUserCreateRequest",
                     "Patient": "#/components/schemas/NonDoctorUserCreateRequest",
@@ -53679,7 +53705,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
+                  "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor|Receptionist)$"
                 },
                 {
                   "type": "null"
@@ -87002,7 +87028,6 @@
               "Admin",
               "Registrar",
               "Nurse",
-              "Receptionist",
               "Cashier",
               "Lab",
               "Patient",
@@ -98790,6 +98815,20 @@
         "title": "ServiceSearchRequest",
         "description": "Запрос поиска услуг"
       },
+      "ServiceUnavailableDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ServiceUnavailableDetail",
+        "description": "Body of the documented catalog 503 (Codex round-6 P2).\n\nFastAPI's HTTPException payload is ``{\"detail\": ...}``; declaring this\nmodel on the affected operations gives generated clients a typed error\nshape instead of ``content?: never`` for the configuration-failure\nresponse shared by GET specialty-vocabulary, POST and PUT /admin/doctors."
+      },
       "ServiceUpdate": {
         "properties": {
           "code": {
@@ -99428,6 +99467,47 @@
           "initialized"
         ],
         "title": "SetupStatusOut"
+      },
+      "SpecialtyVocabularyItem": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "title_ru": {
+            "type": "string",
+            "title": "Title Ru"
+          },
+          "title_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Uz"
+          },
+          "title_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "title_ru"
+        ],
+        "title": "SpecialtyVocabularyItem",
+        "description": "One selectable specialty from the Medical Specialty Catalog (0051).\n\nTyped DTO (Codex P2): a generic dict response compiled to arbitrary\nmaps in generated TS; this model guarantees code/titles exist."
       },
       "StaffActionConfirmRequest": {
         "properties": {
@@ -102610,7 +102690,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
+                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"
@@ -104658,7 +104738,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
+                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor|Receptionist)$"
               },
               {
                 "type": "null"
@@ -104967,7 +105047,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
+                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"

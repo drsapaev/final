@@ -612,6 +612,10 @@ const uzLatn = {
     session_warning_text: 'Sessiya {seconds} sek ichida tugaydi. Saqlanmagan ma\'lumotlarni yo\'qotmaslik uchun uzaytiring.',
     session_warning_title: 'Sessiya tez orada tugaydi',
     single_date: 'Sana',
+    // AXE-EXP-5: accessible names for the cashier date filter inputs
+    filter_date_single_aria: "To'lovlar filtri: sana",
+    filter_date_from_aria: "To'lovlar filtri: sanadan",
+    filter_date_to_aria: "To'lovlar filtri: sanagacha",
     start_online_payment_aria: 'Onlayn to\'lovni boshlash',
     stats_load_failed: 'Statistikani yuklab bo\'lmadi',
     subtitle: 'Tibbiy klinika • {date}',
@@ -3915,7 +3919,6 @@ const uzLatn = {
     um_role_admin: 'Administrator',
     um_role_doctor: 'Shifokor',
     um_role_nurse: 'Hamshira',
-    um_role_receptionist: 'Kutuvchi (respsionist)',
 
     um_role_registrar: 'Registrator',
     um_role_cashier: 'Kassir',
@@ -4608,7 +4611,6 @@ const uzLatn = {
     umdl_role_derma: 'Dermatolog',
     umdl_role_dentist: 'Stomatolog',
     umdl_role_nurse: 'Hamshira',
-    umdl_role_receptionist: 'Kutuvchi (respsionist)',
 
     umdl_role_registrar: 'Registrator',
     umdl_role_cashier: 'Kassir',
@@ -5152,6 +5154,7 @@ const uzLatn = {
     dmdl_user_inactive_suffix: ' • nofaol',
     dmdl_err_user_required: 'Mavjud foydalanuvchi hisobini tanlash kerak',
     dmdl_err_specialty_required: 'Mutaxassislik majburiy',
+    dmdl_specialty_historical: 'tarixiy mutaxassislik',
     dmdl_err_specialty_format: 'Faqat kichik lotin harflari, raqamlar va _ (masalan: cardiology)',
     dmdl_err_price_number: "Narx raqam bo'lishi kerak",
     dmdl_err_start_number: "Boshlang'ich raqam raqam bo'lishi kerak",
@@ -5532,6 +5535,8 @@ const uzLatn = {
 
     // ─── GraphQLExplorer (admin2.gql2_*) ───
     gql2_example_full_name: "Ivanov Ivan Ivanovich",
+    gql2_example_last_name: "Ivanov",
+    gql2_example_first_name: "Ivan",
     gql2_example_notes: "Boshlang'ich konsultatsiya",
 
     // ─── DisplayBoardSettings (admin2.db2_*) ───
@@ -6336,7 +6341,7 @@ const uzLatn = {
     aw_refresh_services_title: 'Xizmatlar roʻyxatini yangilash',
     aw_access_denied_title: 'Kirish rad etildi',
     aw_insufficient_rights: 'Yetarli ruxsat yoʻq',
-    aw_insufficient_rights_description: 'Bemor yozilishlarini yaratish uchun Registrator (Receptionistni oʻz ichiga oladi) yoki Administrator roli kerak.',
+    aw_insufficient_rights_description: 'Bemor yozilishlarini yaratish uchun Registrator yoki Administrator roli kerak.',
 
     // ─── Setup.jsx (setup_) ───────────────────────────────────────────────
     setup_pw_strength_very_weak: 'Juda zaif',

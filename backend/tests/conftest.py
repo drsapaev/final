@@ -44,6 +44,7 @@ from app.models import (  # noqa: F401
     emr,
     file_system,
     lab,
+    medical_specialty,  # Medical Specialty Catalog (migration 0051)
     online_queue,
     payment,
     payment_webhook,
@@ -84,6 +85,17 @@ def test_db():
     tables = inspector.get_table_names()
     if "users" not in tables:
         raise RuntimeError(f"CRITICAL: Table 'users' not created! Available tables: {tables}")
+
+    # Medical Specialty Catalog (0051): production seeds the baseline via
+    # Alembic; the test world builds schema via create_all, so the same
+    # deterministic baseline is applied here once per test database. The
+    # catalog is the write-boundary SSOT — without it every doctor-creating
+    # test would hit the 400/503 guard.
+    from app.services.medical_specialty_seed import seed_medical_specialties
+
+    with engine.connect() as catalog_conn:
+        seed_medical_specialties(catalog_conn)
+        catalog_conn.commit()
 
     yield engine
 

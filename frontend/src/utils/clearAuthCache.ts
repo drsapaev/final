@@ -43,7 +43,10 @@ export function hasStaleAuthCache() {
     const role = profileData?.role;
 
     // Проверяем на устаревшие роли или неправильные маршруты
-    const validRoles = ['admin', 'registrar', 'receptionist', 'lab', 'doctor', 'cashier', 'cardio', 'derma', 'dentist'];
+    // REC-3: 'receptionist' removed from the valid set — a cached legacy
+    // Receptionist profile is now treated as stale and purged, forcing a
+    // fresh login under the canonical Registrar role.
+    const validRoles = ['admin', 'registrar', 'lab', 'doctor', 'cashier', 'cardio', 'derma', 'dentist'];
     return !validRoles.includes(role?.toLowerCase());
   } catch (error) {
     logger.error('Error checking auth cache:', error);
