@@ -3,9 +3,13 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import pytest
 from sqlalchemy import create_engine, text
 
-from app.scripts.migrate_users_to_postgres import migrate_users
+from app.scripts.migrate_users_to_postgres import (
+    _normalize_legacy_role,
+    migrate_users,
+)
 
 
 def _create_source_db(path: Path) -> None:
@@ -204,3 +208,82 @@ def test_migrate_users_updates_existing_user_without_duplication(tmp_path):
     # spells the role 'Receptionist'.
     assert registrar == (3, "Registrar", "hash-registrar", "Registrar", 1)
     assert user_count == 2
+
+
+def _create_manager_source_db(path: Path) -> None:
+    """Legacy source holding a single 'Manager' row (M-1 probe)."""
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute(
+            """
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                username TEXT NOT NULL,
+                email TEXT,
+                full_name TEXT,
+                hashed_password TEXT NOT NULL,
+                role TEXT,
+                is_active INTEGER,
+                is_superuser INTEGER,
+                must_change_password INTEGER,
+                created_at TEXT,
+                updated_at TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO users (
+                id, username, email, full_name, hashed_password, role,
+                is_active, is_superuser, must_change_password,
+                created_at, updated_at
+            ) VALUES (
+                20, 'smoke_manager', 'smoke.manager@synthetic.invalid',
+                '[SYNTHETIC-SMOKE] Manager', 'hash-manager', 'Manager',
+                1, 0, 0, '2026-01-01 10:00:00', '2026-01-02 11:00:00'
+            )
+            """
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+class TestManagerWriteFreeze:
+    """M-1 (Manager deprecation, Codex review P1 PR #3029): the migration
+    boundary must not create or overwrite a stored 'Manager' role — there
+    is no canonical alias, so the boundary rejects the row loudly instead
+    of mapping (invented semantics) or silently skipping (vanishing
+    account)."""
+
+    def test_normalize_rejects_manager(self) -> None:
+        with pytest.raises(ValueError, match="Manager"):
+            _normalize_legacy_role("Manager")
+
+    def test_normalize_rejects_manager_case_insensitive(self) -> None:
+        with pytest.raises(ValueError, match="Manager"):
+            _normalize_legacy_role("manager")
+
+    def test_normalize_keeps_canonical_roles(self) -> None:
+        assert _normalize_legacy_role("Admin") == "Admin"
+        assert _normalize_legacy_role("Doctor") == "Doctor"
+        assert _normalize_legacy_role("Registrar") == "Registrar"
+
+    def test_migrate_users_aborts_on_manager_row_writes_nothing(
+        self, tmp_path: Path
+    ) -> None:
+        source_db = tmp_path / "legacy_manager.db"
+        target_db = tmp_path / "target_manager.db"
+        _create_manager_source_db(source_db)
+        engine = _create_target_engine(target_db)
+
+        with pytest.raises(ValueError, match="Manager"):
+            migrate_users(source_sqlite_path=source_db, target_engine=engine)
+
+        # The abort happens at the load boundary, BEFORE any INSERT/UPDATE
+        # path runs — the target table stays untouched.
+        with engine.connect() as connection:
+            user_count = connection.execute(
+                text("SELECT COUNT(*) FROM users")
+            ).scalar_one()
+        assert user_count == 0

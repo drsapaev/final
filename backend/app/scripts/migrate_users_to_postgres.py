@@ -53,10 +53,29 @@ def _normalize_legacy_role(value: Any) -> str:
     spelling: 0, SQL evidence 2026-09-02), so the migration now normalizes
     the deprecated spelling on write while still READING any legacy value
     (legacy reads temporarily accepted; canonical writes only).
+
+    Codex review P1 (PR #3029, M-1): 'Manager' is likewise frozen out of
+    the WRITE vocabulary, but unlike Receptionist it has NO canonical
+    alias — mapping it to another role would invent a semantic the
+    business decision never approved, and silently skipping a row would
+    make an account vanish from the migration output without operator
+    awareness. So the boundary REJECTS it loudly: the operator must
+    resolve the source row explicitly (deactivate/remove it, or assign
+    a canonical role in the SOURCE) and re-run. Both the INSERT and
+    UPDATE paths flow through this single normalization boundary.
     """
     role = str(value or "").strip()
     if role.lower() == "receptionist":
         return "Registrar"
+    if role.lower() == "manager":
+        raise ValueError(
+            "M-1 (Manager deprecation) write-freeze: refusing to migrate "
+            "legacy role 'Manager' — it is a deprecated legacy/synthetic role "
+            "with no canonical alias (production keeps one legacy row, "
+            "smoke_manager id=20, pending post-deploy ops deactivation). "
+            "Resolve the source row explicitly (deactivate/remove it, or "
+            "assign a canonical role in the SOURCE) and re-run the migration."
+        )
     return role or "Admin"
 
 
