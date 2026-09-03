@@ -550,3 +550,43 @@ class TestUserRoleProvisioningCatalogGuard:
         finally:
             row.active = True
             db_session.commit()
+
+
+class TestActivationLoopholeFollowUp:
+    """Round-6 follow-up: activating an inactive profile with an unchanged
+    non-assignable specialty (sentinel or deactivated code) is a NEW
+    assignment and must pass the catalog."""
+
+    def test_activating_sentinel_profile_with_unchanged_specialty_rejected(
+        self, client, auth_headers, seeded_catalog, test_doctor_user
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",  # incomplete sentinel (never in catalog)
+            active=False,
+        )
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+
+        response = client.put(
+            f"/api/v1/admin/doctors/{doctor.id}",
+            headers=auth_headers,
+            json={"specialty": "general", "active": True},
+        )
+        assert response.status_code == 400
+
+    def test_activating_with_active_catalog_code_succeeds(
+        self, client, auth_headers, seeded_catalog, test_doctor_user
+    ):
+        doctor = Doctor(
+            user_id=test_doctor_user.id, specialty="cardiology", active=False
+        )
+        seeded_catalog.add(doctor)
+        seeded_catalog.commit()
+
+        response = client.put(
+            f"/api/v1/admin/doctors/{doctor.id}",
+            headers=auth_headers,
+            json={"specialty": "cardiology", "active": True},
+        )
+        assert response.status_code == 200, response.text
