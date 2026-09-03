@@ -65,7 +65,7 @@ authors = [{ name = "Clinic Team" }]
 readme = "README.md"
 dependencies = [
   # Web framework & ASGI
-  "fastapi>=0.121,<0.141",
+  "fastapi>=0.121,<0.142",
   "uvicorn[standard]>=0.29,<0.52",
   "starlette>=0.40,<1.4",
   "python-multipart>=0.0.32,<0.0.33",
