@@ -468,7 +468,9 @@ def require_doctor_or_admin(request: Request) -> User:
 def require_staff(request: Request) -> User:
     """Требует сотрудника клиники"""
     user = require_active_user(request)
-    if user.role not in ["Admin", "Doctor", "Nurse", "Receptionist"]:
+    # E-4 (Receptionist alias removal): the legacy spelling dropped —
+    # canonical vocabulary only (stored Receptionist rows = 0, §4.1.27).
+    if user.role not in ["Admin", "Doctor", "Nurse"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Требуются права сотрудника клиники",

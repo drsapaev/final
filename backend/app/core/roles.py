@@ -24,7 +24,11 @@ class Roles(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs
 
     # Дополнительные роли
     NURSE = "Nurse"
-    RECEPTIONIST = "Receptionist"
+    # E-4 (Receptionist alias removal): RECEPTIONIST decommissioned — the
+    # legacy spelling had a canonical successor (Registrar, REC track), the
+    # production table held 0 rows (SQL evidence 2026-09-02), and the last
+    # read/alias surfaces were removed in E-4. Unlike Manager there is no
+    # read-compat window to preserve.
     PATIENT = "Patient"
     SUPER_ADMIN = "SuperAdmin"
 
@@ -117,12 +121,13 @@ def is_doctor_role_spelling(role: object) -> bool:
 DOCTOR_FAMILY_GATE_ROLES: tuple[str, ...] = tuple(sorted(DOCTOR_ROLE_SPELLINGS))
 
 # Роли персонала
+# E-4: Roles.RECEPTIONIST removed — canonical Registrar is the front-desk
+# staff role (REC track); the legacy spelling is decommissioned.
 STAFF_ROLES = {
     Roles.REGISTRAR,
     Roles.LAB,
     Roles.CASHIER,
     Roles.NURSE,
-    Roles.RECEPTIONIST,
 }
 
 # NOTE (M-1): get_role_hierarchy keeps the legacy Roles.MANAGER: 8 entry —
@@ -157,7 +162,8 @@ def get_role_hierarchy(role: str) -> int:
     hierarchy = {
         Roles.PATIENT: 1,
         Roles.NURSE: 2,
-        Roles.RECEPTIONIST: 3,
+        # E-4: Roles.RECEPTIONIST: 3 removed — the level table covers the
+        # canonical vocabulary only (level 3 retired with the spelling).
         Roles.CASHIER: 4,
         Roles.LAB: 5,
         Roles.REGISTRAR: 6,
