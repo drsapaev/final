@@ -48,8 +48,20 @@ const LEGACY_DOCTOR_ROLE_VALUES = new Set([
   'cardiology', 'dermatology', 'dentistry',
 ]);
 
-const isLegacyDoctorRoleValue = (value: string) =>
-  LEGACY_DOCTOR_ROLE_VALUES.has(String(value).trim().toLowerCase());
+// Case-sensitive guard: the bare lowercase spelling "doctor" is a backend
+// compatibility value (POST /users accepts it via NonDoctorUserCreateRequest
+// with NO linked Doctor profile — DOCTOR_PROFILE_ROLES excludes it), so it
+// must never be offered for onboarding. The canonical "Doctor" (exact) is the
+// only doctor-family value that enables the profile block (isDoctorOnboarding
+// compares === 'Doctor'), so it is explicitly preserved here. Any other
+// case-variant ("DOCTOR", "DoCtOr", …) is not accepted by either backend
+// create variant and is hidden as well.
+const isLegacyDoctorRoleValue = (value: string) => {
+  const v = String(value).trim();
+  if (v === 'Doctor') return false;
+  if (v.toLowerCase() === 'doctor') return true;
+  return LEGACY_DOCTOR_ROLE_VALUES.has(v.toLowerCase());
+};
 
 // Форм-обёртки вынесены на уровень модуля: компоненты, определённые ВНУТРИ
 // UserModal, пересоздавали свой тип на каждом рендере — React размонтировал
@@ -131,6 +143,10 @@ const UserModal = ({
   const [errors, setErrors] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [specialtyOptions, setSpecialtyOptions] = useState<{ value: string; label: string }[]>([]);
+  // Vocabulary load failures are surfaced (Codex P2): a silent empty select
+  // blocks doctor onboarding with a misleading "select specialty" error.
+  const [specialtyLoadError, setSpecialtyLoadError] = useState(false);
+  const [specialtyReloadTick, setSpecialtyReloadTick] = useState(0);
 
   // Load roles from API (Phase 4: DB-driven roles - completed)
   const { roleOptions: apiRoleOptions } = useRoles({ includeAll: false });
@@ -164,6 +180,7 @@ const UserModal = ({
   useEffect(() => {
     if (!isOpen || user) return;
     let cancelled = false;
+    setSpecialtyLoadError(false);
     api
       .get('/admin/doctors/specialty-vocabulary')
       .then((response: { data?: unknown }) => {
@@ -183,14 +200,17 @@ const UserModal = ({
         }
       })
       .catch((fetchError: unknown) => {
-        if (!cancelled) setSpecialtyOptions([]);
+        if (!cancelled) {
+          setSpecialtyOptions([]);
+          setSpecialtyLoadError(true);
+        }
         logger.error('Error fetching doctor specialty vocabulary:', fetchError);
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, user]);
+  }, [isOpen, user, specialtyReloadTick]);
 
   // Инициализация формы при открытии
   useEffect(() => {
@@ -448,6 +468,19 @@ const UserModal = ({
                 ]}
                 size="large"
               />
+              {specialtyLoadError && (
+                <div className="admin-field-error-xs admin-flex-center-8">
+                  <AlertCircle className="admin-icon-12" />
+                  <span>{t('admin2.umdl_spec_load_error')}</span>
+                  <button
+                    type="button"
+                    className="admin-field-error-xs admin-retry-link"
+                    onClick={() => setSpecialtyReloadTick((n) => n + 1)}
+                  >
+                    {t('admin2.umdl_spec_retry')}
+                  </button>
+                </div>
+              )}
             </FormField>
             <div className="admin-doctor-onboarding-grid">
               <FormField label={t('admin2.umdl_doctor_cabinet')}>

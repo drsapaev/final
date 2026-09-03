@@ -4624,6 +4624,8 @@ const en = {
     umdl_doctor_start_number: 'Online start number',
     umdl_doctor_max_online: 'Max online per day',
     umdl_doctor_hint: 'Specialty is required. Other fields can be set later in the Doctors section.',
+    umdl_spec_load_error: "Failed to load the specialty list",
+    umdl_spec_retry: "Retry",
     umdl_spec_cardiology: 'Cardiology',
     umdl_spec_dermatology: 'Dermatology',
     umdl_spec_dentistry: 'Dentistry',

@@ -11135,6 +11135,19 @@
   color: var(--mac-error, #FF3B30);
 }
 
+/* Inline retry action inside an error row (vocabulary load failure) */
+.admin-retry-link {
+  margin-top: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-decoration: underline;
+  font: inherit;
+  color: var(--mac-error, #FF3B30);
+}
+.admin-retry-link:hover { opacity: 0.8; }
+
 /* ─── LoadingSkeleton helpers (final batch) ─── */
 
 .admin-skeleton-card {

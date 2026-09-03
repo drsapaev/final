@@ -4624,6 +4624,8 @@ const kk = {
     umdl_doctor_start_number: 'Стартовый номер онлайн-записи',
     umdl_doctor_max_online: 'Макс. онлайн-записей в день',
     umdl_doctor_hint: 'Специальность обязательна. Остальные поля можно задать позже в разделе «Врачи».',
+    umdl_spec_load_error: "Мамандықтар тізімін жүктеу сәтсіз аяқталды",
+    umdl_spec_retry: "Қайталау",
     umdl_spec_cardiology: 'Кардиология',
     umdl_spec_dermatology: 'Дерматология',
     umdl_spec_dentistry: 'Стоматология',

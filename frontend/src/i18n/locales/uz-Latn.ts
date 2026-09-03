@@ -4625,6 +4625,8 @@ const uzLatn = {
     umdl_doctor_start_number: 'Onlayn boshlanish raqami',
     umdl_doctor_max_online: 'Kuniga maks. onlayn',
     umdl_doctor_hint: 'Mutaxassislik majburiy. Qolgan maydonlarni keyinroq «Shifokorlar» bo‘limida to‘ldirish mumkin.',
+    umdl_spec_load_error: "Mutaxassisliklar ro‘yxatini yuklash muvaffaqiyatsiz tugadi",
+    umdl_spec_retry: "Qayta urinish",
     umdl_spec_cardiology: 'Kardiologiya',
     umdl_spec_dermatology: 'Dermatologiya',
     umdl_spec_dentistry: 'Stomatologiya',
