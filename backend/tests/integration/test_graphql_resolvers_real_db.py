@@ -2039,7 +2039,11 @@ def test_graphql_round15(gql_data, monkeypatch, caplog):
     r15_patient_id = created["patient"]["id"]
     doc_records = [r for r in caplog.records if "[FIX:ADM-05]" in r.getMessage()]
     assert doc_records, "debug-лог документа ожидается"
-    assert doc_records[-1].__dict__["doc_number"] == "[REDACTED]"
+    # номер документа не логируется НИ В КАКОМ виде (CodeQL: clear-text
+    # logging flagged even the mask_pii variant) — только факт наличия
+    rec_extra = doc_records[-1].__dict__
+    assert rec_extra["has_doc_number"] is True
+    assert "doc_number" not in rec_extra
     assert doc_number not in caplog.text
 
     # --- 4) updatePatient: дубликат doc_number другого пациента -> 400;

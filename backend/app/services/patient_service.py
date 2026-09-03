@@ -134,15 +134,16 @@ class PatientService:
             raise HTTPException(status_code=400, detail="Некорректная дата рождения")
 
         # Codex round-15 P1: doc_number -- full-redact PII (AGENTS.md
-        # L390-407); debug-лог не должен содержать сырой номер документа.
+        # L390-407); сам номер в лог не попадает НИ В КАКОМ виде (ни
+        # сырым, ни маскированным -- CodeQL flagged the masked variant as
+        # clear-text logging, т.к. поток значения непрозрачен маске):
+        # логируем только тип документа и факт его наличия.
         logger.debug(
             "[FIX:ADM-05] Persisting patient document fields",
-            extra=mask_pii(
-                {
-                    "doc_type": patient_in.doc_type,
-                    "doc_number": patient_in.doc_number,
-                }
-            ),
+            extra={
+                "doc_type": patient_in.doc_type,
+                "has_doc_number": patient_in.doc_number is not None,
+            },
         )
 
         validated_patient = PatientCreate(
