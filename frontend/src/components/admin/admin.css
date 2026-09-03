@@ -11027,13 +11027,15 @@
 /* ─── UserModal / form helpers (final batch) ─── */
 
 /* Doctor onboarding block (canonical User+Doctor creation, 2026-09-01):
-   visually grouped card inside Add User, 2-col grid for optional fields. */
+   visually grouped card inside Add User, 2-col grid for optional fields.
+   Fallbacks mirror tokens.css light theme without hex literals (UI
+   baseline ratchet: cssHexOutsideTokens / varUsagesNoFallback). */
 .admin-doctor-onboarding-block {
   margin: 4px 0 16px;
   padding: 14px 16px;
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-md);
-  background: var(--mac-bg-secondary);
+  border: 1px solid var(--mac-border, rgba(184, 200, 218, 1));
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-bg-secondary, rgba(227, 235, 245, 1));
 }
 
 .admin-doctor-onboarding-grid {
@@ -11048,19 +11050,36 @@
   }
 }
 
-/* AdminDoctors ⋯/Дополнительно recovery menu */
+/* AdminDoctors ⋯/Дополнительно recovery menu — positioning lives here
+   (regression ratchet: style={{…}} inline styles moved out of TSX). */
+.admin-doctors-advanced-anchor {
+  position: relative;
+}
+
+.admin-doctors-advanced-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
 .admin-doctors-advanced-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  z-index: 50;
+  min-width: 280px;
   padding: 6px;
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-md);
-  background: var(--mac-bg-primary);
-  box-shadow: var(--mac-shadow-lg);
+  border: 1px solid var(--mac-border, rgba(184, 200, 218, 1));
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-bg-primary, rgba(238, 243, 250, 1));
+  box-shadow: var(--mac-shadow-lg, 0 10px 25px rgba(0, 0, 0, 0.15));
 }
 
 .admin-doctors-advanced-hint {
   margin: 4px 8px 8px;
-  font-size: var(--mac-font-size-xs, 12px);
-  color: var(--mac-text-tertiary);
+  font-size: var(--mac-font-size-xs, 11px);
+  color: var(--mac-text-tertiary, rgba(93, 111, 132, 1));
   line-height: 1.4;
 }
 
@@ -11149,7 +11168,7 @@
   cursor: pointer;
   text-decoration: underline;
   font: inherit;
-  color: var(--mac-error, #FF3B30);
+  color: var(--mac-error, rgb(255, 59, 48));
 }
 .admin-retry-link:hover { opacity: 0.8; }
 

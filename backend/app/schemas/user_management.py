@@ -592,7 +592,16 @@ class DoctorProfileCreate(BaseModel):
     # schema to the column precision so an oversized value surfaces as a
     # field-level 422 instead of a driver overflow rolling back the whole
     # User+Doctor onboarding transaction.
-    price_default: Decimal | None = Field(None, ge=0, le=Decimal("99999999.99"))
+    # Codex round-8 P2: publish both bound AND scale in the JSON schema —
+    # maximum (from le) plus multipleOf 0.01 documents the two-decimal
+    # scale enforced by validate_price_precision, so contract-generated
+    # clients can pre-validate payloads without a 422 round-trip.
+    price_default: Decimal | None = Field(
+        None,
+        ge=0,
+        le=Decimal("99999999.99"),
+        json_schema_extra={"multipleOf": 0.01},
+    )
     start_number_online: int | None = Field(None, ge=1, le=100)
     max_online_per_day: int | None = Field(None, ge=1, le=100)
 

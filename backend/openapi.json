@@ -53649,6 +53649,16 @@
               }
             }
           },
+          "503": {
+            "description": "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -74898,6 +74908,7 @@
             "anyOf": [
               {
                 "type": "number",
+                "maximum": 99999999.99,
                 "minimum": 0.0
               },
               {
@@ -74908,6 +74919,7 @@
                 "type": "null"
               }
             ],
+            "multipleOf": 0.01,
             "title": "Price Default"
           },
           "start_number_online": {

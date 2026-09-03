@@ -130,7 +130,10 @@ const UserModal = ({
   onSave,
   loading = false
 }: UserModalProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT;
+  const { t: rawT, language: hookLanguage } = useTranslation(); const t = rawT;
+  // Test mocks (and any future hook refactor) may omit `language` — the
+  // catalog-title fallback chain only needs a best-effort locale tag.
+  const language = hookLanguage ?? 'ru';
   const [formData, setFormData] = useState<Record<string, any>>({
     username: '',
     email: '',
@@ -150,7 +153,17 @@ const UserModal = ({
   // Codex round-6 P2: store raw CODES and translate at render time —
   // labels computed at fetch time stayed in the fetch locale after the
   // admin switches the interface language while the modal is open.
-  const [specialtyCodes, setSpecialtyCodes] = useState<string[]>([]);
+  // Codex round-8 P2: keep the FULL catalog items — new specialties have
+  // no admin2.umdl_spec_* i18n keys, so the label falls back to the
+  // locale-appropriate catalog title (title_ru is the documented compat
+  // fallback for kk/uz-Cyrl) instead of rendering a bare missing key.
+  interface SpecialtyVocabularyItem {
+    code: string;
+    title_ru?: string;
+    title_uz?: string;
+    title_en?: string;
+  }
+  const [specialtyItems, setSpecialtyItems] = useState<SpecialtyVocabularyItem[]>([]);
   // Vocabulary load failures are surfaced (Codex P2): a silent empty select
   // blocks doctor onboarding with a misleading "select specialty" error.
   const [specialtyLoadError, setSpecialtyLoadError] = useState(false);
@@ -188,17 +201,33 @@ const UserModal = ({
   // Labels resolved at RENDER time (locale-aware, Codex round-6 P2):
   // switching the interface language while the modal is open immediately
   // re-renders the dropdown in the new locale without re-fetching.
+  // Resolution chain (owner spec, see specialty-vocabulary endpoint):
+  // existing i18n key → locale catalog title → title_ru compat → code.
   const specialtyOptions = useMemo(
     () =>
-      specialtyCodes.map((code) => ({
-        value: code,
-        label: t(`admin2.umdl_spec_${code}`),
-      })),
-    [specialtyCodes, t],
+      specialtyItems.map((item) => {
+        const i18nKey = `admin2.umdl_spec_${item.code}`;
+        const translated = t(i18nKey);
+        let label = translated !== i18nKey ? translated : '';
+        if (!label) {
+          const base = language.split('-')[0];
+          const localeTitle =
+            language === 'uz-Cyrl'
+              ? item.title_ru
+              : base === 'en'
+                ? item.title_en
+                : base === 'uz'
+                  ? item.title_uz
+                  : item.title_ru;
+          label = localeTitle || item.title_ru || item.code;
+        }
+        return { value: item.code, label };
+      }),
+    [specialtyItems, t, language],
   );
 
   // Canonical specialty vocabulary for the onboarding block (Admin-only
-  // endpoint; SSOT lives in backend app/core/specialties.py).
+  // endpoint; runtime SSOT is the medical_specialties catalog, migration 0051).
   useEffect(() => {
     if (!isOpen || user) return;
     let cancelled = false;
@@ -207,20 +236,25 @@ const UserModal = ({
       .get('/admin/doctors/specialty-vocabulary')
       .then((response: { data?: unknown }) => {
         const data = response?.data;
-        const items: Array<{ code?: string }> = Array.isArray(data)
-          ? (data as Array<{ code?: string }>)
-          : ((data as { items?: Array<{ code?: string }> })?.items ?? []);
+        const items: Array<SpecialtyVocabularyItem & { code?: string }> = Array.isArray(data)
+          ? (data as Array<SpecialtyVocabularyItem & { code?: string }>)
+          : ((data as { items?: Array<SpecialtyVocabularyItem & { code?: string }> })?.items ?? []);
         if (!cancelled) {
-          setSpecialtyCodes(
+          setSpecialtyItems(
             items
               .filter((item) => Boolean(item?.code))
-              .map((item) => String(item.code))
+              .map((item) => ({
+                code: String(item.code),
+                title_ru: item.title_ru,
+                title_uz: item.title_uz,
+                title_en: item.title_en,
+              }))
           );
         }
       })
       .catch((fetchError: unknown) => {
         if (!cancelled) {
-          setSpecialtyCodes([]);
+          setSpecialtyItems([]);
           setSpecialtyLoadError(true);
         }
         logger.error('Error fetching doctor specialty vocabulary:', fetchError);

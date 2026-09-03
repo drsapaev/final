@@ -11,9 +11,26 @@ from app.api.v1.endpoints.user_management._helpers import (
     _USER_MANAGEMENT_ROLE_FILTER_PATTERN,
     router,
 )  # noqa: F401
+from app.schemas.clinic import ServiceUnavailableDetail
 
 
-@router.post("/users", response_model=UserResponse)
+@router.post(
+    "/users",
+    response_model=UserResponse,
+    # Codex round-8 P2: the Doctor-onboarding branch returns 503 when the
+    # specialty catalog is unavailable (missing/inactive rows after the
+    # 0051 baseline seed). Generated consumers model the configured
+    # failure via the same ServiceUnavailableDetail contract the
+    # admin-doctor routes publish.
+    responses={
+        503: {
+            "model": ServiceUnavailableDetail,
+            "description": (
+                "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+            ),
+        }
+    },
+)
 async def create_user(
     user_data: UserCreateRequest,
     request: Request,

@@ -13,8 +13,14 @@ const onSave = vi.fn().mockResolvedValue(undefined);
 
 const apiGet = vi.fn().mockImplementation((url: string) => {
   if (url === '/admin/doctors/specialty-vocabulary') {
+    // Codex round-8 P2: the vocabulary serves catalog titles — labels are
+    // resolved i18n-key → locale title → title_ru compat → code.
     return Promise.resolve({
-      data: [{ code: 'cardiology' }, { code: 'dermatology' }, { code: 'dentistry' }],
+      data: [
+        { code: 'cardiology', title_ru: 'Кардиология', title_uz: 'Kardiologiya', title_en: 'Cardiology' },
+        { code: 'dermatology', title_ru: 'Дерматология', title_uz: 'Dermatologiya', title_en: 'Dermatology' },
+        { code: 'dentistry', title_ru: 'Стоматология', title_uz: 'Stomatologiya', title_en: 'Dentistry' },
+      ],
     });
   }
   return Promise.resolve({ data: [] });
@@ -131,6 +137,8 @@ describe('UserModal doctor onboarding', () => {
     );
 
     // Specialty select appears after the role select; reopen the listbox.
+    // The mocked i18n has no umdl_spec_* resources, so the label falls back
+    // to the locale catalog title (language defaults to 'ru' → title_ru).
     const specialtyTrigger = screen
       .getAllByRole('button')
       .filter((el) => el.getAttribute('aria-haspopup') === 'listbox')
@@ -138,7 +146,7 @@ describe('UserModal doctor onboarding', () => {
     fireEvent.click(specialtyTrigger);
     const specialtyOptions = await screen.findAllByRole('option');
     fireEvent.click(
-      specialtyOptions.find((el) => el.textContent === 'admin2.umdl_spec_cardiology') as HTMLElement,
+      specialtyOptions.find((el) => el.textContent === 'Кардиология') as HTMLElement,
     );
 
     submitForm();
@@ -190,7 +198,7 @@ describe('UserModal onboarding numeric validation (Codex P2)', () => {
     fireEvent.click(specialtyTrigger);
     const specialtyOptions = await screen.findAllByRole('option');
     fireEvent.click(
-      specialtyOptions.find((el) => el.textContent === 'admin2.umdl_spec_cardiology') as HTMLElement,
+      specialtyOptions.find((el) => el.textContent === 'Кардиология') as HTMLElement,
     );
   };
 

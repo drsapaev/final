@@ -70155,6 +70155,15 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Каталог специальностей не настроен (миграции/seed 0051 не выполнены) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
         };
     };
     get_user_api_v1_users_users__user_id__get: {

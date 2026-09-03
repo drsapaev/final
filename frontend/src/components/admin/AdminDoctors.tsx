@@ -191,7 +191,7 @@ const AdminDoctors = () => {
               {t('admin2.ad_subtitle')}
             </p>
           </div>
-          <div style={{ position: 'relative' }}>
+          <div className="admin-doctors-advanced-anchor">
             <Button
               variant="secondary"
               startIcon={<MoreHorizontal size={16} />}
@@ -206,19 +206,11 @@ const AdminDoctors = () => {
                 <div
                   aria-hidden="true"
                   onClick={() => setAdvancedMenuOpen(false)}
-                  style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                  className="admin-doctors-advanced-backdrop"
                 />
                 <div
                   role="menu"
                   aria-label={t('admin2.ad_advanced_menu')}
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    right: 0,
-                    marginTop: 6,
-                    zIndex: 50,
-                    minWidth: 280,
-                  }}
                   className="admin-doctors-advanced-menu"
                 >
                   <Button

@@ -36,7 +36,11 @@ const apiGet = vi.fn().mockImplementation((url: string) => {
       return Promise.reject(new Error('vocabulary unavailable'));
     }
     return Promise.resolve({
-      data: [{ code: 'cardiology' }, { code: 'dermatology' }, { code: 'dentistry' }],
+      data: [
+        { code: 'cardiology', title_ru: 'Кардиология', title_uz: 'Kardiologiya', title_en: 'Cardiology' },
+        { code: 'dermatology', title_ru: 'Дерматология', title_uz: 'Dermatologiya', title_en: 'Dermatology' },
+        { code: 'dentistry', title_ru: 'Стоматология', title_uz: 'Stomatologiya', title_en: 'Dentistry' },
+      ],
     });
   }
   return Promise.resolve({ data: [] });
@@ -144,8 +148,10 @@ describe('UserModal specialty vocabulary load failure', () => {
       .getAllByRole('button')
       .filter((el) => el.getAttribute('aria-haspopup') === 'listbox');
     fireEvent.click(triggers[triggers.length - 1] as HTMLElement);
+    // ru locale: the mocked t() returns the key itself (no umdl_spec_*
+    // resources) → the label falls back to the locale catalog title.
     const option = await screen.findByRole('option', {
-      name: 'admin2.umdl_spec_cardiology',
+      name: 'Кардиология',
     });
     expect(option).toBeTruthy();
   });
@@ -166,7 +172,7 @@ describe('UserModal codex round-6 follow-ups', () => {
       .filter((el) => el.getAttribute('aria-haspopup') === 'listbox');
     fireEvent.click(triggers[triggers.length - 1] as HTMLElement);
     expect(
-      await screen.findByRole('option', { name: 'admin2.umdl_spec_cardiology' }),
+      await screen.findByRole('option', { name: 'Кардиология' }),
     ).toBeTruthy();
 
     // switch locale while the modal stays open -> a locale change re-renders
@@ -212,7 +218,7 @@ describe('UserModal codex round-6 follow-ups', () => {
       .filter((el) => el.getAttribute('aria-haspopup') === 'listbox');
     fireEvent.click(specialtyTriggers[specialtyTriggers.length - 1] as HTMLElement);
     const spec = await screen.findByRole('option', {
-      name: 'admin2.umdl_spec_cardiology',
+      name: 'Кардиология',
     });
     fireEvent.click(spec);
 
