@@ -30262,7 +30262,7 @@ export type components = {
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            role: "Admin" | "Registrar" | "Nurse" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "Manager" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
+            role: "Admin" | "Registrar" | "Nurse" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
             /** Doctor Profile */
             doctor_profile?: null;
         };

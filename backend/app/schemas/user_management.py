@@ -560,6 +560,11 @@ _USER_MANAGEMENT_ROLE_PATTERN = (
 # REC-1 (Receptionist deprecation): 'Receptionist' is deliberately ABSENT
 # here — the write freeze is absolute; it remains queryable via the filter
 # pattern below only.
+# M-1 (Manager deprecation, post-#3032 main): 'Manager' is equally ABSENT
+# from the write vocabulary — a deprecated legacy/synthetic role with no
+# canonical successor (privilege-zero landed in M-1D). The merged tree
+# keeps the READ/FILTER vocabulary accepting both deprecated spellings;
+# create/update/bulk-change-role reject them (write freeze stays absolute).
 _NON_DOCTOR_ROLE_VALUES: tuple[str, ...] = (
     "Admin",
     "Registrar",
@@ -568,7 +573,6 @@ _NON_DOCTOR_ROLE_VALUES: tuple[str, ...] = (
     "Lab",
     "Patient",
     "SuperAdmin",
-    "Manager",
 ) + tuple(sorted(DOCTOR_ROLE_SPELLINGS))
 
 # Read/filter vocabulary: canonical write vocabulary PLUS the deprecated

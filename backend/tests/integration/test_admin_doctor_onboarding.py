@@ -266,12 +266,14 @@ class TestConditionalCreateContract:
 
         adapter = TypeAdapter(UserCreateRequest)
         pattern = _re.compile(_USER_MANAGEMENT_ROLE_PATTERN)
-        # every value the legacy regex accepted must validate via the union
+        # every value the legacy regex accepts must validate via the union
         # REC-1 (main): 'Receptionist' is write-frozen (filter-only), so it
         # is intentionally absent from the create union.
+        # M-1 (main post-#3032): 'Manager' is equally write-frozen — the
+        # merged vocabulary rejects it on create (asserted below).
         accepted = [
             "Admin", "Registrar", "Doctor", "Nurse",
-            "Cashier", "Lab", "Patient", "SuperAdmin", "Manager",
+            "Cashier", "Lab", "Patient", "SuperAdmin",
         ] + [
             "cardio", "cardiologist", "cardiology", "dentist", "dentistry",
             "derma", "dermatologist", "dermatology", "doctor",
@@ -287,6 +289,21 @@ class TestConditionalCreateContract:
             if role == "Doctor":
                 payload["doctor_profile"] = {"specialty": "cardiology"}
             adapter.validate_python(payload)  # must not raise
+
+        # M-1 (main post-#3032): deprecated legacy roles stay rejected by the
+        # union — the write freeze survives the discriminated-union refactor
+        # for BOTH deprecated spellings.
+        for frozen in ("Manager", "Receptionist"):
+            assert not pattern.match(frozen), f"write freeze regression: {frozen}"
+            with pytest.raises(ValidationError):
+                adapter.validate_python(
+                    {
+                        "username": "frozen_probe",
+                        "email": "frozen_probe@clinic.test",
+                        "password": _TEST_PASSWORD,
+                        "role": frozen,
+                    }
+                )
 
     def test_openapi_publishes_conditional_requirement(self):
         """The committed OpenAPI spec must describe the Doctor variant with
