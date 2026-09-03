@@ -4628,6 +4628,7 @@ const uzCyrl = {
     umdl_doctor_specialty: 'Специальность',
     umdl_doctor_specialty_ph: 'Выберите специальность',
     umdl_err_doctor_specialty_required: 'Выберите специальность врача',
+    umdl_err_doctor_price_max: "Нарх 99 999 999,99 дан ошмаслиги керак",
     umdl_err_doctor_price_format: 'Введите число, например 150000 или 150 000',
     umdl_err_doctor_number_range: 'Целое число от 1 до 100',
     umdl_doctor_cabinet: 'Кабинет',

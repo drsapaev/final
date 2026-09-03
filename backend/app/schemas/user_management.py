@@ -564,9 +564,22 @@ class DoctorProfileCreate(BaseModel):
 
     specialty: str = Field(..., min_length=1, max_length=100)
     cabinet: str | None = Field(None, max_length=20)
-    price_default: Decimal | None = Field(None, ge=0)
+    # Codex round-6 P2: doctors.price_default is Numeric(10, 2) — bound the
+    # schema to the column precision so an oversized value surfaces as a
+    # field-level 422 instead of a driver overflow rolling back the whole
+    # User+Doctor onboarding transaction.
+    price_default: Decimal | None = Field(None, ge=0, le=Decimal("99999999.99"))
     start_number_online: int | None = Field(None, ge=1, le=100)
     max_online_per_day: int | None = Field(None, ge=1, le=100)
+
+    @field_validator("price_default")
+    @classmethod
+    def validate_price_precision(cls, v: Decimal | None) -> Decimal | None:
+        if v is not None and -v.as_tuple().exponent > 2:
+            raise ValueError(
+                "Цена может содержать не более двух знаков после запятой"
+            )
+        return v
 
 
 class _UserCreateCommon(BaseModel):

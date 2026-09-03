@@ -49,8 +49,13 @@ vi.mock('../../../api/client', () => ({
   },
 }));
 
+const i18nState = vi.hoisted(() => ({ locale: 'ru' }));
+
 vi.mock('../../../i18n/useTranslation', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) =>
+      i18nState.locale === 'ru' ? key : `${key}@${i18nState.locale}`,
+  }),
 }));
 
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -60,6 +65,7 @@ afterEach(() => {
   cleanup();
   onSave.mockClear();
   vocabularyShouldFail = false;
+  i18nState.locale = 'ru';
   apiGet.mockClear();
 });
 
@@ -142,5 +148,93 @@ describe('UserModal specialty vocabulary load failure', () => {
       name: 'admin2.umdl_spec_cardiology',
     });
     expect(option).toBeTruthy();
+  });
+});
+
+describe('UserModal codex round-6 follow-ups', () => {
+  it('recomputes specialty labels when the interface locale changes while the modal is open', async () => {
+    const view = render(
+      <ThemeProvider>
+        <UserModal isOpen onClose={vi.fn()} onSave={onSave} />
+      </ThemeProvider>,
+    );
+    await pickDoctorRole();
+    // open the specialty dropdown (the last listbox trigger) and check the
+    // label in the initial locale
+    const triggers = screen
+      .getAllByRole('button')
+      .filter((el) => el.getAttribute('aria-haspopup') === 'listbox');
+    fireEvent.click(triggers[triggers.length - 1] as HTMLElement);
+    expect(
+      await screen.findByRole('option', { name: 'admin2.umdl_spec_cardiology' }),
+    ).toBeTruthy();
+
+    // switch locale while the modal stays open -> a locale change re-renders
+    // the modal and labels re-resolve at render time without a refetch
+    i18nState.locale = 'en';
+    view.rerender(
+      <ThemeProvider>
+        <UserModal isOpen onClose={vi.fn()} onSave={onSave} />
+      </ThemeProvider>,
+    );
+    // the dropdown stays open across the re-render (Select keeps its own
+    // open state) — options must now carry re-resolved labels
+    expect(
+      await screen.findByRole('option', {
+        name: 'admin2.umdl_spec_cardiology@en',
+      }),
+    ).toBeTruthy();
+  });
+
+  it('blocks a price beyond the Numeric(10,2) column precision and accepts the boundary value', async () => {
+    render(
+      <ThemeProvider>
+        <UserModal isOpen onClose={vi.fn()} onSave={onSave} />
+      </ThemeProvider>,
+    );
+    await pickDoctorRole();
+    fireEvent.change(screen.getByPlaceholderText('admin2.umdl_ph_username'), {
+      target: { value: 'doctor_price' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('admin2.umdl_ph_email'), {
+      target: { value: 'doctor.price@clinic.test' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('admin2.umdl_ph_password'), {
+      target: { value: 'StrongPass123' },
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText('admin2.umdl_ph_password_confirm'),
+      { target: { value: 'StrongPass123' } },
+    );
+
+    const specialtyTriggers = screen
+      .getAllByRole('button')
+      .filter((el) => el.getAttribute('aria-haspopup') === 'listbox');
+    fireEvent.click(specialtyTriggers[specialtyTriggers.length - 1] as HTMLElement);
+    const spec = await screen.findByRole('option', {
+      name: 'admin2.umdl_spec_cardiology',
+    });
+    fireEvent.click(spec);
+
+    // oversized value: 9 integer digits -> field error, submit blocked
+    fireEvent.change(screen.getByPlaceholderText('150000'), {
+      target: { value: '100000000' },
+    });
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Create user' }).closest('form')!,
+    );
+    expect(
+      await screen.findByText('admin2.umdl_err_doctor_price_max'),
+    ).toBeTruthy();
+    expect(onSave).not.toHaveBeenCalled();
+
+    // boundary value: exactly Numeric(10,2) max -> submits
+    fireEvent.change(screen.getByPlaceholderText('150000'), {
+      target: { value: '99999999.99' },
+    });
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Create user' }).closest('form')!,
+    );
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
   });
 });

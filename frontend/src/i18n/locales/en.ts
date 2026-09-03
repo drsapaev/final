@@ -4617,6 +4617,7 @@ const en = {
     umdl_doctor_specialty: 'Specialty',
     umdl_doctor_specialty_ph: 'Select specialty',
     umdl_err_doctor_specialty_required: 'Select the doctor specialty',
+    umdl_err_doctor_price_max: "Price cannot exceed 99,999,999.99",
     umdl_err_doctor_price_format: 'Enter a number, e.g. 150000 or 150 000',
     umdl_err_doctor_number_range: 'Whole number from 1 to 100',
     umdl_doctor_cabinet: 'Office',
