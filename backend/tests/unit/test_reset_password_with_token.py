@@ -17,9 +17,7 @@ from app.services.password_reset_service import get_password_reset_service
 
 @pytest.fixture
 def svc(db_session):
-    svc = get_password_reset_service()
-    svc.reset_tokens = {}
-    return svc
+    return get_password_reset_service()
 
 
 def _seed_user(db_session) -> User:
@@ -38,25 +36,28 @@ def _seed_user(db_session) -> User:
     return user
 
 
-def _seed_token(svc, user: User) -> str:
-    token = "confirm-path-token-abcdef"
-    from datetime import datetime, timedelta
+def _seed_token(db_session, svc, user: User) -> str:
+    from datetime import UTC, datetime, timedelta
 
-    key = svc._get_token_key(token)
-    svc.reset_tokens[key] = {
-        "user_id": user.id,
-        "email": user.email,
-        "created_at": datetime.now(),
-        "expires_at": datetime.now() + timedelta(hours=1),
-        "used": False,
-    }
+    from app.models.authentication import PasswordResetToken
+
+    token = "confirm-path-token-abcdef"
+    db_session.add(
+        PasswordResetToken(
+            user_id=user.id,
+            token=svc._hash_token(token),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            used=False,
+        )
+    )
+    db_session.commit()
     return token
 
 
 @pytest.mark.asyncio
 async def test_confirm_completes_and_marks_token_used(db_session, svc):
     user = _seed_user(db_session)
-    token = _seed_token(svc, user)
+    token = _seed_token(db_session, svc, user)
     old_hash = user.hashed_password
 
     result = svc.reset_password_with_token(db_session, token=token, new_password="BrandNewPass1")
@@ -64,14 +65,20 @@ async def test_confirm_completes_and_marks_token_used(db_session, svc):
     assert result["success"] is True
     db_session.refresh(user)
     assert user.hashed_password != old_hash
-    key = svc._get_token_key(token)
-    assert svc.reset_tokens[key]["used"] is True
+    from app.models.authentication import PasswordResetToken
+
+    row = (
+        db_session.query(PasswordResetToken)
+        .filter(PasswordResetToken.token == svc._hash_token(token))
+        .first()
+    )
+    assert row.used is True
 
 
 @pytest.mark.asyncio
 async def test_confirm_rejects_same_as_old_password(db_session, svc):
     user = _seed_user(db_session)
-    token = _seed_token(svc, user)
+    token = _seed_token(db_session, svc, user)
 
     result = svc.reset_password_with_token(
         db_session, token=token, new_password="OldPassw0rd!"
@@ -80,4 +87,11 @@ async def test_confirm_rejects_same_as_old_password(db_session, svc):
     assert result["success"] is False
     assert result["error_code"] == "PASSWORD_SAME_AS_OLD"
     # неудачная попытка НЕ расходует токен
-    assert svc.reset_tokens[svc._get_token_key(token)]["used"] is False
+    from app.models.authentication import PasswordResetToken
+
+    row = (
+        db_session.query(PasswordResetToken)
+        .filter(PasswordResetToken.token == svc._hash_token(token))
+        .first()
+    )
+    assert row.used is False

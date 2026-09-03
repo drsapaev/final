@@ -105,7 +105,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Create failure issue
         uses: ./.github/actions/notify-failure
         with:
