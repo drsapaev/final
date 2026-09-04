@@ -157,12 +157,15 @@ try {
     }
 
     # --- Start detached uvicorn (survives the calling session) ----------------
-    $python = Join-Path $MainTree 'backend\.venv\Scripts\python.exe'
-    if (-not (Test-Path $python)) { Fail "backend venv python not found at $python." }
-    Start-Process -FilePath $python `
-        -ArgumentList '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$Port", '--log-level', 'warning' `
-        -WorkingDirectory (Join-Path $MainTree 'backend') `
-        -WindowStyle Minimized
+    # Single launch point with persistent logging (tools\uvicorn_backend.log):
+    # the same script the logon autostart uses, so the command line and the
+    # log destination live in exactly one place.
+    $launcher = Join-Path $MainTree 'scripts\run_uvicorn_prod.ps1'
+    if (-not (Test-Path $launcher)) { Fail "launcher script not found at $launcher." }
+    Start-Process -FilePath 'powershell.exe' `
+        -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $launcher `
+        -WorkingDirectory $MainTree `
+        -WindowStyle Hidden
 
     # --- Health poll -----------------------------------------------------------
     $deadline = (Get-Date).AddSeconds($HealthTimeoutSec)
@@ -180,7 +183,7 @@ try {
         }
     } while ((Get-Date) -lt $deadline)
 
-    Fail "health check did not turn OK within ${HealthTimeoutSec}s - inspect the uvicorn window."
+    Fail "health check did not turn OK within ${HealthTimeoutSec}s - inspect tools\uvicorn_backend.log."
 }
 finally {
     Release-DeployMutex

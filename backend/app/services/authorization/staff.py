@@ -45,7 +45,9 @@ _DOCTOR_ROLE_ALIASES = frozenset({
 })
 
 _ADMIN_ROLE_ALIASES = frozenset({"Admin", "admin", "administrator", "super_admin", "superadmin"})
-_REGISTRAR_ROLE_ALIASES = frozenset({"Registrar", "registrar", "receptionist"})
+# E-4 (Receptionist alias removal): the legacy spelling was dropped from
+# the alias set — canonical vocabulary only (§4.1.27).
+_REGISTRAR_ROLE_ALIASES = frozenset({"Registrar", "registrar"})
 _CASHIER_ROLE_ALIASES = frozenset({"Cashier", "cashier"})
 _LAB_ROLE_ALIASES = frozenset({"Lab", "lab", "lab_tech", "laboratory"})
 _PATIENT_ROLE_ALIASES = frozenset({"Patient", "patient"})

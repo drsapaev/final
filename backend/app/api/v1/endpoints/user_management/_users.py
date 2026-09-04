@@ -125,8 +125,9 @@ async def get_users(
         # Manager BEFORE UserSearchRequest was constructed, so ?role=cardio
         # answered 422 while the schema advertised it as valid.
         # Codex re-review P2 (PR #3025): READ surface — compatibility filter
-        # vocabulary keeps ?role=Receptionist valid for querying legacy
-        # rows during the compatibility window (writes stay canonical-only).
+        # vocabulary. E-4 (§4.1.27): the 'Receptionist' filter entry was
+        # decommissioned with the alias (window closed: stored rows = 0);
+        # 'Manager' stays until the ops deactivation (M-1).
         # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     ),
     status_filter: str | None = Query(
