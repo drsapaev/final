@@ -99,6 +99,9 @@ async def test_lab_scheduler_runs_off_event_loop_and_keeps_it_responsive(
         lambda: sessions.append(_FakeSession()) or sessions[-1],
     )
     monkeypatch.setattr(main_module.settings, "AUTO_BACKUP_ENABLED", False)
+    # TESTING=1 skips the scheduler autostart (it flakily corrupts live test
+    # transactions); this regression test arms it explicitly.
+    monkeypatch.setenv("LAB_SCHEDULER_FORCE_START", "1")
 
     await _startup_tasks()
     try:
@@ -247,6 +250,8 @@ async def test_shutdown_grace_is_actually_bounded_and_job_thread_is_daemon(
         lambda: _FakeSession(),
     )
     monkeypatch.setattr(main_module.settings, "AUTO_BACKUP_ENABLED", False)
+    # TESTING=1 skips the scheduler autostart; arm it for this test.
+    monkeypatch.setenv("LAB_SCHEDULER_FORCE_START", "1")
     # Shrink the grace so the test proves bounding instead of waiting 30s.
     monkeypatch.setattr(main_module, "_BACKGROUND_SHUTDOWN_GRACE_SECONDS", 1)
 

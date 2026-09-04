@@ -372,7 +372,7 @@ const DoctorCalendar = ({
   };
 
   return (
-    <div style={styles.container as CSSProperties}>
+    <div style={styles.container as CSSProperties} aria-busy={loading}>
             {/* Header */}
             <div style={styles.header as CSSProperties}>
                 <div style={styles.title as CSSProperties}>

@@ -137,8 +137,13 @@ Setup precedence is enforced by routing guards, not by page-local logic:
 - `role-scoped`: signed-in user plus explicit allowed roles from the route registry
 
 Role normalization:
-- `Receptionist` is treated as `registrar`
-- `Nurse` is treated as `doctor`
+- `Receptionist` is NO LONGER treated as `registrar` — E-4 (Receptionist
+  alias removal, UI_REMEDIATION_PLAN §4.1.27) decommissioned the legacy
+  spelling on both layers; canonical `Registrar` is the front-desk role
+  and a legacy 'Receptionist' profile is denied (REC-3 route parity +
+  backend E-4 deny-contracts)
+- `Nurse` is treated as `doctor` (frontend-only alias; separate policy
+  decision — still in force)
 
 ## Error Routes
 

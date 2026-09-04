@@ -84,14 +84,19 @@ class VisitWithServices(BaseModel):
 def _visits(db: Session) -> Table:
     """
     Return reflected visits table. Использует autoload_with, не bind.
+
+    Perf (2026-09-03): shares the process-level _REFLECTED_META cache —
+    per-call MetaData() re-reflected the schema on every request.
     """
-    md = MetaData()
-    return Table("visits", md, autoload_with=db.get_bind())
+    from app.services.visits_api_service import _REFLECTED_META
+
+    return Table("visits", _REFLECTED_META, autoload_with=db.get_bind())
 
 
 def _vservices(db: Session) -> Table:
-    md = MetaData()
-    return Table("visit_services", md, autoload_with=db.get_bind())
+    from app.services.visits_api_service import _REFLECTED_META
+
+    return Table("visit_services", _REFLECTED_META, autoload_with=db.get_bind())
 
 
 def _isValid_time_str(value: str) -> bool:

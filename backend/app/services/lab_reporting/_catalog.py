@@ -34,6 +34,37 @@ class CatalogMixin(LabReportingServiceMixinBase):
 
 
     def ensure_default_catalog(self) -> None:
+        from sqlalchemy.exc import IntegrityError
+
+        from app.services.lab_reporting._base import (
+            _SEED_LOCK,
+            _mark_seed_ensured,
+            _seed_cache_fresh,
+        )
+
+        bind = self.repository.db.get_bind()
+        with _SEED_LOCK:
+            if not _seed_cache_fresh(bind, "catalog"):
+                return
+            try:
+                self._ensure_default_catalog_locked(bind)
+            except IntegrityError:
+                # Cross-PROCESS loser (multi-worker deploys: another worker
+                # committed the same rows between our probe and insert).
+                # Adopt the winner's rows and mark the part ensured.
+                try:
+                    self.repository.db.rollback()
+                except Exception:
+                    pass
+                _mark_seed_ensured(bind, "catalog")
+                logger.warning(
+                    "[LAB] ensure_default_catalog lost a cross-process seed "
+                    "race — adopted the winner's rows"
+                )
+
+    def _ensure_default_catalog_locked(self, bind) -> None:
+        from app.services.lab_reporting._base import _mark_seed_ensured
+
         logger.info("[LAB] ensure_default_catalog seeding analytes/units/reference ranges")
         touched = 0
 
@@ -147,7 +178,6 @@ class CatalogMixin(LabReportingServiceMixinBase):
                 touched += 1
             self._catalog_reference_cache.pop(analyte_code, None)
 
+        _mark_seed_ensured(bind, "catalog")
         if touched:
             self.repository.commit()
-
-

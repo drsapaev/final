@@ -115,7 +115,7 @@ dependencies = [
   "aiogram>=3.28.2,<4.0.0",
 
   # AI providers
-  "openai>=1.0.0,<2.0.0",
+  "openai>=1.0.0,<3.0.0",
   "google-generativeai>=0.8.0,<1.0.0",
   "google-api-core>=2.0.0,<3.0.0",
   "google-auth>=2.53.0,<3.0.0",

@@ -192,7 +192,7 @@ const EnhancedAppointmentsTable = ({
 
       
       {loading ? loaderNode : null}
-      <div className="eat-table-scroll">
+      <div className="eat-table-scroll" aria-busy={loading} aria-live="polite">
         <div className="admin-table-wrapper">
           {/* PR-UI-09c-4: canonical DataTable replaces the bespoke native <table>.
               Sorting stays parent-owned: DataTable is a view — it renders rows in

@@ -5,7 +5,11 @@ from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
 )
 from app.services.user_mgmt._base import *  # noqa: F401, F403
-from app.services.user_mgmt._base import UserManagementServiceMixinBase
+from app.services.user_mgmt._base import (
+    MEDICAL_SPECIALTY_CATALOG_REMEDIATION,
+    DoctorSpecialtyNotSelectableError,
+    UserManagementServiceMixinBase,
+)
 
 
 class CoreMixin(UserManagementServiceMixinBase):
@@ -33,16 +37,9 @@ class CoreMixin(UserManagementServiceMixinBase):
                 "emr:read",
                 "schedules:read",
             ],
-            "Receptionist": [
-                "patients:read",
-                "patients:write",
-                "appointments:read",
-                "appointments:write",
-                "schedules:read",
-                "schedules:write",
-                "payments:read",
-                "payments:write",
-            ],
+            # E-4 (Receptionist alias removal): the legacy 'Receptionist'
+            # entry was removed — canonical Registrar is the front-desk role
+            # (REC track; stored Receptionist rows = 0, §4.1.27).
             "Cashier": [
                 "payments:read",
                 "payments:write",
@@ -249,54 +246,89 @@ class CoreMixin(UserManagementServiceMixinBase):
                     .first()
                 )
                 if not existing_doctor:
-                    # PR-26: map role to specialty including lowercase cardio/derma/dentist.
-                    # "Doctor" -> "general" is the INCOMPLETE sentinel (decision #5):
-                    # the profile is provisioned mechanically; admin must complete
-                    # the real specialty (see is_doctor_profile_incomplete).
-                    mapped_specialty = DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
-                        user_data.role, INCOMPLETE_DOCTOR_SPECIALTY
-                    )
-                    # Codex round-6 P1: the legacy role auto-map must respect the
-                    # runtime catalog SSOT — a DEACTIVATED catalog specialty must
-                    # not receive a fresh ACTIVE doctor profile (it would appear
-                    # in downstream doctor/queue selectors). If the mapped code is
-                    # not selectable, provision the INCOMPLETE sentinel instead:
-                    # the account still onboards, and the profile requires
-                    # assignment through the validated boundary (POST/PUT
-                    # /admin/doctors with catalog validation). An UNUSABLE catalog
-                    # (missing table / empty seed -> MedicalSpecialtyCatalogError)
-                    # carries no deactivation information — keep the historical
-                    # mapping rather than failing user creation.
-                    if mapped_specialty != INCOMPLETE_DOCTOR_SPECIALTY:
-                        try:
-                            from app.services.medical_specialty_catalog import (
-                                MedicalSpecialtyCatalogService,
-                            )
+                    if user_data.role == "Doctor" and user_data.doctor_profile:
+                        # Canonical onboarding (owner decision 2026-09-01):
+                        # the schema layer guarantees a real onboarding
+                        # specialty here — no "general" sentinel can enter
+                        # through the normal create path anymore. Catalog
+                        # membership/active validation happens at the API
+                        # boundary BEFORE create_user is invoked; the
+                        # transaction only persists what already passed it.
+                        profile_block = user_data.doctor_profile
+                        new_doctor = Doctor(
+                            user_id=user.id,
+                            specialty=profile_block.specialty.strip(),
+                            cabinet=profile_block.cabinet,
+                            price_default=profile_block.price_default,
+                            start_number_online=(
+                                profile_block.start_number_online
+                                if profile_block.start_number_online is not None
+                                else 1
+                            ),
+                            max_online_per_day=(
+                                profile_block.max_online_per_day
+                                if profile_block.max_online_per_day is not None
+                                else 15
+                            ),
+                            active=user_data.is_active,
+                        )
+                        db.add(new_doctor)
+                        doctor_created = True
+                        logger.info(
+                            "Onboarded Doctor profile for user %s "
+                            "(specialty=%s) in the create-user transaction",
+                            user.id,
+                            profile_block.specialty,
+                        )
+                    else:
+                        # Legacy doctor-role spellings via API keep the
+                        # compatibility auto-map (recovery/migration surface,
+                        # NOT canonical onboarding). "Doctor" without a
+                        # doctor_profile is unreachable here: the schema
+                        # validator rejects it with 422.
+                        # Codex round-6 P1: the legacy role auto-map must respect
+                        # the runtime catalog SSOT — a DEACTIVATED catalog
+                        # specialty must not receive a fresh ACTIVE doctor
+                        # profile. If the mapped code is not selectable, provision
+                        # the INCOMPLETE sentinel instead: the account still
+                        # onboards, and the profile requires assignment through
+                        # the validated boundary. An UNUSABLE catalog
+                        # (MedicalSpecialtyCatalogError) carries no deactivation
+                        # information — keep the historical mapping rather than
+                        # failing user creation.
+                        mapped_specialty = DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
+                            user_data.role, INCOMPLETE_DOCTOR_SPECIALTY
+                        )
+                        if mapped_specialty != INCOMPLETE_DOCTOR_SPECIALTY:
+                            try:
+                                from app.services.medical_specialty_catalog import (
+                                    MedicalSpecialtyCatalogService,
+                                )
 
-                            selectable = MedicalSpecialtyCatalogService(
-                                db
-                            ).is_selectable_for_onboarding(mapped_specialty)
-                        except MedicalSpecialtyCatalogError:
-                            selectable = True
-                        if not selectable:
-                            logger.warning(
-                                "Auto-provisioning downgraded role %s: catalog "
-                                "specialty %s is not selectable — incomplete "
-                                "profile requires assignment via /admin/doctors",
-                                user_data.role,
-                                mapped_specialty,
-                            )
-                            mapped_specialty = INCOMPLETE_DOCTOR_SPECIALTY
-                    new_doctor = Doctor(
-                        user_id=user.id,
-                        specialty=mapped_specialty,
-                        active=user_data.is_active,
-                    )
-                    db.add(new_doctor)
-                    doctor_created = True
-                    logger.info(
-                        f"Auto-created Doctor row for user {user.id} (role={user_data.role})"
-                    )
+                                selectable = MedicalSpecialtyCatalogService(
+                                    db
+                                ).is_selectable_for_onboarding(mapped_specialty)
+                            except MedicalSpecialtyCatalogError:
+                                selectable = True
+                            if not selectable:
+                                logger.warning(
+                                    "Auto-provisioning downgraded role %s: catalog "
+                                    "specialty %s is not selectable — incomplete "
+                                    "profile requires assignment via /admin/doctors",
+                                    user_data.role,
+                                    mapped_specialty,
+                                )
+                                mapped_specialty = INCOMPLETE_DOCTOR_SPECIALTY
+                        new_doctor = Doctor(
+                            user_id=user.id,
+                            specialty=mapped_specialty,
+                            active=user_data.is_active,
+                        )
+                        db.add(new_doctor)
+                        doctor_created = True
+                        logger.info(
+                            f"Auto-created Doctor row for user {user.id} (role={user_data.role})"
+                        )
 
             db.commit()
             # Обновляем объекты, чтобы получить все поля (id, created_at, updated_at)
@@ -397,11 +429,22 @@ class CoreMixin(UserManagementServiceMixinBase):
 
             # Ghost-doctor prevention: mirror is_active onto Doctor profile
             if "is_active" in update_data and user.is_active != old_is_active:
+                # Codex #3031 round-7 P2: pass the pending role when the
+                # request also changes it — SessionLocal is autoflush=False,
+                # so the mirror's owner-role gate would otherwise read the
+                # STALE stored role and validate/resurrect a profile the
+                # combined request is about to demote (a safe recovery must
+                # not depend on the catalog). Promotions pass the NEW
+                # doctor-family role (the gate sees the effective state —
+                # same probe contract as before); demotions pass the
+                # non-doctor role so the mirror skips the resurrection and
+                # the demotion branch below deactivates the profile.
                 self._sync_doctor_active(
                     db,
                     user_id,
                     user.is_active,
                     reason="update_user_is_active",
+                    pending_role=user.role if "role" in update_data else None,
                 )
 
             # Lifecycle invariant: role=Doctor-family <-> active linked Doctor
@@ -421,6 +464,24 @@ class CoreMixin(UserManagementServiceMixinBase):
             db.commit()
             return True, "Пользователь успешно обновлен"
 
+        except DoctorSpecialtyNotSelectableError as e:
+            # Codex #3010 follow-up P1: the promotion reactivates a Doctor
+            # profile whose stored specialty is not a selectable catalog
+            # code — surface the REMEDIATION message instead of the generic
+            # internal-error fallback (the role change is rejected, nothing
+            # is activated).
+            db.rollback()
+            logger.warning("Role change rejected by catalog guard: %s", e)
+            return False, str(e)
+        except MedicalSpecialtyCatalogError as e:
+            # Codex #3031 round-1: an UNUSABLE catalog must not degrade into
+            # the generic internal-error fallback — on PostgreSQL the failed
+            # catalog SELECT aborts the transaction, so propagate the
+            # configuration failure as the same remediation message the
+            # POST /users catalog boundary documents.
+            db.rollback()
+            logger.warning("Role change blocked: specialty catalog unavailable (%s)", e)
+            return False, MEDICAL_SPECIALTY_CATALOG_REMEDIATION
         except Exception as e:
             db.rollback()
             logger.error(f"Error updating user: {e}")

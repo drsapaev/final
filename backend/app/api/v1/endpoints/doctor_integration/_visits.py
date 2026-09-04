@@ -36,7 +36,6 @@ async def schedule_next_visit(
             "Doctor",
             "Registrar",
             "Cashier",
-            "Receptionist",
             "cardio",
             "cardiology",
             "derma",
@@ -158,13 +157,22 @@ async def schedule_next_visit(
         # Отправляем приглашение на подтверждение
         notification_service = NotificationService(db)
         try:
+            # Signature contract: send_visit_confirmation_invitation(db,
+            # visit_id, channel). The previous kwargs call (visit=visit,
+            # channel=...) raised TypeError on EVERY schedule-next visit and
+            # was swallowed below — invitations never reached patients.
             notification_result = (
                 await notification_service.send_visit_confirmation_invitation(
-                    visit=visit, channel=request.confirmation_channel
+                    db, visit.id, request.confirmation_channel
                 )
             )
+            # PII/security (Codex P1): the pwa channel returns a URL with
+            # the RAW confirmation token — never log the full result dict.
             logger.info(
-                f"Приглашение отправлено для визита {visit.id}: {notification_result}"
+                "Приглашение отправлено для визита %s: channel=%s success=%s",
+                visit.id,
+                notification_result.get("channel"),
+                notification_result.get("success"),
             )
         except Exception as e:
             logger.error(f"Ошибка отправки приглашения для визита {visit.id}: {e}")
@@ -218,7 +226,6 @@ def get_today_visits(
             "Doctor",
             "Registrar",
             "Cashier",
-            "Receptionist",
             "cardio",
             "cardiology",
             "derma",
@@ -351,7 +358,6 @@ def get_visit_details(
             "Doctor",
             "Registrar",
             "Cashier",
-            "Receptionist",
             "cardio",
             "cardiology",
             "derma",
