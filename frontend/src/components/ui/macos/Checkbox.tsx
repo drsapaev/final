@@ -144,6 +144,7 @@ const Checkbox = React.forwardRef<HTMLDivElement, CheckboxProps>(({
         role="checkbox"
         aria-checked={checked}
         aria-disabled={disabled}
+        aria-invalid={!!error}
         {...(ariaLabel
           ? { 'aria-label': ariaLabel }
           : label
