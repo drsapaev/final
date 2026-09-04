@@ -53,7 +53,7 @@ def _dispatch_patient_registered_notification_async(
         # Codex P2: the patient row is already COMMITTED — a thread-creation
         # failure (burst exhaustion) must not 500 a durable create. Log and
         # drop the best-effort fan-out.
-        logger.warning(
+        logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate id + error type only
             "[FIX:NOTIFICATIONS] patient_registered dispatch could not start a worker thread",
             extra={"patient_id": patient_id, "error_type": type(exc).__name__},
         )
