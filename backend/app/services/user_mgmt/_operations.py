@@ -7,8 +7,12 @@ from app.services.medical_specialty_catalog import (
 )
 from app.services.user_mgmt._base import *  # noqa: F401, F403
 from app.services.user_mgmt._base import (
+    DOCTOR_PROFILE_ROLES,
+    DOCTOR_ROLE_DEFAULT_SPECIALTY,
+    INCOMPLETE_DOCTOR_SPECIALTY,
     MEDICAL_SPECIALTY_CATALOG_REMEDIATION,
     UserManagementServiceMixinBase,
+    canonical_specialty,
 )
 
 
@@ -118,35 +122,102 @@ class OperationsMixin(UserManagementServiceMixinBase):
             # otherwise valid IAM changes must not receive a configuration
             # 400 when the catalog is unavailable — the pre-flight examines
             # the affected users' current roles, not just the requested one.
+            # Codex round-6 P2: the pre-flight must match the probe paths
+            # EXACTLY — an over-approximation makes bulk answers diverge
+            # from their single-user equivalents. Two over-approximations
+            # existed: (1) bulk activate probed for ANY inactive Doctor
+            # profile, but _sync_doctor_active only probes profiles whose
+            # stored specialty canonicalizes to a REAL catalog code —
+            # blank / "general"-sentinel profiles skip the probe entirely
+            # (_base.py:248-254), so their reactivation succeeds on an
+            # unusable catalog; (2) bulk promotion probed for ANY
+            # doctor-family target, but promotion WITHOUT an existing
+            # profile only probes when the role's DEFAULT specialty is a
+            # real code — "Doctor" maps to the "general" sentinel and
+            # skips the probe (_base.py:330-343), so a plain
+            # Registrar -> Doctor batch succeeds. The pre-flight below
+            # resolves the stored/default specialty per candidate and
+            # probes only when a real per-user probe path exists.
             # Per-user failures AFTER a healthy probe are pure-Python
             # validation errors (DoctorSpecialtyNotSelectableError — raised
             # without touching the DB) and stay safely catchable per user.
             if action_data.action == "activate":
-                needs_catalog = (
-                    db.query(Doctor.id)
+                # Mirror _sync_doctor_active's per-row guard: probe iff any
+                # inactive profile stores a REAL canonical specialty.
+                # canonical_specialty() folds legacy dental spellings in
+                # Python — not worth a duplicated SQL expression.
+                inactive_specialties = (
+                    db.query(Doctor.specialty)
                     .join(User, User.id == Doctor.user_id)
                     .filter(
                         User.id.in_(action_data.user_ids),
                         User.role.in_(DOCTOR_PROFILE_ROLES),
                         Doctor.active.is_(False),
                     )
-                    .first()
-                    is not None
+                    .all()
+                )
+                needs_catalog = any(
+                    (
+                        stored_canonical := canonical_specialty(
+                            (row.specialty or "").strip()
+                        )
+                    )
+                    and stored_canonical != INCOMPLETE_DOCTOR_SPECIALTY
+                    for row in inactive_specialties
                 )
             elif action_data.action == "change_role":
-                needs_catalog = (
-                    bool(action_data.role)
-                    and (action_data.role in DOCTOR_PROFILE_ROLES)
-                    and (
-                        db.query(User.id)
+                target_role = action_data.role or ""
+                if target_role not in DOCTOR_PROFILE_ROLES:
+                    # Demotion / non-doctor target: deactivation never probes.
+                    needs_catalog = False
+                else:
+                    # Round-5 P2 (kept): only real promotions — current role
+                    # outside the doctor family — can reach a probe;
+                    # same-role and intra-family transitions return before
+                    # any catalog SELECT.
+                    promoted = (
+                        db.query(
+                            User.id.label("user_id"),
+                            User.is_active.label("user_active"),
+                            Doctor.id.label("doctor_id"),
+                            Doctor.specialty.label("doctor_specialty"),
+                        )
+                        .outerjoin(Doctor, Doctor.user_id == User.id)
                         .filter(
                             User.id.in_(action_data.user_ids),
                             User.role.notin_(DOCTOR_PROFILE_ROLES),
                         )
-                        .first()
-                        is not None
+                        .all()
                     )
-                )
+                    promoted_ids = {row.user_id for row in promoted}
+                    users_with_profile = {
+                        row.user_id for row in promoted if row.doctor_id is not None
+                    }
+                    # (a) promotion WITHOUT an existing profile: probe only
+                    # when the role's default specialty is a REAL code.
+                    role_default = DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
+                        target_role, INCOMPLETE_DOCTOR_SPECIALTY
+                    )
+                    needs_catalog = (
+                        role_default != INCOMPLETE_DOCTOR_SPECIALTY
+                        and bool(promoted_ids - users_with_profile)
+                    )
+                    if not needs_catalog:
+                        # (b) promotion WITH an existing profile (the
+                        # reactivation branch): probe when the user is
+                        # ACTIVE and the stored specialty is a REAL code —
+                        # regardless of the target role's default.
+                        needs_catalog = any(
+                            row.user_active
+                            and (
+                                stored_canonical := canonical_specialty(
+                                    (row.doctor_specialty or "").strip()
+                                )
+                            )
+                            and stored_canonical != INCOMPLETE_DOCTOR_SPECIALTY
+                            for row in promoted
+                            if row.doctor_id is not None
+                        )
             else:
                 needs_catalog = False
             if needs_catalog:

@@ -1057,13 +1057,15 @@ class TestActivationOnlyCatalogGuard:
             row.active = True
             seeded_catalog.commit()
 
-    def test_bulk_change_role_unusable_catalog_fails_batch_cleanly(
+    def test_bulk_change_role_sentinel_promotion_skips_catalog(
         self, client, auth_headers, seeded_catalog, db_session, monkeypatch
     ):
-        """Codex round-5 P2 (narrowed): only a real PROMOTION (current role
-        outside the doctor family -> doctor-family target) reaches a catalog
-        probe, so only such a batch is pre-flighted — a Registrar promoted
-        to Doctor on an unusable catalog still fails cleanly."""
+        """Codex round-6 P2: promotion WITHOUT an existing Doctor profile
+        only probes the catalog when the target role's DEFAULT specialty is
+        a REAL code — "Doctor" maps to the "general" sentinel and skips the
+        probe entirely (_base.py:330-343). A plain Registrar -> Doctor bulk
+        promotion must therefore SUCCEED on an unusable catalog, exactly
+        like its single-user equivalent — no configuration 400."""
         from app.core.security import get_password_hash
         from app.services.medical_specialty_catalog import (
             MedicalSpecialtyCatalogError,
@@ -1072,6 +1074,8 @@ class TestActivationOnlyCatalogGuard:
 
         def _raise(self_db):
             raise MedicalSpecialtyCatalogError("catalog probe failed")
+
+        from app.core.specialties import INCOMPLETE_DOCTOR_SPECIALTY
 
         monkeypatch.setattr(MedicalSpecialtyCatalogService, "list_active", _raise)
         registrar = User(
@@ -1094,14 +1098,98 @@ class TestActivationOnlyCatalogGuard:
             },
             headers=auth_headers,
         )
-        # the configuration failure is handled OUTSIDE the per-user loop:
-        # the batch answers with the remediation message (not the generic
-        # internal error) and the session stays usable afterwards
+        # the sentinel-default promotion never touches the catalog: the
+        # batch succeeds and the profile is provisioned in the controlled
+        # INCOMPLETE state (admin completes it via /admin/doctors)
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["processed_count"] == 1
+        db_session.expire_all()
+        probe = db_session.query(User).filter(User.id == registrar.id).one()
+        assert probe.role == "Doctor"
+        linked = db_session.query(Doctor).filter(Doctor.user_id == probe.id).one()
+        assert linked.specialty == INCOMPLETE_DOCTOR_SPECIALTY
+
+    def test_bulk_change_role_real_default_promotion_fails_batch_cleanly(
+        self, client, auth_headers, seeded_catalog, db_session, monkeypatch
+    ):
+        """Codex round-6 P2 counterpart: a promotion to a role whose DEFAULT
+        specialty is a REAL catalog code (cardio -> cardiology) DOES reach
+        the provisioning probe (_base.py:341-343), so an unusable catalog
+        still fails the batch cleanly with the remediation 400."""
+        from app.core.security import get_password_hash
+        from app.services.medical_specialty_catalog import (
+            MedicalSpecialtyCatalogError,
+            MedicalSpecialtyCatalogService,
+        )
+
+        def _raise(self_db):
+            raise MedicalSpecialtyCatalogError("catalog probe failed")
+
+        monkeypatch.setattr(MedicalSpecialtyCatalogService, "list_active", _raise)
+        registrar = User(
+            username=f"actguard_cardio_{id(self) % 100000}",
+            email=f"actguard-cardio-{id(self) % 100000}@test.com",
+            full_name="Cardiology Candidate",
+            hashed_password=get_password_hash("secret123"),
+            role="Registrar",
+            is_active=True,
+        )
+        seeded_catalog.add(registrar)
+        seeded_catalog.commit()
+        seeded_catalog.refresh(registrar)
+        response = client.post(
+            "/api/v1/users/users/bulk-action",
+            json={
+                "user_ids": [registrar.id],
+                "action": "change_role",
+                "role": "cardio",
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 400, response.text
         assert "не настроен" in response.json()["detail"]
         db_session.expire_all()
         probe = db_session.query(User).filter(User.id == registrar.id).one()
         assert probe.role == "Registrar"
+
+    def test_bulk_change_role_existing_profile_probe_fails_batch(
+        self, client, auth_headers, seeded_catalog, db_session, monkeypatch
+    ):
+        """Codex round-6 P2 branch (b): a promotion of a user with an
+        EXISTING Doctor profile probes the catalog when the user is ACTIVE
+        and the stored specialty is a REAL code (the reactivation branch,
+        _base.py:421-425) — regardless of the target role's sentinel
+        default. An unusable catalog fails the batch cleanly."""
+        from app.services.medical_specialty_catalog import (
+            MedicalSpecialtyCatalogError,
+            MedicalSpecialtyCatalogService,
+        )
+
+        def _raise(self_db):
+            raise MedicalSpecialtyCatalogError("catalog probe failed")
+
+        monkeypatch.setattr(MedicalSpecialtyCatalogService, "list_active", _raise)
+        user, doctor = TestRoleChangePromotionGuard()._make_registrar_with_inactive_profile(
+            seeded_catalog, "dermatology"
+        )
+        response = client.post(
+            "/api/v1/users/users/bulk-action",
+            json={
+                "user_ids": [user.id],
+                "action": "change_role",
+                "role": "Doctor",
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 400, response.text
+        assert "не настроен" in response.json()["detail"]
+        db_session.expire_all()
+        probe = db_session.query(User).filter(User.id == user.id).one()
+        assert probe.role == "Registrar"
+        stored = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+        assert stored.active is False
 
     def test_bulk_change_role_same_role_doctor_skips_catalog(
         self, client, auth_headers, seeded_catalog, db_session, monkeypatch
@@ -1230,6 +1318,54 @@ class TestActivationOnlyCatalogGuard:
         db_session.expire_all()
         activated = db_session.query(User).filter(User.id == registrar.id).one()
         assert activated.is_active is True
+
+    def test_bulk_activate_sentinel_profile_skips_catalog(
+        self, client, auth_headers, seeded_catalog, db_session, monkeypatch
+    ):
+        """Codex round-6 P2: _sync_doctor_active's per-row guard only probes
+        the catalog for profiles whose stored specialty canonicalizes to a
+        REAL code — blank / "general"-sentinel profiles skip the probe
+        entirely (_base.py:248-254). Bulk activation of such accounts must
+        SUCCEED on an unusable catalog, exactly like the single-user
+        activation-only update (the documented recovery path)."""
+        from app.services.medical_specialty_catalog import (
+            MedicalSpecialtyCatalogError,
+            MedicalSpecialtyCatalogService,
+        )
+
+        def _raise(self_db):
+            raise MedicalSpecialtyCatalogError("catalog probe failed")
+
+        monkeypatch.setattr(MedicalSpecialtyCatalogService, "list_active", _raise)
+        sentinel_user, sentinel_doctor = self._make_doctor_with_inactive_profile(
+            seeded_catalog, "general", index=5
+        )
+        blank_user, blank_doctor = self._make_doctor_with_inactive_profile(
+            seeded_catalog, "", index=6
+        )
+        response = client.post(
+            "/api/v1/users/users/bulk-action",
+            json={
+                "user_ids": [sentinel_user.id, blank_user.id],
+                "action": "activate",
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["processed_count"] == 2
+        assert payload["failed_count"] == 0
+        db_session.expire_all()
+        reactivated = db_session.query(Doctor).filter(
+            Doctor.id == sentinel_doctor.id
+        ).one()
+        assert reactivated.active is True
+        assert reactivated.specialty == "general"
+        blank_row = db_session.query(Doctor).filter(
+            Doctor.id == blank_doctor.id
+        ).one()
+        assert blank_row.active is True
 
     def test_bulk_change_role_demotion_skips_catalog(
         self, client, auth_headers, seeded_catalog, db_session, monkeypatch
