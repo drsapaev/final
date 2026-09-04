@@ -101,7 +101,7 @@ class NotificationPlatformServiceMixinBase:
         "lab_technician": "lab",
         "patient": "patient",
         "registrar": "registrar",
-        "receptionist": "registrar",
+        # E-4 (Receptionist alias removal): entry decommissioned (§4.1.27).
         "cardiologist": "cardiologist",
         "dermatologist": "dermatologist",
         "dentist": "dentist",
@@ -119,7 +119,7 @@ class NotificationPlatformServiceMixinBase:
         "laboratory": "lab",
         "registrar": "registrar",
         "reception": "registrar",
-        "receptionist": "registrar",
+        # E-4 (Receptionist alias removal): entry decommissioned (§4.1.27).
         "cashier": "cashier",
         "clinic": "doctor",
         "doctor": "doctor",

@@ -53,7 +53,10 @@ class TestNormalizeRole:
         ("dentist", "doctor"),
         ("Registrar", "registrar"),
         ("registrar", "registrar"),
-        ("receptionist", "registrar"),
+        # E-4 (Receptionist alias removal): the legacy spelling left the
+        # registrar alias set — normalize_role reports it as unknown now
+        # (canonical vocabulary only; §4.1.27).
+        ("receptionist", "unknown"),
         ("Cashier", "cashier"),
         ("cashier", "cashier"),
         ("Lab", "lab"),

@@ -200,7 +200,10 @@ body.landing-body {
 
 .landing-language-option--active {
   background: var(--mac-accent-blue-bg);
-  color: var(--mac-accent-blue, #0ea5e9);
+  /* CC-3: same accent-on-accent-tint failure class as the workflow nodes
+   * (~2.1:1) — latent while the dropdown is closed, fixed with the chip
+   * family for consistency. */
+  color: var(--mac-text-primary);
 }
 
 .landing-language-option .landing-language-code {
@@ -264,9 +267,16 @@ body.landing-body {
   border-radius: 999px;
   background: var(--mac-success-bg);
   border: 1px solid var(--mac-success-border);
+  /* CC-3: the green stays on the pulsing ICON (decorative signal); the LABEL
+   * moves to primary ink — #30d158 on the green tint measured ~2:1 (axe
+   * color-contrast, landing:light). */
   color: var(--mac-success);
   font-size: 13px;
   font-weight: 700;
+}
+
+.landing-live-badge > span {
+  color: var(--mac-text-primary);
 }
 
 .landing-surface-label {
@@ -495,6 +505,14 @@ body.landing-body {
   line-height: 1.62;
 }
 
+/* CC-3: the flow card sits on the accent TINT (var(--mac-accent-blue-bg)),
+ * where muted ink measured 1.23:1 in dark (axe color-contrast) — primary
+ * ink keeps the tinted card readable in both themes. Card descriptions on
+ * regular card surfaces keep the muted ink (passes on both themes). */
+.landing-flow-card p {
+  color: var(--mac-text-primary);
+}
+
 .landing-feature-icon,
 .landing-module-icon,
 .landing-showcase-icon,
@@ -598,7 +616,9 @@ body.landing-body {
   height: 38px;
   flex: 0 0 auto;
   border-radius: 999px;
-  background: var(--mac-accent-blue);
+  /* CC-2: white-ink fill → strong token (5.42:1; base #007aff = 4.02:1,
+   * axe color-contrast on both themes). */
+  background: var(--mac-accent-blue-strong, var(--mac-accent-blue));
   color: var(--mac-text-on-accent, #fff);
   font-size: 13px;
   font-weight: 800;
@@ -612,7 +632,11 @@ body.landing-body {
   margin-bottom: 8px;
   border-radius: 999px;
   background: var(--mac-accent-blue-bg);
-  color: var(--mac-accent-blue);
+  /* CC-3: accent ink on the accent TINT measured ~2.1:1 in light and ~2.5:1
+   * in dark (axe color-contrast, 6 nodes per theme). The chip keeps its blue
+   * identity from the background; the label uses primary ink which flips with
+   * the theme. */
+  color: var(--mac-text-primary);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;

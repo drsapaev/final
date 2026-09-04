@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 import asyncio  # noqa: F401
 import hashlib  # noqa: F401
 import json  # noqa: F401
@@ -74,3 +76,58 @@ class LabReportingDomainError(Exception):
 
 class LabReportingServiceMixinBase:
     """Type-hint anchor for LabReportingService mixins."""
+
+
+# Perf (P0 2026-09-03): the self-heal seeders are idempotent but expensive —
+# hundreds of per-row statements per call (~20s+ on the remote Supabase), and
+# they ran on EVERY read/resolve/create. They are process-cached after the
+# first successful pass: lab templates/catalog rows only change via admin
+# tooling or migrations, and self-heal is re-armed on a template 404
+# (see TemplatesMixin.get_template) so accidental data loss still recovers.
+_SEED_ENSURED = {"bind_id": None, "catalog": False, "templates": False, "bindings": False}
+
+# Codex P1: the warmup thread and concurrent first requests can each observe
+# an unlocked False flag and seed the same rows — unique constraints turn the
+# loser into an IntegrityError. Every ensure_* takes this lock for the
+# check-and-run critical section.
+_SEED_LOCK = threading.Lock()
+
+
+def _seed_cache_fresh(bind: object, part: str) -> bool:
+    """False when this part was already ensured FOR THE CURRENT bind.
+
+    Tests build a fresh database per test while the process lives on, so the
+    cache is keyed by the bind object identity — a new engine re-runs the
+    seeders, the production engine keeps the once-per-process win.
+    """
+    if _SEED_ENSURED.get("bind_id") != id(bind):
+        # A NEW bind resets every part: per-part flags belonged to the
+        # previous database (tests roll data back between cases).
+        _SEED_ENSURED.update(
+            bind_id=id(bind), catalog=False, templates=False, bindings=False,
+            templates_sig=None,
+        )
+    return not _SEED_ENSURED.get(part, False)
+
+
+def _template_definitions_signature(definitions: list[dict]) -> str:
+    import hashlib
+    import json
+
+    return hashlib.sha256(
+        json.dumps(definitions, sort_keys=True, ensure_ascii=False, default=str).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
+
+def _mark_seed_ensured(bind: object, part: str) -> None:
+    _SEED_ENSURED["bind_id"] = id(bind)
+    _SEED_ENSURED[part] = True
+
+
+def reset_lab_seed_cache() -> None:
+    """Re-arm the self-heal seeders (e.g. a template lookup came up empty)."""
+    _SEED_ENSURED["catalog"] = False
+    _SEED_ENSURED["templates"] = False
+    _SEED_ENSURED["bindings"] = False

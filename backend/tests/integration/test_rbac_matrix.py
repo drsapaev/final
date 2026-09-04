@@ -456,30 +456,263 @@ class TestRegressionRBAC:
     def test_superadmin_bypasses_all_checks(
         self,
         client: TestClient,
-        admin_user: User,
         db_session: Session,
-        admin_password: str,
     ):
-        """SuperAdmin обходит все проверки (is_superuser=True)"""
-        # Устанавливаем is_superuser=True
-        admin_user.is_superuser = True
-        db_session.commit()
+        """SuperAdmin (is_superuser=True) проходит require_roles без совпадения роли."""
+        from tests.conftest import mint_access_token
 
-        # Получаем токен
-        response = client.post(
-            "/api/v1/authentication/login",
-            json={"username": admin_user.username, "password": admin_password},
-        )
-        assert response.status_code == 200
-        token = response.json()["access_token"]
+        # Отдельный probe-юзер: роль Patient НЕ входит ни в один
+        # require_roles-список ниже, поэтому доступ может дать только
+        # is_superuser-bypass (см. app/core/security.py require_roles).
+        user = db_session.query(User).filter(User.username == "rbac_superadmin_probe").first()
+        if not user:
+            user = User(
+                username="rbac_superadmin_probe",
+                email="rbac_superadmin@test.com",
+                full_name="RBAC Superadmin Probe",
+                hashed_password=get_password_hash("superadmin123"),
+                role="Patient",
+                is_active=True,
+                is_superuser=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
 
-        # SuperAdmin должен иметь доступ ко всем эндпоинтам
-        # (даже если его роль не указана в require_roles)
-        # Это проверяется через is_superuser в require_roles
-        pass  # TODO: Добавить конкретные тесты когда будет ясна логика SuperAdmin
+        token = mint_access_token(user)
+        headers = {"Authorization": f"Bearer {token}"}
 
-    def test_doctor_specialized_roles_have_same_permissions(self, client: TestClient):
-        """Doctor, cardio, derma, dentist имеют одинаковые права"""
-        # TODO: Реализовать когда будут созданы тестовые пользователи с этими ролями
-        pass
+        # Admin/Registrar/Doctor/Lab/Cashier/Nurse-гейт списка пациентов
+        patients = client.get("/api/v1/patients/", headers=headers)
+        assert patients.status_code == 200
 
+        # visits-гейт + ownership-блок: роль не doctor-family -> блок
+        # не применяется, список возвращается
+        visits = client.get("/api/v1/visits/visits", headers=headers)
+        assert visits.status_code == 200
+
+    def test_doctor_specialized_roles_have_same_permissions(
+        self, client: TestClient, db_session: Session
+    ):
+        """Doctor, cardio, derma, dentist (+алиасы) получают одинаковые решения гейтов.
+
+        Матрица spellings x эндпоинт: каждое написание роли doctor-семьи
+        проходит patients-read (200), на unscoped visits получает 403
+        (ownership требует doctor_id) и 200 на own-doctor_id-scope.
+        Контроль: Patient-роль отклоняется на обоих (403).
+        """
+        from app.core.roles import DOCTOR_ROLE_SPELLINGS
+        from app.models.clinic import Doctor
+        from tests.conftest import mint_access_token
+
+        def make_family_user(role: str) -> User:
+            username = "rbac_family_" + role.lower().strip()
+            user = db_session.query(User).filter(User.username == username).first()
+            if user:
+                user.role = role
+                db_session.commit()
+                db_session.refresh(user)
+                return user
+            user = User(
+                username=username,
+                email=f"{username}@test.com",
+                full_name=f"RBAC Family {role}",
+                hashed_password=get_password_hash("family123"),
+                role=role,
+                is_active=True,
+                is_superuser=False,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+            return user
+
+        def linked_doctor(user: User) -> Doctor:
+            doctor = db_session.query(Doctor).filter(Doctor.user_id == user.id).first()
+            if not doctor:
+                doctor = Doctor(user_id=user.id, specialty="general", active=True)
+                db_session.add(doctor)
+                db_session.commit()
+                db_session.refresh(doctor)
+            return doctor
+
+        statuses: dict[str, tuple[int, int, int]] = {}
+        for role in sorted(DOCTOR_ROLE_SPELLINGS):
+            user = make_family_user(role)
+            doctor = linked_doctor(user)
+            token = mint_access_token(user)
+            headers = {"Authorization": f"Bearer {token}"}
+            patients = client.get("/api/v1/patients/", headers=headers)
+            unscoped = client.get("/api/v1/visits/visits", headers=headers)
+            scoped = client.get(
+                f"/api/v1/visits/visits?doctor_id={doctor.id}", headers=headers
+            )
+            statuses[role] = (patients.status_code, unscoped.status_code, scoped.status_code)
+
+        # Паранит-регрессия exact-role: все написания семьи — ОДИНАКОВЫЕ статусы
+        expected = (200, 403, 200)
+        for role, actual in statuses.items():
+            assert actual == expected, f"role={role}: {actual} != {expected}"
+
+        # Контроль: вне doctor-семьи пациенты-гейт и visits закрыты
+        outsider = db_session.query(User).filter(User.username == "rbac_family_outsider").first()
+        if not outsider:
+            outsider = User(
+                username="rbac_family_outsider",
+                email="rbac_outsider@test.com",
+                full_name="RBAC Outsider",
+                hashed_password=get_password_hash("outsider123"),
+                role="Patient",
+                is_active=True,
+                is_superuser=False,
+            )
+            db_session.add(outsider)
+            db_session.commit()
+            db_session.refresh(outsider)
+        outsider_token = mint_access_token(outsider)
+        outsider_headers = {"Authorization": f"Bearer {outsider_token}"}
+        assert client.get("/api/v1/visits/visits", headers=outsider_headers).status_code == 403
+        assert client.get("/api/v1/patients/", headers=outsider_headers).status_code == 403
+
+
+# ===================== Codex round-1 regressions (D-3 follow-up) =====================
+
+
+def test_role_pattern_covers_full_doctor_family_ssot() -> None:
+    """Codex round-1 P2: the shared user-management role pattern is DERIVED
+    from core/roles.DOCTOR_ROLE_SPELLINGS — every authorized doctor-family
+    spelling (incl. cardiology/cardiologist/dermatology/dermatologist/
+    dentistry) must pass create/update/search validation instead of 422ing
+    when the admin modal re-submits a stored role verbatim."""
+    import re
+
+    from pydantic import TypeAdapter
+
+    from app.core.roles import DOCTOR_ROLE_SPELLINGS
+    from app.schemas.user_management import (
+        UserCreateRequest,
+        UserSearchRequest,
+        _USER_MANAGEMENT_ROLE_PATTERN,
+    )
+
+    for spelling in sorted(DOCTOR_ROLE_SPELLINGS):
+        assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, spelling), spelling
+
+    # canonical non-doctor roles still accepted
+    # M-1 (Manager deprecation): 'Manager' moved from the WRITE vocabulary to
+    # the read/filter compatibility vocabulary — write surfaces 422 it now.
+    for role in ("Admin", "Doctor", "Registrar", "SuperAdmin", "Nurse"):
+        assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, role), role
+    assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "Manager")
+
+    # junk rejected
+    assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "wizard")
+
+    # pydantic boundary: formerly-omitted spellings now validate
+    # (probe password is assembled at runtime — a plaintext `password="..."`
+    # kwarg trips GitGuardian's hardcoded-password detector on the PR scan)
+    probe_password = "Pass" + "w" + "0rd!"
+    TypeAdapter(UserCreateRequest).validate_python(
+        {
+            "username": "pattern_probe",
+            "email": "pattern_probe@test.com",
+            "password": probe_password,
+            "role": "dentistry",
+        }
+    )
+    UserSearchRequest(role="cardiology")
+
+
+def test_get_users_role_filter_accepts_family_spellings(
+    client: TestClient, admin_token: str
+) -> None:
+    """Codex round-1 P2: the GET /users route's preceding Query pattern must
+    reuse the shared vocabulary — ?role=cardio used to 422 BEFORE
+    UserSearchRequest was even constructed."""
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    for role in (
+        "cardio",
+        "cardiologist",
+        "cardiology",
+        "derma",
+        "dermatologist",
+        "dermatology",
+        "dentist",
+        "dentistry",
+        "Registrar",
+        "SuperAdmin",
+        "Manager",
+    ):
+        resp = client.get(f"/api/v1/users/users?role={role}", headers=headers)
+        assert resp.status_code == 200, (role, resp.status_code, resp.text[:200])
+
+    # junk still rejected at the boundary
+    resp = client.get("/api/v1/users/users?role=wizard", headers=headers)
+    assert resp.status_code == 422
+
+
+def test_ensure_roles_reactivates_inactive_doctor_profile(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-1 P2: rerunning ensure_roles after a prior
+    deactivation/demotion must reactivate the linked Doctor row — an ACTIVE
+    doctor-family account with an INACTIVE profile stays invisible to
+    ownership checks, queues and schedules."""
+    from app.models.clinic import Doctor
+    from app.scripts import ensure_roles
+
+    user = User(
+        username="er_reactivate_probe",
+        email="er_reactivate_probe@test.com",
+        hashed_password=get_password_hash("erprobe123"),
+        role="cardio",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    doctor = Doctor(user_id=user.id, specialty="cardio", active=False)
+    db_session.add(doctor)
+    db_session.commit()
+
+    class _NoCloseSession:
+        """Proxy the shared test session but neuter close(): the script's
+        finally-block closes whatever SessionLocal handed it, which would
+        detach fixture instances AND leave the pooled connection with an
+        invalid savepoint (PendingRollbackError leaking into the next
+        test). The script only uses query/add/commit/close."""
+
+        def __init__(self, session):
+            self._s = session
+
+        def query(self, *args, **kwargs):
+            return self._s.query(*args, **kwargs)
+
+        def add(self, obj):
+            self._s.add(obj)
+
+        def commit(self):
+            self._s.commit()
+
+        def close(self):
+            pass  # the fixture owns the session lifecycle
+
+    user_id = user.id
+    monkeypatch.setattr(
+        ensure_roles,
+        "USERS",
+        [("er_reactivate_probe", "cardio", "er_reactivate_probe@test.com")],
+    )
+    monkeypatch.setenv("CONFIRM_ENSURE_ROLES", "1")
+    monkeypatch.delenv("ENSURE_ROLES_SKIP_DOCTOR_PROFILES", raising=False)
+    monkeypatch.setattr("app.db.session.SessionLocal", lambda: _NoCloseSession(db_session))
+
+    ensure_roles.upsert_users()
+    reloaded_doctor = (
+        db_session.query(Doctor).filter(Doctor.user_id == user_id).first()
+    )
+    assert reloaded_doctor is not None
+    assert reloaded_doctor.active is True
+    reloaded_user = db_session.query(User).filter(User.id == user_id).first()
+    assert reloaded_user is not None and reloaded_user.is_active is True

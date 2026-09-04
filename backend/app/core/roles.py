@@ -24,7 +24,11 @@ class Roles(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs
 
     # Дополнительные роли
     NURSE = "Nurse"
-    RECEPTIONIST = "Receptionist"
+    # E-4 (Receptionist alias removal): RECEPTIONIST decommissioned — the
+    # legacy spelling had a canonical successor (Registrar, REC track), the
+    # production table held 0 rows (SQL evidence 2026-09-02), and the last
+    # read/alias surfaces were removed in E-4. Unlike Manager there is no
+    # read-compat window to preserve.
     PATIENT = "Patient"
     SUPER_ADMIN = "SuperAdmin"
 
@@ -42,10 +46,17 @@ CRITICAL_ROLES = {
 }
 
 # Роли с административными правами
+# M-1 (Manager deprecation): Roles.MANAGER removed — Manager is a deprecated
+# legacy/synthetic role (production: 1 automated row, 0 human users) and must
+# not be treated as administrative anywhere. Caller evidence before the
+# change (exhaustive repo search, app + tests): is_admin_role()/ADMIN_ROLES
+# had ZERO call sites, so removal is behavior-neutral at runtime; the set is
+# now consistent with the M-1D grant removal (no Manager admin-equivalence).
+# Roles.MANAGER itself stays in the enum above for read compatibility until
+# the post-deploy ops cleanup + M-2.
 ADMIN_ROLES = {
     Roles.ADMIN,
     Roles.SUPER_ADMIN,
-    Roles.MANAGER,
 }
 
 # Роли врачей
@@ -96,14 +107,34 @@ def is_doctor_role_spelling(role: object) -> bool:
     """Case-insensitive doctor-role check against the full IAM vocabulary."""
     return normalize_role_value(role) in DOCTOR_ROLE_SPELLINGS
 
+
+# require_roles gate members admitting the WHOLE doctor family
+# (canonical "Doctor" + every legacy spelling listed in
+# DOCTOR_ROLE_SPELLINGS). require_roles() is case-insensitive
+# (app/core/security.py), so one lowercase member per spelling is enough
+# - spell them straight from the SSOT frozenset so a future vocabulary
+# addition is picked up here too. Spread with ``*`` into require_roles:
+#     require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)
+# (RBAC unification D-3: visits/patients/appointment-flow used to admit
+# only the exact "Doctor" spelling and 403'd legacy doctor accounts that
+# EMR v2 and the specialist panels accepted - single behavior now.)
+DOCTOR_FAMILY_GATE_ROLES: tuple[str, ...] = tuple(sorted(DOCTOR_ROLE_SPELLINGS))
+
 # Роли персонала
+# E-4: Roles.RECEPTIONIST removed — canonical Registrar is the front-desk
+# staff role (REC track); the legacy spelling is decommissioned.
 STAFF_ROLES = {
     Roles.REGISTRAR,
     Roles.LAB,
     Roles.CASHIER,
     Roles.NURSE,
-    Roles.RECEPTIONIST,
 }
+
+# NOTE (M-1): get_role_hierarchy keeps the legacy Roles.MANAGER: 8 entry —
+# the hierarchy map is a descriptive level table, not a grant: it is only
+# consulted via has_role_permission(), which has zero external callers
+# (verified by exhaustive search). Manager's privileges are governed by the
+# require_roles() grant lists, all of which dropped Manager in M-1D.
 
 
 def is_admin_role(role: str) -> bool:
@@ -131,7 +162,8 @@ def get_role_hierarchy(role: str) -> int:
     hierarchy = {
         Roles.PATIENT: 1,
         Roles.NURSE: 2,
-        Roles.RECEPTIONIST: 3,
+        # E-4: Roles.RECEPTIONIST: 3 removed — the level table covers the
+        # canonical vocabulary only (level 3 retired with the spelling).
         Roles.CASHIER: 4,
         Roles.LAB: 5,
         Roles.REGISTRAR: 6,

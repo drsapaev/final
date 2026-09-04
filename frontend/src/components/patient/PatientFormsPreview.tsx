@@ -3,9 +3,7 @@ import type { HttpApiError } from '../../types/errors';
 import { extractDetailReason } from '../../utils/error-utils';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Badge, Button, Checkbox, Icon, Input, Textarea,
-} from '../ui/macos';
+import { Badge, Button, Checkbox, Input, Textarea } from '../ui/macos';
 import { useConfirm } from '../common/ConfirmDialog';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -14,6 +12,7 @@ import {
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
 import React from "react";
+import { AlertTriangle, CheckCircle2, Download, FileText, RotateCw, Send } from 'lucide-react';
 
 interface PatientFormField {
   key: string;
@@ -68,7 +67,7 @@ interface PatientFormsPreviewProps {
  * L-H-4 fix: PatientFormsPreview выделен в отдельный файл.
  * L-H-1 fix: все строки на русском.
  * L-H-5 fix: skeleton-loading при загрузке форм.
- * L-H-8 fix: lucide-direct → macos <Icon>.
+ * L-H-8 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3).
  * L-M-1 fix: autosave 30s debounce when dirty + storageEnabled.
  * L-M-9 fix: confirmation dialog для submit (irreversible action).
  * L-M-12 fix: aria-live для loading-state.
@@ -246,7 +245,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
   if (status === 'missing-init-data') {
     return (
       <PanelEmptyState
-        icon="doc.text"
+        icon={FileText}
         title={t('patient.pat_forms_missing_init_title')}
         description={t('patient.pat_forms_missing_init_desc')}
       />
@@ -256,7 +255,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
   if (status === 'loading') {
     return (
       <PanelEmptyState
-        icon="doc.text"
+        icon={FileText}
         title={t('patient.pat_forms_loading_title')}
         description={t('patient.pat_forms_loading_desc')}
         variant="loading"
@@ -267,7 +266,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
   if (status === 'error') {
     return (
       <PanelEmptyState
-        icon="exclamationmark.triangle"
+        icon={AlertTriangle}
         title={t('patient.pat_forms_error_title')}
         description={error || t('patient.pat_forms_error_desc')}
         variant="error"
@@ -278,7 +277,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
   if (forms.length === 0) {
     return (
       <PanelEmptyState
-        icon="doc.text"
+        icon={FileText}
         title={t('patient.pat_forms_no_forms_title')}
         description={t('patient.pat_forms_no_forms_desc')}
       />
@@ -307,7 +306,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
           Показывает «Анкета N из M» если форм больше одной. */}
       {forms.length > 1 && (
         <div className="pp-forms-progress" aria-label={t('patient.pat_forms_progress_aria')}>
-          <Icon name="doc.text" size={14} />
+          <FileText size={14} aria-hidden="true" />
           <span>{t('patient.pat_forms_available', { count: forms.length })}</span>
           <span className="pp-forms-progress-separator">·</span>
           <span>
@@ -384,13 +383,13 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
               <div className="pp-grid-span-2 pp-form-footer">
                 {currentFormState.message && (
                   <div className="pp-message pp-message--success" role="status">
-                    <Icon name="checkmark.circle" size={16} />
+                    <CheckCircle2 size={16} aria-hidden="true" />
                     {currentFormState.message}
                   </div>
                 )}
                 {currentFormState.error && (
                   <div className="pp-message pp-message--error" role="alert">
-                    <Icon name="exclamationmark.triangle" size={16} />
+                    <AlertTriangle size={16} aria-hidden="true" />
                     {currentFormState.error}
                   </div>
                 )}
@@ -402,13 +401,13 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                 {/* L-M-1 fix: autosave indicator */}
                 {autoSavingForms[form.id] && (
                   <div className="pp-form-autosave-indicator" aria-live="polite">
-                    <Icon name="arrow.clockwise" size={12} />
+                    <RotateCw size={12} aria-hidden="true" />
                     {t('patient.pat_forms_autosaving')}
                   </div>
                 )}
                 {!autoSavingForms[form.id] && autoSaveTimestamps[form.id] && (
                   <div className="pp-form-autosave-timestamp">
-                    <Icon name="checkmark.circle" size={12} />
+                    <CheckCircle2 size={12} aria-hidden="true" />
                     {t('patient.pat_forms_saved_at', { time: autoSaveTimestamps[form.id].toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) })}
                   </div>
                 )}
@@ -420,7 +419,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                     loading={currentFormState.status === 'saving-draft'}
                     onClick={() => handleSave(form, 'draft')}
                   >
-                    <Icon name="square.and.arrow.down" size={16} />
+                    <Download size={16} aria-hidden="true" />
                     {t('patient.pat_forms_save_draft')}
                   </Button>
                   <Button
@@ -430,7 +429,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                     loading={currentFormState.status === 'submitting'}
                     onClick={() => handleSave(form, 'submitted')}
                   >
-                    <Icon name="paperplane" size={16} />
+                    <Send size={16} aria-hidden="true" />
                     {t('patient.pat_forms_submit_button')}
                   </Button>
                 </div>

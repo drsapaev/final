@@ -42,17 +42,41 @@ class QueueLimitsApiService:
         today = date.today()
         for spec_data in specialties.values():
             total_usage = 0
+            aggregate_cap = 0
             for doctor in spec_data["doctors"]:
-                daily_queue = self.repository.get_daily_queue(
+                # Codex round-5 P2: a doctor may hold several ACTIVE queues
+                # for today under different tags (the quick-call surface
+                # supports that) — enumerate ALL of them, both for usage
+                # and for the aggregate capacity; get_daily_queue would
+                # silently pick only the lowest-id row.
+                queues = self.repository.list_active_daily_queues(
                     day=today,
                     specialist_id=doctor.id,
                 )
-                if daily_queue:
+                for daily_queue in queues:
                     total_usage += self.repository.count_entries(queue_id=daily_queue.id)
+                    # enforcement reads the persisted per-queue cap
+                    # (check_queue_limits -> max_online_entries) — the
+                    # admin aggregate must sum THAT. Falsy -> 15 mirrors
+                    # the enforcement fallback.
+                    aggregate_cap += daily_queue.max_online_entries or 15
+                if not queues:
+                    # No queue yet: the join would create one with the
+                    # doctor's own per-doctor default (Doctor.
+                    # max_online_per_day, column default 15).
+                    aggregate_cap += doctor.max_online_per_day or 15
             spec_data["current_usage"] = total_usage
+            spec_data["aggregate_cap"] = aggregate_cap
 
         result: list[dict] = []
         for spec_name, spec_data in specialties.items():
+            # D-2 display-fix: enforcement stays PER DOCTOR, but with
+            # several doctors per specialty the aggregate cap the admin
+            # sees must reflect the limits actually enforced — the SUM of
+            # each doctor's persisted cap (today's queue override) or
+            # per-doctor default (max_online_per_day). A specialty-wide
+            # max_per_day x N was misleading the moment doctors carry
+            # individual overrides (Codex round-3 P2).
             result.append(
                 {
                     "specialty": spec_name,
@@ -61,6 +85,7 @@ class QueueLimitsApiService:
                     "enabled": True,
                     "current_usage": spec_data["current_usage"],
                     "doctors_count": len(spec_data["doctors"]),
+                    "aggregate_max_per_day": spec_data["aggregate_cap"],
                     "last_updated": datetime.now(UTC),
                 }
             )

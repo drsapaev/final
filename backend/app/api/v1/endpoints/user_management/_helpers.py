@@ -47,6 +47,8 @@ from app.schemas.user_management import (  # noqa: F401
     UserSearchRequest,
     UserStatsResponse,
     UserUpdateRequest,
+    _USER_MANAGEMENT_ROLE_PATTERN,  # noqa: F401 — reused by _users.py Query pattern (Codex round-1 P2)
+    _USER_MANAGEMENT_ROLE_FILTER_PATTERN,  # noqa: F401 — read/filter compatibility vocabulary (Codex re-review P2, PR #3025)
 )
 from app.services.user_management_api_service import (
     UserManagementApiService,  # noqa: F401

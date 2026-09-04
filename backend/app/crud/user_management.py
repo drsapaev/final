@@ -511,7 +511,7 @@ class CRUDUserExtended(CRUDBase[User, UserCreateRequest, UserUpdateRequest]):
 
         # Статистика по ролям
         roles_stats = {}
-        for role in ["Admin", "Doctor", "Nurse", "Receptionist", "Patient"]:
+        for role in ["Admin", "Doctor", "Nurse", "Registrar", "Patient"]:  # E-4: Receptionist → canonical Registrar
             count = db.query(User).filter(User.role == role).count()
             roles_stats[role] = count
 

@@ -1,4 +1,5 @@
 import { generatePath, matchPath, type PathMatch } from 'react-router-dom';
+import type { LucideIcon } from 'lucide-react';
 import { buildRouteDocsSnapshot, type RouteDocsSnapshot } from './routeDocsSnapshot';
 import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } from './routeRegistry';
 
@@ -29,7 +30,7 @@ interface RouteNavMeta {
   tooltipKey?: string;
   ariaLabelKey?: string;
   sectionKey?: string;
-  icon?: string;
+  icon?: LucideIcon;
   badge?: string;
   tooltip?: string;
   ariaLabel?: string;
@@ -93,7 +94,7 @@ interface SidebarItem {
   ariaLabelKey?: string;
   /** Fallback text (route title) when labelKey is absent or missing everywhere. */
   label?: string;
-  icon: string;
+  icon?: LucideIcon;
   badge?: string;
   tooltip?: string;
   ariaLabel?: string;
@@ -392,7 +393,7 @@ export function getAdminNavSections(
       badgeKey: routeNav?.badgeKey,
       tooltipKey: routeNav?.tooltipKey,
       ariaLabelKey: routeNav?.ariaLabelKey,
-      icon: routeNav?.icon || 'circle',
+      icon: routeNav?.icon,
       badge: routeNav?.badge,
       tooltip: routeNav?.tooltip,
       ariaLabel: routeNav?.ariaLabel,
@@ -470,7 +471,7 @@ export function getRouteChromeState(
         id: navRoute.id,
         labelKey: navMeta?.labelKey,
         label: navMeta?.label || navRoute.title,
-        icon: navMeta?.icon || 'circle',
+        icon: navMeta?.icon,
         badge: navMeta?.badge,
         badgeKey: navMeta?.badgeKey,
         tooltip: navMeta?.tooltip,
@@ -488,7 +489,7 @@ export function getRouteChromeState(
         id: navRoute.id,
         labelKey: navMeta?.labelKey,
         label: navMeta?.label || navRoute.title,
-        icon: navMeta?.icon || 'circle',
+        icon: navMeta?.icon,
         badge: navMeta?.badge,
         badgeKey: navMeta?.badgeKey,
         tooltip: navMeta?.tooltip,

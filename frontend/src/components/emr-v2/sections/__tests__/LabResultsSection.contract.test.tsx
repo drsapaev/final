@@ -13,38 +13,47 @@ const source = fs.readFileSync(
   'utf8'
 );
 
-const iconSource = fs.readFileSync(
-  path.join(ROOT, 'components/ui/macos/Icon.tsx'),
-  'utf8'
-);
+describe('LabResultsSection icon contract — Track 3-2 forward-guard', () => {
+  /*
+   * REVERSAL DOCUMENTATION (Do not treat the old test as unexplained regression):
+   * - UX-AUDIT-FIX6 era: lucide-react was replaced with macos <Icon name="..."> —
+   *   at the time the macos SF-Symbols wrapper was treated as the canonical icon
+   *   system for consistency.
+   * - Plan §3.3 / §4.1.17 (v2.6): the canonical end-state is the OPPOSITE —
+   *   "Icon-систем: 2 → 1 (lucide-react)"; the macos Icon wrapper is the legacy
+   *   surface slated for decommission.
+   * - Track 3 (user decision, Plan v2.10 §4.1.21): explicit supersession —
+   *   migrate all consumers to direct lucide imports, then delete Icon.tsx.
+   * The architectural intent of FIX6 (icons follow ONE canonical system) is
+   * preserved; only the direction has been corrected.
+   */
 
-describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon', () => {
-  it('does not import from lucide-react anymore', () => {
-    expect(source).not.toContain("from 'lucide-react'");
-    expect(source).not.toContain('FileText, Download, TestTube, Plus');
+  it('imports icons directly from lucide-react (canonical icon system)', () => {
+    expect(source).toContain("from 'lucide-react'");
+    expect(source).toContain('Download, FileText, Plus, TestTube2');
   });
 
-  it('imports Icon from macos UI library', () => {
-    expect(source).toContain("from '../../ui/macos'");
-    expect(source).toContain('Icon');
+  it('does not render the legacy macos <Icon> wrapper anymore', () => {
+    expect(source).not.toContain('<Icon');
+    const macosImport = source.match(/import\s*\{([^}]*)\}\s*from\s*'\.\.\/\.\.\/ui\/macos'/);
+    expect((macosImport?.[1] ?? '')).not.toMatch(/\bIcon\b/);
   });
 
-  it('uses macos Icon names for all 4 migrated icons', () => {
-    // FileText → doc.text
-    expect(source).toContain('<Icon name="doc.text"');
-    // Download → square.and.arrow.down
-    expect(source).toContain('<Icon name="square.and.arrow.down"');
-    // TestTube → testtube.2
-    expect(source).toContain('<Icon name="testtube.2"');
-    // Plus → plus
-    expect(source).toContain('<Icon name="plus"');
+  it('renders the 4 canonical lucide components (was: SF-symbol names)', () => {
+    // FileText (was doc.text), Download (was square.and.arrow.down),
+    // TestTube2 (was testtube.2), Plus (was plus)
+    expect(source).toContain('<FileText');
+    expect(source).toContain('<Download');
+    expect(source).toContain('<TestTube2');
+    expect(source).toContain('<Plus');
   });
 
-  it('registers square.and.arrow.down in macos Icon.jsx (previously missing)', () => {
-    // Ранее 'square.and.arrow.down' отсутствовал в Icon.jsx — fallback на
-    // 'questionmark'. Теперь SVG-path определён.
-    expect(iconSource).toContain("'square.and.arrow.down'");
-    expect(iconSource).toContain('UX-AUDIT-FIX6');
+  it('square.and.arrow.down fallback questionmark is structurally impossible now', () => {
+    // UX-AUDIT-FIX6 originally registered the missing 'square.and.arrow.down'
+    // SF-name in Icon.jsx. Track 3-2 removes the name→path map entirely:
+    // direct lucide imports cannot fall back to questionmark. Superseded
+    // guard: the component import must be present (no registry to audit).
+    expect(source).toContain('Download');
   });
 
   it('UX-AUDIT-FIX9: requires confirm dialog before creating lab order', () => {

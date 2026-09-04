@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import extract_model_changes, log_critical_change
 from app.core.i18n import t  # noqa: F401
+from app.core.pii_masker import mask_pii
 from app.crud.patient import (
     normalize_patient_name,
     validate_birthdate,
@@ -22,6 +23,82 @@ from app.services.notifications import notification_sender_service
 from app.services.patient_validation import PatientValidationService
 
 logger = logging.getLogger(__name__)
+
+
+def _dispatch_patient_registered_notification_async(
+    *, patient_id: int, actor_id: int | None, registration_source: str
+) -> None:
+    """Run the patient_registered fan-out off the request path.
+
+    Own session (the request session may be closed by the time the thread
+    runs), own event loop via asyncio.run (legal in a fresh thread), and a
+    logged-failure-only contract identical to the previous inline call.
+    """
+    import threading
+
+    def _run() -> None:
+        _run_patient_registered_notification(
+            patient_id=patient_id,
+            actor_id=actor_id,
+            registration_source=registration_source,
+        )
+
+    try:
+        threading.Thread(
+            target=_run,
+            name=f"patient-registered-notify-{patient_id}",
+            daemon=True,
+        ).start()
+    except RuntimeError as exc:
+        # Codex P2: the patient row is already COMMITTED — a thread-creation
+        # failure (burst exhaustion) must not 500 a durable create. Log and
+        # drop the best-effort fan-out.
+        logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate id + error type only
+            "[FIX:NOTIFICATIONS] patient_registered dispatch could not start a worker thread",
+            extra={"patient_id": patient_id, "error_type": type(exc).__name__},
+        )
+
+
+def _run_patient_registered_notification(
+    *, patient_id: int, actor_id: int | None, registration_source: str
+) -> None:
+    from app.db.session import SessionLocal
+
+    db = None
+    try:
+        db = SessionLocal()
+        patient = db.get(Patient, patient_id)
+        if patient is None:
+            logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate id only (no PHI fields), per AGENTS PII policy
+                "[FIX:NOTIFICATIONS] patient_registered skipped: patient not found",
+                extra={"patient_id": patient_id},
+            )
+            return
+        actor_user = db.get(User, actor_id) if actor_id else None
+        canonical_created = asyncio.run(
+            notification_sender_service.send_patient_registered_notification(
+                db=db,
+                patient=patient,
+                registration_source=registration_source,
+                actor_user=actor_user,
+            )
+        )
+        if not canonical_created:
+            logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate ids only
+                "[FIX:NOTIFICATIONS] patient_registered canonical delivery failed",
+                extra={"patient_id": patient_id, "actor_id": actor_id},
+            )
+    except Exception as exc:
+        logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate id + error type only
+            "[FIX:NOTIFICATIONS] patient_registered background dispatch failed",
+            extra={"patient_id": patient_id, "error_type": type(exc).__name__},
+        )
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
 
 
 class PatientService:
@@ -59,9 +136,9 @@ class PatientService:
                 )
 
         has_full_name = patient_in.full_name and patient_in.full_name.strip()
-        has_individual_names = (patient_in.last_name and patient_in.last_name.strip()) or (
-            patient_in.first_name and patient_in.first_name.strip()
-        )
+        has_individual_names = (
+            patient_in.last_name and patient_in.last_name.strip()
+        ) or (patient_in.first_name and patient_in.first_name.strip())
 
         if not has_full_name and not has_individual_names:
             raise HTTPException(
@@ -111,11 +188,16 @@ class PatientService:
         normalized_first_name = (name_parts["first_name"] or "").strip()
         normalized_middle_name = name_parts.get("middle_name")
 
+        # Codex round-16 P1: имена пациента -- PII (AGENTS.md L391-408),
+        # в debug-лог попадают только длины/факт наличия, не значения
+        # (тот же принцип, что и для doc_number в round-15).
         logger.debug(
-            "Нормализация имени пациента: full_name=%s, last_name=%s, first_name=%s",
-            patient_in.full_name,
-            patient_in.last_name,
-            patient_in.first_name,
+            "Нормализация имени пациента: full_name_len=%d, last_name_len=%d, "
+            "first_name_len=%d, middle_name_present=%s",
+            len(patient_in.full_name or ""),
+            len(patient_in.last_name or ""),
+            len(patient_in.first_name or ""),
+            bool(normalized_middle_name),
         )
 
         if not normalized_last_name:
@@ -132,11 +214,16 @@ class PatientService:
         if patient_in.birth_date and not validate_birthdate(patient_in.birth_date):
             raise HTTPException(status_code=400, detail="Некорректная дата рождения")
 
+        # Codex round-15 P1: doc_number -- full-redact PII (AGENTS.md
+        # L390-407); сам номер в лог не попадает НИ В КАКОМ виде (ни
+        # сырым, ни маскированным -- CodeQL flagged the masked variant as
+        # clear-text logging, т.к. поток значения непрозрачен маске):
+        # логируем только тип документа и факт его наличия.
         logger.debug(
             "[FIX:ADM-05] Persisting patient document fields",
             extra={
                 "doc_type": patient_in.doc_type,
-                "doc_number": patient_in.doc_number,
+                "has_doc_number": patient_in.doc_number is not None,
             },
         )
 
@@ -166,7 +253,12 @@ class PatientService:
                 detail="Ошибка сохранения: имя пациента не было сохранено",
             )
 
+        # Codex round-10 P1: JSON-снапшоты аудита хранят PHI в plaintext —
+        # маскируем каноническим pii_masker (AGENTS.md L390-407).
+        # extract_model_changes возвращает КОРТЕЖ (old, new) — маскируем
+        # ПОСЛЕ распаковки (mask_pii не рекурсирует в tuple).
         _, new_data = extract_model_changes(None, patient)
+        new_data = mask_pii(new_data)
         log_critical_change(
             db=self.db,
             user_id=current_user.id,
@@ -176,47 +268,71 @@ class PatientService:
             old_data=None,
             new_data=new_data,
             request=request,
-            description=f"Создан пациент: {patient.last_name} {patient.first_name}",
+            # Codex round-9 P1: initial-only режим аудита — вместо ФИО
+            # идентифицируем пациента ID (AGENTS.md L390-407).
+            description=f"Создан пациент #{patient.id}",
         )
         self.db.commit()
+        # Perf (P0 2026-09-04): the registration fan-out (role-target lookups,
+        # profiles, deliveries) costs dozens of remote-DB roundtrips — it ran
+        # SYNCHRONOUSLY in the request and made patient creation take 15-30s.
+        # Dispatched to a daemon thread with its own session AFTER the commit:
+        # the patient row is already durable, and notifications are
+        # best-effort by contract (the previous try/except only logged).
+        registration_source = (
+            "self_service"
+            if str(getattr(current_user, "role", "")).lower() == "patient"
+            else "registrar_panel"
+        )
         try:
-            registration_source = (
-                "self_service"
-                if str(getattr(current_user, "role", "")).lower() == "patient"
-                else "registrar_panel"
+            _request_bind_is_sqlite = (
+                self.db.get_bind().dialect.name == "sqlite"
             )
-            canonical_created = asyncio.run(
-                notification_sender_service.send_patient_registered_notification(
-                    db=self.db,
-                    patient=patient,
-                    registration_source=registration_source,
-                    actor_user=current_user,
-                )
-            )
-            if not canonical_created:
-                logger.warning(
-                    "[FIX:NOTIFICATIONS] patient_registered canonical delivery failed",
-                    extra={"patient_id": patient.id, "actor_id": current_user.id},
-                )
-        except RuntimeError as exc:
-            logger.warning(
-                "[FIX:NOTIFICATIONS] patient_registered canonical delivery skipped due runtime context",
-                extra={
-                    "patient_id": patient.id,
-                    "actor_id": current_user.id,
-                    "error": str(exc),
-                },
-            )
-        except Exception as exc:
-            logger.error(
-                "[FIX:NOTIFICATIONS] patient_registered canonical delivery error",
-                extra={
-                    "patient_id": patient.id,
-                    "actor_id": current_user.id,
-                    "error": str(exc),
-                },
-            )
+        except Exception:
+            _request_bind_is_sqlite = False
 
+        if _request_bind_is_sqlite:
+            # Test container: run inline on the REQUEST session — the
+            # historical semantics (the test database only exists inside
+            # the request's session scope, and a background SessionLocal
+            # would race it with "database is locked").
+            try:
+                canonical_created = asyncio.run(
+                    notification_sender_service.send_patient_registered_notification(
+                        db=self.db,
+                        patient=patient,
+                        registration_source=registration_source,
+                        actor_user=current_user,
+                    )
+                )
+                if not canonical_created:
+                    logger.warning(
+                        "[FIX:NOTIFICATIONS] patient_registered canonical delivery failed",
+                        extra={"patient_id": patient.id, "actor_id": current_user.id},
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "[FIX:NOTIFICATIONS] patient_registered dispatch failed",
+                    extra={
+                        "patient_id": patient.id,
+                        "actor_id": current_user.id,
+                        "error_type": type(exc).__name__,
+                    },
+                )
+                # A swallowed DB error would leave the session in a
+                # rollback-required state that leaks into the next request
+                # on this connection (test savepoint contamination).
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
+        else:
+            # Production Postgres: fan-out off the request path.
+            _dispatch_patient_registered_notification_async(
+                patient_id=patient.id,
+                actor_id=getattr(current_user, "id", None),
+                registration_source=registration_source,
+            )
         return patient
 
     def update_patient(
@@ -241,11 +357,31 @@ class PatientService:
                     detail="Пациент с таким номером телефона уже существует",
                 )
 
+        # Codex round-15 P1: дубликат doc_number при обновлении -- тот же
+        # контракт, что и при создании (patients.doc_number без unique-
+        # констрейнта; поиск по документу через .first() стал бы
+        # неоднозначным). Исключаем текущего пациента (unchanged value).
+        if patient_in.doc_number and patient_in.doc_number != patient.doc_number:
+            existing_by_doc = (
+                self.db.query(Patient)
+                .filter(Patient.doc_number == patient_in.doc_number)
+                .first()
+            )
+            if existing_by_doc and existing_by_doc.id != patient_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Пациент с таким номером документа уже зарегистрирован",
+                )
+
+        # Codex round-10 P1: маскируем PHI в old-снапшоте (см. create;
+        # extract_model_changes -> кортеж, маскируем после распаковки).
         old_data, _ = extract_model_changes(patient, None)
+        old_data = mask_pii(old_data)
         patient = patient_crud.update(db=self.db, db_obj=patient, obj_in=patient_in)
         self.db.refresh(patient)
 
         _, new_data = extract_model_changes(None, patient)
+        new_data = mask_pii(new_data)
         log_critical_change(
             db=self.db,
             user_id=current_user.id,
@@ -255,7 +391,8 @@ class PatientService:
             old_data=old_data,
             new_data=new_data,
             request=request,
-            description=f"Обновлен пациент: {patient.last_name} {patient.first_name}",
+            # Codex round-9 P1: вместо ФИО — ID пациента
+            description=f"Обновлен пациент #{patient.id}",
         )
         self.db.commit()
 
@@ -277,8 +414,9 @@ class PatientService:
                 status_code=400, detail="Нельзя удалить пациента с активными записями"
             )
 
+        # Codex round-10 P1: маскируем PHI в old-снапшоте (см. create).
         old_data, _ = extract_model_changes(patient, None)
-        patient_name = f"{patient.last_name} {patient.first_name}"
+        old_data = mask_pii(old_data)
 
         try:
             patient_crud.remove(db=self.db, id=patient_id)
@@ -291,7 +429,8 @@ class PatientService:
                 old_data=old_data,
                 new_data=None,
                 request=request,
-                description=f"Удален пациент: {patient_name}",
+                # Codex round-9 P1: вместо ФИО — ID пациента
+                description=f"Удален пациент #{patient_id}",
             )
             self.db.commit()
         except Exception:

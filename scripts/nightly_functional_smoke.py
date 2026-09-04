@@ -7,15 +7,25 @@ analytics scenario with SYNTHETIC-tagged data only (repo synthetic data policy).
 
 Steps:
   1.  GET  /api/v1/health
-  2.  login smoke_registrar / smoke_doctor / smoke_manager (+ optional TOTP)
+  2.  login smoke_registrar / smoke_doctor (+ optional TOTP)
   3.  POST /api/v1/patients/                        (registrar)
   4.  GET  /api/v1/registrar/doctors                (registrar)
   5.  POST /api/v1/visits/visits                    (doctor)
   6.  GET  /api/v1/lab/templates                    (doctor)
   7.  POST /api/v1/lab/orders                       (doctor)
   8.  POST /api/v1/payments/                        (cashier via TOTP, optional)
-  9.  GET  /api/v1/advanced-analytics/doctors/performance (manager)
+  9.  GET  /api/v1/analytics/visualization/doctors/performance (doctor)
   10. GET  /api/v1/registrar/queues/today            (registrar)
+
+M-1 (Manager deprecation): step 9 was repointed from the deprecated
+Manager-role smoke account + advanced-analytics endpoint to the canonical
+smoke_doctor + analytics/visualization endpoint. Coverage change: OLD
+asserted privileged financial/advanced analytics endpoint availability
+under the deprecated Manager role; NEW asserts the production analytics
+pipeline (advanced analytics service -> visualization charts -> DB
+aggregation) availability under the canonical Doctor role. Admin-only
+advanced-analytics coverage lives in the backend integration suite
+(test_manager_deprecation.py + test_analytics_contracts.py).
 
 Accounts must exist first (backend/app/scripts/ensure_smoke_users.py).
 Credentials come from backend/.env: SMOKE_USER_PASSWORD, optional
@@ -117,28 +127,35 @@ def totp_now(secret: str, step: int = 30, digits: int = 6) -> str:
     return str(code).zfill(digits)
 
 
-def login(username: str, password: str, totp_secret: str = "") -> tuple[str | None, str]:
+def login(username: str, password: str, totp_secret: str = "") -> tuple[str | None, int | None, str]:
+    """Login; returns (token, user_id, detail).
+
+    user_id comes from the login response body itself — an extra /auth/me
+    probe here used to trip the 5/5min login rate limit (429) mid-run.
+    """
     status, body = http("POST", "/api/v1/authentication/login",
                         body={"username": username, "password": password})
     if status != 200 or not isinstance(body, dict):
         # intentionally no response body in details — it is not needed for
         # triage and keeps credentials/tokens out of logs and artifacts
-        return None, f"login HTTP {status}"
+        return None, None, f"login HTTP {status}"
     if body.get("requires_2fa_setup"):
-        return None, "login requires 2FA enrollment (requires_2fa_setup) — smoke cannot automate enrollment"
+        return None, None, "login requires 2FA enrollment (requires_2fa_setup) — smoke cannot automate enrollment"
     if body.get("requires_2fa"):
         pending = body.get("pending_2fa_token")
         if not totp_secret or not pending:
-            return None, "login requires 2FA code and no TOTP secret is configured for this account"
+            return None, None, "login requires 2FA code and no TOTP secret is configured for this account"
         v_status, v_body = http("POST", "/api/v1/2fa/verify", body={
             "pending_2fa_token": pending, "totp_code": totp_now(totp_secret)})
         if v_status != 200 or not (isinstance(v_body, dict) and v_body.get("access_token")):
-            return None, f"2FA verify HTTP {v_status}"
-        return v_body["access_token"], "ok (via TOTP)"
+            return None, None, f"2FA verify HTTP {v_status}"
+        v_user = (v_body.get("user") or {})
+        return v_body["access_token"], v_user.get("id"), "ok (via TOTP)"
     token = (body.get("access_token") or "").strip()
     if not token:
-        return None, "login HTTP 200 but no access_token in response"
-    return token, "ok"
+        return None, None, "login HTTP 200 but no access_token in response"
+    user = body.get("user") or {}
+    return token, user.get("id"), "ok"
 
 
 # --------------------------------------------------------------------------
@@ -239,18 +256,18 @@ def main() -> int:
     accounts = [
         ("smoke_registrar", ""),
         ("smoke_doctor", ""),
-        ("smoke_manager", ""),
     ]
     if CASHIER_USERNAME and CASHIER_TOTP_SECRET:
         accounts.append((CASHIER_USERNAME, CASHIER_TOTP_SECRET))
+    user_ids: dict[str, int | None] = {}
     for username, secret in accounts:
-        token, detail = login(username, SMOKE_PASSWORD, secret)
+        token, uid, detail = login(username, SMOKE_PASSWORD, secret)
         tokens[username] = token or ""
+        user_ids[username] = uid
         record(f"login {username}", "PASS" if token else "FAIL", detail)
 
     reg = tokens.get("smoke_registrar", "")
     doc = tokens.get("smoke_doctor", "")
-    mgr = tokens.get("smoke_manager", "")
 
     # 3. patient create (registrar) ----------------------------------------
     patient_id = None
@@ -274,14 +291,25 @@ def main() -> int:
 
     # 4. doctors list (registrar) ------------------------------------------
     doctor_id = None
+    doctor_user_id = user_ids.get("smoke_doctor")
     status, body = http("GET", "/api/v1/registrar/doctors", token=reg)
     if status == 200:
         entries = body if isinstance(body, list) else (
             body.get("doctors") or body.get("items") or body.get("data") or [] if isinstance(body, dict) else [])
-        if entries and isinstance(entries, list) and isinstance(entries[0], dict):
-            doctor_id = entries[0].get("id") or entries[0].get("doctor_id")
+        # The visits write-guard requires the ACTING doctor's own active
+        # profile: pick the smoke doctor's row, not just the first one.
+        own = next(
+            (e for e in entries if isinstance(e, dict)
+             and doctor_user_id is not None and e.get("user_id") == doctor_user_id),
+            None,
+        )
+        if own is not None:
+            doctor_id = own.get("id") or own.get("doctor_id")
         if doctor_id is not None:
-            record("doctors list", "PASS", f"first doctor id={doctor_id}")
+            record("doctors list", "PASS", f"smoke doctor profile id={doctor_id}")
+        elif entries:
+            record("doctors list", "FAIL",
+                   "smoke_doctor has no active Doctor profile — run ensure_smoke_users")
         else:
             record("doctors list", "FAIL",
                    f"HTTP 200 but no doctor rows found — production has no doctors? body={json.dumps(body, ensure_ascii=False)[:160]}")
@@ -356,12 +384,16 @@ def main() -> int:
         else:
             record("payment create", "FAIL", f"HTTP {status}: {json.dumps(body, ensure_ascii=False)[:200]}")
 
-    # 9. doctor analytics (manager) — known User.fio bug lives here --------
+    # 9. doctor performance analytics (doctor) ----------------------------
+    # M-1: repointed from the deprecated Manager account + /analytics/
+    # advanced/doctors/performance to the canonical doctor-authorized
+    # visualization surface. See the module docstring for the recorded
+    # coverage change.
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     status, body = http(
         "GET",
-        f"/api/v1/analytics/advanced/doctors/performance?start_date={today}&end_date={today}",
-        token=mgr,
+        f"/api/v1/analytics/visualization/doctors/performance?start_date={today}&end_date={today}",
+        token=doc,
     )
     record("analytics doctors/performance", "PASS" if status == 200 else "FAIL",
            f"GET -> {status}" + ("" if status == 200 else " (doctors analytics endpoint broken?)"))

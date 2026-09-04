@@ -18,7 +18,8 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 const patientSearchRouteByRole = {
   registrar: getRoleHomeRoute('registrar'),
-  receptionist: getRoleHomeRoute('registrar'),
+  // REC-3: receptionist key removed with the route alias (canonical role is
+  // 'registrar').
   cardio: getRoleHomeRoute('cardio'),
   derma: getRoleHomeRoute('derma'),
   dentist: getRoleHomeRoute('dentist'),
@@ -340,7 +341,9 @@ export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps
       top: '50%',
       transform: 'translateY(-50%)',
       fontSize: 'var(--mac-font-size-xs)',
-      color: 'var(--mac-text-tertiary, #94a3b8)',
+      // AXE-EXP-2: ink on the tertiary chip — tertiary ink was 3.9:1 (light)
+      // / 1.89:1 (dark); on-tertiary token passes both (5.71:1 / 6.74:1).
+      color: 'var(--mac-text-on-tertiary, #455568)',
       background: 'var(--mac-bg-tertiary, #e2e8f0)',
       padding: '2px 6px',
       borderRadius: 'var(--mac-radius-sm)',
@@ -459,6 +462,7 @@ export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps
         <div
           id={listboxId}
           role="listbox"
+          aria-busy={isLoading}
           aria-label={t('misc.gsb_rezultaty_globalnogo_poiska')}
           style={styles.dropdown as CSSProperties}
           ref={dropdownRef}>

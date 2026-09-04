@@ -10,6 +10,131 @@ from app.services.user_mgmt._base import (
     INCOMPLETE_DOCTOR_SPECIALTY,
     is_doctor_profile_incomplete,
 )
+from app.core.specialties import expand_queue_tags
+from app.core.roles import DOCTOR_ROLE_SPELLINGS
+
+
+def _unbookable_doctor_ids(
+    db: Session,
+    doctors: list[Doctor],
+    day,
+    queue_tag: str | None = None,
+) -> set[int]:
+    """Doctors of ``doctors`` whose online queue for ``day`` can NOT accept
+    a new entry (mirror of check_queue_time_window + check_queue_limits):
+
+    - past days: never bookable;
+    - same-day joins before the 07:00 online window: never bookable;
+    - the per-(day, doctor, tag) queue already OPENED reception
+      (``opened_at`` set, same-day only): not bookable;
+    - the per-(day, doctor, tag) queue reached its online cap
+      (active waiting+called entries >= max slots): not bookable.
+
+    Doctors WITHOUT a matching queue row are bookable — the join creates
+    their queue with ``opened_at = NULL`` and zero entries (exactly what
+    ``get_or_create_daily_queue`` would do).
+    """
+    if not doctors:
+        return set()
+
+    doctor_ids = [d.id for d in doctors]
+
+    # Day-level window (identical semantics to check_queue_time_window).
+    now = _now()
+    today = now.date()
+    if day < today:
+        return set(doctor_ids)
+    if day == today and now.time() < QueueBusinessServiceMixinBase.ONLINE_QUEUE_START_TIME:
+        return set(doctor_ids)
+    same_day = day == today
+
+    # Per-queue state: the row the join would use is
+    # (day, specialist_id, queue_tag, active) — first row wins, mirroring
+    # get_or_create_daily_queue's .first() lookup.
+    query = db.query(DailyQueue).filter(
+        DailyQueue.day == day,
+        DailyQueue.specialist_id.in_(doctor_ids),
+        DailyQueue.active == True,  # noqa: E712 — same filter as get_or_create
+    )
+    if queue_tag:
+        query = query.filter(DailyQueue.queue_tag == queue_tag)
+    queues = query.order_by(DailyQueue.id.asc()).all()
+
+    unbookable: set[int] = set()
+    active_counts: dict[int, int] = {}
+    if queues:
+        count_rows = (
+            db.query(
+                OnlineQueueEntry.queue_id,
+                func.count(OnlineQueueEntry.id),
+            )
+            .filter(
+                OnlineQueueEntry.queue_id.in_([q.id for q in queues]),
+                OnlineQueueEntry.status.in_(["waiting", "called"]),
+            )
+            .group_by(OnlineQueueEntry.queue_id)
+            .all()
+        )
+        active_counts = {queue_id: count for queue_id, count in count_rows}
+
+    for queue in queues:
+        if queue.specialist_id in unbookable:
+            continue
+        if same_day and queue.opened_at is not None:
+            unbookable.add(queue.specialist_id)
+            continue
+        # Codex round-2 P2: DailyQueue persists the online cap as
+        # ``max_online_entries`` (dev_seed sets 20, legacy crud honors it);
+        # the old getattr(queue, "max_slots", ...) never existed on the
+        # model, so every queue silently fell back to DEFAULT_MAX_SLOTS=15
+        # and the picker disagreed with the configured bookability. Same
+        # fallback shape as the legacy crud path (falsy -> default).
+        max_slots = (
+            queue.max_online_entries
+            or QueueBusinessServiceMixinBase.DEFAULT_MAX_SLOTS
+        )
+        if active_counts.get(queue.id, 0) >= max_slots:
+            unbookable.add(queue.specialist_id)
+    return unbookable
+
+
+def _find_clinic_wide_duplicate(
+    db: Session,
+    doctors: list[Doctor],
+    *,
+    day,
+    queue_tag: str,
+    phone: str | None,
+    telegram_id: str | None,
+) -> tuple[OnlineQueueEntry | None, DailyQueue | None]:
+    """The patient's existing entry across ALL candidate doctors'
+    active same-day queues for ``queue_tag`` (Codex round-4 P1):
+    duplicates must be resolved BEFORE least-load routing — a retry or
+    double submit raises the first doctor's load, so routing would
+    pick a sibling and the per-queue ``check_uniqueness`` would let a
+    SECOND entry for the same patient through under another doctor."""
+    if not phone and not telegram_id:
+        return None, None
+    base = (
+        db.query(OnlineQueueEntry)
+        .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+        .filter(
+            DailyQueue.day == day,
+            DailyQueue.specialist_id.in_([d.id for d in doctors]),
+            DailyQueue.active.is_(True),
+            DailyQueue.queue_tag == queue_tag,
+            OnlineQueueEntry.status.in_(["waiting", "called"]),
+        )
+    )
+    entry = None
+    if phone:
+        entry = base.filter(OnlineQueueEntry.phone == phone).first()
+    if entry is None and telegram_id:
+        entry = base.filter(OnlineQueueEntry.telegram_id == telegram_id).first()
+    if entry is None:
+        return None, None
+    queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+    return entry, queue
 
 
 class OperationsMixin(QueueBusinessServiceMixinBase):
@@ -71,7 +196,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             .count()
         )
 
-        max_slots = getattr(daily_queue, 'max_slots', None) or cls.DEFAULT_MAX_SLOTS
+        # Codex round-2 P2 (companion of the _unbookable_doctor_ids fix):
+        # the enforcement side carried the same phantom ``max_slots``
+        # attribute — the admin-configured ``max_online_entries`` cap was
+        # never honored here, so a capacity-30 queue still rejected at 15
+        # while a capacity-10 queue stayed eligible. Read the persisted cap
+        # exactly like the legacy crud path (falsy -> DEFAULT_MAX_SLOTS).
+        max_slots = daily_queue.max_online_entries or cls.DEFAULT_MAX_SLOTS
 
         if current_entries >= max_slots:
             return (
@@ -567,6 +698,79 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         }
         return queue_token, metadata
 
+    @staticmethod
+    def _pick_least_loaded_doctor(
+        db: Session,
+        doctors: list[Doctor],
+        day,
+        queue_tag: str | None = None,
+    ) -> Doctor | None:
+        """D-2 least-loaded routing: pick the doctor with the shortest
+        ACTIVE queue (waiting+called entries) for ``day``; ties break to
+        the lowest ``Doctor.id`` so the choice is deterministic.
+
+        ``doctors`` are assumed already filtered to active/eligible rows.
+        Doctors without a DailyQueue for the day have load 0 — a fresh
+        doctor wins over an already loaded one, and equal loads keep the
+        historical lowest-id preference.
+
+        Codex round-1 P1 (bookable-state routing): a doctor whose own
+        queue can no longer accept an online entry for ``day`` — reception
+        already opened (``opened_at`` set), the per-queue online cap
+        reached, or (for same-day joins) the 07:00 online window not yet
+        reached — is NOT routed to while another candidate remains
+        bookable. Otherwise the later ``check_queue_time_window`` /
+        ``check_queue_limits`` validation rejected the WHOLE
+        specialty-wide join even though a sibling doctor still accepted
+        patients. Ranking happens over the bookable subset first; when NO
+        candidate is bookable the original least-loaded pick stands, so
+        the precise downstream error (opened reception / limit reached /
+        window not open yet) surfaces unchanged.
+        """
+        if not doctors:
+            return None
+        if len(doctors) == 1:
+            return doctors[0]
+
+        doctor_ids = [d.id for d in doctors]
+        load_query = (
+            db.query(
+                DailyQueue.specialist_id,
+                func.count(OnlineQueueEntry.id),
+            )
+            .join(
+                OnlineQueueEntry,
+                OnlineQueueEntry.queue_id == DailyQueue.id,
+            )
+            .filter(
+                DailyQueue.day == day,
+                DailyQueue.specialist_id.in_(doctor_ids),
+                # Codex round-2 P2: only ACTIVE queues carry live load —
+                # historical same-day entries in an inactive queue (the row
+                # the join would NOT use — get_or_create_daily_queue filters
+                # active) must not inflate a doctor's ranking.
+                DailyQueue.active.is_(True),
+                OnlineQueueEntry.status.in_(["waiting", "called"]),
+            )
+        )
+        if queue_tag:
+            # Codex round-3 P2: the join targets the (day, doctor, TAG) row
+            # — a doctor's entries under OTHER tags (e.g. a legacy
+            # 'dentistry' queue) must not make their empty target-tag queue
+            # look loaded.
+            load_query = load_query.filter(DailyQueue.queue_tag == queue_tag)
+        load_rows = load_query.group_by(DailyQueue.specialist_id).all()
+        active_loads = {specialist_id: count for specialist_id, count in load_rows}
+
+        # Codex round-1 P1: rank BOOKABLE doctors first (see docstring).
+        unbookable_ids = _unbookable_doctor_ids(db, doctors, day, queue_tag)
+        candidates = [d for d in doctors if d.id not in unbookable_ids]
+        if not candidates:
+            # Nobody bookable: keep the legacy least-loaded pick so the
+            # downstream window/limit validation produces its precise,
+            # actionable message for the patient instead of a generic one.
+            candidates = doctors
+        return min(candidates, key=lambda d: (active_loads.get(d.id, 0), d.id))
 
     def join_queue_with_token(
         self,
@@ -625,48 +829,106 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 # QueueProfile.key - это "cardiology", "dermatology", etc.
                 # QueueProfile.queue_tags - это список возможных doctor.specialty значений
                 profile_key = queue_profile.key
-                queue_tags = queue_profile.queue_tags or [profile_key]
+                # D-1 canonical vocabulary: expand queue_tags with every
+                # dental-family spelling, so a canonical "dentistry"
+                # doctor is visible to the stomatology profile even when
+                # its stored tags predate migration 0049.
+                queue_tags = expand_queue_tags(
+                    queue_profile.queue_tags or [profile_key]
+                )
 
-                # Ищем врача с specialty из queue_tags профиля.
+                # Ищем врачей с specialty из queue_tags профиля.
                 # Incomplete ("general" sentinel) profiles are explicitly
                 # excluded: they are not clinical-eligible for specialty QR
                 # routing even if an admin ever tags a profile with
                 # "general" (defense in depth, Codex P1-D).
-                doctor = (
+                # Codex round-3 P2: the candidate query applies the SAME
+                # owner-eligibility contract as the appointment writers
+                # (services/appointment_eligibility.py): an active Doctor
+                # row whose owner is missing (decision #13 — userless rows
+                # violate the linkage contract), deactivated or demoted to
+                # a non-doctor role is a legacy ghost — and the least-load
+                # ranking would PREFER it (load 0) over healthy doctors.
+                eligible_doctors = (
                     db.query(Doctor)
+                    .join(User, Doctor.user_id == User.id)
                     .filter(
                         Doctor.active.is_(True),
                         Doctor.specialty.in_(queue_tags),
                         Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+                        User.is_active.is_(True),
+                        func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
                     )
-                    .first()
+                    .order_by(Doctor.id.asc())
+                    .all()
                 )
-
-                # Если не нашли - это ошибка сопоставления профиля, а не повод
-                # подставлять случайного активного врача.
-                if not doctor:
-                    raise QueueValidationError(
-                        f"Нет активных врачей для профиля {queue_profile.title_ru or queue_profile.title}"
+                # D-2 least-loaded routing (NEEDS DECISION resolved): with
+                # several active doctors per specialty the new patient goes
+                # to the doctor with the shortest ACTIVE queue for the day
+                # (waiting+called), ties break to the lowest Doctor.id.
+                # queue_tag scopes the bookability pre-check to the exact
+                # (day, doctor, tag) row the join will use (Codex round-1 P1).
+                # Codex round-4 P1: resolve the patient's EXISTING entry
+                # across the profile's candidate queues BEFORE least-load
+                # routing (see _find_clinic_wide_duplicate) — otherwise a
+                # retry lands a second entry under another doctor.
+                existing_entry, existing_queue = _find_clinic_wide_duplicate(
+                    db,
+                    eligible_doctors,
+                    day=day,
+                    queue_tag=profile_key,
+                    phone=phone,
+                    telegram_id=telegram_id,
+                )
+                if existing_queue is not None:
+                    doctor = existing_queue.specialist or (
+                        db.query(Doctor)
+                        .filter(Doctor.id == existing_queue.specialist_id)
+                        .first()
                     )
+                    daily_queue = existing_queue
+                    queue_tag = profile_key
+                    specialist_name = (
+                        (doctor.user.full_name or doctor.user.username)
+                        if doctor and doctor.user
+                        else None
+                    )
+                    specialist_name = (
+                        specialist_name
+                        or queue_profile.title_ru
+                        or f"Врач #{existing_queue.specialist_id}"
+                    )
+                    cabinet = doctor.cabinet if doctor else None
                 else:
-                    # Нашли врача - используем его данные
-                    queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty
-                    defaults = {
-                        "start_number": doctor.start_number_online,
-                        "max_online_entries": doctor.max_online_per_day,
-                        "cabinet_number": doctor.cabinet,
-                    }
-                    daily_queue = self.get_or_create_daily_queue(
-                        db,
-                        day=day,
-                        specialist_id=doctor.id,
-                        queue_tag=queue_tag,
-                        defaults=defaults,
+                    doctor = self._pick_least_loaded_doctor(
+                        db, eligible_doctors, day, queue_tag=profile_key
                     )
-                    if doctor.user:
-                        specialist_name = doctor.user.full_name or doctor.user.username
-                    specialist_name = specialist_name or queue_profile.title_ru or f"Врач #{doctor.id}"
-                    cabinet = doctor.cabinet
+
+                    # Если не нашли - это ошибка сопоставления профиля, а не повод
+                    # подставлять случайного активного врача.
+                    if not doctor:
+                        raise QueueValidationError(
+                            f"Нет активных врачей для профиля {queue_profile.title_ru or queue_profile.title}"
+                        )
+                    else:
+                        # Нашли врача - используем его данные
+                        queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty
+                        defaults = {
+                            "start_number": doctor.start_number_online,
+                            "max_online_entries": doctor.max_online_per_day,
+                            "cabinet_number": doctor.cabinet,
+                        }
+                        daily_queue = self.get_or_create_daily_queue(
+                            db,
+                            day=day,
+                            specialist_id=doctor.id,
+                            queue_tag=queue_tag,
+                            defaults=defaults,
+                        )
+                        if doctor.user:
+                            specialist_name = doctor.user.full_name or doctor.user.username
+                        specialist_name = specialist_name or queue_profile.title_ru or f"Врач #{doctor.id}"
+                        cabinet = doctor.cabinet
             else:
                 # Legacy: specialist_id_override is Doctor.id
                 doctor = (

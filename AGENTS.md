@@ -79,6 +79,25 @@ Hard rules for all repo-aware agents:
 
 Small PR means small blast radius, not shallow reasoning. Even tiny changes need scope, risk, validation, and rollback clarity.
 
+## Multi-Session Worktree & Deploy Convention
+
+Several agent sessions share this checkout, and this checkout is also the
+production host (uvicorn :18000 behind Cloudflare Tunnel). Rules:
+
+- Production runs ONLY from the main tree (`C:\final`) when it is on
+  `main`, clean, and synced with `origin/main`. Restart production via
+  `scripts/deploy_restart.ps1` — it enforces these guards and refuses
+  otherwise. Never restart uvicorn from a feature branch or a worktree.
+- Agent sessions MUST NOT switch branches or rebase in the main tree.
+  Do session work in your own worktree:
+  `git worktree add C:\final\_wt_<topic> -b <branch> origin/main`.
+- The main tree returns to `main` (and pulls) only after your own PR is
+  merged, and only when no other session is mid-operation in it.
+- Keep session scratch files (profiles, dumps, PR bodies, patches) inside
+  your worktree, not the main tree. `_wt*/` is gitignored.
+- Mechanics (venv reuse, test runs from a worktree, deploy procedure):
+  `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
+
 ## Skill Routing Policy
 
 Installed repo skills live in `.agents/skills`. User-level skills may live under `$HOME/.agents/skills`. Load skills only when the task matches their trigger, and prefer the most project-specific skill first.
@@ -296,6 +315,7 @@ For risky tasks that should not execute yet, output `plan`, `dossier`, or `hando
 DB / Alembic / SQLAlchemy migrations:
 
 - Use the ownership chain `model -> schema -> migration -> tests`.
+- Never create or alter production tables via ad-hoc SQL/session DDL — every schema change ships as an Alembic revision, a creating revision must enable RLS, and new models must be imported in `backend/app/models/__init__.py` so autogenerate can see them (incident 2026-09-02: out-of-band tables stayed RLS-off until a Supabase alert; see `docs/incidents/2026-09-02-supabase-rls-disabled-in-public.md`).
 - SQLAlchemy model without a matching table/migration is migration ownership, not endpoint, webhook, status, queue, or UI ownership.
 - If the root cause is a missing table for an existing SQLAlchemy model, the first-touch patch must include a new Alembic revision under `backend/alembic/versions/`.
 - Treat the existing SQLAlchemy model and the previous Alembic revision as read-only references unless the user explicitly changes the model contract.
