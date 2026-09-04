@@ -50,7 +50,7 @@ export default function NotificationSystemStatus() {
         }
     }
 
-    if (loading) return <div>{t('misc.nss_zagruzka_statusa')}</div>;
+    if (loading) return <div aria-busy="true">{t('misc.nss_zagruzka_statusa')}</div>;
     if (!status) return <div>{t('misc.nss_ne_udalos_zagruzit_status')}</div>;
 
     return (
