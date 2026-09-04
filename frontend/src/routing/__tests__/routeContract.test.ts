@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderRouteDocsMarkdown } from '../routeDocsSnapshot';
+import { hasRouteAccess, routeToRoles } from '../../constants/routes';
 import { resolveSetupRedirect } from '../routeGuards';
 import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry';
 import {
@@ -169,5 +170,32 @@ describe('docs snapshot', () => {
     expect(markdown).toContain('Compatibility Redirects');
     expect(markdown).toContain('/registrar');
     expect(markdown).toContain('/admin/settings');
+  });
+});
+
+// P-014 B:TIGHTEN (user business decision): the cashier sidebar preset no
+// longer references /clinical/appointments. Preset navigation is NOT
+// route-access-filtered (getRouteChromeState returns preset items verbatim
+// for non-admin presets), so keeping the «Записи» item after the route
+// tightened to the canonical trio would render a dead link to /forbidden.
+// The canonical cashier payment navigation (/cashier home, backed by the
+// separate pending-payments payment surface) must remain intact.
+describe('P-014 B:TIGHTEN — cashier preset', () => {
+  it('drops the clinical-appointments item from the cashier preset', () => {
+    const items = (SIDEBAR_PRESETS.cashier as { items: Array<{ id: string }> }).items;
+    expect(items.map((item) => item.id)).not.toContain('clinical-appointments');
+  });
+
+  it('keeps the canonical cashier payment navigation (home surface only)', () => {
+    const items = (SIDEBAR_PRESETS.cashier as { items: Array<{ id: string }> }).items;
+    expect(items.map((item) => item.id)).toEqual(['cashier-home']);
+    // The /cashier home route remains the cashier payment surface
+    // (backed by the separate pending-payments endpoint policy).
+    expect(routeToRoles('/cashier')).toContain('Cashier');
+  });
+
+  it('still resolves the cashier home route for the Cashier profile', () => {
+    expect(hasRouteAccess({ role: 'Cashier' }, '/cashier')).toBe(true);
+    expect(hasRouteAccess({ role: 'Cashier' }, '/clinical/appointments')).toBe(false);
   });
 });

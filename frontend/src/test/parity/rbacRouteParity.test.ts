@@ -40,4 +40,28 @@ describe('RBAC route parity', () => {
     const profile = { role: 'Nurse' };
     expect(hasRouteAccess(profile, '/clinical/scheduler')).toBe(true);
   });
+
+  // P-014 B:TIGHTEN (user business decision): canonical Appointments/Scheduler
+  // frontend access = Admin/Registrar/Doctor on BOTH surfaces. Route contract
+  // equals the page RoleGate contract; the historical widening (Cashier, Lab,
+  // cardio, derma, dentist) is revoked at route level. Backend doctor-family
+  // data access is unchanged (scoped); pending-payments stays a separate
+  // Cashier payment surface (pinned in backend owner-guard tests).
+  it('pins the canonical trio role list on appointments and scheduler routes (P-014 B:TIGHTEN)', () => {
+    expect(routeToRoles('/clinical/appointments')).toEqual(['Admin', 'Doctor', 'Registrar']);
+    expect(routeToRoles('/clinical/scheduler')).toEqual(['Admin', 'Doctor', 'Registrar']);
+  });
+
+  it('allows Admin/Registrar/Doctor on /clinical/appointments (P-014 B:TIGHTEN)', () => {
+    expect(hasRouteAccess({ role: 'Admin' }, '/clinical/appointments')).toBe(true);
+    expect(hasRouteAccess({ role: 'Registrar' }, '/clinical/appointments')).toBe(true);
+    expect(hasRouteAccess({ role: 'Doctor' }, '/clinical/appointments')).toBe(true);
+  });
+
+  it('denies roles reachable only via the historical P-014 widening', () => {
+    for (const role of ['Cashier', 'Lab', 'cardio', 'derma', 'dentist']) {
+      expect(hasRouteAccess({ role }, '/clinical/appointments')).toBe(false);
+      expect(hasRouteAccess({ role }, '/clinical/scheduler')).toBe(false);
+    }
+  });
 });

@@ -65,14 +65,21 @@ export const SIDEBAR_PRESETS = {
     ],
   },
   // PR-UI-04b: restored cashier preset (completes AppShell migration).
-  // Cashier sidebar: Касса (home) + Записи (shared clinical route).
+  // P-014 B:TIGHTEN: «Записи» removed from the cashier sidebar. Preset
+  // navigation is NOT route-access-filtered, so keeping the item after the
+  // route tightened to the canonical trio would leave Cashier a dead link
+  // to /forbidden. Cashier payment workflows are unaffected — their lookup
+  // surface is /cashier, backed by GET /cashier/pending-payments
+  // (Admin/Cashier per cashier/_payments.py — the endpoint the cashier UI
+  // actually calls via usePayments). The hidden legacy
+  // GET /appointments/pending-payments (Admin/Registrar/Cashier) remains a
+  // separate, schema-excluded payment surface pinned by backend tests.
   // admin-finance excluded — role-scoped to Admin only.
   cashier: {
     navigation: 'path',
     defaultItem: 'cashier-home',
     items: [
       { id: 'cashier-home', labelKey: 'nav.cashier', icon: CreditCard, to: '/cashier' },
-      { id: 'clinical-appointments', labelKey: 'nav.appointments', icon: Calendar, to: '/clinical/appointments' },
     ],
   },
   doctor: {
@@ -1241,11 +1248,14 @@ export const ROUTE_REGISTRY = [
     lifecycle: stable,
     shell: 'app-shell',
     auth: 'role-scoped',
-    // P-014 fix: previously roles:[Admin, Registrar] excluded Doctor, Cashier, Lab.
-    // Cashier needs to look up appointments to take payments; Lab needs to find
-    // patients for sample collection; Doctor needs to see schedules of peers.
-    // All clinical roles now have read access to the appointments list.
-    roles: ['Admin', 'Doctor', 'Registrar', 'Cashier', 'Lab', 'cardio', 'derma', 'dentist'],
+    // P-014 B:TIGHTEN (user business decision — supersedes the historical
+    // widening that listed 8 roles here). Canonical Appointments/Scheduler
+    // frontend access = Admin/Registrar/Doctor; route contract now equals
+    // the page RoleGate contract. Cashier/Lab have no business requirement
+    // to manage the appointments UI (their flows live on their own surfaces);
+    // cardio/derma/dentist are legacy specialty roles, canonical actor =
+    // Doctor. Backend doctor-family data access is unchanged (scoped).
+    roles: ['Admin', 'Doctor', 'Registrar'],
     entry: 'menu',
     nav: nav({ labelKey: 'nav.appointments', icon: Calendar, sectionKey: 'nav.section_clinical', order: 90, menu: true }),
     title: 'Clinical Appointments',
