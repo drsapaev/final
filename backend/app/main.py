@@ -523,8 +523,65 @@ _app_start_time = _time.time()
 # -----------------------------------------------------------------------------
 # Диагностика подключённых маршрутов (called from lifespan)
 # -----------------------------------------------------------------------------
+def _warm_table_reflection() -> None:
+    """Pre-reflect service tables once per process (perf P0 2026-09-03).
+
+    visits_api_service reflects schema tables lazily; the first reflection
+    costs dozens of pg_catalog roundtrips (~25s against the remote
+    Supabase). Warming the shared cache in a daemon thread right after
+    boot keeps the FIRST user request fast without blocking startup.
+    Best-effort: any failure logs and leaves the lazy path in place.
+    """
+    import threading
+
+    def _warm() -> None:
+        try:
+            from app.db.session import SessionLocal
+            from app.services.visits_api_service import _REFLECTED_META
+            from sqlalchemy import Table
+
+            session = SessionLocal()
+            bind = session.get_bind()
+            for name in ("visits", "visit_services", "patients", "doctors", "users"):
+                Table(name, _REFLECTED_META, autoload_with=bind)
+
+            # ORM compile touch: the FIRST query per mapper also pays a
+            # per-process compilation/catalog cost — touch the hot mappers
+            # once so user-facing requests skip it (same class of cost the
+            # reflection warmup removes).
+            from sqlalchemy import select as _select
+
+            from app.models.clinic import Doctor as _Doctor
+            from app.models.patient import Patient as _Patient
+            from app.models.user import User as _User
+
+            for _mapper_stmt in (
+                _select(_User).limit(1),
+                _select(_Patient).limit(1),
+                _select(_Doctor).limit(1),
+            ):
+                session.execute(_mapper_stmt)
+
+            # Lab self-heal seeders: first pass costs hundreds of statements
+            # against the remote DB — pay it here, once per process.
+            from app.services.lab_reporting_service import LabReportingService
+
+            LabReportingService(session).list_templates()
+            session.close()
+            log.info(
+                "✅ Warmup complete (reflection %s tables + ORM touch + lab seed)",
+                len(_REFLECTED_META.tables),
+            )
+        except Exception as exc:  # pragma: no cover - startup best-effort
+            log.warning("Table reflection warmup skipped: %s", type(exc).__name__)
+
+    threading.Thread(target=_warm, name="schema-reflection-warmup", daemon=True).start()
+
+
+
 async def _startup_tasks() -> None:
     """Startup tasks - validates security settings and prints routes"""
+    _warm_table_reflection()
     # Validate SECRET_KEY on startup
     try:
         from app.core.config import _DEFAULT_SECRET_KEY, get_settings

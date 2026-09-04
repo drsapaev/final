@@ -123,6 +123,42 @@ def ensure_smoke_users() -> list[dict]:
                 {"username": username, "id": row.id, "role": role, "created": True}
             )
 
+        # The nightly functional smoke books a VISIT as smoke_doctor, and the
+        # visits write-guard requires an ACTIVE Doctor profile for the acting
+        # doctor with payload.doctor_id == that profile. Provision it here
+        # (idempotent, canonical catalog specialty) so the E2E doctor path
+        # stays alive; ORM-direct, so catalog API guards are not involved.
+        from app.models.clinic import Doctor  # noqa: E402
+
+        doctor_user = (
+            db.execute(select(User).where(User.username == "smoke_doctor"))
+            .scalars()
+            .first()
+        )
+        if doctor_user is not None:
+            profile = (
+                db.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+            )
+            if profile is None:
+                profile = Doctor(
+                    user_id=doctor_user.id,
+                    specialty="cardiology",
+                    cabinet="SMOKE",
+                    active=True,
+                )
+                db.add(profile)
+                db.commit()
+                results.append(
+                    {"doctor_profile": {"id": profile.id, "created": True}}
+                )
+            elif not profile.active or profile.specialty == "general":
+                profile.active = True
+                profile.specialty = "cardiology"
+                db.commit()
+                results.append(
+                    {"doctor_profile": {"id": profile.id, "repaired": True}}
+                )
+
         # M-1: report — never touch — any retired smoke account that still
         # exists. No password re-pin, no role rewrite, no activation flip:
         # the row's lifecycle belongs to the post-deploy ops step only.

@@ -34,6 +34,11 @@ class CatalogMixin(LabReportingServiceMixinBase):
 
 
     def ensure_default_catalog(self) -> None:
+        from app.services.lab_reporting._base import _mark_seed_ensured, _seed_cache_fresh
+
+        bind = self.repository.db.get_bind()
+        if not _seed_cache_fresh(bind, "catalog"):
+            return
         logger.info("[LAB] ensure_default_catalog seeding analytes/units/reference ranges")
         touched = 0
 
@@ -147,6 +152,7 @@ class CatalogMixin(LabReportingServiceMixinBase):
                 touched += 1
             self._catalog_reference_cache.pop(analyte_code, None)
 
+        _mark_seed_ensured(bind, "catalog")
         if touched:
             self.repository.commit()
 
