@@ -1189,7 +1189,7 @@ def _normalize_staff_role(role: Any) -> str:
         "lab_tech": "lab",
         "laboratory": "lab",
         "registrar": "registrar",
-        "receptionist": "registrar",
+        # E-4 (Receptionist alias removal): entry decommissioned (§4.1.27).
     }
     return role_aliases.get(role_key, role_key)
 

@@ -230,7 +230,9 @@ const AppointmentWizardV2 = ({
 }: WizardProps) => {
   // Проверка прав доступа
   const { hasRole } = useRoleAccess();
-  const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
+  // REC-3: 'Receptionist' dropped from the wizard allow-list — the route
+  // alias is gone and the canonical spelling is 'Registrar'.
+  const hasRegistrarAccess = hasRole(['Admin', 'Registrar']);
 
   // i18n: unified translation hook — required for all t('misc.aw_*') calls below.
   const { t: rawT } = useTranslation();
@@ -2910,10 +2912,7 @@ const AppointmentWizardV2 = ({
         }}>
 
             <span style={{ fontSize: 'var(--mac-font-size-lg)', display: 'inline-flex', alignItems: 'center' }}>
-            {cat.icon === 'stethoscope' ? <Stethoscope size={16} /> :
-             cat.icon === 'flask' ? <FlaskConical size={16} /> :
-             cat.icon === 'syringe' ? <Syringe size={16} /> :
-             cat.icon === 'clipboard' ? <ClipboardList size={16} /> : null}
+            {cat.icon && <cat.icon size={16} aria-hidden="true" />}
           </span>
             {cat.label}
           </button>

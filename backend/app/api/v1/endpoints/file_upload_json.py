@@ -36,7 +36,7 @@ async def upload_file_json(
     request: FileUploadRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+        require_roles("Admin", "Doctor", "Nurse")
     ),
 ):
     """Загрузка файла через JSON (base64)"""

@@ -47,6 +47,12 @@ except Exception:
     # If import fails the project is misconfigured; leave User unresolved to raise early.
     User = None  # type: ignore
 
+# import TokenBlacklist model (blacklist check is fused into the user query)
+try:
+    from app.models.authentication import TokenBlacklist  # type: ignore
+except Exception:
+    TokenBlacklist = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 # Document the 2FA-aware canonical login endpoint in OpenAPI.
@@ -81,42 +87,23 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return encoded_jwt
 
 
-def _username_from_token(token: str) -> str | None:
+def _subject_from_payload(payload: dict) -> str | None:
     """
-    Decode JWT and extract username claim. Returns None if invalid.
-    Tries 'username' field first, then falls back to 'sub' if it's a string.
+    Extract the lookup subject from an already-decoded JWT payload.
+
+    Prefers the 'username' claim (set by the canonical 2FA login), then
+    falls back to 'sub' which may be a username or a numeric user id
+    string. Returns None when neither claim is a string.
     """
-    try:
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[getattr(settings, "ALGORITHM", "HS256")],
-        )
+    username = payload.get("username")
+    if isinstance(username, str):
+        return username
 
-        # Сначала пробуем поле 'username'
-        username = payload.get("username")
-        if isinstance(username, str):
-            return username
+    sub = payload.get("sub")
+    if isinstance(sub, str):
+        return sub
 
-        # Fallback на 'sub' - может быть username или ID
-        sub = payload.get("sub")
-        if isinstance(sub, str):
-            # Если sub содержит @, то это username
-            if '@' in sub:
-                return sub
-            # Если sub содержит только цифры, то это ID как строка - возвращаем для поиска по ID
-            elif sub.isdigit():
-                return sub
-            else:
-                return sub
-
-        return None
-    except JWTError as e:
-        logger.warning(
-            "_username_from_token: JWT decode error (%s)",
-            type(e).__name__,
-        )
-        return None
+    return None
 
 
 async def _get_user_by_username(db, username: str) -> User | None:
@@ -201,6 +188,63 @@ async def _get_user_by_id(db, user_id: int) -> User | None:
             return None
 
 
+async def _get_user_with_blacklist(
+    db,
+    jti: str | None,
+    user_id: int | None = None,
+    username: str | None = None,
+) -> tuple[User | None, bool]:
+    """
+    Load the user and check the token blacklist in ONE SQL roundtrip.
+
+    Perf (#2772): the previous flow ran up to 3 sequential SELECTs per
+    authenticated request (user fetch + blacklist by jti + blacklist
+    "all_user_tokens" sentinel) — ~1.2s of RTT against the remote
+    Supabase Postgres. Both blacklist checks are now EXISTS columns on
+    the same query. The returned User is a fully-loaded session-attached
+    ORM instance, so endpoint-side semantics are unchanged.
+
+    Returns (user, blacklisted); user is None when the user is not found.
+    """
+    if db is None or TokenBlacklist is None:
+        return None, False
+
+    if user_id is not None:
+        subject_filter = User.id == user_id
+    elif username is not None:
+        subject_filter = User.username == username
+    else:
+        return None, False
+
+    jti_bl = select(TokenBlacklist.id).where(TokenBlacklist.jti == jti).exists()
+    sentinel_bl = (
+        select(TokenBlacklist.id)
+        .where(
+            TokenBlacklist.user_id == User.id,  # correlated with the outer users row
+            TokenBlacklist.reason.like("all_user_tokens:%"),
+            TokenBlacklist.expires_at > datetime.now(UTC),
+        )
+        .exists()
+    )
+    stmt = select(
+        User,
+        jti_bl.label("jti_bl"),
+        sentinel_bl.label("sentinel_bl"),
+    ).where(subject_filter)
+
+    execute_callable = getattr(db, "execute", None)
+    if inspect.iscoroutinefunction(execute_callable):
+        row = (await db.execute(stmt)).first()
+    else:
+        row = db.execute(stmt).first()
+
+    if row is None:
+        return None, False
+
+    found_user, jti_hit, sentinel_hit = row
+    return found_user, bool(jti_hit or sentinel_hit)
+
+
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db=Depends(get_db),
@@ -209,10 +253,30 @@ async def get_current_user(
     Dependency that returns the current authenticated User.
     Works with either async or sync DB sessions returned by get_db().
     Raises 401 on invalid token or missing user.
+
+    Perf (#2772): user fetch and token blacklist check (jti + all-user
+    sentinel) run as ONE SQL roundtrip via _get_user_with_blacklist —
+    same semantics as the previous up-to-3 sequential SELECTs.
     """
-    # Пытаемся декодировать токен и поддержать оба варианта: username или числовой sub (user_id)
-    username = _username_from_token(token)
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[getattr(settings, "ALGORITHM", "HS256")],
+        )
+    except JWTError as jwt_error:
+        logger.debug(
+            "get_current_user: JWT decode error (%s)",
+            type(jwt_error).__name__,
+        )
+        payload = {}
+
+    # Пытаемся поддержать оба варианта: username или числовой sub (user_id)
+    username = _subject_from_payload(payload)
+    sub = payload.get("sub")
+    jti = payload.get("jti")
     user: User | None = None
+    blacklisted = False
 
     try:
         if username:
@@ -223,47 +287,39 @@ async def get_current_user(
             # Если username содержит только цифры, то это ID
             if username.isdigit():
                 logger.debug("get_current_user: primary subject is numeric")
-                user = await _get_user_by_id(db, int(username))
+                user, blacklisted = await _get_user_with_blacklist(
+                    db, jti=jti, user_id=int(username)
+                )
             else:
                 logger.debug("get_current_user: primary subject is text")
-                user = await _get_user_by_username(db, username)
+                user, blacklisted = await _get_user_with_blacklist(
+                    db, jti=jti, username=username
+                )
             logger.debug(
                 "get_current_user: primary lookup found_user=%s",
                 user is not None,
             )
         else:
-            logger.debug("get_current_user: no username, trying payload fallback")
+            logger.debug(
+                "get_current_user: no username claim, falling back to sub (%s)",
+                _token_subject_kind(sub),
+            )
             # Падаем обратно на извлечение sub и поиск по ID
-            try:
-                payload = jwt.decode(
-                    token,
-                    settings.SECRET_KEY,
-                    algorithms=[getattr(settings, "ALGORITHM", "HS256")],
+            if isinstance(sub, str) and sub.isdigit():
+                logger.debug("get_current_user: fallback sub is numeric")
+                user, blacklisted = await _get_user_with_blacklist(
+                    db, jti=jti, user_id=int(sub)
                 )
-                sub = payload.get("sub")
-                logger.debug(
-                    "get_current_user: fallback sub kind=%s",
-                    _token_subject_kind(sub),
+            elif isinstance(sub, int):
+                logger.debug("get_current_user: fallback sub is numeric")
+                user, blacklisted = await _get_user_with_blacklist(
+                    db, jti=jti, user_id=sub
                 )
-                if isinstance(sub, str) and sub.isdigit():
-                    logger.debug("get_current_user: fallback sub is numeric")
-                    user = await _get_user_by_id(db, int(sub))
-                elif isinstance(sub, int):
-                    logger.debug("get_current_user: fallback sub is numeric")
-                    user = await _get_user_by_id(db, sub)
-                elif isinstance(sub, str):
-                    logger.debug("get_current_user: fallback sub is text")
-                    user = await _get_user_by_username(db, sub)
-                logger.debug(
-                    "get_current_user: fallback lookup found_user=%s",
-                    user is not None,
+            elif isinstance(sub, str):
+                logger.debug("get_current_user: fallback sub is text")
+                user, blacklisted = await _get_user_with_blacklist(
+                    db, jti=jti, username=sub
                 )
-            except JWTError as jwt_error:
-                logger.debug(
-                    "get_current_user: JWT decode error (%s)",
-                    type(jwt_error).__name__,
-                )
-                user = None
     except Exception as e:
         logger.warning(
             "get_current_user: validation failed (%s)",
@@ -284,41 +340,15 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Check token blacklist (jti-based revocation)
-    try:
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[getattr(settings, "ALGORITHM", "HS256")],
-        )
-        jti = payload.get("jti")
-        # sub может быть числовым user_id или username; извлекаем user_id если возможно
-        sub = payload.get("sub")
-        token_user_id: int | None = None
-        if isinstance(sub, str) and sub.isdigit():
-            token_user_id = int(sub)
-        elif isinstance(sub, int):
-            token_user_id = sub
-        elif user is not None:
-            token_user_id = getattr(user, "id", None)
-        if jti:
-            from app.services.token_blacklist_service import TokenBlacklistService
-            if TokenBlacklistService.is_token_blacklisted(db, jti, user_id=token_user_id):
-                logger.warning(
-                    "[deps.get_current_user] token jti=%s is blacklisted (revoked)",
-                    jti,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token has been revoked",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-    except HTTPException:
-        raise
-    except Exception as blacklist_err:
+    if blacklisted:
         logger.warning(
-            "[deps.get_current_user] blacklist check failed (non-blocking): %s",
-            blacklist_err,
+            "[deps.get_current_user] token jti=%s is blacklisted (revoked)",
+            jti,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     logger.debug(
@@ -438,7 +468,9 @@ def require_doctor_or_admin(request: Request) -> User:
 def require_staff(request: Request) -> User:
     """Требует сотрудника клиники"""
     user = require_active_user(request)
-    if user.role not in ["Admin", "Doctor", "Nurse", "Receptionist"]:
+    # E-4 (Receptionist alias removal): the legacy spelling dropped —
+    # canonical vocabulary only (stored Receptionist rows = 0, §4.1.27).
+    if user.role not in ["Admin", "Doctor", "Nurse"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Требуются права сотрудника клиники",

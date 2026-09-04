@@ -11,6 +11,7 @@ from sqlalchemy import MetaData, Table, select, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
 from app.models.clinic import Doctor
 from app.models.visit import Visit
 from app.services.visit_state_checks import (
@@ -22,7 +23,17 @@ from app.services.visits_api_service import VisitsApiService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-VISIT_READ_ROLES = ("Admin", "Registrar", "Doctor", "Cashier", "Lab", "Nurse")
+# RBAC unification (D-3): admit the whole doctor family, not only the exact
+# "Doctor" spelling — legacy doctor accounts (cardio/derma/dentist/...) must
+# get the same treatment EMR v2 and the specialist panels already give them.
+VISIT_READ_ROLES = (
+    "Admin",
+    "Registrar",
+    *DOCTOR_FAMILY_GATE_ROLES,
+    "Cashier",
+    "Lab",
+    "Nurse",
+)
 
 
 # Pydantic fallbacks (если полноценные схемы уже есть в app.schemas, в следующих шагах заменим)
@@ -73,14 +84,19 @@ class VisitWithServices(BaseModel):
 def _visits(db: Session) -> Table:
     """
     Return reflected visits table. Использует autoload_with, не bind.
+
+    Perf (2026-09-03): shares the process-level _REFLECTED_META cache —
+    per-call MetaData() re-reflected the schema on every request.
     """
-    md = MetaData()
-    return Table("visits", md, autoload_with=db.get_bind())
+    from app.services.visits_api_service import _REFLECTED_META
+
+    return Table("visits", _REFLECTED_META, autoload_with=db.get_bind())
 
 
 def _vservices(db: Session) -> Table:
-    md = MetaData()
-    return Table("visit_services", md, autoload_with=db.get_bind())
+    from app.services.visits_api_service import _REFLECTED_META
+
+    return Table("visit_services", _REFLECTED_META, autoload_with=db.get_bind())
 
 
 def _isValid_time_str(value: str) -> bool:
@@ -127,7 +143,7 @@ def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user) -> None
         current_user, "is_superuser", False
     ):
         return
-    if getattr(current_user, "role", None) != "Doctor":
+    if not is_doctor_role_spelling(getattr(current_user, "role", None)):
         return
 
     doctor = (
@@ -178,7 +194,7 @@ def _ensure_doctor_can_create_visit_for_payload(
         current_user, "is_superuser", False
     ):
         return
-    if getattr(current_user, "role", None) != "Doctor":
+    if not is_doctor_role_spelling(getattr(current_user, "role", None)):
         return
 
     doctor_id = getattr(payload, "doctor_id", None)
@@ -199,7 +215,7 @@ def list_visits(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(*VISIT_READ_ROLES)),
 ):
-    if getattr(current_user, "role", None) == "Doctor":
+    if is_doctor_role_spelling(getattr(current_user, "role", None)):
         if doctor_id is None:
             raise HTTPException(status_code=403, detail="Access denied")
         if doctor_id not in _doctor_allowed_visit_doctor_ids(db, current_user):
@@ -220,14 +236,14 @@ def list_visits(
     "/visits",
     response_model=VisitOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_roles("Admin", "Registrar", "Doctor"))],
+    dependencies=[Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES))],
     summary="Создать визит",
 )
 def create_visit(
     request: Request,
     payload: VisitCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles("Admin", "Registrar", "Doctor")),
+    current_user = Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
     _ensure_doctor_can_create_visit_for_payload(db, payload, current_user)
     result = VisitsApiService(db).create_visit(
@@ -267,7 +283,7 @@ def add_service(
     visit_id: int,
     item: VisitServiceIn,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin", "Registrar", "Doctor", "Cashier")),
+    current_user=Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Cashier")),
 ):
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
@@ -285,7 +301,7 @@ def set_status(
     visit_id: int,
     status_new: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin", "Doctor", "Registrar")),
+    current_user=Depends(require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES, "Registrar")),
 ):
     # H-3 (Launch Blockers Audit): visit state machine.
     # Previously this endpoint validated ONLY the target status (it

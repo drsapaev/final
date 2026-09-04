@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
   Select,
   MacOSTab,
-  Table,
   AppEmpty,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import type { SelectChangeEvent } from '../ui/macos/Select';
 import {
   Brain,
@@ -282,7 +282,7 @@ const AIAnalytics = () => {
   <div className="ai-analytics-tab-content">
       {/* Сводка */}
       {usageSummary &&
-    <MacOSCard className="ai-analytics-card-padded">
+    <Card className="ai-analytics-card-padded">
           <div className="ai-analytics-section-header">
             <h3 className="ai-analytics-h3">
               <Activity style={{ width: '20px', height: '20px' }} />
@@ -357,11 +357,11 @@ const AIAnalytics = () => {
               </div>
             </div>
       }
-        </MacOSCard>
+        </Card>
     }
 
       {/* Быстрые действия */}
-      <MacOSCard className="ai-analytics-card-padded">
+      <Card className="ai-analytics-card-padded">
         <h3 className="ai-analytics-h3-mb16">
           <Settings style={{ width: '20px', height: '20px' }} />
           {t('misc.aia_quick_actions')}
@@ -404,7 +404,7 @@ const AIAnalytics = () => {
             {t('misc.aia_compare_models_btn')}
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
@@ -413,7 +413,7 @@ const AIAnalytics = () => {
       {usageAnalytics &&
     <>
           {/* Общая статистика */}
-          <MacOSCard className="ai-analytics-card-padded">
+          <Card className="ai-analytics-card-padded">
             <h3 className="ai-analytics-h3-mb16">
               <BarChart3 style={{ width: '20px', height: '20px' }} />
               {t('misc.aia_usage_stats_title', { start: usageAnalytics.period?.start_date, end: usageAnalytics.period?.end_date })}
@@ -451,11 +451,11 @@ const AIAnalytics = () => {
                 <div className="ai-analytics-stat-label-xs">{t('misc.aia_costs')}</div>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Разбивка по функциям */}
           {Object.keys(usageAnalytics.function_breakdown ?? {}).length > 0 &&
-      <MacOSCard className="ai-analytics-card-padded">
+      <Card className="ai-analytics-card-padded">
               <h3 className="ai-analytics-h3-mb16">
                 {t('misc.aia_by_ai_functions')}
               </h3>
@@ -483,12 +483,12 @@ const AIAnalytics = () => {
                   </div>
           )}
               </div>
-            </MacOSCard>
+            </Card>
       }
 
           {/* Рекомендации */}
           {usageAnalytics.recommendations && usageAnalytics.recommendations.length > 0 &&
-      <MacOSCard className="ai-analytics-card-padded">
+      <Card className="ai-analytics-card-padded">
               <h3 className="ai-analytics-h3-mb16">
                 {t('misc.aia_optimization_recommendations')}
               </h3>
@@ -504,7 +504,7 @@ const AIAnalytics = () => {
                   </div>
           )}
               </div>
-            </MacOSCard>
+            </Card>
       }
         </>
     }
@@ -531,7 +531,7 @@ const AIAnalytics = () => {
     <>
           {/* Медицинские паттерны */}
           {learningInsights.medical_patterns &&
-      <MacOSCard className="ai-analytics-card-padded">
+      <Card className="ai-analytics-card-padded">
               <h4 className="ai-analytics-h4">
                 {t('misc.aia_medical_patterns')}
               </h4>
@@ -573,12 +573,12 @@ const AIAnalytics = () => {
                   </div>
                 </div>
         }
-            </MacOSCard>
+            </Card>
       }
 
           {/* Точность диагностики */}
           {learningInsights.diagnostic_accuracy &&
-      <MacOSCard className="ai-analytics-card-padded">
+      <Card className="ai-analytics-card-padded">
               <h4 className="ai-analytics-h4">
                 {t('misc.aia_diagnostic_accuracy')}
               </h4>
@@ -603,12 +603,12 @@ const AIAnalytics = () => {
                   <div className="ai-analytics-stat-label-xs">{t('misc.aia_agreement_rate')}</div>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       }
 
           {/* Рекомендации для обучения */}
           {learningInsights.learning_recommendations &&
-      <MacOSCard className="ai-analytics-card-padded">
+      <Card className="ai-analytics-card-padded">
               <h4 className="ai-analytics-h4">
                 {t('misc.aia_learning_recommendations')}
               </h4>
@@ -624,7 +624,7 @@ const AIAnalytics = () => {
                   </div>
           )}
               </div>
-            </MacOSCard>
+            </Card>
       }
         </>
     }
@@ -650,7 +650,7 @@ const AIAnalytics = () => {
       {costAnalysis &&
     <>
           {/* Сводка затрат */}
-          <MacOSCard className="ai-analytics-card-padded">
+          <Card className="ai-analytics-card-padded">
             <h4 className="ai-analytics-h4">
               {t('misc.aia_cost_summary')}
             </h4>
@@ -675,11 +675,11 @@ const AIAnalytics = () => {
                 <div className="ai-analytics-stat-label-xs">{t('misc.aia_month_forecast')}</div>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Затраты по функциям */}
           {costAnalysis.function_costs && Object.keys(costAnalysis.function_costs).length > 0 &&
-      <MacOSCard className="ai-analytics-card-padded">
+      <Card className="ai-analytics-card-padded">
               <h4 className="ai-analytics-h4">
                 {t('misc.aia_cost_by_function')}
               </h4>
@@ -707,12 +707,12 @@ const AIAnalytics = () => {
                   </div>
           )}
               </div>
-            </MacOSCard>
+            </Card>
       }
 
           {/* Рекомендации по оптимизации затрат */}
           {costAnalysis.cost_optimization?.recommendations &&
-      <MacOSCard className="ai-analytics-card-padded">
+      <Card className="ai-analytics-card-padded">
               <h4 className="ai-analytics-h4">
                 {t('misc.aia_cost_optimization')}
               </h4>
@@ -738,7 +738,7 @@ const AIAnalytics = () => {
                   </div>
           )}
               </div>
-            </MacOSCard>
+            </Card>
       }
         </>
     }
@@ -764,12 +764,12 @@ const AIAnalytics = () => {
       {modelComparison &&
     <>
           {/* Сравнительная таблица */}
-          <MacOSCard className="ai-analytics-card-padded">
+          <Card className="ai-analytics-card-padded">
             <h4 className="ai-analytics-h4">
               {t('misc.aia_comparison_for_function', { func: modelComparison.function })}
             </h4>
             
-            <Table
+            <DataTable
           columns={[
           { key: 'model', label: t('misc.aia_col_model'), width: '20%' },
           { key: 'accuracy', label: t('misc.aia_col_accuracy'), width: '15%', align: 'center' },
@@ -794,10 +794,10 @@ const AIAnalytics = () => {
 
           } />
 
-          </MacOSCard>
+          </Card>
 
           {/* Рекомендации */}
-          <MacOSCard className="ai-analytics-card-padded">
+          <Card className="ai-analytics-card-padded">
             <h4 className="ai-analytics-h4">
               {t('misc.aia_recommendations')}
             </h4>
@@ -829,7 +829,7 @@ const AIAnalytics = () => {
                 </div>
           )}
             </div>
-          </MacOSCard>
+          </Card>
         </>
     }
     </div>;
@@ -852,7 +852,7 @@ const AIAnalytics = () => {
       </div>
 
       {/* Фильтры */}
-      <MacOSCard className="ai-analytics-card-padded-sm">
+      <Card className="ai-analytics-card-padded-sm">
         <div className="ai-analytics-filter-grid">
           <div>
             <label className="ai-analytics-filter-label">
@@ -903,7 +903,7 @@ const AIAnalytics = () => {
             </Button>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Вкладки */}
       <MacOSTab

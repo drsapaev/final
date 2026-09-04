@@ -417,7 +417,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
                 db.query(UserSession).filter(
                     UserSession.user_id == token_obj.user_id,
                     UserSession.revoked == False,
-                ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
+                ).update({"revoked": True})
                 db.commit()
                 from app.services.token_blacklist_service import token_blacklist_service
                 token_blacklist_service.blacklist_all_user_tokens(
@@ -514,11 +514,12 @@ class TokensMixin(AuthenticationServiceMixinBase):
                     {"revoked": True, "revoked_at": datetime.now(UTC)}
                 )
 
-                # Деактивируем все сессии (модель использует `revoked`, не `is_active`)
+                # Деактивируем все сессии (модель использует `revoked`, не `is_active`;
+                # поля revoked_at у UserSession нет — см. #2924)
                 db.query(UserSession).filter(
                     UserSession.user_id == user_id,
                     UserSession.revoked == False,
-                ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
+                ).update({"revoked": True})
 
                 db.commit()
 
@@ -607,13 +608,15 @@ class TokensMixin(AuthenticationServiceMixinBase):
             )
 
             # Revoke all active user sessions
+            # (UserSession has no revoked_at column — see #2924; writing it here
+            # raised CompileError and rolled back the whole revocation)
             session_count = (
                 db.query(UserSession)
                 .filter(
                     UserSession.user_id == user_id,
                     UserSession.revoked == False,
                 )
-                .update({"revoked": True, "revoked_at": now})
+                .update({"revoked": True})
             )
 
             db.commit()

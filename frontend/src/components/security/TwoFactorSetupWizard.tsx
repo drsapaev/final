@@ -17,6 +17,11 @@ import {
 import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
 import { Button, Input } from '../ui/macos';
+import {
+  UZ_PHONE_PREFIX,
+  normalizePhoneInput,
+  validatePhone,
+} from '../auth/phoneInput';
 
 /**
  * Мастер настройки двухфакторной аутентификации (TOTP).
@@ -54,6 +59,7 @@ const TwoFactorSetupWizard = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryPhone, setRecoveryPhone] = useState('');
   const [setupData, setSetupData] = useState<Record<string, unknown> | null>(null);
   const [code, setCode] = useState('');
   const [showSecret, setShowSecret] = useState(false);
@@ -76,6 +82,8 @@ const TwoFactorSetupWizard = ({
     try {
       const response = (await api.post('/2fa/setup', {
         recovery_email: recoveryEmail || null,
+        // Канонический '+998XXXXXXXXX' или null — пустое поле не шлём
+        recovery_phone: validatePhone(recoveryPhone) ? recoveryPhone : null,
         ...(enrollmentToken ? { enrollment_token: enrollmentToken } : {}),
       })) as unknown as AxiosLike;
       const data = response.data;
@@ -291,6 +299,28 @@ const TwoFactorSetupWizard = ({
               value={recoveryEmail}
               onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRecoveryEmail(e.target.value)}
               placeholder="recovery@example.com"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="tfsw-recovery-phone"
+              className="block"
+              style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)' as CSSProperties['fontWeight'], marginBottom: 'var(--mac-spacing-2)', color: 'var(--mac-text-primary)' }}
+            >
+              {t('misc.tfsw_label_recovery_phone')}
+            </label>
+            <Input
+              id="tfsw-recovery-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              aria-label="2FA recovery phone"
+              value={recoveryPhone}
+              onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                setRecoveryPhone(normalizePhoneInput(e.target.value))
+              }
+              placeholder={UZ_PHONE_PREFIX}
+              maxLength={13}
             />
           </div>
           {renderError()}

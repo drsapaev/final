@@ -112,9 +112,7 @@ const fileChecks = [
   ['src/components/common/ErrorBoundary.jsx', 'Error Boundary'],
   ['src/components/common/Toast.jsx', 'Toast система'],
   ['src/components/common/Loading.jsx', 'Loading компоненты'],
-  ['src/components/common/Modal.jsx', 'Modal система'],
   ['src/components/common/Form.jsx', 'Form система'],
-  ['src/components/common/Table.jsx', 'Table компонент'],
   ['src/components/common/RoleGuard.jsx', 'Role Guard'],
   ['src/components/common/index.js', 'Экспорты компонентов'],
   
@@ -129,7 +127,6 @@ const fileChecks = [
   ['src/utils/frontendAudit.js', 'Frontend Audit'],
   
   // Тесты
-  ['src/components/test/ComponentTest.jsx', 'Component Test'],
   ['src/test/integration.test.js', 'Integration Tests']
 ];
 
@@ -163,14 +160,8 @@ const contentChecks = [
   // Loading компоненты
   ['src/components/common/Loading.jsx', ['Loading', 'ButtonLoading', 'useLoading'], 'Loading компоненты'],
   
-  // Modal система
-  ['src/components/common/Modal.jsx', ['ModalProvider', 'useModal', 'openModal'], 'Modal система'],
-  
   // Form система
   ['src/components/common/Form.jsx', ['FormProvider', 'useForm', 'FormField'], 'Form система'],
-  
-  // Table компонент
-  ['src/components/common/Table.jsx', ['Table', 'sortable', 'pagination'], 'Table компонент'],
   
   // Role Guard
   ['src/components/common/RoleGuard.jsx', ['RoleGuard', 'useRoleAccess', 'hasRole'], 'Role Guard']

@@ -27,6 +27,7 @@ import Setup from './pages/Setup';
 import { useSetupStatus } from './hooks/useSetupStatus';
 import { useBreakpoint } from './hooks/useEnhancedMediaQuery';
 import auth from './stores/auth';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import { ROUTE_REGISTRY } from './routing/routeRegistry';
 import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards';
 import { getRouteChromeState, type RouteProfile } from './routing/routeSelectors';
@@ -53,7 +54,6 @@ const QueueJoin = lazy(() => import('./pages/QueueJoin'));
 const PatientPanel = lazy(() => import('./pages/PatientPanel'));
 const DisplayBoardUnified = lazy(() => import('./pages/DisplayBoardUnified'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
-const MediLabDemo = lazy(() => import('./pages/MediLabDemo'));
 const CSSTestPage = lazy(() => import('./pages/CSSTestPage'));
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
 const PaymentCancel = lazy(() => import('./pages/PaymentCancel'));
@@ -94,6 +94,7 @@ const IntegrationDemo = lazy(() => import('./components/integration/IntegrationD
 
 const ROUTE_COMPONENTS = {
   Landing,
+  ResetPasswordPage,
   LoginFormStyled,
   ChangePasswordRequired,
   Health,
@@ -124,7 +125,6 @@ const ROUTE_COMPONENTS = {
   Search,
   UserProfile,
   PatientPickupView,
-  MediLabDemo,
   MacOSDemoPage,
   IntegrationDemo,
   PaymentTest,

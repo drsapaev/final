@@ -100,7 +100,15 @@ const PaymentCancel = () => {
           <Typography id="payment-cancel-title" variant="h4" color="warning" gutterBottom>
             Платеж не завершен
           </Typography>
-          <Typography id="payment-cancel-reason" variant="h6" color="textSecondary">
+          {/* CC-5 (UI color-contrast track): the status card carries the
+              warning TINT background (var(--mac-warning-bg)); MUI
+              textSecondary resolved to #8e8e93 on it — 1.59:1 in dark
+              (axe color-contrast, e2e/a11y-baseline.json payment-cancel:dark).
+              Primary ink flips with the theme and passes on the tint in both. */}
+          <Typography
+            id="payment-cancel-reason"
+            variant="h6"
+            style={{ color: 'var(--mac-text-primary)' }}>
             {getReason()}
           </Typography>
         </CardContent>

@@ -130,7 +130,10 @@ def test_migrate_users_preserves_ids_and_inserts_missing_rows(tmp_path):
         ).fetchall()
 
     assert rows == [
-        (20, "registrar@example.com", "registrar@example.com", "Receptionist", 0),
+        # REC-1 write-freeze (Codex review P1, PR #3025): the legacy source
+        # row keeps its original 'Receptionist' spelling (legacy READ
+        # accepted), but the migration must WRITE the canonical 'Registrar'.
+        (20, "registrar@example.com", "registrar@example.com", "Registrar", 0),
         (21, "doctor@example.com", "doctor@example.com", "Doctor", 1),
     ]
 
@@ -196,5 +199,8 @@ def test_migrate_users_updates_existing_user_without_duplication(tmp_path):
         ).one()
         user_count = connection.execute(text("SELECT COUNT(*) FROM users")).scalar_one()
 
-    assert registrar == (3, "Registrar", "hash-registrar", "Receptionist", 1)
+    # REC-1 write-freeze (Codex review P1, PR #3025): the UPDATE path must
+    # store the canonical 'Registrar' even though the legacy source row
+    # spells the role 'Receptionist'.
+    assert registrar == (3, "Registrar", "hash-registrar", "Registrar", 1)
     assert user_count == 2

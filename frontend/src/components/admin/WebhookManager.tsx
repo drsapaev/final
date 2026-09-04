@@ -27,7 +27,7 @@ import {
   UserPlus } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   SegmentedControl,
@@ -148,7 +148,18 @@ const WebhookManager = () => {
     };
 
     loadData();
-  }, [loadWebhooks, loadSystemStats]);
+    // AXE-EXP-1 determinism fix: mount-only load. The i18n wrapper
+    // (i18n/useTranslation.ts) creates a NEW t identity on every render,
+    // so loadWebhooks (useCallback deps [t]) changes identity per render
+    // and this effect re-fired on EVERY render → infinite async load
+    // loop (loading↔loaded flicker + unbounded /webhooks/ polling; each
+    // cycle awaits a promise, so React's nested-update detector never
+    // fires). Detected by the a11y-axe-authenticated gate probe: the
+    // /admin/webhooks surface oscillated forever and no axe audit could
+    // be deterministic. Explicit refresh buttons keep calling
+    // loadWebhooks()/loadSystemStats() directly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Действия с webhook'ами
   const handleActivateWebhook = async (webhookId: string | number) => {
@@ -336,7 +347,7 @@ const WebhookManager = () => {
       {activeTab === 'webhooks' &&
       <div className="flex flex-col gap-4">
           {/* Фильтры */}
-          <MacOSCard className="p-4">
+          <Card className="p-4">
             <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
@@ -396,12 +407,12 @@ const WebhookManager = () => {
                 </Button>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Список webhook'ов */}
           <div className="flex flex-col gap-4">
             {filteredWebhooks.map((webhook) =>
-          <MacOSCard key={String(webhook.id ?? "")} className="p-6">
+          <Card key={String(webhook.id ?? "")} className="p-6">
                 <div className="admin-flex-ai-start-jc-between">
                   <div className="admin-flex-1">
                     <div className="admin-flex-ai-center-gap-12-mb-8">
@@ -521,7 +532,7 @@ const WebhookManager = () => {
                     </Button>
                   </div>
                 </div>
-              </MacOSCard>
+              </Card>
           )}
           </div>
 
@@ -566,7 +577,7 @@ const WebhookManager = () => {
           </div>
 
           {/* Фильтры для вызовов */}
-          <MacOSCard className="p-4">
+          <Card className="p-4">
             <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
@@ -603,12 +614,12 @@ const WebhookManager = () => {
 
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Список вызовов */}
           <div className="flex flex-col gap-2">
             {calls.map((call) =>
-          <MacOSCard key={call.id} className="p-4">
+          <Card key={call.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="admin-flex-1">
                     <div className="admin-flex-ai-center-gap-12-mb-8">
@@ -646,7 +657,7 @@ const WebhookManager = () => {
                 }
                   </div>
                 </div>
-              </MacOSCard>
+              </Card>
           )}
           </div>
 
@@ -711,7 +722,7 @@ const WebhookManager = () => {
           </div>
 
           {/* Список типов событий */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <h3 className="admin-lg-semi-primary-m-0016px0">
               {t('admin2.wh_event_types_heading')}
             </h3>
@@ -808,7 +819,7 @@ const WebhookManager = () => {
 
             })}
             </div>
-          </MacOSCard>
+          </Card>
         </div>
       }
 

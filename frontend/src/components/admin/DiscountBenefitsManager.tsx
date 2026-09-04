@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from "react";
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
@@ -659,12 +659,12 @@ const DiscountBenefitsManager = () => {
       </div>
 
       {showCreateForm &&
-    <MacOSCard className="p-0">
+    <Card className="p-0">
           <h4 className="admin-h4-md-semi-primary-mb-16">
             {t('admin2.disc_create_form_title')}
           </h4>
           {renderDiscountForm()}
-        </MacOSCard>
+        </Card>
     }
 
       <div className="admin-grid-gap-16">
@@ -681,7 +681,7 @@ const DiscountBenefitsManager = () => {
 
 
       discounts.map((discount) =>
-      <MacOSCard key={discount.id} className="p-0">
+      <Card key={discount.id} className="p-0">
               <div className="admin-flex-between-flex-start">
                 <div>
                   <h4 className="admin-h4-md-semi-primary-mb-8">
@@ -707,7 +707,7 @@ const DiscountBenefitsManager = () => {
                   <div>{t('admin2.disc_field_priority', { value: discount.priority })}</div>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       )
       }
       </div>
@@ -731,12 +731,12 @@ const DiscountBenefitsManager = () => {
       </div>
 
       {showCreateForm &&
-    <MacOSCard className="p-0">
+    <Card className="p-0">
           <h4 className="admin-h4-md-semi-primary-mb-16">
             {t('admin2.disc_create_benefit_form_title')}
           </h4>
           {renderBenefitForm()}
-        </MacOSCard>
+        </Card>
     }
 
       <div className="admin-grid-gap-16">
@@ -753,7 +753,7 @@ const DiscountBenefitsManager = () => {
 
 
       benefits.map((benefit) =>
-      <MacOSCard key={benefit.id} className="p-0">
+      <Card key={benefit.id} className="p-0">
               <div className="admin-flex-between-flex-start">
                 <div>
                   <h4 className="admin-h4-md-semi-primary-mb-8">
@@ -785,7 +785,7 @@ const DiscountBenefitsManager = () => {
                   {benefit.max_discount_amount && <div>{t('admin2.disc_field_max_discount', { value: benefit.max_discount_amount, currency: t('admin2.disc_currency') })}</div>}
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       )
       }
       </div>
@@ -809,12 +809,12 @@ const DiscountBenefitsManager = () => {
       </div>
 
       {showCreateForm &&
-    <MacOSCard className="p-0">
+    <Card className="p-0">
           <h4 className="admin-h4-md-semi-primary-mb-16">
             {t('admin2.disc_create_loyalty_form_title')}
           </h4>
           {renderLoyaltyForm()}
-        </MacOSCard>
+        </Card>
     }
 
       <div className="admin-grid-gap-16">
@@ -831,7 +831,7 @@ const DiscountBenefitsManager = () => {
 
 
       loyaltyPrograms.map((program) =>
-      <MacOSCard key={program.id} className="p-0">
+      <Card key={program.id} className="p-0">
               <div className="admin-flex-between-flex-start">
                 <div>
                   <h4 className="admin-h4-md-semi-primary-mb-8">
@@ -856,7 +856,7 @@ const DiscountBenefitsManager = () => {
                   <div>{t('admin2.disc_field_min_redeem', { value: program.min_points_to_redeem })}</div>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       )
       }
       </div>
@@ -874,7 +874,7 @@ const DiscountBenefitsManager = () => {
     <div className="admin-grid-auto-300">
           {/* Аналитика скидок */}
           {analytics.discounts &&
-      <MacOSCard className="p-0">
+      <Card className="p-0">
               <h4 className="admin-h4-md-semi-primary-mb-12-flex">
                 <TrendingUp size={16} />
                 {t('admin2.disc_analytics_discounts_title')}
@@ -890,12 +890,12 @@ const DiscountBenefitsManager = () => {
                   {t('admin2.disc_analytics_avg_discount_percent')} <span className="admin-text-med-primary">{analytics.discounts.average_discount_percentage?.toFixed(1)}%</span>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       }
 
           {/* Аналитика льгот */}
           {analytics.benefits &&
-      <MacOSCard className="p-0">
+      <Card className="p-0">
               <h4 className="admin-h4-md-semi-primary-mb-12-flex">
                 <Users size={16} />
                 {t('admin2.disc_analytics_benefits_title')}
@@ -911,12 +911,12 @@ const DiscountBenefitsManager = () => {
                   {t('admin2.disc_analytics_avg_benefit_percent')} <span className="admin-text-med-primary">{analytics.benefits.average_benefit_percentage?.toFixed(1)}%</span>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       }
 
           {/* Аналитика лояльности */}
           {analytics.loyalty &&
-      <MacOSCard className="p-0">
+      <Card className="p-0">
               <h4 className="admin-h4-md-semi-primary-mb-12-flex">
                 <DollarSign size={16} />
                 {t('admin2.disc_analytics_loyalty_title')}
@@ -935,7 +935,7 @@ const DiscountBenefitsManager = () => {
                   {t('admin2.disc_analytics_redemption_rate')} <span className="admin-text-med-primary">{analytics.loyalty.redemption_rate?.toFixed(1)}%</span>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       }
         </div> :
 

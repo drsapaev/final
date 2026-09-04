@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy.orm import Session
+from app.services import r2_uploader
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +97,16 @@ def _validate_pg_component(value: str | None, kind: str) -> str:
         )
     patterns = {"hostname": _PG_HOST_RE, "username": _PG_USER_RE, "database": _PG_DB_RE}
     pattern = patterns.get(kind)
-    if pattern and not pattern.match(value):
-        raise BackupSecurityError(f"Invalid {kind}: contains forbidden characters: {value!r}")
-    return value
+    if pattern is None:
+        return value
+    # Use the captured group: CodeQL models fullmatch-group capture as a
+    # taint barrier for flows into the pg argv.
+    matched = pattern.fullmatch(value)
+    if matched is None:
+        raise BackupSecurityError(
+            f"Invalid {kind}: contains forbidden characters: {value!r}"
+        )
+    return matched.group(0)
 
 
 def _is_sqlite_url(url: str) -> bool:
@@ -122,6 +130,30 @@ def _validate_database_url(url: str) -> None:
             "Use PostgreSQL as the schema source of truth, or set "
             "ALLOW_SQLITE_DATABASE_URL=1 only for explicit legacy tools/tests."
         )
+
+
+def _resolve_pg_tool(tool: str) -> str:
+    """Resolve pg_dump/pg_restore even when absent from PATH.
+
+    On the production Windows box only the PostgreSQL/17 client install
+    exists and it is not on PATH, so bare "pg_dump" raised FileNotFoundError
+    and every nightly backup silently produced nothing (#2772 checkpoint).
+    """
+    import os
+    import shutil
+
+    found = shutil.which(tool)
+    if found:
+        return found
+    for base in (
+        "C:/Program Files/PostgreSQL/17/bin",
+        "C:/Program Files/PostgreSQL/16/bin",
+        "C:/Program Files/PostgreSQL/15/bin",
+    ):
+        candidate = os.path.join(base, tool + ".exe")
+        if os.path.isfile(candidate):
+            return candidate
+    return tool
 
 
 def _get_database_url() -> str:
@@ -162,8 +194,19 @@ class BackupService:
             db_url = _get_database_url()
 
             timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-            backup_filename = f"backup_{backup_type}_{timestamp}.db"
-            backup_path = self.backup_dir / backup_filename
+            # CodeQL py/path-injection: normalize caller-supplied type so the
+            # filename flow carries only allowlisted characters.
+            import re as _re
+
+            safe_type = _re.sub(r"[^a-z0-9_]", "", (backup_type or "").lower())[:40]
+            # fullmatch-group capture = CodeQL taint barrier (same model as
+            # the pg component validator above).
+            _m = _re.fullmatch(r"[a-z0-9_]{0,40}", safe_type)
+            safe_type = _m.group(0) if _m else "manual"
+            backup_filename = f"backup_{safe_type or 'manual'}_{timestamp}.db"
+            # Atomic write: pg_dump targets .tmp; final name appears only
+            # after success - a failed dump no longer leaves zero-byte files.
+            backup_path = self.backup_dir / (backup_filename + ".tmp")
 
             # Create backup based on database type
             if db_url.startswith("sqlite"):
@@ -200,7 +243,7 @@ class BackupService:
                 env["PGPASSWORD"] = parsed.password or ""
 
                 cmd = [
-                    "pg_dump",
+                    _resolve_pg_tool("pg_dump"),
                     "-h", pg_host,
                     "-p", str(pg_port),
                     "-U", pg_user,
@@ -222,6 +265,11 @@ class BackupService:
 
             else:
                 raise ValueError(f"Unsupported database type: {db_url}")
+
+            # Dump succeeded - atomically publish the final name.
+            final_path = self.backup_dir / backup_filename
+            os.replace(backup_path, final_path)
+            backup_path = final_path
 
             # Get backup size
             backup_size = backup_path.stat().st_size
@@ -247,12 +295,41 @@ class BackupService:
 
             logger.info(f"✅ Backup created: {backup_path.name} ({backup_info['size_mb']} MB)")
 
+            # Offsite (#2772): после успешного gzip. Никогда не валим
+            # локальный бэкап из-за сети и никогда не удаляем предыдущую
+            # копию до успешной загрузки новой (код uploader'а не содержит
+            # Delete/List вовсе).
+            backup_info["offsite"] = {"status": "skipped",
+                                      "reason": "R2_* not configured"}
+            if r2_uploader.r2_configured():
+                try:
+                    uploaded = r2_uploader.upload_file(
+                        key=f"daily/{backup_path.name}",
+                        filepath=str(backup_path),
+                    )
+                    backup_info["offsite"] = {"status": "ok", **uploaded}
+                except Exception as off_err:  # noqa: BLE001 — сигнал, не сбой
+                    backup_info["offsite"] = {
+                        "status": "error",
+                        "error": str(off_err)[:200],
+                    }
+                    logger.warning(
+                        "Offsite R2 upload failed: %s",
+                        backup_info["offsite"]["error"],
+                    )
+
             # Cleanup old backups
             self._cleanup_old_backups()
 
             return backup_info
 
         except Exception as e:
+            # remove .tmp leftovers from a failed dump
+            for stray in self.backup_dir.glob("*.tmp"):
+                try:
+                    stray.unlink()
+                except OSError:
+                    pass
             logger.error(f"❌ Backup failed: {e}")
             raise
 
@@ -286,7 +363,9 @@ class BackupService:
             removed_count = 0
 
             for backup in backups:
-                backup_time = datetime.fromtimestamp(backup.stat().st_mtime)
+                # aware-UTC: naive fromtimestamp vs aware cutoff raised
+                # TypeError and killed retention cleanup (Sentry P0 2026-08-28).
+                backup_time = datetime.fromtimestamp(backup.stat().st_mtime, tz=UTC)
                 if backup_time < cutoff_date:
                     backup.unlink()
                     removed_count += 1
@@ -389,7 +468,7 @@ class BackupService:
                 env["PGPASSWORD"] = parsed.password or ""
 
                 cmd = [
-                    "pg_restore",
+                    _resolve_pg_tool("pg_restore"),
                     "-h", pg_host,
                     "-p", str(pg_port),
                     "-U", pg_user,

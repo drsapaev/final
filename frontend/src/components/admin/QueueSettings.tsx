@@ -28,7 +28,7 @@ import {
   ToggleRight } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Input,
   Select,
@@ -60,6 +60,12 @@ interface QueueProfileDto {
   icon?: string;
   color?: string;
   queue_tags?: string[];
+  // D-1: canonical clinic_settings segment for this profile's
+  // start_number_*/max_per_day_* rows (backend-computed via
+  // core/specialties.canonical_specialty). The profile key itself may
+  // stay a legacy machinery value ("stomatology") while the settings
+  // rows live under the canonical "dentistry" after migration 0049.
+  settings_key?: string;
 }
 
 interface Specialty {
@@ -68,6 +74,9 @@ interface Specialty {
   icon: LucideIcon;
   color: string;
   description: string;
+  tags: string[];
+  // Settings reads AND edits use this key, never `key` (Codex round-3 P1).
+  settingsKey: string;
 }
 
 interface QueueSettingsState {
@@ -132,11 +141,22 @@ const getDoctorDisplayName = (doctor: DoctorRecord | null | undefined, t: Transl
 
 const pickCanonicalDoctorForSpecialty = (
   doctorsList: DoctorRecord[] | null | undefined,
-  specialtyKey: string
+  specialtyKey: string,
+  queueTags?: string[]
 ): { doctor: DoctorRecord | null; candidates: DoctorRecord[] } => {
-  const specialty = normalizeText(specialtyKey);
+  // D-1 canonical vocabulary: a doctor's stored specialty is canonical
+  // ('dentistry') while the queue profile key keeps its machinery value
+  // ('stomatology') — match against the profile key AND its queue_tags
+  // (which carry every accepted family spelling) instead of the key alone.
+  const accepted = new Set<string>([normalizeText(specialtyKey)]);
+  for (const tag of Array.isArray(queueTags) ? queueTags : []) {
+    const normalizedTag = normalizeText(tag);
+    if (normalizedTag) {
+      accepted.add(normalizedTag);
+    }
+  }
   const candidates = (Array.isArray(doctorsList) ? doctorsList : [])
-    .filter((doctor) => normalizeText(doctor?.specialty) === specialty)
+    .filter((doctor) => accepted.has(normalizeText(doctor?.specialty)))
     .sort((left, right) => {
       const leftScore = [
         left?.active === false ? 1 : 0,
@@ -201,7 +221,12 @@ const QueueSettings = () => {
         name: p.title_ru || p.title || p.key,
         icon: ICON_MAP[p.icon ?? ''] || Stethoscope,
         color: p.color || 'var(--mac-text-primary)',
-        description: (p.queue_tags || []).join(', ')
+        description: (p.queue_tags || []).join(', '),
+        tags: p.queue_tags || [],
+        // D-1: settings rows are keyed by the canonical specialty
+        // ("dentistry"), not by the profile machinery key
+        // ("stomatology"). Fall back to the key for older backends.
+        settingsKey: p.settings_key || p.key
       })));
 
       const doctorsData = (doctorsRes.data ?? []) as DoctorRecord[];
@@ -278,16 +303,16 @@ const QueueSettings = () => {
     }
   };
 
-  const testQueueGeneration = async (specialty: string) => {
+  const testQueueGeneration = async (specialty: Specialty) => {
     try {
       setTesting(true);
       setTestResult(null);
 
       // ⭐ SSOT: Выбираем врача детерминированно среди докторов этой специальности.
-      const { doctor, candidates } = pickCanonicalDoctorForSpecialty(doctors, specialty);
+      const { doctor, candidates } = pickCanonicalDoctorForSpecialty(doctors, specialty.key, specialty.tags);
 
       if (!doctor || !doctor.id) {
-        setMessage({ type: 'error', text: t('admin2.qs_doctor_not_found', { specialty }) });
+        setMessage({ type: 'error', text: t('admin2.qs_doctor_not_found', { specialty: specialty.name }) });
         setTesting(false);
         return;
       }
@@ -323,21 +348,21 @@ const QueueSettings = () => {
   if (loading) {
     return (
       <div className="admin-outer-container-p-0">
-        <MacOSCard className="admin-card-p-0-text-center">
+        <Card className="admin-card-p-0-text-center">
           <div className="admin-flex-center-justify admin-gap-12">
             <RefreshCw className="admin-icon-32-blue-spin" />
             <span className="admin-span-lg-secondary-med">
               {t('admin2.qs_loading')}
             </span>
           </div>
-        </MacOSCard>
+        </Card>
       </div>);
 
   }
 
   return (
     <div className="admin-outer-container-p-0">
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         {/* Заголовок */}
         <div className="admin-header-flex-between-pb-24-border-bottom">
           <div>
@@ -377,7 +402,7 @@ const QueueSettings = () => {
 
         {/* Сообщения */}
         {message.text &&
-        <MacOSCard
+        <Card
           className="admin-dynamic-banner-p-16 mb-6"
           style={{
             '--admin-banner-bg': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
@@ -397,11 +422,11 @@ const QueueSettings = () => {
                 {message.text}
               </span>
             </div>
-          </MacOSCard>
+          </Card>
         }
 
         {/* ⭐ Dev Mode Toggle */}
-        <MacOSCard
+        <Card
           className="admin-dev-mode-card"
           style={{
             '--admin-card-bg': settings.dev_mode_enabled ? 'var(--mac-error-bg)' : 'var(--mac-bg-secondary)',
@@ -448,12 +473,12 @@ const QueueSettings = () => {
               }
             </button>
           </div>
-        </MacOSCard>
+        </Card>
 
         <div className="admin-grid-auto-400-24-mb-24">
 
           {/* Общие настройки */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
               <Settings className="admin-icon-20-blue" />
               {t('admin2.qs_general')}
@@ -506,10 +531,10 @@ const QueueSettings = () => {
                 
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Тестирование */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
               <TestTube className="admin-icon-20-success" />
               {t('admin2.qs_testing')}
@@ -535,7 +560,7 @@ const QueueSettings = () => {
                   </div>
                   <Button
                   variant="outline"
-                  onClick={() => testQueueGeneration(specialty.key)}
+                  onClick={() => testQueueGeneration(specialty)}
                   disabled={testing}
                   title={`Test queue generation for ${specialty.name}`}
                   aria-label={`Test queue generation for ${specialty.name}`}
@@ -551,7 +576,7 @@ const QueueSettings = () => {
               )}
 
               {testResult &&
-              <MacOSCard className="admin-card-success-p-16">
+              <Card className="admin-card-success-p-16">
                   <h4 className="admin-h4-med-success-mb-8">
                     {t('admin2.qs_result_title')}
                   </h4>
@@ -567,16 +592,16 @@ const QueueSettings = () => {
                     <div><strong>{t('admin2.qs_label_candidates')}</strong> {testResult.matched_doctors_count ?? 0}</div>
                     <div><strong>QR URL:</strong> <code className="admin-code-success-xs">{testResult.qr_url}</code></div>
                   </div>
-                </MacOSCard>
+                </Card>
               }
             </div>
-          </MacOSCard>
+          </Card>
         </div>
 
         {/* Настройки по специальностям */}
         <div className="admin-grid-auto-280-24-mb-24">
           {specialties.map((specialty) =>
-          <MacOSCard key={specialty.key} className="admin-card-p-20">
+          <Card key={specialty.key} className="admin-card-p-20">
               <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
                 <specialty.icon className="admin-icon-20-blue" />
                 {specialty.name}
@@ -592,8 +617,8 @@ const QueueSettings = () => {
                   type="number"
                   min="1"
                   max="100"
-                  value={getNumberSetting(settings.start_numbers, specialty.key, 1)}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
+                  value={getNumberSetting(settings.start_numbers, specialty.settingsKey, 1)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`start_numbers.${specialty.settingsKey}`, parseInt(e.target.value))}
                   className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
@@ -610,8 +635,8 @@ const QueueSettings = () => {
                   type="number"
                   min="1"
                   max="100"
-                  value={getNumberSetting(settings.max_per_day, specialty.key, 1)}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
+                  value={getNumberSetting(settings.max_per_day, specialty.settingsKey, 1)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`max_per_day.${specialty.settingsKey}`, parseInt(e.target.value))}
                   className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
@@ -624,17 +649,17 @@ const QueueSettings = () => {
                   <div className="admin-flex-between-sm">
                     <span className="text-[var(--mac-text-secondary)]">{t('admin2.qs_range_label')}</span>
                     <div className="admin-range-badge">
-                      {getNumberSetting(settings.start_numbers, specialty.key, 1)} - {getNumberSetting(settings.start_numbers, specialty.key, 1) + getNumberSetting(settings.max_per_day, specialty.key, 1) - 1}
+                      {getNumberSetting(settings.start_numbers, specialty.settingsKey, 1)} - {getNumberSetting(settings.start_numbers, specialty.settingsKey, 1) + getNumberSetting(settings.max_per_day, specialty.settingsKey, 1) - 1}
                     </div>
                   </div>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
           )}
         </div>
 
         {/* Информационная панель */}
-        <MacOSCard className="admin-card-info-p-24">
+        <Card className="admin-card-info-p-24">
           <h3 className="admin-h3-lg-semi-info-mb-12-flex">
             <QrCode className="w-5 h-5" />
             {t('admin2.qs_info_title')}
@@ -646,8 +671,8 @@ const QueueSettings = () => {
             <p className="admin-m-0">{t('admin2.qs_info_4')}</p>
             <p className="admin-m-0">{t('admin2.qs_info_5')}</p>
           </div>
-        </MacOSCard>
-      </MacOSCard>
+        </Card>
+      </Card>
     </div>);
 
 };

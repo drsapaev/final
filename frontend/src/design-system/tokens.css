@@ -30,6 +30,28 @@
   --mac-text-primary: #000000;
   --mac-text-secondary: #455568;
   --mac-text-tertiary: #5d6f84;
+  /* AXE-EXP-2 (authorized-surface a11y track): ink for small text sitting
+   * ON a --mac-bg-tertiary surface (header search ⌘K hint chip, sidebar
+   * count badges, tertiary chips). Both secondary/tertiary inks fail WCAG
+   * AA on tertiary surfaces in one theme or the other (light: tertiary
+   * #5d6f84 on #d7e1ee = 3.9:1; dark: secondary #98989d on #3a3a3c =
+   * 3.95:1, tertiary #636366 = 1.89:1). Light value = text-secondary
+   * (#455568, 5.71:1 on #d7e1ee — no visual delta in light); dark value
+   * #c7c7cc = 6.74:1 on #3a3a3c.
+   * ELEV (elevated-debt closure): the dark secondary later moved to
+   * #a6a6ad (4.69:1 on #3a3a3c), so this token now carries headroom,
+   * not a floor — kept for semantic clarity and small-text margin. */
+  --mac-text-on-tertiary: #455568;
+  /* AXE-EXP-4 (authorized-surface a11y track): canonical dual-theme LINK
+   * ink — text-level accent usage (active tab labels, links) on neutral
+   * surfaces. The base accent fails BOTH themes as text: light #007aff =
+   * 4.02:1 on white / 3.6:1 on #eef3fa; dark #007aff = 4.23:1 on #1c1c1e.
+   * The CC-2 strong family can't serve dark text either (#0066d6 = 2.99:1
+   * on #1c1c1e). Light value = --mac-accent-blue-strong #0066d6 (5.42:1
+   * on white, 5.1:1 on #eef3fa); dark value = #5ac8fa (macOS light blue:
+   * 8.97:1 on #1c1c1e, 7.4:1 on #2c2c2e). Documented since CC-2 as the
+   * deferred link-ink latent class. */
+  --mac-link-ink: #0066d6;
 
   --mac-border: #b8c8da;
   --mac-border-secondary: #cad8e7;
@@ -37,6 +59,45 @@
   --mac-accent-blue: #007aff;
   --mac-accent-blue-hover: #0051d5;
   --mac-accent-blue-active: #004bb5;
+  /* CC-1 (UI color-contrast track): strong accent/danger/success values for
+   * surfaces that carry WHITE text (--mac-text-on-accent). The base accent
+   * #007aff measures 4.02:1 against white (below the WCAG AA 4.5:1 floor —
+   * axe color-contrast, e2e/a11y-baseline.json); #0066d6 measures 5.42:1.
+   * #ff453a → #d92c20 = 3.41 → 4.85:1; #30d158 → #147a38 = 2.02 → 6.14:1.
+   * Border/link/status chips keep the base accent values; only text-bearing
+   * fills use the strong variants. Used by QueueJoin recovery buttons here;
+   * Button.tsx variants and the macos class set follow in CC-2. */
+  --mac-accent-blue-strong: #0066d6;
+  --mac-danger-strong: #d92c20;
+  --mac-success-strong: #147a38;
+  /* CC-2: amber fill for white ink — #ff9f0a measures 2.06:1 against white;
+   * #a86200 measures 4.76:1. Same strong-family contract as above. */
+  --mac-warning-strong: #a86200;
+  /* CC-4 (UI color-contrast track): DisplayBoard theme palettes. The board
+   * renders on shared TVs and must NOT resolve through the app-theme
+   * tokens — its light/medical entries previously mixed constant dark ink
+   * with var(--mac-bg-primary)/var(--mac-text-secondary), which flip with
+   * the viewer's app theme and rendered 1.04:1 under a dark app (axe
+   * color-contrast, e2e/a11y-baseline.json display-board:dark). The values
+   * are exactly what those tokens resolved to in the light app, so the
+   * light rendering is pixel-identical. Referenced by DisplayBoardUnified.tsx
+   * themes; kept here (canonical token file) so TSX stays hex-free
+   * (ui-baseline ratchet: tsxHex / cssHexOutsideTokens). */
+  --displayboard-light-bg: linear-gradient(135deg, #e3ebf5 0%, #b8c8da 100%);
+  --displayboard-light-card: #eef3fa;
+  --displayboard-light-ink: #1a202c;
+  --displayboard-light-ink-muted: #455568;
+  --displayboard-light-border: #b8c8da;
+  --displayboard-dark-bg: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+  --displayboard-dark-card: #2d3748;
+  --displayboard-dark-ink: #f7fafc;
+  --displayboard-dark-ink-muted: #a0aec0;
+  --displayboard-dark-border: #4a5568;
+  --displayboard-medical-bg: linear-gradient(135deg, #f0fff4 0%, rgba(48, 209, 88, 0.12) 100%);
+  --displayboard-medical-card: #eef3fa;
+  --displayboard-medical-ink: #1a202c;
+  --displayboard-medical-ink-muted: #455568;
+  --displayboard-medical-border: #c6f6d5;
   --mac-accent-blue-500: var(--mac-accent-blue);
   --mac-accent-blue-600: var(--mac-accent-blue-hover);
   --mac-accent-blue-700: var(--mac-accent-blue-active);
@@ -181,8 +242,26 @@
     --mac-bg-quaternary: #48484a;
 
     --mac-text-primary: #ffffff;
-    --mac-text-secondary: #8e8e93;
+    /* CC-1: #8e8e93 → #98989d — muted ink was 4.27:1 on --mac-bg-content
+     * (#2c2c2e), below the WCAG AA 4.5:1 floor (axe color-contrast on the
+     * landing dark shell). #98989d measures 4.85:1 on #2c2c2e and 5.93:1 on
+     * #1c1c1e; on the translucent card surface it only improves.
+     * ELEV (elevated-debt closure, follow-up to the CC deviation note):
+     * #98989d measured only 3.95:1 on the elevated surface --mac-bg-tertiary
+     * (#3a3a3c) — documented as the CC-track residual debt. #a6a6ad is the
+     * originally authorized muted ink: 7.03:1 on #1c1c1e, 5.76:1 on #2c2c2e
+     * and 4.69:1 on #3a3a3c — WCAG AA holds on every canonical dark
+     * surface, removing the need for per-surface secondary inks.
+     * Pinned by styles/__tests__/darkThemeInk.contract.test.ts (both dark
+     * blocks, window + content + elevated). */
+    --mac-text-secondary: #a6a6ad;
     --mac-text-tertiary: #636366;
+    /* AXE-EXP-2: ink on tertiary surfaces — see the :root comment;
+     * #c7c7cc = 6.74:1 on #3a3a3c. */
+    --mac-text-on-tertiary: #c7c7cc;
+    /* AXE-EXP-4: link ink — see the :root comment; #5ac8fa = 8.97:1 on
+     * #1c1c1e / 7.4:1 on #2c2c2e. */
+    --mac-link-ink: #5ac8fa;
 
     --mac-border: #38383a;
     --mac-border-secondary: #48484a;
@@ -218,6 +297,10 @@
   --mac-text-primary: #000000;
   --mac-text-secondary: #455568;
   --mac-text-tertiary: #5d6f84;
+  /* AXE-EXP-2: mirror of the :root definition. */
+  --mac-text-on-tertiary: #455568;
+  /* AXE-EXP-4: mirror of the :root definition. */
+  --mac-link-ink: #0066d6;
 
   --mac-border: #b8c8da;
   --mac-border-secondary: #cad8e7;
@@ -267,8 +350,15 @@
   --mac-bg-quaternary: #48484a;
 
   --mac-text-primary: #ffffff;
-  --mac-text-secondary: #8e8e93;
+  /* CC-1 mirror + ELEV elevated-debt closure — see the prefers-color-scheme
+   * block for the full rationale (#a6a6ad: 7.03/5.76/4.69 on
+   * #1c1c1e/#2c2c2e/#3a3a3c). */
+  --mac-text-secondary: #a6a6ad;
   --mac-text-tertiary: #636366;
+  /* AXE-EXP-2: mirror of the prefers-color-scheme block. */
+  --mac-text-on-tertiary: #c7c7cc;
+  /* AXE-EXP-4: mirror of the prefers-color-scheme block. */
+  --mac-link-ink: #5ac8fa;
 
   --mac-border: #38383a;
   --mac-border-secondary: #48484a;
@@ -402,9 +492,12 @@
 }
 
 .mac-button--primary {
-  background: var(--mac-accent-blue);
+  /* CC-2: white-ink fill moved to the strong token (5.42:1 vs the base
+   * #007aff at 4.02:1 — axe color-contrast, e2e/a11y-baseline.json).
+   * Hover/active shades stay (#0051d5 6.69:1 / #004bb5 7.85:1 — both pass). */
+  background: var(--mac-accent-blue-strong, var(--mac-accent-blue));
   color: white;
-  border-color: var(--mac-accent-blue);
+  border-color: var(--mac-accent-blue-strong, var(--mac-accent-blue));
 }
 
 .mac-button--primary:hover {
@@ -734,6 +827,125 @@
   opacity: 0.3;
 }
 
+/* --- DataTable opt-in toolbar (PR-UI-12: column visibility + density toggle) ---
+ * Renders only when DataTable receives showColumnToggle / showDensityToggle.
+ * Every var() carries a fallback (ui-baseline ratchet: varUsagesNoFallback).
+ */
+.mac-table-shell {
+  position: relative;
+}
+
+.mac-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mac-spacing-2, 8px);
+  padding: var(--mac-spacing-1, 4px) 0;
+  position: relative;
+}
+
+.mac-table-toolbar__columns {
+  position: relative;
+}
+
+.mac-table-toolbar__button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-1, 4px);
+  padding: var(--mac-spacing-1, 4px) var(--mac-spacing-2, 8px);
+  font-size: var(--mac-font-size-xs, 11px);
+  color: var(--mac-text-primary, #1d1d1f);
+  background: var(--mac-bg-primary, #ffffff);
+  border: 1px solid var(--mac-border, #d2d2d7);
+  border-radius: var(--mac-radius-sm, 6px);
+  cursor: pointer;
+  transition: background-color var(--mac-duration-normal, 0.2s) var(--mac-ease, ease);
+}
+
+.mac-table-toolbar__button:hover {
+  background: var(--mac-bg-secondary, #f5f5f7);
+}
+
+.mac-table-toolbar__button:focus-visible {
+  outline: 2px solid var(--mac-accent, #007aff);
+  outline-offset: 1px;
+}
+
+.mac-table-toolbar__menu {
+  position: absolute;
+  top: calc(100% + var(--mac-spacing-1, 4px));
+  left: 0;
+  z-index: 10;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-1, 4px);
+  padding: var(--mac-spacing-2, 8px);
+  background: var(--mac-bg-primary, #ffffff);
+  border: 1px solid var(--mac-border, #d2d2d7);
+  border-radius: var(--mac-radius-md, 8px);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+}
+
+.mac-table-toolbar__menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2, 8px);
+  padding: var(--mac-spacing-1, 4px) 0;
+  font-size: var(--mac-font-size-sm, 12px);
+  color: var(--mac-text-primary, #1d1d1f);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mac-table-toolbar__menu-item input[type='checkbox'] {
+  accent-color: var(--mac-accent, #007aff);
+  margin: 0;
+  cursor: pointer;
+}
+
+.mac-table-toolbar__menu-item:has(input:disabled) {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mac-table-toolbar__density {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-1, 4px);
+  padding: var(--mac-spacing-1, 4px);
+  border: 1px solid var(--mac-border, #d2d2d7);
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-bg-primary, #ffffff);
+}
+
+.mac-table-toolbar__density-option {
+  padding: var(--mac-spacing-1, 4px) var(--mac-spacing-2, 8px);
+  font-size: var(--mac-font-size-xs, 11px);
+  color: var(--mac-text-secondary, #455568);
+  background: transparent;
+  border: none;
+  border-radius: var(--mac-radius-sm, 6px);
+  cursor: pointer;
+  transition: background-color var(--mac-duration-normal, 0.2s) var(--mac-ease, ease);
+}
+
+.mac-table-toolbar__density-option:hover {
+  background: var(--mac-bg-secondary, #f5f5f7);
+  color: var(--mac-text-primary, #1d1d1f);
+}
+
+.mac-table-toolbar__density-option[aria-pressed='true'] {
+  background: var(--mac-bg-secondary, #f5f5f7);
+  color: var(--mac-text-primary, #1d1d1f);
+  font-weight: var(--mac-font-weight-semibold, 600);
+}
+
+.mac-table-toolbar__density-option:focus-visible {
+  outline: 2px solid var(--mac-accent, #007aff);
+  outline-offset: 1px;
+}
+
 /* macOS Chat Styles */
 .mac-chat-bubble {
   background: var(--mac-bg-secondary);
@@ -910,6 +1122,17 @@
   .mac-nav-item:hover {
     background: var(--mac-bg-secondary);
   }
+
+  /* PR-UI-12 (Codex P2, round 4): toolbar controls are ~24px tall at the
+   * 11px xs font size — below the 44px comfortable-touch target. Enlarge
+   * them for coarse pointers; the layout keeps its compact desktop metrics.
+   */
+  .mac-table-toolbar__button,
+  .mac-table-toolbar__density-option {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: var(--mac-font-size-sm, 12px);
+  }
 }
 
 /* macOS High Contrast Support */
@@ -919,6 +1142,8 @@
     --mac-border-secondary: #000000;
     --mac-text-secondary: #000000;
     --mac-text-tertiary: #000000;
+    --mac-text-on-tertiary: #000000;
+    --mac-link-ink: #000000;
   }
 }
 

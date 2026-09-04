@@ -1,15 +1,15 @@
-import { Icon } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import type { ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
 
 interface PanelEmptyStateProps {
-  icon: string;
+  icon?: LucideIcon;
   title: ReactNode;
   description?: ReactNode;
   variant?: 'empty' | 'loading' | 'error';
 }
 
-function PanelEmptyState({ icon, title, description, variant = 'empty' }: PanelEmptyStateProps) {
+function PanelEmptyState({ icon: EmptyIcon, title, description, variant = 'empty' }: PanelEmptyStateProps) {
   const { t } = useTranslation();
   void t;
   const iconSize = 24;
@@ -20,7 +20,7 @@ function PanelEmptyState({ icon, title, description, variant = 'empty' }: PanelE
       aria-live={variant === 'loading' ? 'polite' : undefined}
       aria-busy={variant === 'loading' ? 'true' : undefined}
     >
-      <Icon name={icon} size={iconSize} className="pp-empty-state-icon" />
+      {EmptyIcon && <EmptyIcon size={iconSize} className="pp-empty-state-icon" aria-hidden="true" />}
       <div className="pp-empty-state-title">{title}</div>
       {description && <p className="pp-empty-state-description">{description}</p>}
       {variant === 'loading' && (

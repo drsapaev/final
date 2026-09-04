@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Textarea,
   Alert,
@@ -110,7 +110,6 @@ const GraphQLExplorer = () => {
         id
         fullName
         email
-        phone
       }
     }
     pagination {
@@ -132,8 +131,10 @@ const GraphQLExplorer = () => {
     items {
       id
       appointmentDate
+      appointmentTime
       status
-      paymentStatus
+      paymentType
+      services
       patient {
         fullName
         phone
@@ -144,17 +145,13 @@ const GraphQLExplorer = () => {
           fullName
         }
       }
-      service {
-        name
-        price
-      }
     }
   }
 }`,
       variables: {
         'filter': {
-          'dateFrom': new Date().toISOString().split('T')[0] + 'T00:00:00Z',
-          'dateTo': new Date().toISOString().split('T')[0] + 'T23:59:59Z'
+          'dateFrom': new Date().toISOString().split('T')[0],
+          'dateTo': new Date().toISOString().split('T')[0]
         }
       }
     },
@@ -165,11 +162,10 @@ const GraphQLExplorer = () => {
     items {
       id
       visitDate
+      visitTime
       status
       discountMode
-      allFree
-      totalAmount
-      paymentStatus
+      notes
       doctor {
         specialty
         user {
@@ -194,22 +190,18 @@ const GraphQLExplorer = () => {
       name
       code
       price
-      category
-      description
-      durationMinutes
+      unit
+      currency
+      categoryCode
       active
-      doctor {
-        specialty
-        user {
-          fullName
-        }
-      }
     }
   }
 }`,
       variables: {
         'filter': {
-          'category': 'consultation',
+          // category_code — однобуквенный код (K=консультации, D, C, L, S, O);
+          // «consultation» — не валидный код: пример возвращал пустой список
+          'categoryCode': 'K',
           'active': true
         }
       }
@@ -254,7 +246,8 @@ const GraphQLExplorer = () => {
 }`,
       variables: {
         'input': {
-          'fullName': t('admin2.gql2_example_full_name'),
+          'lastName': t('admin2.gql2_example_last_name'),
+          'firstName': t('admin2.gql2_example_first_name'),
           'phone': '+998901234567',
           'email': 'ivanov@example.com',
           'birthDate': '1990-01-01'
@@ -280,10 +273,7 @@ const GraphQLExplorer = () => {
           fullName
         }
       }
-      service {
-        name
-        price
-      }
+      services
     }
   }
 }`,
@@ -291,8 +281,9 @@ const GraphQLExplorer = () => {
         'input': {
           'patientId': 1,
           'doctorId': 1,
-          'serviceId': 1,
-          'appointmentDate': new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          'appointmentDate': new Date(Date.now() + 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 10),
           'notes': t('admin2.gql2_example_notes')
         }
       }
@@ -439,7 +430,7 @@ const GraphQLExplorer = () => {
     }
 
       {/* Примеры запросов */}
-      <MacOSCard style={sectionCardStyle}>
+      <Card style={sectionCardStyle}>
         <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi-1">
           <BookOpen size={20} />
           {t('admin2.gql_heading_examples')}
@@ -457,11 +448,11 @@ const GraphQLExplorer = () => {
             </Button>
         )}
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Редактор запроса */}
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24">
-        <MacOSCard style={sectionCardStyle}>
+        <Card style={sectionCardStyle}>
           <div className="admin-d-flex-fw-wrap-jc-between-ai-center-mb-16-gap-12-1">
             <h3 className="admin-m-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi-1">
               <Code size={20} />
@@ -510,9 +501,9 @@ const GraphQLExplorer = () => {
             className="admin-w-100pct-ff-Monaco-Consolas-Cour-fs-sm-lh-1p5-rz-vertical" />
           
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard style={sectionCardStyle}>
+        <Card style={sectionCardStyle}>
           <div className="admin-d-flex-fw-wrap-jc-between-ai-center-mb-16-gap-12">
             <h3 className="admin-m-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
               <Activity size={20} />
@@ -547,14 +538,14 @@ const GraphQLExplorer = () => {
               </div>
           }
           </div>
-        </MacOSCard>
+        </Card>
       </div>
     </div>;
 
 
   const renderSchemaTab = () =>
   <div className="flex flex-col gap-6">
-      <MacOSCard style={sectionCardStyle}>
+      <Card style={sectionCardStyle}>
         <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
           <Database size={20} />
           {t('admin2.gql_heading_schema')}
@@ -607,7 +598,7 @@ const GraphQLExplorer = () => {
         className="admin-h-200" />
 
       }
-      </MacOSCard>
+      </Card>
     </div>;
 
 

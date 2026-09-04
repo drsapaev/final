@@ -68,7 +68,7 @@ describe('UserProfile page', () => {
     nationality: 'Uzbek',
     date_of_birth: '1990-01-01T00:00:00',
     gender: 'female',
-    role: 'Receptionist',
+    role: 'Registrar',
     is_active: true,
     is_superuser: false,
     email_verified: true,

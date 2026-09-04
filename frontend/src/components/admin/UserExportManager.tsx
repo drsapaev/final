@@ -19,7 +19,7 @@ import {
   File } from
 'lucide-react';
 import {
-  MacOSCard, Button, Input, Select, Checkbox, SegmentedControl, Skeleton,
+  Card, Button, Input, Select, Checkbox, SegmentedControl, Skeleton,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
@@ -262,7 +262,7 @@ const UserExportManager = () => {
   const renderExportTab = () =>
   <div className="admin-d-grid-gtc-1fr-1fr-gap-24">
       {/* Левая панель - настройки экспорта */}
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         <h3 className="admin-m-0-0-24px-0-d-flex-ai-center-gap-8-fs-lg-fw-med-primary">
           <Settings className="admin-icon-20" />
           {t('admin2.ue_settings_title')}
@@ -344,10 +344,10 @@ const UserExportManager = () => {
             </label>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Правая панель - фильтры */}
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         <h3 className="admin-m-0-0-24px-0-d-flex-ai-center-gap-8-fs-lg-fw-med-primary">
           <Filter className="admin-icon-20" />
           {t('admin2.ue_filters_title')}
@@ -476,12 +476,12 @@ const UserExportManager = () => {
           }
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderFilesTab = () =>
-  <MacOSCard className="admin-p-24">
+  <Card className="admin-p-24">
       <div className="admin-d-flex-jc-between-ai-center-mb-24">
         <h3 className="admin-m-0-d-flex-ai-center-gap-8-fs-lg-fw-med-primary">
           <FileText className="admin-icon-20" />
@@ -546,7 +546,7 @@ const UserExportManager = () => {
       )}
         </div>
     }
-    </MacOSCard>;
+    </Card>;
 
 
   return (

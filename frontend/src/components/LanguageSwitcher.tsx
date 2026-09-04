@@ -11,10 +11,9 @@
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react';
 import ReactDOM from 'react-dom';
 import { useTranslation } from '../i18n/useTranslation';
-import {
-  Button, Icon,
-} from './ui/macos';
+import { Button } from './ui/macos';
 import { AVAILABLE_LANGUAGES } from '../i18n/useTranslation';
+import { ChevronDown } from 'lucide-react';
 
 const LanguageSwitcher = ({ compact = false }: { compact?: boolean }) => {
     const { language, setLanguage, t: rawT } = useTranslation();
@@ -157,7 +156,7 @@ const LanguageSwitcher = ({ compact = false }: { compact?: boolean }) => {
             >
                 <span style={{ fontSize: 'var(--mac-font-size-lg)' }} aria-hidden="true">{currentLang.flag}</span>
                 {!compact && <span>{currentLang.code.toUpperCase()}</span>}
-                <Icon name="chevron.down" size="small" aria-hidden="true" />
+                <ChevronDown size={16} aria-hidden="true" />
             </Button>
 
             {isOpen && dropdownPos && ReactDOM.createPortal(

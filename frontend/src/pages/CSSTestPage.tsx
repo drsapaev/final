@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   Card, Button, Badge,
 } from '../components/ui/macos';
-import ModernTabs from '../components/navigation/ModernTabs';
+import Tabs from '../components/navigation/Tabs';
 import { AlertCircle, CheckCircle, XCircle, Info } from 'lucide-react';
 
 import logger from '../utils/logger';
@@ -26,7 +26,7 @@ const CSSTestPage = () => {
     logger.info('Running CSS tests');
     const results: Array<{ test: string; passed: boolean; message: string }> = [];
     
-    // Тест 1: ModernTabs без CSS конфликтов
+    // Тест 1: Tabs без CSS конфликтов
     try {
       const tabsElement = document.querySelector('.modern-tabs .tabs-container');
       if (tabsElement) {
@@ -34,7 +34,7 @@ const CSSTestPage = () => {
         const hasBorderConflict = computedStyle.border && computedStyle.borderBottom;
         
         results.push({
-          test: 'ModernTabs Border Conflict',
+          test: 'Tabs Border Conflict',
           passed: !hasBorderConflict,
           message: hasBorderConflict ? t('misc.ctp_obnaruzhen_konflikt_border_b') : t('misc.ctp_konflikt_ispravlen')
         });
@@ -42,7 +42,7 @@ const CSSTestPage = () => {
     } catch (error) {
       const err = error as { message?: string };
       results.push({
-        test: 'ModernTabs Border Conflict',
+        test: 'Tabs Border Conflict',
         passed: false,
         message: t('misc.ctp_oshibka_testirovaniya_error_', { message: err?.message })
       });
@@ -89,11 +89,11 @@ const CSSTestPage = () => {
       });
     }
 
-    // Тест 4: Симулируем ререндер ModernTabs
+    // Тест 4: Симулируем ререндер Tabs
     setTimeout(() => {
       setActiveTab(activeTab === 'cardio' ? 'derma' : 'cardio');
       results.push({
-        test: 'ModernTabs Re-render',
+        test: 'Tabs Re-render',
         passed: true,
         message: t('misc.ctp_rerender_vypolnen_bez_oshibo')
       });
@@ -163,14 +163,14 @@ const CSSTestPage = () => {
           </Card>
         )}
 
-        {/* Тест ModernTabs */}
+        {/* Тест Tabs */}
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-4">{t('misc.ctp_test_moderntabs_osnovnaya_pr')}</h2>
           <p className="text-gray-600 mb-4">
             Этот компонент вызывал CSS конфликты border/borderBottom. Проверьте консоль на warnings.
           </p>
           
-          <ModernTabs
+          <Tabs
             activeTab={activeTab}
             onTabChange={(tab) => setActiveTab(tab ?? '')}
             departmentStats={departmentStats}
@@ -224,7 +224,7 @@ const CSSTestPage = () => {
           <div className="space-y-2 text-blue-700">
             <p>1. Откройте консоль разработчика (F12)</p>
             <p>2. Нажмите «Запустить тесты» для автоматической проверки</p>
-            <p>3. Переключайте вкладки ModernTabs и следите за warnings в консоли</p>
+            <p>3. Переключайте вкладки Tabs и следите за warnings в консоли</p>
             <p>4. Проверьте, что все нативные компоненты отображаются корректно</p>
             <p>5. Убедитесь, что нет ошибок «Updating a style property during rerender»</p>
           </div>
@@ -236,7 +236,7 @@ const CSSTestPage = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">1</div>
-              <div className="text-sm text-gray-600">ModernTabs исправлен</div>
+              <div className="text-sm text-gray-600">Tabs исправлен</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">3</div>

@@ -15,7 +15,7 @@ import {
   Shield
 } from 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Input,
   Checkbox,
@@ -103,7 +103,7 @@ const BenefitSettings = () => {
   if (loading) {
     return (
       <div className="admin-benefit-container">
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="admin-flex-center-12 mb-6">
             <Settings className="admin-icon-32-blue" />
             <h2 className="admin-benefit-h2">
@@ -111,7 +111,7 @@ const BenefitSettings = () => {
             </h2>
           </div>
           <Skeleton height="600px" />
-        </MacOSCard>
+        </Card>
       </div>
     );
   }
@@ -120,7 +120,7 @@ const BenefitSettings = () => {
   if (error && !settings?.updated_at) {
     return (
       <div className="admin-benefit-container">
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <div className="admin-flex-center-12 mb-6">
             <Settings className="admin-icon-32-blue" />
             <h2 className="admin-benefit-h2">
@@ -138,14 +138,14 @@ const BenefitSettings = () => {
               </Button>
             }
           />
-        </MacOSCard>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="admin-benefit-container">
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <div className="flex flex-col gap-6">
           {/* Критическая ошибка */}
           {error && (
@@ -191,7 +191,7 @@ const BenefitSettings = () => {
           {/* Настройки */}
           <div className="admin-grid-auto-400-24">
             {/* Повторные визиты */}
-            <MacOSCard className="admin-settings-card" style={{ '--admin-card-transform': settings.repeat_visit_discount > 0 ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
+            <Card className="admin-settings-card" style={{ '--admin-card-transform': settings.repeat_visit_discount > 0 ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
               <div className="admin-setting-card-header">
                 <div className="admin-icon-bg-success">
                   <Calendar className="admin-icon-20-success" />
@@ -270,7 +270,7 @@ const BenefitSettings = () => {
                 </div>
 
                 {/* Информационная карточка */}
-                <MacOSCard className="admin-info-card-accent">
+                <Card className="admin-info-card-accent">
                   <div className="admin-info-row">
                     <Info className="admin-info-icon-blue" />
                     <div className="admin-info-text-blue">
@@ -284,12 +284,12 @@ const BenefitSettings = () => {
                       </ul>
                     </div>
                   </div>
-                </MacOSCard>
+                </Card>
               </div>
-            </MacOSCard>
+            </Card>
 
             {/* Льготные визиты */}
-            <MacOSCard className="admin-settings-card" style={{ '--admin-card-transform': settings.benefit_consultation_free ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
+            <Card className="admin-settings-card" style={{ '--admin-card-transform': settings.benefit_consultation_free ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
               <div className="admin-setting-card-header">
                 <div className="admin-icon-bg-warning">
                   <Shield className="admin-icon-20-warning" />
@@ -351,7 +351,7 @@ const BenefitSettings = () => {
 
                 {/* Предупреждение об автоодобрении */}
                 {settings.all_free_auto_approve && (
-                  <MacOSCard className="admin-info-card-warning">
+                  <Card className="admin-info-card-warning">
                     <div className="admin-info-row">
                       <AlertCircle className="admin-info-icon-warning" />
                       <div className="admin-info-text-warning">
@@ -363,11 +363,11 @@ const BenefitSettings = () => {
                         </p>
                       </div>
                     </div>
-                  </MacOSCard>
+                  </Card>
                 )}
 
                 {/* Информационная карточка */}
-                <MacOSCard className="admin-info-card-warning">
+                <Card className="admin-info-card-warning">
                   <div className="admin-info-row">
                     <Info className="admin-info-icon-warning" />
                     <div className="admin-info-text-warning">
@@ -380,9 +380,9 @@ const BenefitSettings = () => {
                       </ul>
                     </div>
                   </div>
-                </MacOSCard>
+                </Card>
               </div>
-            </MacOSCard>
+            </Card>
           </div>
 
           {/* Действия */}
@@ -463,7 +463,7 @@ const BenefitSettings = () => {
           </div>
 
           {/* Предварительный просмотр */}
-          <MacOSCard className="admin-preview-card">
+          <Card className="admin-preview-card">
             <h4 className="admin-preview-h4">
               {t('admin2.bs_preview_title')}
             </h4>
@@ -493,9 +493,9 @@ const BenefitSettings = () => {
                 </span>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Модальное окно подтверждения */}
       <Modal

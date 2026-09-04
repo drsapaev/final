@@ -3,10 +3,8 @@ import type { CSSProperties } from "react";
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
-// S-M-2 fix: lucide-direct replaced with macos <Icon>
-import {
-  Button, MacOSCard, Badge, Input, AppEmpty,
-  Icon } from '../components/ui/macos';
+// S-M-2 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3)
+import { Button, Card, Badge, Input, AppEmpty } from '../components/ui/macos';
 
 import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
@@ -52,6 +50,7 @@ import {
 } from '../utils/doctorPanelShared';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 import { getErrorMessage } from '../utils/type-guards';
+import { Calendar, CheckCircle2, CircleDollarSign, FileText, HeartPulse, Phone, RotateCw, Scissors, Sparkles, Stethoscope, User } from 'lucide-react';
 
 const API_V1_BASE = getApiBaseUrl();
 const DERMATOLOGY_REQUEST_COOLDOWN_MS = 5000;
@@ -849,9 +848,6 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  // Проверяем демо-режим после всех хуков
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
-
   const authHeader = useCallback(() => ({
     Authorization: `Bearer ${tokenManager.getAccessToken()}`
   }), []);
@@ -1484,11 +1480,6 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  if (isDemoMode) {
-    logger.info('DermatologistPanelUnified: Skipping render in demo mode');
-    return null;
-  }
-
   const appointmentSummaryItems = [
     {
       key: 'total',
@@ -1528,10 +1519,10 @@ const DermatologistPanelUnified = () => {
               Phase 4+: 'patients' tab combines appointments + history. */}
           {(activeTab === 'appointments' || activeTab === 'patients') &&
           <div className="derma-flex-col-24 derma-w-full derma-max-w-none">
-              <MacOSCard className="derma-card-w-full">
+              <Card className="derma-card-w-full">
                 <div style={dermatologyAppointmentsHeaderStyle}>
                   <h3 style={dermatologyAppointmentsTitleStyle}>
-                    <Icon name="calendar" size={20} className="derma-icon-mr-green" />
+                    <Calendar size={20} className="derma-icon-mr-green" aria-hidden="true" />
                     {t('derma.derma_panel_appointments_title')}
                   </h3>
                   <AppointmentSummaryBar
@@ -1556,17 +1547,17 @@ const DermatologistPanelUnified = () => {
                 onRowClick={handleAppointmentRowClick}
                 onActionClick={handleAppointmentActionClick} />
 
-              </MacOSCard>
+              </Card>
             </div>
           }
 
           {/* Список пациентов */}
           {activeTab === 'patients' &&
           <div className="derma-flex-col-24">
-              <MacOSCard className="derma-p-8">
+              <Card className="derma-p-8">
                 <div className="derma-flex-center">
                   <h3 className="derma-flex-center">
-                    <Icon name="person" size={20} className="derma-icon-mr-green" />
+                    <User size={20} className="derma-icon-mr-green" aria-hidden="true" />
                     {t('derma.derma_panel_patients_title')}
                   </h3>
                   <Badge variant="info">{t('derma.derma_panel_patients_count', { count: patients.length })}</Badge>
@@ -1574,7 +1565,7 @@ const DermatologistPanelUnified = () => {
 
                 {loading ?
               <div className="derma-loading-state">
-                    <Icon name="arrow.clockwise" size={32} className="derma-loading-icon" />
+                    <RotateCw size={32} className="derma-loading-icon" aria-hidden="true" />
                     <p className="derma-p-14-secondary">{t('derma.derma_panel_patients_loading')}</p>
                   </div> :
 
@@ -1591,15 +1582,15 @@ const DermatologistPanelUnified = () => {
                             </div>
                             <div className="derma-patient-info-list">
                               <div className="derma-flex-center">
-                                <Icon name="phone" size={18} className="derma-icon-mr derma-text-accent" />
+                                <Phone size={18} className="derma-icon-mr derma-text-accent" aria-hidden="true" />
                                 {patient.phone}
                               </div>
                               <div className="derma-flex-center">
-                                <Icon name="calendar" size={14} className="derma-icon-mr" />
+                                <Calendar size={14} className="derma-icon-mr" aria-hidden="true" />
                                 {patient.birth_date}
                               </div>
                               <div className="derma-flex-center">
-                                <Icon name="person" size={14} className="derma-icon-mr" />
+                                <User size={14} className="derma-icon-mr" aria-hidden="true" />
                                 ID: {patient.id}
                               </div>
                             </div>
@@ -1618,7 +1609,7 @@ const DermatologistPanelUnified = () => {
                         }}
                         className="derma-flex-center">
 
-                              <Icon name="waveform.path.ecg" size={16} />
+                              <HeartPulse size={16} aria-hidden="true" />
                               {t('derma.derma_panel_button_exam')}
                             </Button>
                             <Button
@@ -1634,7 +1625,7 @@ const DermatologistPanelUnified = () => {
                         }}
                         className="derma-flex-center">
 
-                              <Icon name="sparkles" size={16} />
+                              <Sparkles size={16} aria-hidden="true" />
                               {t('derma.derma_panel_button_procedure')}
                             </Button>
                             <Button
@@ -1642,7 +1633,7 @@ const DermatologistPanelUnified = () => {
                         onClick={() => setSelectedPatient(patient)}
                         className="derma-flex-center">
 
-                              <Icon name="person" size={16} />
+                              <User size={16} aria-hidden="true" />
                               {t('derma.derma_panel_button_view')}
                             </Button>
                           </div>
@@ -1651,7 +1642,7 @@ const DermatologistPanelUnified = () => {
                 )}
                   </div>
               }
-              </MacOSCard>
+              </Card>
             </div>
           }
 
@@ -1662,10 +1653,10 @@ const DermatologistPanelUnified = () => {
 
           {activeTab === 'visit' && currentAppointment &&
           <div className="derma-flex-col-24">
-              <MacOSCard className="derma-p-8">
+              <Card className="derma-p-8">
                 <div className="derma-flex-center">
                   <h3 className="derma-flex-center">
-                    <Icon name="stethoscope" size={20} className="derma-icon-mr-orange" />
+                    <Stethoscope size={20} className="derma-icon-mr-orange" aria-hidden="true" />
                     {t('derma.derma_panel_visit_title', { name: currentAppointment.patient_name || t('derma.derma_panel_visit_name_unspecified') })}
                   </h3>
                   <Badge variant="info">
@@ -1683,7 +1674,7 @@ const DermatologistPanelUnified = () => {
                 {/* EMR система */}
                 <div className="derma-mt-24">
                   <h4 className="derma-flex-center">
-                    <Icon name="doc.text" size={20} className="derma-icon-mr-blue" />
+                    <FileText size={20} className="derma-icon-mr-blue" aria-hidden="true" />
                     {t('derma.derma_panel_emr_title')}
                   </h4>
                   <EMRContainerV2
@@ -1697,7 +1688,7 @@ const DermatologistPanelUnified = () => {
                 {emr && !emr.is_draft &&
               <div className="derma-mt-24">
                     <h4 className="derma-flex-center">
-                      <Icon name="doc.text" size={20} className="derma-icon-mr-green" />
+                      <FileText size={20} className="derma-icon-mr-green" aria-hidden="true" />
                       {t('derma.derma_panel_prescription_title')}
                     </h4>
                     <PrescriptionSystem
@@ -1720,15 +1711,15 @@ const DermatologistPanelUnified = () => {
                   className="derma-flex-center">
 
                       {loading ?
-                  <Icon name="arrow.clockwise" size={20} className="animate-spin" /> :
+                  <RotateCw size={20} className="animate-spin" aria-hidden="true" /> :
 
-                  <Icon name="checkmark.circle" size={20} />
+                  <CheckCircle2 size={20} aria-hidden="true" />
                   }
                       {loading ? t('derma.derma_panel_completing') : t('derma.derma_panel_complete_button')}
                     </Button>
                   </div>
               }
-              </MacOSCard>
+              </Card>
             </div>
           }
 
@@ -1738,7 +1729,7 @@ const DermatologistPanelUnified = () => {
               If selectedPatient exists without currentAppointment, a useEffect auto-promotes it. */}
 
           {activeTab === 'visit' && !currentAppointment && !selectedPatient &&
-          <MacOSCard className="derma-p-48">
+          <Card className="derma-p-48">
               <AppEmpty
               icon="calendar"
               title={t('derma.derma_panel_select_visit_title')}
@@ -1748,7 +1739,7 @@ const DermatologistPanelUnified = () => {
                     {t('derma.derma_panel_go_to_appointments')}
                   </Button>
               } />
-            </MacOSCard>
+            </Card>
           }
 
           {/* Фото — R-15: extracted to DermaPhotosTab */}
@@ -1797,9 +1788,9 @@ const DermatologistPanelUnified = () => {
           {/* Управление услугами */}
           {activeTab === 'services' &&
           <div className="derma-flex-col-24">
-              <MacOSCard className="derma-p-8">
+              <Card className="derma-p-8">
                 <h3 className="derma-flex-center">
-                  <Icon name="scissors" size={20} className="derma-icon-mr-orange" />
+                  <Scissors size={20} className="derma-icon-mr-orange" aria-hidden="true" />
                   {t('derma.derma_panel_services_title')}
                 </h3>
 
@@ -1840,7 +1831,7 @@ const DermatologistPanelUnified = () => {
                       </label>
                       <div className="derma-flex-gap-8">
                         <div className="derma-pos-rel-flex-1">
-                          <Icon name="dollarsign.circle" size={16} className="derma-dollar-icon-abs" />
+                          <CircleDollarSign size={16} className="derma-dollar-icon-abs" aria-hidden="true" />
                           <Input
                           type="text"
                           value={doctorPrice}
@@ -1860,7 +1851,7 @@ const DermatologistPanelUnified = () => {
                         aria-label={t('derma.derma_panel_change_price_aria')}
                         title={t('derma.derma_panel_change_price_aria')}>
 
-                          <Icon name="dollarsign.circle" size={16} />
+                          <CircleDollarSign size={16} aria-hidden="true" />
                         </Button>
                       </div>
                     </div>
@@ -1897,7 +1888,7 @@ const DermatologistPanelUnified = () => {
                     </div>
                   </div>
                 </div>
-              </MacOSCard>
+              </Card>
             </div>
           }
 

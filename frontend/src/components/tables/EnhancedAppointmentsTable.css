@@ -130,6 +130,14 @@
   .hide-on-mobile {
     display: none !important;
   }
+
+  /* PR-UI-09c-4 (Codex P2): canonical DataTable generates th/td without the
+     legacy hide-on-mobile class — hide the ENTIRE generated cell when its
+     content opts out (mirrors the legacy whole-column removal). */
+  .enhanced-table th:has(.hide-on-mobile),
+  .enhanced-table td:has(.hide-on-mobile) {
+    display: none;
+  }
 }
 
 @media (max-width: 480px) {
@@ -878,4 +886,90 @@
   border-radius: var(--mac-radius-sm);
   background-color: var(--mac-bg-primary);
   font-size: var(--mac-font-size-base);
+}
+
+
+/* ============================================================
+   PR-UI-09c-4: canonical DataTable integration styles.
+   The canonical DataTable (ui/DataTable.tsx) generates its own
+   th/td without per-column style hooks, so the legacy row-level
+   visuals (session-color indicator, selected-row tint) are
+   reproduced via CSS :has() markers rendered inside the first
+   content cell — same technique as QueueTable 09c-2 (PR-2860).
+   Session color VALUES mirror the SESSION_COLORS palette in
+   EnhancedAppointmentsTable.tsx.
+   ============================================================ */
+
+.eat-session-marker,
+.eat-row-selected-marker {
+  display: none;
+}
+
+/* Session-color left border (visual SSOT grouping indicator) */
+.enhanced-table tr:has(.eat-session-0) { border-left: 4px solid var(--mac-accent-blue); }
+.enhanced-table tr:has(.eat-session-1) { border-left: 4px solid var(--mac-success); }
+.enhanced-table tr:has(.eat-session-2) { border-left: 4px solid var(--mac-warning); }
+.enhanced-table tr:has(.eat-session-3) { border-left: 4px solid var(--mac-error); }
+.enhanced-table tr:has(.eat-session-4) { border-left: 4px solid #8B5CF6; }
+.enhanced-table tr:has(.eat-session-5) { border-left: 4px solid #EC4899; }
+.enhanced-table tr:has(.eat-session-6) { border-left: 4px solid var(--mac-accent-blue-light); }
+.enhanced-table tr:has(.eat-session-7) { border-left: 4px solid #84CC16; }
+
+/* PR-UI-09c-4 (Codex P2): striped + hoverable combination — canonical
+   DataTable's hover cleanup resets the row inline background to transparent,
+   progressively erasing odd-row striping. Keep striping intact by disabling
+   the inline hover handlers (hoverable={false}) and providing CSS-only hover
+   via the same inset box-shadow technique as the selected-row tint below
+   (a plain background rule cannot beat the tr inline striped background).
+   Declared BEFORE the selected-rule so a selected row keeps its tint while
+   hovered. Row cursor lives on td — generated tds carry no inline cursor,
+   so no !important is needed and the cssImportant ratchet stays unchanged. */
+.enhanced-table tbody td {
+  cursor: pointer;
+}
+
+.enhanced-table tbody tr:hover td {
+  box-shadow: inset 0 0 0 9999px var(--mac-table-row-hover-bg);
+}
+
+/* Selected-row tint — inset box-shadow beats the DataTable inline
+   td background (mirrors the qt-called-marker technique) */
+.enhanced-table tr:has(.eat-row-selected-marker) td {
+  box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--mac-accent-blue) 6%, transparent);
+}
+
+/* Cell content wrappers: approximate the legacy td alignment /
+   typography on top of canonical DataTable cells */
+.eat-cell { display: block; }
+.eat-cell--center { text-align: center; }
+.eat-cell--end { text-align: right; }
+.eat-cell--secondary {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-base);
+}
+.eat-cell--primary {
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+}
+.eat-cell--patient {
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-medium);
+}
+.eat-cell--nowrap {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Actions cell (replaces the legacy td-level wrapper styles and
+   keeps row-click suppression inside the action area) */
+.eat-actions-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mac-spacing-1);
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 100;
 }

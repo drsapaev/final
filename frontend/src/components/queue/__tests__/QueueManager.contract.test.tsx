@@ -37,11 +37,14 @@ describe('Queue manager command contract', () => {
 
   it('keeps registrar online queue doctor selection explicit before doctor-specific commands load', () => {
     const registrarSource = read('pages/RegistrarPanel.tsx');
+    // PR-UI-13-5: the calendar slice (with the explicit doctor-selection note)
+    // moved to pages/registrar/useRegistrarCalendar.ts.
+    const calendarSource = read('pages/registrar/useRegistrarCalendar.ts');
     const queueViewSource = read('pages/registrar/views/QueueView.tsx');
     const managerSource = read('components/queue/ModernQueueManager.tsx');
     const tableSource = read('components/queue/QueueTable.tsx');
 
-    expect(registrarSource).toContain('Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди');
+    expect(calendarSource).toContain('Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди');
     // Decomp 6a: selectedDoctor prop moved to QueueView.jsx
     expect(queueViewSource).toContain('selectedDoctor={searchParams.get(\'doctor\') || \'\'}');
 

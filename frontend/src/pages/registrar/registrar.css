@@ -530,7 +530,6 @@
   gap: var(--mac-spacing-2);
   font-size: var(--mac-font-size-sm);
   font-weight: var(--mac-font-weight-medium);
-  padding: '4px 10px';
 }
 
 /* Worklist header section */
@@ -703,7 +702,17 @@
   gap: 12px;
   align-items: start;
 }
-.registrar-preview-label { font-size: 13px; }
+.registrar-preview-grid {
+  /* PR-UI-13-3: moved from inline style (RecordPreview view extraction) —
+     same value, zero visual delta. */
+  color: var(--mac-text-primary);
+}
+.registrar-preview-label {
+  font-size: 13px;
+  /* PR-UI-13-3: moved from inline style (RecordPreview view extraction) —
+     same value, zero visual delta. */
+  color: var(--mac-text-secondary);
+}
 .registrar-preview-value {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -721,6 +730,17 @@
 }
 .registrar-reschedule-icon-bg {
   background-color: color-mix(in srgb, var(--mac-accent) 16%, transparent);
+}
+/* PR-UI-13-3: moved from inline styles (RescheduleSlots view extraction) —
+   same values, zero visual delta. */
+.registrar-reschedule-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+.registrar-reschedule-icon-accent {
+  color: var(--mac-accent-blue);
 }
 .registrar-reschedule-title-text { color: var(--mac-text-primary); }
 .registrar-reschedule-desc-text  { color: var(--mac-text-secondary); }

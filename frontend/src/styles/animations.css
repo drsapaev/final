@@ -2,9 +2,10 @@
    PR-UI-08: dead utilities + keyframes removed (~310 LOC); legacy
    fadeInUp/Left/Right/Scale + .animate-delay-* deleted (consumers
    migrated to canonical mac-entrance-* / mac-delay-* in tokens.css);
-   hover-lift/hover-scale kept (demo perimeter — medical/* + MediLabDemo,
-   PR-UI-17 owns decommission); animate-pulse/spin kept (production
-   loaders/skeletons — functional, opacity-only / rotate). */
+   PR-UI-17-1: hover-lift/hover-scale decommissioned (demo perimeter
+   medical/* + MediLabDemo deleted with the /internal-demo/medilab route);
+   animate-pulse/spin kept (production loaders/skeletons — functional,
+   opacity-only / rotate). */
 
 /* Анимация пульсации */
 @keyframes pulse {
@@ -35,24 +36,6 @@
   animation: spin 1s linear infinite;
 }
 
-/* Hover эффекты (demo perimeter — medical/* + MediLabDemo; PR-UI-17 owns decommission) */
-.hover-lift {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px color-mix(in srgb, black, transparent 90%), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-.hover-scale {
-  transition: transform 0.3s ease;
-}
-
-.hover-scale:hover {
-  transform: scale(1.05);
-}
-
 /* Reduced Motion Support - отключение анимаций для пользователей с ограничениями */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -67,10 +50,5 @@
   .animate-pulse,
   .animate-spin {
     animation: none !important;
-  }
-
-  .hover-lift:hover,
-  .hover-scale:hover {
-    transform: none !important;
   }
 }

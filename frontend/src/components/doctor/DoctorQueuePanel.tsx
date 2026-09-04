@@ -18,7 +18,7 @@ import {
   Activity } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Skeleton,
@@ -148,8 +148,9 @@ const DoctorQueuePanel = ({
   };
 
   useEffect(() => {
-    // Проверяем, не находимся ли мы в демо-режиме
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
+    // Проверяем, не находимся ли мы в демо-режиме (dev-моки localhost:5173;
+    // medilab-demo дизъюнкт удалён в PR-UI-17-1 вместе с роутом)
+    const isDemoMode =
     window.location.hostname === 'localhost' &&
     window.location.port === '5173';
 
@@ -225,8 +226,8 @@ const DoctorQueuePanel = ({
   }, [specialty]);
 
   const loadDoctorData = async () => {
-    // Проверяем демо-режим еще раз
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
+    // Проверяем демо-режим (dev-моки localhost:5173)
+    const isDemoMode =
     window.location.hostname === 'localhost' &&
     window.location.port === '5173';
 
@@ -254,8 +255,8 @@ const DoctorQueuePanel = ({
   };
 
   const loadQueueData = async () => {
-    // Проверяем демо-режим еще раз
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') ||
+    // Проверяем демо-режим (dev-моки localhost:5173)
+    const isDemoMode =
     window.location.hostname === 'localhost' &&
     window.location.port === '5173';
 
@@ -409,9 +410,9 @@ const DoctorQueuePanel = ({
 
   if (loading && !queueData) {
     return (
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-6)' }}>
         <Skeleton type="card" count={3} />
-      </MacOSCard>);
+      </Card>);
 
   }
 
@@ -441,7 +442,7 @@ const DoctorQueuePanel = ({
       }
 
       {/* Информация о враче и очереди */}
-      <MacOSCard style={{ padding: 'var(--mac-spacing-4)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-4)' }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -563,10 +564,10 @@ const DoctorQueuePanel = ({
             </div>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Список пациентов в очереди */}
-      <MacOSCard style={{ overflow: 'hidden' }}>
+      <Card style={{ overflow: 'hidden' }}>
         <div style={{
           padding: 'var(--mac-spacing-4)',
           backgroundColor: 'var(--mac-bg-secondary)',
@@ -770,11 +771,11 @@ const DoctorQueuePanel = ({
           })
           }
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Информация о настройках очереди */}
       {doctorInfo &&
-      <MacOSCard style={{
+      <Card style={{
         padding: 'var(--mac-spacing-4)',
         backgroundColor: 'var(--mac-bg-accent)',
         border: '1px solid var(--mac-accent)'
@@ -804,7 +805,7 @@ const DoctorQueuePanel = ({
           <div>Кабинет: {doctorInfo.doctor.cabinet}</div>
           }
           </div>
-        </MacOSCard>
+        </Card>
       }
     </div>);
 

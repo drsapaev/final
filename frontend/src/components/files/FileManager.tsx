@@ -43,11 +43,11 @@ import {
   DialogContent,
   DialogTitle,
   Input,
-  Table,
   Progress,
   SegmentedControl,
   Select,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 
 const pageStyles: CSSProperties = {
   display: 'flex',
@@ -642,7 +642,7 @@ const FileManager = () => {
   ];
 
   const renderFileList = () => (
-    <Table
+    <DataTable
       columns={tableColumns}
       data={files}
       sortable={false}

@@ -39,7 +39,9 @@ _STAFF_ROLE_ALIASES = {
     "lab_tech": "lab",
     "laboratory": "lab",
     "registrar": "registrar",
-    "receptionist": "registrar",
+    # E-4 (Receptionist alias removal): entry decommissioned (§4.1.27) —
+    # the staff scope derives the role from the DB user row, and stored
+    # Receptionist rows = 0 (production SQL evidence 2026-09-02).
 }
 
 TelegramMiniAppScopeType = Literal["patient", "staff"]

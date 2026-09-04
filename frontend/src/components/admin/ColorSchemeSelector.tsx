@@ -5,7 +5,7 @@ import { Monitor, Moon, Palette, Sun } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { COLOR_SCHEMES } from '../../theme/colorScheme';
 import {
-  MacOSCard, Select,
+  Card, Select,
 } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -139,7 +139,7 @@ export default function ColorSchemeSelector() {
   const metrics = getMetrics(t);
 
   return (
-    <MacOSCard
+    <Card
       role="region"
       aria-labelledby={selectorTitleId}
       aria-describedby={selectorDescriptionId}
@@ -272,6 +272,6 @@ export default function ColorSchemeSelector() {
           </div>
         </div>
       </div>
-    </MacOSCard>
+    </Card>
   );
 }

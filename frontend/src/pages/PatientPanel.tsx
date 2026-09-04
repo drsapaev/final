@@ -2,9 +2,7 @@ import type { HttpApiError } from '../types/errors';
 import { extractDetailReason } from '../utils/error-utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import {
-  Card, Button, Badge, Icon,
-} from '../components/ui/macos';
+import { Card, Button, Badge } from '../components/ui/macos';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import logger from '../utils/logger';
 import { api } from '../api/client';
@@ -23,6 +21,7 @@ import PatientCabinetSummary from '../components/patient/PatientCabinetSummary';
 import PatientFormsPreview from '../components/patient/PatientFormsPreview';
 import './patient.css';
 import { useTranslation } from '../i18n/useTranslation';
+import { AlertTriangle, Calendar, FileText, Heart, Home, RotateCw, type LucideIcon } from 'lucide-react';
 
 interface PatientAppointment {
   id: string | number;
@@ -56,7 +55,7 @@ interface FormsPreview {
  *   PatientCabinetSummary, PatientFormsPreview).
  * L-H-6 fix: добавлен tablist-pattern для навигации по секциям
  *   (role=tablist + role=tab + aria-selected + keyboard nav).
- * L-H-8 fix: lucide-direct icons заменены на macos <Icon>.
+ * L-H-8 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3).
  *
  * Доступ: /patient (hideSidebar:true, homeForRoles:['patient']).
  * Защищённые данные требуют Telegram Mini App identity (initData).
@@ -131,7 +130,7 @@ const PatientPanel = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const sectionConfig = (PATIENT_SECTIONS as Record<string, { title: string; icon: string; description?: string; visibleInTabs?: boolean }>)[activeSection];
+  const sectionConfig = (PATIENT_SECTIONS as Record<string, { title: string; icon: LucideIcon; description?: string; visibleInTabs?: boolean }>)[activeSection];
   const isSectionMode = Boolean(sectionConfig);
   const sectionTitle = sectionConfig?.title || t('misc.pp_glavnaya_patsienta');
 
@@ -212,11 +211,11 @@ const PatientPanel = () => {
 
   // L-H-6 fix: build tablist items (home + visible sections).
   const tabItems = useMemo(() => [
-    { id: 'home', label: t('misc.pp_glavnaya'), icon: 'house' },
+    { id: 'home', label: t('misc.pp_glavnaya'), icon: Home },
     ...VISIBLE_PATIENT_TABS.map((key) => ({
       id: key,
-      label: (PATIENT_SECTIONS as Record<string, { title: string; icon: string }>)[key].title,
-      icon: (PATIENT_SECTIONS as Record<string, { title: string; icon: string }>)[key].icon,
+      label: (PATIENT_SECTIONS as Record<string, { title: string; icon: LucideIcon }>)[key].title,
+      icon: (PATIENT_SECTIONS as Record<string, { title: string; icon: LucideIcon }>)[key].icon,
     })),
   ], []);
 
@@ -246,7 +245,7 @@ const PatientPanel = () => {
                 onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => handleTabKeyDown(e, tab.id)}
                 className={`pp-tab ${isActive ? 'pp-tab-active' : ''}`}
               >
-                <Icon name={tab.icon} size={16} />
+                <tab.icon size={16} aria-hidden="true" />
                 {tab.label}
               </button>
             );
@@ -278,7 +277,7 @@ const PatientPanel = () => {
           {isSectionMode ? (
             <Card className="pp-card" data-testid={`patient-section-${activeSection}`}>
               <div className="pp-home-card-header">
-                <Icon name={sectionConfig.icon} size={16} />
+                <sectionConfig.icon size={16} aria-hidden="true" />
                 <h3 className="pp-home-card-title">{sectionTitle}</h3>
               </div>
               <div className="pp-card-body">
@@ -310,7 +309,7 @@ const PatientPanel = () => {
             <div className="pp-home-grid">
               <Card className="pp-card">
                 <div className="pp-home-card-header">
-                  <Icon name="calendar" size={16} />
+                  <Calendar size={16} aria-hidden="true" />
                   <h3 className="pp-home-card-title">{t('misc.pp_predstoyaschie_vizity')}</h3>
                 </div>
                 <div className="pp-home-list">
@@ -328,7 +327,7 @@ const PatientPanel = () => {
                     ))
                   ) : (
                     <PanelEmptyState
-                      icon="calendar"
+                      icon={Calendar}
                       title={t('misc.pp_vizitov_poka_net')}
                       description={t('misc.pp_dobavte_vizit_posle_privyazk')}
                     />
@@ -338,7 +337,7 @@ const PatientPanel = () => {
 
               <Card className="pp-card">
                 <div className="pp-home-card-header">
-                  <Icon name="heart" size={16} />
+                  <Heart size={16} aria-hidden="true" />
                   <h3 className="pp-home-card-title">{t('misc.pp_rezultaty_analizov')}</h3>
                 </div>
                 <div className="pp-home-list">
@@ -350,14 +349,14 @@ const PatientPanel = () => {
                           <div className="pp-list-item-secondary">{r.date}</div>
                         </div>
                         <Button variant="outline" size="small">
-                          <Icon name="doc.text" size={16} />
+                          <FileText size={16} aria-hidden="true" />
                           Открыть
                         </Button>
                       </div>
                     ))
                   ) : (
                     <PanelEmptyState
-                      icon="doc.text"
+                      icon={FileText}
                       title={t('misc.pp_rezultatov_poka_net')}
                       description={t('misc.pp_ispolzuyte_zaschischyonnuyu_')}
                     />
@@ -375,7 +374,7 @@ const PatientPanel = () => {
           <Card className="pp-card">
             <div className="pp-card-body">
               <PanelEmptyState
-                icon="arrow.clockwise"
+                icon={RotateCw}
                 title={t('misc.pp_dannye_patsienta_zagruzhayut')}
                 description={t('misc.pp_zapisi_i_rezultaty_poyavyats')}
                 variant="loading"
@@ -387,7 +386,7 @@ const PatientPanel = () => {
           <Card className="pp-card">
             <div className="pp-card-body">
               <PanelEmptyState
-                icon="exclamationmark.triangle"
+                icon={AlertTriangle}
                 title={t('misc.pp_oshibka_zagruzki')}
                 description={patientDataError}
                 variant="error"

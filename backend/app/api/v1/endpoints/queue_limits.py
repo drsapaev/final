@@ -72,6 +72,12 @@ class QueueLimitResponse(BaseModel):
     enabled: bool
     current_usage: int
     doctors_count: int
+    # D-2 display-fix (Codex round-1 P2): the aggregate cap the admin UI
+    # shows for a multi-doctor specialty — max_per_day x doctors_count.
+    # Declared explicitly so Pydantic does NOT silently drop the key the
+    # service puts into the item dict (it must appear in the HTTP response
+    # and the OpenAPI contract, not just internally).
+    aggregate_max_per_day: int
     last_updated: datetime | None
 
 

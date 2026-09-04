@@ -21,7 +21,7 @@ import {
 
 'lucide-react';
 import {
-  MacOSCard, Button, Input, Select, Checkbox,
+  Card, Button, Input, Select, Checkbox,
 } from '../ui/macos';
 
 import { api } from '../../api/client';
@@ -176,12 +176,12 @@ const TelegramSettings = () => {
 
   if (loading) {
     return (
-      <MacOSCard className="admin-p-32">
+      <Card className="admin-p-32">
         <div className="admin-flex-ai-center-jc-center">
           <RefreshCw className="admin-w-20-h-20-mr-8-anim-spin1slinearinfinite" />
           <span className="text-[var(--mac-text-primary)]">{t('admin2.ts_loading')}</span>
         </div>
-      </MacOSCard>);
+      </Card>);
 
   }
 
@@ -234,43 +234,43 @@ const TelegramSettings = () => {
 
       {/* Статистика */}
       <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
-        <MacOSCard className="admin-p-24-ta-center">
+        <Card className="admin-p-24-ta-center">
           <div className="admin-2xl-bold-blue-mb-8">
             {stats.total_users || 0}
           </div>
           <div className="text-sm text-[var(--mac-text-secondary)]">
             {t('admin2.ts_stat_total_users')}
           </div>
-        </MacOSCard>
-        <MacOSCard className="admin-p-24-ta-center">
+        </Card>
+        <Card className="admin-p-24-ta-center">
           <div className="admin-2xl-bold-success-mb-8">
             {stats.messages_sent || 0}
           </div>
           <div className="text-sm text-[var(--mac-text-secondary)]">
             {t('admin2.ts_stat_messages_sent')}
           </div>
-        </MacOSCard>
-        <MacOSCard className="admin-p-24-ta-center">
+        </Card>
+        <Card className="admin-p-24-ta-center">
           <div className="admin-2xl-bold-warning-mb-8">
             {stats.messages_delivered || 0}
           </div>
           <div className="text-sm text-[var(--mac-text-secondary)]">
             {t('admin2.ts_stat_messages_delivered')}
           </div>
-        </MacOSCard>
-        <MacOSCard className="admin-p-24-ta-center">
+        </Card>
+        <Card className="admin-p-24-ta-center">
           <div className="admin-2xl-bold-error-mb-8">
             {stats.messages_failed || 0}
           </div>
           <div className="text-sm text-[var(--mac-text-secondary)]">
             {t('admin2.ts_stat_messages_failed')}
           </div>
-        </MacOSCard>
+        </Card>
       </div>
 
       <div className="admin-grid-gtc-rauto-fitcminmax400pxc1fr-gap-24">
         {/* Основные настройки */}
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
             <Bot className="admin-w-20-h-20-mr-8-blue" />
             {t('admin2.ts_bot_settings_title')}
@@ -347,10 +347,10 @@ const TelegramSettings = () => {
               </Button>
             </div>
           </div>
-        </MacOSCard>
+        </Card>
 
         {/* Настройки уведомлений */}
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
             <Bell className="admin-w-20-h-20-mr-8-success" />
             {t('admin2.ts_notifications_title')}
@@ -431,11 +431,11 @@ const TelegramSettings = () => {
               </div>
             }
           </div>
-        </MacOSCard>
+        </Card>
       </div>
 
       {/* Тестирование */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
           <Send className="admin-w-20-h-20-mr-8-purple" />
           {t('admin2.ts_test_send_title')}
@@ -480,10 +480,10 @@ const TelegramSettings = () => {
             {t('admin2.ts_send_test_button')}
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Инструкция */}
-      <MacOSCard className="admin-p-24-bg-info-bg-bd-1solidvar-mac-info-border">
+      <Card className="admin-p-24-bg-info-bg-bd-1solidvar-mac-info-border">
         <h3 className="admin-lg-med-mb-8-flex-ai-center-info-m-0">
           <MessageSquare className="admin-w-20-h-20-mr-8" />
           {t('admin2.ts_setup_title')}
@@ -495,7 +495,7 @@ const TelegramSettings = () => {
           <p className="admin-m-0">{t('admin2.ts_setup_step_4')}</p>
           <p className="admin-m-0">{t('admin2.ts_setup_step_5')}</p>
         </div>
-      </MacOSCard>
+      </Card>
     </div>);
 
 };

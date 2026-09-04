@@ -22,7 +22,7 @@ import {
   XCircle } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
@@ -681,12 +681,12 @@ const DepartmentManagement = () => {
 
   if (loading) {
     return (
-      <MacOSCard>
+      <Card>
                 <div className="admin-loading-p-40-center">
                     <div className="spinner admin-spinner-mb-16"></div>
                     <p className="text-[var(--mac-text-secondary)]">{t('admin2.dept_loading')}</p>
                 </div>
-            </MacOSCard>);
+            </Card>);
 
   }
 
@@ -694,7 +694,7 @@ const DepartmentManagement = () => {
     <div className="admin-flex-col-20">
             {/* Статистика отделений */}
             <div className="admin-grid-auto-200-mb-16">
-                <MacOSCard className="p-4">
+                <Card className="p-4">
                     <div className="text-center">
                         <div className="admin-stat-number-mb-4">
                             {departmentStats.total}
@@ -703,9 +703,9 @@ const DepartmentManagement = () => {
                             {t('admin2.dept_stat_total')}
                         </div>
                     </div>
-                </MacOSCard>
+                </Card>
 
-                <MacOSCard className="p-4">
+                <Card className="p-4">
                     <div className="text-center">
                         <div className="admin-stat-number-success-mb-4">
                             {departmentStats.active}
@@ -714,9 +714,9 @@ const DepartmentManagement = () => {
                             {t('admin2.dept_stat_active')}
                         </div>
                     </div>
-                </MacOSCard>
+                </Card>
 
-                <MacOSCard className="p-4">
+                <Card className="p-4">
                     <div className="text-center">
                         <div className="admin-stat-number-warning-mb-4">
                             {departmentStats.inactive}
@@ -725,9 +725,9 @@ const DepartmentManagement = () => {
                             {t('admin2.dept_stat_inactive')}
                         </div>
                     </div>
-                </MacOSCard>
+                </Card>
 
-                <MacOSCard className="p-4">
+                <Card className="p-4">
                     <div className="text-center">
                         <div className="admin-stat-number-info-mb-4">
                             {departmentStats.withDoctors}
@@ -736,10 +736,10 @@ const DepartmentManagement = () => {
                             {t('admin2.dept_stat_with_doctors')}
                         </div>
                     </div>
-                </MacOSCard>
+                </Card>
             </div>
 
-            <MacOSCard>
+            <Card>
                 <div className="p-6">
                     <div className="admin-flex-between-mb-24">
                         <h2 className="admin-title-20">
@@ -1205,7 +1205,7 @@ const DepartmentManagement = () => {
                         </div>
           }
                 </div>
-            </MacOSCard>
+            </Card>
 
             {/* Модальное окно редактирования отделения */}
             <Modal
