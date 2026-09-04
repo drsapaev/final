@@ -664,6 +664,15 @@ async def _startup_tasks() -> None:
         except Exception as e:
             log.error(f"Failed to start backup scheduler: {e}")
 
+    if TESTING and os.getenv("LAB_SCHEDULER_FORCE_START") != "1":
+        # Test container: the every-5-minutes worker shares the sqlite engine
+        # with live per-test transactions — its periodic commits surface as
+        # flaky "no such savepoint"/"database is locked" teardown errors in
+        # whichever test is running when it fires. The scheduler's own
+        # behavior is covered by its dedicated regression tests, which arm it
+        # explicitly via LAB_SCHEDULER_FORCE_START=1.
+        log.info("Lab notification scheduler autostart skipped (TESTING=1)")
+        return
     # #8 fix: Start lab notification scheduler as a safety net.
     # The primary notification path is inline in lab_reporting_service.finalize(),
     # but this scheduler catches any missed events (e.g. if the inline call
