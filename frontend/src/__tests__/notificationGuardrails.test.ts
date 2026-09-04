@@ -72,7 +72,9 @@ describe('notification guardrails', () => {
   });
 
   it('keeps registrar table action visibility on backend-provided actions', () => {
-    const table = read('components/tables/EnhancedAppointmentsTable.tsx');
+    // PR-UI-09e-2: the EAT actions column moved verbatim to
+    // appointmentsTableColumns.tsx — read-list follows the moved code.
+    const table = read('components/tables/appointmentsTableColumns.tsx');
 
     expect(table).toContain('getBackendActionAvailability');
     expect(table).toContain('can_mark_paid');

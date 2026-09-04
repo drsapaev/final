@@ -36,7 +36,6 @@ def get_doctor_queue_today(
             "Doctor",
             "Registrar",
             "Cashier",
-            "Receptionist",
             "cardio",
             "cardiology",
             "Cardiologist",
@@ -75,21 +74,17 @@ def get_doctor_queue_today(
                 .first()
             )
 
-        if not doctor and normalized_specialty != "general":
-            doctor = (
-                db.query(Doctor)
-                .filter(
-                    and_(
-                        Doctor.specialty.in_(specialty_variants), Doctor.active == True
-                    )
-                )
-                .first()
-            )
-
+        # D-5 / FU-2: the previous fallback silently resolved ANY OTHER
+        # active doctor of the specialty when the caller has no Doctor row
+        # — cross-doctor data exposure (audit F4, security-adjacent).
+        # Decision D-5: no substitution — a caller without their OWN
+        # active Doctor profile of this specialty gets 403. Staff viewers
+        # (Admin/Registrar) have dedicated queue views instead.
         if not doctor and normalized_specialty != "general":
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Врач специальности '{specialty}' не найден. Проверенные варианты: {specialty_variants}",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: у текущего пользователя нет активного профиля "
+                f"врача специальности '{specialty}'",
             )
 
         today = date.today()
@@ -257,7 +252,6 @@ def call_patient(
             "Doctor",
             "Registrar",
             "Cashier",
-            "Receptionist",
             "cardio",
             "cardiology",
             "Cardiologist",
@@ -397,7 +391,6 @@ def start_patient_visit(
             "Doctor",
             "Registrar",
             "Cashier",
-            "Receptionist",
             "cardio",
             "cardiology",
             "Cardiologist",
@@ -511,7 +504,6 @@ def complete_patient_visit(
             "Doctor",
             "Registrar",
             "Cashier",
-            "Receptionist",
             "cardio",
             "cardiology",
             "Cardiologist",

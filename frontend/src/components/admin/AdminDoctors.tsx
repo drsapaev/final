@@ -1,6 +1,6 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
-import { Edit, Plus, RefreshCw, Search, Stethoscope, Trash2 } from 'lucide-react';
+import { Edit, Link2, MoreHorizontal, RefreshCw, Search, Stethoscope, Trash2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 import DoctorModal from './DoctorModal';
@@ -88,6 +88,11 @@ const AdminDoctors = () => {
     refreshAvailableUsers,
   } = useDoctors();
   const doctorModal = useModal();
+
+  // Recovery/migration action ("Link existing user") lives under
+  // ⋯ / Дополнительно — normal doctor creation moved to the Users module
+  // (canonical User+Doctor onboarding, owner decision 2026-09-01).
+  const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
 
   // PR-19: load departments dynamically (was hardcoded)
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
@@ -186,9 +191,48 @@ const AdminDoctors = () => {
               {t('admin2.ad_subtitle')}
             </p>
           </div>
-          <Button onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
-            {t('admin2.ad_add_doctor')}
-          </Button>
+          <div className="admin-doctors-advanced-anchor">
+            <Button
+              variant="secondary"
+              startIcon={<MoreHorizontal size={16} />}
+              aria-haspopup="menu"
+              aria-expanded={advancedMenuOpen}
+              onClick={() => setAdvancedMenuOpen((open) => !open)}
+            >
+              {t('admin2.ad_advanced_menu')}
+            </Button>
+            {advancedMenuOpen && (
+              <>
+                <div
+                  aria-hidden="true"
+                  onClick={() => setAdvancedMenuOpen(false)}
+                  className="admin-doctors-advanced-backdrop"
+                />
+                <div
+                  role="menu"
+                  aria-label={t('admin2.ad_advanced_menu')}
+                  className="admin-doctors-advanced-menu"
+                >
+                  <Button
+                    type="button"
+                    role="menuitem"
+                    variant="ghost"
+                    size="small"
+                    startIcon={<Link2 size={16} />}
+                    onClick={() => {
+                      setAdvancedMenuOpen(false);
+                      handleCreateDoctor();
+                    }}
+                  >
+                    {t('admin2.ad_link_existing_user')}
+                  </Button>
+                  <p className="admin-doctors-advanced-hint">
+                    {t('admin2.ad_link_existing_hint')}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div
@@ -206,7 +250,7 @@ const AdminDoctors = () => {
           {/* UX Audit Admin #4.7: фильтр специализации — Select вместо текстового инпута. */}
           <Select
             value={filterSpecialization}
-            onChange={(v: unknown) => setFilterSpecialization(String(v))}
+            onValueChange={(v) => setFilterSpecialization(String(v))}
             options={[
               { value: '', label: t('admin2.ad_specialization_all') },
               ...[...new Set(doctors.map((d: Doctor) => d.specialty).filter((s): s is string => Boolean(s)))].map((s: string) => ({ value: s, label: s })),
@@ -216,14 +260,14 @@ const AdminDoctors = () => {
           />
           <Select
             value={filterDepartment}
-            onChange={(v: unknown) => setFilterDepartment(String(v))}
+            onValueChange={(v) => setFilterDepartment(String(v))}
             options={departmentOptions}
             size="large"
             aria-label={t('admin2.ad_filter_department_aria')}
           />
           <Select
             value={filterStatus}
-            onChange={(v: unknown) => setFilterStatus(String(v))}
+            onValueChange={(v) => setFilterStatus(String(v))}
             options={statusOptions}
             size="large"
             aria-label={t('admin2.ad_filter_status_aria')}
@@ -262,11 +306,15 @@ const AdminDoctors = () => {
               description={
                 filtersActive
                   ? t('admin2.ad_empty_filters')
-                  : t('admin2.ad_empty_no_doctors')
+                  : t('admin2.ad_empty_create_hint')
               }
               action={
-                <Button onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
-                  {t('admin2.ad_add_first_doctor')}
+                <Button
+                  variant="secondary"
+                  onClick={handleCreateDoctor}
+                  startIcon={<Link2 size={16} />}
+                >
+                  {t('admin2.ad_link_existing_user')}
                 </Button>
               }
             />

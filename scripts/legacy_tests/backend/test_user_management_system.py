@@ -54,7 +54,7 @@ def test_user_management_system():
             print(f"✅ Пользователь создан: {user.username} (ID: {user.id})")
             user_id = user.id
         else:
-            print(f"❌ Ошибка создания пользователя: {message}")
+            print("❌ Ошибка создания пользователя (детали не печатаются: ответ сервиса может содержать пользовательские данные)")
             return False
         
         # Тест 2: Получение профиля пользователя
@@ -84,7 +84,7 @@ def test_user_management_system():
         if success:
             print("✅ Профиль обновлен успешно")
         else:
-            print(f"❌ Ошибка обновления профиля: {message}")
+            print("❌ Ошибка обновления профиля (детали не печатаются: ответ сервиса может содержать пользовательские данные)")
             return False
         
         # Тест 4: Обновление настроек пользователя
@@ -106,7 +106,7 @@ def test_user_management_system():
         if success:
             print("✅ Настройки пользователя обновлены успешно")
         else:
-            print(f"❌ Ошибка обновления настроек: {message}")
+            print("❌ Ошибка обновления настроек (детали не печатаются: ответ сервиса может содержать пользовательские данные)")
             return False
         
         # Тест 5: Обновление настроек уведомлений
@@ -128,7 +128,7 @@ def test_user_management_system():
         if success:
             print("✅ Настройки уведомлений обновлены успешно")
         else:
-            print(f"❌ Ошибка обновления настроек уведомлений: {message}")
+            print("❌ Ошибка обновления настроек уведомлений (детали не печатаются)")
             return False
         
         # Тест 6: Поиск пользователей
@@ -179,11 +179,11 @@ def test_user_management_system():
         success, message, result = service.bulk_action_users(db, bulk_action_data, 1)
         
         if success:
-            print(f"✅ Массовое действие выполнено: {message}")
+            print("✅ Массовое действие выполнено")
             print(f"   - Обработано: {result['processed_count']}")
             print(f"   - Ошибок: {result['failed_count']}")
         else:
-            print(f"❌ Ошибка массового действия: {message}")
+            print("❌ Ошибка массового действия (детали не печатаются: ответ сервиса может содержать пользовательские данные)")
             return False
         
         # Тест 9: Проверка CRUD операций
@@ -222,7 +222,7 @@ def test_user_management_system():
         if success:
             print("✅ Тестовый пользователь удален")
         else:
-            print(f"❌ Ошибка удаления тестового пользователя: {message}")
+            print("❌ Ошибка удаления тестового пользователя (детали не печатаются)")
             return False
         
         print("\n🎉 ВСЕ ТЕСТЫ ПРОШЛИ УСПЕШНО!")

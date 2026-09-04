@@ -120,7 +120,8 @@ export function useRoleAccess(profile: Record<string, unknown> | null = null) {
   };
 
   const isRegistrar = () => {
-    return hasRole(['registrar', 'Registrar', 'receptionist', 'Receptionist']);
+    // REC-3: legacy receptionist spellings removed — canonical 'registrar'/'Registrar'.
+    return hasRole(['registrar', 'Registrar']);
   };
 
   const isLab = () => {
@@ -256,7 +257,8 @@ function getUserPermissions(profile: Record<string, unknown>): string[] {
     permissions.push('view_patients', 'edit_patients', 'view_appointments', 'edit_appointments');
   }
 
-  if (roles.includes('registrar') || roles.includes('receptionist')) {
+  // REC-3: legacy 'receptionist' spelling removed from the permission branch.
+  if (roles.includes('registrar')) {
     permissions.push('view_patients', 'edit_patients', 'view_appointments', 'edit_appointments', 'manage_queue');
   }
 

@@ -67,8 +67,6 @@ const DoctorServiceSelector = ({
   className = ''
 }: DoctorServiceSelectorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
-  // Проверяем демо-режим в самом начале
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
   const [serviceSearch, setServiceSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -98,15 +96,6 @@ const DoctorServiceSelector = ({
   };
 
   const loadServices = useCallback(async () => {
-    // Проверяем демо-режим только по пути
-    const isDemoMode = window.location.pathname.includes('/medilab-demo');
-
-    if (isDemoMode) {
-      logger.log('DoctorServiceSelector: Skipping loadServices in demo mode');
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       setError('');
@@ -208,11 +197,6 @@ const DoctorServiceSelector = ({
       onActivate();
     }
   };
-
-  if (isDemoMode) {
-    logger.log('DoctorServiceSelector: Skipping render in demo mode');
-    return null;
-  }
 
   if (loading) {
     return (

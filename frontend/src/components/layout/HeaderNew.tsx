@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
-import { Sun as LSun, Moon as LMoon, Monitor as LMonitor, Rainbow as LRainbow, Layers as LLayers, Sparkles as LSparkles, Bell as BellIcon } from 'lucide-react';
+import { ArrowRight, ChevronLeft, CreditCard, Plus, Stethoscope, User, Sun as LSun, Moon as LMoon, Monitor as LMonitor, Rainbow as LRainbow, Layers as LLayers, Sparkles as LSparkles, Bell as BellIcon, type LucideIcon } from 'lucide-react';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth';
 import { useTheme } from '../../contexts/ThemeContext';
 import CompactConnectionStatus from '../pwa/CompactConnectionStatus';
-import {
-  Button, Icon,
-} from '../ui/macos';
+import { Button } from '../ui/macos';
 import LanguageSwitcher from '../LanguageSwitcher';
 import GlobalSearchBar from '../search/GlobalSearchBar';
 import ChatButton from '../chat/ChatButton';
@@ -111,8 +109,9 @@ export default function HeaderNew() {
   const user = stateTyped.profile || stateTyped.user || null;
   const role = user?.role || user?.role_name || 'Guest';
   const roleLower = String(role).toLowerCase();
-  // Normalize receptionist to registrar for UI consistency
-  const roleNormalized = roleLower === 'receptionist' ? 'registrar' : roleLower;
+  // REC-3: receptionist->registrar normalization removed with the alias —
+  // canonical profiles carry 'registrar' directly.
+  const roleNormalized = roleLower;
   const currentRoute = getEffectiveRouteByPath(location.pathname);
 
   const isRegistrarPanel = currentRoute?.id === 'registrar-home';
@@ -159,12 +158,12 @@ export default function HeaderNew() {
 
   // Навигация по ролям (как в исходном хедере)
   const navItems = useMemo(() => {
-    const items: Array<{ to: string; label: string; icon: string }> = [];
+    const items: Array<{ to: string; label: string; icon: LucideIcon }> = [];
     if (roleNormalized !== 'admin') {
       // PR-UI-04b: cashier home button removed from header — now in canonical Sidebar
       // via SIDEBAR_PRESETS.cashier. Cross-role navigation (registrar → cashier)
       // is still available here for roles that don't have their own sidebar.
-      if (roleNormalized === 'registrar') items.push({ to: getRoleHomeRoute('cashier'), label: t('legacy.hn_nav_cashier_role'), icon: 'creditcard' });
+      if (roleNormalized === 'registrar') items.push({ to: getRoleHomeRoute('cashier'), label: t('legacy.hn_nav_cashier_role'), icon: CreditCard });
     }
     return items;
   }, [roleNormalized]);
@@ -218,7 +217,7 @@ export default function HeaderNew() {
         padding: '8px 10px',
         flexShrink: 0
       }}>
-      <Icon name="chevron.left" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+      <ChevronLeft size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />
     </Button>
   ) : null;
 
@@ -238,7 +237,7 @@ export default function HeaderNew() {
       padding: 'var(--mac-spacing-2) var(--mac-spacing-3)'
     }}>
 
-      <Icon name="stethoscope" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+      <Stethoscope size={20} aria-hidden="true" style={{ color: 'var(--mac-accent-blue)' }} />
       <span className="hdr-hide-xs">{t('legacy.hn_brand_text')}</span>
     </Button>;
 
@@ -247,6 +246,7 @@ export default function HeaderNew() {
   <div className="hdr-nav-scroll" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap', overflowX: 'auto' }}>
       {navItems.map((item) => {
       const active = location.pathname === item.to;
+      const ItemIcon = item.icon;
       return (
         <Button
           key={item.to}
@@ -265,7 +265,7 @@ export default function HeaderNew() {
             theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : 'var(--mac-text-primary)'
           }}>
 
-            <Icon name={item.icon} size="small" style={{ color: active ? 'white' : theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
+            <ItemIcon size={16} aria-hidden="true" style={{ color: active ? 'white' : theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
             <span className="hdr-hide-sm">{item.label}</span>
           </Button>);
 
@@ -295,7 +295,7 @@ export default function HeaderNew() {
         }}
         style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0 }}>
 
-            <Icon name="plus" size="small" style={{ color: 'white' }} />
+            <Plus size={16} aria-hidden="true" style={{ color: 'white' }} />
             <span className="hdr-hide-md">{t('legacy.hn_new_appointment_title')}</span>
           </Button>
         </>
@@ -355,7 +355,8 @@ export default function HeaderNew() {
             <BellIcon size={16} style={{ color: 'var(--mac-text-primary)' }} />
             {(() => {
               const role = String(user?.role || user?.role_name || '').toLowerCase();
-              const normalizedRole = role === 'receptionist' ? 'registrar' : role;
+              // REC-3: receptionist normalization removed with the alias.
+              const normalizedRole = role;
               const count = getUnreadCount(normalizedRole);
               return count > 0 ? (
                 <span style={{
@@ -507,7 +508,7 @@ export default function HeaderNew() {
               gap: 'var(--mac-spacing-2)',
               flex: '0 0 auto'
             }}>
-            <Icon name="person" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+            <User size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />
             <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
               {String(user?.full_name ?? '') || String(user?.username ?? '') || t('legacy.hn_profile_fallback')}
             </span>
@@ -556,7 +557,7 @@ export default function HeaderNew() {
                     alignItems: 'center',
                     gap: '8px',
                   }}>
-                  <Icon name="person" size="small" />
+                  <User size={16} aria-hidden="true" />
                   {t('legacy.hn_profile_menu_item')}
                 </button>
                 <button
@@ -578,7 +579,7 @@ export default function HeaderNew() {
                     alignItems: 'center',
                     gap: '8px',
                   }}>
-                  <Icon name="arrow.right.square" size="small" />
+                  <ArrowRight size={16} aria-hidden="true" />
                   {t('legacy.hn_logout')}
                 </button>
               </div>
@@ -597,7 +598,7 @@ export default function HeaderNew() {
             gap: 'var(--mac-spacing-2)',
             flex: '0 0 auto'
           }}>
-          <Icon name="person" size="small" style={{ color: 'white' }} />
+          <User size={16} aria-hidden="true" style={{ color: 'white' }} />
           <span>{t('legacy.hn_login')}</span>
         </Button>
       )}
@@ -630,8 +631,14 @@ export default function HeaderNew() {
             padding: '4px 8px',
             fontSize: 'var(--mac-font-size-xs)',
             fontWeight: 'var(--mac-font-weight-medium)',
-            color: 'var(--mac-text-secondary, #6b7280)',
-            background: 'var(--mac-surface-secondary, #f3f4f6)',
+            // AXE-EXP-2: the previous background var(--mac-surface-secondary,
+            // #f3f4f6) resolved to the LIGHT literal in both themes (the
+            // token is not defined anywhere) — in dark the ink fell to
+            // dark secondary #98989d on the light surface = 2.6:1. Now a
+            // themed tertiary surface + the on-tertiary ink (5.71:1 light /
+            // 6.74:1 dark).
+            color: 'var(--mac-text-on-tertiary, #455568)',
+            background: 'var(--mac-bg-tertiary, #d7e1ee)',
             border: '1px solid var(--mac-border, #d1d5db)',
             borderRadius: 'var(--mac-radius-sm)',
             cursor: 'pointer',
@@ -641,10 +648,10 @@ export default function HeaderNew() {
             transition: 'background 0.15s ease',
           }}
           onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
-            e.currentTarget.style.background = 'var(--mac-surface-hover, #e5e7eb)';
+            e.currentTarget.style.background = 'var(--mac-bg-secondary, #e3ebf5)';
           }}
           onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
-            e.currentTarget.style.background = 'var(--mac-surface-secondary, #f3f4f6)';
+            e.currentTarget.style.background = 'var(--mac-bg-tertiary, #d7e1ee)';
           }}
         >
           ⌘K

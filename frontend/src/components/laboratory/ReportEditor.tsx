@@ -1,11 +1,12 @@
 
-import { Badge, Icon, Input } from '../ui/macos';
+import { Badge, Input } from '../ui/macos';
 import { formatFlagLabel, formatThreshold } from './utils/labReportNormalize';
 import { flagVariant } from './utils/labReportActions';
 // STRAT#24: t() для i18n — field-level strings.
 // STRAT#2: labToast для interactive numeric validation toasts.
 import { useLabToast } from './hooks/useLabToast';
 import { useTranslation } from '../../i18n/useTranslation';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 /**
  * STRAT#24: ReportEditor — extracted from LabReportWorkbench.
@@ -106,7 +107,7 @@ export default function ReportEditor({
             >
               {section.title || section.key}
               {/* L-M-11 fix: заменены ▶/▼ (CJK punctuation) на lucide chevron icons */}
-              <Icon name={isCollapsed ? 'chevron.right' : 'chevron.down'} size={14} />
+              {isCollapsed  ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
             </div>
             {!isCollapsed && (
             <div style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', display: 'grid', gap: '10px' }}>

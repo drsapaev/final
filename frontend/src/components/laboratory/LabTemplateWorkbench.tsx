@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState, useId } from 'react';
-import {
-  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
-} from '../ui/macos';
+import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../ui/macos';
 import { useConfirm } from '../common/ConfirmDialog';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
 import { useLabReporting } from '../../hooks/useLabReporting';
@@ -29,6 +27,7 @@ import SignersTab from './templateEditor/SignersTab';
 import PreviewTab from './templateEditor/PreviewTab';
 import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
+import { Archive, BadgeCheck, Download, Files, Plus, RotateCcw, SlidersHorizontal, SquareStack } from 'lucide-react';
 
 export default function LabTemplateWorkbench({
   templates,
@@ -500,11 +499,11 @@ export default function LabTemplateWorkbench({
         <CardHeader className="ltw-card-header">
           <CardTitle className="ltw-card-title">
             <span className="ltw-flex-center">
-              <Icon name="rectangle.stack.badge.plus" size={20} />
+              <SquareStack size={20} aria-hidden="true" />
               {t('template.title')}
             </span>
             <Button variant="primary" size="small" onClick={() => setShowNewTemplateDialog(true)} disabled={saving}>
-              <Icon name="plus" size={14} />
+              <Plus size={14} aria-hidden="true" />
               {t('template.new_template')}
             </Button>
           </CardTitle>
@@ -562,13 +561,13 @@ export default function LabTemplateWorkbench({
         <CardHeader className="ltw-card-header">
           <CardTitle className="ltw-card-title-gap-12">
             <span className="ltw-flex-center">
-              <Icon name="slider.horizontal.3" size={20} />
+              <SlidersHorizontal size={20} aria-hidden="true" />
               Редактор бланка
             </span>
             {selectedTemplate && (
               <div className="ltw-flex-gap-8">
                 <Button variant="outline" onClick={handleCloneTemplate} disabled={saving}>
-                  <Icon name="doc.on.doc" size={16} />
+                  <Files size={16} aria-hidden="true" />
                   {t('template.clone')}
                 </Button>
                 <Button
@@ -596,19 +595,19 @@ export default function LabTemplateWorkbench({
                   disabled={saving || !activeVersion}
                   title={t('misc.ltw_otmenit_izmeneniya_i_vosstan')}
                 >
-                  <Icon name="arrow.counterclockwise" size={16} />
+                  <RotateCcw size={16} aria-hidden="true" />
                   Отменить
                 </Button>
                 <Button variant="outline" onClick={handleSaveTemplate} disabled={saving}>
-                  <Icon name="square.and.arrow.down" size={16} />
+                  <Download size={16} aria-hidden="true" />
                   {t('common.save_draft')}
                 </Button>
                 <Button variant="primary" onClick={handlePublishVersion} disabled={saving}>
-                  <Icon name="checkmark.seal" size={16} />
+                  <BadgeCheck size={16} aria-hidden="true" />
                   {t('template.publish')}
                 </Button>
                 <Button variant="outline" onClick={handleArchiveTemplate} disabled={saving || !activeVersion} title={t('template.archive')}>
-                  <Icon name="archivebox" size={16} />
+                  <Archive size={16} aria-hidden="true" />
                   {t('template.archive')}
                 </Button>
               </div>

@@ -29,6 +29,12 @@ MODULE_SPECS = [
             "frontend/src/pages/DoctorPanel.jsx",
             "frontend/src/hooks/useDoctorPhrases.js",
             "frontend/src/hooks/useDoctorTreatmentTemplates.js",
+            # PR-UI-15 (DoctorPanel refactor, #2925-2926) extracted empty-state
+            # and a11y/keyboard patterns into view files; include them so the
+            # UX scorecard still detects the indicators that the main panel
+            # no longer carries inline.
+            "frontend/src/pages/doctor/views/DoctorEmptyState.tsx",
+            "frontend/src/pages/doctor/views/DoctorPatientInfo.tsx",
         ],
     },
     {
@@ -38,6 +44,15 @@ MODULE_SPECS = [
             "frontend/src/pages/CashierPanel.jsx",
             "frontend/src/hooks/usePayments.js",
             "frontend/src/services/payment.js",
+            # PR-UI-14 (CashierPanel refactor, #2914-2921) extracted empty-state
+            # and a11y/keyboard patterns into view files; include them so the
+            # UX scorecard still detects the indicators that the main panel
+            # no longer carries inline. usePaymentsApi.ts carries the
+            # isValidPaymentAmount / validation tokens that usePayments.ts
+            # (a thin re-export wrapper) does not.
+            "frontend/src/hooks/usePaymentsApi.ts",
+            "frontend/src/pages/cashier/views/CashierPendingTable.tsx",
+            "frontend/src/pages/cashier/views/CashierHistoryTable.tsx",
         ],
     },
     {

@@ -13,6 +13,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db, require_roles
 from app.core.roles import Roles
 from app.models.user import User
+
+# M-1 (Manager deprecation): Manager removed from the statistics
+# grant below (privileged read surface) — Admin-only now. No role was
+# widened as compensation.
 from app.services.cloud_printing_service import (
     DocumentFormat,
     PrinterStatus,
@@ -583,7 +587,7 @@ async def test_printer(
 async def get_printing_statistics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Получить статистику печати"""
     try:

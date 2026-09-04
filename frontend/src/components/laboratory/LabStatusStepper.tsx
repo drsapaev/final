@@ -1,11 +1,12 @@
 
-import { Icon } from '../ui/macos';
+;
 import {
   LAB_REPORT_STATUS_CONFIG,
   getLabReportStepIndex,
 } from './utils/labStatusConfig';
 
 import { useTranslation } from '../../i18n/useTranslation';
+import { CheckCircle2 } from 'lucide-react';
 /**
  * P-04 fix: LabStatusStepper выделен в отдельный файл.
  *
@@ -92,7 +93,7 @@ export default function LabStatusStepper({ status }: { status: string }) {
               title={`${step.label} — ${titleSuffix}`}
             >
               {isCompleted && (
-                <Icon name="checkmark.circle.fill" size={12} />
+                <CheckCircle2 size={12} aria-hidden="true" />
               )}
               {isCurrent && (
                 <span

@@ -99,6 +99,9 @@ async def test_lab_scheduler_runs_off_event_loop_and_keeps_it_responsive(
         lambda: sessions.append(_FakeSession()) or sessions[-1],
     )
     monkeypatch.setattr(main_module.settings, "AUTO_BACKUP_ENABLED", False)
+    # TESTING=1 skips the scheduler autostart (it flakily corrupts live test
+    # transactions); this regression test arms it explicitly.
+    monkeypatch.setenv("LAB_SCHEDULER_FORCE_START", "1")
 
     await _startup_tasks()
     try:
@@ -213,3 +216,59 @@ async def test_backup_stop_cancels_idle_scheduler_immediately(
 class _NeverBackupService:
     def create_backup(self, backup_type: str) -> dict:  # pragma: no cover
         raise AssertionError("backup must not fire in this test")
+
+
+@pytest.mark.asyncio
+async def test_shutdown_grace_is_actually_bounded_and_job_thread_is_daemon(
+    monkeypatch,
+) -> None:
+    """Codex follow-up on #2874: a stalled job must not block shutdown past
+    the grace period, and its worker thread must be a daemon so the process
+    can exit without joining it."""
+    import app.db.session as db_session_module
+    import app.main as main_module
+    import app.services.lab_notification_service as lab_module
+
+    started = threading.Event()
+    release = threading.Event()
+    seen_thread_ids: list[int] = []
+
+    async def fake_run_lab_notifications(db):
+        seen_thread_ids.append(threading.get_ident())
+        started.set()
+        # Block the daemon thread itself (no executor): simulates a stalled
+        # sync DB call that will never finish within the grace period.
+        release.wait(120)
+        return {}
+
+    monkeypatch.setattr(
+        lab_module, "run_lab_notifications", fake_run_lab_notifications
+    )
+    monkeypatch.setattr(
+        db_session_module,
+        "SessionLocal",
+        lambda: _FakeSession(),
+    )
+    monkeypatch.setattr(main_module.settings, "AUTO_BACKUP_ENABLED", False)
+    # TESTING=1 skips the scheduler autostart; arm it for this test.
+    monkeypatch.setenv("LAB_SCHEDULER_FORCE_START", "1")
+    # Shrink the grace so the test proves bounding instead of waiting 30s.
+    monkeypatch.setattr(main_module, "_BACKGROUND_SHUTDOWN_GRACE_SECONDS", 1)
+
+    await _startup_tasks()
+    await _wait_for_event(started)
+
+    worker = next(
+        t for t in threading.enumerate() if t.ident == seen_thread_ids[0]
+    )
+    assert worker.daemon, "background job thread must be daemon"
+
+    shutdown_started = time_module.monotonic()
+    await _shutdown_background_tasks()
+    elapsed = time_module.monotonic() - shutdown_started
+
+    assert elapsed < 5, (
+        f"shutdown blocked {elapsed:.1f}s past the 1s grace period — "
+        "the grace is not actually bounded"
+    )
+    release.set()

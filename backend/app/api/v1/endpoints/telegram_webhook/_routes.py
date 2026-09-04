@@ -40,6 +40,8 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
 )
 from app.api.v1.endpoints.telegram_webhook._patient_commands import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._staff_commands import *  # noqa: F401, F403
+from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.schemas.notifications import (
     SendMessageRequest,
     TelegramWebhookUpdateRequest,
@@ -643,6 +645,30 @@ def create_mini_app_appointment_booking(
         request=request,  # M4-P0-1: pass request for audit logging
     )
     draft_payload = preview.draft.to_appointment_create_payload()
+
+    if preview.draft.doctor_id is not None:
+        # Atomic slot reservation (Codex P1 round-7, ordering fixed round-8:
+        # the per-doctor FOR UPDATE lock is taken BEFORE eligibility so a
+        # concurrent deactivation must commit first and the eligibility read
+        # below sees the post-commit state) — concurrent same-slot writers
+        # (web/mobile/telegram) serialize on the doctor row.
+        lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)
+
+        # Lifecycle eligibility (Codex round-2 P1): every live appointment
+        # writer must reject inactive/incomplete doctors — the Telegram Mini
+        # App booking included (same contract as POST /appointments, mobile
+        # book, QR path). detail-dict style matches the slot-conflict reply
+        # below so the Mini App error handling stays uniform.
+        try:
+            ensure_doctor_eligible_for_appointment(db, preview.draft.doctor_id)
+        except HTTPException as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={
+                    "reason": "doctor_not_eligible",
+                    "message": exc.detail,
+                },
+            ) from exc
 
     if preview.draft.doctor_id is not None and preview.draft.appointment_time:
         slot_occupied = appointment_crud.is_time_slot_occupied(

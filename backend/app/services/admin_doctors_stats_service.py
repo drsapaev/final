@@ -32,6 +32,16 @@ class AdminDoctorsStatsService:
             "description": "Стоматологические услуги",
             "color": "#007bff",
         },
+        # D-1 (Codex round-8 P2): 0049 stores dental doctors under the
+        # canonical spelling — the admin specialties endpoint must return
+        # the localized dental metadata, not the raw-value fallback.
+        "dentistry": {
+            "name_ru": "Стоматология",
+            "name_uz": "Stomatologiya",
+            "name_en": "Dentistry",
+            "description": "Стоматологические услуги",
+            "color": "#007bff",
+        },
     }
 
     def __init__(

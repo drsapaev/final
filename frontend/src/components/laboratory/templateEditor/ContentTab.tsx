@@ -1,12 +1,13 @@
 
 import { useState } from 'react';
-import { Badge, Button, Icon } from '../../ui/macos';
+import { Badge, Button } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
 // STRAT#11: t() и tInterpolate() для i18n — delete dialogs мигрированы.
 import { fieldTypeOptions, referenceModeOptions } from './config';
 import ReferenceRuleEditor from './ReferenceRuleEditor';
 import { useTranslation } from '@/i18n/useTranslation';
 import React from 'react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, FileDown, Files, Plus, Trash2 } from 'lucide-react';
 
 interface ContentTabField {
   field_key: string;
@@ -191,7 +192,7 @@ function ContentTab({
             {t('content.developer_mode')}
           </label>
           <Button variant="outline" onClick={onAddSection}>
-            <Icon name="plus" size={16} />
+            <Plus size={16} aria-hidden="true" />
             {t('content.add_section')}
           </Button>
           {/* UX-AUDIT-FIX7: Bulk-кнопка для загрузки всех референсных
@@ -209,7 +210,7 @@ function ContentTab({
             )}
             title={t('content.load_all_norms_title')}
           >
-            <Icon name="square.and.arrow.down.on.square" size={14} />
+            <FileDown size={14} aria-hidden="true" />
             {t('content.load_all_norms')}
           </Button>
         </span>
@@ -227,19 +228,19 @@ function ContentTab({
               aria-label={`${t('content.section_aria')}: ${section.title || section.key}`}
             >
               <div className="ltw-flex-center">
-                <Icon name={isSectionExpanded ? 'chevron.down' : 'chevron.right'} size={16} />
+                {isSectionExpanded  ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
                 <span className="ltw-section-title">{section.title || section.key}</span>
                 <Badge variant="default">{section.fields.length} {t('content.section_fields_count')}</Badge>
               </div>
               <span className="ltw-flex-gap-4">
                 <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onMoveSection(sectionIndex, 'up'); }} disabled={sectionIndex === 0} aria-label={t('content.move_section_up')}>
-                  <Icon name="arrow.up" size={14} />
+                  <ArrowUp size={14} aria-hidden="true" />
                 </Button>
                 <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onMoveSection(sectionIndex, 'down'); }} disabled={sectionIndex === draftVersion.sections.length - 1} aria-label={t('content.move_section_down')}>
-                  <Icon name="arrow.down" size={14} />
+                  <ArrowDown size={14} aria-hidden="true" />
                 </Button>
                 <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); handleRemoveSection(sectionIndex, section); }} aria-label={t('content.delete_section')}>
-                  <Icon name="trash" size={14} />
+                  <Trash2 size={14} aria-hidden="true" />
                 </Button>
               </span>
             </button>
@@ -271,23 +272,23 @@ function ContentTab({
                           aria-label={`${t('content.field_aria')}: ${field.label || field.field_key}`}
                         >
                           <div className="ltw-flex-center">
-                            <Icon name={isFieldExpanded ? 'chevron.down' : 'chevron.right'} size={14} />
+                            {isFieldExpanded  ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
                             <span className="ltw-field-title">{field.label || field.field_key || t('content.field_no_title')}</span>
                             <Badge variant="info">{fieldTypeOptions.find((o) => o.value === field.value_type)?.label || field.value_type}</Badge>
                             {field.required && <Badge variant="warning">{t('content.field_required')}</Badge>}
                           </div>
                           <span className="ltw-flex-gap-4">
                             <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'up'); }} disabled={fieldIndex === 0} aria-label={t('content.move_field_up')}>
-                              <Icon name="arrow.up" size={12} />
+                              <ArrowUp size={12} aria-hidden="true" />
                             </Button>
                             <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'down'); }} disabled={fieldIndex === section.fields.length - 1} aria-label={t('content.move_field_down')}>
-                              <Icon name="arrow.down" size={12} />
+                              <ArrowDown size={12} aria-hidden="true" />
                             </Button>
                             <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onDuplicateField(sectionIndex, fieldIndex); }} aria-label={t('content.duplicate_field')}>
-                              <Icon name="doc.on.doc" size={12} />
+                              <Files size={12} aria-hidden="true" />
                             </Button>
                             <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); handleRemoveField(sectionIndex, fieldIndex, field); }} aria-label={t('content.delete_field')}>
-                              <Icon name="trash" size={12} />
+                              <Trash2 size={12} aria-hidden="true" />
                             </Button>
                           </span>
                         </button>
@@ -353,7 +354,7 @@ function ContentTab({
                                     size="small"
                                     onClick={() => onLoadCatalogReferenceRange(sectionIndex, fieldIndex, field.analyte_code || '')}
                                   >
-                                    <Icon name="square.and.arrow.down.on.square" size={14} />
+                                    <FileDown size={14} aria-hidden="true" />
                                     {t('content.load_from_catalog')}
                                   </Button>
                                 </div>
@@ -403,7 +404,7 @@ function ContentTab({
                     );
                   })}
                   <Button variant="outline" onClick={() => onAddField(sectionIndex)}>
-                    <Icon name="plus" size={16} />
+                    <Plus size={16} aria-hidden="true" />
                     {t('content.add_field')}
                   </Button>
                 </div>

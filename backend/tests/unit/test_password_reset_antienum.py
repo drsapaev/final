@@ -125,15 +125,17 @@ async def test_phone_outcomes_share_identical_response_shape(db_session, monkeyp
     assert set(unknown) == set(delivered) == set(failed)
 
 
-@pytest.mark.asyncio
-async def test_duplicate_emails_do_not_break_the_lookup(db_session, monkeypatch):
+def test_duplicate_emails_are_rejected_by_schema(db_session):
+    """0053_users_email_unique formalized the invariant: duplicate emails
+    can no longer EXIST, so the old graceful-dup-lookup test (two users,
+    one email) is obsolete by construction. Pin the new contract instead:
+    the second insert raises at the DB level."""
+    import pytest as _pytest
+    from sqlalchemy.exc import IntegrityError
+
     shared = "dup.shared@test.local"
     _make_user(db_session, username="dup_one", email=shared)
-    _make_user(db_session, username="dup_two", email=shared)
 
-    found = crud_user.get_user_by_email(db_session, email=shared)
-    assert found is not None  # scalar_one_or_none поднимал MultipleResultsFound
-
-    svc = _email_svc(monkeypatch, ok=True)
-    result = await svc.initiate_email_reset(db_session, email=shared)
-    assert result["success"] is True
+    with _pytest.raises(IntegrityError):
+        _make_user(db_session, username="dup_two", email=shared)
+        db_session.commit()
