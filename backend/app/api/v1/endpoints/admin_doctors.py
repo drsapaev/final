@@ -603,13 +603,25 @@ def update_doctor(
             # No-cascade contract: an UNCHANGED historical value (possibly
             # now inactive/absent in the catalog) must not block unrelated
             # edits — only a genuine CHANGE is validated (Codex P2). The one
-            # exception is ACTIVATION of an inactive profile: carrying an
-            # unchanged non-assignable specialty (deactivated code or the
-            # incomplete sentinel) into an ACTIVE doctor is a NEW assignment
-            # and must pass the catalog (round-6 follow-up).
-            specialty_payload_present and activating_inactive_profile
+            # exception is ACTIVATION of an inactive profile: carrying the
+            # stored specialty (unchanged OR omitted from the payload) into
+            # an ACTIVE doctor is a NEW assignment and must pass the catalog
+            # (round-6 follow-up; #3010 round-6 P1 — an activation-only
+            # {"active": true} payload used to bypass the gate entirely and
+            # reactivate a profile holding a deactivated/unknown/sentinel
+            # code).
+            activating_inactive_profile
         ):
-            _validate_specialty_assignable(db, doctor.specialty)
+            # Payload present → validate the payload value (raw, so the
+            # None-is-unset semantics of _validate_specialty_assignable are
+            # preserved); payload omits specialty → validate the STORED
+            # value the activation would carry into the active state.
+            _validate_specialty_assignable(
+                db,
+                doctor.specialty
+                if specialty_payload_present
+                else existing_doctor.specialty,
+            )
 
         updated_doctor = crud_clinic.update_doctor(db, doctor_id, doctor)
         if not updated_doctor:

@@ -5,7 +5,11 @@ from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
 )
 from app.services.user_mgmt._base import *  # noqa: F401, F403
-from app.services.user_mgmt._base import UserManagementServiceMixinBase
+from app.services.user_mgmt._base import (
+    MEDICAL_SPECIALTY_CATALOG_REMEDIATION,
+    DoctorSpecialtyNotSelectableError,
+    UserManagementServiceMixinBase,
+)
 
 
 class CoreMixin(UserManagementServiceMixinBase):
@@ -425,11 +429,22 @@ class CoreMixin(UserManagementServiceMixinBase):
 
             # Ghost-doctor prevention: mirror is_active onto Doctor profile
             if "is_active" in update_data and user.is_active != old_is_active:
+                # Codex #3031 round-7 P2: pass the pending role when the
+                # request also changes it — SessionLocal is autoflush=False,
+                # so the mirror's owner-role gate would otherwise read the
+                # STALE stored role and validate/resurrect a profile the
+                # combined request is about to demote (a safe recovery must
+                # not depend on the catalog). Promotions pass the NEW
+                # doctor-family role (the gate sees the effective state —
+                # same probe contract as before); demotions pass the
+                # non-doctor role so the mirror skips the resurrection and
+                # the demotion branch below deactivates the profile.
                 self._sync_doctor_active(
                     db,
                     user_id,
                     user.is_active,
                     reason="update_user_is_active",
+                    pending_role=user.role if "role" in update_data else None,
                 )
 
             # Lifecycle invariant: role=Doctor-family <-> active linked Doctor
@@ -449,6 +464,24 @@ class CoreMixin(UserManagementServiceMixinBase):
             db.commit()
             return True, "Пользователь успешно обновлен"
 
+        except DoctorSpecialtyNotSelectableError as e:
+            # Codex #3010 follow-up P1: the promotion reactivates a Doctor
+            # profile whose stored specialty is not a selectable catalog
+            # code — surface the REMEDIATION message instead of the generic
+            # internal-error fallback (the role change is rejected, nothing
+            # is activated).
+            db.rollback()
+            logger.warning("Role change rejected by catalog guard: %s", e)
+            return False, str(e)
+        except MedicalSpecialtyCatalogError as e:
+            # Codex #3031 round-1: an UNUSABLE catalog must not degrade into
+            # the generic internal-error fallback — on PostgreSQL the failed
+            # catalog SELECT aborts the transaction, so propagate the
+            # configuration failure as the same remediation message the
+            # POST /users catalog boundary documents.
+            db.rollback()
+            logger.warning("Role change blocked: specialty catalog unavailable (%s)", e)
+            return False, MEDICAL_SPECIALTY_CATALOG_REMEDIATION
         except Exception as e:
             db.rollback()
             logger.error(f"Error updating user: {e}")
