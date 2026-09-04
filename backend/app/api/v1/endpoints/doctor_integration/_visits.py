@@ -157,9 +157,13 @@ async def schedule_next_visit(
         # Отправляем приглашение на подтверждение
         notification_service = NotificationService(db)
         try:
+            # Signature contract: send_visit_confirmation_invitation(db,
+            # visit_id, channel). The previous kwargs call (visit=visit,
+            # channel=...) raised TypeError on EVERY schedule-next visit and
+            # was swallowed below — invitations never reached patients.
             notification_result = (
                 await notification_service.send_visit_confirmation_invitation(
-                    visit=visit, channel=request.confirmation_channel
+                    db, visit.id, request.confirmation_channel
                 )
             )
             logger.info(

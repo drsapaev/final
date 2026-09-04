@@ -629,3 +629,67 @@ class TestE2EVisitFlow:
         assert visit.confirmation_channel == "telegram"
         assert visit.confirmation_token is not None
         assert visit.confirmation_expires_at is not None
+
+
+class TestScheduleNextInvitationDispatch:
+    """Regression: the schedule-next endpoint called
+    send_visit_confirmation_invitation(visit=..., channel=...) while the
+    method's contract is (db, visit_id, channel) — TypeError on EVERY call,
+    swallowed by the except, so invitations silently never reached patients.
+    """
+
+    def test_invitation_dispatched_with_correct_arguments(
+        self,
+        client,
+        db_session,
+        cardio_auth_headers,
+        test_patient,
+        test_doctor,
+        test_service,
+        monkeypatch,
+    ):
+        from app.services.notification_service import (
+            NotificationService as _RealService,
+        )
+
+        existing_visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today(),
+            visit_time="09:00",
+            status="open",
+            discount_mode="none",
+            source="desk",
+        )
+        db_session.add(existing_visit)
+        db_session.commit()
+
+        calls: list[tuple[int, str]] = []
+
+        async def _spy(self, db, visit_id, channel="auto"):
+            calls.append((visit_id, channel))
+            return {"success": True, "channel": channel}
+
+        monkeypatch.setattr(
+            _RealService, "send_visit_confirmation_invitation", _spy
+        )
+
+        response = client.post(
+            "/api/v1/doctor/visits/schedule-next",
+            json={
+                "patient_id": test_patient.id,
+                "service_ids": [test_service.id],
+                "visit_date": (date.today() + timedelta(days=1)).isoformat(),
+                "visit_time": "10:00",
+                "discount_mode": "none",
+                "all_free": False,
+                "confirmation_channel": "phone",
+            },
+            headers=cardio_auth_headers,
+        )
+
+        assert response.status_code == 200, response.text
+        assert calls, "invitation dispatch was never reached (swallowed TypeError?)"
+        visit_id, channel = calls[0]
+        assert visit_id == response.json()["visit_id"]
+        assert channel == "phone"
