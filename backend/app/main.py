@@ -523,8 +523,87 @@ _app_start_time = _time.time()
 # -----------------------------------------------------------------------------
 # Диагностика подключённых маршрутов (called from lifespan)
 # -----------------------------------------------------------------------------
+def _warm_table_reflection() -> None:
+    """Pre-reflect service tables once per process (perf P0 2026-09-03).
+
+    visits_api_service reflects schema tables lazily; the first reflection
+    costs dozens of pg_catalog roundtrips (~25s against the remote
+    Supabase). Warming the shared cache in a daemon thread right after
+    boot keeps the FIRST user request fast without blocking startup.
+    Best-effort: any failure logs and leaves the lazy path in place.
+    """
+    import threading
+
+    def _warm() -> None:
+        try:
+            import os as _os
+
+            if _os.getenv("TESTING") == "1":
+                # Test container: per-test databases (and monkeypatched
+                # session factories) make process-level warmup meaningless;
+                # running it here only leaks fake sessions into
+                # worker-thread assertions. Production runtime only.
+                return
+            from sqlalchemy import Table
+            from sqlalchemy import select as _select
+
+            from app.db.session import SessionLocal
+            from app.models.clinic import Doctor as _Doctor
+            from app.models.patient import Patient as _Patient
+            from app.models.user import User as _User
+            from app.services.lab_reporting_service import LabReportingService
+            from app.services.visits_api_service import _REFLECTED_META
+
+            session = SessionLocal()
+            try:
+                bind = session.get_bind()
+                for name in ("visits", "visit_services", "patients", "doctors", "users"):
+                    Table(name, _REFLECTED_META, autoload_with=bind)
+
+                # ORM compile touch: the FIRST query per mapper also pays a
+                # per-process compilation/catalog cost — touch the hot
+                # mappers once so user-facing requests skip it.
+                for _mapper_stmt in (
+                    _select(_User).limit(1),
+                    _select(_Patient).limit(1),
+                    _select(_Doctor).limit(1),
+                ):
+                    session.execute(_mapper_stmt)
+
+                # Lab self-heal seeders: first pass costs hundreds of
+                # statements against the remote DB — pay it here, once per
+                # process. Cross-PROCESS losers (multi-worker deploys) hit
+                # IntegrityError; the seeders treat it as "already seeded".
+                try:
+                    LabReportingService(session).list_templates()
+                except Exception as lab_exc:
+                    log.info(
+                        "Warmup lab seed skipped (%s) — seeders re-arm lazily",
+                        type(lab_exc).__name__,
+                    )
+                    try:
+                        session.rollback()
+                    except Exception:
+                        pass
+            finally:
+                try:
+                    session.close()
+                except Exception:
+                    pass
+            log.info(
+                "✅ Warmup complete (reflection %s tables + ORM touch + lab seed)",
+                len(_REFLECTED_META.tables),
+            )
+        except Exception as exc:  # pragma: no cover - startup best-effort
+            log.warning("Table reflection warmup skipped: %s", type(exc).__name__)
+
+    threading.Thread(target=_warm, name="schema-reflection-warmup", daemon=True).start()
+
+
+
 async def _startup_tasks() -> None:
     """Startup tasks - validates security settings and prints routes"""
+    _warm_table_reflection()
     # Validate SECRET_KEY on startup
     try:
         from app.core.config import _DEFAULT_SECRET_KEY, get_settings
@@ -585,6 +664,15 @@ async def _startup_tasks() -> None:
         except Exception as e:
             log.error(f"Failed to start backup scheduler: {e}")
 
+    if TESTING and os.getenv("LAB_SCHEDULER_FORCE_START") != "1":
+        # Test container: the every-5-minutes worker shares the sqlite engine
+        # with live per-test transactions — its periodic commits surface as
+        # flaky "no such savepoint"/"database is locked" teardown errors in
+        # whichever test is running when it fires. The scheduler's own
+        # behavior is covered by its dedicated regression tests, which arm it
+        # explicitly via LAB_SCHEDULER_FORCE_START=1.
+        log.info("Lab notification scheduler autostart skipped (TESTING=1)")
+        return
     # #8 fix: Start lab notification scheduler as a safety net.
     # The primary notification path is inline in lab_reporting_service.finalize(),
     # but this scheduler catches any missed events (e.g. if the inline call

@@ -8,6 +8,8 @@ from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import MetaData, Table, select, text
+
+_REFLECTED_META = MetaData()
 from sqlalchemy.orm import Session
 
 from app.core.audit import extract_model_changes
@@ -26,25 +28,25 @@ class VisitsApiService:
     ):
         self.repository = repository or VisitsApiRepository(db)
 
+    # Process-level reflection cache (perf P0 2026-09-03): a fresh
+    # MetaData() per call made EVERY request re-reflect the schema — dozens
+    # of pg_catalog roundtrips (~25s on the remote Supabase per visit/lab
+    # create). One shared MetaData reflects each table exactly once; later
+    # Table(...) calls return the cached reflection without I/O.
     def _visits(self) -> Table:
-        md = MetaData()
-        return Table("visits", md, autoload_with=self.repository.get_bind())
+        return Table("visits", _REFLECTED_META, autoload_with=self.repository.get_bind())
 
     def _vservices(self) -> Table:
-        md = MetaData()
-        return Table("visit_services", md, autoload_with=self.repository.get_bind())
+        return Table("visit_services", _REFLECTED_META, autoload_with=self.repository.get_bind())
 
     def _patients(self) -> Table:
-        md = MetaData()
-        return Table("patients", md, autoload_with=self.repository.get_bind())
+        return Table("patients", _REFLECTED_META, autoload_with=self.repository.get_bind())
 
     def _doctors(self) -> Table:
-        md = MetaData()
-        return Table("doctors", md, autoload_with=self.repository.get_bind())
+        return Table("doctors", _REFLECTED_META, autoload_with=self.repository.get_bind())
 
     def _users(self) -> Table:
-        md = MetaData()
-        return Table("users", md, autoload_with=self.repository.get_bind())
+        return Table("users", _REFLECTED_META, autoload_with=self.repository.get_bind())
 
     def _update_queue_entries_for_visit_owner(
         self,

@@ -586,6 +586,8 @@ def test_role_pattern_covers_full_doctor_family_ssot() -> None:
     when the admin modal re-submits a stored role verbatim."""
     import re
 
+    from pydantic import TypeAdapter
+
     from app.core.roles import DOCTOR_ROLE_SPELLINGS
     from app.schemas.user_management import (
         UserCreateRequest,
@@ -597,8 +599,11 @@ def test_role_pattern_covers_full_doctor_family_ssot() -> None:
         assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, spelling), spelling
 
     # canonical non-doctor roles still accepted
-    for role in ("Admin", "Doctor", "Registrar", "SuperAdmin", "Manager", "Nurse"):
+    # M-1 (Manager deprecation): 'Manager' moved from the WRITE vocabulary to
+    # the read/filter compatibility vocabulary — write surfaces 422 it now.
+    for role in ("Admin", "Doctor", "Registrar", "SuperAdmin", "Nurse"):
         assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, role), role
+    assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "Manager")
 
     # junk rejected
     assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "wizard")
@@ -607,11 +612,13 @@ def test_role_pattern_covers_full_doctor_family_ssot() -> None:
     # (probe password is assembled at runtime — a plaintext `password="..."`
     # kwarg trips GitGuardian's hardcoded-password detector on the PR scan)
     probe_password = "Pass" + "w" + "0rd!"
-    UserCreateRequest(
-        username="pattern_probe",
-        email="pattern_probe@test.com",
-        password=probe_password,
-        role="dentistry",
+    TypeAdapter(UserCreateRequest).validate_python(
+        {
+            "username": "pattern_probe",
+            "email": "pattern_probe@test.com",
+            "password": probe_password,
+            "role": "dentistry",
+        }
     )
     UserSearchRequest(role="cardiology")
 

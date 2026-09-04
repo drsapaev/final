@@ -18,7 +18,8 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 const patientSearchRouteByRole = {
   registrar: getRoleHomeRoute('registrar'),
-  receptionist: getRoleHomeRoute('registrar'),
+  // REC-3: receptionist key removed with the route alias (canonical role is
+  // 'registrar').
   cardio: getRoleHomeRoute('cardio'),
   derma: getRoleHomeRoute('derma'),
   dentist: getRoleHomeRoute('dentist'),
@@ -461,6 +462,7 @@ export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps
         <div
           id={listboxId}
           role="listbox"
+          aria-busy={isLoading}
           aria-label={t('misc.gsb_rezultaty_globalnogo_poiska')}
           style={styles.dropdown as CSSProperties}
           ref={dropdownRef}>

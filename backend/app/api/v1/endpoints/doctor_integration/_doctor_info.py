@@ -36,7 +36,6 @@ def get_doctor_services(
             "Doctor",
             "Registrar",
             "Cashier",
-            "Receptionist",
             "cardio",
             "cardiology",
             "Cardiologist",

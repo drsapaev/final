@@ -38,4 +38,4 @@
 ## Open items
 
 - `medical_specialties` (recurrence) still has **no owning migration/model** — the session that created it must adopt it (0051 pattern) or drop it; until then it is chain-invisible (the CI guard cannot see out-of-band tables — only live inventory can).
-- Audit trail for out-of-band DDL: consider a weekly cron that runs the same `check_public_rls.py` inventory against production and alerts on drift (the CI guard covers the chain, not the live DB).
+- ~~Audit trail for out-of-band DDL: consider a weekly cron~~ **DONE (2026-09-03)**: `ops/scripts/nightly_rls_inventory.ps1` runs the `check_public_rls.py` inventory against the live production database daily at 03:35 (Windows scheduled task `FinalClinic RLS Nightly Inventory` on the prod host) and raises a Sentry event on drift; log at `C:inal	oolsls_inventory.log`. The CI guard covers the chain; this covers the live DB.

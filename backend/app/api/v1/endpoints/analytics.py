@@ -17,7 +17,11 @@ logger = logging.getLogger(__name__)
 
 ANALYTICS_PUBLIC_ERROR = "Internal server error"
 CLINICAL_ANALYTICS_ROLES = ["admin", "doctor", "nurse"]
-FINANCIAL_ANALYTICS_ROLES = ["admin", "manager"]
+# M-1 (Manager deprecation): 'manager' removed from this role set —
+# the deprecated role loses all financial/KPI/predictive/revenue/export and
+# specialized-panel privileges. Admin keeps the surface unchanged; no role
+# was widened as compensation.
+FINANCIAL_ANALYTICS_ROLES = ["admin"]
 
 
 def _build_payment_provider_payload(

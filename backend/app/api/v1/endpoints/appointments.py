@@ -46,21 +46,21 @@ def _normalized_role_value(role: object) -> str:
     return str(getattr(role, "value", role)).strip().lower()
 
 
-# RBAC SSOT (app/core/security.py require_roles) maps the persisted
-# "Receptionist" spelling to "Registrar" for compatibility: legacy rows
-# carry that spelling and every require_roles gate already treats
-# Receptionist as registrar-equivalent. The inline guards below must
-# honor the same alias (Codex round-1 P2 on the department-schedule
-# guard): broad access is therefore tested on the NORMALIZED role value
-# against the alias-expanded set, not on the raw DB spelling.
+# E-4 (Receptionist alias removal): the inline guards previously expanded
+# the broad-access set with the legacy "Receptionist" spelling to mirror
+# the RBAC SSOT alias (Codex round-1 P2 on the department-schedule guard).
+# The alias is decommissioned (§4.1.27): stored Receptionist rows = 0
+# (production SQL evidence 2026-09-02), REC-1 froze writes, REC-3 removed
+# frontend callers, and the Telegram staff scope derives roles from the DB
+# user row. Broad access is now tested against the canonical spellings
+# only; a legacy 'Receptionist' row would be denied here.
 APPOINTMENT_BROAD_ACCESS_ROLES_LOWER = frozenset(
-    spelling.lower()
-    for spelling in (*APPOINTMENT_BROAD_ACCESS_ROLES, "Receptionist")
+    spelling.lower() for spelling in APPOINTMENT_BROAD_ACCESS_ROLES
 )
 
 
 def _has_broad_appointment_access(current_user: User) -> bool:
-    """Admin/Registrar (+registrar-equivalent Receptionist) or superuser."""
+    """Admin/Registrar or superuser."""
     return (
         _normalized_role_value(getattr(current_user, "role", None))
         in APPOINTMENT_BROAD_ACCESS_ROLES_LOWER

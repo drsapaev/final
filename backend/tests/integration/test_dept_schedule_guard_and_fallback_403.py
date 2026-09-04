@@ -150,11 +150,19 @@ def _admin(db_session) -> User:
     return admin
 
 
-def test_department_schedule_receptionist_alias_reads_any(client, db_session):
-    """Codex round-1 P2: the RBAC SSOT (core/security.py require_roles)
-    maps the persisted 'Receptionist' spelling to 'Registrar' — the inline
-    department-schedule guard must honor the same alias instead of 403'ing
-    registrar-equivalent accounts on their raw DB spelling."""
+def test_department_schedule_receptionist_spelling_denied(client, db_session):
+    """E-4 (Receptionist alias removal, §4.1.27) — inverted deny-contract.
+
+    The RBAC SSOT alias (core/security.py receptionist→registrar) and the
+    matching inline-guard expansion were decommissioned: the compatibility
+    window closed with all four removal-gate conditions verified (stored
+    Receptionist rows = 0 in production, REC-1 write-freeze, REC-3 frontend
+    caller removal, external-caller audit). A compatible deployment that
+    still carries a legacy 'Receptionist' row must now be DENIED on the
+    department-schedule surface (403) instead of silently promoted to
+    registrar-equivalent access — the same deny semantics REC-3 pinned on
+    the frontend route/page layers.
+    """
     dep = _department(db_session, "cardio")
     user, doctor = _doctor_with_user(
         db_session, specialty="cardiology", department=dep, label="rcp"
@@ -187,9 +195,7 @@ def test_department_schedule_receptionist_alias_reads_any(client, db_session):
         params={"date": str(date.today() + timedelta(days=1))},
         headers=_headers_for(receptionist),
     )
-    assert response.status_code == 200, response.text
-    ids = [entry["id"] for entry in response.json()["appointments"]]
-    assert appointment.id in ids
+    assert response.status_code == 403, response.text
 
 
 def test_department_schedule_numeric_key_resolved_by_key_first(client, db_session):
