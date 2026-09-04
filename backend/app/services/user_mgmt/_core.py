@@ -429,11 +429,22 @@ class CoreMixin(UserManagementServiceMixinBase):
 
             # Ghost-doctor prevention: mirror is_active onto Doctor profile
             if "is_active" in update_data and user.is_active != old_is_active:
+                # Codex #3031 round-7 P2: pass the pending role when the
+                # request also changes it — SessionLocal is autoflush=False,
+                # so the mirror's owner-role gate would otherwise read the
+                # STALE stored role and validate/resurrect a profile the
+                # combined request is about to demote (a safe recovery must
+                # not depend on the catalog). Promotions pass the NEW
+                # doctor-family role (the gate sees the effective state —
+                # same probe contract as before); demotions pass the
+                # non-doctor role so the mirror skips the resurrection and
+                # the demotion branch below deactivates the profile.
                 self._sync_doctor_active(
                     db,
                     user_id,
                     user.is_active,
                     reason="update_user_is_active",
+                    pending_role=user.role if "role" in update_data else None,
                 )
 
             # Lifecycle invariant: role=Doctor-family <-> active linked Doctor

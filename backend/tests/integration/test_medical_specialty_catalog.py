@@ -1367,6 +1367,74 @@ class TestActivationOnlyCatalogGuard:
         ).one()
         assert blank_row.active is True
 
+    def test_combined_reactivation_and_demotion_skips_catalog(
+        self, client, auth_headers, seeded_catalog, db_session, monkeypatch
+    ):
+        """Codex round-7 P2: {"role": "Registrar", "is_active": true} on an
+        inactive doctor account is a SAFE recovery — the intended end state
+        is an active non-doctor with an INACTIVE Doctor profile, and the
+        demotion lifecycle never probes the catalog. SessionLocal runs with
+        autoflush=False, so the activation mirror's owner-role gate reads
+        the STALE stored doctor role and must receive the effective target
+        role instead of re-reading the pre-flush snapshot."""
+        from app.services.medical_specialty_catalog import (
+            MedicalSpecialtyCatalogError,
+            MedicalSpecialtyCatalogService,
+        )
+
+        def _raise(self_db):
+            raise MedicalSpecialtyCatalogError("catalog probe failed")
+
+        monkeypatch.setattr(MedicalSpecialtyCatalogService, "list_active", _raise)
+        user, doctor = self._make_doctor_with_inactive_profile(
+            seeded_catalog, "dermatology", index=7
+        )
+        response = client.put(
+            f"/api/v1/users/users/{user.id}",
+            json={"role": "Registrar", "is_active": True},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        db_session.expire_all()
+        demoted = db_session.query(User).filter(User.id == user.id).one()
+        assert demoted.role == "Registrar"
+        assert demoted.is_active is True
+        stored = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+        # the profile stays INACTIVE — a stale-role resurrection followed by
+        # a re-demotion is exactly the intermediate drift this prevents
+        assert stored.active is False
+        assert stored.specialty == "dermatology"
+
+    def test_combined_reactivation_and_promotion_still_probes(
+        self, client, auth_headers, seeded_catalog, db_session
+    ):
+        """Codex round-7 P2 counterpart: a combined reactivation PLUS
+        promotion keeps the full catalog contract - the pending
+        doctor-family role passes the mirror's gate and a stored REAL
+        specialty that is no longer selectable still rejects the request
+        with the same descriptive error."""
+        user, doctor = self._make_doctor_with_inactive_profile(
+            seeded_catalog, "dermatology", index=8
+        )
+        row = self._deactivate(seeded_catalog, "dermatology")
+        try:
+            response = client.put(
+                f"/api/v1/users/users/{user.id}",
+                json={"role": "derma", "is_active": True},
+                headers=auth_headers,
+            )
+            assert response.status_code == 400, response.text
+            assert "недоступную в каталоге" in response.json()["detail"]
+            db_session.expire_all()
+            owner = db_session.query(User).filter(User.id == user.id).one()
+            assert owner.role == "Doctor"
+            assert owner.is_active is False
+            stored = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+            assert stored.active is False
+        finally:
+            row.active = True
+            seeded_catalog.commit()
+
     def test_bulk_change_role_demotion_skips_catalog(
         self, client, auth_headers, seeded_catalog, db_session, monkeypatch
     ):

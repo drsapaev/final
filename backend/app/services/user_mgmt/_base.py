@@ -186,6 +186,7 @@ class UserManagementServiceMixinBase:
         *,
         reason: str = "owner_state_change",
         detach_owner: bool = False,
+        pending_role: str | None = None,
     ) -> int:
         """Mirror User.is_active onto the linked Doctor profile(s).
 
@@ -212,7 +213,26 @@ class UserManagementServiceMixinBase:
             # to the doctor family. A demoted user (Registrar/Admin/other)
             # keeps the profile linked but INACTIVE — reactivation must never
             # resurrect it (non-doctor user != active Doctor profile).
-            owner_role = db.query(User.role).filter(User.id == user_id).scalar()
+            # Codex #3031 round-7 P2: ``update_user`` assigns the pending
+            # role BEFORE mirroring is_active, but SessionLocal runs with
+            # autoflush=False (backend/app/db/session.py) — the scalar query
+            # below still reads the STORED role. On a combined
+            # {"role": "Registrar", "is_active": true} reactivation-plus-
+            # demotion the stale read made the mirror treat the account as
+            # an active doctor: it resurrected the profile and ran the
+            # catalog guard against a state the request was about to
+            # abandon — rejecting a SAFE recovery (the intended end state is
+            # an active non-doctor with an INACTIVE profile) when the old
+            # profile's specialty was unavailable or the catalog
+            # unconfigured. ``pending_role`` carries the effective target
+            # role so the gate reflects the REQUEST's outcome, not the
+            # pre-flush snapshot; demotion-before-activation skips the
+            # resurrection AND its catalog dependency entirely.
+            owner_role = (
+                pending_role
+                if pending_role is not None
+                else db.query(User.role).filter(User.id == user_id).scalar()
+            )
             if owner_role not in DOCTOR_PROFILE_ROLES:
                 logger.info(
                     "Doctor profiles NOT reactivated: owner role %r is not "
