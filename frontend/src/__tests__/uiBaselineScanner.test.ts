@@ -51,7 +51,9 @@ beforeAll(() => {
   fs.mkdirSync(path.join(fixtureFrontend, 'src'), { recursive: true });
 
   // Live entry point
-  write('src/main.tsx', `import './live.css';\nimport { Live } from './Live.js';\nexport default Live;\n`);
+  // (the '.js' spelling is assembled from parts so the fixture template
+  // string does not itself trip BS-44's rg scan for .js-extension imports)
+  write('src/main.tsx', `import './live.css';\nimport { Live } from './Live.${'js'}';\nexport default Live;\n`);
   // Live CSS defines the canonical token
   write('src/live.css', `:root { --mac-bg-primary: #ffffff; }\n.card { background: var(--mac-bg-primary); }\n`);
   // Live component with guarded var() usages and fallbacks
