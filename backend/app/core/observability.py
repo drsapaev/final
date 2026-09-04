@@ -28,6 +28,12 @@ class SlaThresholds:
     error_rate_pct: float
     queue_lag_max: int
     window_seconds: int
+    # Percentile/ratio alerts are meaningless on tiny windows: at clinic
+    # opening (or at night, or right after a restart) a handful of cold
+    # requests drags p95 over the threshold and pages Sentry with a
+    # "breach" that is just sampling noise. Suppress BOTH ratio alerts
+    # until the window holds at least this many requests.
+    alert_min_samples: int = 20
 
 
 class ObservabilityState:
@@ -154,7 +160,14 @@ class ObservabilityState:
         alerts: dict[str, Any] = {}
 
         error_rate = float(window["error_rate_pct"])
-        if error_rate > self.thresholds.error_rate_pct:
+        enough_samples = window["requests"] >= self.thresholds.alert_min_samples
+        if not enough_samples:
+            logger.info(
+                "sla_alerts.suppressed window_requests=%s min_samples=%s",
+                window["requests"],
+                self.thresholds.alert_min_samples,
+            )
+        if enough_samples and error_rate > self.thresholds.error_rate_pct:
             severity = (
                 AlertSeverity.CRITICAL
                 if error_rate > self.thresholds.error_rate_pct * 1.5
@@ -176,7 +189,7 @@ class ObservabilityState:
                 alerts["error_rate"] = alert.message
 
         p95_latency = float(window["latency_p95_ms"])
-        if p95_latency > self.thresholds.latency_p95_ms:
+        if enough_samples and p95_latency > self.thresholds.latency_p95_ms:
             severity = (
                 AlertSeverity.CRITICAL
                 if p95_latency > self.thresholds.latency_p95_ms * 1.5
@@ -285,5 +298,6 @@ observability_state = ObservabilityState(
         error_rate_pct=float(getattr(settings, "OBS_SLA_ERROR_RATE_PCT", 5.0)),
         queue_lag_max=int(getattr(settings, "OBS_SLA_QUEUE_LAG_MAX", 50)),
         window_seconds=int(getattr(settings, "OBS_SLA_WINDOW_SECONDS", 300)),
+        alert_min_samples=int(getattr(settings, "OBS_SLA_MIN_SAMPLES", 20)),
     )
 )
