@@ -58,10 +58,15 @@ def _make_pending_confirmation_visit(
         session.commit()
         session.refresh(patient)
 
+        # SSOT: активация confirmed → open сравнивает visit_date с днём
+        # КЛИНИКИ (не host-UTC) — сеим ту же дату, иначе тест зависит от
+        # окна UTC-хоста 19:00-24:00.
+        from app.crud.clinic import clinic_today
+
         visit = Visit(
             patient_id=patient.id,
             doctor_id=doctor.id,
-            visit_date=date.today(),
+            visit_date=clinic_today(session),
             visit_time="10:00",
             status="pending_confirmation",
             discount_mode="none",

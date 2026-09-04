@@ -12,7 +12,6 @@ from app.core.specialties import (
     specialty_variants,
 )
 from app.models.clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
-from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
 from app.schemas.clinic import (
     ClinicSettingsCreate,
     ClinicSettingsUpdate,
@@ -23,6 +22,7 @@ from app.schemas.clinic import (
     ServiceCategoryCreate,
     ServiceCategoryUpdate,
 )
+from app.services.user_mgmt._base import INCOMPLETE_DOCTOR_SPECIALTY
 
 # ===================== НАСТРОЙКИ КЛИНИКИ =====================
 
@@ -145,7 +145,9 @@ def get_ticket_print_settings(db: Session) -> dict[str, bool]:
         if field_name not in result:
             continue
 
-        result[field_name] = _coerce_ticket_print_bool(setting.value, result[field_name])
+        result[field_name] = _coerce_ticket_print_bool(
+            setting.value, result[field_name]
+        )
 
     return result
 
@@ -241,12 +243,7 @@ def get_doctors_by_specialty(
             func.trim(Doctor.specialty) != '',
             Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
         ]
-    return (
-        db.query(Doctor)
-        .filter(and_(*predicates))
-        .order_by(Doctor.id.asc())
-        .all()
-    )
+    return db.query(Doctor).filter(and_(*predicates)).order_by(Doctor.id.asc()).all()
 
 
 def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
@@ -267,9 +264,7 @@ def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
     return db_doctor
 
 
-def update_doctor(
-    db: Session, doctor_id: int, doctor: DoctorUpdate
-) -> Doctor | None:
+def update_doctor(db: Session, doctor_id: int, doctor: DoctorUpdate) -> Doctor | None:
     """Обновить врача"""
     db_doctor = get_doctor_by_id(db, doctor_id)
     if not db_doctor:
@@ -385,9 +380,7 @@ def get_service_categories(
     return query.all()
 
 
-def get_service_category_by_id(
-    db: Session, category_id: int
-) -> ServiceCategory | None:
+def get_service_category_by_id(db: Session, category_id: int) -> ServiceCategory | None:
     """Получить категорию по ID"""
     return db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
 
@@ -468,6 +461,23 @@ def get_queue_settings(db: Session) -> dict[str, Any]:
             result["max_per_day"][canonical_specialty(specialty)] = setting.value
 
     return result
+
+
+def clinic_today(db: Session) -> "date":
+    """SSOT: календарный день КЛИНИКИ по таймзоне очередей.
+
+    Host date.today() на UTC-хосте между 19:00 и полуночью уже «вчера»
+    для Asia/Tashkent (см. get_queue_settings().timezone), а createVisit
+    дефолтит visit_date на день клиники. Все сравнения visit_date
+    ("визит на сегодня?") обязаны использовать ЭТУ дату, иначе в этом
+    окне подтверждение ошибочно пропускает выдачу номеров очереди и
+    активацию confirmed → open (main CI red 2026-09-04 19:05Z-19:47Z).
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    tz_name = get_queue_settings(db).get("timezone", "Asia/Tashkent")
+    return datetime.now(ZoneInfo(tz_name)).date()
 
 
 def update_queue_settings(

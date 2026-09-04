@@ -2,8 +2,10 @@
 
 Split from queue_service.py.
 """
+
 from __future__ import annotations
 
+from app.crud.clinic import clinic_today
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase  # noqa: F401
 
@@ -33,7 +35,6 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
             "called_at": entry.called_at,
         }
 
-
     def staff_call_next_patient(
         self,
         db: Session,
@@ -45,7 +46,8 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
         actor_user_id: int | None = None,
         commit: bool = True,
     ) -> dict[str, Any]:
-        target_day = target_date or date.today()
+        # SSOT: дефолт — день КЛИНИКИ (crud.clinic.clinic_today), не host-UTC
+        target_day = target_date or clinic_today(db)
         query = (
             db.query(OnlineQueueEntry)
             .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
@@ -62,17 +64,14 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
         if queue_tag:
             query = query.filter(DailyQueue.queue_tag == queue_tag)
 
-        entry = (
-            query.order_by(
-                OnlineQueueEntry.priority.desc(),
-                func.coalesce(
-                    OnlineQueueEntry.queue_time,
-                    OnlineQueueEntry.created_at,
-                ).asc(),
-                OnlineQueueEntry.id.asc(),
-            )
-            .first()
-        )
+        entry = query.order_by(
+            OnlineQueueEntry.priority.desc(),
+            func.coalesce(
+                OnlineQueueEntry.queue_time,
+                OnlineQueueEntry.created_at,
+            ).asc(),
+            OnlineQueueEntry.id.asc(),
+        ).first()
         if not entry:
             raise QueueNotFoundError("No waiting queue entry found for staff call")
 
@@ -95,7 +94,6 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
             original_queue_time=original_queue_time,
         )
 
-
     def staff_skip_queue_entry(
         self,
         db: Session,
@@ -105,9 +103,7 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
         commit: bool = True,
     ) -> dict[str, Any]:
         entry = (
-            db.query(OnlineQueueEntry)
-            .filter(OnlineQueueEntry.id == entry_id)
-            .first()
+            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         )
         if not entry:
             raise QueueNotFoundError(f"Queue entry {entry_id} not found")
@@ -132,7 +128,6 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
             previous_status=previous_status,
             original_queue_time=original_queue_time,
         )
-
 
     def _staff_visit_queue_link_entry(
         self,
@@ -164,13 +159,14 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
             .all()
         )
         if not entries:
-            raise QueueNotFoundError(f"Active queue link for visit {visit_id} not found")
+            raise QueueNotFoundError(
+                f"Active queue link for visit {visit_id} not found"
+            )
         if len(entries) > 1:
             raise QueueConflictError(
                 f"Visit {visit_id} has multiple active queue links"
             )
         return entries[0]
-
 
     def staff_cancel_visit_queue_link(
         self,
@@ -198,7 +194,6 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
             original_queue_time=original_queue_time,
         )
 
-
     def staff_move_visit_queue_link(
         self,
         db: Session,
@@ -225,7 +220,6 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
             original_queue_time=original_queue_time,
         )
 
-
     def update_queue_status(
         self,
         db: Session,
@@ -236,12 +230,10 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
     ) -> dict[str, Any]:
         raise NotImplementedError("update_queue_status is pending implementation")
 
-
     def validate_status_transition(self, current_status: str, new_status: str) -> None:
         raise NotImplementedError(
             "validate_status_transition is pending implementation"
         )
-
 
     def close_queue_entry(
         self,
@@ -253,22 +245,18 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
     ) -> dict[str, Any]:
         raise NotImplementedError("close_queue_entry is pending implementation")
 
-
     def calculate_wait_time(self, entry: OnlineQueueEntry) -> dict[str, Any]:
         raise NotImplementedError("calculate_wait_time is pending implementation")
-
 
     def get_visit_history(
         self, db: Session, *, patient_id: int, limit: int = 100
     ) -> list[dict[str, Any]]:
         raise NotImplementedError("get_visit_history is pending implementation")
 
-
     def reorder_queue(
         self, db: Session, *, queue_id: int, entry_orders: list[dict[str, int]]
     ) -> dict[str, Any]:
         raise NotImplementedError("reorder_queue is pending implementation")
-
 
     def resolve_conflicts(
         self, db: Session, *, queue_id: int, strategy: str = "compact"
@@ -282,6 +270,5 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
 def get_queue_service() -> QueueBusinessService:
     """Получить экземпляр сервиса очереди"""
     from app.services.queue_service import queue_service as _qs
+
     return _qs
-
-

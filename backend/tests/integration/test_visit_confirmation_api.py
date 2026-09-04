@@ -1,12 +1,11 @@
 """
 Интеграционные тесты для API подтверждения визитов
 """
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
 from app.models.online_queue import OnlineQueueEntry
-from app.models.visit import Visit
 
 
 @pytest.mark.integration
@@ -155,8 +154,10 @@ class TestVisitConfirmationAPI:
 
     def test_confirm_visit_creates_queue_entry_today(self, client, db_session, test_visit, test_daily_queue):
         """Тест создания записи в очереди при подтверждении визита на сегодня"""
-        # Устанавливаем дату визита на сегодня
-        test_visit.visit_date = date.today()
+        # SSOT: «сегодня» = день КЛИНИКИ (не host-UTC дата)
+        from app.services.visit_confirmation_service import _clinic_today
+
+        test_visit.visit_date = _clinic_today(db_session)
         db_session.commit()
 
         response = client.post("/api/v1/telegram/visits/confirm", json={
@@ -183,8 +184,10 @@ class TestVisitConfirmationAPI:
 
     def test_confirm_visit_no_queue_entry_future_date(self, client, db_session, test_visit, test_daily_queue):
         """Тест отсутствия записи в очереди при подтверждении визита на будущую дату"""
-        # Устанавливаем дату визита на завтра
-        test_visit.visit_date = date.today() + timedelta(days=1)
+        # SSOT: «завтра» = день клиники + 1 (не host-UTC окно 19:00-24:00)
+        from app.services.visit_confirmation_service import _clinic_today
+
+        test_visit.visit_date = _clinic_today(db_session) + timedelta(days=1)
         db_session.commit()
 
         response = client.post("/api/v1/telegram/visits/confirm", json={

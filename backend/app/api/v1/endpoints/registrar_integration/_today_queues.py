@@ -58,53 +58,34 @@ def _resolve_entry_department(
         from app.models.visit import VisitService
 
         visit_services_for_dept = (
-            db.query(VisitService)
-            .filter(VisitService.visit_id == record_id)
-            .all()
+            db.query(VisitService).filter(VisitService.visit_id == record_id).all()
         )
         for vs in visit_services_for_dept:
             if vs.service_id:
-                svc = (
-                    db.query(Service)
-                    .filter(Service.id == vs.service_id)
-                    .first()
-                )
+                svc = db.query(Service).filter(Service.id == vs.service_id).first()
                 if svc and svc.department_key:
                     entry_department_key = svc.department_key
                     break
     elif entry_type == "appointment":
         if entry_data is None:
-            logger.warning("get_today_queues: appointment entry with None data, skipping")
+            logger.warning(
+                "get_today_queues: appointment entry with None data, skipping"
+            )
             return None, None
         # Для Appointment получаем из услуг или напрямую
         appointment_obj = entry_data
-        if (
-            hasattr(appointment_obj, 'services')
-            and appointment_obj.services
-        ):
+        if hasattr(appointment_obj, 'services') and appointment_obj.services:
             for service_item in appointment_obj.services:
                 svc = None
                 if isinstance(service_item, dict):
                     service_id = service_item.get('id')
                     if service_id:
-                        svc = (
-                            db.query(Service)
-                            .filter(Service.id == service_id)
-                            .first()
-                        )
+                        svc = db.query(Service).filter(Service.id == service_id).first()
                 elif isinstance(service_item, int):
-                    svc = (
-                        db.query(Service)
-                        .filter(Service.id == service_item)
-                        .first()
-                    )
+                    svc = db.query(Service).filter(Service.id == service_item).first()
                 elif isinstance(service_item, str):
                     # [OK] ДОБАВЛЕНО: Поиск услуги по названию (Appointment.services - это JSON строк)
-                    svc = (
-                        db.query(Service)
-                        .filter(Service.name == service_item)
-                        .first()
-                    )
+                    svc = db.query(Service).filter(Service.name == service_item).first()
 
                 if svc and svc.department_key:
                     entry_department_key = svc.department_key
@@ -166,7 +147,9 @@ def _process_visits_for_queues(
         )
 
         # R-22: ECG detection extracted to helper
-        has_ecg, ecg_services_count, non_ecg_services_count = _detect_ecg_services(services)
+        has_ecg, ecg_services_count, non_ecg_services_count = _detect_ecg_services(
+            services
+        )
 
         # Только ЭКГ: если есть ЭКГ услуги и нет не-ЭКГ услуг
         has_only_ecg = has_ecg and non_ecg_services_count == 0
@@ -180,7 +163,9 @@ def _process_visits_for_queues(
         )
 
         # [OK] Определяем specialty: если есть ЭКГ, разделяем на отдельные очереди
-        visit_date = visit.visit_date or today  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
+        visit_date = (
+            visit.visit_date or today
+        )  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
         patient_id = visit.patient_id
 
         if has_ecg and not has_only_ecg:
@@ -234,8 +219,12 @@ def _process_visits_for_queues(
             # echokg/cardiology buckets keep an empty "doctors" map and the
             # payload's "specialists" list hides a doctor that really has a
             # visit in the queue.
-            _register_bucket_doctor(queues_by_specialty[specialty_ecg], getattr(visit, 'doctor', None))
-            _register_bucket_doctor(queues_by_specialty[specialty], getattr(visit, 'doctor', None))
+            _register_bucket_doctor(
+                queues_by_specialty[specialty_ecg], getattr(visit, 'doctor', None)
+            )
+            _register_bucket_doctor(
+                queues_by_specialty[specialty], getattr(visit, 'doctor', None)
+            )
             continue  # Переходим к следующему визиту
         elif has_ecg and has_only_ecg:
             # Только ЭКГ - идёт в echokg
@@ -265,7 +254,9 @@ def _process_visits_for_queues(
             # the visit's doctor in the echokg bucket BEFORE the continue so
             # "specialists" is not empty while the queue holds that doctor's
             # visit.
-            _register_bucket_doctor(queues_by_specialty[specialty], getattr(visit, 'doctor', None))
+            _register_bucket_doctor(
+                queues_by_specialty[specialty], getattr(visit, 'doctor', None)
+            )
             continue  # Переходим к следующему визиту
         else:
             # [OK] ОБНОВЛЕНО: Определяем specialty по department_key из услуг визита
@@ -327,10 +318,11 @@ def _process_visits_for_queues(
                 queues_by_specialty[specialty]["doctor"] = visit_doctor
                 # ✅ ИСПРАВЛЕНО: Обновляем doctor_id, если doctor найден
                 queues_by_specialty[specialty]["doctor_id"] = visit_doctor.id
-        _register_bucket_doctor(queues_by_specialty[specialty], getattr(visit, 'doctor', None))
+        _register_bucket_doctor(
+            queues_by_specialty[specialty], getattr(visit, 'doctor', None)
+        )
         # ✅ ИСПРАВЛЕНО: Убрана логика обновления doctor_id для visit записей, если specialty уже существует
         # Это предотвращает перезапись doctor_id, установленного online_queue записями (которые обрабатываются позже)
-
 
 
 def _collect_lab_report_summaries(
@@ -360,11 +352,7 @@ def _collect_lab_report_summaries(
         entry_visit_id = (
             entry_wrapper.get("visit_id")
             or getattr(entry_data, "visit_id", None)
-            or (
-                getattr(entry_data, "id", None)
-                if entry_type == "visit"
-                else None
-            )
+            or (getattr(entry_data, "id", None) if entry_type == "visit" else None)
         )
         if entry_visit_id:
             visible_visit_ids.add(entry_visit_id)
@@ -403,7 +391,6 @@ def _build_queue_result(
             department_filter=department_filter,
         )
     )
-
 
     for specialty, queue_data in queues_by_specialty.items():
         specialty_key = str(specialty or "").strip().lower()
@@ -457,9 +444,7 @@ def _build_queue_result(
             visit_time = None
             discount_mode = "none"
             record_id = None
-            visit_department = (
-                None  # ✅ ДОБАВЛЕНО: для хранения department из Visit
-            )
+            visit_department = None  # ✅ ДОБАВЛЕНО: для хранения department из Visit
             appointment_date = None  # R-22 fix: для queue_entry lookup
             doctor_id = None  # R-22 fix: для queue_entry lookup
 
@@ -546,16 +531,18 @@ def _build_queue_result(
             appointment_id_value = record_id if entry_type == "appointment" else None
 
             # R-22 Phase 5: queue entry metadata lookup extracted to helper
-            queue_entry_number, queue_entry_time, queue_entry_updated_at = _resolve_queue_entry_metadata(
-                db=db,
-                entry_type=entry_type,
-                entry_data=entry_data,
-                entry_wrapper=entry_wrapper,
-                record_id=record_id,
-                patient_id=patient_id,
-                appointment_date=appointment_date,
-                doctor_id=doctor_id,
-                idx=idx,
+            queue_entry_number, queue_entry_time, queue_entry_updated_at = (
+                _resolve_queue_entry_metadata(
+                    db=db,
+                    entry_type=entry_type,
+                    entry_data=entry_data,
+                    entry_wrapper=entry_wrapper,
+                    record_id=record_id,
+                    patient_id=patient_id,
+                    appointment_date=appointment_date,
+                    doctor_id=doctor_id,
+                    idx=idx,
+                )
             )
 
             # [OK] ДОБАВЛЯЕМ department_key и department для фронтенда
@@ -580,7 +567,9 @@ def _build_queue_result(
                 or entry_wrapper.get("created_at")
             )
             entry_display_time_kind = (
-                "queue_time" if queue_entry_time or entry_wrapper.get("queue_time") else "created_at"
+                "queue_time"
+                if queue_entry_time or entry_wrapper.get("queue_time")
+                else "created_at"
             )
 
             entry_visit_id = (
@@ -691,12 +680,11 @@ def get_today_queues(
     """
     try:
 
-
         # R-22 Phase 5: _same_patient_queue_entry_for_visit_id and _same_patient_queue_entry_for_visit
         # promoted to module-level helpers (take db as first parameter).
 
         # R-22: date parsing + department filter extracted to helpers
-        today = _parse_queue_target_date(target_date)
+        today = _parse_queue_target_date(target_date, db)
         department_filter = _normalize_department_filter(department)
 
         # R-22: data loading extracted to helper
@@ -717,10 +705,14 @@ def get_today_queues(
         )
 
         # R-22 Phase 3: online entries processing extracted to helper
-        _process_online_queue_entries(db, online_entries, visits, queues_by_specialty, seen_visit_ids)
+        _process_online_queue_entries(
+            db, online_entries, visits, queues_by_specialty, seen_visit_ids
+        )
 
         # R-22 Phase 3: appointment processing extracted to helper
-        _process_legacy_appointments(db, appointments, queues_by_specialty, seen_appointment_ids, today)
+        _process_legacy_appointments(
+            db, appointments, queues_by_specialty, seen_appointment_ids, today
+        )
 
         # Формируем результат
         # Build the final result from queues_by_specialty
@@ -800,9 +792,7 @@ def get_registrar_calendar(
 class BatchServiceItem(BaseModel):
     """Услуга для массового создания очередей"""
 
-    specialist_id: int = Field(
-        ..., description="ID специалиста (Doctor.id)"
-    )
+    specialist_id: int = Field(..., description="ID специалиста (Doctor.id)")
     service_id: int = Field(..., description="ID услуги")
     quantity: int = Field(default=1, ge=1, description="Количество")
 
@@ -889,7 +879,9 @@ def create_queue_entries_batch(
         # Группируем услуги по specialist_id (один врач = одна запись в очереди)
         services_by_specialist: dict[int, list[BatchServiceItem]] = {}
         for service_item in request.services:
-            service = db.query(Service).filter(Service.id == service_item.service_id).first()
+            service = (
+                db.query(Service).filter(Service.id == service_item.service_id).first()
+            )
             if not service:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -929,7 +921,11 @@ def create_queue_entries_batch(
 
             queue_tag = None
             if services_list:
-                first_service = db.query(Service).filter(Service.id == services_list[0].service_id).first()
+                first_service = (
+                    db.query(Service)
+                    .filter(Service.id == services_list[0].service_id)
+                    .first()
+                )
                 queue_tag = getattr(first_service, "queue_tag", None)
 
             daily_queue = queue_service.get_or_create_daily_queue(
@@ -1083,7 +1079,9 @@ def create_queue_entries_batch(
 # ===================== КОНВЕРТАЦИЯ DOCTOR_ID → USER_ID =====================
 
 
-@router.get("/registrar-integration/doctors/{doctor_id}/user-id", response_model=dict[str, Any])
+@router.get(
+    "/registrar-integration/doctors/{doctor_id}/user-id", response_model=dict[str, Any]
+)
 def get_doctor_user_id(
     doctor_id: int,
     db: Session = Depends(get_db),

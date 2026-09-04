@@ -17,6 +17,18 @@ from app.models.payment import Payment
 from app.models.visit import Visit
 from app.models.visit import VisitService
 
+def _clinic_today(db_session):
+    """SSOT: «сегодня» в тестах = день КЛИНИКИ (не host-UTC дата).
+
+    Фикстуры test_visit/test_daily_queue сеются днём клиники; фильтры
+    и asserts этого файла должны сравнивать с той же датой, иначе
+    тесты зависят от окна UTC-хоста 19:00-24:00.
+    """
+    from app.crud.clinic import clinic_today
+
+    return clinic_today(db_session)
+
+
 
 @pytest.mark.integration
 class TestRegistrarAllAppointments:
@@ -32,7 +44,7 @@ class TestRegistrarAllAppointments:
         appointment = Appointment(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            appointment_date=date.today(),
+            appointment_date=_clinic_today(db_session),
             appointment_time="11:00",
             status="scheduled",
             visit_type="paid",
@@ -44,7 +56,7 @@ class TestRegistrarAllAppointments:
         db_session.commit()
         db_session.refresh(appointment)
 
-        today = date.today().isoformat()
+        today = _clinic_today(db_session).isoformat()
         response = client.get(
             f"/api/v1/registrar/all-appointments?date_from={today}&date_to={today}&limit=50",
             headers=auth_headers,
@@ -84,7 +96,7 @@ class TestRegistrarAllAppointments:
         appointment = Appointment(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            appointment_date=date.today(),
+            appointment_date=_clinic_today(db_session),
             appointment_time="12:30",
             status="scheduled",
             visit_type="paid",
@@ -135,7 +147,7 @@ class TestRegistrarAllAppointments:
         test_doctor,
     ):
         queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,
@@ -166,13 +178,13 @@ class TestRegistrarAllAppointments:
         db_session.refresh(entry)
 
         response = client.get(
-            f"/api/v1/registrar/queues/today?target_date={date.today().isoformat()}",
+            f"/api/v1/registrar/queues/today?target_date={_clinic_today(db_session).isoformat()}",
             headers=auth_headers,
         )
 
         assert response.status_code == 200, response.text
         payload = response.json()
-        assert payload["date"] == date.today().isoformat()
+        assert payload["date"] == _clinic_today(db_session).isoformat()
 
         found_entry = None
         for queue_payload in payload["queues"]:
@@ -226,7 +238,7 @@ class TestRegistrarAllAppointments:
         test_doctor,
     ):
         old_queue = DailyQueue(
-            day=date.today() - timedelta(days=1),
+            day=_clinic_today(db_session) - timedelta(days=1),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,
@@ -257,7 +269,7 @@ class TestRegistrarAllAppointments:
         appointment = Appointment(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            appointment_date=date.today(),
+            appointment_date=_clinic_today(db_session),
             appointment_time="11:00",
             status="scheduled",
             visit_type="paid",
@@ -271,7 +283,7 @@ class TestRegistrarAllAppointments:
         db_session.refresh(appointment)
 
         response = client.get(
-            f"/api/v1/registrar/queues/today?target_date={date.today().isoformat()}",
+            f"/api/v1/registrar/queues/today?target_date={_clinic_today(db_session).isoformat()}",
             headers=auth_headers,
         )
 
@@ -303,7 +315,7 @@ class TestRegistrarAllAppointments:
         visit = Visit(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="10:00",
             status="waiting",
             discount_mode="none",
@@ -313,7 +325,7 @@ class TestRegistrarAllAppointments:
         unrelated_appointment = Appointment(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            appointment_date=date.today(),
+            appointment_date=_clinic_today(db_session),
             appointment_time="11:00",
             status="scheduled",
             visit_type="paid",
@@ -338,7 +350,7 @@ class TestRegistrarAllAppointments:
         db_session.refresh(unrelated_appointment)
 
         response = client.get(
-            f"/api/v1/registrar/queues/today?target_date={date.today().isoformat()}",
+            f"/api/v1/registrar/queues/today?target_date={_clinic_today(db_session).isoformat()}",
             headers=auth_headers,
         )
 
@@ -366,7 +378,7 @@ class TestRegistrarAllAppointments:
         canceled_visit = Visit(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="10:00",
             status="canceled",
             discount_mode="none",
@@ -376,7 +388,7 @@ class TestRegistrarAllAppointments:
         canceled_appointment = Appointment(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            appointment_date=date.today(),
+            appointment_date=_clinic_today(db_session),
             appointment_time="11:00",
             status="cancelled",
             visit_type="paid",
@@ -399,7 +411,7 @@ class TestRegistrarAllAppointments:
         db_session.commit()
 
         response = client.get(
-            f"/api/v1/registrar/queues/today?target_date={date.today().isoformat()}",
+            f"/api/v1/registrar/queues/today?target_date={_clinic_today(db_session).isoformat()}",
             headers=auth_headers,
         )
 
@@ -439,7 +451,7 @@ class TestRegistrarAllAppointments:
             phone="+998900000115",
         )
         queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,
@@ -447,7 +459,7 @@ class TestRegistrarAllAppointments:
         visit = Visit(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="10:30",
             status="waiting",
             discount_mode="none",
@@ -483,7 +495,7 @@ class TestRegistrarAllAppointments:
         db_session.refresh(stale_entry)
 
         response = client.get(
-            f"/api/v1/registrar/queues/today?target_date={date.today().isoformat()}",
+            f"/api/v1/registrar/queues/today?target_date={_clinic_today(db_session).isoformat()}",
             headers=auth_headers,
         )
 
@@ -558,13 +570,13 @@ class TestRegistrarAllAppointments:
         test_doctor,
     ):
         cardio_queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology",
             active=True,
         )
         lab_queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="lab",
             active=True,
@@ -623,7 +635,7 @@ class TestRegistrarAllAppointments:
         test_visit,
     ):
         lab_queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="lab",
             active=True,
@@ -718,7 +730,7 @@ class TestRegistrarAllAppointments:
         test_doctor,
     ):
         queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,
@@ -732,7 +744,7 @@ class TestRegistrarAllAppointments:
             id=collision_id,
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="09:00",
             status="pending_confirmation",
             discount_mode="none",
@@ -777,7 +789,7 @@ class TestRegistrarAllAppointments:
         test_doctor,
     ):
         queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,
@@ -793,7 +805,7 @@ class TestRegistrarAllAppointments:
         other_visit = Visit(
             patient_id=other_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="10:00",
             status="pending_confirmation",
             discount_mode="none",

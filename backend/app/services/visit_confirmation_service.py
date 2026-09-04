@@ -27,6 +27,10 @@ from app.utils.validators import normalize_phone_uz
 
 logger = logging.getLogger(__name__)
 
+# SSOT: день КЛИНИКИ — канонический хелпер живёт в crud.clinic рядом с
+# get_queue_settings (нейтральный слой, доступный всем контекстам).
+from app.crud.clinic import clinic_today as _clinic_today  # noqa: E402
+
 CANONICAL_ACTIVE_CONFIRMATION_STATUSES = (
     "waiting",
     "called",
@@ -100,7 +104,9 @@ def _hash_telegram_ticket_start_token(token: str) -> str:
     return f"{TELEGRAM_TICKET_QR_HASH_PREFIX}{digest}"
 
 
-def build_telegram_ticket_start_token(*, expires_at: datetime, nonce: str | None = None) -> str:
+def build_telegram_ticket_start_token(
+    *, expires_at: datetime, nonce: str | None = None
+) -> str:
     """Build a compact signed Telegram /start payload without patient data."""
     exp = int(_as_utc_naive(expires_at).replace(tzinfo=UTC).timestamp())
     token_nonce = nonce or _base36_encode(secrets.randbits(48))
@@ -108,10 +114,7 @@ def build_telegram_ticket_start_token(*, expires_at: datetime, nonce: str | None
         f"{TELEGRAM_TICKET_QR_PREFIX}{TELEGRAM_TICKET_QR_SEPARATOR}"
         f"{_base36_encode(exp)}{TELEGRAM_TICKET_QR_SEPARATOR}{token_nonce}"
     )
-    return (
-        f"{body}{TELEGRAM_TICKET_QR_SEPARATOR}"
-        f"{_ticket_qr_signature(body)}"
-    )
+    return f"{body}{TELEGRAM_TICKET_QR_SEPARATOR}" f"{_ticket_qr_signature(body)}"
 
 
 def parse_telegram_ticket_start_token(token: str) -> dict[str, Any] | None:
@@ -149,7 +152,10 @@ def consume_telegram_ticket_start_token(db, token: str) -> Visit | None:
     if not visit:
         return None
 
-    if visit.confirmation_expires_at and _as_aware_utc(visit.confirmation_expires_at) < now:
+    if (
+        visit.confirmation_expires_at
+        and _as_aware_utc(visit.confirmation_expires_at) < now
+    ):
         return None
 
     updated = (
@@ -348,10 +354,9 @@ class VisitConfirmationService:
                     detail="Визит не найден или уже подтвержден",
                 )
 
-            if (
+            if visit.confirmation_expires_at and _as_aware_utc(
                 visit.confirmation_expires_at
-                and _as_aware_utc(visit.confirmation_expires_at) < datetime.now(UTC)
-            ):
+            ) < datetime.now(UTC):
                 raise VisitConfirmationDomainError(
                     status_code=400,
                     detail="Срок подтверждения истек",
@@ -400,10 +405,9 @@ class VisitConfirmationService:
                     detail="Визит не найден",
                 )
 
-            if (
+            if visit.confirmation_expires_at and _as_aware_utc(
                 visit.confirmation_expires_at
-                and _as_aware_utc(visit.confirmation_expires_at) < datetime.now(UTC)
-            ):
+            ) < datetime.now(UTC):
                 raise VisitConfirmationDomainError(
                     status_code=400,
                     detail="Срок подтверждения истек",
@@ -433,14 +437,20 @@ class VisitConfirmationService:
                 )
                 total_amount += item_total
 
-            doctor = self.repository.get_doctor(visit.doctor_id) if visit.doctor_id else None
-            doctor_name = doctor.user.full_name if doctor and doctor.user else "Не назначен"
+            doctor = (
+                self.repository.get_doctor(visit.doctor_id) if visit.doctor_id else None
+            )
+            doctor_name = (
+                doctor.user.full_name if doctor and doctor.user else "Не назначен"
+            )
 
             return {
                 "success": True,
                 "visit_id": visit.id,
                 "status": visit.status,
-                "patient_name": patient.short_name() if patient else "Неизвестный пациент",
+                "patient_name": (
+                    patient.short_name() if patient else "Неизвестный пациент"
+                ),
                 "doctor_name": doctor_name,
                 "visit_date": visit.visit_date.isoformat(),
                 "visit_time": visit.visit_time,
@@ -507,7 +517,7 @@ class VisitConfirmationService:
 
         queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
-        if visit.visit_date == date.today():
+        if visit.visit_date == _clinic_today(self.repository.db):
             queue_numbers, print_tickets = self.assign_queue_numbers_on_confirmation(
                 visit,
                 confirmation_phone=confirmation_phone,
@@ -650,7 +660,9 @@ class VisitConfirmationService:
         return existing_entry
 
     @staticmethod
-    def _reuse_existing_active_entry(*, existing_entry: OnlineQueueEntry, visit) -> None:
+    def _reuse_existing_active_entry(
+        *, existing_entry: OnlineQueueEntry, visit
+    ) -> None:
         if existing_entry.patient_id is None:
             existing_entry.patient_id = visit.patient_id
         if existing_entry.visit_id is None:
@@ -686,7 +698,7 @@ class VisitConfirmationService:
             else:
                 return [], []
 
-        today = date.today()
+        today = _clinic_today(self.repository.db)
         queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
         patient = self.repository.get_patient(visit.patient_id)
@@ -702,7 +714,9 @@ class VisitConfirmationService:
                     specialist_doctor_id = visit_doctor.id
 
             if queue_tag == "ecg" and not specialist_doctor_id:
-                ecg_resource = self.repository.get_active_user_by_username("ecg_resource")
+                ecg_resource = self.repository.get_active_user_by_username(
+                    "ecg_resource"
+                )
                 if ecg_resource:
                     ecg_doctor = self.repository.get_doctor_by_user_id(ecg_resource.id)
                     if ecg_doctor:
@@ -713,7 +727,9 @@ class VisitConfirmationService:
                             ecg_resource.id,
                         )
             elif queue_tag == "lab" and not specialist_doctor_id:
-                lab_resource = self.repository.get_active_user_by_username("lab_resource")
+                lab_resource = self.repository.get_active_user_by_username(
+                    "lab_resource"
+                )
                 if lab_resource:
                     lab_doctor = self.repository.get_doctor_by_user_id(lab_resource.id)
                     if lab_doctor:
@@ -797,12 +813,16 @@ class VisitConfirmationService:
                 "lab": "Лаборатория",
                 "general": "Общая очередь",
             }
-            doctor = self.repository.get_doctor(visit.doctor_id) if visit.doctor_id else None
+            doctor = (
+                self.repository.get_doctor(visit.doctor_id) if visit.doctor_id else None
+            )
             patient = self.repository.get_patient(visit.patient_id)
 
             ticket_payload_extra: dict[str, Any] = {}
             if not telegram_ticket_qr_resolved:
-                telegram_ticket_qr_payload = self._build_ticket_telegram_qr_payload(visit)
+                telegram_ticket_qr_payload = self._build_ticket_telegram_qr_payload(
+                    visit
+                )
                 telegram_ticket_qr_resolved = True
             if telegram_ticket_qr_payload:
                 ticket_payload_extra["qr_payload"] = telegram_ticket_qr_payload

@@ -25,6 +25,15 @@ from app.models.webhook import (
 )
 from app.services.lab_reporting_service import LabReportingService
 
+def _clinic_today(db_session):
+    """SSOT: «сегодня» = день КЛИНИКИ (не host-UTC) — синхронно с
+    прод-фильтрами (_patient_commands/_staff_commands используют
+    crud.clinic.clinic_today)."""
+    from app.crud.clinic import clinic_today
+
+    return clinic_today(db_session)
+
+
 
 class FakeTelegramBotService:
     def __init__(self):
@@ -177,7 +186,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
     ):
         _link_staff_chat(db_session, chat_id=7206, user_id=registrar_user.id)
         queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,
@@ -263,35 +272,35 @@ class TestTelegramStaffReadOnlyMenuRuntime:
                 Visit(
                     patient_id=test_patient.id,
                     doctor_id=test_doctor.id,
-                    visit_date=date.today(),
+                    visit_date=_clinic_today(db_session),
                     visit_time="09:00",
                     status="open",
                 ),
                 Visit(
                     patient_id=test_patient.id,
                     doctor_id=test_doctor.id,
-                    visit_date=date.today(),
+                    visit_date=_clinic_today(db_session),
                     visit_time="10:00",
                     status="in_progress",
                 ),
                 Visit(
                     patient_id=test_patient.id,
                     doctor_id=test_doctor.id,
-                    visit_date=date.today(),
+                    visit_date=_clinic_today(db_session),
                     visit_time="11:00",
                     status="completed",
                 ),
                 Visit(
                     patient_id=test_patient.id,
                     doctor_id=test_doctor.id,
-                    visit_date=date.today() - timedelta(days=1),
+                    visit_date=_clinic_today(db_session) - timedelta(days=1),
                     visit_time="12:00",
                     status="open",
                 ),
                 Visit(
                     patient_id=test_patient.id,
                     doctor_id=None,
-                    visit_date=date.today(),
+                    visit_date=_clinic_today(db_session),
                     visit_time="13:00",
                     status="open",
                 ),
@@ -349,28 +358,28 @@ class TestTelegramStaffReadOnlyMenuRuntime:
                 Visit(
                     patient_id=test_patient.id,
                     doctor_id=test_doctor.id,
-                    visit_date=date.today(),
+                    visit_date=_clinic_today(db_session),
                     visit_time="09:00",
                     status="open",
                 ),
                 Visit(
                     patient_id=test_patient.id,
                     doctor_id=test_doctor.id,
-                    visit_date=date.today(),
+                    visit_date=_clinic_today(db_session),
                     visit_time="10:00",
                     status="in_progress",
                 ),
                 Visit(
                     patient_id=test_patient.id,
                     doctor_id=test_doctor.id,
-                    visit_date=date.today(),
+                    visit_date=_clinic_today(db_session),
                     visit_time="11:00",
                     status="closed",
                 ),
                 Visit(
                     patient_id=test_patient.id,
                     doctor_id=None,
-                    visit_date=date.today(),
+                    visit_date=_clinic_today(db_session),
                     visit_time="12:00",
                     status="open",
                 ),
@@ -1134,7 +1143,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
     ):
         _link_staff_chat(db_session, chat_id=7220, user_id=registrar_user.id)
         queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,
@@ -1228,7 +1237,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
         )
         _link_staff_chat(db_session, chat_id=7221, user_id=registrar_user.id)
         queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,
@@ -1322,7 +1331,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
     ):
         _link_staff_chat(db_session, chat_id=7222, user_id=registrar_user.id)
         queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,
@@ -1434,7 +1443,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
     ):
         _link_staff_chat(db_session, chat_id=7223, user_id=registrar_user.id)
         queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,
@@ -1505,7 +1514,7 @@ class TestTelegramStaffReadOnlyMenuRuntime:
     ):
         _link_staff_chat(db_session, chat_id=7224, user_id=registrar_user.id)
         queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=test_doctor.id,
             queue_tag="cardiology_common",
             active=True,

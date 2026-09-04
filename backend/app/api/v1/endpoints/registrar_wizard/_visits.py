@@ -10,6 +10,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _resolve_payment_truth,
 )  # noqa: F401
 from app.api.v1.endpoints.registrar_wizard._settings import VisitResponse  # noqa
+from app.crud.clinic import clinic_today as _clinic_today  # noqa: F401
 from app.services.visit_confirmation_service import _as_aware_utc  # noqa: F401
 from app.services.visit_lifecycle_service import VisitNotFoundError  # noqa: F401
 
@@ -17,7 +18,18 @@ from app.services.visit_lifecycle_service import VisitNotFoundError  # noqa: F40
 @router.get("/registrar/visits", response_model=list[VisitResponse])
 def get_visits(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "cardio", "derma", "dentist", "Cashier", "Lab")),
+    current_user: User = Depends(
+        require_roles(
+            "Admin",
+            "Registrar",
+            "Doctor",
+            "cardio",
+            "derma",
+            "dentist",
+            "Cashier",
+            "Lab",
+        )
+    ),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: int | None = Query(None, description="Фильтр по ID пациента"),
@@ -42,27 +54,36 @@ def get_visits(
 
             # Фильтры для appointments
             if patient_id:
-                appointments_query = appointments_query.filter(Appointment.patient_id == patient_id)
+                appointments_query = appointments_query.filter(
+                    Appointment.patient_id == patient_id
+                )
             if doctor_id:
-                appointments_query = appointments_query.filter(Appointment.doctor_id == doctor_id)
+                appointments_query = appointments_query.filter(
+                    Appointment.doctor_id == doctor_id
+                )
             if department:
-                appointments_query = appointments_query.filter(Appointment.department == department)
+                appointments_query = appointments_query.filter(
+                    Appointment.department == department
+                )
             if date_from:
                 try:
                     from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
-                    appointments_query = appointments_query.filter(Appointment.appointment_date >= from_date)
+                    appointments_query = appointments_query.filter(
+                        Appointment.appointment_date >= from_date
+                    )
                 except ValueError:
                     pass
             if date_to:
                 try:
                     to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
-                    appointments_query = appointments_query.filter(Appointment.appointment_date <= to_date)
+                    appointments_query = appointments_query.filter(
+                        Appointment.appointment_date <= to_date
+                    )
                 except ValueError:
                     pass
 
             appointments = (
-                appointments_query
-                .order_by(Appointment.created_at.desc())
+                appointments_query.order_by(Appointment.created_at.desc())
                 .limit(limit)
                 .all()
             )
@@ -316,9 +337,7 @@ def _serialize_appointments_for_listing(
                 try:
                     service_id_int = int(service_id)
                     service = (
-                        db.query(Service)
-                        .filter(Service.id == service_id_int)
-                        .first()
+                        db.query(Service).filter(Service.id == service_id_int).first()
                     )
                     if service:
                         service_names.append(service.name)
@@ -456,9 +475,7 @@ def _serialize_visits_for_listing(
         # Получаем имя пациента
         patient_fio = None
         if visit.patient_id:
-            patient = (
-                db.query(Patient).filter(Patient.id == visit.patient_id).first()
-            )
+            patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
             if patient:
                 patient_fio = patient.short_name()
 
@@ -478,9 +495,7 @@ def _serialize_visits_for_listing(
             if vs.price is not None:  # Используем сохраненную цену (включая 0)
                 service_price = float(vs.price)
             elif vs.service_id:  # Fallback - ищем цену в таблице services
-                service = (
-                    db.query(Service).filter(Service.id == vs.service_id).first()
-                )
+                service = db.query(Service).filter(Service.id == vs.service_id).first()
                 if service and service.price:
                     service_price = float(service.price)
 
@@ -491,9 +506,7 @@ def _serialize_visits_for_listing(
                 if vs.code:
                     service_codes.append(normalize_service_code(vs.code))
             else:  # Fallback - ищем в таблице services
-                service = (
-                    db.query(Service).filter(Service.id == vs.service_id).first()
-                )
+                service = db.query(Service).filter(Service.id == vs.service_id).first()
                 if service:
                     service_names.append(service.name)
                     service_code = service.service_code or get_service_code(
@@ -506,7 +519,7 @@ def _serialize_visits_for_listing(
         queue_numbers = []
         confirmation_status = None
 
-        if visit.visit_date == date.today():
+        if visit.visit_date == _clinic_today(db):
             # Ищем записи в очередях для этого визита
             from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
@@ -518,9 +531,7 @@ def _serialize_visits_for_listing(
 
             for entry in queue_entries:
                 queue = (
-                    db.query(DailyQueue)
-                    .filter(DailyQueue.id == entry.queue_id)
-                    .first()
+                    db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
                 )
                 if queue:
                     queue_names = {
@@ -621,9 +632,7 @@ def get_all_appointments(
     offset: int = Query(0, ge=0),
     date_from: str | None = Query(None, description="Дата начала (YYYY-MM-DD)"),
     date_to: str | None = Query(None, description="Дата окончания (YYYY-MM-DD)"),
-    search: str | None = Query(
-        None, description="Поиск по ФИО, телефону или услугам"
-    ),
+    search: str | None = Query(None, description="Поиск по ФИО, телефону или услугам"),
 ):
     """Простое объединение appointments + visits для фронтенда"""
     try:
@@ -767,10 +776,7 @@ def _registrar_command_allowed_roles(
     action: str,
     record_kind: str | None = None,
 ) -> set[str] | None:
-    if (
-        record_kind == "appointment"
-        and action in {"start_visit", "complete"}
-    ):
+    if record_kind == "appointment" and action in {"start_visit", "complete"}:
         return REGISTRAR_APPOINTMENT_WORKFLOW_ROLES
     return REGISTRAR_COMMAND_ROLE_BY_ACTION.get(action)
 
@@ -932,6 +938,7 @@ def _run_single_registrar_record_action(
                     from app.api.v1.endpoints.visits import (
                         _update_queue_entries_for_visit_owner,
                     )
+
                     _update_queue_entries_for_visit_owner(
                         db,
                         visit_id=record_id,
@@ -988,9 +995,9 @@ def _run_single_registrar_record_action(
                 )
             status_value = None
             if isinstance(result, dict):
-                status_value = result.get("status") or (
-                    result.get("entry") or {}
-                ).get("status")
+                status_value = result.get("status") or (result.get("entry") or {}).get(
+                    "status"
+                )
             return _registrar_command_item(
                 record_kind=record_kind,
                 record_id=record_id,
@@ -1001,7 +1008,9 @@ def _run_single_registrar_record_action(
 
         if action == "complete":
             if record_kind == "appointment":
-                appointment = crud_appointment.complete_visit(db, appointment_id=record_id)
+                appointment = crud_appointment.complete_visit(
+                    db, appointment_id=record_id
+                )
                 if not appointment:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
@@ -1070,6 +1079,7 @@ def _run_single_registrar_record_action(
 # === MARK-PAID ENDPOINTS ===
 # ============================================================
 
+
 @router.post("/registrar/visits/{visit_id}/mark-paid", response_model=dict[str, Any])
 def mark_visit_as_paid(
     visit_id: int,
@@ -1126,8 +1136,9 @@ def mark_visit_as_paid(
             # The raw SQL bypassed: with_for_update() lock, paid_amount check,
             # overpayment policy, and IntegrityError defense-in-depth.
             # PaymentInvariantService provides all of these.
-            from app.services.payment_invariant_service import PaymentInvariantService
             from decimal import Decimal
+
+            from app.services.payment_invariant_service import PaymentInvariantService
 
             billing_service = BillingService(db)
             total_info = billing_service.calculate_total(
@@ -1163,7 +1174,9 @@ def mark_visit_as_paid(
         changed_at = datetime.now(UTC)
         from app.services.visit_lifecycle_service import VisitLifecycleService
 
-        visit = VisitLifecycleService(db).restore_operational_status_after_payment_change(
+        visit = VisitLifecycleService(
+            db
+        ).restore_operational_status_after_payment_change(
             visit_id=visit.id,
         )
         visit.updated_at = changed_at
@@ -1195,7 +1208,8 @@ def mark_visit_as_paid(
             ),
             "amount": (
                 float(existing_payment.amount)
-                if existing_payment and getattr(existing_payment, "amount", None) is not None
+                if existing_payment
+                and getattr(existing_payment, "amount", None) is not None
                 else payment_amount
             ),
             "message": "Запись отмечена как оплаченная",
@@ -1215,7 +1229,9 @@ def mark_visit_as_paid(
 # ===================== ЭНДПОИНТ ДЛЯ ОТМЕТКИ ЗАПИСЕЙ ОНЛАЙН-ОЧЕРЕДИ КАК ОПЛАЧЕННЫХ =====================
 
 
-@router.post("/registrar/queue/entry/{entry_id}/mark-paid", response_model=dict[str, Any])
+@router.post(
+    "/registrar/queue/entry/{entry_id}/mark-paid", response_model=dict[str, Any]
+)
 def mark_queue_entry_as_paid(
     entry_id: int,
     payment_req: MarkPaidRequest | None = Body(default=None),
@@ -1241,11 +1257,13 @@ def mark_queue_entry_as_paid(
         )
 
         # Находим запись в очереди
-        entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        entry = (
+            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        )
         if not entry:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Запись очереди с ID {entry_id} не найдена"
+                detail=f"Запись очереди с ID {entry_id} не найдена",
             )
 
         # Пытаемся найти связанный Visit
@@ -1254,7 +1272,9 @@ def mark_queue_entry_as_paid(
         # 1. Через visit_id
         if entry.visit_id:
             visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
-            logger.info(f"mark_queue_entry_as_paid: Найден Visit {entry.visit_id} через entry.visit_id")
+            logger.info(
+                f"mark_queue_entry_as_paid: Найден Visit {entry.visit_id} через entry.visit_id"
+            )
 
         if visit and visit.patient_id != entry.patient_id:
             logger.warning(
@@ -1311,8 +1331,9 @@ def mark_queue_entry_as_paid(
             # Issue #06 Phase 4b Fix #1: Replaced raw SQL INSERT INTO payments
             # with PaymentInvariantService.create_payment_for_visit().
             # See mark_visit_as_paid above for full rationale.
-            from app.services.payment_invariant_service import PaymentInvariantService
             from decimal import Decimal
+
+            from app.services.payment_invariant_service import PaymentInvariantService
 
             billing_service = BillingService(db)
             total_info = billing_service.calculate_total(
@@ -1349,7 +1370,9 @@ def mark_queue_entry_as_paid(
         changed_at = datetime.now(UTC)
         from app.services.visit_lifecycle_service import VisitLifecycleService
 
-        visit = VisitLifecycleService(db).restore_operational_status_after_payment_change(
+        visit = VisitLifecycleService(
+            db
+        ).restore_operational_status_after_payment_change(
             visit_id=visit.id,
         )
         visit.updated_at = changed_at
@@ -1391,7 +1414,8 @@ def mark_queue_entry_as_paid(
             ),
             "amount": (
                 float(existing_payment.amount)
-                if existing_payment and getattr(existing_payment, "amount", None) is not None
+                if existing_payment
+                and getattr(existing_payment, "amount", None) is not None
                 else payment_amount
             ),
             "message": "Запись отмечена как оплаченная",
@@ -1406,6 +1430,7 @@ def mark_queue_entry_as_paid(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
+
 
 @router.post("/registrar/visits/{visit_id}/complete", response_model=dict[str, Any])
 def complete_visit(
@@ -1627,10 +1652,9 @@ def confirm_visit_by_registrar(
             )
 
         # Проверяем что токен не истек
-        if (
+        if visit.confirmation_expires_at and _as_aware_utc(
             visit.confirmation_expires_at
-            and _as_aware_utc(visit.confirmation_expires_at) < datetime.now(UTC)
-        ):
+        ) < datetime.now(UTC):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Срок подтверждения истек",
@@ -1654,8 +1678,9 @@ def confirm_visit_by_registrar(
         queue_numbers = {}
         print_tickets = []
 
-        # Если визит на сегодня - присваиваем номера в очередях
-        if visit.visit_date == date.today():
+        # Если визит на сегодня (день КЛИНИКИ, не host-UTC) - присваиваем
+        # номера в очередях
+        if visit.visit_date == _clinic_today(db):
             from app.services.visit_confirmation_service import (
                 VisitConfirmationDomainError,
             )

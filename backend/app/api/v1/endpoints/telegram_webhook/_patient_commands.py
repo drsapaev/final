@@ -1,12 +1,13 @@
 """
 Split from telegram_webhook.py (5647 LOC → modular).
 """
+
 from __future__ import annotations
 
 import hashlib
 import logging
 import secrets
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -42,9 +43,13 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
     _normalize_patient_language,
 )  # noqa: F401
 
+# SSOT: календарный день КЛИНИКИ (не host-UTC дата)
+from app.crud.clinic import clinic_today  # noqa: E402
+
 # NOTE: _queue_entry_name and _queue_entry_position are imported lazily
 # inside _staff_next_patient_message to avoid circular import with
 # _staff_commands.py which imports from this module.
+
 
 async def _send_patient_bot_reply(
     db: Session,
@@ -457,9 +462,7 @@ def _create_staff_action_confirmation_request(
     confirmation_window_seconds = int(
         STAFF_BOT_CONFIRMATION_CONTRACT.get("confirmation_window_seconds") or 120
     )
-    expires_at = datetime.now(UTC) + timedelta(
-        seconds=confirmation_window_seconds
-    )
+    expires_at = datetime.now(UTC) + timedelta(seconds=confirmation_window_seconds)
     target_reference_hash = _staff_action_reference_hash(operation_key)
     action_payload_hash = _staff_action_payload_hash(
         operation_key=operation_key,
@@ -575,7 +578,7 @@ def _normalize_staff_button_text(text: Any) -> str:
     for prefix in STAFF_MENU_BUTTON_ICON_PREFIXES:
         normalized_prefix = prefix.replace("\ufe0f", "").strip().lower()
         if normalized_prefix and value.startswith(normalized_prefix):
-            value = value[len(normalized_prefix):].strip()
+            value = value[len(normalized_prefix) :].strip()
             break
     return value
 
@@ -673,8 +676,26 @@ def _staff_menu_item_for_command(
     return None
 
 
-def _today_start() -> datetime:
-    return datetime.combine(date.today(), datetime.min.time())
+def _today_start(db: Session | None = None) -> datetime:
+    """Начало СЕГОДНЯШНЕГО дня КЛИНИКИ (наивный UTC).
+
+    SSOT: день клиники по таймзоне очередей (см. crud.clinic.clinic_today);
+    host-полночь на UTC-хосте в окне 19:00-24:00 отсекает «сегодняшние»
+    для клиники записи как прошедшие.
+    """
+    from zoneinfo import ZoneInfo
+
+    from app.crud.clinic import get_queue_settings
+
+    tz_name = (
+        get_queue_settings(db).get("timezone", "Asia/Tashkent")
+        if db is not None
+        else "Asia/Tashkent"
+    )
+    tz = ZoneInfo(tz_name)
+    now_local = datetime.now(tz)
+    midnight_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    return midnight_local.astimezone(UTC).replace(tzinfo=None)
 
 
 def _status_counts(rows: list[tuple[Any, Any]]) -> dict[str, int]:
@@ -693,7 +714,7 @@ def _queue_status_counts(db: Session) -> dict[str, int]:
     rows = (
         db.query(OnlineQueueEntry.status, func.count(OnlineQueueEntry.id))
         .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-        .filter(DailyQueue.day == date.today())
+        .filter(DailyQueue.day == clinic_today(db))
         .group_by(OnlineQueueEntry.status)
         .all()
     )
@@ -709,7 +730,7 @@ def _payment_status_rows(db: Session) -> list[tuple[str, int, Decimal]]:
                 func.count(Payment.id),
                 func.coalesce(func.sum(Payment.amount), 0),
             )
-            .filter(Payment.created_at >= _today_start())
+            .filter(Payment.created_at >= _today_start(db))
             .group_by(Payment.status)
             .all()
         )
@@ -725,7 +746,7 @@ def _payment_invoice_status_rows(db: Session) -> list[tuple[str, int, Decimal]]:
                 func.count(PaymentInvoice.id),
                 func.coalesce(func.sum(PaymentInvoice.total_amount), 0),
             )
-            .filter(PaymentInvoice.created_at >= _today_start())
+            .filter(PaymentInvoice.created_at >= _today_start(db))
             .group_by(PaymentInvoice.status)
             .all()
         )
@@ -735,7 +756,7 @@ def _payment_invoice_status_rows(db: Session) -> list[tuple[str, int, Decimal]]:
 def _lab_status_counts(db: Session) -> dict[str, int]:
     rows = (
         db.query(LabReportInstance.status, func.count(LabReportInstance.id))
-        .filter(LabReportInstance.created_at >= _today_start())
+        .filter(LabReportInstance.created_at >= _today_start(db))
         .group_by(LabReportInstance.status)
         .all()
     )
@@ -750,7 +771,7 @@ def _lab_delivery_status_counts(db: Session) -> dict[str, int]:
         )
         .join(NotificationEvent, NotificationEvent.id == NotificationDelivery.event_id)
         .filter(
-            NotificationDelivery.created_at >= _today_start(),
+            NotificationDelivery.created_at >= _today_start(db),
             NotificationDelivery.channel == "telegram",
             NotificationEvent.event_type.in_(LAB_RESULT_DELIVERY_EVENT_TYPES),
         )
@@ -764,7 +785,7 @@ def _integration_error_counts(db: Session) -> dict[str, int]:
     failed_webhook_calls_today = (
         db.query(func.count(WebhookCall.id))
         .filter(
-            WebhookCall.created_at >= _today_start(),
+            WebhookCall.created_at >= _today_start(db),
             WebhookCall.status == WebhookCallStatus.FAILED,
         )
         .scalar()
@@ -785,7 +806,7 @@ def _integration_error_counts(db: Session) -> dict[str, int]:
     failed_payment_webhooks_today = (
         db.query(func.count(PaymentWebhook.id))
         .filter(
-            PaymentWebhook.created_at >= _today_start(),
+            PaymentWebhook.created_at >= _today_start(db),
             PaymentWebhook.status == "failed",
         )
         .scalar()
@@ -801,7 +822,7 @@ def _integration_error_counts(db: Session) -> dict[str, int]:
 
 def _visit_status_counts(db: Session, user: User | None = None) -> dict[str, int]:
     query = db.query(Visit.status, func.count(Visit.id)).filter(
-        Visit.visit_date == date.today()
+        Visit.visit_date == clinic_today(db)
     )
     if _normalize_staff_role(getattr(user, "role", None)) == "doctor":
         doctor = (
@@ -823,7 +844,9 @@ def _staff_queue_overview_message(db: Session) -> str:
     counts = _queue_status_counts(db)
     total = sum(counts.values())
     active = sum(
-        count for status, count in counts.items() if status not in QUEUE_TERMINAL_STATUSES
+        count
+        for status, count in counts.items()
+        if status not in QUEUE_TERMINAL_STATUSES
     )
     in_progress = sum(
         counts.get(status, 0) for status in ("called", "in_service", "diagnostics")
@@ -831,7 +854,7 @@ def _staff_queue_overview_message(db: Session) -> str:
     return "\n".join(
         [
             "Queue overview",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Total entries: {total}",
             f"Active entries: {active}",
             f"Waiting: {counts.get('waiting', 0)}",
@@ -846,7 +869,7 @@ def _staff_next_patient_entry(db: Session) -> OnlineQueueEntry | None:
         db.query(OnlineQueueEntry)
         .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
         .filter(
-            DailyQueue.day == date.today(),
+            DailyQueue.day == clinic_today(db),
             DailyQueue.active.is_(True),
             OnlineQueueEntry.status.in_(QUEUE_WAITING_STATUSES),
         )
@@ -872,7 +895,7 @@ def _staff_next_patient_message(db: Session) -> str:
         return "\n".join(
             [
                 "Next patient",
-                f"Date: {date.today().isoformat()}",
+                f"Date: {clinic_today(db).isoformat()}",
                 "Waiting patients: 0",
                 "Mode: read-only queue snapshot",
             ]
@@ -882,7 +905,7 @@ def _staff_next_patient_message(db: Session) -> str:
     position = _queue_entry_position(db, entry)
     details = [
         "Next patient",
-        f"Date: {date.today().isoformat()}",
+        f"Date: {clinic_today(db).isoformat()}",
         f"Queue: {queue_name}",
         f"Queue number: {entry.number}",
         f"Status: {entry.status}",
@@ -904,8 +927,7 @@ def _staff_today_schedule_message(db: Session, user: User | None = None) -> str:
         for status in ("in_progress", "in_visit", "called")
     )
     completed = sum(
-        normalized_counts.get(status, 0)
-        for status in ("completed", "served", "done")
+        normalized_counts.get(status, 0) for status in ("completed", "served", "done")
     )
     cancelled = sum(
         normalized_counts.get(status, 0)
@@ -915,7 +937,7 @@ def _staff_today_schedule_message(db: Session, user: User | None = None) -> str:
     return "\n".join(
         [
             "Today's schedule",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Visits today: {total}",
             f"Open visits: {open_visits}",
             f"In progress: {in_progress}",
@@ -943,7 +965,7 @@ def _staff_emr_reminders_message(db: Session, user: User | None = None) -> str:
     return "\n".join(
         [
             "EMR reminders",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Visits needing EMR closure: {needs_closure}",
             f"Open visits: {open_visits}",
             f"In progress: {in_progress}",
@@ -960,13 +982,17 @@ def _staff_unpaid_invoices_message(db: Session) -> str:
         count for status, count, _amount in rows if status in UNPAID_INVOICE_STATUSES
     )
     unpaid_total = sum(
-        (amount for status, _count, amount in rows if status in UNPAID_INVOICE_STATUSES),
+        (
+            amount
+            for status, _count, amount in rows
+            if status in UNPAID_INVOICE_STATUSES
+        ),
         Decimal("0"),
     )
     return "\n".join(
         [
             "Unpaid invoices",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Invoices today: {total_count}",
             f"Unpaid invoices: {unpaid_count}",
             f"Unpaid total: {_format_money(unpaid_total)}",
@@ -988,7 +1014,7 @@ def _staff_paid_invoices_message(db: Session) -> str:
     return "\n".join(
         [
             "Paid invoices",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Invoices today: {total_count}",
             f"Paid invoices: {paid_count}",
             f"Paid total: {_format_money(paid_total)}",
@@ -1003,6 +1029,7 @@ def _staff_reconciliation_alerts_message(db: Session) -> str:
     from app.api.v1.endpoints.telegram_webhook import (
         PaymentReconciliationApiService as _PRAS,
     )
+
     result = _PRAS(db).get_reconciliation_alerts(
         threshold=float(RECONCILIATION_ALERT_THRESHOLD)
     )
@@ -1028,7 +1055,7 @@ def _staff_reconciliation_alerts_message(db: Session) -> str:
     return "\n".join(
         [
             "Reconciliation alerts",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Alerts: {int(result.get('alert_count') or len(alerts))}",
             f"High severity: {severity_counts['high']}",
             f"Medium severity: {severity_counts['medium']}",
@@ -1047,7 +1074,11 @@ def _staff_payment_status_message(db: Session) -> str:
         Decimal("0"),
     )
     pending_total = sum(
-        (amount for status, _count, amount in rows if status in PAYMENT_PENDING_STATUSES),
+        (
+            amount
+            for status, _count, amount in rows
+            if status in PAYMENT_PENDING_STATUSES
+        ),
         Decimal("0"),
     )
     pending_count = sum(
@@ -1056,7 +1087,7 @@ def _staff_payment_status_message(db: Session) -> str:
     return "\n".join(
         [
             "Payment status",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Payments today: {total_count}",
             f"Pending payments: {pending_count}",
             f"Paid total: {_format_money(paid_total)}",
@@ -1075,14 +1106,18 @@ def _staff_revenue_summary_message(db: Session) -> str:
         Decimal("0"),
     )
     pending_total = sum(
-        (amount for status, _count, amount in rows if status in UNPAID_INVOICE_STATUSES),
+        (
+            amount
+            for status, _count, amount in rows
+            if status in UNPAID_INVOICE_STATUSES
+        ),
         Decimal("0"),
     )
     other_total = max(gross_total - collected_total - pending_total, Decimal("0"))
     return "\n".join(
         [
             "Revenue summary",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Invoices today: {invoice_count}",
             f"Gross invoiced: {_format_money(gross_total)}",
             f"Collected revenue: {_format_money(collected_total)}",
@@ -1103,7 +1138,7 @@ def _staff_lab_reports_message(db: Session) -> str:
     return "\n".join(
         [
             "Lab report status",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Reports today: {total}",
             f"Ready reports: {ready}",
             f"Pending reports: {max(total - ready, 0)}",
@@ -1114,9 +1149,7 @@ def _staff_lab_reports_message(db: Session) -> str:
 
 def _staff_pending_lab_reports_message(db: Session) -> str:
     counts = _lab_status_counts(db)
-    pending = sum(
-        counts.get(status, 0) for status in LAB_REPORT_PENDING_STATUSES
-    )
+    pending = sum(counts.get(status, 0) for status in LAB_REPORT_PENDING_STATUSES)
     draft = counts.get("DRAFT", 0)
     in_progress = counts.get("IN_PROGRESS", 0)
     ready_or_done = sum(
@@ -1127,7 +1160,7 @@ def _staff_pending_lab_reports_message(db: Session) -> str:
     return "\n".join(
         [
             "Pending lab reports",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Reports today: {total}",
             f"Pending reports: {pending}",
             f"Draft reports: {draft}",
@@ -1141,16 +1174,14 @@ def _staff_pending_lab_reports_message(db: Session) -> str:
 def _staff_lab_delivery_status_message(db: Session) -> str:
     counts = _lab_delivery_status_counts(db)
     total = sum(counts.values())
-    successful = sum(
-        counts.get(status, 0) for status in SUCCESSFUL_DELIVERY_STATUSES
-    )
+    successful = sum(counts.get(status, 0) for status in SUCCESSFUL_DELIVERY_STATUSES)
     pending = sum(counts.get(status, 0) for status in PENDING_DELIVERY_STATUSES)
     failed = counts.get("failed", 0)
     other = max(total - successful - pending - failed, 0)
     return "\n".join(
         [
             "Lab result delivery status",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Telegram deliveries today: {total}",
             f"Delivered/seen/read: {successful}",
             f"Pending/dispatched: {pending}",
@@ -1167,7 +1198,7 @@ def _staff_integration_errors_message(db: Session) -> str:
     return "\n".join(
         [
             "Integration errors",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Total attention items: {total}",
             f"Failed webhook calls today: {counts['failed_webhook_calls_today']}",
             f"Retrying webhook calls: {counts['retrying_webhook_calls']}",
@@ -1184,7 +1215,7 @@ def _staff_daily_summary_message(db: Session) -> str:
     lab_counts = _lab_status_counts(db)
     visits_today = (
         db.query(func.count(Visit.id))
-        .filter(Visit.visit_date == date.today())
+        .filter(Visit.visit_date == clinic_today(db))
         .scalar()
         or 0
     )
@@ -1203,7 +1234,7 @@ def _staff_daily_summary_message(db: Session) -> str:
     return "\n".join(
         [
             "Daily clinic summary",
-            f"Date: {date.today().isoformat()}",
+            f"Date: {clinic_today(db).isoformat()}",
             f"Visits scheduled: {int(visits_today)}",
             f"Queue entries: {sum(queue_counts.values())}",
             f"Paid today: {_format_money(paid_total)}",
@@ -1310,4 +1341,3 @@ def _linked_staff_for_chat(
         return telegram_user, user, None
 
     return telegram_user, user, _staff_menu_for_role(getattr(user, "role", None))
-
