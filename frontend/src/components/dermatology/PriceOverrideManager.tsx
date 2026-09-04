@@ -276,11 +276,9 @@ const PriceOverrideManager = ({
                   }}
                   onFocus={(e: React.FocusEvent<HTMLElement>) => {
                     (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
-                    (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
                   }}
                   onBlur={(e: React.FocusEvent<HTMLElement>) => {
                     (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
-                    (e.target as HTMLElement).style.boxShadow = 'none';
                   }}
                   placeholder={t('derma.derma_price_ph_new_price')}
                   inputMode="numeric" />
@@ -317,7 +315,7 @@ const PriceOverrideManager = ({
                 }}
                 onFocus={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
-                  (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
+                  (e.target as HTMLElement).style.boxShadow = '0 0 0 3px rgba(0, 122, 255, 0.1)';
                 }}
                 onBlur={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
@@ -352,11 +350,9 @@ const PriceOverrideManager = ({
                 }}
                 onFocus={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
-                  (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
                 }}
                 onBlur={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
-                  (e.target as HTMLElement).style.boxShadow = 'none';
                 }}
                 placeholder={t('derma.derma_price_ph_custom_reason')} />
 
@@ -395,7 +391,7 @@ const PriceOverrideManager = ({
                 }}
                 onFocus={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
-                  (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
+                  (e.target as HTMLElement).style.boxShadow = '0 0 0 3px rgba(0, 122, 255, 0.1)';
                 }}
                 onBlur={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';

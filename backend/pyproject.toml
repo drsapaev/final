@@ -65,7 +65,7 @@ authors = [{ name = "Clinic Team" }]
 readme = "README.md"
 dependencies = [
   # Web framework & ASGI
-  "fastapi>=0.121,<0.141",
+  "fastapi>=0.121,<0.142",
   "uvicorn[standard]>=0.29,<0.52",
   "starlette>=0.40,<1.4",
   "python-multipart>=0.0.32,<0.0.33",
@@ -88,7 +88,7 @@ dependencies = [
   "PyJWT>=2.8,<3.0",
   "passlib[argon2]>=1.7,<1.8",
   "argon2-cffi>=21.3,<26.0",
-  "cryptography>=42.0,<50.0",
+  "cryptography>=50.0,<51.0",
 
   # PDF & documents
   "reportlab>=4.0,<4.6",
@@ -115,7 +115,7 @@ dependencies = [
   "aiogram>=3.28.2,<4.0.0",
 
   # AI providers
-  "openai>=1.0.0,<2.0.0",
+  "openai>=1.0.0,<3.0.0",
   "google-generativeai>=0.8.0,<1.0.0",
   "google-api-core>=2.0.0,<3.0.0",
   "google-auth>=2.53.0,<3.0.0",
@@ -125,13 +125,13 @@ dependencies = [
 
   # Data processing
   "pandas>=3.0.3,<4.0.0",
-  "psutil>=5.9.0,<6.0.0",
+  "psutil>=5.9.0,<7.0.0",
 
   # GraphQL
   "strawberry-graphql>=0.315.5",
 
   # Background tasks
-  "arq>=0.26.0,<0.27",
+  "arq>=0.26.0,<0.29",
 
   # Security: rate limiting & file validation
   "slowapi==0.1.10",
@@ -254,4 +254,38 @@ convention = "google"
 add-ignore = ["D100", "D104", "D107"]
 match = "(?!test_).*\\.py"
 match-dir = "(?!tests|test_).*"
+
+# Mutation testing (nightly CI: .github/workflows/mutation.yml, mutmut 3.x).
+# Whole `app/` tree is copied into `mutants/` so package imports resolve;
+# only the critical crud modules are actually mutated.
+# Selection = unit + integration suites minus repo-audit tests: audits that
+# read files via parents[3] (repo root, e.g. ops/, frontend/) break under
+# the mutants/ layout and do not exercise mutated code. They still run in
+# the normal backend-tests CI job.
+[tool.mutmut]
+source_paths = ["app/"]
+pytest_add_cli_args_test_selection = [
+    "tests/unit/",
+    "tests/integration/",
+    "--deselect", "tests/unit/test_extract_frontend_api_usage.py",
+    "--deselect", "tests/unit/test_frontend_backend_parity.py",
+    "--deselect", "tests/unit/test_frontend_backend_parity_gate.py",
+    "--deselect", "tests/unit/test_load_regression_profiles.py",
+    "--deselect", "tests/unit/test_notification_endpoint_inventory.py",
+    "--deselect", "tests/unit/test_no_legacy_ports_in_active_text.py",
+    "--deselect", "tests/integration/test_pr30_security_hardening.py",
+    "--deselect", "tests/integration/test_pr31_pii_masking.py",
+    "--deselect", "tests/integration/test_pr32_perf_n_plus_1.py",
+    "--deselect", "tests/integration/test_pr33_token_expiry_and_refresh.py",
+    "--deselect", "tests/integration/test_pr34_redis_rate_limit.py",
+    # Uses deprecated asyncio.get_event_loop().run_until_complete() — breaks
+    # under Python 3.12 in-process pytest (mutmut); needs asyncio.run() fix.
+    "--deselect", "tests/integration/test_ai_upload_limits.py::test_legacy_ai_image_upload_rejects_oversized_payload_before_provider_call",
+]
+only_mutate = [
+    "app/crud/appointment.py",
+    "app/crud/payment.py",
+    "app/crud/queue.py",
+    "app/crud/emr.py",
+]
 

@@ -11,7 +11,7 @@
  */
 
 import { User, FileText, RefreshCw, Save, Calendar, Phone } from 'lucide-react';
-import { Button, MacOSCard, MacOSEmptyState } from '../ui/macos';
+import { Button, Card, AppEmpty } from '../ui/macos';
 import { EMRContainerV2 } from '../emr-v2/EMRContainerV2';
 import { formatRegistrarDate, formatRegistrarDateTime } from '../../utils/dateUtils';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -54,8 +54,8 @@ export function VisitTab({
   // Empty state: no patient selected
   if (!selectedPatient) {
     return (
-      <MacOSCard className="cardio-empty-state" style={{ padding: '48px' }}>
-        <MacOSEmptyState
+      <Card className="cardio-empty-state" style={{ padding: '48px' }}>
+        <AppEmpty
           icon={Calendar}
           title={t('cardio.cardio_visit_empty_title')}
           description={t('cardio.cardio_visit_empty_desc')}
@@ -65,14 +65,14 @@ export function VisitTab({
             </Button>
           }
         />
-      </MacOSCard>
+      </Card>
     );
   }
 
   return (
     <div className="cardio-flex-col-visible" style={{ gap: 'var(--mac-spacing-6)' }}>
       {/* Patient info card */}
-      <MacOSCard className="cardio-card-padded">
+      <Card className="cardio-card-padded">
         <h3 className="cardio-section-heading">
           <User size={20} className="cardio-icon-mr cardio-icon-blue" />
           {t('cardio.cardio_visit_patient_label', { name: selectedPatient.patient_name || selectedPatient.patient?.full_name || `№${selectedPatient.number}` })}
@@ -133,10 +133,10 @@ export function VisitTab({
             {emr.signed_by != null && emr.signed_by > 0 && <span title={t('cardio.cardio_visit_emr_signed_by_title')}>{t('cardio.cardio_visit_doctor_prefix', { id: emr.signed_by })}</span>}
           </div>
         )}
-      </MacOSCard>
+      </Card>
 
       {/* EMR container */}
-      <MacOSCard className="cardio-card-padded">
+      <Card className="cardio-card-padded">
         <h3 className="cardio-section-heading">
           <FileText size={20} className="cardio-icon-mr cardio-icon-blue" />
           {t('cardio.cardio_visit_emr_title')}
@@ -146,10 +146,10 @@ export function VisitTab({
           patientId={selectedPatient?.patient?.id || selectedPatient?.patient_id}
           specialty="cardiology"
         />
-      </MacOSCard>
+      </Card>
 
       {/* Action buttons */}
-      <MacOSCard className="cardio-card-padded">
+      <Card className="cardio-card-padded">
         <div className="flex justify-end" style={{ gap: 'var(--mac-spacing-3)' }}>
           <Button variant="outline" onClick={onCancel}>{t('cardio.cardio_visit_cancel')}</Button>
           <Button onClick={onComplete} disabled={loading}>
@@ -157,7 +157,7 @@ export function VisitTab({
             {t('cardio.cardio_visit_complete')}
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
     </div>
   );
 }

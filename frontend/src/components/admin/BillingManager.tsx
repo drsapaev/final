@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
   Textarea,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Select,
   Checkbox } from '../ui/macos';
 import {
@@ -335,8 +335,7 @@ const BillingManager = () => {
       {/* Список счетов */}
       <div className="admin-d-grid-gap-16">
         {invoices.length === 0 ?
-      <MacOSEmptyState
-        type="invoice"
+      <AppEmpty
         title={t('admin2.bill_empty_invoices_title')}
         description={t('admin2.bill_empty_invoices_desc')}
         action={
@@ -348,7 +347,7 @@ const BillingManager = () => {
 
 
       invoices.map((invoice) =>
-      <MacOSCard key={invoice.id} className="p-0">
+      <Card key={invoice.id} className="p-0">
               <div className="admin-d-flex-jc-between-ai-start">
                 <div className="admin-flex-1">
                   <div className="admin-d-flex-ai-center-gap-8-mb-12">
@@ -411,14 +410,14 @@ const BillingManager = () => {
                   </Button>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
       )
       }
       </div>
 
       {/* Форма создания счета */}
       {showCreateInvoice &&
-    <MacOSCard className="p-0">
+    <Card className="p-0">
           <div className="admin-d-flex-jc-between-ai-center-mb-16-3">
             <h4 className="admin-m-0-primary-fs-lg-fw-semi-1">
               {t('admin2.bill_create_inv_btn')}
@@ -566,12 +565,12 @@ const BillingManager = () => {
               {t('admin2.bill_create_btn')}
             </Button>
           </div>
-        </MacOSCard>
+        </Card>
     }
 
       {/* Форма записи платежа */}
       {showRecordPayment &&
-    <MacOSCard className="p-0">
+    <Card className="p-0">
           <div className="admin-d-flex-jc-between-ai-center-mb-16-2">
             <h4 className="admin-m-0-primary-fs-lg-fw-semi">
               {t('admin2.bill_record_pay_modal_title')}
@@ -664,7 +663,7 @@ const BillingManager = () => {
               {t('admin2.bill_record_btn')}
             </Button>
           </div>
-        </MacOSCard>
+        </Card>
     }
     </div>;
 
@@ -678,7 +677,7 @@ const BillingManager = () => {
 
       <div className="grid gap-4">
         {payments.map((payment) =>
-      <MacOSCard key={payment.id} className="p-4">
+      <Card key={payment.id} className="p-4">
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
@@ -700,7 +699,7 @@ const BillingManager = () => {
                 </div>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
       )}
       </div>
     </div>;
@@ -716,15 +715,15 @@ const BillingManager = () => {
       {analytics &&
     <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <MacOSCard className="p-4">
+            <Card className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="w-5 h-5 text-blue-500" />
                 <h4 className="font-medium">{t('admin2.bill_stat_total_inv')}</h4>
               </div>
               <div className="text-2xl font-bold">{analytics.summary?.total_invoices || 0}</div>
-            </MacOSCard>
+            </Card>
 
-            <MacOSCard className="p-4">
+            <Card className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <DollarSign className="w-5 h-5 text-green-500" />
                 <h4 className="font-medium">{t('admin2.bill_stat_total_amount')}</h4>
@@ -732,9 +731,9 @@ const BillingManager = () => {
               <div className="text-2xl font-bold text-green-600">
                 {analytics.summary?.total_amount?.toLocaleString() || 0} {t('admin2.bill_currency')}
               </div>
-            </MacOSCard>
+            </Card>
 
-            <MacOSCard className="p-4">
+            <Card className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle className="w-5 h-5 text-green-500" />
                 <h4 className="font-medium">{t('admin2.bill_stat_paid')}</h4>
@@ -742,9 +741,9 @@ const BillingManager = () => {
               <div className="text-2xl font-bold text-green-600">
                 {analytics.summary?.paid_amount?.toLocaleString() || 0} {t('admin2.bill_currency')}
               </div>
-            </MacOSCard>
+            </Card>
 
-            <MacOSCard className="p-4">
+            <Card className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <XCircle className="w-5 h-5 text-red-500" />
                 <h4 className="font-medium">{t('admin2.bill_stat_overdue')}</h4>
@@ -752,11 +751,11 @@ const BillingManager = () => {
               <div className="text-2xl font-bold text-red-600">
                 {analytics.summary?.overdue_amount?.toLocaleString() || 0} {t('admin2.bill_currency')}
               </div>
-            </MacOSCard>
+            </Card>
           </div>
 
           {analytics.status_breakdown &&
-      <MacOSCard className="p-4">
+      <Card className="p-4">
               <h4 className="font-medium mb-4">{t('admin2.bill_status_breakdown')}</h4>
               <div className="space-y-2">
                 {analytics.status_breakdown.map((stat, index) =>
@@ -769,7 +768,7 @@ const BillingManager = () => {
                   </div>
           )}
               </div>
-            </MacOSCard>
+            </Card>
       }
         </>
     }
@@ -805,7 +804,7 @@ const BillingManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="admin-p-16px-24px-bd-none-bg-none-cur-pointer-d-flex-ai-center-gap-8-fs-sm-tr-all-var-mac-duration-bd-b-dyn-col-dyn-fw-dyn" style={{ '--admin-bd-b0': activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent', '--admin-col1': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)', '--admin-fw2': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}>
+              className="admin-p-16px-24px-bd-none-bg-none-cur-pointer-d-flex-ai-center-gap-8-fs-sm-tr-all-var-mac-duration-bd-b-dyn-col-dyn-fw-dyn" style={{ '--admin-bd-b0': activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent', '--admin-col1': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)', '--admin-fw2': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-regular)' } as CSSProperties}>
               
               <Icon size={16} />
               {tab.label}
@@ -823,8 +822,7 @@ const BillingManager = () => {
           {activeTab === 'payments' && renderPaymentsTab()}
           {activeTab === 'analytics' && renderAnalyticsTab()}
           {activeTab === 'settings' &&
-        <MacOSEmptyState
-          type="settings"
+        <AppEmpty
           title={t('admin2.bill_settings_title')}
           description={t('admin2.bill_settings_desc')} />
 

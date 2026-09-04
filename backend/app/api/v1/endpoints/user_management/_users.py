@@ -7,11 +7,30 @@ from app.api.v1.endpoints.user_management._helpers import (
     _find_user_export_file,
     _safe_user_export_filename,
     _user_export_mime_type,
+    _USER_MANAGEMENT_ROLE_PATTERN,
+    _USER_MANAGEMENT_ROLE_FILTER_PATTERN,
     router,
 )  # noqa: F401
+from app.schemas.clinic import ServiceUnavailableDetail
 
 
-@router.post("/users", response_model=UserResponse)
+@router.post(
+    "/users",
+    response_model=UserResponse,
+    # Codex round-8 P2: the Doctor-onboarding branch returns 503 when the
+    # specialty catalog is unavailable (missing/inactive rows after the
+    # 0051 baseline seed). Generated consumers model the configured
+    # failure via the same ServiceUnavailableDetail contract the
+    # admin-doctor routes publish.
+    responses={
+        503: {
+            "model": ServiceUnavailableDetail,
+            "description": (
+                "Каталог специальностей не настроен (миграции/seed 0051 не выполнены)"
+            ),
+        }
+    },
+)
 async def create_user(
     user_data: UserCreateRequest,
     request: Request,
@@ -19,6 +38,56 @@ async def create_user(
     current_user: User = Depends(require_roles("Admin")),
 ):
     """Создать нового пользователя"""
+    # Canonical doctor onboarding (owner decision 2026-09-01): the medical
+    # specialty catalog (migration 0051) is the runtime SSOT — the schema
+    # layer checks only the payload shape; membership + active status are
+    # enforced here, at the write boundary, BEFORE any row is created.
+    if getattr(user_data, "role", None) == "Doctor":
+        from fastapi import HTTPException as _HTTPException
+
+        from app.services.medical_specialty_catalog import (
+            MedicalSpecialtyCatalogError,
+            MedicalSpecialtyCatalogService,
+        )
+
+        requested_specialty = (
+            user_data.doctor_profile.specialty.strip()
+            if user_data.doctor_profile is not None
+            else ""
+        )
+        try:
+            selectable = MedicalSpecialtyCatalogService(
+                db
+            ).is_selectable_for_onboarding(requested_specialty)
+        except MedicalSpecialtyCatalogError as catalog_error:
+            raise _HTTPException(
+                status_code=503,
+                detail=(
+                    "Каталог медицинских специальностей не настроен: "
+                    "выполните миграции БД (baseline seed 0051)."
+                ),
+            ) from catalog_error
+        if not selectable:
+            # Codex round-9 P2: the operation's declared 422 body is
+            # HTTPValidationError (detail = array of {loc, msg, type}) — a
+            # plain-string detail would break generated clients decoding the
+            # documented schema, so return the standard validation-error
+            # array shape instead.
+            raise _HTTPException(
+                status_code=422,
+                detail=[
+                    {
+                        "loc": ["body", "doctor_profile", "specialty"],
+                        "msg": (
+                            f"Специальность '{requested_specialty}' должна "
+                            "быть активным кодом из каталога специальностей "
+                            "(/admin/doctors/specialty-vocabulary)."
+                        ),
+                        "type": "value_error",
+                    }
+                ],
+            )
+
     try:
         service = get_user_management_service()
         success, message, user = service.create_user(db, user_data, current_user.id)
@@ -50,7 +119,15 @@ async def get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     role: str | None = Query(
-        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Cashier|Lab|Patient)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_FILTER_PATTERN
+        # Codex round-1 P2: reuse the shared vocabulary — the previous
+        # hardcoded list rejected cardio/derma/dentist/Registrar/SuperAdmin/
+        # Manager BEFORE UserSearchRequest was constructed, so ?role=cardio
+        # answered 422 while the schema advertised it as valid.
+        # Codex re-review P2 (PR #3025): READ surface — compatibility filter
+        # vocabulary. E-4 (§4.1.27): the 'Receptionist' filter entry was
+        # decommissioned with the alias (window closed: stored rows = 0);
+        # 'Manager' stays until the ops deactivation (M-1).
         # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     ),
     status_filter: str | None = Query(
@@ -804,7 +881,11 @@ async def user_management_health_check():
             "user_search",
             "user_statistics",
         ],
-        "supported_roles": ["Admin", "Doctor", "Nurse", "Receptionist", "Patient"],
+        # REC-1 (Receptionist deprecation) + Codex re-review P2 (PR #3025):
+        # 'Receptionist' replaced by the canonical 'Registrar' — the module
+        # vocabulary now matches the write contract (create/update accept
+        # Registrar; deprecated spelling frozen out of writes).
+        "supported_roles": ["Admin", "Doctor", "Nurse", "Registrar", "Patient"],
         "supported_statuses": ["active", "inactive", "suspended", "pending", "locked"],
         "export_formats": ["csv", "excel", "json", "pdf"],
     }

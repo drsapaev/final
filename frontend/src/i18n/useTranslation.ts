@@ -132,7 +132,6 @@ export { ru as TRANSLATIONS };
  * It simply renders its children — no state, no context.
  */
 import React from 'react';
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 export function TranslationProvider({ children }: { children: React.ReactNode }) {
   return children;

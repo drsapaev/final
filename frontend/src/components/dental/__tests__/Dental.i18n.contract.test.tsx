@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../..');
 const translationsSource = fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.ts'), 'utf8');
 
-const files = ['DentalPriceManager', 'DentalVisitScreen', 'DiagnosisForm', 'ExaminationForm', 'PatientCard', 'PhotoArchive', 'ToothModal', 'TreatmentPlanner', 'VisitProtocol'];
+const files = ['DentalPriceManager', 'DentalVisitScreen', 'DiagnosisForm', 'PatientCard', 'PhotoArchive', 'ToothModal', 'TreatmentPlanner', 'VisitProtocol'];
 
 describe('Dental components STRAT#38 — i18n migration', () => {
   for (const name of files) {

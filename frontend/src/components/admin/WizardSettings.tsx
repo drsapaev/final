@@ -2,15 +2,15 @@ import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Checkbox,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
   Badge,
   Modal,
-  MacOSStatCard,
+  StatCard,
 } from '../ui/macos';
 import { Settings, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -92,7 +92,7 @@ const WizardSettings = () => {
 
   if (loading) {
     return (
-      <MacOSCard className="admin-p-24-bgc-bg-primary-minh-100vh">
+      <Card className="admin-p-24-bgc-bg-primary-minh-100vh">
           <div className="admin-d-flex-ai-center-gap-8-mb-24">
             <Settings className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
@@ -100,21 +100,21 @@ const WizardSettings = () => {
             </h2>
           </div>
           <Skeleton height="400px" />
-      </MacOSCard>);
+      </Card>);
 
   }
 
   // Критическая ошибка загрузки
   if (error && !settings.updated_at) {
     return (
-      <MacOSCard className="admin-p-24-bgc-bg-primary-minh-100vh">
+      <Card className="admin-p-24-bgc-bg-primary-minh-100vh">
           <div className="admin-d-flex-ai-center-gap-8-mb-24">
             <Settings className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
               {t('admin2.ws_title')}
             </h2>
           </div>
-          <MacOSEmptyState
+          <AppEmpty
           icon={AlertCircle}
           title={t('admin2.ws_load_error_title')}
           description={t('admin2.ws_load_error_hint')}
@@ -125,12 +125,12 @@ const WizardSettings = () => {
               </Button>
           } />
 
-      </MacOSCard>);
+      </Card>);
 
   }
 
   return (
-    <MacOSCard className="admin-p-24-bgc-bg-primary-minh-100vh">
+    <Card className="admin-p-24-bgc-bg-primary-minh-100vh">
       <div className="admin-d-flex-ai-center-gap-8-mb-24-fw-wrap">
           <Settings className="admin-w-32-h-32-blue" />
           <h2 className="admin-fs-2xl-fw-semi-primary-m-0-flex-1-minw-200">
@@ -149,7 +149,7 @@ const WizardSettings = () => {
           }
 
           {/* A/B Переключатель */}
-          <MacOSCard className="admin-p-24-bgc-bg-secondary-bd-1px-solid-var-mac-bo">
+          <Card className="admin-p-24-bgc-bg-secondary-bd-1px-solid-var-mac-bo">
             <div className="admin-d-flex-ai-center-jc-between-mb-16">
               <div className="admin-flex-1">
                 <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0">
@@ -173,11 +173,11 @@ const WizardSettings = () => {
                 </span>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Статистика использования */}
           <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.ws_stat_usage_title')}
               value={settings.use_new_wizard ? '100%' : '0%'}
               icon={settings.use_new_wizard ? CheckCircle : AlertCircle}
@@ -186,7 +186,7 @@ const WizardSettings = () => {
               trendColor={settings.use_new_wizard ? 'var(--mac-success)' : 'var(--mac-warning)'} />
 
             
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.ws_stat_updated_title')}
               value={settings.updated_at ? new Date(settings.updated_at).toLocaleDateString('ru-RU') : t('admin2.ws_unknown')}
               icon={RefreshCw}
@@ -198,7 +198,7 @@ const WizardSettings = () => {
 
           {/* Информация о версиях */}
           <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
-            <MacOSCard className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': !settings.use_new_wizard ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)', '--admin-bgc1': !settings.use_new_wizard ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': !settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
+            <Card className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': !settings.use_new_wizard ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)', '--admin-bgc1': !settings.use_new_wizard ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': !settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
               <div className="admin-d-flex-ai-center-gap-4-mb-8">
                 <h4 className="admin-fs-lg-fw-semi-primary-m-0">
                   {t('admin2.ws_classic_card_title')}
@@ -216,9 +216,9 @@ const WizardSettings = () => {
                 <li>{t('admin2.ws_classic_feat_3')}</li>
                 <li>{t('admin2.ws_classic_feat_4')}</li>
               </ul>
-            </MacOSCard>
+            </Card>
 
-            <MacOSCard className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': settings.use_new_wizard ? '2px solid var(--mac-success)' : '1px solid var(--mac-border)', '--admin-bgc1': settings.use_new_wizard ? 'var(--mac-success-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
+            <Card className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': settings.use_new_wizard ? '2px solid var(--mac-success)' : '1px solid var(--mac-border)', '--admin-bgc1': settings.use_new_wizard ? 'var(--mac-success-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
               <div className="admin-d-flex-ai-center-gap-4-mb-8">
                 <h4 className="admin-fs-lg-fw-semi-primary-m-0">
                   {t('admin2.ws_new_card_title')}
@@ -238,19 +238,19 @@ const WizardSettings = () => {
                 <li>{t('admin2.ws_new_feat_5')}</li>
                 <li>{t('admin2.ws_new_feat_6')}</li>
               </ul>
-            </MacOSCard>
+            </Card>
           </div>
 
           {/* Предупреждение */}
           {hasChanges &&
-          <MacOSCard className="admin-p-16-bgc-var-mac-warning-bg-bd-1px-solid-var-mac-wa">
+          <Card className="admin-p-16-bgc-var-mac-warning-bg-bd-1px-solid-var-mac-wa">
               <div className="admin-flex-center-8">
                 <AlertCircle className="admin-w-20-h-20-warning-fsk-0" />
                 <p className="admin-fs-sm-warning-m-0-fw-med">
                   {t('admin2.ws_unsaved_changes')}
                 </p>
               </div>
-            </MacOSCard>
+            </Card>
           }
 
           {/* Информация об обновлении */}
@@ -338,7 +338,7 @@ const WizardSettings = () => {
           </div>
         </div>
       </Modal>
-    </MacOSCard>);
+    </Card>);
 
 };
 

@@ -38,8 +38,7 @@
  *
  * Default providers (always included, in order — ALL side-effect-free):
  *   1. MemoryRouter — react-router context (most components use useNavigate/useLocation)
- *   2. MacOSThemeProvider — design-token theme context
- *   3. ThemeProvider — color-scheme + theme runtime
+ *   2. ThemeProvider — color-scheme + theme runtime + design-token accent context
  *   4. TranslationProvider — i18n (most components use useTranslation)
  *   5. NotificationCenterProvider — notification inbox state (no mount-time network)
  *   6. ToastProvider — toast UI (used by notify service)
@@ -47,7 +46,6 @@
  * Optional providers (opt-in via flags — each has mount-time cost/side effect):
  *   - withNotificationWs — NotificationWebSocketProvider (opens WebSocket on mount)
  *   - withChat — ChatProvider (may establish chat state)
- *   - withModal — ModalProvider
  *   - withForm — FormProvider
  *
  * Usage:
@@ -67,13 +65,11 @@ import React from 'react';
 import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
 import { MemoryRouter, type MemoryRouterProps } from 'react-router-dom';
 import { ThemeProvider } from '../contexts/ThemeContext';
-import { MacOSThemeProvider } from '../theme/macosTheme';
 import { TranslationProvider } from '../i18n/useTranslation';
 import { NotificationCenterProvider } from '../contexts/NotificationCenterContext';
 import { NotificationWebSocketProvider } from '../contexts/NotificationWebSocketContext';
 import { ChatProvider } from '../contexts/ChatContext';
 import { ToastProvider } from '../components/common/Toast';
-import { ModalProvider } from '../components/common/Modal';
 import { FormProvider } from '../components/common/Form';
 
 export interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
@@ -85,8 +81,6 @@ export interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper
   withNotificationWs?: boolean;
   /** Include ChatProvider (may establish chat state — opt-in). */
   withChat?: boolean;
-  /** Include ModalProvider. */
-  withModal?: boolean;
   /** Include FormProvider. */
   withForm?: boolean;
 }
@@ -102,7 +96,6 @@ export function buildProviderWrapper(options: RenderWithProvidersOptions = {}) {
     skipRouter = false,
     withNotificationWs = false,
     withChat = false,
-    withModal = false,
     withForm = false,
   } = options;
 
@@ -113,9 +106,6 @@ export function buildProviderWrapper(options: RenderWithProvidersOptions = {}) {
     // Order matches AppProviders.tsx for the providers we share.
     if (withForm) {
       tree = <FormProvider>{tree}</FormProvider>;
-    }
-    if (withModal) {
-      tree = <ModalProvider>{tree}</ModalProvider>;
     }
     if (withNotificationWs) {
       tree = <NotificationWebSocketProvider>{tree}</NotificationWebSocketProvider>;
@@ -130,7 +120,6 @@ export function buildProviderWrapper(options: RenderWithProvidersOptions = {}) {
     }
     tree = <TranslationProvider>{tree}</TranslationProvider>;
     tree = <ThemeProvider>{tree}</ThemeProvider>;
-    tree = <MacOSThemeProvider>{tree}</MacOSThemeProvider>;
     if (!skipRouter) {
       tree = <MemoryRouter {...routerProps}>{tree}</MemoryRouter>;
     }

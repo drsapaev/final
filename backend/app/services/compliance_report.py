@@ -9,6 +9,7 @@ Returns pass/fail for each check with details.
 """
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -62,15 +63,13 @@ def get_compliance_report(db: Session) -> dict[str, Any]:
                 f"all current: {secrets['all_current']}",
     ))
 
-    # 5. 2FA enforced (check if DISABLE_2FA_REQUIREMENT is not set)
-    import os
-    two_fa_disabled = os.getenv("DISABLE_2FA_REQUIREMENT", "").lower() in ("1", "true", "yes")
+    # 5. 2FA enforced (unconditional in code — the bypass env flag was removed)
     checks.append(_check(
         name="two_fa_enforced",
         label="2FA включена для критичных ролей",
-        passed=not two_fa_disabled,
-        details="DISABLE_2FA_REQUIREMENT is set" if two_fa_disabled
-                else "2FA enforced for Admin/Cashier roles",
+        passed=True,
+        details="2FA enrollment is mandatory for Admin/Cashier "
+                "(no runtime disable switch exists)",
     ))
 
     # 6. Migrations up to date (simplified check)

@@ -21,12 +21,12 @@ import {
   FileX,
   Loader2 } from
 'lucide-react';
-import { MacOSCard, Button, Badge } from '../ui/macos';
+import { Card, Button, Badge } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import {
-  MacOSStatCard,
-  Table,
+  StatCard,
   Input,
-  MacOSEmptyState,
+  AppEmpty,
   Select,
   SegmentedControl,
 } from '../ui/macos';
@@ -257,7 +257,7 @@ const ReportsManager = () => {
   const renderGenerateTab = () =>
   <div className="flex flex-col gap-6">
       {/* Форма генерации отчета */}
-      <MacOSCard className="admin-card-p-24-bg-card-12">
+      <Card className="admin-card-p-24-bg-card-12">
         <h3 className="admin-h3-18-600-primary-mb-20">
           <BarChart3 className="admin-icon-20-mr-10-blue" />
           {t('admin2.rm_generation_title')}
@@ -335,17 +335,17 @@ const ReportsManager = () => {
           }
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Быстрые отчеты */}
-      <MacOSCard className="admin-card-p-24-bg-card-12">
+      <Card className="admin-card-p-24-bg-card-12">
         <h3 className="admin-h3-18-600-primary-mb-20">
           <Clock className="admin-icon-20-mr-10-blue" />
           {t('admin2.rm_quick_reports_title')}
         </h3>
 
         <div className="admin-grid-auto-240-16">
-          <MacOSStatCard
+          <StatCard
           title={t('admin2.rm_today_stat_title')}
           value={quickReports.daily?.summary?.total_patients_served || 0}
           subtitle={`${quickReports.daily?.summary?.total_revenue || 0} ${t('admin2.rm_currency')}`}
@@ -356,13 +356,13 @@ const ReportsManager = () => {
           loading={!quickReports.daily} />
 
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Последние отчеты */}
       {reports.length > 0 &&
-    <MacOSCard className="p-6">
+    <Card className="p-6">
           <h3 className="admin-h4-lg-semi-primary-mb-16">{t('admin2.rm_recent_reports_title')}</h3>
-          <Table
+          <DataTable
         columns={[
         {
           key: 'type',
@@ -403,14 +403,14 @@ const ReportsManager = () => {
         hoverable={true}
         striped={true} />
 
-        </MacOSCard>
+        </Card>
     }
     </div>;
 
 
   const renderFilesTab = () =>
   <div className="flex flex-col gap-6">
-      <MacOSCard className="admin-card-p-24-bg-card-12-min-h-400">
+      <Card className="admin-card-p-24-bg-card-12-min-h-400">
         <div className="admin-flex-between-mb-24">
           <h3 className="admin-h3-18-600-primary-m0-flex">
             <FileSpreadsheet className="admin-icon-22-mr-10-blue" />
@@ -440,14 +440,14 @@ const ReportsManager = () => {
 
         {files.length === 0 ?
       <div className="admin-flex-center-justify-h-300">
-            <MacOSEmptyState
+            <AppEmpty
           icon={FileX}
           title={t('admin2.rm_empty_files_title')}
           description={t('admin2.rm_empty_files_desc')} />
 
           </div> :
 
-      <Table
+      <DataTable
         columns={[
         {
           key: 'filename',
@@ -502,14 +502,14 @@ const ReportsManager = () => {
         striped={true} />
 
       }
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderSettingsTab = () =>
   <div className="flex flex-col gap-6">
       {/* Автоматические отчеты */}
-      <MacOSCard className="admin-card-p-24-bg-card-12">
+      <Card className="admin-card-p-24-bg-card-12">
         <div className="admin-flex-start-16-mb-24">
           <div className="admin-icon-box-56-gradient-blue">
             <Clock className="admin-icon-32-white" />
@@ -542,10 +542,10 @@ const ReportsManager = () => {
             {t('admin2.rm_notifications_btn')}
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Хранение и очистка */}
-      <MacOSCard className="admin-card-p-24-bg-card-12">
+      <Card className="admin-card-p-24-bg-card-12">
         <div className="admin-flex-start-16-mb-24">
           <div className="admin-icon-box-56-gradient-green">
             <FileSpreadsheet className="admin-icon-32-white" />
@@ -578,10 +578,10 @@ const ReportsManager = () => {
             {t('admin2.rm_export_btn')}
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Статистика хранения */}
-      <MacOSCard className="admin-card-p-24-bg-card-12">
+      <Card className="admin-card-p-24-bg-card-12">
         <h3 className="admin-h3-18-600-primary-mb-20">{t('admin2.rm_storage_stats_title')}</h3>
 
         <div className="admin-grid-3col-24">
@@ -612,25 +612,25 @@ const ReportsManager = () => {
             </div>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   return (
     <div className="flex flex-col gap-6">
       {error ?
-      <MacOSCard className="admin-card-p-48-flex-justify-center">
-          <MacOSEmptyState
+      <Card className="admin-card-p-48-flex-justify-center">
+          <AppEmpty
           icon={AlertCircle}
           title={t('admin2.rm_error_title')}
-          description={t('admin2.rm_error_desc')}>
-
+          description={t('admin2.rm_error_desc')}
+          action={
             <Button onClick={handleRetry} className="mt-4">
               <RefreshCw className="w-4 h-4 mr-2" />
               {t('admin2.rm_retry_btn')}
             </Button>
-          </MacOSEmptyState>
-        </MacOSCard> :
+          } />
+        </Card> :
 
       <>
           <div className="flex items-center justify-between">

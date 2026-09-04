@@ -23,8 +23,9 @@ import {
 
 'lucide-react';
 import {
-  AppError, AppLoading, MacOSCard, Button, Badge, Input, Table, Checkbox, Select,
+  AppError, AppLoading, Card, Button, Badge, Input, Checkbox, Select,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import type { SelectChangeEvent } from '../ui/macos/Select';
 // UX Audit: ModernDialog для extend-activation диалога (вместо window.prompt).
 import ModernDialog from '../dialogs/ModernDialog';
@@ -261,19 +262,19 @@ const [activations, setActivations] = useState<Activation[]>([]);
 
   if (loading) {
     return (
-      <MacOSCard className="admin-card-p-32">
+      <Card className="admin-card-p-32">
         <AppLoading
           title={t('admin2.act_loading_title')}
           description={t('admin2.act_loading_desc')}
           size="small"
         />
-      </MacOSCard>);
+      </Card>);
 
   }
 
   if (showInitialLoadError) {
     return (
-      <MacOSCard className="admin-card-p-32">
+      <Card className="admin-card-p-32">
         <AppError
           title={t('admin2.act_load_failed_title')}
           description={loadError}
@@ -283,7 +284,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
             </Button>
           }
         />
-      </MacOSCard>);
+      </Card>);
 
   }
 
@@ -347,42 +348,42 @@ const [activations, setActivations] = useState<Activation[]>([]);
 
       {/* Статистика */}
       <div className="admin-grid-auto-200">
-        <MacOSCard className="admin-card-p-24-center">
+        <Card className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-blue">
             {Number(stats?.total_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_total')}
           </div>
-        </MacOSCard>
-        <MacOSCard className="admin-card-p-24-center">
+        </Card>
+        <Card className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-success">
             {Number(stats?.active_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_active')}
           </div>
-        </MacOSCard>
-        <MacOSCard className="admin-card-p-24-center">
+        </Card>
+        <Card className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-warning">
             {Number(stats?.trial_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_trial')}
           </div>
-        </MacOSCard>
-        <MacOSCard className="admin-card-p-24-center">
+        </Card>
+        <Card className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-error">
             {Number(stats?.expired_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_expired')}
           </div>
-        </MacOSCard>
+        </Card>
       </div>
 
       {/* Фильтры */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <div className="admin-grid-auto-300">
           <div>
             <label className="admin-label-block-sm-med-primary-mb-8">
@@ -417,12 +418,12 @@ const [activations, setActivations] = useState<Activation[]>([]);
               className="w-full" />
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Таблица активаций */}
-      <MacOSCard className="admin-card-p-0-overflow-hidden">
+      <Card className="admin-card-p-0-overflow-hidden">
         <div className="p-4">
-          <Table
+          <DataTable
             columns={[
             {
               key: 'key',
@@ -561,7 +562,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
             } />
           
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Форма создания ключа */}
       {showCreateForm &&
@@ -572,7 +573,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
       }
 
       {/* Информация */}
-      <MacOSCard className="admin-card-info-bg">
+      <Card className="admin-card-info-bg">
         <h3 className="admin-shield-h3-info">
           <Shield className="w-5 h-5 mr-2" />
           {t('admin2.act_info_title')}
@@ -584,7 +585,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
           <p className="admin-p-list-item-m0">{t('admin2.act_info_4')}</p>
           <p className="admin-p-list-item-m0">{t('admin2.act_info_5')}</p>
         </div>
-      </MacOSCard>
+      </Card>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}
 
@@ -655,7 +656,7 @@ const ActivationKeyForm = ({ onSave, onCancel }: ActivationKeyFormProps) => {
   };
 
   return (
-    <MacOSCard className="p-6">
+    <Card className="p-6">
       <h3 className="admin-h3-lg-med-primary-mb-16">
         {t('admin2.act_form_title')}
       </h3>
@@ -767,7 +768,7 @@ const ActivationKeyForm = ({ onSave, onCancel }: ActivationKeyFormProps) => {
           </Button>
         </div>
       </form>
-    </MacOSCard>);
+    </Card>);
 
 };
 

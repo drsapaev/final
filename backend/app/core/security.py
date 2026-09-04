@@ -154,16 +154,20 @@ def require_roles(*roles: Any):
         role_label = _coerce_role_label(role)
         role_lower = role_label.lower() if role_label else ""
 
-        # ✅ ROLE NORMALIZATION: Map 'receptionist' to 'registrar' for compatibility
-        # DB stores 'Receptionist' but API endpoints expect 'Registrar'
+        # E-4 (Receptionist alias removal): the receptionist→registrar input
+        # normalization and the registrar→receptionist allowed-list expansion
+        # are decommissioned. The compatibility window closed with all four
+        # removal-gate conditions verified (UI_REMEDIATION_PLAN §4.1.27):
+        # stored Receptionist rows = 0 (production SQL evidence 2026-09-02),
+        # new writes frozen (REC-1 schema write-freeze + migration
+        # normalization), frontend callers = 0 (REC-3), external callers = 0
+        # (the Telegram staff scope derives the role from the DB user row,
+        # not from initData content). The RBAC layer speaks the canonical
+        # vocabulary only; a legacy 'Receptionist' row would now be denied
+        # here instead of silently promoted to registrar.
         role_normalized = role_lower
-        if role_normalized == "receptionist":
-            role_normalized = "registrar"
 
         allowed_roles_lower = [r.lower() for r in normalized_roles]
-        # Also add 'receptionist' as allowed if 'registrar' is in allowed roles
-        if "registrar" in allowed_roles_lower and "receptionist" not in allowed_roles_lower:
-            allowed_roles_lower.append("receptionist")
 
         logger.debug(
             "RBAC role check evaluated",
@@ -176,7 +180,7 @@ def require_roles(*roles: Any):
             },
         )
 
-        if role_normalized not in allowed_roles_lower and role_lower not in allowed_roles_lower:
+        if role_normalized not in allowed_roles_lower:
             # ✅ AUDIT LOG: Логируем попытку несанкционированного доступа
             from app.core.audit import log_critical_change
 

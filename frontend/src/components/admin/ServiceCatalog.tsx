@@ -29,16 +29,16 @@ import {
   CheckSquare
 } from 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
   Select,
-  Table,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
   Checkbox,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import {
   normalizeServiceCode,
   formatServiceCodeInput,
@@ -435,7 +435,7 @@ const ServiceCatalog = () => {
 
   if (loading) {
     return (
-      <MacOSCard
+      <Card
         variant="default"
         className="p-6">
 
@@ -443,7 +443,7 @@ const ServiceCatalog = () => {
           <RefreshCw className="admin-spinner-20-mr-8" size={20} />
           <span className="admin-load-text-primary">{t('admin2.sc_loading_catalog')}</span>
         </div>
-      </MacOSCard>);
+      </Card>);
 
   }
 
@@ -492,7 +492,7 @@ const ServiceCatalog = () => {
       }
 
       {/* Фильтры */}
-      <MacOSCard
+      <Card
         variant="default"
         className="p-6">
 
@@ -559,11 +559,11 @@ const ServiceCatalog = () => {
               } />
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Статистика */}
       <div className="admin-grid-auto-200">
-        <MacOSCard
+        <Card
           variant="default"
           className="p-6">
 
@@ -575,8 +575,8 @@ const ServiceCatalog = () => {
               {t('admin2.sc_stat_total')}
             </div>
           </div>
-        </MacOSCard>
-        <MacOSCard
+        </Card>
+        <Card
           variant="default"
           className="p-6">
 
@@ -588,8 +588,8 @@ const ServiceCatalog = () => {
               {t('admin2.sc_stat_active')}
             </div>
           </div>
-        </MacOSCard>
-        <MacOSCard
+        </Card>
+        <Card
           variant="default"
           className="p-6">
 
@@ -601,8 +601,8 @@ const ServiceCatalog = () => {
               {t('admin2.sc_stat_categories')}
             </div>
           </div>
-        </MacOSCard>
-        <MacOSCard
+        </Card>
+        <Card
           variant="default"
           className="p-6">
 
@@ -614,15 +614,15 @@ const ServiceCatalog = () => {
               {t('admin2.sc_stat_filtered')}
             </div>
           </div>
-        </MacOSCard>
+        </Card>
       </div>
 
       {/* Таблица услуг */}
-      <MacOSCard
+      <Card
         variant="default"
         className="admin-card-p-0-overflow-hidden">
 
-        <Table
+        <DataTable
           columns={[
           {
             key: 'select',
@@ -744,7 +744,7 @@ const ServiceCatalog = () => {
             };
           })}
           emptyState={
-          <MacOSEmptyState
+          <AppEmpty
                 icon={Package}
                 title={t('admin2.sc_empty_title')}
                 description={searchTerm || selectedCategory !== 'all' || selectedSpecialty !== 'all' || selectedDepartment !== 'all' ?
@@ -758,7 +758,7 @@ const ServiceCatalog = () => {
                 } />
           } />
 
-      </MacOSCard>
+      </Card>
 
       {/* UX Audit Admin #1.4: форма в modal overlay вместо inline внизу страницы. */}
       {(showAddForm || editingService) &&
@@ -1002,7 +1002,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
 
   return (
-    <MacOSCard variant="default" className="p-6">
+    <Card variant="default" className="p-6">
       <h3 className="admin-h3-18-600-primary-mb-20">
         {service ? t('admin2.sc_form_title_edit') : t('admin2.sc_form_title_add')}
       </h3>
@@ -1274,7 +1274,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
           </div>
         </div>
       )}
-    </MacOSCard>);
+    </Card>);
 
 };
 

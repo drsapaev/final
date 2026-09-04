@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import {
-  MacOSCard, Button, Badge, Input, Select, Textarea,
+  Card, Button, Badge, Input, Select, Textarea,
 } from '../ui/macos';
 import {
   Bell,
@@ -174,7 +174,7 @@ const RegistrarNotificationManager = () => {
   const renderSendTab = () =>
   <div className="admin-flex-col-24">
       {/* Форма отправки уведомления */}
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         <h3 className="admin-m-0016px0-primary-flex-ai-center-gap-8-lg-med">
           <Send className="admin-icon-20" />
           {t('admin2.rnm_send_notification_title')}
@@ -252,10 +252,10 @@ const RegistrarNotificationManager = () => {
           {loading ? <RefreshCw className="admin-w-16-h-16-anim-spin1slinearinfinite" /> : <Send className="admin-icon-16" />}
           {t('admin2.rnm_send_notification_title')}
         </Button>
-      </MacOSCard>
+      </Card>
 
       {/* Быстрые действия */}
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         <h3 className="admin-m-0016px0-primary-flex-ai-center-gap-8-lg-med">
           <Activity className="admin-icon-20" />
           {t('admin2.rnm_quick_actions_title')}
@@ -288,12 +288,12 @@ const RegistrarNotificationManager = () => {
             </Button>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderRegistrarsTab = () =>
-  <MacOSCard className="admin-p-24">
+  <Card className="admin-p-24">
       <div className="admin-flex-jc-between-ai-center-mb-24">
         <h3 className="admin-m-0-primary-flex-ai-center-gap-8-lg-med">
           <Users className="admin-icon-20" />
@@ -354,11 +354,11 @@ const RegistrarNotificationManager = () => {
           {t('admin2.rnm_no_registrars')}
         </div>
     }
-    </MacOSCard>;
+    </Card>;
 
 
   const renderStatsTab = () =>
-  <MacOSCard className="admin-p-24">
+  <Card className="admin-p-24">
       <div className="admin-flex-jc-between-ai-center-mb-24">
         <h3 className="admin-m-0-primary-flex-ai-center-gap-8-lg-med">
           <BarChart3 className="admin-icon-20" />
@@ -431,7 +431,7 @@ const RegistrarNotificationManager = () => {
           </div>
         </div>
     }
-    </MacOSCard>;
+    </Card>;
 
 
   const tabs = [
@@ -459,7 +459,7 @@ const RegistrarNotificationManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="admin-p-12px20-bd-none-bg-transparent-cursor-pointer-flex-ai-center-gap-8-sm-tra-ea233b09" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fontWeight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}
+              className="admin-p-12px20-bd-none-bg-transparent-cursor-pointer-flex-ai-center-gap-8-sm-tra-ea233b09" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fontWeight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-regular)' } as CSSProperties}
               onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                 if (!isActive) {
                   e.currentTarget.style.color = 'var(--mac-text-primary)';

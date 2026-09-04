@@ -35,7 +35,6 @@ const InteractivePanel = ({
     overflow: 'hidden',
     transition: 'all 0.3s ease',
     cursor: onClick ? 'pointer' : 'default',
-    transform: isHovered ? 'translateY(-2px) scale(1.01)' : 'translateY(0) scale(1)',
     boxShadow: isHovered ? getShadow('lg') : getShadow('md'),
     borderColor: isHovered ? getColor('primary', 200) : getColor('border'),
     backgroundColor: getColor('surface')

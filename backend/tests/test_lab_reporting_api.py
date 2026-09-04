@@ -999,3 +999,37 @@ def test_legacy_lab_contract_is_not_published(client, auth_headers):
     ):
         response = client.get(route, headers=auth_headers)
         assert response.status_code == 404
+
+
+def test_create_lab_order_endpoint_resolves_published_version(
+    client, auth_headers, db_session, test_patient
+):
+    """Regression: POST /api/v1/lab/orders used to 500 on two ghost lookups.
+
+    The endpoint read template.published_version_id (attribute does not exist
+    on LabReportTemplate) and called service.get_template_version (method does
+    not exist on LabReportingService). Published-version resolution must go
+    through template.versions, and the version fetch through the repository.
+    """
+    templates_response = client.get("/api/v1/lab/templates", headers=auth_headers)
+    assert templates_response.status_code == 200
+    cbc_template = next(
+        template
+        for template in templates_response.json()
+        if template["code"] == "cbc_oak"
+    )
+
+    response = client.post(
+        "/api/v1/lab/orders",
+        headers=auth_headers,
+        json={
+            "template_id": cbc_template["id"],
+            "patient_id": test_patient.id,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["instance_id"] > 0
+    assert body["patient_id"] == test_patient.id
+    assert body["template_name"]
+    assert body["status"]

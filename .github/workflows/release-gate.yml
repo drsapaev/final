@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -55,7 +55,7 @@ jobs:
       - name: Incremental Stryker — state machines + mappers
         working-directory: frontend
         run: |
-          npx stryker run --configFile stryker.config.mjs \
+          npx stryker run \
             --mutate "src/types/state-machines/*.ts,src/api/mappers/patient.ts,src/api/mappers/appointment.ts,src/api/mappers/billing.ts"
 
 
@@ -68,11 +68,22 @@ jobs:
       # === 5. Load test with baseline (k6) ===
       - name: Install k6
         run: |
-          sudo gpg -k
-          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A36442D5730B2B1A0669E2A2A
-          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
-          sudo apt-get update
-          sudo apt-get install -y k6
+          # The old apt+keyserver method fails on GitHub runners with
+          # "gpg: keyserver receive failed: No data" — this is what kept
+          # release-gate from ever passing. Grafana's master install.sh is
+          # gone (404) too. Install the official .deb from the latest
+          # GitHub release: no keyserver, no removed scripts.
+          # Codex review follow-up: authenticate the release lookup (avoids
+          # API rate limits) and keep the version overridable via env.
+          K6_VER="${K6_VERSION:-}"
+          if [ -z "$K6_VER" ]; then
+            K6_VER=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" https://api.github.com/repos/grafana/k6/releases/latest | grep -oE '"tag_name": *"[^"]+"' | cut -d'"' -f4)
+          fi
+          curl -sL -o /tmp/k6.deb "https://github.com/grafana/k6/releases/download/${K6_VER}/k6-${K6_VER}-linux-amd64.deb"
+          sudo dpkg -i /tmp/k6.deb
+          k6 version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run k6 load tests (with baseline gate)
         working-directory: tests/load

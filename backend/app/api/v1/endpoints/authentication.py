@@ -124,6 +124,8 @@ async def login(request: Request,
             two_factor_method=result["two_factor_method"],
             pending_2fa_token=result.get("pending_2fa_token"),
             must_change_password=result.get("must_change_password", False),
+            requires_2fa_setup=result.get("requires_2fa_setup", False),
+            enrollment_token=result.get("enrollment_token"),
         )
 
     except HTTPException:

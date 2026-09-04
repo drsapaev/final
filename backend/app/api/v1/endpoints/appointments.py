@@ -3,22 +3,29 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.roles import DOCTOR_ROLES
 from app.crud.appointment import appointment as appointment_crud
 from app.models import appointment as appointment_models
 from app.models.clinic import Doctor
+from app.models.department import Department
 from app.models.patient import Patient
 from app.models.setting import Setting
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
+from app.services.patient_access_audit import log_patient_access
 from app.services.online_queue import (
     _broadcast,  # Добавляем _broadcast
     get_or_create_day,
     load_stats,
+)
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
+from app.services.appointment_eligibility import (
+    ensure_doctor_eligible_for_appointment as _ensure_appointment_doctor_eligible,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,16 +33,67 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 APPOINTMENTS_PUBLIC_ERROR = "Internal server error"
 APPOINTMENT_BROAD_ACCESS_ROLES = {"Admin", "Registrar"}
+
+
+def _normalized_role_value(role: object) -> str:
+    """Extract a role's string value and normalize case/whitespace.
+
+    Roles are stored as raw strings in the DB and arrive either as plain
+    strings or as the ``Roles`` str-enum, so the raw value must be
+    extracted before any set membership test (str(Roles.X) would yield
+    'Roles.X', not the value).
+    """
+    return str(getattr(role, "value", role)).strip().lower()
+
+
+# E-4 (Receptionist alias removal): the inline guards previously expanded
+# the broad-access set with the legacy "Receptionist" spelling to mirror
+# the RBAC SSOT alias (Codex round-1 P2 on the department-schedule guard).
+# The alias is decommissioned (§4.1.27): stored Receptionist rows = 0
+# (production SQL evidence 2026-09-02), REC-1 froze writes, REC-3 removed
+# frontend callers, and the Telegram staff scope derives roles from the DB
+# user row. Broad access is now tested against the canonical spellings
+# only; a legacy 'Receptionist' row would be denied here.
+APPOINTMENT_BROAD_ACCESS_ROLES_LOWER = frozenset(
+    spelling.lower() for spelling in APPOINTMENT_BROAD_ACCESS_ROLES
+)
+
+
+def _has_broad_appointment_access(current_user: User) -> bool:
+    """Admin/Registrar or superuser."""
+    return (
+        _normalized_role_value(getattr(current_user, "role", None))
+        in APPOINTMENT_BROAD_ACCESS_ROLES_LOWER
+        or bool(getattr(current_user, "is_superuser", False))
+    )
+
+
+# Doctor-role spellings accepted across the repo's IAM surfaces. Codex P1
+# (round-7): the hardcoded set omitted the canonical lowercase
+# 'cardiologist'/'dermatologist' spellings exercised by test_cardio_api,
+# so those doctor accounts were denied their OWN schedule by the new
+# ownership guard. Derived from the canonical sources instead of another
+# hand-maintained list:
+# - core/roles.py DOCTOR_ROLES (canonical enum values),
+# - user_mgmt/_core.py doctor-role tuple (PR-26 specialty mapping),
+# - cardio.py CARDIO_ROLES / derma.py DERMA_ROLES (specialist surfaces).
+# Membership is case-insensitive via _normalized_role_value so any case
+# variant of a recognized spelling resolves to the same gate.
+_APPOINTMENT_DOCTOR_ROLE_VOCABULARY = (
+    {str(getattr(r, "value", r)) for r in DOCTOR_ROLES}
+    | {
+        "Cardiologist",
+        "cardiology",
+        "cardiologist",
+        "Dermatologist",
+        "dermatology",
+        "dermatologist",
+        "Dentist",
+        "dentistry",
+    }
+)
 APPOINTMENT_DOCTOR_ROLES = {
-    "Doctor",
-    "cardio",
-    "cardiology",
-    "Cardiologist",
-    "Cardio",
-    "derma",
-    "Dermatologist",
-    "dentist",
-    "Dentist",
+    value.strip().lower() for value in _APPOINTMENT_DOCTOR_ROLE_VOCABULARY
 }
 APPOINTMENT_PATIENT_ROLES = {"Patient"}
 APPOINTMENT_PENDING_PAYMENT_ROLES = {"Admin", "Registrar", "Cashier"}
@@ -71,12 +129,10 @@ def _ensure_appointment_record_access(
     current_user: User,
 ) -> None:
     role = getattr(current_user, "role", None)
-    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
-        current_user, "is_superuser", False
-    ):
+    if _has_broad_appointment_access(current_user):
         return
 
-    if role in APPOINTMENT_DOCTOR_ROLES:
+    if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
         doctor = (
             db.query(Doctor)
             .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
@@ -154,12 +210,10 @@ def _scope_appointment_list_filters(
     current_user: User,
 ) -> tuple[int | None, int | None]:
     role = getattr(current_user, "role", None)
-    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
-        current_user, "is_superuser", False
-    ):
+    if _has_broad_appointment_access(current_user):
         return patient_id, doctor_id
 
-    if role in APPOINTMENT_DOCTOR_ROLES:
+    if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
         if doctor_id is None:
             raise HTTPException(status_code=403, detail="Access denied")
         if doctor_id not in _appointment_doctor_scope_ids(db, current_user):
@@ -186,7 +240,7 @@ def _ensure_appointment_create_access(
     ):
         return
 
-    if role in APPOINTMENT_DOCTOR_ROLES:
+    if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
         if appointment_in.doctor_id not in _appointment_doctor_scope_ids(
             db, current_user
         ):
@@ -402,6 +456,15 @@ def create_appointment(
     # Проверяем, не занято ли время у врача
     _ensure_appointment_create_access(db, appointment_in, current_user)
 
+    # Atomic slot reservation (Codex P1 round-7, ordering fixed round-8: the
+    # per-doctor FOR UPDATE lock is taken BEFORE eligibility so a concurrent
+    # deactivation must commit first and the eligibility read below sees the
+    # post-commit state).
+    lock_doctor_for_slot_reservation(db, appointment_in.doctor_id)
+
+    # Lifecycle eligibility (Codex P1-D consistency): a NEW booking must
+    # target a clinically eligible doctor (active, completed profile).
+    _ensure_appointment_doctor_eligible(db, appointment_in.doctor_id)
     if appointment_crud.is_time_slot_occupied(
         db,
         doctor_id=appointment_in.doctor_id,
@@ -691,6 +754,19 @@ def update_appointment(
         new_time = appointment_in.appointment_time or appointment.appointment_time
         new_doctor_id = appointment_in.doctor_id or appointment.doctor_id
 
+        # Atomic slot reservation (Codex P1 round-7, ordering fixed round-8: the
+        # per-doctor FOR UPDATE lock is taken BEFORE eligibility so a concurrent
+        # deactivation must commit first and the eligibility read below sees the
+        # post-commit state) — concurrent same-slot writers (reschedules
+        # included) serialize.
+        lock_doctor_for_slot_reservation(db, new_doctor_id)
+
+        # Lifecycle eligibility (Codex P1-D consistency): validate a doctor
+        # REASSIGNMENT to an eligible doctor. A payload that keeps the current
+        # doctor_id (time-only reschedule of an existing row) is not a new
+        # booking and stays legal even if that doctor was deactivated later.
+        if appointment_in.doctor_id and appointment_in.doctor_id != appointment.doctor_id:
+            _ensure_appointment_doctor_eligible(db, appointment_in.doctor_id)
         if appointment_crud.is_time_slot_occupied(
             db,
             doctor_id=new_doctor_id,
@@ -728,9 +804,71 @@ def delete_appointment(
     return {"message": "Запись успешно отменена"}
 
 
-@router.get("/doctor/{doctor_id}/schedule", response_model=dict[str, Any])
+def _ensure_doctor_schedule_access(
+    db: Session, *, doctor_id: int, current_user: User
+) -> None:
+    """Ownership for GET /appointments/doctor/{doctor_id}/schedule.
+
+    Role matrix (mirrors _scope_appointment_list_filters in this module):
+    - Admin/Registrar (+superuser): any doctor's schedule — operational need;
+    - doctor-capable roles (Doctor/cardio/derma/dentist variants): only their
+      own doctor_id (legacy writers stored User.id in doctor_id; allowed only
+      when it does not resolve to a real Doctor row — same rule as
+      appointment record access);
+    - Patient and every other role: denied (a doctor's appointment schedule
+      is not a patient-visible resource; patients have
+      /appointments/patient/{patient_id} instead).
+    """
+    role = getattr(current_user, "role", None)
+    if role in APPOINTMENT_BROAD_ACCESS_ROLES or getattr(
+        current_user, "is_superuser", False
+    ):
+        return
+
+    if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
+        if doctor_id not in _appointment_doctor_scope_ids(db, current_user):
+            raise HTTPException(status_code=403, detail="Access denied")
+        return
+
+    raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _ensure_department_schedule_access(
+    db: Session, *, department_id: int, current_user: User
+) -> None:
+    """Ownership for GET /appointments/department/{department}/schedule
+    (D-4 / FU-1) — mirrors _ensure_doctor_schedule_access:
+
+    - Admin/Registrar (+superuser): any department's schedule —
+      operational need;
+    - doctor-capable roles (Doctor/cardio/derma/dentist variants): only
+      their OWN department (their active Doctor row must belong to the
+      requested department); a doctor-capable user without a Doctor row
+      is denied (a cross-doctor department schedule is not a substitute);
+    - Patient and every other role: denied (department schedules expose
+      per-patient PHI; patients have /appointments/patient/{patient_id}).
+    """
+    role = getattr(current_user, "role", None)
+    if _has_broad_appointment_access(current_user):
+        return
+
+    if _normalized_role_value(role) in APPOINTMENT_DOCTOR_ROLES:
+        doctor = (
+            db.query(Doctor)
+            .filter(Doctor.user_id == current_user.id, Doctor.active.is_(True))
+            .first()
+        )
+        if doctor is None or doctor.department_id != department_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        return
+
+    raise HTTPException(status_code=403, detail="Access denied")
+
+
+@router.get("/doctor/{doctor_id}/schedule", response_model=list[dict[str, Any]])
 def get_doctor_schedule(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     doctor_id: int,
     date: str = Query(..., description="Дата (YYYY-MM-DD)"),
@@ -739,13 +877,38 @@ def get_doctor_schedule(
     """
     Получить расписание врача на определенную дату
     """
+    _ensure_doctor_schedule_access(
+        db, doctor_id=doctor_id, current_user=current_user
+    )
     schedule = appointment_crud.get_doctor_schedule(db, doctor_id=doctor_id, date=date)
+
+    # Threat model (AGENTS.md "Threat model"): "Audit log on every patient
+    # read" — the repaired serializer now really returns patient_id + notes,
+    # so each returned row is a per-patient PHI read by a staff actor and
+    # gets its own audit trail entry before the response is returned.
+    for entry in schedule:
+        log_patient_access(
+            db,
+            actor_user=current_user,
+            subject_patient_id=entry["patient_id"],
+            resource_type="appointment",
+            resource_id=str(entry["id"]),
+            action="view",
+            request=request,
+            extra_data={
+                "operation": "doctor_schedule_view",
+                "doctor_id": doctor_id,
+                "date": date,
+            },
+        )
+
     return schedule
 
 
 @router.get("/department/{department}/schedule", response_model=dict[str, Any])
 def get_department_schedule(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     department: str,
     date: str = Query(..., description="Дата (YYYY-MM-DD)"),
@@ -754,10 +917,63 @@ def get_department_schedule(
     """
     Получить расписание отделения на определенную дату
     """
-    schedule = appointment_crud.get_department_schedule(
-        db, department=department, date=date
+    # D-4 / FU-1: the legacy crud compared the `department` RELATIONSHIP
+    # to a raw string and read a non-existent `apt.reason` column — the
+    # endpoint was a 500 for every non-empty schedule. The department is
+    # now resolved by key (or numeric id) and the schedule is scoped to
+    # its department_id, with the same repaired serializer as the doctor
+    # schedule twin (PR4).
+    # Codex round-2 P2: an all-numeric KEY is legal (DepartmentCreate
+    # permits it), so resolution tries the KEY first and only falls back
+    # to a numeric-id lookup — the previous id-first order silently
+    # returned another department's schedule (or a false 404) for a
+    # numeric-key department.
+    department_row = (
+        db.query(Department).filter(Department.key == department).first()
     )
-    return schedule
+    if department_row is None and department.strip().isdigit():
+        department_row = (
+            db.query(Department)
+            .filter(Department.id == int(department.strip()))
+            .first()
+        )
+    if department_row is None:
+        raise HTTPException(status_code=404, detail="Отделение не найдено")
+
+    _ensure_department_schedule_access(
+        db, department_id=department_row.id, current_user=current_user
+    )
+
+    schedule = appointment_crud.get_department_schedule(
+        db, department_id=department_row.id, date=date
+    )
+
+    # Threat model (AGENTS.md "Threat model"): every returned row is a
+    # per-patient PHI read by a staff actor and gets its own audit trail
+    # entry before the response is returned (mirrors the doctor schedule).
+    for entry in schedule:
+        log_patient_access(
+            db,
+            actor_user=current_user,
+            subject_patient_id=entry["patient_id"],
+            resource_type="appointment",
+            resource_id=str(entry["id"]),
+            action="view",
+            request=request,
+            extra_data={
+                "operation": "department_schedule_view",
+                "department_id": department_row.id,
+                "date": date,
+            },
+        )
+
+    return {
+        "department": department_row.key,
+        "department_id": department_row.id,
+        "date": date,
+        "total": len(schedule),
+        "appointments": schedule,
+    }
 
 
 # Сохраняем существующие endpoints для совместимости

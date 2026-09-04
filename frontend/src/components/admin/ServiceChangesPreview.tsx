@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { useTranslation } from '../../i18n/useTranslation';
 import { AlertCircle, ArrowRight, Check, X } from 'lucide-react';
 import {
-  MacOSCard, Button, Badge, AppEmpty,
+  Card, Button, Badge, AppEmpty,
 } from '../ui/macos';
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string;
@@ -105,7 +105,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }: 
 
   if (changes.length === 0) {
     return (
-      <MacOSCard
+      <Card
         variant="default"
         role="dialog"
         aria-modal="true"
@@ -126,12 +126,12 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }: 
             </Button>
           }
         />
-      </MacOSCard>
+      </Card>
     );
   }
 
   return (
-    <MacOSCard
+    <Card
       variant="default"
       role="dialog"
       aria-modal="true"
@@ -249,7 +249,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }: 
           </Button>
         </div>
       </div>
-    </MacOSCard>
+    </Card>
   );
 };
 

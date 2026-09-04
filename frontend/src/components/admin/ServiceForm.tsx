@@ -10,7 +10,7 @@ import i18n from '../../i18n';
  */
 import { useState, useEffect, useCallback } from 'react';
 import { AlertCircle, X, Save, Package, Users, Filter } from 'lucide-react';
-import { MacOSTab, MacOSCard, Button, Input, Label, Select, Textarea, Checkbox } from '../ui/macos';
+import { MacOSTab, Card, Button, Input, Label, Select, Textarea, Checkbox } from '../ui/macos';
 import ServiceChangesPreview from './ServiceChangesPreview';
 import { isValidServiceCode, normalizeServiceCode, formatServiceCodeInput } from '../../utils/serviceCodeUtils';
 import logger from '../../utils/logger';
@@ -274,7 +274,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
 
 
   return (
-    <MacOSCard variant="default" className="p-6">
+    <Card variant="default" className="p-6">
       <h3 className="admin-h3-18-600-primary-mb-20">
         {service ? t18('admin2.sf_header_edit') : t18('admin2.sf_header_add')}
       </h3>
@@ -547,7 +547,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
           </div>
         </div>
       )}
-    </MacOSCard>);
+    </Card>);
 
 };
 

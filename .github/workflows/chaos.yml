@@ -16,7 +16,7 @@ jobs:
 
     # Phase 1: failure injection → Phase 2: recovery → Phase 3: post-recovery verification
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -91,3 +91,21 @@ jobs:
           path: |
             frontend/chaos-output-*.txt
             frontend/chaos-results-*.json
+
+  # Alert on scheduled-run failures: a red nightly is invisible without this
+  # (mutation.yml was red for 4+ nights before anyone noticed).
+  notify-failure:
+    name: 🔔 Notify on failure
+    runs-on: ubuntu-latest
+    needs: [chaos-test]
+    if: failure() && github.event_name == 'schedule'
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create failure issue
+        uses: ./.github/actions/notify-failure
+        with:
+          title: "🔴 Weekly chaos testing failed"
+          detail: |
+            Failure-injection + recovery verification via Playwright.

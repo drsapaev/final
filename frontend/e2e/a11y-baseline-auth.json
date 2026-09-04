@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "purpose": "AXE-EXP-1 (a11y axe audit, e2e/a11y-axe-authenticated.spec.ts) — accepted pre-existing violation rule IDs per authorized QA-harness route:theme key. The gate fails on NEW rules and on stale entries (findings that no longer reproduce must be removed from this file — the baseline must shrink, not rot).",
+    "policy": "Adding a rule here requires a documented justification. FORBIDDEN: adding a rule to make a failing audit pass without justification (Rule 13 analog). Every entry is a PRE-EXISTING finding first baselined at AXE-EXP-1 (probe on main aca7d96a8, 02.09.2026, 34 audits, 236 nodes); the shrink-only ratchet stays in force across the AXE-EXP track.",
+    "scope": "Authorized QA-harness surfaces only (e2e/support/authenticatedQa.ts): 6 role homes (admin/registrar/doctor/cashier/lab/patient) + 2 specialty surfaces (doctor-cardiology, doctor-dermatology ?tab=appointments) + 9 admin-family routes × light/dark = 34 audits. Public routes are covered by e2e/a11y-baseline.json (empty after the CC track).",
+    "resolution": "AXE-EXP-2 (app-chrome inks) → --mac-text-on-tertiary. AXE-EXP-3 (badge fills) → CC-2 strong tokens + info tint dark ink. AXE-EXP-4 (tab/link inks) → --mac-link-ink + on-tertiary + strong fill + secondary admin inks. AXE-EXP-5 (ARIA structural): MacOSTab buttons now live inside a role=tablist container (aria-required-parent, 22 nodes); SegmentedControl no longer emits dangling aria-controls references — the panel-<value> ids never existed on any consumer (aria-valid-attr-value, 6 nodes; optional controlsPrefix prop for future real panel wiring); AppointmentSummaryBar's refresh Button moved out of the role=list container (list owns only listitem badges via a display:contents wrapper — zero pixel delta; aria-required-children, 4 nodes); the admin KPI loading grid got role=status (aria-busy is prohibited on the generic role; aria-prohibited-attr, 2 nodes); the three cashier date-filter inputs got accessible names via 3 new i18n keys × 5 locales (label, 2 nodes + latent range pair). AXE-EXP-6 (closing): the legacy white-table dark patch (dark-theme-visibility-fix.css — --dark-card-bg wired to the TEXT token --mac-text-primary = #ffffff, force-painted onto every bare <table> via !important) was narrowed to its legacy class scope (.table-wrapper/.data-table) and the canonical DataTable's dead-invalid variant color-mix (gradient operand → transparent since inception) was repaired to explicit transparent. The baseline is now EMPTY: all 34 audits run with zero WCAG 2.x A/AA violations. The shrink-only ratchet contract stays in force — any new violation fails the gate.",
+    "probe_diagnosis": "Original seeding (AXE-EXP-1): 236 violation nodes / 34 audits — 200 color-contrast + 36 ARIA. Monotonic shrink across AXE-EXP-2..EXP-6: 236→172→60→38→2→0 nodes; the closing increment removed the last 2 (admin-services:dark, the DataTable white-in-dark surface class).",
+    "axeTags": [
+      "wcag2a",
+      "wcag2aa",
+      "wcag21a",
+      "wcag21aa"
+    ]
+  }
+}

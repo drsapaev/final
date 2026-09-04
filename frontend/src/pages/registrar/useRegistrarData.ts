@@ -1,29 +1,24 @@
 /**
- * Registrar Panel — data loading hook (partial extraction).
+ * Registrar Panel — reference data hook (doctors / services / departments).
  *
  * Decomposition step 4: extracted from RegistrarPanel.jsx.
+ * PR-UI-13-4: the hook now OWNS the reference-data state (doctors, services,
+ * dynamicDepartments) instead of receiving external setters — the panel's
+ * useState count drops to 5 (plan §PR-UI-13 AC).
  *
- * Extracted functions:
+ * Exported functions:
  * - loadIntegratedData: loads doctors, services, departments in parallel
- *   from /registrar/* endpoints. Sets state via provided setters.
+ *   from /registrar/* endpoints.
  * - fetchPatientData: fetches single patient by ID from /api/v1/patients/:id.
  *   Returns null for demo patients (ID >= 1000) or on error.
  * - enrichAppointmentsWithPatientData: enriches appointment records with
  *   patient display fields (FIO, phone, birth year, gender, address) if
  *   missing from backend response. Also applies local overrides.
  *
- * NOT extracted (remain in RegistrarPanel due to complex ref dependencies):
- * - loadAppointments: depends on loadAppointmentsInFlightRef,
- *   autoRefreshCooldownUntilRef, autoRefreshCooldownLoggedRef,
- *   filteredAppointmentsRef, and calls enrichAppointmentsWithPatientData.
- * - loadMoreAppointments: depends on paginationInfo state and loadAppointments.
- *
- * @param {Object} deps
- * @param {Function} deps.setDoctors - state setter for doctors array
- * @param {Function} deps.setServices - state setter for services object
- * @param {Function} deps.setDynamicDepartments - state setter for departments
+ * NOT extracted (remain in useRegistrarWorklistData — PR-UI-13-1):
+ * - loadAppointments / loadMoreAppointments.
  */
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { api } from '../../api/client';
 // UX Audit Registrar #1: getPatient() — централизованный доступ к /patients/{id}.
 // Раньше здесь был raw fetch() с ручным Authorization-хедером.
@@ -40,15 +35,13 @@ import {
   normalizePatientGender,
 } from './registrarHelpers';
 
-export const useRegistrarData = ({
-  setDoctors,
-  setServices,
-  setDynamicDepartments,
-}: {
-  setDoctors: (doctors: Doctor[]) => void;
-  setServices: (services: Record<string, unknown>) => void;
-  setDynamicDepartments: (departments: unknown[]) => void;
-}) => {
+export const useRegistrarData = () => {
+  // PR-UI-13-4: reference-data state owned by the hook (former panel
+  // useState + external setters — same reset semantics inside
+  // loadIntegratedData: cleared before fetch, set only on success).
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [services, setServices] = useState<Record<string, unknown>>({});
+  const [dynamicDepartments, setDynamicDepartments] = useState<unknown[]>([]);
   // ───────────────────────────────────────────────────────────
   // loadIntegratedData: parallel fetch of doctors + services + departments
   // ───────────────────────────────────────────────────────────
@@ -264,6 +257,9 @@ export const useRegistrarData = ({
   }, [fetchPatientData]);
 
   return {
+    doctors,
+    services,
+    dynamicDepartments,
     loadIntegratedData,
     fetchPatientData,
     enrichAppointmentsWithPatientData,

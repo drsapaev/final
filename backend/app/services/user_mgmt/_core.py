@@ -1,8 +1,15 @@
 """Core mixin for UserManagementService. Split from user_management_service.py."""
 from __future__ import annotations
 
+from app.services.medical_specialty_catalog import (
+    MedicalSpecialtyCatalogError,
+)
 from app.services.user_mgmt._base import *  # noqa: F401, F403
-from app.services.user_mgmt._base import UserManagementServiceMixinBase
+from app.services.user_mgmt._base import (
+    MEDICAL_SPECIALTY_CATALOG_REMEDIATION,
+    DoctorSpecialtyNotSelectableError,
+    UserManagementServiceMixinBase,
+)
 
 
 class CoreMixin(UserManagementServiceMixinBase):
@@ -30,16 +37,9 @@ class CoreMixin(UserManagementServiceMixinBase):
                 "emr:read",
                 "schedules:read",
             ],
-            "Receptionist": [
-                "patients:read",
-                "patients:write",
-                "appointments:read",
-                "appointments:write",
-                "schedules:read",
-                "schedules:write",
-                "payments:read",
-                "payments:write",
-            ],
+            # E-4 (Receptionist alias removal): the legacy 'Receptionist'
+            # entry was removed — canonical Registrar is the front-desk role
+            # (REC track; stored Receptionist rows = 0, §4.1.27).
             "Cashier": [
                 "payments:read",
                 "payments:write",
@@ -239,33 +239,96 @@ class CoreMixin(UserManagementServiceMixinBase):
             # registrar doctor selector, and schedules until admin manually
             # links them via AdminDoctors → "Add doctor" → pick user.
             doctor_created = False
-            if user_data.role in ("Doctor", "Cardiologist", "Dermatologist", "Dentist", "cardio", "derma", "dentist"):
+            if user_data.role in DOCTOR_PROFILE_ROLES:
                 existing_doctor = (
                     db.query(Doctor)
                     .filter(Doctor.user_id == user.id)
                     .first()
                 )
                 if not existing_doctor:
-                    # PR-26: map role to specialty including lowercase cardio/derma/dentist
-                    specialty_map = {
-                        "Doctor": "general",
-                        "Cardiologist": "cardiology",
-                        "Dermatologist": "dermatology",
-                        "Dentist": "dentistry",
-                        "cardio": "cardiology",
-                        "derma": "dermatology",
-                        "dentist": "dentistry",
-                    }
-                    new_doctor = Doctor(
-                        user_id=user.id,
-                        specialty=specialty_map.get(user_data.role, "general"),
-                        active=user_data.is_active,
-                    )
-                    db.add(new_doctor)
-                    doctor_created = True
-                    logger.info(
-                        f"Auto-created Doctor row for user {user.id} (role={user_data.role})"
-                    )
+                    if user_data.role == "Doctor" and user_data.doctor_profile:
+                        # Canonical onboarding (owner decision 2026-09-01):
+                        # the schema layer guarantees a real onboarding
+                        # specialty here — no "general" sentinel can enter
+                        # through the normal create path anymore. Catalog
+                        # membership/active validation happens at the API
+                        # boundary BEFORE create_user is invoked; the
+                        # transaction only persists what already passed it.
+                        profile_block = user_data.doctor_profile
+                        new_doctor = Doctor(
+                            user_id=user.id,
+                            specialty=profile_block.specialty.strip(),
+                            cabinet=profile_block.cabinet,
+                            price_default=profile_block.price_default,
+                            start_number_online=(
+                                profile_block.start_number_online
+                                if profile_block.start_number_online is not None
+                                else 1
+                            ),
+                            max_online_per_day=(
+                                profile_block.max_online_per_day
+                                if profile_block.max_online_per_day is not None
+                                else 15
+                            ),
+                            active=user_data.is_active,
+                        )
+                        db.add(new_doctor)
+                        doctor_created = True
+                        logger.info(
+                            "Onboarded Doctor profile for user %s "
+                            "(specialty=%s) in the create-user transaction",
+                            user.id,
+                            profile_block.specialty,
+                        )
+                    else:
+                        # Legacy doctor-role spellings via API keep the
+                        # compatibility auto-map (recovery/migration surface,
+                        # NOT canonical onboarding). "Doctor" without a
+                        # doctor_profile is unreachable here: the schema
+                        # validator rejects it with 422.
+                        # Codex round-6 P1: the legacy role auto-map must respect
+                        # the runtime catalog SSOT — a DEACTIVATED catalog
+                        # specialty must not receive a fresh ACTIVE doctor
+                        # profile. If the mapped code is not selectable, provision
+                        # the INCOMPLETE sentinel instead: the account still
+                        # onboards, and the profile requires assignment through
+                        # the validated boundary. An UNUSABLE catalog
+                        # (MedicalSpecialtyCatalogError) carries no deactivation
+                        # information — keep the historical mapping rather than
+                        # failing user creation.
+                        mapped_specialty = DOCTOR_ROLE_DEFAULT_SPECIALTY.get(
+                            user_data.role, INCOMPLETE_DOCTOR_SPECIALTY
+                        )
+                        if mapped_specialty != INCOMPLETE_DOCTOR_SPECIALTY:
+                            try:
+                                from app.services.medical_specialty_catalog import (
+                                    MedicalSpecialtyCatalogService,
+                                )
+
+                                selectable = MedicalSpecialtyCatalogService(
+                                    db
+                                ).is_selectable_for_onboarding(mapped_specialty)
+                            except MedicalSpecialtyCatalogError:
+                                selectable = True
+                            if not selectable:
+                                logger.warning(
+                                    "Auto-provisioning downgraded role %s: catalog "
+                                    "specialty %s is not selectable — incomplete "
+                                    "profile requires assignment via /admin/doctors",
+                                    user_data.role,
+                                    mapped_specialty,
+                                )
+                                mapped_specialty = INCOMPLETE_DOCTOR_SPECIALTY
+                        new_doctor = Doctor(
+                            user_id=user.id,
+                            specialty=mapped_specialty,
+                            active=user_data.is_active,
+                        )
+                        db.add(new_doctor)
+                        doctor_created = True
+                        logger.info(
+                            f"Auto-created Doctor row for user {user.id} (role={user_data.role})"
+                        )
 
             db.commit()
             # Обновляем объекты, чтобы получить все поля (id, created_at, updated_at)
@@ -293,6 +356,8 @@ class CoreMixin(UserManagementServiceMixinBase):
 
             # Обновляем основные поля
             update_data = user_data.model_dump(exclude_unset=True)
+            old_is_active = user.is_active
+            old_role = user.role
 
             target_is_active = update_data.get("is_active", user.is_active)
             target_role = update_data.get("role", user.role)
@@ -362,6 +427,35 @@ class CoreMixin(UserManagementServiceMixinBase):
                         if hasattr(user.profile, field):
                             setattr(user.profile, field, value)
 
+            # Ghost-doctor prevention: mirror is_active onto Doctor profile
+            if "is_active" in update_data and user.is_active != old_is_active:
+                # Codex #3031 round-7 P2: pass the pending role when the
+                # request also changes it — SessionLocal is autoflush=False,
+                # so the mirror's owner-role gate would otherwise read the
+                # STALE stored role and validate/resurrect a profile the
+                # combined request is about to demote (a safe recovery must
+                # not depend on the catalog). Promotions pass the NEW
+                # doctor-family role (the gate sees the effective state —
+                # same probe contract as before); demotions pass the
+                # non-doctor role so the mirror skips the resurrection and
+                # the demotion branch below deactivates the profile.
+                self._sync_doctor_active(
+                    db,
+                    user_id,
+                    user.is_active,
+                    reason="update_user_is_active",
+                    pending_role=user.role if "role" in update_data else None,
+                )
+
+            # Lifecycle invariant: role=Doctor-family <-> active linked Doctor
+            # profile. Promotion provisions/reactivates the linked Doctor row;
+            # demotion deactivates it (history preserved). Legacy roles are
+            # handled by the same contract (see _apply_role_change_doctor_lifecycle).
+            if "role" in update_data and user.role != old_role:
+                self._apply_role_change_doctor_lifecycle(
+                    db, user, old_role, user.role
+                )
+
             # Логируем обновление
             self._log_user_action(
                 db, user_id, "update", "Пользователь обновлен", updated_by
@@ -370,6 +464,24 @@ class CoreMixin(UserManagementServiceMixinBase):
             db.commit()
             return True, "Пользователь успешно обновлен"
 
+        except DoctorSpecialtyNotSelectableError as e:
+            # Codex #3010 follow-up P1: the promotion reactivates a Doctor
+            # profile whose stored specialty is not a selectable catalog
+            # code — surface the REMEDIATION message instead of the generic
+            # internal-error fallback (the role change is rejected, nothing
+            # is activated).
+            db.rollback()
+            logger.warning("Role change rejected by catalog guard: %s", e)
+            return False, str(e)
+        except MedicalSpecialtyCatalogError as e:
+            # Codex #3031 round-1: an UNUSABLE catalog must not degrade into
+            # the generic internal-error fallback — on PostgreSQL the failed
+            # catalog SELECT aborts the transaction, so propagate the
+            # configuration failure as the same remediation message the
+            # POST /users catalog boundary documents.
+            db.rollback()
+            logger.warning("Role change blocked: specialty catalog unavailable (%s)", e)
+            return False, MEDICAL_SPECIALTY_CATALOG_REMEDIATION
         except Exception as e:
             db.rollback()
             logger.error(f"Error updating user: {e}")
@@ -423,6 +535,18 @@ class CoreMixin(UserManagementServiceMixinBase):
             # Логируем удаление
             self._log_user_action(
                 db, user_id, "delete", "Пользователь удален", deleted_by
+            )
+
+            # Ghost-doctor prevention: a deleted owner must not leave an
+            # ACTIVE clinical Doctor profile behind (FK SET NULL will keep
+            # the row). Deactivate BEFORE the delete in the same transaction;
+            # historical visits/EMR/audit keep referencing the Doctor row.
+            self._sync_doctor_active(
+                db,
+                user_id,
+                False,
+                reason="owner_user_deleted",
+                detach_owner=True,
             )
 
             # Удаляем пользователя (каскадное удаление)
@@ -554,6 +678,19 @@ class CoreMixin(UserManagementServiceMixinBase):
                     ),
                 }
 
+            # Doctor profile completeness (decision #5 — admin must see
+            # "Profile incomplete / Specialty required"). None = no linked
+            # Doctor row; True = linked profile still has the auto-create
+            # placeholder specialty ("general") and must be completed.
+            doctor_row = (
+                db.query(Doctor).filter(Doctor.user_id == user.id).first()
+            )
+            profile_data["doctor_profile_incomplete"] = (
+                is_doctor_profile_incomplete(doctor_row.specialty)
+                if doctor_row is not None
+                else None
+            )
+
             return profile_data
 
         except Exception as e:
@@ -625,6 +762,15 @@ class CoreMixin(UserManagementServiceMixinBase):
 
             # Формируем результат
             result = []
+            page_user_ids = [u.id for u in users]
+            doctor_by_user_id: dict[int, Doctor] = {}
+            if page_user_ids:
+                doctor_rows = (
+                    db.query(Doctor)
+                    .filter(Doctor.user_id.in_(page_user_ids))
+                    .all()
+                )
+                doctor_by_user_id = {d.user_id: d for d in doctor_rows}
             for user in users:
                 user_data = {
                     "id": user.id,
@@ -663,6 +809,14 @@ class CoreMixin(UserManagementServiceMixinBase):
                             "last_login": user.profile.last_login,
                             "last_activity": user.profile.last_activity,
                         }
+                    )
+
+                # Doctor profile completeness flag (decision #5): one batched
+                # query for the whole page, no N+1. None = no linked Doctor row.
+                doctor_row = doctor_by_user_id.get(user.id)
+                if doctor_row is not None:
+                    user_data["doctor_profile_incomplete"] = (
+                        is_doctor_profile_incomplete(doctor_row.specialty)
                     )
 
                 result.append(user_data)

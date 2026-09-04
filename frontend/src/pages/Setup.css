@@ -6,7 +6,7 @@
    сжималась без адаптации.
 
    Теперь стили в CSS — можно делать responsive layout через media queries.
-   Все цвета используют CSS-переменные (--mac-*) из macos-tokens.css,
+   Все цвета используют CSS-переменные (--mac-*) из design-system/tokens.css,
    чтобы корректно работать в light/dark теме.
 
    Соответствие старым inline-стилям:

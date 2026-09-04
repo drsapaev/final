@@ -1,13 +1,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  Icon, Typography,
-} from '../ui/macos';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '../ui/macos';
 import { AIButton, AIAssistant } from '../ai';
 // STRAT#22: t() для i18n — AI analysis strings мигрированы.
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { X } from 'lucide-react';
 
 /**
  * P-01 fix: AI-анализ лабораторного бланка перенесён из LabResultsManager
@@ -168,7 +166,7 @@ export default function LabReportAIAnalysis({ activeInstance, notify }: LabRepor
               >
                 {/* L-M-8 fix: emoji ✕ заменён на lucide-icon X для консистентности
                     с остальными UI-кнопками (cashier/registrar/admin/doctor panels). */}
-                <Icon name="xmark" size={14} />
+                <X size={14} aria-hidden="true" />
               </Button>
             </Box>
           </DialogTitle>

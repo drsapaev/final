@@ -9,7 +9,7 @@ Inside the monolith, each domain follows layered flow: API endpoint -> service -
 ## Decision Rationale
 
 - **Project type:** EMR/clinic platform with payments, queueing, chat, and role-based workflows.
-- **Tech stack:** FastAPI + SQLAlchemy + Alembic + PostgreSQL, React 18 + Vite, GitHub Actions CI/CD.
+- **Tech stack:** FastAPI + SQLAlchemy + Alembic + PostgreSQL, React 19 + Vite + TypeScript (strict), GitHub Actions CI/CD.
 - **Key factor:** High domain complexity with strong consistency and audit requirements, but better served by single deployment and strict internal boundaries.
 
 ## Folder Structure

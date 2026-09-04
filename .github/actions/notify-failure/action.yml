@@ -1,0 +1,44 @@
+name: 'Notify failure (GitHub issue)'
+description: >-
+  Create a GitHub issue describing the failed run. Call from a step or job
+  guarded by `if: failure()` (optionally && github.event_name == 'schedule'
+  for nightly-only alerting). Requires `permissions: issues: write` on the
+  calling job.
+inputs:
+  title:
+    description: Issue title.
+    required: true
+  detail:
+    description: Extra context lines appended to the issue body.
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Create failure issue
+      uses: actions/github-script@v9
+      with:
+        script: |
+          const title = ${{ toJSON(inputs.title) }};
+          const detail = ${{ toJSON(inputs.detail) }};
+          const body = [
+            `**${title}**`,
+            ``,
+            `Workflow **${context.workflow}** failed in run ${context.runId}.`,
+            ``,
+            detail,
+            ``,
+            `**Action required:**`,
+            `1. Open the failed run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            `2. Identify the failing job and step, find the root cause`,
+            `3. Fix before the next scheduled run — a new auto-issue per run means ongoing breakage`,
+            ``,
+            `Run details: event=${context.eventName} ref=${context.ref} sha=${context.sha}`,
+          ].filter((line) => line !== '').join('\n');
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title,
+            body,
+            labels: ['ci-failure', 'auto-generated'],
+          });

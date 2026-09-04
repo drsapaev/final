@@ -7,8 +7,9 @@
  */
 
 import { memo } from 'react';
-import { Icon } from '../../components/ui/macos';
+;
 import { useTranslation } from '../../i18n/useTranslation';
+import { AlertTriangle, ArrowUpDown, CheckCircle2 } from 'lucide-react';
 
 interface DataSourceIndicatorProps {
   dataSource?: 'loading' | 'api' | 'error' | string;
@@ -26,7 +27,7 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
   if (dataSource === 'error') {
     return (
       <div className="registrar-ds-indicator registrar-ds-error">
-        <Icon name="exclamationmark.triangle" size="small" className="registrar-text-white" />
+        <AlertTriangle size={16} className="registrar-text-white" aria-hidden="true" />
         <span>{t('registrarPanel.ds_error_message')}</span>
         <button
           onClick={() => onRetry?.({ source: 'error_refresh_button', force: true })}
@@ -40,7 +41,7 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
   if (dataSource === 'api') {
     return (
       <div className="registrar-ds-indicator registrar-ds-success">
-        <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
+        <CheckCircle2 size={16} className="registrar-text-white" aria-hidden="true" />
         <span>{t('registrarPanel.data_source_api')}</span>
         <span className="registrar-ds-count">
           {count} / {paginationInfo?.total ?? count}
@@ -52,7 +53,7 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
   if (dataSource === 'loading') {
     return (
       <div className="registrar-ds-indicator registrar-ds-loading">
-        <Icon name="arrow.up.arrow.down" size="small" className="registrar-text-white" />
+        <ArrowUpDown size={16} className="registrar-text-white" aria-hidden="true" />
         <span>{t('registrarPanel.loading')}</span>
       </div>
     );

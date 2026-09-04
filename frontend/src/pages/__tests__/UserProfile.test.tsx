@@ -2,7 +2,6 @@ import React, { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../../contexts/ThemeContext';
-import { MacOSThemeProvider } from '../../theme/macosTheme';
 
 const { apiGet, apiPut, setAuthProfile, getAuthState } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -35,22 +34,18 @@ import UserProfile, { __resetSelfProfileCacheForTests } from '../UserProfile';
 
 function renderUserProfile() {
   return render(
-    <MacOSThemeProvider>
-      <ThemeProvider>
+          <ThemeProvider>
         <UserProfile />
       </ThemeProvider>
-    </MacOSThemeProvider>
   );
 }
 
 function renderUserProfileInStrictMode() {
   return render(
     <StrictMode>
-      <MacOSThemeProvider>
-        <ThemeProvider>
+              <ThemeProvider>
           <UserProfile />
         </ThemeProvider>
-      </MacOSThemeProvider>
     </StrictMode>
   );
 }
@@ -73,7 +68,7 @@ describe('UserProfile page', () => {
     nationality: 'Uzbek',
     date_of_birth: '1990-01-01T00:00:00',
     gender: 'female',
-    role: 'Receptionist',
+    role: 'Registrar',
     is_active: true,
     is_superuser: false,
     email_verified: true,

@@ -18,12 +18,9 @@ from app.models.visit import Visit
 
 
 def _login_admin(client, admin_user, admin_password):
-    login_response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    assert login_response.status_code == 200, login_response.text
-    return {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+    from tests.conftest import mint_access_token
+
+    return {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
 
 
 @pytest.mark.integration

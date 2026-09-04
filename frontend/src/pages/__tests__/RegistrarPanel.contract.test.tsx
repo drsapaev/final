@@ -13,6 +13,23 @@ const registrarPanelPath = path.resolve(__dirname, '../RegistrarPanel.tsx');
 // Decomp step 3: reschedule helpers extracted to ./registrar/useRegistrarReschedule.js.
 // Decomp step 4: data-loading functions extracted to ./registrar/useRegistrarData.js.
 // Decomp step 5: record action handlers extracted to ./registrar/useRegistrarActions.js.
+// PR-UI-13-1 (Decomp 8): queue entry adapter + worklist data lifecycle hook.
+const registrarQueueAdapterPath = path.resolve(__dirname, '../registrar/registrarQueueAdapter.ts');
+const useRegistrarWorklistDataPath = path.resolve(__dirname, '../registrar/useRegistrarWorklistData.ts');
+// PR-UI-13-2 (Decomp 9): view-model row computation + service filtering.
+const registrarWorklistRowsPath = path.resolve(__dirname, '../registrar/registrarWorklistRows.ts');
+const registrarServiceFilterPath = path.resolve(__dirname, '../registrar/registrarServiceFilter.ts');
+// PR-UI-13-3 (Decomp 10): dialog + wizard state machines + extracted dialogs.
+const useRegistrarDialogsPath = path.resolve(__dirname, '../registrar/useRegistrarDialogs.ts');
+const useRegistrarWizardPath = path.resolve(__dirname, '../registrar/useRegistrarWizard.ts');
+const RecordPreviewViewPath = path.resolve(__dirname, '../registrar/views/RecordPreview.tsx');
+const RescheduleSlotsViewPath = path.resolve(__dirname, '../registrar/views/RescheduleSlots.tsx');
+// PR-UI-13-5: navigation, row actions, calendar, breadcrumb + dialogs layer.
+const useRegistrarNavigationPath = path.resolve(__dirname, '../registrar/useRegistrarNavigation.ts');
+const useRegistrarRowActionsPath = path.resolve(__dirname, '../registrar/useRegistrarRowActions.ts');
+const useRegistrarCalendarPath = path.resolve(__dirname, '../registrar/useRegistrarCalendar.ts');
+const RegistrarBreadcrumbPath = path.resolve(__dirname, '../registrar/views/RegistrarBreadcrumb.tsx');
+const RegistrarDialogsLayerPath = path.resolve(__dirname, '../registrar/views/RegistrarDialogsLayer.tsx');
 // Contract tests must read all files because they verify that certain
 // functions exist in the registrar panel source tree (not necessarily
 // in the orchestrator file itself).
@@ -36,6 +53,32 @@ const readRegistrarSourceTree = () => [
   normalizeSource(fs.readFileSync(useRegistrarDataPath, 'utf8')),
   '// ─── useRegistrarActions.js ───',
   normalizeSource(fs.readFileSync(useRegistrarActionsPath, 'utf8')),
+  '// ─── registrarQueueAdapter.js (PR-UI-13-1) ───',
+  normalizeSource(fs.readFileSync(registrarQueueAdapterPath, 'utf8')),
+  '// ─── useRegistrarWorklistData.js (PR-UI-13-1) ───',
+  normalizeSource(fs.readFileSync(useRegistrarWorklistDataPath, 'utf8')),
+  '// ─── registrarWorklistRows.js (PR-UI-13-2) ───',
+  normalizeSource(fs.readFileSync(registrarWorklistRowsPath, 'utf8')),
+  '// ─── registrarServiceFilter.js (PR-UI-13-2) ───',
+  normalizeSource(fs.readFileSync(registrarServiceFilterPath, 'utf8')),
+  '// ─── useRegistrarDialogs.js (PR-UI-13-3) ───',
+  normalizeSource(fs.readFileSync(useRegistrarDialogsPath, 'utf8')),
+  '// ─── useRegistrarWizard.js (PR-UI-13-3) ───',
+  normalizeSource(fs.readFileSync(useRegistrarWizardPath, 'utf8')),
+  '// ─── RecordPreview.jsx (PR-UI-13-3) ───',
+  normalizeSource(fs.readFileSync(RecordPreviewViewPath, 'utf8')),
+  '// ─── RescheduleSlots.jsx (PR-UI-13-3) ───',
+  normalizeSource(fs.readFileSync(RescheduleSlotsViewPath, 'utf8')),
+  '// ─── useRegistrarNavigation.js (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(useRegistrarNavigationPath, 'utf8')),
+  '// ─── useRegistrarRowActions.js (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(useRegistrarRowActionsPath, 'utf8')),
+  '// ─── useRegistrarCalendar.js (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(useRegistrarCalendarPath, 'utf8')),
+  '// ─── RegistrarBreadcrumb.jsx (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(RegistrarBreadcrumbPath, 'utf8')),
+  '// ─── RegistrarDialogsLayer.jsx (PR-UI-13-5) ───',
+  normalizeSource(fs.readFileSync(RegistrarDialogsLayerPath, 'utf8')),
 ].join('\n\n');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
@@ -117,10 +160,12 @@ describe('RegistrarPanel command contract', () => {
 
   it('allows edit mode for aggregate all-departments rows while keeping preview separate', () => {
     const source = readRegistrarSourceTree();
+    // PR-UI-13-4: handleTableAction (EAT row-action routing) now sits between
+    // openRecordEditor and handleContextMenuAction — the edit block ends there.
     const editBlock = extractSourceBlock(
       source,
       'const openRecordEditor = useCallback((row: unknown) => {',
-      'const handleContextMenuAction = useCallback(async (action: string, row: Appointment) => {',
+      'const handleTableAction = useCallback(',
     );
 
     // Contract: aggregate row detection must use hasMultipleRecordRefs.
@@ -208,10 +253,13 @@ describe('RegistrarPanel command contract', () => {
 
   it('filters displayed services by backend department metadata before legacy code prefixes', () => {
     const source = readRegistrarSourceTree();
+    // PR-UI-13-2: filterServicesByDepartment moved from RegistrarPanel.tsx
+    // (useCallback closure over services state) to registrarServiceFilter.ts
+    // (pure function, services as parameter). Block markers follow the module.
     const filterBlock = extractSourceBlock(
       source,
-      'const filterServicesByDepartment = useCallback((appointment: Appointment, departmentKey: string | null) => {',
-      'const filteredAppointments = useMemo(() => {',
+      'export const filterServicesByDepartment = (',
+      'export default filterServicesByDepartment;',
     );
 
     expect(source).toContain('service_details: Array.isArray(fullEntry.service_details) ? fullEntry.service_details : []');
@@ -223,8 +271,7 @@ describe('RegistrarPanel command contract', () => {
     expect(filterBlock).toContain('serviceMeta?.department_key ?? serviceMeta?.departmentKey');
     // Contract: filterByBackendDepartment is called BEFORE legacy code-prefix
     // fallback (departmentCodePrefixes) and BEFORE serviceToCodeMap fallback.
-    // Ordering verified via indexOf. The second needle drops the TS annotation
-    // (`: Record<string, string[]>`) which helper Phase 5 strips from the source.
+    // Ordering verified via indexOf.
     expect(filterBlock.indexOf('const backendFilteredServices = filterByBackendDepartment(appointment.services || [])')).toBeLessThan(
       filterBlock.indexOf('const departmentCodePrefixes = {'),
     );
@@ -304,6 +351,82 @@ describe('RegistrarPanel command contract', () => {
     expect(source).toContain('return sortRegistrarRowsForPresentation(searched)');
     expect(source).toContain('const sortedAggregated = sortRegistrarRowsForPresentation(aggregatedPatients)');
     expect(source).toContain('return sortRegistrarRowsForPresentation(appointments');
+  });
+
+  it('delegates the worklist data lifecycle to useRegistrarWorklistData (PR-UI-13-1)', () => {
+    // Decomposition boundary contract: the orchestrator must consume the
+    // extracted hook, and the fetch + refresh machinery must live ONLY in the
+    // hook (no duplicate inline copy left behind in the panel).
+    const panelSource = readRegistrarPanelSource();
+    const hookSource = normalizeSource(fs.readFileSync(useRegistrarWorklistDataPath, 'utf8'));
+
+    expect(panelSource).toContain('useRegistrarWorklistData({');
+    expect(panelSource).not.toContain("api.get('/registrar/queues/today'");
+    expect(hookSource).toContain("api.get('/registrar/queues/today'");
+    // Reducer state machine (plan §PR-UI-13): state slice owned by useReducer.
+    expect(hookSource).toContain('useReducer(worklistDataReducer');
+    // Refresh lifecycle ports (window-event listeners + interval).
+    expect(hookSource).toContain("window.addEventListener('queueUpdated'");
+    expect(hookSource).toContain("window.addEventListener('departments:updated'");
+    expect(hookSource).toContain('setInterval');
+  });
+
+  it('delegates the worklist view-model to registrarWorklistRows (PR-UI-13-2)', () => {
+    // Decomposition boundary contract: the orchestrator consumes the extracted
+    // pure view-model functions; the heavy filtering logic lives ONLY in the
+    // modules (no inline copy left in the panel).
+    const panelSource = readRegistrarPanelSource();
+    const rowsSource = normalizeSource(fs.readFileSync(registrarWorklistRowsPath, 'utf8'));
+
+    expect(panelSource).toContain('computeRegistrarWorklistRows({');
+    expect(panelSource).toContain('computeDepartmentStats(appointments, todayStr, queueProfiles)');
+    // 5 presentation-only sorting call-sites live in the rows module now.
+    expect(rowsSource).toContain('const sorted = sortRegistrarRowsForPresentation(entriesForTab');
+    expect(rowsSource).toContain('const filtered = sortRegistrarRowsForPresentation(appointments.filter');
+    expect(rowsSource).toContain('return sortRegistrarRowsForPresentation(searched)');
+    expect(rowsSource).toContain('const sortedAggregated = sortRegistrarRowsForPresentation(aggregatedPatients)');
+    expect(rowsSource).toContain('return sortRegistrarRowsForPresentation(appointments');
+    expect(rowsSource).toContain('aggregateRegistrarPatients(filtered)');
+  });
+
+  it('delegates the worklist section to WorklistView and guards the wizard (PR-UI-13-4)', () => {
+    const panelSource = readRegistrarPanelSource();
+    const worklistViewSource = normalizeSource(fs.readFileSync(
+      path.resolve(__dirname, '../registrar/views/WorklistView.tsx'), 'utf8'));
+
+    // Worklist section boundary: the EAT + empty states + load-more bar render
+    // inside WorklistView; the panel only wires it.
+    expect(panelSource).toContain('<WorklistView');
+    expect(panelSource).not.toContain('<EnhancedAppointmentsTable');
+    expect(worklistViewSource).toContain('<EnhancedAppointmentsTable');
+    expect(worklistViewSource).toContain('AnimatedLoader.TableSkeleton');
+    expect(worklistViewSource).toContain('registrar-load-more-bar');
+    // Row-action routing lives in useRegistrarRowActions (PR-UI-13-5) and is
+    // passed down to WorklistView.
+    const rowActionsSource = normalizeSource(fs.readFileSync(useRegistrarRowActionsPath, 'utf8'));
+    expect(rowActionsSource).toContain('const handleTableAction = useCallback(');
+    expect(panelSource).toContain('onActionClick={handleTableAction}');
+    // Plan §PR-UI-13 item 4: local ErrorBoundary around the wizard (mounted
+    // inside RegistrarDialogsLayer since PR-UI-13-5).
+    const dialogsLayerSource = normalizeSource(fs.readFileSync(RegistrarDialogsLayerPath, 'utf8'));
+    expect(dialogsLayerSource).toContain('<ErrorBoundary');
+    expect(dialogsLayerSource).toContain('<AppointmentWizardV2');
+    // Reference data (doctors/services/dynamicDepartments) owned by useRegistrarData.
+    expect(panelSource).not.toContain('const [doctors, setDoctors]');
+    expect(panelSource).not.toContain('const [services, setServices]');
+    expect(panelSource).not.toContain('const [dynamicDepartments, setDynamicDepartments]');
+    expect(panelSource).toContain('} = useRegistrarData();');
+  });
+
+  it('meets the plan §PR-UI-13 size acceptance criteria (≤500 LOC, ≤5 useState)', () => {
+    // Plan §PR-UI-13 acceptance criteria (final increment PR-UI-13-5):
+    // RegistrarPanel ≤ 500 LOC and useState ≤ 5 after decomposition.
+    const panelRaw = fs.readFileSync(registrarPanelPath, 'utf8');
+    const loc = panelRaw.split('\n').length;
+    expect(loc).toBeLessThanOrEqual(500);
+
+    const useStateMatches = panelRaw.match(/\buseState\s*\(/g) ?? [];
+    expect(useStateMatches.length).toBeLessThanOrEqual(5);
   });
 
   it('does not use appointment or queue ids as visit ids for reschedule commands', () => {

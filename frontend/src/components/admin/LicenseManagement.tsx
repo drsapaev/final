@@ -21,14 +21,14 @@ import {
   EyeOff } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
   Select,
   Textarea,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
 } from '../ui/macos';
 import { api } from '../../api/client';
@@ -295,7 +295,7 @@ const LicenseManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <div className="admin-flex-col-gap-16-wrap">
           <div className="admin-flex-1-pos-relative">
             <Input
@@ -338,11 +338,11 @@ const LicenseManagement = () => {
             </Button>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Форма добавления/редактирования */}
       {showAddForm &&
-      <MacOSCard className="admin-p-24-overflow-hidden">
+      <Card className="admin-p-24-overflow-hidden">
           <div className="admin-flex-jc-between-ai-center-mb-16">
             <h3 className="admin-lg-semi-primary-m-0">
               {editingLicense ? t('admin2.lm_form_edit_title') : t('admin2.lm_form_create_title')}
@@ -514,20 +514,20 @@ const LicenseManagement = () => {
               </Button>
             </div>
           </form>
-        </MacOSCard>
+        </Card>
       }
 
       {/* Список лицензий */}
       {loading ?
       <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-24-overflow-hidden">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} className="p-6">
+        <Card key={i} className="p-6">
               <Skeleton height="200px" />
-            </MacOSCard>
+            </Card>
         )}
         </div> :
       filteredLicenses.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Key}
         title={licenseEmptyTitle}
         description={licenseEmptyDescription}
@@ -541,7 +541,7 @@ const LicenseManagement = () => {
 
       <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-24-overflow-hidden">
           {filteredLicenses.map((license) =>
-        <MacOSCard key={license.id} className="p-6">
+        <Card key={license.id} className="p-6">
               <div className="admin-flex-jc-between-ai-start-mb-16">
                 <div>
                   <h3 className="admin-lg-semi-primary-m-004px0">
@@ -635,7 +635,7 @@ const LicenseManagement = () => {
                   <Trash2 aria-hidden="true" className="w-4 h-4" />
                 </Button>
               </div>
-            </MacOSCard>
+            </Card>
         )}
         </div>
       }

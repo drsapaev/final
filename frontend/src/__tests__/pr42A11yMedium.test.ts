@@ -1,11 +1,13 @@
 /**
- * PR-42 — Frontend a11y medium: Medium-E + Medium-F + Medium-G.
+ * PR-42 — Frontend a11y medium: Medium-E + Medium-F.
  *
  * Tests for:
  * 1. Medium-E: at least one form component has <label htmlFor> association
- * 2. Medium-F: ResponsiveModal, ResponsiveForm, PhotoComparison do not use
- *    hardcoded backgroundColor: 'white' (breaks dark mode)
- * 3. Medium-G: ModernInput, ModernSelect do not use tabIndex={-1} on action icons
+ * 2. Medium-F: ResponsiveModal, PhotoComparison do not use hardcoded
+ *    backgroundColor: 'white' (breaks dark mode)
+ *
+ * PR-UI-17-2: Medium-F ResponsiveForm + Medium-G ModernInput/ModernSelect
+ * cases removed — dead components deleted (0 runtime importers).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,10 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
 const RESPONSIVE_MODAL = path.join(ROOT, 'src/components/ResponsiveModal.tsx');
-const RESPONSIVE_FORM = path.join(ROOT, 'src/components/forms/ResponsiveForm.tsx');
 const PHOTO_COMPARISON = path.join(ROOT, 'src/components/dermatology/PhotoComparison.tsx');
-const MODERN_INPUT = path.join(ROOT, 'src/components/forms/ModernInput.tsx');
-const MODERN_SELECT = path.join(ROOT, 'src/components/forms/ModernSelect.tsx');
 
 // ---------- 1. Medium-E: label htmlFor association ----------
 
@@ -54,16 +53,6 @@ describe('Medium-F: dark mode backgroundColor fix', () => {
     expect(stripped).not.toMatch(/backgroundColor:\s*['"]#ffffff['"]/i);
   });
 
-  it('ResponsiveForm does not use hardcoded backgroundColor: white', () => {
-    const src = fs.readFileSync(RESPONSIVE_FORM, 'utf-8');
-    const stripped = src
-      .replace(/\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(stripped).not.toMatch(/backgroundColor:\s*['"]white['"]/);
-    expect(stripped).not.toMatch(/backgroundColor:\s*['"]#fff['"]/);
-    expect(stripped).not.toMatch(/backgroundColor:\s*['"]#ffffff['"]/i);
-  });
-
   it('PhotoComparison does not use hardcoded backgroundColor: white', () => {
     const src = fs.readFileSync(PHOTO_COMPARISON, 'utf-8');
     const stripped = src
@@ -72,26 +61,6 @@ describe('Medium-F: dark mode backgroundColor fix', () => {
     expect(stripped).not.toMatch(/backgroundColor:\s*['"]white['"]/);
     expect(stripped).not.toMatch(/backgroundColor:\s*['"]#fff['"]/);
     expect(stripped).not.toMatch(/backgroundColor:\s*['"]#ffffff['"]/i);
-  });
-});
-
-// ---------- 3. Medium-G: tabIndex on action icons ----------
-
-describe('Medium-G: tabIndex on action icons', () => {
-  it('ModernInput does not use tabIndex={-1} on action icons', () => {
-    const src = fs.readFileSync(MODERN_INPUT, 'utf-8');
-    const stripped = src
-      .replace(/\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(stripped).not.toMatch(/tabIndex\s*=\s*\{\s*-1\s*\}/);
-  });
-
-  it('ModernSelect does not use tabIndex={-1} on action icons', () => {
-    const src = fs.readFileSync(MODERN_SELECT, 'utf-8');
-    const stripped = src
-      .replace(/\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(stripped).not.toMatch(/tabIndex\s*=\s*\{\s*-1\s*\}/);
   });
 });
 

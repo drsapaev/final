@@ -1,0 +1,21 @@
+{
+  // Type-check boundary for Node-side build/test config files that live at
+  // the frontend root (outside the src/** include of tsconfig.json and thus
+  // previously never type-checked).
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["node", "vite/client"]
+  },
+  "include": ["vite.config.ts", "vitest.config.ts", "types/declarations.node.d.ts"]
+}

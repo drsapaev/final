@@ -34,11 +34,50 @@ class CatalogMixin(LabReportingServiceMixinBase):
 
 
     def ensure_default_catalog(self) -> None:
+        from sqlalchemy.exc import IntegrityError
+
+        from app.services.lab_reporting._base import (
+            _SEED_LOCK,
+            _mark_seed_ensured,
+            _seed_cache_fresh,
+        )
+
+        bind = self.repository.db.get_bind()
+        with _SEED_LOCK:
+            if not _seed_cache_fresh(bind, "catalog"):
+                return
+            try:
+                self._ensure_default_catalog_locked(bind)
+            except IntegrityError:
+                # Cross-PROCESS loser (multi-worker deploys: another worker
+                # committed the same rows between our probe and insert).
+                # Adopt the winner's rows and mark the part ensured.
+                try:
+                    self.repository.db.rollback()
+                except Exception:
+                    pass
+                _mark_seed_ensured(bind, "catalog")
+                logger.warning(
+                    "[LAB] ensure_default_catalog lost a cross-process seed "
+                    "race — adopted the winner's rows"
+                )
+
+    def _ensure_default_catalog_locked(self, bind) -> None:
+        from app.services.lab_reporting._base import _mark_seed_ensured
+
         logger.info("[LAB] ensure_default_catalog seeding analytes/units/reference ranges")
         touched = 0
 
+        # Perf (#2977): probe each table once and diff in memory. The previous
+        # row-by-row get_catalog_unit/get_catalog_analyte probes plus a
+        # per-analyte range listing cost ~80 sequential roundtrips to the
+        # remote Postgres on EVERY read (>20s per GET /lab/templates).
+        # Seeding semantics (create missing, refresh drifted rows) unchanged.
+        existing_units = {
+            unit.code: unit for unit in self.repository.list_catalog_units()
+        }
         for definition in DEFAULT_LAB_UNIT_DEFINITIONS:
-            unit = self.repository.get_catalog_unit(definition["code"])
+            unit = existing_units.get(definition["code"])
             if unit is None:
                 unit = LabCatalogUnit(
                     code=definition["code"],
@@ -56,8 +95,12 @@ class CatalogMixin(LabReportingServiceMixinBase):
             self._catalog_unit_cache[unit.code] = unit
             touched += 1
 
+        existing_analytes = {
+            analyte.code: analyte
+            for analyte in self.repository.list_catalog_analytes()
+        }
         for definition in DEFAULT_LAB_ANALYTE_DEFINITIONS:
-            analyte = self.repository.get_catalog_analyte(definition["code"])
+            analyte = existing_analytes.get(definition["code"])
             if analyte is None:
                 analyte = LabCatalogAnalyte(
                     code=definition["code"],
@@ -84,6 +127,10 @@ class CatalogMixin(LabReportingServiceMixinBase):
             for definition in DEFAULT_LAB_REFERENCE_RANGE_DEFINITIONS
         }
 
+        ranges_by_analyte: dict[str, list[LabCatalogReferenceRange]] = {}
+        for item in self.repository.list_catalog_reference_ranges():
+            ranges_by_analyte.setdefault(item.analyte_code, []).append(item)
+
         for analyte in DEFAULT_LAB_ANALYTE_DEFINITIONS:
             analyte_code = analyte["code"]
             existing_ranges = {
@@ -96,9 +143,7 @@ class CatalogMixin(LabReportingServiceMixinBase):
                         "sort_order": item.sort_order,
                     }
                 ): item
-                for item in self.repository.list_catalog_reference_ranges(
-                    analyte_code=analyte_code
-                )
+                for item in ranges_by_analyte.get(analyte_code, [])
             }
             for key, definition in seeded_ranges_by_key.items():
                 if definition["analyte_code"] != analyte_code:
@@ -133,7 +178,6 @@ class CatalogMixin(LabReportingServiceMixinBase):
                 touched += 1
             self._catalog_reference_cache.pop(analyte_code, None)
 
+        _mark_seed_ensured(bind, "catalog")
         if touched:
             self.repository.commit()
-
-

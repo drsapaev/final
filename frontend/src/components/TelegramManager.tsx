@@ -20,15 +20,15 @@ import {
   Textarea,
   Grid,
   List,
-  Table,
 } from './ui/macos';
 import {
+  DataTable,
   TableHead,
   TableBody,
   TableRow,
   TableCell,
   TableHeaderCell } from
-'./ui/macos/Table';
+'./ui/DataTable';
 import {
   ListItem,
   ListItemIcon,
@@ -1188,7 +1188,7 @@ const TelegramManager = () => {
           {t('misc.tg_title')}
         </Typography>
         <Button
-          variant="outlined"
+          variant="outline"
           onClick={loadTelegramData}>
           <RefreshCw size={16} />
           {t('misc.tg_refresh')}
@@ -1723,14 +1723,14 @@ const TelegramManager = () => {
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <Button
                   fullWidth
-                  variant="contained"
+                  variant="secondary"
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <Settings size={16} />
                   {t('misc.tg_configure_bot')}
                 </Button>
                 <Button
                   fullWidth
-                  variant="outlined"
+                  variant="outline"
                   disabled={!botStatus?.configured || registeringCommands}
                   onClick={registerPatientCommands}
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
@@ -1739,7 +1739,7 @@ const TelegramManager = () => {
                 </Button>
                 <Button
                   fullWidth
-                  variant="outlined"
+                  variant="outline"
                   disabled={!staffCommandRegistrationEnabled || registeringStaffCommands}
                   onClick={registerStaffCommands}
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
@@ -1748,14 +1748,14 @@ const TelegramManager = () => {
                 </Button>
                 <Button
                   fullWidth
-                  variant="outlined"
+                  variant="outline"
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <Send size={16} />
                   {t('misc.tg_send_message')}
                 </Button>
                 <Button
                   fullWidth
-                  variant="outlined"
+                  variant="outline"
                   onClick={() => setShowTemplateDialog(true)}
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <Plus size={16} />
@@ -1784,7 +1784,7 @@ const TelegramManager = () => {
                   </Badge>
                   <Button
                     type="button"
-                    variant="outlined"
+                    variant="outline"
                     size="small"
                     disabled={exportingOnboardingCsv}
                     onClick={handleExportOnboardingCsv}>
@@ -1840,7 +1840,7 @@ const TelegramManager = () => {
                   style={{ minWidth: 220 }} />
                 <Button
                   type="button"
-                  variant="outlined"
+                  variant="outline"
                   size="small"
                   onClick={loadOnboardingRequests}
                   aria-label="Refresh REQUEST_REVIEW requests"
@@ -2028,7 +2028,7 @@ const TelegramManager = () => {
                                         <Box mt={1.5}>
                                           <Button
                                             type="button"
-                                            variant="contained"
+                                            variant="primary"
                                             size="small"
                                             onClick={() => {
                                               updateOnboardingReviewForm(requestId, 'selectedCandidateId', candidateId);
@@ -2059,7 +2059,7 @@ const TelegramManager = () => {
                                 <>
                                   <Button
                                     type="button"
-                                    variant="contained"
+                                    variant="primary"
                                     size="small"
                                     disabled={actionBusy || !duplicateCandidates.length}
                                     onClick={() => openOnboardingActionDialog(requestId, 'link-existing', String(form.selectedCandidateId || ''))}>
@@ -2068,7 +2068,7 @@ const TelegramManager = () => {
                                   </Button>
                                   <Button
                                     type="button"
-                                    variant="outlined"
+                                    variant="outline"
                                     size="small"
                                     disabled={actionBusy}
                                     onClick={() => openOnboardingActionDialog(requestId, 'create-patient')}>
@@ -2077,7 +2077,7 @@ const TelegramManager = () => {
                                   </Button>
                                   <Button
                                     type="button"
-                                    variant="outlined"
+                                    variant="outline"
                                     size="small"
                                     disabled={actionBusy}
                                     onClick={() => openOnboardingActionDialog(requestId, 'request-more-info')}>
@@ -2086,7 +2086,7 @@ const TelegramManager = () => {
                                   </Button>
                                   <Button
                                     type="button"
-                                    variant="outlined"
+                                    variant="outline"
                                     size="small"
                                     disabled={actionBusy}
                                     onClick={() => openOnboardingActionDialog(requestId, 'reject')}>
@@ -2197,7 +2197,7 @@ const TelegramManager = () => {
                 {t('misc.tg_templates_title')}
               </Typography>
               <div style={{ width: '100%', overflowX: 'auto' }}>
-                <Table style={{ minWidth: 640 }}>
+                <DataTable style={{ minWidth: 640 }}>
                   <TableHead>
                     <TableRow>
                       <TableHeaderCell>{t('misc.tg_col_name')}</TableHeaderCell>
@@ -2251,7 +2251,7 @@ const TelegramManager = () => {
                       </TableRow>
                     )}
                   </TableBody>
-                </Table>
+                </DataTable>
               </div>
             </CardContent>
           </Card>
@@ -2484,7 +2484,7 @@ const TelegramManager = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowTemplateDialog(false)}>{t('misc.tg_cancel')}</Button>
-          <Button onClick={handleCreateTemplate} variant="contained">
+          <Button onClick={handleCreateTemplate} variant="primary">
             {t('misc.tg_create')}
           </Button>
         </DialogActions>

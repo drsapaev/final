@@ -5,13 +5,18 @@ Pydantic схемы для управления пользователями
 import logging
 import os
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
-from typing import Any
+from typing import Any, Literal, Union
 
 from email_validator import EmailNotValidError
 from email_validator import validate_email as validate_email_address
-from pydantic import BaseModel, Field, field_validator
+from typing_extensions import Annotated
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.config import ConfigDict
+
+from app.core.roles import DOCTOR_ROLE_SPELLINGS
 
 logger = logging.getLogger(__name__)
 
@@ -507,17 +512,165 @@ class UserAuditLogResponse(UserAuditLogBase):
 
 # Схемы для управления пользователями
 
+# Single shared role vocabulary for UserCreateRequest AND UserUpdateRequest
+# (D-3 RBAC unification): the two patterns used to drift — creation accepted
+# the legacy doctor spellings (cardio/derma/dentist) while updates forbade
+# them, so a legacy spelling could never be (re)assigned after creation.
+# The doctor-lifecycle mapping (user_mgmt DOCTOR_ROLE_DEFAULT_SPECIALTY)
+# normalizes whatever spelling arrives.
+# Codex round-1 P2: the doctor-family part is DERIVED from the IAM SSOT
+# (core/roles.DOCTOR_ROLE_SPELLINGS) instead of a smaller hardcoded subset —
+# cardiology/cardiologist/dermatology/dermatologist/dentistry are authorized
+# spellings as well, and the admin modal re-submits a stored user's role
+# verbatim, so an omitted spelling turns "edit account" into a 422.
+# sorted() keeps the generated OpenAPI contract deterministic.
+# REC-1 (Receptionist deprecation): 'Receptionist' removed from the canonical
+# write vocabulary — Registrar is the canonical front-desk role and no
+# Receptionist rows exist in production (SQL evidence 2026-09-02). Update-
+# re-submission safety: 0 stored users carry the spelling, so no edit flow
+# can re-submit it.
+# E-4 (Receptionist alias removal, §4.1.27): the READ alias in
+# core/security.require_roles and the 'Receptionist' entry in the
+# READ/FILTER vocabulary below were decommissioned — the compatibility
+# window closed with all four removal-gate conditions verified (stored = 0,
+# writes frozen, frontend callers = 0, external callers = 0).
+# Codex re-review P2 (PR #3025): the WRITE vocabulary is deliberately
+# separate from the READ/FILTER vocabulary below — the search/filter
+# surfaces must keep accepting the deprecated spelling so a compatible
+# deployment holding legacy rows can still query them (legacy reads
+# temporarily accepted; canonical writes only).
+# M-1 (Manager deprecation): 'Manager' removed from the canonical write
+# vocabulary — Manager is a deprecated legacy/synthetic role (production
+# inventory 2026-09-03: exactly 1 row, the automated smoke_manager account;
+# 0 real human users), so no NEW stored 'Manager' users may be created,
+# bulk-assigned or role-changed. Unlike Receptionist there is NO canonical
+# successor role and NO backend alias (privileged grants were removed in
+# M-1D instead). Update-re-submission safety: the single legacy row
+# (smoke_manager) is owned by the post-deploy ops step (DEACTIVATE, not
+# DELETE); an admin edit that re-submits role='Manager' for it now 422s by
+# design — the freeze is the enforcement, ops deactivation is the cleanup.
+_USER_MANAGEMENT_ROLE_PATTERN = (
+    "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|"
+    "SuperAdmin|"
+    + "|".join(sorted(DOCTOR_ROLE_SPELLINGS))
+    + ")$"
+)
 
-class UserCreateRequest(BaseModel):
-    """Схема создания пользователя"""
+# Roles accepted by POST /users WITHOUT a doctor_profile. Exact complement
+# of the canonical "Doctor" variant below — DOCTOR_ROLE_SPELLINGS carries
+# every legacy lowercase spelling (including the bare "doctor"), which all
+# keep the compatibility auto-map and are NOT canonical onboarding.
+# REC-1 (Receptionist deprecation): 'Receptionist' is deliberately ABSENT
+# here — the write freeze is absolute; it remains queryable via the filter
+# pattern below only.
+# M-1 (Manager deprecation, post-#3032 main): 'Manager' is equally ABSENT
+# from the write vocabulary — a deprecated legacy/synthetic role with no
+# canonical successor (privilege-zero landed in M-1D). The merged tree
+# keeps the READ/FILTER vocabulary accepting both deprecated spellings;
+# create/update/bulk-change-role reject them (write freeze stays absolute).
+_NON_DOCTOR_ROLE_VALUES: tuple[str, ...] = (
+    "Admin",
+    "Registrar",
+    "Nurse",
+    "Cashier",
+    "Lab",
+    "Patient",
+    "SuperAdmin",
+) + tuple(sorted(DOCTOR_ROLE_SPELLINGS))
+
+# Read/filter vocabulary: canonical write vocabulary PLUS the deprecated
+# 'Manager' spelling — used ONLY by query/filter surfaces
+# (UserSearchRequest.role, GET /users role parameter) so legacy rows in
+# compatible deployments remain queryable during the compatibility window
+# (M-1: production carries 1 stored 'Manager' row — smoke_manager — that
+# must stay visible/queryable until the ops deactivation).
+# E-4 (§4.1.27): the 'Receptionist' filter entry was REMOVED — its window
+# closed (0 stored rows, canonical successor exists, alias decommissioned
+# everywhere); Manager's window stays open until the ops deactivation.
+# NOT used by create/update/bulk-change-role (write freeze stays absolute).
+_USER_MANAGEMENT_ROLE_FILTER_PATTERN = (
+    _USER_MANAGEMENT_ROLE_PATTERN[:-2] + "|Manager)$"
+)
+
+
+NonDoctorRoleLiteral = Literal.__getitem__(_NON_DOCTOR_ROLE_VALUES)
+
+# Codex round-10 P2: Decimal JSON schema publishes a number|string anyOf.
+# `multipleOf` (from json_schema_extra) and `maximum` (from le) only bind
+# the NUMBER branch; the STRING branch used the default permissive pattern
+# and advertised values ("1.234", "999999999.99") that Pydantic then
+# rejected with 422 — a schema-valid request could still fail. This hook
+# pins the string branch to the Numeric(10, 2) column precision: at most 8
+# integer digits, at most 2 fractional digits, no sign other than a
+# leading "+". Every string matching it converts to a Decimal that passes
+# ge=0 / le=99999999.99 / the two-decimal scale validator.
+_PRICE_STRING_PATTERN = r"^[+]?[0-9]{1,8}(\.[0-9]{1,2})?$"
+
+
+def _pin_price_string_branch(schema: dict) -> None:
+    # Round-8 contract: publish the two-decimal scale for client-side
+    # pre-validation (asserted by test_openapi_contract.py).
+    schema.setdefault("multipleOf", 0.01)
+    for sub in schema.get("anyOf", []):
+        if isinstance(sub, dict) and sub.get("type") == "string":
+            sub["pattern"] = _PRICE_STRING_PATTERN
+
+
+class DoctorProfileCreate(BaseModel):
+    """Doctor profile block for canonical new-doctor onboarding (POST /users).
+
+    Only accepted for role="Doctor" (canonical onboarding); legacy
+    doctor-role spellings keep their compatibility auto-map and must not
+    send this block. ``specialty`` must be a canonical onboarding id —
+    the incomplete sentinel ("general"), legacy dental spellings and any
+    free-text value are rejected.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    specialty: str = Field(..., min_length=1, max_length=100)
+    cabinet: str | None = Field(None, max_length=20)
+    # Codex round-6 P2: doctors.price_default is Numeric(10, 2) — bound the
+    # schema to the column precision so an oversized value surfaces as a
+    # field-level 422 instead of a driver overflow rolling back the whole
+    # User+Doctor onboarding transaction.
+    # Codex round-8 P2: publish both bound AND scale in the JSON schema —
+    # maximum (from le) plus multipleOf 0.01 documents the two-decimal
+    # scale enforced by validate_price_precision, so contract-generated
+    # clients can pre-validate payloads without a 422 round-trip.
+    # Codex round-10 P2: `multipleOf` is ignored for string instances and
+    # `maximum` lands only on the number branch, so the published string
+    # pattern still accepted values ("1.234", "999999999.99") that Pydantic
+    # then rejected with 422. The string branch below is pinned to the
+    # Numeric(10, 2) precision: at most 8 integer digits and 2 fractional
+    # digits, so every schema-valid payload survives the range/scale check.
+    price_default: Decimal | None = Field(
+        None,
+        ge=0,
+        le=Decimal("99999999.99"),
+        json_schema_extra=_pin_price_string_branch,
+    )
+    start_number_online: int | None = Field(None, ge=1, le=100)
+    max_online_per_day: int | None = Field(None, ge=1, le=100)
+
+    @field_validator("price_default")
+    @classmethod
+    def validate_price_precision(cls, v: Decimal | None) -> Decimal | None:
+        if v is not None and -v.as_tuple().exponent > 2:
+            raise ValueError(
+                "Цена может содержать не более двух знаков после запятой"
+            )
+        return v
+
+
+class _UserCreateCommon(BaseModel):
+    """Shared fields of the POST /users create variants (discriminated by role)."""
 
     model_config = ConfigDict(protected_namespaces=())
 
     username: str = Field(..., min_length=3, max_length=50)
     email: str = Field(..., min_length=3, max_length=254)
     password: str = Field(..., min_length=8, max_length=100)
-    # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
-    role: str = Field(..., pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager|cardio|derma|dentist)$")
     is_active: bool | None = True
     is_superuser: bool | None = False
     must_change_password: bool | None = False  # Требуется смена пароля при первом входе
@@ -550,6 +703,50 @@ class UserCreateRequest(BaseModel):
         )
 
 
+class DoctorUserCreateRequest(_UserCreateCommon):
+    """Canonical new-doctor onboarding variant (POST /users, role=Doctor).
+
+    doctor_profile is REQUIRED here and published as required in OpenAPI, so
+    generated clients describe the conditional contract instead of relying
+    on the runtime validator alone (Codex P2). Legacy doctor-role spellings
+    are handled by NonDoctorUserCreateRequest and keep the auto-map.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    role: Literal["Doctor"]
+    doctor_profile: DoctorProfileCreate
+
+    # NOTE: only FORMAT is validated here (schema layer has no DB access).
+    # Catalog membership + active status are enforced at the API boundary
+    # (POST /users) against the medical_specialties runtime SSOT — see
+    # user_management/_users.py; empty/missing catalog surfaces as 503 there.
+
+
+class NonDoctorUserCreateRequest(_UserCreateCommon):
+    """Every non-canonical-Doctor role variant (POST /users).
+
+    Includes legacy lowercase doctor-role spellings (cardio/derma/dentist/
+    doctor/…): they keep the compatibility auto-map and must NOT carry a
+    doctor_profile — the block is rejected here instead of being silently
+    dropped.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    role: NonDoctorRoleLiteral
+    doctor_profile: None = None
+
+
+# Conditional create contract: FastAPI publishes this as oneOf with a role
+# discriminator, so OpenAPI/generated TS distinguish the Doctor variant
+# (doctor_profile REQUIRED) from every non-Doctor create.
+UserCreateRequest = Annotated[
+    Union[DoctorUserCreateRequest, NonDoctorUserCreateRequest],
+    Field(discriminator="role"),
+]
+
+
 class UserUpdateRequest(BaseModel):
     """Схема обновления пользователя"""
 
@@ -559,7 +756,7 @@ class UserUpdateRequest(BaseModel):
     email: str | None = Field(None, min_length=3, max_length=254)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str | None = Field(
-        None, pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
     )
     is_active: bool | None = None
     is_superuser: bool | None = None
@@ -600,6 +797,11 @@ class UserResponse(BaseModel):
     preferences: UserPreferencesResponse | None = None
     notification_settings: UserNotificationSettingsResponse | None = None
 
+    # Lifecycle (decision #5): None = no linked Doctor row; True = linked
+    # Doctor profile still has the auto-create placeholder specialty
+    # ("general") and must be completed by an admin.
+    doctor_profile_incomplete: bool | None = None
+
 
 class UserListResponse(BaseModel):
     """Схема ответа списка пользователей"""
@@ -637,8 +839,11 @@ class UserSearchRequest(BaseModel):
 
     query: str | None = Field(None, min_length=1, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
+    # Codex re-review P2 (PR #3025): READ surface — compatibility filter
+    # vocabulary. E-4 (§4.1.27): 'Receptionist' dropped from the filter set
+    # (window closed); 'Manager' kept until the ops deactivation (M-1).
     role: str | None = Field(
-        None, pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_FILTER_PATTERN
     )
     status: UserStatus | None = None
     is_active: bool | None = None
@@ -662,7 +867,7 @@ class UserBulkActionRequest(BaseModel):
     )
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     role: str | None = Field(
-        None, pattern="^(Admin|Registrar|Doctor|Nurse|Receptionist|Cashier|Lab|Patient|SuperAdmin|Manager)$"
+        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
     )
     reason: str | None = Field(None, max_length=500)
 

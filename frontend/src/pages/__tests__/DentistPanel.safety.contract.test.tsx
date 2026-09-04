@@ -9,8 +9,32 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../..');
 const PANEL_PATH = path.join(ROOT, 'pages/DentistPanelUnified.tsx');
 
+// PR-UI-15-5: the action-handler slice (incl. the C-1/C-3 completeVisit
+// confirm flow) moved verbatim to pages/dentist/useDentistActions.ts — the
+// dentist contract surface is the union of the panel and its extracted
+// modules (same pattern as DoctorPanels.contract.test.tsx and the
+// registrar/cashier contract boundary updates).
+const readDentistModules = () => {
+  const parts: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === '__tests__') continue;
+        walk(full);
+      } else if (/\.tsx?$/.test(entry.name)) {
+        parts.push(fs.readFileSync(full, 'utf8'));
+      }
+    }
+  };
+  const dentistDir = path.join(ROOT, 'pages/dentist');
+  if (fs.existsSync(dentistDir)) walk(dentistDir);
+  return parts.join('\n');
+};
+
 const readSource = () =>
-  fs.readFileSync(PANEL_PATH, 'utf8').replace(/\r\n/g, '\n');
+  (fs.readFileSync(PANEL_PATH, 'utf8') + '\n' + readDentistModules())
+    .replace(/\r\n/g, '\n');
 
 const extractBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);

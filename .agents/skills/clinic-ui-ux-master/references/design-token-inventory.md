@@ -99,7 +99,7 @@ Scope:
 Files scanned:
 Top hardcoded colors:
 Top inline style files:
-Legacy/MUI surfaces:
+Legacy-class surfaces:
 Token gaps:
 Suggested first convergence slice:
 ```

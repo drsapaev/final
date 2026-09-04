@@ -13,7 +13,6 @@ import SecuritySettings from './SecuritySettings';
 import WizardSettings from './WizardSettings';
 import ClinicSettings from './ClinicSettings';
 import ColorSchemeSelector from './ColorSchemeSelector';
-import { AccentPicker } from '../ui/macos';
 // P-025 fix: shared loading/error/empty wrapper for Unified* panels.
 import StateWrapper from '../common/StateWrapper';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -167,17 +166,6 @@ const UnifiedSettings = () => {
         return (
           <div className="admin-settings-grid-20">
             <ColorSchemeSelector />
-            <div className="admin-settings-card-accent">
-              <div className="admin-settings-section-title">
-                {t('admin2.us_accent_color')}
-              </div>
-              <div className="admin-settings-grid-10">
-                <AccentPicker />
-                <div className="admin-settings-hint-12">
-                  {t('admin2.us_accent_hint')}
-                </div>
-              </div>
-            </div>
             <div className="admin-settings-card-gradient">
               <div className="admin-settings-section-title-mb-0">
                 {t('admin2.us_application_logic')}
@@ -188,7 +176,8 @@ const UnifiedSettings = () => {
             </div>
             {/* UX Audit Admin #2.6: ClinicSettings удалён из default-ветки.
                 Дублировал admin-clinic-settings маршрут. Теперь «Настройки» =
-                только тема/акцент, «Профиль клиники» = ClinicSettings. */}
+                только тема, «Профиль клиники» = ClinicSettings.
+                PR-UI-01: accent picker удалён (multi-accent system deleted). */}
           </div>);
     }
   };

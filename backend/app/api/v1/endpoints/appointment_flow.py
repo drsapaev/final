@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core.audit import extract_model_changes
 from app.core.config import settings
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, DOCTOR_ROLE_SPELLINGS, is_doctor_role_spelling
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
 from app.models.clinic import Doctor
@@ -54,34 +55,19 @@ def convert_datetimes_to_iso(obj):
 
 router = APIRouter()
 
+# RBAC unification (D-3): spell the gate tuples straight from the SSOT
+# (app/core/roles.py) instead of hand-maintained spelling lists — legacy
+# doctor accounts get the same access the exact "Doctor" spelling has.
 APPOINTMENT_FLOW_READ_ROLES = (
     "Admin",
-    "Doctor",
     "Registrar",
+    *DOCTOR_FAMILY_GATE_ROLES,
     "Cashier",
-    "cardio",
-    "cardiology",
-    "Cardiologist",
-    "Cardio",
-    "derma",
-    "Dermatologist",
-    "dentist",
-    "Dentist",
     "Lab",
     "Laboratory",
 )
 
-APPOINTMENT_FLOW_DOCTOR_ROLES = {
-    "Doctor",
-    "cardio",
-    "cardiology",
-    "Cardiologist",
-    "Cardio",
-    "derma",
-    "Dermatologist",
-    "dentist",
-    "Dentist",
-}
+APPOINTMENT_FLOW_DOCTOR_ROLES = frozenset(DOCTOR_ROLE_SPELLINGS)
 
 
 class CanonicalVisitResponse(BaseModel):
@@ -107,7 +93,7 @@ def _ensure_appointment_doctor_access(
 ) -> None:
     if current_user.role == "Admin" or current_user.is_superuser:
         return
-    if current_user.role not in APPOINTMENT_FLOW_DOCTOR_ROLES:
+    if not is_doctor_role_spelling(current_user.role):
         return
 
     doctor = (
@@ -183,7 +169,7 @@ def _canonical_emr_ready(canonical_emr: Any | None) -> bool:
 def start_visit(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Admin", "Doctor", "Registrar")),
+    current_user: User = Depends(deps.require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES, "Registrar")),
 ) -> Any:
     """
     Начать прием (переход paid -> in_visit)
@@ -228,16 +214,8 @@ def create_or_update_emr(
     current_user: User = Depends(
         deps.require_roles(
             "Admin",
-            "Doctor",
             "Registrar",
-            "cardio",
-            "cardiology",
-            "Cardiologist",
-            "Cardio",
-            "derma",
-            "Dermatologist",
-            "dentist",
-            "Dentist",
+            *DOCTOR_FAMILY_GATE_ROLES,
             "Lab",
             "Laboratory",
         )
@@ -387,7 +365,7 @@ def save_emr(
     appointment_id: int,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    current_user: User = Depends(deps.require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES)),
 ) -> Any:
     """
     Сохранить EMR (перевести из черновика)
@@ -438,7 +416,7 @@ def save_emr(
 def get_emr(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Admin", "Doctor", "Registrar")),
+    current_user: User = Depends(deps.require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES, "Registrar")),
 ) -> Any:
     """
     Получить EMR по записи
@@ -459,7 +437,7 @@ def create_or_update_prescription(
     appointment_id: int,
     prescription_data: PrescriptionCreate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    current_user: User = Depends(deps.require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES)),
 ) -> Any:
     """
     Создать или обновить рецепт
@@ -529,7 +507,7 @@ def create_or_update_prescription(
 def save_prescription(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    current_user: User = Depends(deps.require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES)),
 ) -> Any:
     """
     Сохранить рецепт (перевести из черновика)
@@ -561,7 +539,7 @@ def save_prescription(
 def get_prescription(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Admin", "Doctor", "Registrar")),
+    current_user: User = Depends(deps.require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES, "Registrar")),
 ) -> Any:
     """
     Получить рецепт по записи
@@ -583,7 +561,7 @@ def get_prescription(
 def complete_visit(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    current_user: User = Depends(deps.require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES)),
 ) -> Any:
     """
     Завершить прием (переход in_visit -> completed)

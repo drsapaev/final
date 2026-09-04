@@ -5,7 +5,7 @@
  * Renders the "Осмотр кожи" (skin) and "Косметология" (cosmetic) tabs.
  * Each tab shows a form + history list.
  */
-import { MacOSCard, Button, Input, Select, Textarea, Badge } from '../ui/macos';
+import { Card, Button, Input, Select, Textarea, Badge } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
@@ -103,7 +103,7 @@ export function DermaExamsTab({
   if (activeTab === 'skin') {
     return (
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: getSpacing?.('xl') }}>
-        <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <Card style={{ padding: 'var(--mac-spacing-6)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--mac-spacing-5)' }}>
             <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
               {t('derma.derma_exams_skin_title')}
@@ -180,7 +180,7 @@ export function DermaExamsTab({
               {t('derma.derma_exams_skin_empty')}
             </div>
           )}
-        </MacOSCard>
+        </Card>
       </div>
     );
   }
@@ -188,7 +188,7 @@ export function DermaExamsTab({
   if (activeTab === 'cosmetic') {
     return (
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: getSpacing?.('xl') }}>
-        <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+        <Card style={{ padding: 'var(--mac-spacing-6)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--mac-spacing-5)' }}>
             <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
               {t('derma.derma_exams_cosmetic_title')}
@@ -252,7 +252,7 @@ export function DermaExamsTab({
               {t('derma.derma_exams_cosmetic_empty')}
             </div>
           )}
-        </MacOSCard>
+        </Card>
       </div>
     );
   }

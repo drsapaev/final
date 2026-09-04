@@ -26,6 +26,11 @@ from app.services.force_majeure_api_service import (
 
 router = APIRouter()
 
+# M-1 (Manager deprecation): Manager removed from the refund-request grant
+# lists — Admin and Cashier keep the refund surface unchanged (live product
+# contract), the deprecated role loses the financial privilege (approve /
+# reject / complete = money movement). No other role was widened.
+
 
 # ========================= СХЕМЫ =========================
 
@@ -210,12 +215,12 @@ async def get_refund_requests(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier", "Manager")),
+    current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
     """
     Получить список заявок на возврат
 
-    Доступно: Admin, Cashier, Manager
+    Доступно: Admin, Cashier
     """
     payload = ForceMajeureApiService(db).get_refund_requests(
         status_filter=status_filter,
@@ -230,12 +235,12 @@ async def get_refund_requests(
 async def get_refund_request(
     request_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier", "Manager")),
+    current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
     """
     Получить заявку на возврат по ID
 
-    Доступно: Admin, Cashier, Manager
+    Доступно: Admin, Cashier
     """
     try:
         payload = ForceMajeureApiService(db).get_refund_request(request_id=request_id)
@@ -249,7 +254,7 @@ async def process_refund_request(
     request_id: int,
     process_request: ProcessRefundRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier", "Manager")),
+    current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
     """
     Обработать заявку на возврат
@@ -259,7 +264,7 @@ async def process_refund_request(
     - reject: Отклонить заявку
     - complete: Завершить (деньги возвращены)
 
-    Доступно: Admin, Cashier, Manager
+    Доступно: Admin, Cashier
     """
     service = ForceMajeureApiService(db)
     try:

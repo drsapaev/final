@@ -89,7 +89,7 @@ BEFORE                      AFTER
 ────────────────────────   ─────────────────────
 theme.css                   muiTheme.ts (unified)
 dark-theme.css              ✓ Single config
-macos-tokens.css            ✓ Zero conflicts
+design-system/tokens.css            ✓ Zero conflicts
 macos.css                   ✓ 100% maintainable
 ColorSchemeSelector.jsx
 legacy makeStyles

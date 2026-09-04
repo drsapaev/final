@@ -9,11 +9,15 @@ import {
   type ReactNode
 } from 'react';
 import { useInRouterContext, useLocation } from 'react-router-dom';
-import tokens, { colors as tokenColors } from '../theme/tokens-legacy';
-// colorScheme.ts / colorUtils.ts are still @ts-nocheck; their functions
-// accept (string, string) and return string|null. They'll be migrated in a
-// later batch — for now the implicit-any return is acceptable under the
-// current tsconfig (noImplicitAny: false).
+// PR-UI-17-4: theme/tokens-legacy.ts deleted — its only live importer was this
+// context. The legacy token values ThemeContext actually reads are inlined
+// below as private constants (byte-identical values; lookup logic untouched).
+// The context effect already reads CSS variables FIRST and uses these maps
+// only as fallbacks. Full getColor migration to var(--mac-*) would change
+// rendered colors (legacy palette ≠ macOS palette: #0ea5e9 vs #007aff) and
+// requires a dedicated visual-regression-verified effort — recorded in
+// Plan-SSOT. The unused `designTokens` context property is dropped (0
+// external consumers).
 import {
   applyColorSchemeToDom,
   getStoredColorScheme,
@@ -22,6 +26,7 @@ import {
   persistColorSchemeLocally,
   resolveThemeMode,
 } from '../theme/colorScheme';
+import { legacyColors, legacySpacing, legacyFontSize, legacyShadows } from './themeLegacyTokens';
 import apiClient from '../api/client';
 import { mixColors, toRgbaString } from '../theme/colorUtils';
 import logger from '../utils/logger';
@@ -29,6 +34,8 @@ import tokenManager from '../utils/tokenManager';
 import { isPublicRoutePath } from '../routing/routeSelectors';
 import type { HttpApiError } from '../types/errors';
 
+// PR-UI-17-4: legacy token maps live in ./themeLegacyTokens.ts (private
+// data module; values byte-identical to the deleted theme/tokens-legacy.ts).
 type ThemeMode = 'light' | 'dark';
 type ColorScheme = string;
 type Spacing = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | string;
@@ -62,7 +69,6 @@ interface ThemeContextValue {
   isDark: boolean;
   isLight: boolean;
   themeConfig: ThemeConfig;
-  designTokens: typeof tokens;
   getColor: (color: ColorToken, shade?: number | string) => string;
   getSpacing: (size: Spacing) => string;
   getFontSize: (size: FontSize) => string;
@@ -191,48 +197,45 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   const getColor = useCallback((color: ColorToken, shade: number | string = 500): string => {
     const numericShade = typeof shade === 'number' ? shade : 500;
     if (color === 'primary' || color === 'secondary') {
-      return (tokenColors as Record<string, Record<number, string>>)[color]?.[numericShade] || (tokenColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
+      return (legacyColors as Record<string, Record<number, string>>)[color]?.[numericShade] || (legacyColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
     }
     if (color === 'success' || color === 'warning' || color === 'danger' || color === 'info') {
-      const status = (tokenColors as unknown as { status?: Record<string, string> }).status;
-      return status?.[color] || (tokenColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
+      const status = (legacyColors as unknown as { status?: Record<string, string> }).status;
+      return status?.[color] || (legacyColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
     }
     if (color === 'text') {
-      const semantic = (tokenColors as Record<string, { text?: Record<string, string> }>).semantic;
+      const semantic = (legacyColors as Record<string, { text?: Record<string, string> }>).semantic;
       const key = typeof shade === 'string' ? shade : 'primary';
       return semantic?.text?.[key] || 'var(--mac-text-primary)';
     }
     if (color === 'background') {
-      const semantic = (tokenColors as Record<string, { background?: Record<string, string> }>).semantic;
+      const semantic = (legacyColors as Record<string, { background?: Record<string, string> }>).semantic;
       const key = typeof shade === 'string' ? shade : 'primary';
       return semantic?.background?.[key] || 'var(--mac-bg-primary)';
     }
     if (color === 'border') {
-      const semantic = (tokenColors as Record<string, { border?: Record<string, string> }>).semantic;
+      const semantic = (legacyColors as Record<string, { border?: Record<string, string> }>).semantic;
       const key = typeof shade === 'string' ? shade : 'medium';
       return semantic?.border?.[key] || 'var(--mac-border)';
     }
     if (color === 'surface') {
-      const semantic = (tokenColors as Record<string, { surface?: Record<string, string> }>).semantic;
+      const semantic = (legacyColors as Record<string, { surface?: Record<string, string> }>).semantic;
       const key = typeof shade === 'string' ? shade : 'card';
       return semantic?.surface?.[key] || 'var(--mac-bg-primary)';
     }
-    return (tokenColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
+    return (legacyColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
   }, []);
 
   const getSpacing = useCallback((size: Spacing): string => {
-    const spacing = (tokens as { spacing?: Record<string, string> }).spacing;
-    return spacing?.[size] || spacing?.md || '16px';
+    return legacySpacing[size] || legacySpacing[4] || '16px';
   }, []);
 
   const getFontSize = useCallback((size: FontSize): string => {
-    const fontSize = (tokens as { typography?: { fontSize?: Record<string, string> } }).typography?.fontSize;
-    return fontSize?.[size] || fontSize?.base || '16px';
+    return legacyFontSize[size] || legacyFontSize.base || '16px';
   }, []);
 
   const getShadow = useCallback((size: ShadowSize): string => {
-    const shadows = (tokens as { shadows?: Record<string, string> }).shadows;
-    return shadows?.[size] || shadows?.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+    return legacyShadows[size] || legacyShadows.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
   }, []);
 
   const setColorScheme = useCallback((nextScheme: ColorScheme, options: SetColorSchemeOptions = {}): void => {
@@ -330,9 +333,10 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   useEffect(() => {
     persistColorSchemeLocally(colorScheme, theme);
     applyColorSchemeToDom(colorScheme, theme);
-    window.dispatchEvent(new CustomEvent('colorSchemeChanged', {
-      detail: colorScheme,
-    }));
+    // PR-UI-01: removed dispatch of 'colorSchemeChanged' CustomEvent.
+    // The only consumer was MacOSThemeProvider (deleted in this PR). Components
+    // that need to react to theme changes should read useTheme().colorScheme
+    // or useTheme().theme directly — React re-renders propagate the change.
   }, [colorScheme, theme]);
 
   useEffect(() => {
@@ -349,9 +353,9 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   useEffect(() => {
     const root = document.documentElement;
     const computedStyle = window.getComputedStyle(root);
-    const semanticColors = (tokenColors as { semantic?: Record<string, Record<string, string>> }).semantic;
-    const primaryColors = (tokenColors as { primary?: Record<number, string> }).primary;
-    const statusColors = (tokenColors as { status?: Record<string, string> }).status;
+    const semanticColors = (legacyColors as { semantic?: Record<string, Record<string, string>> }).semantic;
+    const primaryColors = (legacyColors as { primary?: Record<number, string> }).primary;
+    const statusColors = (legacyColors as { status?: Record<string, string> }).status;
     const macBgPrimary: string = computedStyle.getPropertyValue('--mac-bg-primary').trim() || semanticColors?.background.primary || '';
     const macBgSecondary: string = computedStyle.getPropertyValue('--mac-bg-secondary').trim() || semanticColors?.background.secondary || '';
     const macBgTertiary: string = computedStyle.getPropertyValue('--mac-bg-tertiary').trim() || semanticColors?.background.tertiary || '';
@@ -390,25 +394,25 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     root.style.setProperty(
       '--shadow-sm',
       computedStyle.getPropertyValue('--mac-shadow-sm').trim() ||
-      (tokens as { shadows?: Record<string, string> }).shadows?.sm ||
+      legacyShadows.sm ||
       '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
     );
     root.style.setProperty(
       '--shadow-md',
       computedStyle.getPropertyValue('--mac-shadow-md').trim() ||
-      (tokens as { shadows?: Record<string, string> }).shadows?.md ||
+      legacyShadows.md ||
       '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
     );
     root.style.setProperty(
       '--shadow-lg',
       computedStyle.getPropertyValue('--mac-shadow-lg').trim() ||
-      (tokens as { shadows?: Record<string, string> }).shadows?.lg ||
+      legacyShadows.lg ||
       '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
     );
     root.style.setProperty(
       '--shadow-xl',
       computedStyle.getPropertyValue('--mac-shadow-xl').trim() ||
-      (tokens as { shadows?: Record<string, string> }).shadows?.xl ||
+      legacyShadows.xl ||
       '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
     );
 
@@ -630,7 +634,6 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     isDark,
     isLight,
     themeConfig,
-    designTokens: tokens,
     getColor,
     getSpacing,
     getFontSize,

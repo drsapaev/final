@@ -594,7 +594,7 @@ frontend/
 ├── design-system/
 │   └── styles/global.css  (ds-* classes)
 └── theme/
-    ├── macos-tokens.css  (mac-* variables)
+    ├── design-system/tokens.css  (mac-* variables)
     └── globalStyles.css  (duplicate?)
 
 // In components, don't know which to use!

@@ -99,8 +99,18 @@ function getBrowserOrigin(): string {
 function buildRuntimeSnapshot(): RuntimeSnapshot {
   const currentOrigin = getBrowserOrigin();
   const configuredOrigin = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL);
+  // CONTRACT: an explicitly configured VITE_API_BASE_URL wins over the
+  // browser origin — ops/vps/frontend.env.sample documents it as an
+  // intentional separate-API-origin switch (Vercel frontend + API elsewhere).
+  // Without it the previous "browser origin preferred on non-localhost" rule
+  // silently overrode the operator's setting and sent API calls to the
+  // static host (405). When the env is NOT set, the same-origin behaviour is
+  // preserved (fallback DEFAULT covers local dev).
+  const hasExplicitApiOrigin = Boolean(import.meta.env.VITE_API_BASE_URL);
   const preferBrowserOrigin =
-    currentOrigin && (!isLocalOrigin(currentOrigin) || isViteDevProxyOrigin(currentOrigin));
+    !hasExplicitApiOrigin &&
+    currentOrigin &&
+    (!isLocalOrigin(currentOrigin) || isViteDevProxyOrigin(currentOrigin));
   const apiOrigin = preferBrowserOrigin ? currentOrigin : configuredOrigin;
   const apiBaseUrl = `${apiOrigin}/api/v1`;
   const parsedOrigin = parseOriginParts(apiOrigin) || parseOriginParts(configuredOrigin);

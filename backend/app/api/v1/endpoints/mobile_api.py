@@ -9,7 +9,8 @@ import gzip
 # the module of the same name). Using importlib avoids the shadowing.
 import importlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -35,7 +36,7 @@ from app.db.session import get_db
 from app.schemas.authentication import RefreshTokenResponse
 from app.schemas.mobile import (
     AppointmentUpcomingOut,
-    BookAppointmentRequest,
+    MobileBookAppointmentRequest,
     LabResultOut,
     MobileAppointmentDetailOut,
     MobileAttestRequest,
@@ -45,6 +46,8 @@ from app.schemas.mobile import (
     PatientProfileOut,
 )
 from app.services.mobile_api_service import MobileApiService
+from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.notification_platform_service import get_notification_platform_service
 from app.services.notifications import notification_sender_service
 
@@ -389,7 +392,7 @@ def get_appointment_detail(
 
 @router.post("/appointments/book", response_model=AppointmentUpcomingOut)
 async def book_mobile_appointment(
-    request: BookAppointmentRequest,
+    request: MobileBookAppointmentRequest,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -400,25 +403,101 @@ async def book_mobile_appointment(
         if not patient:
             raise HTTPException(status_code=404, detail="Профиль пациента не найден")
 
-        # Создаем запись
+        # Atomic slot reservation (Codex P1 round-7, ordering fixed round-8:
+        # the per-doctor FOR UPDATE lock is taken BEFORE eligibility so a
+        # concurrent deactivation must commit first and the eligibility
+        # reads below see the post-commit state — lock-then-validate, never
+        # validate-then-wait-then-proceed).
+        lock_doctor_for_slot_reservation(db, request.doctor_id)
+
+        # Lifecycle eligibility (Codex round-2 P1): every live appointment
+        # writer must reject inactive/incomplete doctors — mobile booking
+        # included (same contract as POST /appointments and the QR path).
+        ensure_doctor_eligible_for_appointment(db, request.doctor_id)
+
+        try:
+            appointment_date = date.fromisoformat(request.preferred_date)
+        except ValueError as exc:
+            # Codex round-8 P2: malformed patient input must surface as a
+            # 4xx validation error, not as a 500 from the catch-all.
+            raise HTTPException(
+                status_code=400,
+                detail="Некорректный формат даты записи (ожидается YYYY-MM-DD)",
+            ) from exc
+
+        # Slot-occupancy guard (Codex round-3 P1): same contract as the web
+        # and Telegram writers — two patients must never receive successful
+        # bookings for the same doctor slot. Skipped when NO time was chosen
+        # (Codex round-4 P1): preferred_time is optional, and the occupancy
+        # query would match appointment_time IS NULL rows — after the first
+        # date-only booking every later date-only request would get a false
+        # 409 although no concrete slot was ever selected.
+        if (
+            request.preferred_time
+            and crud_appointment.appointment.is_time_slot_occupied(
+                db,
+                doctor_id=request.doctor_id,
+                appointment_date=appointment_date,
+                appointment_time=request.preferred_time,
+            )
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Это время уже занято у выбранного врача",
+            )
+
+        # Persist requested services through the REAL contract (Codex
+        # round-3 P2): web/Telegram store service NAMES in the
+        # Appointment.services JSON column at creation time — resolve the
+        # mobile service IDs to names here. Inactive or unknown IDs are
+        # rejected (Codex round-4 P2): the mobile search contract exposes
+        # only Service.active == True rows, so a booking must never persist
+        # an unavailable service; the former stub loop
+        # (add_appointment_service) wrote nothing and is retired.
+        service_names: list[str] = []
+        if request.services:
+            from app.models.service import Service
+
+            service_rows = (
+                db.query(Service)
+                .filter(
+                    Service.id.in_(request.services),
+                    Service.active.is_(True),
+                )
+                .all()
+            )
+            found_ids = {s.id for s in service_rows}
+            unavailable = [sid for sid in request.services if sid not in found_ids]
+            if unavailable:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Услуги недоступны (не найдены или деактивированы): "
+                        f"{sorted(unavailable)}"
+                    ),
+                )
+            service_names = [s.name for s in service_rows]
+
+        # Создаем запись. NOTE: the handler used to bind the wrong request
+        # schema and referenced nonexistent Appointment columns (complaint,
+        # source) — the endpoint returned 500 for EVERY valid request
+        # (pre-existing bug surfaced by the round-2 eligibility tests).
+        # Bound schema is now MobileBookAppointmentRequest (the shape this
+        # handler was written for) and only real model columns are written:
+        # the patient's complaint AND notes are both preserved (Codex
+        # round-3 P1 — never silently discard one of them).
+        notes_parts = [p for p in (request.complaint, request.notes) if p]
         appointment_data = {
             "patient_id": patient.id,
             "doctor_id": request.doctor_id,
-            "appointment_date": datetime.fromisoformat(request.preferred_date),
-            "complaint": request.complaint,
-            "notes": request.notes,
+            "appointment_date": appointment_date,
+            "appointment_time": request.preferred_time,
+            "notes": "\n".join(notes_parts) or None,
             "status": "scheduled",
-            "source": "mobile",
+            "services": service_names,
         }
 
         appointment = crud_appointment.create_appointment(db, appointment_data)
-
-        # Добавляем услуги
-        if request.services:
-            for service_id in request.services:
-                crud_appointment.add_appointment_service(
-                    db, appointment_id=appointment.id, service_id=service_id
-                )
 
         # PR-3: doctor lives in the doctors table, not users. Use clinic CRUD.
         from app.crud import clinic as crud_clinic
@@ -733,10 +812,20 @@ def list_mobile_doctors(
     """
     try:
         from app.crud import clinic as crud_clinic
+        # Lifecycle eligibility (Codex round-2 P2, refined round-7 P2): the
+        # incomplete-profile ("general" sentinel) predicate is applied IN
+        # THE DATABASE QUERY (eligible_only=True) — this list feeds the
+        # patient-facing booking selector, and filtering the sentinel AFTER
+        # the crud row cap omitted eligible doctors beyond the cap while
+        # the requested limit allowed more rows.
         if specialty:
-            doctors = crud_clinic.get_doctors_by_specialty(db, specialty=specialty)
+            doctors = crud_clinic.get_doctors_by_specialty(
+                db, specialty=specialty, eligible_only=True
+            )
         else:
-            doctors = crud_clinic.get_doctors(db, active_only=True)
+            doctors = crud_clinic.get_doctors(
+                db, active_only=True, eligible_only=True
+            )
         # Limit
         doctors = doctors[:limit]
 

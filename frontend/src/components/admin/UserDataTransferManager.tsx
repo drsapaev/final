@@ -1,7 +1,7 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import {
-  MacOSCard, Button, Input, Checkbox, SegmentedControl,
+  Card, Button, Input, Checkbox, SegmentedControl,
 } from '../ui/macos';
 import { Users, ArrowRight, Search, CheckCircle, XCircle, History, BarChart3 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -294,7 +294,7 @@ const UserDataTransferManager = () => {
   const renderTransferTab = () =>
   <div className="admin-flex-col-24">
       {/* Поиск пользователей */}
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <Search className="admin-icon-20" />
           {t('admin2.udtm_search_users_title')}
@@ -353,11 +353,11 @@ const UserDataTransferManager = () => {
             </div>
         }
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Выбранные пользователи */}
       <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-24">
-        <MacOSCard className="admin-p-24">
+        <Card className="admin-p-24">
           <h3 className="admin-lg-med-primary-m-0016px0">
             {t('admin2.udtm_source_user_title')}
           </h3>
@@ -389,9 +389,9 @@ const UserDataTransferManager = () => {
               {t('admin2.udtm_source_user_hint')}
             </div>
         }
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard className="admin-p-24">
+        <Card className="admin-p-24">
           <h3 className="admin-lg-med-primary-m-0016px0">
             {t('admin2.udtm_target_user_title')}
           </h3>
@@ -420,12 +420,12 @@ const UserDataTransferManager = () => {
               {t('admin2.udtm_target_user_hint')}
             </div>
         }
-        </MacOSCard>
+        </Card>
       </div>
 
       {/* Сводка данных источника */}
       {userDataSummary &&
-    <MacOSCard className="admin-p-24">
+    <Card className="admin-p-24">
           <h3 className="admin-lg-med-primary-m-0016px0">
             {t('admin2.udtm_data_to_transfer')}
           </h3>
@@ -455,11 +455,11 @@ const UserDataTransferManager = () => {
               </div>
             </div>
           </div>
-        </MacOSCard>
+        </Card>
     }
 
       {/* Выбор типов данных */}
-      <MacOSCard className="admin-p-24">
+      <Card className="admin-p-24">
         <h3 className="admin-lg-med-primary-m-0016px0">
           {t('admin2.udtm_data_types_title')}
         </h3>
@@ -490,7 +490,7 @@ const UserDataTransferManager = () => {
             </label>
         )}
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Кнопка передачи */}
       <div className="admin-flex-jc-center">
@@ -518,7 +518,7 @@ const UserDataTransferManager = () => {
 
 
   const renderHistoryTab = () =>
-  <MacOSCard className="admin-p-24">
+  <Card className="admin-p-24">
       <div className="admin-flex-jc-between-ai-center-mb-16">
         <h3 className="admin-lg-med-primary-m-0">
           {t('admin2.udtm_history_title')}
@@ -559,11 +559,11 @@ const UserDataTransferManager = () => {
       )}
         </div>
     }
-    </MacOSCard>;
+    </Card>;
 
 
   const renderStatisticsTab = () =>
-  <MacOSCard className="admin-p-24">
+  <Card className="admin-p-24">
       <div className="admin-flex-jc-between-ai-center-mb-16">
         <h3 className="admin-lg-med-primary-m-0">
           {t('admin2.udtm_statistics_title')}
@@ -606,7 +606,7 @@ const UserDataTransferManager = () => {
           {t('admin2.udtm_statistics_hint')}
         </div>
     }
-    </MacOSCard>;
+    </Card>;
 
 
   return (

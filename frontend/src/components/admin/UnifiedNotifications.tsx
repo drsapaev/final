@@ -1,6 +1,7 @@
 import React from "react";
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Bell, Users } from 'lucide-react';
 import FCMManager from './FCMManager';
 import RegistrarNotificationManager from './RegistrarNotificationManager';
 import ErrorBoundary from '../common/ErrorBoundary';
@@ -25,8 +26,8 @@ const UnifiedNotifications = () => {
   }, [section]);
 
   const tabs = [
-    { id: 'fcm' as const, label: 'Push (FCM)', icon: 'Bell' },
-    { id: 'registrar' as const, label: t('admin2.un_tab_registrar'), icon: 'Users' }
+    { id: 'fcm' as const, label: 'Push (FCM)', icon: Bell },
+    { id: 'registrar' as const, label: t('admin2.un_tab_registrar'), icon: Users }
   ];
 
   const renderContent = () => {

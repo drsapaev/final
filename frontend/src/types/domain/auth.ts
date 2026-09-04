@@ -5,7 +5,7 @@
  *   - stores/auth.ts (the actual auth store — token + profile snapshot)
  *   - types/auth-store.ts (store API surface)
  *   - contexts/ChatContext.tsx, contexts/ThemeContext.tsx
- *   - routing/routeGuards.tsx, components/layout/Nav.tsx
+ *   - routing/routeGuards.tsx (Nav.tsx deleted in PR-UI-17-2)
 import type { UserId } from './branded';
  *   - LoginForm, UserManagement, RoleGate, security components
  *
@@ -24,7 +24,7 @@ export type AuthStatus = 'authenticated' | 'unauthenticated' | 'loading' | 'erro
 
 // === Store-level auth snapshot (CANONICAL) ==================================
 // This is the actual shape returned by stores/auth.ts getState().
-// All consumers (routeGuards, Nav, ChatContext, etc.) must use this type.
+// All consumers (routeGuards, ChatContext, etc.) must use this type.
 
 export interface UserProfile {
   id?: number | null;
@@ -127,8 +127,10 @@ export interface LoginCredentials {
 // ============================================================================
 //
 // Domain invariant (AUTHENTICATION_LAWS_FOR_AI.md ЗАКОН 2):
-//   requires_2fa === true  ⇒  access_token MUST NOT be present
-//   requires_2fa === false ⇒  pending_2fa_token MUST NOT be present
+//   requires_2fa === true         ⇒  access_token MUST NOT be present
+//   requires_2fa === false        ⇒  pending_2fa_token MUST NOT be present
+//   requires_2fa_setup === true   ⇒  access_token MUST NOT be present,
+//                                     enrollment_token MUST be present
 //
 // The discriminated union below makes this invariant unrepresentable at the
 // type level — there is no `LoginResult` value where both branches coexist.
@@ -140,14 +142,30 @@ export interface LoginCredentials {
 /** Login succeeded, but 2FA verification required before access_token is issued. */
 export interface LoginRequires2FA {
   requires_2fa: true;
+  requires_2fa_setup?: false;
   pending_2fa_token: string;
   two_factor_method?: string | null;
+  must_change_password?: boolean;
+}
+
+/**
+ * Login accepted (password verified), but 2FA ENROLLMENT is required for
+ * critical roles (Admin/Cashier) — two-stage authentication. The backend
+ * issues a single-use enrollment token instead of access tokens; it is
+ * accepted only by /2fa/setup and /2fa/verify-setup (10-minute TTL).
+ */
+export interface LoginRequires2FASetup {
+  requires_2fa: false;
+  requires_2fa_setup: true;
+  enrollment_token: string;
+  user: unknown;
   must_change_password?: boolean;
 }
 
 /** Login succeeded, no 2FA required — tokens issued immediately. */
 export interface LoginSucceeded {
   requires_2fa: false;
+  requires_2fa_setup?: false;
   access_token: string;
   refresh_token: string;
   token_type: string;
@@ -157,13 +175,14 @@ export interface LoginSucceeded {
 }
 
 /**
- * Discriminated union — use `requires_2fa` as the discriminant.
- * TS narrows automatically when you check `if (result.requires_2fa) { ... }`.
+ * Discriminated union — use `requires_2fa` / `requires_2fa_setup` as the
+ * discriminants. TS narrows automatically when you check
+ * `if (result.requires_2fa) { ... }` / `if (result.requires_2fa_setup) { ... }`.
  *
  * This is the DOMAIN type, not the raw transport shape.
  * Use `parseLoginResponse(dto)` from auth-mapper.ts to convert.
  */
-export type LoginResult = LoginRequires2FA | LoginSucceeded;
+export type LoginResult = LoginRequires2FA | LoginRequires2FASetup | LoginSucceeded;
 
 // ============================================================================
 // 2FA verification — POST /2fa/verify

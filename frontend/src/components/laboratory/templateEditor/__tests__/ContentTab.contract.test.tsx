@@ -79,8 +79,9 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     expect(source).toContain("t('content.load_all_norms')");
     // Disabled когда нет валидных полей
     expect(source).toContain("disabled={!draftVersion?.sections?.some");
-    // Иконка square.and.arrow.down.on.square
-    expect(source).toContain('square.and.arrow.down.on.square');
+    // Иконка bulk-кнопки: был SF 'square.and.arrow.down.on.square' (macos Icon),
+    // Track 3-2 → прямой lucide FileDown (§3.3 / Plan v2.10 §4.1.21).
+    expect(source).toContain('<FileDown');
   });
 
   it('UX-AUDIT-FIX14: uses parent-provided datalist IDs instead of hardcoded', () => {

@@ -13,6 +13,7 @@
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import { ClipboardList, FlaskConical, Stethoscope, Syringe } from 'lucide-react';
 
 // =====================================================================
 // CONSTANTS
@@ -394,10 +395,10 @@ export const resolveInitialServiceCategory = (
 // =====================================================================
 
 export const categories = [
-  { id: 'specialists', label: 'Специалисты', icon: 'stethoscope' },
-  { id: 'laboratory', label: 'Лаборатория', icon: 'flask' },
-  { id: 'procedures', label: 'Процедуры', icon: 'syringe' },
-  { id: 'other', label: 'Прочее', icon: 'clipboard' },
+  { id: 'specialists', label: 'Специалисты', icon: Stethoscope },
+  { id: 'laboratory', label: 'Лаборатория', icon: FlaskConical },
+  { id: 'procedures', label: 'Процедуры', icon: Syringe },
+  { id: 'other', label: 'Прочее', icon: ClipboardList },
 ];
 
 // =====================================================================

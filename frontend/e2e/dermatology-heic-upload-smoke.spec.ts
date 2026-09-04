@@ -1,9 +1,20 @@
 // @ts-check
 import fs from 'fs';
 import { test, expect } from '@playwright/test';
-import { installAuthenticatedQaHarness } from './support/authenticatedQa.js';
+import { installAuthenticatedQaHarness } from './support/authenticatedQa';
 
 const heicSmokeFile = process.env.HEIC_SMOKE_FILE;
+
+interface UploadRequestEvidence {
+  url: string;
+  method: string;
+  contentType: string;
+  hasPhotoBeforeKind: boolean;
+  hasVisitId: boolean;
+  hasExpectedJpegName: boolean;
+  hasJpegContentType: boolean;
+  bodyLength: number;
+}
 
 test.describe('Dermatology HEIC upload manual smoke', () => {
   test.skip(!heicSmokeFile, 'Set HEIC_SMOKE_FILE to a local .heic/.heif file to run this manual smoke.');
@@ -11,11 +22,11 @@ test.describe('Dermatology HEIC upload manual smoke', () => {
   test('converts a local HEIC fixture to JPEG multipart upload', async ({ page }) => {
     test.setTimeout(180_000);
 
-    expect(fs.existsSync(heicSmokeFile), `HEIC fixture should exist at ${heicSmokeFile}`).toBe(true);
-    const expectedJpegName = heicSmokeFile.replace(/^.*[\\/]/, '').replace(/\.(heic|heif)$/i, '.jpg');
+    expect(fs.existsSync(heicSmokeFile!), `HEIC fixture should exist at ${heicSmokeFile}`).toBe(true);
+    const expectedJpegName = heicSmokeFile!.replace(/^.*[\\/]/, '').replace(/\.(heic|heif)$/i, '.jpg');
 
-    const pageErrors = [];
-    const uploadRequests = [];
+    const pageErrors: string[] = [];
+    const uploadRequests: UploadRequestEvidence[] = [];
 
     page.on('pageerror', (error) => {
       pageErrors.push(error.message);
@@ -55,7 +66,7 @@ test.describe('Dermatology HEIC upload manual smoke', () => {
     });
 
     const startedAt = Date.now();
-    await page.locator('input[type="file"]').first().setInputFiles(heicSmokeFile);
+    await page.locator('input[type="file"]').first().setInputFiles(heicSmokeFile!);
 
     await expect.poll(() => uploadRequests.length, {
       timeout: 120_000,

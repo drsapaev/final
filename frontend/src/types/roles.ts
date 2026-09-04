@@ -17,7 +17,9 @@ export type BackendRole =
   | 'derma'
   | 'dentist'
   | 'Nurse'
-  | 'Receptionist'
+  // E-4 (Receptionist alias removal): 'Receptionist' removed — mirrors the
+  // backend core/roles.py enum decommission (§4.1.27). Canonical Registrar
+  // is the front-desk role; the legacy spelling had 0 stored rows.
   | 'Patient'
   | 'SuperAdmin';
 
@@ -37,7 +39,10 @@ export const CRITICAL_ROLES: readonly BackendRole[] = [
 ] as const;
 
 export const ADMIN_ROLES: readonly BackendRole[] = [
-  'Admin', 'SuperAdmin', 'Manager',
+  // M-1 (Manager deprecation): 'Manager' removed — mirrors backend
+  // core/roles.py ADMIN_ROLES (zero callers on either side, verified by
+  // exhaustive search; removal is behavior-neutral).
+  'Admin', 'SuperAdmin',
 ] as const;
 
 export const DOCTOR_ROLES: readonly BackendRole[] = [
@@ -45,7 +50,9 @@ export const DOCTOR_ROLES: readonly BackendRole[] = [
 ] as const;
 
 export const STAFF_ROLES: readonly BackendRole[] = [
-  'Registrar', 'Lab', 'Cashier', 'Nurse', 'Receptionist',
+  // E-4: 'Receptionist' removed — canonical Registrar is the front-desk
+  // staff role (mirror of backend core/roles.py STAFF_ROLES, §4.1.27).
+  'Registrar', 'Lab', 'Cashier', 'Nurse',
 ] as const;
 
 // ============================================================================
@@ -57,7 +64,7 @@ export const STAFF_ROLES: readonly BackendRole[] = [
 export const ROLE_LEVEL: Readonly<Record<BackendRole, number>> = {
   Patient: 1,
   Nurse: 2,
-  Receptionist: 3,
+  // E-4: Receptionist: 3 retired with the spelling (§4.1.27).
   Cashier: 4,
   Lab: 5,
   Registrar: 6,
@@ -71,12 +78,16 @@ export const ROLE_LEVEL: Readonly<Record<BackendRole, number>> = {
 } as const;
 
 // ============================================================================
-// Role aliases — mirror routeRegistry.js ROLE_ALIASES.
+// Role aliases — mirror routeRegistry ROLE_ALIASES.
 // Frontend-only mapping; not in backend.
+// REC-3 (Receptionist deprecation): the receptionist -> registrar alias was
+// removed — Registrar is the canonical front-desk role and the legacy
+// spelling no longer reaches registrar routes (route parity test pins the
+// deny). The nurse -> doctor alias is a separate policy decision and is
+// intentionally untouched.
 // ============================================================================
 
 export const ROLE_ALIASES: Readonly<Record<string, FrontendRoleKey>> = {
-  receptionist: 'registrar',
   nurse: 'doctor',
 } as const;
 
@@ -91,7 +102,7 @@ export function isBackendRole(value: unknown): value is BackendRole {
       value === 'Admin' || value === 'Registrar' || value === 'Doctor' ||
       value === 'Lab' || value === 'Cashier' || value === 'Manager' ||
       value === 'cardio' || value === 'derma' || value === 'dentist' ||
-      value === 'Nurse' || value === 'Receptionist' || value === 'Patient' ||
+      value === 'Nurse' || value === 'Patient' ||
       value === 'SuperAdmin'
     )
   );

@@ -27,15 +27,15 @@ import {
   Info } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
   Checkbox,
-  Table,
-  MacOSEmptyState,
+  AppEmpty,
   Select,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -258,7 +258,7 @@ const SystemManagement = () => {
   const renderMonitoringTab = () =>
   <div className="flex flex-col gap-6">
       {/* Общее состояние системы */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <div className="admin-flex-between-mb-16">
           <h3 className="admin-h3-icon-m0">
             <Activity className="w-5 h-5" />
@@ -301,13 +301,13 @@ const SystemManagement = () => {
         })}
           </div>
       }
-      </MacOSCard>
+      </Card>
 
       {/* Системные метрики */}
       {systemMetrics &&
     <div className="admin-grid-auto-300-24">
           {/* CPU */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
                 <Cpu className="w-4 h-4" />
@@ -327,10 +327,10 @@ const SystemManagement = () => {
                 </div>
           }
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Память */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
                 <MemoryStick className="w-4 h-4" />
@@ -351,10 +351,10 @@ const SystemManagement = () => {
                 {t('admin2.sm_available')} {formatBytes((systemMetrics.memory as { available?: number })?.available || 0)}
             </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {/* Диск */}
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
                 <HardDrive className="w-4 h-4" />
@@ -375,23 +375,22 @@ const SystemManagement = () => {
                 {t('admin2.sm_free')} {formatBytes((systemMetrics.disk as { free?: number })?.free || 0)}
             </div>
             </div>
-          </MacOSCard>
+          </Card>
         </div>
     }
 
       {/* Алерты */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-h3-icon-mb-16">
           <AlertTriangle className="w-5 h-5" />
           {t('admin2.sm_recent_alerts')}
         </h3>
         
         {alerts.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={CheckCircle}
         title={t('admin2.sm_no_active_alerts')}
-        description={t('admin2.sm_system_stable')}
-        iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-success)' }} /> :
+        description={t('admin2.sm_system_stable')} /> :
       <>
       {/* UX Audit Admin #4.8: alerts counter + show all button. */}
       {alerts.length > 0 && (
@@ -426,14 +425,14 @@ const SystemManagement = () => {
           </div>
       </>
       }
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderBackupsTab = () =>
   <div className="flex flex-col gap-6">
       {/* Создание бэкапа */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-h3-icon-mb-16">
           <Database className="w-5 h-5" />
           {t('admin2.sm_create_backup_title')}
@@ -483,10 +482,10 @@ const SystemManagement = () => {
             </Button>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Список бэкапов */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <div className="admin-flex-between-mb-16">
           <h3 className="admin-h3-icon-m0">
             <Shield className="w-5 h-5" />
@@ -503,14 +502,13 @@ const SystemManagement = () => {
         </div>
 
         {backups.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Database}
         title={t('admin2.sm_no_backups')}
-        description={t('admin2.sm_no_backups_desc')}
-        iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} /> :
+        description={t('admin2.sm_no_backups_desc')} /> :
 
 
-      <Table
+      <DataTable
         columns={[
         { key: 'name', label: t('admin2.sm_col_name') },
         { key: 'type', label: t('admin2.sm_col_type') },
@@ -554,7 +552,7 @@ const SystemManagement = () => {
 
         }))}
         emptyState={
-        <MacOSEmptyState
+        <AppEmpty
           icon={Database}
           title={t('admin2.sm_no_backups')}
           description={t('admin2.sm_no_backups_desc')} />
@@ -562,13 +560,13 @@ const SystemManagement = () => {
         } />
 
       }
-      </MacOSCard>
+      </Card>
     </div>;
 
 
   const renderSettingsTab = () =>
   <div className="flex flex-col gap-6">
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <h3 className="admin-h3-icon-mb-16">
           <Settings className="w-5 h-5" />
           {t('admin2.sm_monitoring_settings')}
@@ -663,7 +661,7 @@ const SystemManagement = () => {
             {t('admin2.sm_save_settings')}
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 

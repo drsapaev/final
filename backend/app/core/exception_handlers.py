@@ -8,6 +8,7 @@ import logging
 import uuid
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
@@ -227,7 +228,11 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "validation_error",
                 "message": "Ошибка валидации запроса",
-                "detail": exc.errors(),
+                # exc.errors() can carry non-JSON-serializable objects in ctx
+                # (e.g. the ValueError raised by a custom validator) - passing
+                # it raw made JSONResponse itself raise, surfacing as a 500
+                # from the security-middleware catch-all instead of a 422.
+                "detail": jsonable_encoder(exc.errors()),
             },
         )
 

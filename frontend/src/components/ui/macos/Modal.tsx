@@ -196,8 +196,6 @@ const Modal = ({
 
   const contentStyles: StyleWithBackdrop = {
     backgroundColor: 'var(--mac-bg-primary)',
-    backdropFilter: 'var(--mac-blur-light)',
-    WebkitBackdropFilter: 'var(--mac-blur-light)',
     borderRadius: '12px',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
     border: '1px solid var(--mac-border)',
@@ -287,6 +285,8 @@ const Modal = ({
           variant="ghost"
           size="small"
           onClick={onClose}
+          aria-label={t('common.close', { defaultValue: 'Close' })}
+          title={t('common.close', { defaultValue: 'Close' })}
           style={{
             position: 'absolute',
             top: '12px',
