@@ -2,6 +2,7 @@
 CRUD операции для управления клиникой в админ панели
 """
 
+from datetime import date
 from typing import Any
 
 from sqlalchemy import and_, func
@@ -463,7 +464,7 @@ def get_queue_settings(db: Session) -> dict[str, Any]:
     return result
 
 
-def clinic_today(db: Session) -> "date":
+def clinic_today(db: Session) -> date:
     """SSOT: календарный день КЛИНИКИ по таймзоне очередей.
 
     Host date.today() на UTC-хосте между 19:00 и полуночью уже «вчера»
@@ -473,7 +474,7 @@ def clinic_today(db: Session) -> "date":
     окне подтверждение ошибочно пропускает выдачу номеров очереди и
     активацию confirmed → open (main CI red 2026-09-04 19:05Z-19:47Z).
     """
-    from datetime import datetime
+    from datetime import date, datetime
     from zoneinfo import ZoneInfo
 
     tz_name = get_queue_settings(db).get("timezone", "Asia/Tashkent")
