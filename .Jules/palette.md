@@ -13,3 +13,7 @@
 ## 2026-08-31 - [Added Native Tooltip to IconButton]
  **Learning:** [Accessibility] While native `title` attributes provide basic tooltips, screen readers might announce them redundantly with `aria-label`, and they don't follow custom design system styles.
  **Action:** For icon-only buttons using existing components, wrap them in a custom `<Tooltip content={label}>` and use `aria-label` on the button itself. Remove the `title` attribute from the button. This prevents double tooltips while preserving a11y and UX consistency.
+
+## 2026-09-02 - Communicating error states via aria-invalid
+**Learning:** Visual error states (like red borders) on form inputs, textareas, custom checkboxes, and custom selects are completely invisible to screen readers unless the `aria-invalid` attribute is used. Relying only on color to convey state is an accessibility violation.
+**Action:** Always ensure `aria-invalid={!!error}` is passed down to the underlying interactive element (e.g. `<input>`, `<textarea>`, `<button>`, `<div role="checkbox">`) within custom form controls to properly communicate error states to assistive technologies.
