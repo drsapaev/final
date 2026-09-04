@@ -311,10 +311,14 @@ def test_service(db_session):
 @pytest.fixture(scope="function")
 def test_visit(db_session, test_patient, test_doctor):
     """Создает тестовый визит"""
+    # SSOT: день КЛИНИКИ (не host-UTC) — подтверждение активирует
+    # confirmed → open только для визитов дня клиники
+    from app.crud.clinic import clinic_today
+
     visit = Visit(
         patient_id=test_patient.id,
         doctor_id=test_doctor.id,
-        visit_date=date.today(),
+        visit_date=clinic_today(db_session),
         visit_time="10:00",
         status="pending_confirmation",
         discount_mode="none",
@@ -332,8 +336,10 @@ def test_visit(db_session, test_patient, test_doctor):
 @pytest.fixture(scope="function")
 def test_daily_queue(db_session, cardio_user):
     """Создает тестовую дневную очередь"""
+    from app.crud.clinic import clinic_today
+
     queue = DailyQueue(
-        day=date.today(),
+        day=clinic_today(db_session),
         specialist_id=cardio_user.id,
         queue_tag="cardiology_common",
         active=True,

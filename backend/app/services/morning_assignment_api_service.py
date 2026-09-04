@@ -33,10 +33,16 @@ class MorningAssignmentApiService:
     ):
         self.repository = repository or MorningAssignmentApiRepository(db)
 
-    @staticmethod
-    def parse_target_date(target_date: str | None) -> date:
+    def parse_target_date(self, target_date: str | None) -> date:
+        # SSOT: дефолт — день КЛИНИКИ по таймзоне очередей (см.
+        # visit_confirmation_service._clinic_today), а не host
+        # date.today(): на UTC-хосте в окне 19:00-24:00 это уже
+        # «вчера» для Asia/Tashkent, и утренняя сборка молча
+        # обрабатывает прошедший день.
+        from app.crud.clinic import clinic_today
+
         if not target_date:
-            return date.today()
+            return clinic_today(self.repository.db)
         return datetime.strptime(target_date, "%Y-%m-%d").date()
 
     def _build_morning_service(self) -> MorningAssignmentService:
@@ -158,10 +164,14 @@ class MorningAssignmentApiService:
                     # active visits, queue assignment is still legitimate (admin
                     # re-assigning queue numbers), but we report it as "reassignment"
                     # rather than "activation".
-                    from app.services.visit_lifecycle_service import VisitLifecycleService
+                    from app.services.visit_lifecycle_service import (
+                        VisitLifecycleService,
+                    )
 
                     if visit.status == "confirmed":
-                        VisitLifecycleService(self.repository.db).activate_confirmed_visit(
+                        VisitLifecycleService(
+                            self.repository.db
+                        ).activate_confirmed_visit(
                             visit_id=visit.id,
                             current_user=current_user,
                             commit=False,
@@ -261,7 +271,9 @@ class MorningAssignmentApiService:
                     "doctor_id": queue.specialist_id,
                     "entries_count": entries_count,
                     "active": queue.active,
-                    "opened_at": queue.opened_at.isoformat() if queue.opened_at else None,
+                    "opened_at": (
+                        queue.opened_at.isoformat() if queue.opened_at else None
+                    ),
                 }
             )
 

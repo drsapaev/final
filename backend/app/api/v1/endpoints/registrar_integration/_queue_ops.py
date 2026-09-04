@@ -7,6 +7,7 @@ from app.api.v1.endpoints.registrar_integration._helpers import (
     _normalize_registration_discount_mode,
     _serialize_registrar_datetime,
 )  # noqa: F401
+from app.crud.clinic import clinic_today
 from app.services.queue_service import queue_service  # noqa: F401
 
 
@@ -264,9 +265,17 @@ def start_queue_visit(
 # ===================== HELPERS ДЛЯ get_today_queues (R-22 decomposition) =====================
 
 
-def _parse_queue_target_date(target_date: str | None) -> date:
-    """R-22: Парсинг даты для очереди. Возвращает today если невалидно."""
+def _parse_queue_target_date(target_date: str | None, db=None) -> date:
+    """R-22: Парсинг даты для очереди. Возвращает today если невалидно.
+
+    SSOT: дефолт «сегодня» — день КЛИНИКИ по таймзоне очередей
+    (crud.clinic.clinic_today), а не host date.today(): на UTC-хосте в
+    окне 19:00-24:00 host-дата уже «вчера» для Asia/Tashkent, и экран
+    «Сегодняшние очереди» молча показывал прошедший день.
+    """
     from datetime import datetime
+    from zoneinfo import ZoneInfo
+
     if target_date:
         import re
         if re.match(r'^\d{4}-\d{2}-\d{2}$', target_date):
@@ -274,7 +283,10 @@ def _parse_queue_target_date(target_date: str | None) -> date:
                 return datetime.strptime(target_date, '%Y-%m-%d').date()
             except (ValueError, TypeError):
                 pass
-    return date.today()
+    if db is not None:
+        return clinic_today(db)
+    # db недоступен (не должен происходить в эндпоинтах): дефолт клиники
+    return datetime.now(ZoneInfo("Asia/Tashkent")).date()
 
 
 def _normalize_department_filter(department: str | None) -> set[str] | None:
