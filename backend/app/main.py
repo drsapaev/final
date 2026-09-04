@@ -536,6 +536,14 @@ def _warm_table_reflection() -> None:
 
     def _warm() -> None:
         try:
+            import os as _os
+
+            if _os.getenv("TESTING") == "1":
+                # Test container: per-test databases (and monkeypatched
+                # session factories) make process-level warmup meaningless;
+                # running it here only leaks fake sessions into
+                # worker-thread assertions. Production runtime only.
+                return
             from app.db.session import SessionLocal
             from app.services.visits_api_service import _REFLECTED_META
             from sqlalchemy import Table
