@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 import asyncio  # noqa: F401
 import hashlib  # noqa: F401
 import json  # noqa: F401
@@ -83,6 +85,12 @@ class LabReportingServiceMixinBase:
 # tooling or migrations, and self-heal is re-armed on a template 404
 # (see TemplatesMixin.get_template) so accidental data loss still recovers.
 _SEED_ENSURED = {"bind_id": None, "catalog": False, "templates": False, "bindings": False}
+
+# Codex P1: the warmup thread and concurrent first requests can each observe
+# an unlocked False flag and seed the same rows — unique constraints turn the
+# loser into an IntegrityError. Every ensure_* takes this lock for the
+# check-and-run critical section.
+_SEED_LOCK = threading.Lock()
 
 
 def _seed_cache_fresh(bind: object, part: str) -> bool:

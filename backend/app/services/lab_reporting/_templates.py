@@ -54,14 +54,26 @@ class TemplatesMixin(LabReportingServiceMixinBase):
         self.ensure_default_templates()
         template = self.repository.get_template(template_id)
         if not template:
-            # Self-heal re-arm: a miss may mean rows vanished after the
-            # process cached the seeders — run them once more before 404.
-            from app.services.lab_reporting._base import reset_lab_seed_cache
+            # Self-heal re-arm (Codex P1): a miss for an ARBITRARY id must
+            # not re-run the expensive seeders before 404 — reseed only when
+            # a seeded BASELINE template actually vanished.
+            from app.services.lab_reporting._payload import (
+                DEFAULT_LAB_TEMPLATE_DEFINITIONS,
+            )
+            from app.services.lab_reporting._repository_shortcuts import (
+                baseline_templates_present,
+            )
 
-            reset_lab_seed_cache()
-            self.ensure_default_catalog()
-            self.ensure_default_templates()
-            template = self.repository.get_template(template_id)
+            if not baseline_templates_present(
+                self.repository,
+                [d["code"] for d in DEFAULT_LAB_TEMPLATE_DEFINITIONS],
+            ):
+                from app.services.lab_reporting._base import reset_lab_seed_cache
+
+                reset_lab_seed_cache()
+                self.ensure_default_catalog()
+                self.ensure_default_templates()
+                template = self.repository.get_template(template_id)
         if not template:
             raise LabReportingDomainError(404, "Lab report template not found")
         return template

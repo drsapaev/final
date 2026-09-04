@@ -43,11 +43,20 @@ def _dispatch_patient_registered_notification_async(
             registration_source=registration_source,
         )
 
-    threading.Thread(
-        target=_run,
-        name=f"patient-registered-notify-{patient_id}",
-        daemon=True,
-    ).start()
+    try:
+        threading.Thread(
+            target=_run,
+            name=f"patient-registered-notify-{patient_id}",
+            daemon=True,
+        ).start()
+    except RuntimeError as exc:
+        # Codex P2: the patient row is already COMMITTED — a thread-creation
+        # failure (burst exhaustion) must not 500 a durable create. Log and
+        # drop the best-effort fan-out.
+        logger.warning(
+            "[FIX:NOTIFICATIONS] patient_registered dispatch could not start a worker thread",
+            extra={"patient_id": patient_id, "error_type": type(exc).__name__},
+        )
 
 
 def _run_patient_registered_notification(

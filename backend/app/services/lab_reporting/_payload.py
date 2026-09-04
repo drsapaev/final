@@ -104,11 +104,21 @@ class PayloadMixin(LabReportingServiceMixinBase):
 
 
     def ensure_default_templates(self) -> None:
-        from app.services.lab_reporting._base import _mark_seed_ensured, _seed_cache_fresh
+        from app.services.lab_reporting._base import (
+            _SEED_LOCK,
+            _mark_seed_ensured,
+            _seed_cache_fresh,
+        )
 
         bind = self.repository.db.get_bind()
-        if not _seed_cache_fresh(bind, "templates"):
-            return
+        with _SEED_LOCK:
+            if not _seed_cache_fresh(bind, "templates"):
+                return
+            self._ensure_default_templates_locked(bind)
+
+    def _ensure_default_templates_locked(self, bind) -> None:
+        from app.services.lab_reporting._base import _mark_seed_ensured
+
         logger.info("[LAB] ensure_default_templates seeding pilot templates")
         seeded_count = 0
         # Perf (#2977): one batched lookup replaces a get_template_by_code
@@ -225,11 +235,21 @@ class PayloadMixin(LabReportingServiceMixinBase):
 
 
     def ensure_default_template_bindings(self) -> None:
-        from app.services.lab_reporting._base import _mark_seed_ensured, _seed_cache_fresh
+        from app.services.lab_reporting._base import (
+            _SEED_LOCK,
+            _mark_seed_ensured,
+            _seed_cache_fresh,
+        )
 
         bind = self.repository.db.get_bind()
-        if not _seed_cache_fresh(bind, "bindings"):
-            return
+        with _SEED_LOCK:
+            if not _seed_cache_fresh(bind, "bindings"):
+                return
+            self._ensure_default_bindings_locked(bind)
+
+    def _ensure_default_bindings_locked(self, bind) -> None:
+        from app.services.lab_reporting._base import _mark_seed_ensured
+
         logger.info("[LAB] ensure_default_template_bindings seeding workflow mappings")
         touched = 0
         # Perf (#2977): 100 binding definitions previously cost two SELECTs
