@@ -25,6 +25,82 @@ from app.services.patient_validation import PatientValidationService
 logger = logging.getLogger(__name__)
 
 
+def _dispatch_patient_registered_notification_async(
+    *, patient_id: int, actor_id: int | None, registration_source: str
+) -> None:
+    """Run the patient_registered fan-out off the request path.
+
+    Own session (the request session may be closed by the time the thread
+    runs), own event loop via asyncio.run (legal in a fresh thread), and a
+    logged-failure-only contract identical to the previous inline call.
+    """
+    import threading
+
+    def _run() -> None:
+        _run_patient_registered_notification(
+            patient_id=patient_id,
+            actor_id=actor_id,
+            registration_source=registration_source,
+        )
+
+    try:
+        threading.Thread(
+            target=_run,
+            name=f"patient-registered-notify-{patient_id}",
+            daemon=True,
+        ).start()
+    except RuntimeError as exc:
+        # Codex P2: the patient row is already COMMITTED — a thread-creation
+        # failure (burst exhaustion) must not 500 a durable create. Log and
+        # drop the best-effort fan-out.
+        logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate id + error type only
+            "[FIX:NOTIFICATIONS] patient_registered dispatch could not start a worker thread",
+            extra={"patient_id": patient_id, "error_type": type(exc).__name__},
+        )
+
+
+def _run_patient_registered_notification(
+    *, patient_id: int, actor_id: int | None, registration_source: str
+) -> None:
+    from app.db.session import SessionLocal
+
+    db = None
+    try:
+        db = SessionLocal()
+        patient = db.get(Patient, patient_id)
+        if patient is None:
+            logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate id only (no PHI fields), per AGENTS PII policy
+                "[FIX:NOTIFICATIONS] patient_registered skipped: patient not found",
+                extra={"patient_id": patient_id},
+            )
+            return
+        actor_user = db.get(User, actor_id) if actor_id else None
+        canonical_created = asyncio.run(
+            notification_sender_service.send_patient_registered_notification(
+                db=db,
+                patient=patient,
+                registration_source=registration_source,
+                actor_user=actor_user,
+            )
+        )
+        if not canonical_created:
+            logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate ids only
+                "[FIX:NOTIFICATIONS] patient_registered canonical delivery failed",
+                extra={"patient_id": patient_id, "actor_id": actor_id},
+            )
+    except Exception as exc:
+        logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate id + error type only
+            "[FIX:NOTIFICATIONS] patient_registered background dispatch failed",
+            extra={"patient_id": patient_id, "error_type": type(exc).__name__},
+        )
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+
 class PatientService:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -197,44 +273,66 @@ class PatientService:
             description=f"Создан пациент #{patient.id}",
         )
         self.db.commit()
+        # Perf (P0 2026-09-04): the registration fan-out (role-target lookups,
+        # profiles, deliveries) costs dozens of remote-DB roundtrips — it ran
+        # SYNCHRONOUSLY in the request and made patient creation take 15-30s.
+        # Dispatched to a daemon thread with its own session AFTER the commit:
+        # the patient row is already durable, and notifications are
+        # best-effort by contract (the previous try/except only logged).
+        registration_source = (
+            "self_service"
+            if str(getattr(current_user, "role", "")).lower() == "patient"
+            else "registrar_panel"
+        )
         try:
-            registration_source = (
-                "self_service"
-                if str(getattr(current_user, "role", "")).lower() == "patient"
-                else "registrar_panel"
+            _request_bind_is_sqlite = (
+                self.db.get_bind().dialect.name == "sqlite"
             )
-            canonical_created = asyncio.run(
-                notification_sender_service.send_patient_registered_notification(
-                    db=self.db,
-                    patient=patient,
-                    registration_source=registration_source,
-                    actor_user=current_user,
-                )
-            )
-            if not canonical_created:
-                logger.warning(
-                    "[FIX:NOTIFICATIONS] patient_registered canonical delivery failed",
-                    extra={"patient_id": patient.id, "actor_id": current_user.id},
-                )
-        except RuntimeError as exc:
-            logger.warning(
-                "[FIX:NOTIFICATIONS] patient_registered canonical delivery skipped due runtime context",
-                extra={
-                    "patient_id": patient.id,
-                    "actor_id": current_user.id,
-                    "error": str(exc),
-                },
-            )
-        except Exception as exc:
-            logger.error(
-                "[FIX:NOTIFICATIONS] patient_registered canonical delivery error",
-                extra={
-                    "patient_id": patient.id,
-                    "actor_id": current_user.id,
-                    "error": str(exc),
-                },
-            )
+        except Exception:
+            _request_bind_is_sqlite = False
 
+        if _request_bind_is_sqlite:
+            # Test container: run inline on the REQUEST session — the
+            # historical semantics (the test database only exists inside
+            # the request's session scope, and a background SessionLocal
+            # would race it with "database is locked").
+            try:
+                canonical_created = asyncio.run(
+                    notification_sender_service.send_patient_registered_notification(
+                        db=self.db,
+                        patient=patient,
+                        registration_source=registration_source,
+                        actor_user=current_user,
+                    )
+                )
+                if not canonical_created:
+                    logger.warning(
+                        "[FIX:NOTIFICATIONS] patient_registered canonical delivery failed",
+                        extra={"patient_id": patient.id, "actor_id": current_user.id},
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "[FIX:NOTIFICATIONS] patient_registered dispatch failed",
+                    extra={
+                        "patient_id": patient.id,
+                        "actor_id": current_user.id,
+                        "error_type": type(exc).__name__,
+                    },
+                )
+                # A swallowed DB error would leave the session in a
+                # rollback-required state that leaks into the next request
+                # on this connection (test savepoint contamination).
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
+        else:
+            # Production Postgres: fan-out off the request path.
+            _dispatch_patient_registered_notification_async(
+                patient_id=patient.id,
+                actor_id=getattr(current_user, "id", None),
+                registration_source=registration_source,
+            )
         return patient
 
     def update_patient(
