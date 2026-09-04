@@ -9,3 +9,7 @@
 ## 2026-08-26 - Missing aria-hidden on Purely Visual Placeholders
 **Learning:** Adding `aria-busy="true"` to a container component to indicate a loading state is good, but if that container renders custom placeholder DOM elements (like skeleton loaders), those placeholders themselves can create "noise" for screen readers. Screen readers may attempt to read the empty inner `<div>`s intended only for visual effect.
 **Action:** When creating skeleton loaders or other purely visual placeholder elements, always add `aria-hidden="true"` to their root nodes so screen readers ignore them entirely, especially when their parent container already accurately conveys the state via `aria-busy` and `role="status"`.
+
+## 2026-08-31 - [Added Native Tooltip to IconButton]
+ **Learning:** [Accessibility] While native `title` attributes provide basic tooltips, screen readers might announce them redundantly with `aria-label`, and they don't follow custom design system styles.
+ **Action:** For icon-only buttons using existing components, wrap them in a custom `<Tooltip content={label}>` and use `aria-label` on the button itself. Remove the `title` attribute from the button. This prevents double tooltips while preserving a11y and UX consistency.
