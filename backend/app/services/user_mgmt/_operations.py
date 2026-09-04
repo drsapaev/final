@@ -107,13 +107,20 @@ class OperationsMixin(UserManagementServiceMixinBase):
             # The pre-flight is limited to batches that can actually reach a
             # probe: bulk activate only when the batch targets a
             # doctor-family account that still has an INACTIVE Doctor profile
-            # to reactivate; bulk change_role only on PROMOTION to a
-            # doctor-family role (demotions and same-role no-ops deactivate
-            # or no-op without querying the catalog), so non-doctor IAM
-            # recovery never depends on the onboarding catalog. Per-user
-            # failures AFTER a healthy probe are pure-Python validation
-            # errors (DoctorSpecialtyNotSelectableError — raised without
-            # touching the DB) and stay safely catchable per user.
+            # to reactivate; bulk change_role only on a real PROMOTION to a
+            # doctor-family role — i.e. the target role is doctor-family AND
+            # the batch contains at least one user whose CURRENT role is
+            # outside the doctor family. Codex round-5 P2: intra-family
+            # transitions (Doctor -> Doctor same-role no-op, dentist ->
+            # Doctor, cardio -> Doctor) and demotions return from
+            # _apply_role_change_doctor_lifecycle before any catalog SELECT
+            # (_base.py: old_is_doctor == new_is_doctor -> early return), so
+            # otherwise valid IAM changes must not receive a configuration
+            # 400 when the catalog is unavailable — the pre-flight examines
+            # the affected users' current roles, not just the requested one.
+            # Per-user failures AFTER a healthy probe are pure-Python
+            # validation errors (DoctorSpecialtyNotSelectableError — raised
+            # without touching the DB) and stay safely catchable per user.
             if action_data.action == "activate":
                 needs_catalog = (
                     db.query(Doctor.id)
@@ -127,8 +134,18 @@ class OperationsMixin(UserManagementServiceMixinBase):
                     is not None
                 )
             elif action_data.action == "change_role":
-                needs_catalog = bool(action_data.role) and (
-                    action_data.role in DOCTOR_PROFILE_ROLES
+                needs_catalog = (
+                    bool(action_data.role)
+                    and (action_data.role in DOCTOR_PROFILE_ROLES)
+                    and (
+                        db.query(User.id)
+                        .filter(
+                            User.id.in_(action_data.user_ids),
+                            User.role.notin_(DOCTOR_PROFILE_ROLES),
+                        )
+                        .first()
+                        is not None
+                    )
                 )
             else:
                 needs_catalog = False

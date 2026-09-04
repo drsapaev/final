@@ -1060,6 +1060,11 @@ class TestActivationOnlyCatalogGuard:
     def test_bulk_change_role_unusable_catalog_fails_batch_cleanly(
         self, client, auth_headers, seeded_catalog, db_session, monkeypatch
     ):
+        """Codex round-5 P2 (narrowed): only a real PROMOTION (current role
+        outside the doctor family -> doctor-family target) reaches a catalog
+        probe, so only such a batch is pre-flighted — a Registrar promoted
+        to Doctor on an unusable catalog still fails cleanly."""
+        from app.core.security import get_password_hash
         from app.services.medical_specialty_catalog import (
             MedicalSpecialtyCatalogError,
             MedicalSpecialtyCatalogService,
@@ -1069,13 +1074,21 @@ class TestActivationOnlyCatalogGuard:
             raise MedicalSpecialtyCatalogError("catalog probe failed")
 
         monkeypatch.setattr(MedicalSpecialtyCatalogService, "list_active", _raise)
-        user, _doctor = self._make_doctor_with_inactive_profile(
-            seeded_catalog, "dermatology", index=3
+        registrar = User(
+            username=f"actguard_promo_{id(self) % 100000}",
+            email=f"actguard-promo-{id(self) % 100000}@test.com",
+            full_name="Promotion Candidate",
+            hashed_password=get_password_hash("secret123"),
+            role="Registrar",
+            is_active=True,
         )
+        seeded_catalog.add(registrar)
+        seeded_catalog.commit()
+        seeded_catalog.refresh(registrar)
         response = client.post(
             "/api/v1/users/users/bulk-action",
             json={
-                "user_ids": [user.id],
+                "user_ids": [registrar.id],
                 "action": "change_role",
                 "role": "Doctor",
             },
@@ -1087,8 +1100,95 @@ class TestActivationOnlyCatalogGuard:
         assert response.status_code == 400, response.text
         assert "не настроен" in response.json()["detail"]
         db_session.expire_all()
+        probe = db_session.query(User).filter(User.id == registrar.id).one()
+        assert probe.role == "Registrar"
+
+    def test_bulk_change_role_same_role_doctor_skips_catalog(
+        self, client, auth_headers, seeded_catalog, db_session, monkeypatch
+    ):
+        """Codex round-5 P2: a same-role Doctor -> Doctor bulk change never
+        reaches the lifecycle (role != user.role guard skips it), so an
+        unusable catalog must not block it with a configuration 400."""
+        from app.services.medical_specialty_catalog import (
+            MedicalSpecialtyCatalogError,
+            MedicalSpecialtyCatalogService,
+        )
+
+        def _raise(self_db):
+            raise MedicalSpecialtyCatalogError("catalog probe failed")
+
+        monkeypatch.setattr(MedicalSpecialtyCatalogService, "list_active", _raise)
+        user, doctor = self._make_doctor_with_inactive_profile(
+            seeded_catalog, "dermatology", index=3
+        )
+        user.is_active = True
+        doctor.active = True
+        seeded_catalog.commit()
+
+        response = client.post(
+            "/api/v1/users/users/bulk-action",
+            json={
+                "user_ids": [user.id],
+                "action": "change_role",
+                "role": "Doctor",
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["processed_count"] == 1
+        db_session.expire_all()
         probe = db_session.query(User).filter(User.id == user.id).one()
         assert probe.role == "Doctor"
+        # the linked profile is untouched by a same-role no-op
+        row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+        assert row.specialty == "dermatology"
+        assert row.active is True
+
+    def test_bulk_change_role_intra_family_skips_catalog(
+        self, client, auth_headers, seeded_catalog, db_session, monkeypatch
+    ):
+        """Codex round-5 P2: an intra-family transition (cardio -> Doctor)
+        returns from _apply_role_change_doctor_lifecycle before any catalog
+        SELECT (old_is_doctor == new_is_doctor), so an unusable catalog
+        must not block this otherwise valid IAM change."""
+        from app.services.medical_specialty_catalog import (
+            MedicalSpecialtyCatalogError,
+            MedicalSpecialtyCatalogService,
+        )
+
+        def _raise(self_db):
+            raise MedicalSpecialtyCatalogError("catalog probe failed")
+
+        monkeypatch.setattr(MedicalSpecialtyCatalogService, "list_active", _raise)
+        user, doctor = self._make_doctor_with_inactive_profile(
+            seeded_catalog, "cardiology", index=5
+        )
+        user.is_active = True
+        doctor.active = True
+        seeded_catalog.commit()
+
+        response = client.post(
+            "/api/v1/users/users/bulk-action",
+            json={
+                "user_ids": [user.id],
+                "action": "change_role",
+                "role": "Doctor",
+            },
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["processed_count"] == 1
+        db_session.expire_all()
+        promoted = db_session.query(User).filter(User.id == user.id).one()
+        assert promoted.role == "Doctor"
+        # intra-family: same clinical identity, stored specialty preserved
+        row = db_session.query(Doctor).filter(Doctor.id == doctor.id).one()
+        assert row.specialty == "cardiology"
+        assert row.active is True
 
     def test_bulk_activate_non_doctor_batch_skips_catalog(
         self, client, auth_headers, seeded_catalog, db_session, monkeypatch
