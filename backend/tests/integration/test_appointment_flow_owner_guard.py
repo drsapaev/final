@@ -394,3 +394,112 @@ def test_patient_cannot_delete_other_patient_legacy_appointment(
 
     assert response.status_code == 403
     assert db_session.get(Appointment, appointment_id) is not None
+
+
+# ---------------------------------------------------------------------------
+# P-014 B:TIGHTEN — backend preservation pin (user decision, 2026-09-04).
+#
+# The frontend /clinical/appointments route tightened to the canonical trio
+# (Admin/Registrar/Doctor), but GET /appointments/pending-payments is a
+# materially different, LEGITIMATE payment-surface policy: Cashier keeps
+# access (payment lookup before taking payment). This test pins that the
+# tighten did NOT cascade into the backend and that no unification with the
+# appointments-UI trio happened.
+# ---------------------------------------------------------------------------
+
+
+def _create_staff_user(db_session, *, label: str, role: str) -> User:
+    suffix = _suffix()
+    user = User(
+        username=f"appt_staff_{label}_{suffix}",
+        email=f"appt-staff-{label}-{suffix}@test.local",
+        full_name=f"Appointment Staff {label}",
+        hashed_password=get_password_hash("staff-pin-2fa-not-tested-here"),
+        role=role,
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+def _staff_headers(user: User) -> dict[str, str]:
+    # Admin/Cashier /login always routes through the mandatory two-stage 2FA
+    # flow (enrollment/TOTP) and returns access_token=None, so endpoint tests
+    # mint the stateless token directly (canonical pattern, see conftest
+    # mint_access_token and test_dept_schedule_guard_and_fallback_403).
+    # The /login 2FA paths themselves are covered by test_2fa_enforcement.py.
+    from tests.conftest import mint_access_token
+
+    return {"Authorization": f"Bearer {mint_access_token(user)}"}
+
+
+def test_pending_payments_keeps_admin_registrar_cashier_allow(
+    client,
+    db_session,
+) -> None:
+    """P-014 preservation: pending-payments stays a Cashier payment surface."""
+    for role in ("Admin", "Registrar", "Cashier"):
+        user = _create_staff_user(db_session, label=role.lower(), role=role)
+        response = client.get(
+            "/api/v1/appointments/pending-payments",
+            headers=_staff_headers(user),
+        )
+        assert response.status_code == 200, f"{role} must keep pending-payments access"
+
+
+def test_pending_payments_still_denies_non_payment_roles(
+    client,
+    db_session,
+) -> None:
+    """Lab (and other non-payment roles) stay denied on pending-payments."""
+    user = _create_staff_user(db_session, label="lab", role="Lab")
+    response = client.get(
+        "/api/v1/appointments/pending-payments",
+        headers=_staff_headers(user),
+    )
+    assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Codex P2 (PR #3046 review of c20f8ed): the cashier UI calls
+# GET /api/v1/cashier/pending-payments (frontend/src/hooks/usePayments.ts),
+# NOT the hidden legacy /api/v1/appointments/pending-payments route. The
+# production cashier endpoint carries its own policy — Admin/Cashier
+# (cashier/_payments.py) — so pin it directly: the retained /cashier workflow
+# must stay reachable, and its policy must NOT silently drift.
+# ---------------------------------------------------------------------------
+
+
+def test_cashier_pending_payments_production_endpoint_allows_admin_cashier(
+    client,
+    db_session,
+) -> None:
+    """The endpoint backing the cashier page keeps Admin/Cashier access."""
+    for role in ("Admin", "Cashier"):
+        user = _create_staff_user(db_session, label=role.lower(), role=role)
+        response = client.get(
+            "/api/v1/cashier/pending-payments",
+            headers=_staff_headers(user),
+        )
+        assert (
+            response.status_code == 200
+        ), f"{role} must keep /cashier/pending-payments access"
+
+
+def test_cashier_pending_payments_production_endpoint_denies_other_roles(
+    client,
+    db_session,
+) -> None:
+    """Registrar (allowed only on the legacy surface) and Lab stay denied."""
+    for role in ("Registrar", "Lab"):
+        user = _create_staff_user(db_session, label=role.lower(), role=role)
+        response = client.get(
+            "/api/v1/cashier/pending-payments",
+            headers=_staff_headers(user),
+        )
+        assert (
+            response.status_code == 403
+        ), f"{role} must stay denied on /cashier/pending-payments"
