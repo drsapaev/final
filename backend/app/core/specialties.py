@@ -41,7 +41,6 @@ DENTAL_FAMILY_SPELLINGS = frozenset(
     {"dentistry", "dental", "stomatology", "dentist"}
 )
 
-
 def canonical_specialty(value: str | None) -> str | None:
     """Normalize a specialty value for STORAGE (write boundary).
 
