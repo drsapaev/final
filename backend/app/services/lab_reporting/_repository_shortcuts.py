@@ -10,7 +10,7 @@ def baseline_templates_present(repository, codes: list[str]) -> bool:
     """
     from sqlalchemy import select as _select
 
-    from app.models.lab_reporting import LabReportTemplate
+    from app.models.lab import LabReportTemplate  # model lives in app.models.lab (Codex P1)
 
     stmt = _select(LabReportTemplate.id).where(
         LabReportTemplate.code.in_(codes)

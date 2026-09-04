@@ -544,38 +544,52 @@ def _warm_table_reflection() -> None:
                 # running it here only leaks fake sessions into
                 # worker-thread assertions. Production runtime only.
                 return
-            from app.db.session import SessionLocal
-            from app.services.visits_api_service import _REFLECTED_META
             from sqlalchemy import Table
-
-            session = SessionLocal()
-            bind = session.get_bind()
-            for name in ("visits", "visit_services", "patients", "doctors", "users"):
-                Table(name, _REFLECTED_META, autoload_with=bind)
-
-            # ORM compile touch: the FIRST query per mapper also pays a
-            # per-process compilation/catalog cost — touch the hot mappers
-            # once so user-facing requests skip it (same class of cost the
-            # reflection warmup removes).
             from sqlalchemy import select as _select
 
+            from app.db.session import SessionLocal
             from app.models.clinic import Doctor as _Doctor
             from app.models.patient import Patient as _Patient
             from app.models.user import User as _User
-
-            for _mapper_stmt in (
-                _select(_User).limit(1),
-                _select(_Patient).limit(1),
-                _select(_Doctor).limit(1),
-            ):
-                session.execute(_mapper_stmt)
-
-            # Lab self-heal seeders: first pass costs hundreds of statements
-            # against the remote DB — pay it here, once per process.
             from app.services.lab_reporting_service import LabReportingService
+            from app.services.visits_api_service import _REFLECTED_META
 
-            LabReportingService(session).list_templates()
-            session.close()
+            session = SessionLocal()
+            try:
+                bind = session.get_bind()
+                for name in ("visits", "visit_services", "patients", "doctors", "users"):
+                    Table(name, _REFLECTED_META, autoload_with=bind)
+
+                # ORM compile touch: the FIRST query per mapper also pays a
+                # per-process compilation/catalog cost — touch the hot
+                # mappers once so user-facing requests skip it.
+                for _mapper_stmt in (
+                    _select(_User).limit(1),
+                    _select(_Patient).limit(1),
+                    _select(_Doctor).limit(1),
+                ):
+                    session.execute(_mapper_stmt)
+
+                # Lab self-heal seeders: first pass costs hundreds of
+                # statements against the remote DB — pay it here, once per
+                # process. Cross-PROCESS losers (multi-worker deploys) hit
+                # IntegrityError; the seeders treat it as "already seeded".
+                try:
+                    LabReportingService(session).list_templates()
+                except Exception as lab_exc:
+                    log.info(
+                        "Warmup lab seed skipped (%s) — seeders re-arm lazily",
+                        type(lab_exc).__name__,
+                    )
+                    try:
+                        session.rollback()
+                    except Exception:
+                        pass
+            finally:
+                try:
+                    session.close()
+                except Exception:
+                    pass
             log.info(
                 "✅ Warmup complete (reflection %s tables + ORM touch + lab seed)",
                 len(_REFLECTED_META.tables),

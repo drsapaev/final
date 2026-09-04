@@ -4,6 +4,8 @@ Split from lab_reporting_service.py.
 """
 from __future__ import annotations
 
+from sqlalchemy.exc import IntegrityError
+
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
 
@@ -114,7 +116,22 @@ class PayloadMixin(LabReportingServiceMixinBase):
         with _SEED_LOCK:
             if not _seed_cache_fresh(bind, "templates"):
                 return
-            self._ensure_default_templates_locked(bind)
+            try:
+                self._ensure_default_templates_locked(bind)
+            except IntegrityError:
+                # Cross-PROCESS loser (multi-worker deploys): the winner
+                # committed the same rows — adopt them and mark ensured.
+                try:
+                    self.repository.db.rollback()
+                except Exception:
+                    pass
+                from app.services.lab_reporting._base import _mark_seed_ensured
+
+                _mark_seed_ensured(bind, "templates")
+                logger.warning(
+                    "[LAB] ensure_default_templates lost a cross-process seed "
+                    "race — adopted the winner's rows"
+                )
 
     def _ensure_default_templates_locked(self, bind) -> None:
         from app.services.lab_reporting._base import _mark_seed_ensured
@@ -245,7 +262,22 @@ class PayloadMixin(LabReportingServiceMixinBase):
         with _SEED_LOCK:
             if not _seed_cache_fresh(bind, "bindings"):
                 return
-            self._ensure_default_bindings_locked(bind)
+            try:
+                self._ensure_default_bindings_locked(bind)
+            except IntegrityError:
+                # Cross-PROCESS loser (multi-worker deploys): the winner
+                # committed the same rows — adopt them and mark ensured.
+                try:
+                    self.repository.db.rollback()
+                except Exception:
+                    pass
+                from app.services.lab_reporting._base import _mark_seed_ensured
+
+                _mark_seed_ensured(bind, "bindings")
+                logger.warning(
+                    "[LAB] ensure_default_bindings lost a cross-process seed "
+                    "race — adopted the winner's rows"
+                )
 
     def _ensure_default_bindings_locked(self, bind) -> None:
         from app.services.lab_reporting._base import _mark_seed_ensured
