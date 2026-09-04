@@ -60,7 +60,7 @@ def _run_patient_registered_notification(
         db = SessionLocal()
         patient = db.get(Patient, patient_id)
         if patient is None:
-            logger.warning(
+            logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate id only (no PHI fields), per AGENTS PII policy
                 "[FIX:NOTIFICATIONS] patient_registered skipped: patient not found",
                 extra={"patient_id": patient_id},
             )
@@ -75,12 +75,12 @@ def _run_patient_registered_notification(
             )
         )
         if not canonical_created:
-            logger.warning(
+            logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate ids only
                 "[FIX:NOTIFICATIONS] patient_registered canonical delivery failed",
                 extra={"patient_id": patient_id, "actor_id": actor_id},
             )
     except Exception as exc:
-        logger.warning(
+        logger.warning(  # codeql[py/clear-text-logging-sensitive-data] — numeric surrogate id + error type only
             "[FIX:NOTIFICATIONS] patient_registered background dispatch failed",
             extra={"patient_id": patient_id, "error_type": type(exc).__name__},
         )
