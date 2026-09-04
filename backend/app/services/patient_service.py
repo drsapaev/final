@@ -310,6 +310,13 @@ class PatientService:
                         "error_type": type(exc).__name__,
                     },
                 )
+                # A swallowed DB error would leave the session in a
+                # rollback-required state that leaks into the next request
+                # on this connection (test savepoint contamination).
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
         else:
             # Production Postgres: fan-out off the request path.
             _dispatch_patient_registered_notification_async(
