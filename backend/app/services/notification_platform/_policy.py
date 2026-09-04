@@ -373,7 +373,9 @@ class PolicyMixin(NotificationPlatformServiceMixinBase):
         if normalized_role == "admin":
             query = query.filter(func.lower(User.role) == "admin")
         elif normalized_role == "registrar":
-            query = query.filter(func.lower(User.role).in_(["receptionist", "registrar"]))
+            # E-4 (Receptionist alias removal): legacy spelling dropped
+            # from the reader filter — canonical rows only (§4.1.27).
+            query = query.filter(func.lower(User.role) == "registrar")
         elif normalized_role == "cashier":
             query = query.filter(func.lower(User.role) == "cashier")
         elif normalized_role == "lab":

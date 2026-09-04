@@ -239,7 +239,7 @@ def list_lab_orders(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab", "Doctor", "Registrar", "Receptionist", "Cashier")),
+    user=Depends(require_roles("Admin", "Lab", "Doctor", "Registrar", "Cashier")),
 ):
     service = LabReportingService(db)
     return service.list_orders(status=status, patient_id=patient_id, limit=limit, offset=offset)

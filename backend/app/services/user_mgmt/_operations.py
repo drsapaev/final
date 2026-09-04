@@ -32,7 +32,7 @@ class OperationsMixin(UserManagementServiceMixinBase):
 
             # Статистика по ролям
             users_by_role = {}
-            for role in ["Admin", "Doctor", "Nurse", "Receptionist", "Patient"]:
+            for role in ["Admin", "Doctor", "Nurse", "Registrar", "Patient"]:  # E-4: Receptionist → canonical Registrar
                 count = db.query(User).filter(User.role == role).count()
                 users_by_role[role] = count
 

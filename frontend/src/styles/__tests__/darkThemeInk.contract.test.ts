@@ -139,4 +139,42 @@ describe('tokens.css — CC-1 dark secondary-ink contrast contract', () => {
       ).toBeGreaterThanOrEqual(4.5);
     }
   });
+
+  it('dark --mac-text-secondary meets WCAG AA (≥4.5:1) on the elevated surface --mac-bg-tertiary #3a3a3c (ELEV)', () => {
+    // ELEV (elevated-debt closure): #98989d — the CC-1 muted ink — measured
+    // only 3.95:1 on the elevated surface (#3a3a3c): secondary text inside
+    // cards/popovers/tertiary fills silently dropped below the AA floor even
+    // though the content-surface gate above passed. #a6a6ad (the originally
+    // authorized muted ink) restores 4.69:1 there while keeping ≥4.5 on the
+    // window (#1c1c1e, 7.03:1) and content (#2c2c2e, 5.76:1) surfaces. This
+    // contract pins BOTH dark blocks so the elevated floor cannot regress.
+    const css = readTokens();
+    const darkThemeBlock = css.match(/\.dark-theme\s*\{[\s\S]*?\}/)?.[0] ?? '';
+    const darkMediaBlock =
+      css.match(/@media\s*\(prefers-color-scheme:\s*dark\)\s*\{[\s\S]*?\n\s*\}/)?.[0] ?? '';
+    const extract = (block: string) =>
+      block.match(/--mac-text-secondary:\s*(#[0-9a-fA-F]{6});/)?.[1]?.toLowerCase() ?? null;
+
+    const darkValues = [extract(darkThemeBlock), extract(darkMediaBlock)];
+    expect(darkValues.every(Boolean), 'both dark blocks must define --mac-text-secondary').toBe(true);
+
+    const luminance = (hex: string) => {
+      const n = hex.slice(1).match(/.{2}/g)!.map((b) => parseInt(b, 16) / 255);
+      const lin = n.map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+    };
+    const ratio = (fg: string, bg: string) => {
+      const l1 = luminance(fg);
+      const l2 = luminance(bg);
+      const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+      return (hi + 0.05) / (lo + 0.05);
+    };
+
+    for (const value of darkValues as string[]) {
+      expect(
+        ratio(value, '#3a3a3c'),
+        `dark --mac-text-secondary ${value} must stay ≥ 4.5:1 on --mac-bg-tertiary #3a3a3c (ELEV)`
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });
