@@ -166,8 +166,13 @@ async def schedule_next_visit(
                     db, visit.id, request.confirmation_channel
                 )
             )
+            # PII/security (Codex P1): the pwa channel returns a URL with
+            # the RAW confirmation token — never log the full result dict.
             logger.info(
-                f"Приглашение отправлено для визита {visit.id}: {notification_result}"
+                "Приглашение отправлено для визита %s: channel=%s success=%s",
+                visit.id,
+                notification_result.get("channel"),
+                notification_result.get("success"),
             )
         except Exception as e:
             logger.error(f"Ошибка отправки приглашения для визита {visit.id}: {e}")
