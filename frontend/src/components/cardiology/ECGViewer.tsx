@@ -80,7 +80,6 @@ interface AnalysisResult {
 // `any` is used here intentionally to keep the mixed-type access ergonomic;
 // explicit `any` is permitted under noImplicitAny (which only flags inferred
 // any). See ADR-0014 for the rationale on legacy style objects.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const styles: Record<string, any> = {
   root: {
     display: 'grid',

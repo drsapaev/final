@@ -43,9 +43,16 @@ describe('notification guardrails', () => {
     const app = read('App.tsx');
     expect(app).toContain('GlobalNotificationCenter');
 
+    // PR-UI-13-1: the registrar fetch-loop guards (in-flight ref + 429 cooldown
+    // ref) moved verbatim from RegistrarPanel.tsx into the extracted worklist
+    // data lifecycle hook (useRegistrarWorklistData.ts). The contract intent —
+    // the registrar surface keeps its duplicate-fetch/notification-loop
+    // guards — is pinned against the panel + hook tree.
     const registrar = read('pages/RegistrarPanel.tsx');
-    expect(registrar).toContain('loadAppointmentsInFlightRef');
-    expect(registrar).toContain('autoRefreshCooldownUntilRef');
+    const registrarWorklist = read('pages/registrar/useRegistrarWorklistData.ts');
+    expect(registrar).toContain('useRegistrarWorklistData({');
+    expect(registrarWorklist).toContain('loadAppointmentsInFlightRef');
+    expect(registrarWorklist).toContain('autoRefreshCooldownUntilRef');
   });
 
   it('keeps notification center loaders stable to avoid fetch loops', () => {
@@ -65,7 +72,9 @@ describe('notification guardrails', () => {
   });
 
   it('keeps registrar table action visibility on backend-provided actions', () => {
-    const table = read('components/tables/EnhancedAppointmentsTable.tsx');
+    // PR-UI-09e-2: the EAT actions column moved verbatim to
+    // appointmentsTableColumns.tsx — read-list follows the moved code.
+    const table = read('components/tables/appointmentsTableColumns.tsx');
 
     expect(table).toContain('getBackendActionAvailability');
     expect(table).toContain('can_mark_paid');

@@ -1,9 +1,7 @@
-
 import { useState } from 'react';
 import { api } from '../api/client';
-import { Shield, Smartphone, Key, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
-import { Input,
-  Checkbox } from './ui/macos';
+import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { Input, Checkbox } from './ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 import { getErrorMessage } from '../utils/type-guards';
 
@@ -14,13 +12,19 @@ interface TwoFactorVerifyProps {
   pendingToken?: string;
 }
 
-const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }: TwoFactorVerifyProps) => {
+/**
+ * Форма подтверждения 2FA (challenge при входе).
+ *
+ * Живёт внутри стеклянной Card из LoginFormStyled (общий заголовок и
+ * «Отмена» — там); здесь только поля ввода и кнопка подтверждения.
+ * Слой UI: токены --mac-* (frontend/DESIGN_SYSTEM.md UI Layer Contract).
+ */
+const TwoFactorVerify = ({ onSuccess, method = 'totp', pendingToken }: TwoFactorVerifyProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Verification data
   const [totpCode, setTotpCode] = useState('');
   const [backupCode, setBackupCode] = useState('');
   const [recoveryToken, setRecoveryToken] = useState('');
@@ -35,7 +39,6 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }:
         remember_device: rememberDevice
       };
 
-      // Добавляем pending_2fa_token если он есть
       if (pendingToken) {
         requestData.pending_2fa_token = pendingToken;
       }
@@ -60,7 +63,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }:
           onSuccess(response);
         }
       } else {
-        setError(response.data?.message || response.data?.message || t('misc.tfv_nevernyy_kod'));
+        setError(response.data?.message || t('misc.tfv_nevernyy_kod'));
       }
     } catch (err) {
       setError(getErrorMessage(err) || t('misc.tfv_oshibka_verifikatsii'));
@@ -75,258 +78,180 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }:
     }
   };
 
-  const renderTOTPForm = () =>
-  <div>
-      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <Smartphone size={48} style={{ color: 'var(--accent-color)', marginBottom: 'var(--mac-spacing-4)' }} />
-        <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
-          Введите код из приложения
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-          Откройте приложение аутентификатора и введите 6-значный код
-        </p>
-      </div>
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    textAlign: 'center',
+    marginBottom: 'var(--mac-spacing-2)',
+    fontWeight: 'var(--mac-font-weight-medium)' as React.CSSProperties['fontWeight'],
+    color: 'var(--mac-text-primary)',
+    fontSize: 'var(--mac-font-size-sm)',
+  };
 
-      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
-        <label style={{
-        display: 'block',
-        marginBottom: 'var(--mac-spacing-2)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--text-primary)'
-      }}>
-          Код аутентификатора:
-        </label>
-        <Input
-        type="text"
-        aria-label="Authenticator code"
-        value={totpCode}
-        onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-        onKeyPress={handleKeyPress}
-        placeholder="123456"
-        maxLength={6}
-        style={{
-          width: '100%',
-          padding: 'var(--mac-spacing-4)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--mac-radius-md)',
-          background: 'var(--bg-primary)',
-          color: 'var(--text-primary)',
-          fontSize: 'var(--mac-font-size-3xl)',
-          textAlign: 'center',
-          letterSpacing: '4px',
-          fontFamily: 'monospace',
-          fontWeight: 'var(--mac-font-weight-medium)'
-        }} />
+  const codeInputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-md)',
+    background: 'var(--mac-bg-content)',
+    color: 'var(--mac-text-primary)',
+    fontSize: 'var(--mac-font-size-xl)',
+    textAlign: 'center',
+    letterSpacing: '0.4em',
+    fontFamily: 'var(--mac-font-family-mono, monospace)',
+    fontWeight: 'var(--mac-font-weight-medium)' as React.CSSProperties['fontWeight'],
+  };
 
-      </div>
-    </div>;
-
-
-  const renderBackupCodeForm = () =>
-  <div>
-      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <Key size={48} style={{ color: 'var(--accent-color)', marginBottom: 'var(--mac-spacing-4)' }} />
-        <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
-          Введите backup код
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-          Используйте один из ваших backup кодов для входа
-        </p>
-      </div>
-
-      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
-        <label style={{
-        display: 'block',
-        marginBottom: 'var(--mac-spacing-2)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--text-primary)'
-      }}>
-          Backup код:
-        </label>
-        <Input
-        type="text"
-        aria-label="Backup code"
-        value={backupCode}
-        onChange={(e) => setBackupCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
-        onKeyPress={handleKeyPress}
-        placeholder="ABCD1234"
-        maxLength={8}
-        style={{
-          width: '100%',
-          padding: 'var(--mac-spacing-4)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--mac-radius-md)',
-          background: 'var(--bg-primary)',
-          color: 'var(--text-primary)',
-          fontSize: 'var(--mac-font-size-xl)',
-          textAlign: 'center',
-          letterSpacing: '2px',
-          fontFamily: 'monospace',
-          fontWeight: 'var(--mac-font-weight-medium)'
-        }} />
-
-      </div>
-    </div>;
-
-
-  const renderRecoveryForm = () =>
-  <div>
-      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <Shield size={48} style={{ color: 'var(--accent-color)', marginBottom: 'var(--mac-spacing-4)' }} />
-        <h2 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
-          Восстановление доступа
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-          Введите токен восстановления, отправленный на ваш email или телефон
-        </p>
-      </div>
-
-      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
-        <label style={{
-        display: 'block',
-        marginBottom: 'var(--mac-spacing-2)',
-        fontWeight: 'var(--mac-font-weight-medium)',
-        color: 'var(--text-primary)'
-      }}>
-          Токен восстановления:
-        </label>
-        <Input
-        type="text"
-        aria-label="Recovery token"
-        value={recoveryToken}
-        onChange={(e) => setRecoveryToken(e.target.value)}
-        onKeyPress={handleKeyPress}
-        placeholder={t('misc.tfv_vvedite_token_vosstanovleniy')}
-        style={{
-          width: '100%',
-          padding: 'var(--mac-spacing-4)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--mac-radius-md)',
-          background: 'var(--bg-primary)',
-          color: 'var(--text-primary)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontFamily: 'monospace'
-        }} />
-
-      </div>
-    </div>;
-
+  const hintStyle: React.CSSProperties = {
+    textAlign: 'center',
+    color: 'var(--mac-text-secondary)',
+    fontSize: 'var(--mac-font-size-sm)',
+    margin: '0 0 var(--mac-spacing-4) 0',
+  };
 
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto' }}>
-      {method === 'totp' && renderTOTPForm()}
-      {method === 'backup' && renderBackupCodeForm()}
-      {method === 'recovery' && renderRecoveryForm()}
+      {method === 'totp' && (
+        <div>
+          <p style={hintStyle}>Откройте приложение аутентификатора и введите 6-значный код</p>
+          <label style={labelStyle}>Код аутентификатора</label>
+          <Input
+            key="totp"
+            autoFocus
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            aria-label="Authenticator code"
+            value={totpCode}
+            onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            onKeyPress={handleKeyPress}
+            placeholder="000000"
+            maxLength={6}
+            style={codeInputStyle}
+          />
+        </div>
+      )}
+
+      {method === 'backup' && (
+        <div>
+          <p style={hintStyle}>Используйте один из резервных кодов, сохранённых при настройке 2FA</p>
+          <label style={labelStyle}>Резервный код</label>
+          <Input
+            key="backup"
+            autoFocus
+            type="text"
+            aria-label="Backup code"
+            value={backupCode}
+            onChange={(e) => setBackupCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+            onKeyPress={handleKeyPress}
+            placeholder="ABCD1234"
+            maxLength={8}
+            style={codeInputStyle}
+          />
+        </div>
+      )}
+
+      {method === 'recovery' && (
+        <div>
+          <p style={hintStyle}>Введите токен восстановления, отправленный на ваш email или телефон</p>
+          <label style={labelStyle}>Токен восстановления</label>
+          <Input
+            key="recovery"
+            autoFocus
+            type="text"
+            aria-label="Recovery token"
+            value={recoveryToken}
+            onChange={(e) => setRecoveryToken(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder={t('misc.tfv_vvedite_token_vosstanovleniy')}
+            style={{
+              ...codeInputStyle,
+              letterSpacing: 'normal',
+              fontSize: 'var(--mac-font-size-base)',
+            }}
+          />
+        </div>
+      )}
 
       {method !== 'recovery' &&
-      <div style={{ marginBottom: 'var(--mac-spacing-6)' }}>
+        <div style={{ margin: 'var(--mac-spacing-4) 0' }}>
           <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--mac-spacing-2)',
-          cursor: 'pointer',
-          color: 'var(--text-primary)'
-        }}>
-            <Checkbox aria-label="Remember this device for 30 days" checked={rememberDevice} onChange={(e) => setRememberDevice(e)}
-            style={{ margin: 0 }} />
-
-            <span style={{ fontSize: 'var(--mac-font-size-base)' }}>
-              Запомнить это устройство на 30 дней
-            </span>
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-2)',
+            cursor: 'pointer',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-sm)',
+          }}>
+            <Checkbox aria-label="Remember this device for 30 days" checked={rememberDevice} onChange={(e) => setRememberDevice(e)} style={{ margin: 0 }} />
+            <span>Запомнить это устройство на 30 дней</span>
           </label>
         </div>
       }
 
       {error &&
-      <div style={{
-        background: 'var(--mac-error-bg)',
-        border: '1px solid var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))',
-        borderRadius: 'var(--mac-radius-md)',
-        padding: 'var(--mac-spacing-3)',
-        marginBottom: 'var(--mac-spacing-4)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--mac-spacing-2)',
-        color: 'var(--mac-error)',
-        fontSize: 'var(--mac-font-size-base)'
-      }}>
-          <AlertCircle size={16} />
-          <span>{error}</span>
+        <div style={{
+          background: 'var(--mac-accent-red-bg)',
+          borderRadius: 'var(--mac-radius-md)',
+          padding: 'var(--mac-spacing-3)',
+          marginBottom: 'var(--mac-spacing-3)',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 'var(--mac-spacing-2)',
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-sm)',
+        }}>
+          <AlertCircle size={16} style={{ color: 'var(--mac-accent-red)', flexShrink: 0, marginTop: 2 }} />
+          <span role="alert" aria-live="polite">{error}</span>
         </div>
       }
 
       {success &&
-      <div style={{
-        background: 'var(--mac-success-bg)',
-        border: '1px solid #6EE7B7',
-        borderRadius: 'var(--mac-radius-md)',
-        padding: 'var(--mac-spacing-3)',
-        marginBottom: 'var(--mac-spacing-4)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--mac-spacing-2)',
-        color: 'var(--mac-success)',
-        fontSize: 'var(--mac-font-size-base)'
-      }}>
-          <CheckCircle size={16} />
+        <div style={{
+          background: 'var(--mac-accent-green-bg)',
+          borderRadius: 'var(--mac-radius-md)',
+          padding: 'var(--mac-spacing-3)',
+          marginBottom: 'var(--mac-spacing-3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--mac-spacing-2)',
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-sm)',
+        }}>
+          <CheckCircle size={16} style={{ color: 'var(--mac-accent-green)' }} />
           <span>{success}</span>
         </div>
       }
 
-      <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
-        <button
-          onClick={handleVerify}
-          disabled={loading ||
+      <button
+        type="button"
+        onClick={handleVerify}
+        disabled={loading ||
           method === 'totp' && totpCode.length !== 6 ||
           method === 'backup' && backupCode.length !== 8 ||
           method === 'recovery' && !recoveryToken
-          }
-          style={{
-            flex: 1,
-            padding: 'var(--mac-spacing-4) var(--mac-spacing-6)',
-            background: 'var(--accent-color)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 'var(--mac-radius-md)',
-            cursor: loading ||
-            method === 'totp' && totpCode.length !== 6 ||
-            method === 'backup' && backupCode.length !== 8 ||
-            method === 'recovery' && !recoveryToken ?
-            'not-allowed' : 'pointer',
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-medium)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 'var(--mac-spacing-2)'
-          }}>
-
-          {loading ? <RefreshCw size={20} className="animate-spin" /> : <CheckCircle size={20} />}
-          {loading ? t('misc.tfv_proverka') : t('misc.tfv_podtverdit')}
-        </button>
-        
-        {onCancel &&
-        <button
-          onClick={onCancel}
-          style={{
-            padding: 'var(--mac-spacing-4) var(--mac-spacing-6)',
-            background: 'var(--bg-secondary)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--mac-radius-md)',
-            cursor: 'pointer',
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-medium)'
-          }}>
-
-            Отмена
-          </button>
         }
-      </div>
-    </div>);
-
+        style={{
+          width: '100%',
+          padding: 'var(--mac-spacing-3) var(--mac-spacing-5)',
+          background: 'var(--mac-accent-blue)',
+          color: 'var(--mac-text-inverse)',
+          border: 'none',
+          borderRadius: 'var(--mac-radius-md)',
+          cursor: 'pointer',
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: 'var(--mac-font-weight-medium)' as React.CSSProperties['fontWeight'],
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 'var(--mac-spacing-2)',
+          font: 'inherit',
+          opacity: loading ? 0.7 : 1,
+        }}>
+        {loading ? <RefreshCw size={18} className="animate-spin" /> : <CheckCircle size={18} />}
+        {loading ? t('misc.tfv_proverka') : t('misc.tfv_podtverdit')}
+      </button>
+    </div>
+  );
 };
-
-
 
 export default TwoFactorVerify;

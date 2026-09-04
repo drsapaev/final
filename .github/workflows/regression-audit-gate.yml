@@ -17,8 +17,9 @@ on:
       - 'frontend/eslint.config.js'
       - 'frontend/package.json'
       - 'frontend/tsconfig.json'
+      - 'frontend/scripts/ui-baseline.mjs'
+      - 'frontend/scripts/ui-baseline.json'
       - 'scripts/regression-audit-check.mjs'
-      - 'scripts/strict-baseline.json'
   push:
     branches: [main]
     paths:
@@ -27,8 +28,9 @@ on:
       - 'frontend/eslint.config.js'
       - 'frontend/package.json'
       - 'frontend/tsconfig.json'
+      - 'frontend/scripts/ui-baseline.mjs'
+      - 'frontend/scripts/ui-baseline.json'
       - 'scripts/regression-audit-check.mjs'
-      - 'scripts/strict-baseline.json'
 
 permissions:
   contents: read
@@ -49,3 +51,6 @@ jobs:
 
       - name: Run regression audit checks
         run: node scripts/regression-audit-check.mjs
+
+      - name: UI baseline ratchet (UI_AUDIT_PLAN.md Phase 0)
+        run: node frontend/scripts/ui-baseline.mjs --check

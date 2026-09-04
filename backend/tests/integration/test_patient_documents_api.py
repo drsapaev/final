@@ -9,16 +9,9 @@ def test_create_patient_accepts_document_type_and_number_pair(
     admin_user,
     admin_password,
 ):
-    login_response = client.post(
-        "/api/v1/authentication/login",
-        json={
-            "username": admin_user.username,
-            "password": admin_password,
-        },
-    )
-    assert login_response.status_code == 200, login_response.text
+    from tests.conftest import mint_access_token
 
-    token = login_response.json()["access_token"]
+    token = mint_access_token(admin_user)
     headers = {"Authorization": f"Bearer {token}"}
 
     response = client.post(
@@ -29,7 +22,7 @@ def test_create_patient_accepts_document_type_and_number_pair(
             "middle_name": "Тест",
             "birth_date": str(date(1991, 4, 15)),
             "sex": "M",
-            "phone": "+998901234599",
+            "phone": "+998900000124",
             "doc_type": "passport",
             "doc_number": "AA7654321",
             "address": "QA patient document test",

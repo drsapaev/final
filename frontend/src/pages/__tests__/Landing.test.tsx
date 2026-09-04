@@ -7,7 +7,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import Landing from '../Landing';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { TranslationProvider } from '../../i18n/useTranslation';
-import { MacOSThemeProvider } from '../../theme/macosTheme';
 
 function renderLanding() {
   let root = document.getElementById('root');
@@ -19,13 +18,11 @@ function renderLanding() {
 
   return render(
     <MemoryRouter>
-      <MacOSThemeProvider>
-        <ThemeProvider>
+              <ThemeProvider>
           <TranslationProvider>
             <Landing />
           </TranslationProvider>
         </ThemeProvider>
-      </MacOSThemeProvider>
     </MemoryRouter>,
     { container: root }
   );
@@ -61,6 +58,34 @@ describe('Landing', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByText(/\+998 \(95\) 104-34-34/i)).toBeInTheDocument();
+  });
+
+  // PR-UI-16-4 (plan §PR-UI-16 AC: workflow diagram shows 7 steps): the flow
+  // overview and the detail steps share one data source (workflow.stages),
+  // so this pins both the 7-node diagram AND the 7 numbered detail steps,
+  // plus their 1:1 node correspondence in rendering order.
+  it('renders the 7-stage workflow with matching nodes and detail steps', () => {
+    const { container } = renderLanding();
+
+    const chips = Array.from(container.querySelectorAll('.landing-flow-chip'));
+    const steps = Array.from(container.querySelectorAll('.landing-workflow-step'));
+
+    expect(chips).toHaveLength(7);
+    expect(steps).toHaveLength(7);
+
+    const chipNodes = chips.map((chip) => chip.textContent?.trim());
+    const stepNodes = steps.map((step) => step.querySelector('.landing-workflow-node')?.textContent?.trim());
+    expect(stepNodes).toEqual(chipNodes);
+
+    // Numbered markers 01..07 in order.
+    const markers = steps.map((step) => step.querySelector('.landing-workflow-marker')?.textContent?.trim());
+    expect(markers).toEqual(['01', '02', '03', '04', '05', '06', '07']);
+
+    // Every stage carries a substantive title (workflow node + detail step).
+    steps.forEach((step) => {
+      expect(step.querySelector('h3')).not.toBeNull();
+      expect(step.querySelector('p')).not.toBeNull();
+    });
   });
 
   // UX Audit Stage 2: language cycle replaced with dropdown.

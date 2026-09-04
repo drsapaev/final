@@ -33,11 +33,9 @@ import type { Patient } from '../../../../types/domain/clinic';
 
 // 1. Zod schema output must be assignable to OpenAPI DTO type.
 //    If OpenAPI adds a required field that zod doesn't have, this fails.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _patientSchemaToDto: PatientDto = null as unknown as z.infer<typeof PatientDtoSchema>;
 
 // 2. Mapper output must be assignable to domain type.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _patientMapperToDomain: Patient = null as unknown as ReturnType<typeof mapPatientDto>;
 
 // Need z.infer — import locally
@@ -122,9 +120,7 @@ import type { AppointmentDto } from '../../../../types/api';
 import type { Appointment } from '../../../../types/domain/clinic';
 
 // Type-level contracts
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _appointmentSchemaToDto: AppointmentDto = null as unknown as z.infer<typeof AppointmentDtoSchema>;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _appointmentMapperToDomain: Appointment = null as unknown as ReturnType<typeof mapAppointmentDto>;
 
 describe('Appointment contract: OpenAPI → zod → mapper → domain', () => {
@@ -187,9 +183,7 @@ import { mapInvoiceDto, mapPaymentDto } from '../../billing';
 import type { Invoice, Payment } from '../../../../types/domain/billing';
 
 // Type-level contracts
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _invoiceMapperToDomain: Invoice = null as unknown as ReturnType<typeof mapInvoiceDto>;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _paymentMapperToDomain: Payment = null as unknown as ReturnType<typeof mapPaymentDto>;
 
 describe('Billing contract: zod → mapper → domain', () => {

@@ -7,10 +7,21 @@
  * UICard, UIBadge, etc.) are preserved so legacy imports keep working.
  */
 
-// Re-export everything from the macos kit (Button, Card, Badge, Input,
-// Select, Label, Textarea, Skeleton, Avatar, Checkbox, Radio, Table,
-// Modal, Dialog, Tooltip, Progress, etc.).
-export * from './macos';
+// Re-export the macos kit (Button, Card, Badge, Input, Select, Label,
+// Textarea, Skeleton, Avatar, Checkbox, Radio, Modal, Dialog, Tooltip,
+// Progress, etc.). Track 3-3: the list is EXPLICIT (was `export *`) so a
+// reintroduced macos/Icon export cannot silently propagate through this
+// barrel — the ESLint no-restricted-imports register (importNames: Icon)
+// also blocks the named import at every specifier.
+export {
+  Input, Select, Avatar, Textarea, Checkbox, Radio, Button, Badge, MacOSTab, MacOSBreadcrumb, MacOSPagination, StatCard, MacOSStatCard, List, AppLoading, AppEmpty, AppError, Skeleton, Alert, Modal, Box, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Dialog, DialogTitle, DialogContent, DialogActions, Grid, Label, Option, Paper, Progress, CircularProgress, SegmentedControl, Sidebar, Switch, Tooltip, Typography, DataCard
+} from './macos';
+export type { SelectChangeEvent, DataCardProps, DataCardVariant, DataCardDensity } from './macos';
+
+// PR-UI-09d: canonical table. The macos/Table alias was removed after the
+// 09b–09c consumer migration, so the table component is re-exported here to
+// keep a barrel path (`import { DataTable } from '../ui'`).
+export { default as DataTable } from './DataTable';
 
 // AnimatedTransition was previously in ./native — now lives in ./macos.
 export { default as AnimatedTransition } from './macos/AnimatedTransition';

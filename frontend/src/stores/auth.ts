@@ -249,12 +249,32 @@ export async function getProfile(force = false): Promise<UserProfile | null> {
     } catch (err) {
       const e = err as HttpApiError;
       const status = e?.response?.status;
-      if (status === 401 || status === 403) {
+
+      // #05 Tier 1: Distinguish CSRF 403 from authorization 403.
+      // A CSRF rejection (X-CSRF-Status: rejected header) is recoverable —
+      // the axios response interceptor handles it by refreshing the CSRF
+      // token and retrying. We must NOT clear auth state (logout) for CSRF 403.
+      // Only clear auth on 401 or a genuine authorization 403 (no CSRF header).
+      const isCSRFRejection =
+        status === 403 &&
+        (e?.response?.headers?.['x-csrf-status'] === 'rejected' ||
+         e?.response?.headers?.['X-CSRF-Status'] === 'rejected');
+
+      if (status === 401 || (status === 403 && !isCSRFRejection)) {
         logger.warn('[FIX:AUTH] Backend rejected current session, clearing auth state', {
           status,
+          isCSRF: isCSRFRejection,
         });
         clearToken();
         return null;
+      }
+      if (status === 403 && isCSRFRejection) {
+        // CSRF rejection — don't logout. The interceptor should have retried.
+        // If we get here, the retry also failed, but we still don't clear auth.
+        logger.warn('[FIX:AUTH] CSRF rejection during profile fetch — keeping auth state', {
+          status,
+        });
+        return stored;
       }
       if (status === 429) {
         logger.warn('[FIX:AUTH] Auth profile check hit rate limit, keeping cached auth state', {

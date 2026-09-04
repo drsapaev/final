@@ -33,7 +33,7 @@ def test_create_patient_emits_patient_registered_to_admin_and_registrar(
             "last_name": "Нотиф",
             "first_name": "Пациент",
             "birth_date": "1993-05-11",
-            "phone": "+998901345678",
+            "phone": "+998900000129",
             "address": "Tashkent",
         },
     )
@@ -64,7 +64,7 @@ def test_update_patient_does_not_emit_patient_registered_event(
     patient = Patient(
         first_name="Старый",
         last_name="Пациент",
-        phone="+998907777700",
+        phone="+998900000142",
         birth_date=date(1990, 2, 2),
         address="Old address",
     )
@@ -78,7 +78,7 @@ def test_update_patient_does_not_emit_patient_registered_event(
         json={
             "first_name": "Обновленный",
             "last_name": patient.last_name,
-            "phone": "+998907777701",
+            "phone": "+998900000143",
             "address": "New address",
         },
     )

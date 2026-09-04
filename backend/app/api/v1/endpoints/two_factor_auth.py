@@ -10,11 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.rate_limiter import limiter
 from app.crud.two_factor_auth import (
     two_factor_auth,
     two_factor_backup_code,
     two_factor_device,
-    two_factor_recovery,
 )
 from app.db.session import get_db
 from app.models.user import User
@@ -73,15 +73,65 @@ async def get_two_factor_status(
         raise_two_factor_internal_error("getting 2FA status", e)
 
 
+async def _resolve_user_bearer_or_enrollment(
+    request: Request,
+    enrollment_token: str | None,
+    db: Session,
+):
+    """Resolve the acting user from a Bearer JWT or an enrollment token.
+
+    Two-stage authentication: a critical-role user whose password verified
+    at login holds a single-use server-side '2fa_enrollment' session token
+    (NOT a JWT). It is valid ONLY here — business endpoints require JWTs,
+    so the enrollment token can never reach them by construction.
+    Returns (user, enrollment_token_or_None); (None, None) if unauthorized.
+    """
+    # 1) Bearer JWT — уже вошедший пользователь управляет своей 2FA
+    try:
+        from fastapi.security import HTTPBearer
+
+        security = HTTPBearer(auto_error=False)
+        token_result = await security(request)
+        if token_result and token_result.credentials:
+            try:
+                return await get_current_user(token_result.credentials, db), None
+            except HTTPException:
+                pass
+    except Exception:
+        pass
+
+    # 2) enrollment-токен из двухстадийного логина
+    if enrollment_token:
+        user = TwoFactorAuthApiService(db).get_user_from_enrollment_token(
+            enrollment_token
+        )
+        if user:
+            return user, enrollment_token
+    return None, None
+
+
 @router.post("/setup", response_model=TwoFactorSetupResponse)
 async def setup_two_factor_auth(
     request_data: TwoFactorSetupRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
-    """Настроить 2FA для текущего пользователя"""
+    """Настроить 2FA для текущего пользователя.
+
+    Авторизация: Bearer JWT (уже вошедший) ИЛИ одноразовый
+    enrollment_token из login-ответа (двухстадийная аутентификация
+    для критичных ролей без 2FA).
+    """
     try:
+        current_user, _ = await _resolve_user_bearer_or_enrollment(
+            request, request_data.enrollment_token, db
+        )
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required. Provide a Bearer token or a valid enrollment_token",
+            )
+
         service = get_two_factor_service()
 
         # Проверяем, не настроена ли уже 2FA
@@ -110,14 +160,27 @@ async def setup_two_factor_auth(
 @router.post("/verify-setup", response_model=TwoFactorVerifyResponse)
 async def verify_totp_setup(
     request_data: TwoFactorVerifySetupRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Верифицировать настройку TOTP.
 
     SECURITY (AUTH-REAUDIT-28): totp_code перенесён из query-param в body.
+
+    Двухстадийная аутентификация: при авторизации через enrollment_token
+    успешная верификация завершает enrollment — токен отзывается
+    (одноразовость) и выдаются нормальные access/refresh токены.
     """
     try:
+        current_user, enrollment_token = await _resolve_user_bearer_or_enrollment(
+            request, request_data.enrollment_token, db
+        )
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required. Provide a Bearer token or a valid enrollment_token",
+            )
+
         service = get_two_factor_service()
         totp_code = request_data.totp_code
 
@@ -130,8 +193,23 @@ async def verify_totp_setup(
         success = service.verify_totp_setup(db, current_user.id, totp_code)
 
         if success:
+            tokens_payload = None
+            if enrollment_token:
+                auth = get_authentication_service()
+                tokens_payload = TwoFactorAuthApiService(
+                    db
+                ).exchange_enrollment_token_for_tokens(
+                    user=current_user,
+                    enrollment_token=enrollment_token,
+                    auth_service=auth,
+                )
             return TwoFactorVerifyResponse(
-                success=True, message="TOTP setup verified successfully"
+                success=True,
+                message="TOTP setup verified successfully",
+                access_token=(tokens_payload or {}).get("access_token"),
+                refresh_token=(tokens_payload or {}).get("refresh_token"),
+                token_type=(tokens_payload or {}).get("token_type"),
+                expires_in=(tokens_payload or {}).get("expires_in"),
             )
         else:
             return TwoFactorVerifyResponse(success=False, message="Invalid TOTP code")
@@ -166,28 +244,35 @@ async def verify_two_factor(
                 detail="At least one verification method must be provided",
             )
 
-        # ✅ CERTIFICATION: Получаем пользователя из access_token или pending_2fa_token
+        # ✅ CERTIFICATION: Получаем пользователя из pending_2fa_token или access_token.
+        # SECURITY (#2986): when pending_2fa_token is present it is the authoritative
+        # credential of the BLOCKING LOGIN challenge and must win. Resolving the
+        # access_token header first let any unrelated valid token stored in the
+        # browser (e.g. another staff user's session) hijack the challenge —
+        # verify ran against THAT user and returned "2FA not enabled" for a
+        # fully correct admin code. Access_token remains the path for the
+        # already-authenticated settings flow (no pending token in that case).
         user: User | None = None
 
-        # Пробуем получить из access_token (если передан в заголовке)
-        try:
-            from fastapi.security import HTTPBearer
-
-            security = HTTPBearer(auto_error=False)
-            token_result = await security(request)
-            if token_result and token_result.credentials:
-                try:
-                    user = await get_current_user(token_result.credentials, db)
-                except HTTPException:
-                    pass  # Не JWT токен, пробуем pending_2fa_token
-        except Exception:
-            pass
-
-        # Если access_token не сработал, пробуем pending_2fa_token
-        if not user and request_data.pending_2fa_token:
+        if request_data.pending_2fa_token:
             user = TwoFactorAuthApiService(db).get_user_from_pending_token(
                 request_data.pending_2fa_token
             )
+
+        # Fallback for the authenticated settings flow: access_token header.
+        if not user:
+            try:
+                from fastapi.security import HTTPBearer
+
+                security = HTTPBearer(auto_error=False)
+                token_result = await security(request)
+                if token_result and token_result.credentials:
+                    try:
+                        user = await get_current_user(token_result.credentials, db)
+                    except HTTPException:
+                        pass  # Не JWT токен
+            except Exception:
+                pass
 
         if not user:
             raise HTTPException(
@@ -296,13 +381,22 @@ async def disable_two_factor_auth(
 
 
 @router.post("/recovery/request", response_model=TwoFactorRecoveryResponse)
+# IP-бакет — грубая защита от абьюза SMTP-провайдера; точный лимит
+# по аккаунту (3/час) считает сервис — NAT-клинику не блокируем.
+@limiter.limit("10/hour")
 async def request_two_factor_recovery(
-    request_data: TwoFactorRecoveryRequest,
     request: Request,
+    request_data: TwoFactorRecoveryRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Запросить восстановление 2FA"""
+    """Запросить восстановление 2FA.
+
+    Токен ДОСТАВЛЯЕТСЯ по настроенному каналу (email через SMTP-провайдера).
+    Доставка выполняется до записи в БД: при сбое провайдера не остаётся
+    «повисшего» невыданного токена (HTTP 502, можно безопасно повторить).
+    Прежние неотработанные токены сжигаются — действующий всегда один.
+    """
     try:
         service = get_two_factor_service()
         ip_address, user_agent = get_client_info(request)
@@ -315,11 +409,6 @@ async def request_two_factor_recovery(
                 detail="2FA is not enabled for this user",
             )
 
-        # Создаем токен восстановления
-        recovery_token = service.generate_recovery_token()
-        expires_at = datetime.now(UTC) + timedelta(hours=1)
-
-        # Сохраняем попытку восстановления
         two_factor_auth_obj = two_factor_auth.get_by_user_id(db, current_user.id)
         if not two_factor_auth_obj:
             raise HTTPException(
@@ -327,28 +416,39 @@ async def request_two_factor_recovery(
                 detail="2FA configuration not found",
             )
 
-        two_factor_recovery.create(
-            db,
-            obj_in={
-                "two_factor_auth_id": two_factor_auth_obj.id,
-                "recovery_type": request_data.recovery_type,
-                "recovery_value": request_data.recovery_value,
-                "recovery_token": recovery_token,
-                "ip_address": ip_address,
-                "user_agent": user_agent,
-            },
+        result = await service.create_and_dispatch_recovery(
+            db=db,
+            two_factor_auth=two_factor_auth_obj,
+            recovery_type=request_data.recovery_type,
+            ip_address=ip_address,
+            user_agent=user_agent,
         )
+        if not result.get("success"):
+            error_code = result.get("error_code", "RECOVERY_FAILED")
+            status_code = {
+                "EMAIL_SEND_FAILED": 502,
+                "CHANNEL_NOT_CONFIGURED": 400,
+                "UNSUPPORTED_CHANNEL": 400,
+                "PHONE_CHANNEL_UNAVAILABLE": 503,
+                "RATE_LIMITED": 429,
+            }.get(error_code, 500)
+            raise HTTPException(
+                status_code=status_code,
+                detail=result.get("error", "Recovery dispatch failed"),
+            )
 
         # SECURITY (AUTH-REAUDIT-28): НЕ возвращаем recovery_token в ответе.
         # Раньше токен возвращался напрямую, что позволяло атакующему с
         # украденным паролем (но заблокированным 2FA) получить recovery-токен
         # и обойти канал восстановления (email/phone).
-        # Токен должен отправляться через recovery-канал; API возвращает только
+        # Токен отправляется через recovery-канал; API возвращает только
         # подтверждение и expiry.
         return TwoFactorRecoveryResponse(
             recovery_token=None,  # не возвращаем
-            expires_at=expires_at,
-            message="Recovery token generated. It was sent to your configured recovery channel.",
+            expires_at=result["expires_at"],
+            message=result.get(
+                "message", "Код восстановления отправлен на настроенный канал."
+            ),
         )
 
     except HTTPException:

@@ -9,6 +9,7 @@ from typing import Any
 from app.models.enums import PaymentStatus
 from app.repositories.payment_create_repository import PaymentCreateRepository
 from app.services.billing_service import BillingService
+from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.canonical_visit_service import (
     CanonicalVisitResolutionError,
     CanonicalVisitService,
@@ -44,13 +45,24 @@ class PaymentCreateService:
                 status_code=400, detail="Не указан visit_id или appointment_id"
             )
 
-        payment = self.billing_service.create_payment(
+        # Issue #06 Phase 4b B1+: This caller creates PAID payments (not
+        # pending), so it uses create_payment_for_visit() (cashier path),
+        # NOT create_pending_payment() (online path).
+        #
+        # The original BillingService.create_payment() bypassed:
+        #   - with_for_update() row lock
+        #   - paid_amount vs total_cost check
+        #   - overpayment policy
+        #   - IntegrityError defense-in-depth
+        from decimal import Decimal
+
+        payment = PaymentInvariantService(self.billing_service.db).create_payment_for_visit(
             visit_id=resolved_visit_id,
-            amount=float(amount),
-            currency=currency,
+            amount=Decimal(str(amount)),
             method=method,
-            status=PaymentStatus.PAID.value,
             note=note,
+            current_user=type("User", (), {"id": None})(),  # no user context in this service
+            commit=True,  # standalone — caller owns no larger transaction
         )
 
         self._sync_visit_paid_state(visit_id=resolved_visit_id)
@@ -91,25 +103,39 @@ class PaymentCreateService:
             return None
 
     def _sync_visit_paid_state(self, *, visit_id: int) -> None:
-        visit = self.repository.get_visit(visit_id)
-        if not visit:
-            return
+        """Sync visit's payment-derived state after a payment is created.
 
-        total_cost = Decimal("0")
-        for vs in self.repository.get_visit_services(visit_id):
-            price = Decimal(str(vs.price)) if vs.price else Decimal("0")
-            qty = Decimal(vs.qty if vs.qty else 1)
-            total_cost += price * qty
+        Issue #06 Phase 0 (Launch Blockers Audit): the previous version
+        set ``visit.status = "paid"`` and ``visit.discount_mode = "paid"``
+        when ``total_paid >= total_cost``. This conflated payment state
+        with visit lifecycle state — two competing state machines
+        (``Visit.status`` and ``Payment.status``) that inevitably
+        diverge.
 
-        total_paid = sum(
-            (Decimal(str(p.amount)) for p in self.repository.list_paid_payments_for_visit(visit_id)),
-            Decimal("0"),
-        )
+        Audit confirmed 0 consumers of ``visit.status == "paid"`` in the
+        codebase. The ``_preserve_cashier_visit_status()`` and
+        ``_preserve_operational_status_on_payment()`` functions already
+        normalize the legacy ``"paid"`` value back to ``"waiting"`` with
+        docstring: "legacy visit.status='paid' becomes operational waiting".
 
-        if total_paid >= total_cost:
-            visit.status = "paid"
-            visit.discount_mode = "paid"
-            self.repository.commit()
+        Payment state is the source of truth and lives in the ``Payment``
+        table (``status`` field, ``amount``, ``paid_at``). The aggregate
+        "fully paid" state is derivable via
+        ``PaymentInvariantService.compute_paid_amount() >= total_cost``.
+
+        This method is now a no-op — kept as a hook for future
+        audit-log integration (H-5) and to preserve the call site in
+        ``create_payment`` without a larger refactor. The
+        ``discount_mode`` field is also no longer set to ``"paid"`` here;
+        if that field needs to track payment state, it should be derived
+        from the Payment table, not denormalized onto the Visit.
+        """
+        # Issue #06 Phase 0: visit.status = "paid" removed.
+        # Payment state lives in Payment table; visit lifecycle state
+        # remains independent (open, in_progress, completed, closed, canceled).
+        # This method is intentionally a no-op. If you need to react to
+        # "visit became fully paid", query PaymentInvariantService instead.
+        return None
 
     def _build_payment_response(self, *, payment_id: int) -> dict[str, Any]:
         payment = self.repository.get_payment(payment_id)

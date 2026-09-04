@@ -11,6 +11,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
 )  # noqa: F401
 from app.api.v1.endpoints.registrar_wizard._settings import VisitResponse  # noqa
 from app.services.visit_confirmation_service import _as_aware_utc  # noqa: F401
+from app.services.visit_lifecycle_service import VisitNotFoundError  # noqa: F401
 
 
 @router.get("/registrar/visits", response_model=list[VisitResponse])
@@ -733,11 +734,11 @@ REGISTRAR_COMMAND_ROLE_BY_ACTION = {
         "dentist",
         "lab",
     },
-    "cancel": {"admin", "registrar", "cashier", "receptionist", "doctor"},
+    "cancel": {"admin", "registrar", "cashier", "doctor"},
 }
 
 REGISTRAR_SUPPORTED_RECORD_KINDS = {"visit", "online_queue", "appointment"}
-REGISTRAR_APPOINTMENT_WORKFLOW_ROLES = {"admin", "registrar", "receptionist"}
+REGISTRAR_APPOINTMENT_WORKFLOW_ROLES = {"admin", "registrar"}
 
 
 def _registrar_user_role_names(user: User | None) -> set[str]:
@@ -894,14 +895,55 @@ def _run_single_registrar_record_action(
 
         if action == "cancel":
             if record_kind == "visit":
-                visit = VisitsApiService(db).set_status(
+                # Gate C bypass fix: delegate to VisitLifecycleService.cancel_visit()
+                # instead of VisitsApiService.set_status().
+                #
+                # The old code (VisitsApiService.set_status) bypassed the state
+                # machine — it did NOT call is_valid_visit_transition(), allowing
+                # invalid transitions like completed→canceled, closed→canceled,
+                # expired→canceled. These silently broke financial/EMR invariants
+                # (a completed visit has clinical work done; a closed visit has
+                # EMR signed + payment collected).
+                #
+                # VisitLifecycleService.cancel_visit() provides:
+                #   - SELECT FOR UPDATE row lock (concurrency safety)
+                #   - is_valid_visit_transition() validation (state machine)
+                #   - Audit logging (logger.info with visit_id, user_id, reason)
+                #   - commit=False for caller-controlled transaction
+                #
+                # If the transition is invalid (e.g. completed→canceled), the
+                # service raises HTTPException(409), which is caught by the
+                # outer except HTTPException → returns success=False with error.
+                from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                visit = VisitLifecycleService(db).cancel_visit(
                     visit_id=record_id,
-                    status_new="canceled",
+                    current_user=current_user,
+                    reason=request.reason,
+                    commit=False,  # caller owns the transaction
                 )
                 if request.reason:
                     visit.notes = (visit.notes or "") + f"\nCanceled: {request.reason}"
-                    db.commit()
-                    db.refresh(visit)
+                # Cascade cancel to queue entries (preserves behavior of the
+                # old VisitsApiService.set_status which did this internally).
+                # Uses commit=False — the cascade is staged in the same
+                # transaction as the visit status change.
+                try:
+                    from app.api.v1.endpoints.visits import (
+                        _update_queue_entries_for_visit_owner,
+                    )
+                    _update_queue_entries_for_visit_owner(
+                        db,
+                        visit_id=record_id,
+                        patient_id=visit.patient_id,
+                        status_value="canceled",
+                    )
+                except Exception:
+                    # Queue cascade failure must not block visit cancellation
+                    # (same behavior as the old code).
+                    pass
+                db.commit()
+                db.refresh(visit)
                 result = {"id": visit.id, "status": visit.status}
             elif record_kind == "online_queue":
                 entry = OnlineQueueNewService(db).cancel_entry(entry_id=record_id)
@@ -988,6 +1030,26 @@ def _run_single_registrar_record_action(
             success=False,
             error=exc.detail,
         )
+    except VisitNotFoundError:
+        # P2 #5 fix (PR 2725): VisitNotFoundError is raised by
+        # VisitLifecycleService._load_visit_for_update() when a visit
+        # ID doesn't exist. It's a VisitLifecycleError(Exception), NOT
+        # an HTTPException — so the except HTTPException above does NOT
+        # catch it. Without this catch, the exception propagates out of
+        # _run_single, aborts the batch list comprehension, and reaches
+        # FastAPI's global handler as HTTP 500.
+        #
+        # This was a REGRESSION from PR #2719: the old VisitsApiService
+        # raised HTTPException(404) which WAS caught. The migration to
+        # VisitLifecycleService introduced VisitNotFoundError which is not.
+        #
+        # Fix: catch it here → per-record failure (batch isolation).
+        return _registrar_command_item(
+            record_kind=record_kind,
+            record_id=record_id,
+            success=False,
+            error="Visit not found",
+        )
     except HTTPException as exc:
         return _registrar_command_item(
             record_kind=record_kind,
@@ -1051,51 +1113,35 @@ def mark_visit_as_paid(
         )
 
         if not existing_payment:
-            # [OK] ИСПРАВЛЕНО: Создаем платеж через SSOT перед пометкой визита как оплаченного
-            billing_service = BillingService(db)
+            # Issue #06 Phase 4b Fix #1: Replaced raw SQL INSERT INTO payments
+            # with PaymentInvariantService.create_payment_for_visit().
+            #
+            # The raw SQL was originally a workaround for a BillingPayment vs
+            # Payment model conflict (both mapped to the `payments` table).
+            # That conflict has been resolved — BillingPayment is deprecated
+            # (app/models/billing.py:4), commented out (app/models/__init__.py:55),
+            # and removed from imports (app/services/billing_service_pkg/_base.py:33).
+            # Payment from app.models.payment is now the single ORM model.
+            #
+            # The raw SQL bypassed: with_for_update() lock, paid_amount check,
+            # overpayment policy, and IntegrityError defense-in-depth.
+            # PaymentInvariantService provides all of these.
+            from app.services.payment_invariant_service import PaymentInvariantService
+            from decimal import Decimal
 
-            # Рассчитываем сумму визита через SSOT
+            billing_service = BillingService(db)
             total_info = billing_service.calculate_total(
                 visit_id=visit_id, discount_mode=visit.discount_mode or "none"
             )
-            payment_amount = float(total_info["total"])
-
-            # [OK] ИСПРАВЛЕНО: Используем прямой SQL для создания платежа, чтобы обойти конфликт моделей
-            # (BillingPayment и Payment используют одну таблицу, что вызывает проблемы)
-            from sqlalchemy import text
-
-            currency = total_info.get("currency", "UZS")
+            payment_amount = Decimal(str(total_info["total"]))
             note = f"Оплата визита {visit_id} через панель кассира"
-            paid_at = datetime.now(UTC)
 
-            # Создаем платеж через прямой SQL
-            result = db.execute(  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
-                text(
-                    """
-                    INSERT INTO payments
-                    (visit_id, amount, currency, method, status, note, paid_at, created_at)
-                    VALUES (:visit_id, :amount, :currency, :method, :status, :note, :paid_at, :created_at)
-                """
-                ),
-                {
-                    "visit_id": visit_id,
-                    "amount": payment_amount,
-                    "currency": currency,
-                    "method": requested_method,
-                    "status": "paid",
-                    "note": note,
-                    "paid_at": paid_at,
-                    "created_at": paid_at,
-                },
-            )
-            db.commit()
-
-            # Получаем созданный платеж
-            payment = (
-                db.query(Payment)
-                .filter(Payment.visit_id == visit_id)
-                .order_by(Payment.created_at.desc())
-                .first()
+            payment = PaymentInvariantService(db).create_payment_for_visit(
+                visit_id=visit_id,
+                amount=payment_amount,
+                method=requested_method,
+                note=note,
+                current_user=current_user,
             )
 
             logger.info(
@@ -1113,8 +1159,13 @@ def mark_visit_as_paid(
             )
 
         # [FIX:PAYMENT_STATUS] Payment must not overwrite the operational visit/queue status.
+        # Issue #06 Phase 3: delegate to VisitLifecycleService.
         changed_at = datetime.now(UTC)
-        visit.status = _preserve_operational_status_on_payment(visit.status)
+        from app.services.visit_lifecycle_service import VisitLifecycleService
+
+        visit = VisitLifecycleService(db).restore_operational_status_after_payment_change(
+            visit_id=visit.id,
+        )
         visit.updated_at = changed_at
         _sync_payment_invoices_for_paid_visit(
             db,
@@ -1257,45 +1308,25 @@ def mark_queue_entry_as_paid(
         )
 
         if not existing_payment:
-            # Создаем платеж через SSOT
+            # Issue #06 Phase 4b Fix #1: Replaced raw SQL INSERT INTO payments
+            # with PaymentInvariantService.create_payment_for_visit().
+            # See mark_visit_as_paid above for full rationale.
+            from app.services.payment_invariant_service import PaymentInvariantService
+            from decimal import Decimal
+
             billing_service = BillingService(db)
             total_info = billing_service.calculate_total(
                 visit_id=visit.id, discount_mode=visit.discount_mode or "none"
             )
-            payment_amount = float(total_info["total"])
-
-            from sqlalchemy import text
-
-            currency = total_info.get("currency", "UZS")
+            payment_amount = Decimal(str(total_info["total"]))
             note = f"Оплата визита {visit.id} через запись очереди {entry_id}"
-            paid_at = datetime.now(UTC)
 
-            result = db.execute(  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
-                text(
-                    """
-                    INSERT INTO payments
-                    (visit_id, amount, currency, method, status, note, paid_at, created_at)
-                    VALUES (:visit_id, :amount, :currency, :method, :status, :note, :paid_at, :created_at)
-                """
-                ),
-                {
-                    "visit_id": visit.id,
-                    "amount": payment_amount,
-                    "currency": currency,
-                    "method": requested_method,
-                    "status": "paid",
-                    "note": note,
-                    "paid_at": paid_at,
-                    "created_at": paid_at,
-                },
-            )
-            db.commit()
-
-            payment = (
-                db.query(Payment)
-                .filter(Payment.visit_id == visit.id)
-                .order_by(Payment.created_at.desc())
-                .first()
+            payment = PaymentInvariantService(db).create_payment_for_visit(
+                visit_id=visit.id,
+                amount=payment_amount,
+                method=requested_method,
+                note=note,
+                current_user=current_user,
             )
 
             logger.info(
@@ -1314,10 +1345,17 @@ def mark_queue_entry_as_paid(
             )
 
         # [FIX:PAYMENT_STATUS] Payment is stored separately; queue operational status stays intact.
+        # Issue #06 Phase 3: delegate visit status normalization to VisitLifecycleService.
         changed_at = datetime.now(UTC)
-        visit.status = _preserve_operational_status_on_payment(visit.status)
+        from app.services.visit_lifecycle_service import VisitLifecycleService
+
+        visit = VisitLifecycleService(db).restore_operational_status_after_payment_change(
+            visit_id=visit.id,
+        )
         visit.updated_at = changed_at
 
+        # NOTE: entry.status is on OnlineQueueEntry, not Visit.
+        # This is a separate concern (queue_svc domain) and stays as-is.
         entry.status = _preserve_operational_status_on_payment(entry.status)
         entry.updated_at = changed_at
         _sync_payment_invoices_for_paid_visit(
@@ -1374,13 +1412,24 @@ def complete_visit(
     visit_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
+        require_roles("Admin", "Registrar", "Cashier", "Doctor")
     ),
 ):
     """Завершить запись из таблицы visits"""
+    # Issue #06 (H-3 coverage gap): previously set visit.status = "completed"
+    # directly, bypassing the state machine. A closed/canceled visit could
+    # be moved to "completed" — the exact terminal→non-terminal transition
+    # H-3 was supposed to prevent.
+    #
+    # Now delegates to VisitLifecycleService.transition_status(), which
+    # enforces ALLOWED_VISIT_TRANSITIONS and acquires with_for_update().
     try:
         from app.models.visit import Visit
+        from app.services.visit_lifecycle_service import VisitLifecycleService
 
+        # Pre-load for access check (lifecycle service does its own load
+        # with FOR UPDATE, but we need the visit object for the access
+        # check first).
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
@@ -1389,10 +1438,15 @@ def complete_visit(
 
         _ensure_visit_doctor_access(db, visit, current_user)
 
-        visit.status = "completed"
-        visit.updated_at = datetime.now(UTC)
-        db.commit()
-        db.refresh(visit)
+        # Transition via the state machine. Allowed: open→? (no, open can
+        # only go to in_progress or canceled), in_progress→completed (yes),
+        # completed→completed (idempotent). If the visit is closed/canceled,
+        # this raises 409 terminal_to_non_terminal.
+        visit = VisitLifecycleService(db).transition_status(
+            visit_id=visit_id,
+            target_status="completed",
+            current_user=current_user,
+        )
 
         return {"id": visit.id, "status": visit.status, "message": "Запись завершена"}
 
@@ -1412,19 +1466,15 @@ def start_visit(
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """Начать прием (в кабинете) для записи из таблицы visits"""
+    # Issue #06: delegate to VisitLifecycleService for state machine + lock.
     try:
-        from app.models.visit import Visit
+        from app.services.visit_lifecycle_service import VisitLifecycleService
 
-        visit = db.query(Visit).filter(Visit.id == visit_id).first()
-        if not visit:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("error.not_found")
-            )
-
-        visit.status = "in_progress"
-        visit.updated_at = datetime.now(UTC)
-        db.commit()
-        db.refresh(visit)
+        visit = VisitLifecycleService(db).transition_status(
+            visit_id=visit_id,
+            target_status="in_progress",
+            current_user=current_user,
+        )
 
         return {"id": visit.id, "status": visit.status, "message": "Прием начат"}
 
@@ -1457,7 +1507,6 @@ def run_registrar_record_action(
             "Admin",
             "Registrar",
             "Cashier",
-            "Receptionist",
             "Doctor",
             "cardio",
             "cardiology",
@@ -1588,9 +1637,19 @@ def confirm_visit_by_registrar(
             )
 
         # Подтверждаем визит
-        visit.confirmed_at = datetime.now(UTC)
-        visit.confirmed_by = request.confirmed_by or f"registrar_{current_user.id}"
-        visit.status = "confirmed"
+        # Issue #06 Phase 3: delegate to VisitLifecycleService.
+        # confirm_visit() does pending_confirmation → confirmed.
+        # If the visit is for today, activate_confirmed_visit() then
+        # does confirmed → open (after queue numbers are assigned).
+        from app.services.visit_lifecycle_service import VisitLifecycleService
+
+        lifecycle = VisitLifecycleService(db)
+        visit = lifecycle.confirm_visit(
+            visit_id=visit.id,
+            current_user=current_user,
+            confirmed_by=request.confirmed_by or f"registrar_{current_user.id}",
+            commit=False,  # Gate D fix: composition — single commit at end
+        )
 
         queue_numbers = {}
         print_tickets = []
@@ -1607,7 +1666,12 @@ def confirm_visit_by_registrar(
                 )
             except VisitConfirmationDomainError as exc:
                 raise HTTPException(status_code=exc.status_code, detail=exc.detail)
-            visit.status = "open"  # Ready for appointment
+            # Activate: confirmed → open (ready for appointment)
+            visit = lifecycle.activate_confirmed_visit(
+                visit_id=visit.id,
+                current_user=current_user,
+                commit=False,  # Gate D fix: composition — single commit at end
+            )
 
         db.commit()
         db.refresh(visit)

@@ -13,7 +13,7 @@
  */
 
 import { Calendar, Eye, Download, FileText } from 'lucide-react';
-import { Button, Badge, MacOSCard, MacOSEmptyState } from '../ui/macos';
+import { Button, Badge, Card, AppEmpty } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
@@ -108,13 +108,13 @@ export function HistoryTab({
   // Empty state: no patient selected
   if (!selectedPatient) {
     return (
-      <MacOSCard style={{ padding: getSpacing('xl'), textAlign: 'center' }}>
+      <Card style={{ padding: getSpacing('xl'), textAlign: 'center' }}>
         <Calendar size={48} style={{ margin: '0 auto 16px', color: getColor('textSecondary') }} />
         <h3 style={{ fontSize: getFontSize('lg'), fontWeight: 'var(--mac-font-weight-medium)', marginBottom: getSpacing('sm'), color: getColor('text') }}>
           {t('cardio.cardio_hist_empty_title')}
         </h3>
         <p className="cardio-text-secondary">{t('cardio.cardio_hist_empty_desc')}</p>
-      </MacOSCard>
+      </Card>
     );
   }
 
@@ -127,7 +127,7 @@ export function HistoryTab({
       flexDirection: 'column',
       gap: getSpacing('xl'),
     }}>
-      <MacOSCard className="cardio-card-padded">
+      <Card className="cardio-card-padded">
         {/* Header */}
         <div style={{
           display: 'flex',
@@ -175,8 +175,7 @@ export function HistoryTab({
 
         {/* History entries */}
         {filteredHistoryEntries.length === 0 ? (
-          <MacOSEmptyState
-            type="calendar"
+          <AppEmpty
             title={t('cardio.cardio_hist_filter_empty_title')}
             description={t('cardio.cardio_hist_filter_empty_desc')}
           />
@@ -252,7 +251,7 @@ export function HistoryTab({
             ))}
           </div>
         )}
-      </MacOSCard>
+      </Card>
     </div>
   );
 }

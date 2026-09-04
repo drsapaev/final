@@ -128,6 +128,7 @@ def manual_assignment_for_visits(
         return api_service.manual_assignment_for_visits(
             visit_ids=request.visit_ids,
             force=request.force,
+            current_user=current_user,
         )
     except HTTPException:
         raise

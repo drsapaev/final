@@ -95,7 +95,7 @@ Drift signals:
 
 - `style={{` in many repeated elements
 - `legacy-` classes on active routes
-- `@mui/` imports in screens that otherwise use canonical clinic components
+- any `@mui/` import (MUI is removed codebase-wide; reintroduction is drift)
 - duplicate colors, shadows, border radii, or spacing constants
 
 ## Forms
@@ -114,6 +114,24 @@ Clinical risks:
 
 - ambiguous patient identity, phone, payment amount, queue date, or procedure selection is P1/P0
 - errors shown only at top of a long form are P1 on critical flows
+
+## Copy And Microcopy
+
+Borrowed from the 2026-06 frontend-design upstream rewrite: words are design material, not decoration.
+
+Check:
+
+- action labels say what happens from the staff side, not how the system is built
+- one action keeps the same name through the whole flow: button, confirmation, toast, and status agree
+- active voice by default; the primary action states exactly what it does
+- errors say what went wrong and how to fix it, in the interface voice; no vague apologies
+- empty states invite the next action instead of decorating the void
+- no clever wording where staff need direct task labels (see anti-patterns)
+
+Clinical risks:
+
+- an ambiguous action label on payment, queue, or EMR flow is P1 (wrong-button risk)
+- a vague error on a critical flow is P1 if staff cannot tell what to do next
 
 ## Tables And Lists
 
@@ -140,6 +158,7 @@ Every touched workflow should account for:
 - loading
 - empty
 - partial data
+- offline or cached-data mode (break-glass)
 - error
 - forbidden or role-denied
 - disabled action
@@ -147,6 +166,21 @@ Every touched workflow should account for:
 - success confirmation
 
 Payment, queue, lab, and EMR screens must not collapse multiple states into the same visual treatment.
+
+When the backend or AI is unavailable, doctor panels must degrade to cached/read-only break-glass states with a visible offline indicator instead of blocking care (see the AGENTS.md break-glass procedure).
+
+## PHI Display
+
+Check:
+
+- shared or non-medical screens show initials or masked identity, not full names
+- phone, IIN, document numbers, diagnosis, and prescriptions appear only in medical contexts that require them
+- screen-sharing surfaces (dashboards, queue displays, reports) minimize visible PHI
+- masking follows the AGENTS.md PII table
+
+Clinical risks:
+
+- unmasked PHI on shared screens is at least P1; stop and report instead of polishing
 
 ## Accessibility
 
@@ -189,6 +223,21 @@ High-risk mobile surfaces:
 - patient portal
 - registration/check-in
 - public callback pages
+
+## Internationalization
+
+Check:
+
+- layout holds across all supported locales: ru, uz-Latn, uz-Cyrl, en, kk
+- language switch does not clip actions, labels, table columns, or statuses
+- truncation never removes meaning from status, amount, date, or patient identity
+- no hardcoded user-facing strings bypassing the i18n layer (`frontend/src/i18n`)
+- locale-specific dates, numbers, and currency render consistently
+
+Clinical risks:
+
+- meaning-changing truncation in another locale is P1
+- hardcoded strings staff cannot read on operational screens is P1
 
 ## Performance
 

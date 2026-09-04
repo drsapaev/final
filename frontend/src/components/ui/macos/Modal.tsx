@@ -196,8 +196,6 @@ const Modal = ({
 
   const contentStyles: StyleWithBackdrop = {
     backgroundColor: 'var(--mac-bg-primary)',
-    backdropFilter: 'var(--mac-blur-light)',
-    WebkitBackdropFilter: 'var(--mac-blur-light)',
     borderRadius: '12px',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
     border: '1px solid var(--mac-border)',

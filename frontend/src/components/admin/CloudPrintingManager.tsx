@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
@@ -351,7 +351,7 @@ const CloudPrintingManager = () => {
     <>
       <div className="admin-grid-auto-300">
         {list.map((printer) =>
-          <MacOSCard key={`${printer.provider}-${printer.id}`} className="p-4">
+          <Card key={`${printer.provider}-${printer.id}`} className="p-4">
             <div className="admin-flex-between-flex-start-mb-12">
               <div>
                 <h4 className="admin-h4-semi-mb-4-primary">{printer.name}</h4>
@@ -389,7 +389,7 @@ const CloudPrintingManager = () => {
                 {t('admin2.cp_view_details')}
               </Button>
             </div>
-          </MacOSCard>
+          </Card>
         )}
       </div>
 
@@ -413,26 +413,26 @@ const CloudPrintingManager = () => {
 
         {statistics &&
     <div className="admin-grid-auto-200-mb-24-printing">
-          <MacOSCard className="p-6">
+          <Card className="p-6">
             <div className="admin-stat-num-2xl-bold-dynamic admin-stat-accent">{statistics.total_printers}</div>
             <div className="admin-stat-label-sm-secondary-block">{t('admin2.cp_stat_total_printers')}</div>
-          </MacOSCard>
-          <MacOSCard className="p-6">
+          </Card>
+          <Card className="p-6">
             <div className="admin-stat-num-2xl-bold-dynamic admin-stat-success">{statistics.online_printers}</div>
             <div className="admin-stat-label-sm-secondary-block">{t('admin2.cp_stat_online')}</div>
-          </MacOSCard>
-          <MacOSCard className="p-6">
+          </Card>
+          <Card className="p-6">
             <div className="admin-stat-num-2xl-bold-dynamic admin-stat-destructive">{statistics.offline_printers}</div>
             <div className="admin-stat-label-sm-secondary-block">{t('admin2.cp_stat_offline')}</div>
-          </MacOSCard>
-          <MacOSCard className="p-6">
+          </Card>
+          <Card className="p-6">
             <div className="admin-stat-num-2xl-bold-dynamic admin-stat-warning">{statistics.providers_count}</div>
             <div className="admin-stat-label-sm-secondary-block">{t('admin2.cp_stat_providers')}</div>
-          </MacOSCard>
-          <MacOSCard className="p-6">
+          </Card>
+          <Card className="p-6">
             <div className="admin-stat-num-2xl-bold-dynamic admin-stat-accent">{localPrinters.length}</div>
             <div className="admin-stat-label-sm-secondary-block">{t('admin2.cp_stat_local_printers')}</div>
-          </MacOSCard>
+          </Card>
         </div>
     }
 
@@ -455,7 +455,7 @@ const CloudPrintingManager = () => {
       <h3 className="admin-section-h3-m0">{t('admin2.cp_print_document_title')}</h3>
       
       <div className="admin-grid-auto-400-24">
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <h4 className="admin-h4-lg-semi-primary-mb-16">{t('admin2.cp_print_settings')}</h4>
           
           <div className="flex flex-col gap-4">
@@ -538,9 +538,9 @@ const CloudPrintingManager = () => {
               </div>
             </div>
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <h4 className="admin-h4-lg-semi-primary-mb-16">{t('admin2.cp_document_content')}</h4>
           
           <Textarea
@@ -559,7 +559,7 @@ const CloudPrintingManager = () => {
             <Printer size={16} className="mr-2" />
             {t('admin2.cp_print_button')}
           </Button>
-        </MacOSCard>
+        </Card>
       </div>
     </div>;
 
@@ -569,7 +569,7 @@ const CloudPrintingManager = () => {
       <h3 className="admin-section-h3-m0">{t('admin2.cp_medical_documents_title')}</h3>
       
       <div className="admin-grid-auto-400-24">
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <h4 className="admin-h4-md-semi-primary-mb-16">{t('admin2.cp_main_settings')}</h4>
           
           <div className="flex flex-col gap-4">
@@ -652,9 +652,9 @@ const CloudPrintingManager = () => {
               </div>
             </div>
           </div>
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard className="p-6">
+        <Card className="p-6">
           <h4 className="admin-h4-md-semi-primary-mb-16">{t('admin2.cp_template_data_title')}</h4>
           
           <div className="flex flex-col gap-4">
@@ -785,7 +785,7 @@ const CloudPrintingManager = () => {
           medicalForm.document_type === 'receipt' ? t('admin2.cp_print_receipt') :
           medicalForm.document_type === 'ticket' ? t('admin2.cp_print_ticket') : t('admin2.cp_print_report')}
           </Button>
-        </MacOSCard>
+        </Card>
       </div>
     </div>;
 

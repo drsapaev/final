@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 const PUBLIC_ROUTES = [
   { path: '/login', name: 'login' },
@@ -15,14 +16,14 @@ const PROTECTED_ROUTES = [
   { path: '/lab', role: 'lab' },
 ];
 
-async function clearAuthState(page) {
+async function clearAuthState(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
 }
 
-async function expectMountedApp(page) {
+async function expectMountedApp(page: Page) {
   await expect(page.locator('#root')).toBeVisible();
   await expect.poll(
     async () => (await page.locator('body').innerText()).trim().length,

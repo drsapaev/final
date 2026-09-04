@@ -348,6 +348,7 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str | None = None
     SMTP_PASSWORD: str | None = None
     SMTP_USE_TLS: bool = True
+    SMTP_FROM: str | None = Field(default=None, description="Envelope/From address for outgoing mail; falls back to SMTP_USERNAME when unset")
 
     # --- Telegram Settings ---
     TELEGRAM_BOT_TOKEN: str | None = Field(default=None, description="Telegram Bot API token for notifications")
@@ -586,14 +587,6 @@ def get_settings() -> Settings:
                 "ENABLE_FALLBACK_AUTH must be False in production. "
                 "Legacy/fallback login endpoints bypass 2FA, account lockout, "
                 "and login-attempt logging. Set ENABLE_FALLBACK_AUTH=false."
-            )
-
-        # 7. DISABLE_2FA_REQUIREMENT must not be set in production
-        # Skipped in test environments.
-        if not os.environ.get("TESTING") and os.getenv("DISABLE_2FA_REQUIREMENT", "").lower() in ("1", "true", "yes"):
-            errors.append(
-                "DISABLE_2FA_REQUIREMENT must not be set in production. "
-                "This env var disables 2FA enforcement for Admin/Cashier roles."
             )
 
         # AI-REAUDIT-28 P0-8: ENCRYPTION_KEY обязателен в production.

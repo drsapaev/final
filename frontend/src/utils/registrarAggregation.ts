@@ -175,7 +175,6 @@ const pickPatientGender = (appointment: Record<string, unknown>): string => {
 };
 
 export const aggregatePatientsForAllDepartments = (appointments: Record<string, unknown>[] = []) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- aggregation result has heterogeneous shapes per group; tightening requires modeling the full aggregation pipeline (Phase 9 cleanup)
   const patientGroups: Record<string, any> = {};
 
   const toTime = (value: unknown) => {

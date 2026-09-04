@@ -14,6 +14,7 @@ from app.services.morning_assignment import (
     MorningAssignmentService,
 )
 from app.services.queue_domain_service import QueueDomainService
+from app.services.visit_lifecycle_service import VisitLifecycleService
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,8 @@ class RegistrarWizardQueueAssignmentService:
             Any,
         ]
         | None = None,
+        lifecycle_service_factory: Callable[[Session], VisitLifecycleService]
+        | None = None,
     ) -> None:
         self.db = db
         self._assignment_service_factory = (
@@ -45,6 +48,9 @@ class RegistrarWizardQueueAssignmentService:
         self._create_entry_allocator = (
             create_entry_allocator or self._allocate_create_branch_handoff
         )
+        self._lifecycle_service_factory = (
+            lifecycle_service_factory or (lambda session: VisitLifecycleService(session))
+        )
 
     def assign_same_day_queue_numbers(
         self,
@@ -52,7 +58,20 @@ class RegistrarWizardQueueAssignmentService:
         *,
         target_day: date,
         source: str = "desk",
+        current_user: Any | None = None,
     ) -> dict[int, list[dict[str, Any]]]:
+        """Assign same-day queue numbers to confirmed visits.
+
+        Args:
+            visits: Visits to process. Only visits with ``visit_date == target_day``
+                and ``status == "confirmed"`` are processed.
+            target_day: The day to assign queues for.
+            source: Audit source label (e.g. "desk", "morning_assignment").
+            current_user: The authenticated admin/registrar requesting the
+                assignment. Threaded through to ``activate_confirmed_visit()``
+                for audit attribution (Codex P2 fix). None is allowed
+                (batch/system context).
+        """
         queue_numbers: dict[int, list[dict[str, Any]]] = {}
         assignment_service = self._assignment_service_factory(self.db)
 
@@ -68,7 +87,17 @@ class RegistrarWizardQueueAssignmentService:
                     source=source,
                 )
                 if queue_assignments:
-                    visit.status = "open"
+                    # Gate C bypass fix: delegate to VisitLifecycleService
+                    # instead of direct visit.status = "open".
+                    # This ensures state machine validation, with_for_update()
+                    # row lock, and audit logging.
+                    # Codex P2 fix: thread current_user through for audit
+                    # attribution (otherwise logs say user_id=batch).
+                    self._lifecycle_service_factory(self.db).activate_confirmed_visit(
+                        visit_id=visit.id,
+                        current_user=current_user,
+                        commit=False,
+                    )
                     queue_numbers[visit.id] = queue_assignments
                     logger.info(
                         "REGISTRATION: Visit %d - assigned %d queue numbers (source=%s)",
@@ -102,6 +131,23 @@ class RegistrarWizardQueueAssignmentService:
         *,
         source: str,
     ) -> list[dict[str, Any]]:
+        """Assign queue entries for all queue_tags of a visit.
+
+        P2-1c (post-merge stabilization): same defect class as P2-1b.
+        The original code called self._rollback_session() on per-queue_tag
+        failure, which discarded ALL staged work AND left stale dicts in
+        queue_assignments. The loop continued, and the visit was activated
+        with stale data (non-empty queue_assignments but 0 real DB entries).
+
+        Fix: on failure, rollback restores the session, queue_assignments
+        is CLEARED to remove stale dicts, and the loop BREAKS. The visit
+        is NOT activated (queue_assignments is empty).
+
+        Contract (consistent with P2-1b):
+            Partial queue assignment is intentionally unsupported. On any
+            queue-tag assignment failure, all assignments for the current
+            visit are discarded and processing stops.
+        """
         unique_queue_tags = assignment_service._get_visit_queue_tags(visit)
         if not unique_queue_tags:
             logger.warning("Визит %d: нет queue_tag в услугах", visit.id)
@@ -127,7 +173,18 @@ class RegistrarWizardQueueAssignmentService:
                     str(exc),
                     exc_info=True,
                 )
+                # P2-1c: rollback to restore the session after failure.
                 self._rollback_session()
+                # P2-1c: CLEAR stale data. The rollback destroyed all
+                # flushed entries, so any dicts in queue_assignments
+                # reference non-existent DB rows. Without clearing, the
+                # caller would see non-empty queue_assignments and
+                # activate the visit with 0 real queue entries.
+                queue_assignments.clear()
+                # P2-1c: BREAK — after a full rollback, the session state
+                # is reset. Continuing the loop would re-query stale data
+                # and potentially create partial/inconsistent state.
+                break
 
         return queue_assignments
 

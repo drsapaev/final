@@ -69,7 +69,8 @@ TERMINAL_TRANSACTION_STATUSES = frozenset({"cancelled", "refunded"})
 ALLOWED_PAYMENT_TRANSITIONS: dict[str, list[str]] = {
     "pending": ["processing", "paid", "failed", "cancelled"],
     "processing": ["paid", "failed", "cancelled"],
-    "paid": ["refunded", "void"],
+    "paid": ["refunded", "void", "cancelled"],
+    "completed": ["refunded", "void", "cancelled"],
     "failed": ["pending", "cancelled"],
     "cancelled": [],
     "refunded": [],

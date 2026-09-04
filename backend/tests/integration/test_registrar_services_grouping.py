@@ -40,13 +40,9 @@ def test_registrar_services_prefers_explicit_lab_routing_over_code_fallback(
     db_session.commit()
     db_session.refresh(service)
 
-    login_response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    assert login_response.status_code == 200, login_response.text
+    from tests.conftest import mint_access_token
 
-    headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+    headers = {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
     response = client.get("/api/v1/registrar/services", headers=headers)
 
     assert response.status_code == 200, response.text

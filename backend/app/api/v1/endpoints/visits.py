@@ -11,13 +11,29 @@ from sqlalchemy import MetaData, Table, select, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
 from app.models.clinic import Doctor
 from app.models.visit import Visit
+from app.services.visit_state_checks import (
+    ACCEPTED_VISIT_STATUSES,
+    force_reopen_target_allowed,
+    is_valid_visit_transition,
+)
 from app.services.visits_api_service import VisitsApiService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-VISIT_READ_ROLES = ("Admin", "Registrar", "Doctor", "Cashier", "Lab", "Nurse")
+# RBAC unification (D-3): admit the whole doctor family, not only the exact
+# "Doctor" spelling — legacy doctor accounts (cardio/derma/dentist/...) must
+# get the same treatment EMR v2 and the specialist panels already give them.
+VISIT_READ_ROLES = (
+    "Admin",
+    "Registrar",
+    *DOCTOR_FAMILY_GATE_ROLES,
+    "Cashier",
+    "Lab",
+    "Nurse",
+)
 
 
 # Pydantic fallbacks (если полноценные схемы уже есть в app.schemas, в следующих шагах заменим)
@@ -68,14 +84,19 @@ class VisitWithServices(BaseModel):
 def _visits(db: Session) -> Table:
     """
     Return reflected visits table. Использует autoload_with, не bind.
+
+    Perf (2026-09-03): shares the process-level _REFLECTED_META cache —
+    per-call MetaData() re-reflected the schema on every request.
     """
-    md = MetaData()
-    return Table("visits", md, autoload_with=db.get_bind())
+    from app.services.visits_api_service import _REFLECTED_META
+
+    return Table("visits", _REFLECTED_META, autoload_with=db.get_bind())
 
 
 def _vservices(db: Session) -> Table:
-    md = MetaData()
-    return Table("visit_services", md, autoload_with=db.get_bind())
+    from app.services.visits_api_service import _REFLECTED_META
+
+    return Table("visit_services", _REFLECTED_META, autoload_with=db.get_bind())
 
 
 def _isValid_time_str(value: str) -> bool:
@@ -122,7 +143,7 @@ def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user) -> None
         current_user, "is_superuser", False
     ):
         return
-    if getattr(current_user, "role", None) != "Doctor":
+    if not is_doctor_role_spelling(getattr(current_user, "role", None)):
         return
 
     doctor = (
@@ -173,7 +194,7 @@ def _ensure_doctor_can_create_visit_for_payload(
         current_user, "is_superuser", False
     ):
         return
-    if getattr(current_user, "role", None) != "Doctor":
+    if not is_doctor_role_spelling(getattr(current_user, "role", None)):
         return
 
     doctor_id = getattr(payload, "doctor_id", None)
@@ -194,7 +215,7 @@ def list_visits(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(*VISIT_READ_ROLES)),
 ):
-    if getattr(current_user, "role", None) == "Doctor":
+    if is_doctor_role_spelling(getattr(current_user, "role", None)):
         if doctor_id is None:
             raise HTTPException(status_code=403, detail="Access denied")
         if doctor_id not in _doctor_allowed_visit_doctor_ids(db, current_user):
@@ -215,14 +236,14 @@ def list_visits(
     "/visits",
     response_model=VisitOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_roles("Admin", "Registrar", "Doctor"))],
+    dependencies=[Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES))],
     summary="Создать визит",
 )
 def create_visit(
     request: Request,
     payload: VisitCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles("Admin", "Registrar", "Doctor")),
+    current_user = Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
     _ensure_doctor_can_create_visit_for_payload(db, payload, current_user)
     result = VisitsApiService(db).create_visit(
@@ -262,7 +283,7 @@ def add_service(
     visit_id: int,
     item: VisitServiceIn,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin", "Registrar", "Doctor", "Cashier")),
+    current_user=Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Cashier")),
 ):
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
@@ -280,14 +301,57 @@ def set_status(
     visit_id: int,
     status_new: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin", "Doctor", "Registrar")),
+    current_user=Depends(require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES, "Registrar")),
 ):
-    if status_new not in {"open", "in_progress", "closed", "canceled"}:
+    # H-3 (Launch Blockers Audit): visit state machine.
+    # Previously this endpoint validated ONLY the target status (it
+    # had to be one of {open, in_progress, closed, canceled}) but
+    # did NOT check the current status. This allowed arbitrary
+    # transitions like ``closed → in_progress`` (reopening a closed
+    # visit after payment was collected and change given) or
+    # ``canceled → open`` (reviving a canceled visit), which silently
+    # broke financial/EMR invariants.
+    #
+    # Now the transition is validated against
+    # ``ALLOWED_VISIT_TRANSITIONS`` in visit_state_checks.py. Terminal
+    # statuses (``closed``, ``canceled``) can only be left via the
+    # dedicated admin ``force_reopen`` endpoint, which logs the
+    # override with an explicit reason.
+    if status_new not in ACCEPTED_VISIT_STATUSES:
         raise HTTPException(400, "Invalid status")
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
         raise HTTPException(404, "Visit not found")
     _ensure_visit_doctor_access(db, visit, current_user)
+
+    allowed, reason = is_valid_visit_transition(visit.status, status_new)
+    if not allowed:
+        # 409 Conflict: the transition itself is well-formed but
+        # violates the state machine. Distinct from 400 (malformed
+        # request) so the frontend can render a specific message.
+        logger.warning(
+            "visit.set_status rejected transition visit_id=%s "
+            "current=%s target=%s reason=%s user_id=%s",
+            visit_id,
+            visit.status,
+            status_new,
+            reason,
+            getattr(current_user, "id", None),
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": reason,
+                "message": (
+                    f"Недопустимый переход статуса визита: "
+                    f"'{visit.status}' → '{status_new}'. "
+                    "Используйте force-reopen (только для Admin) для "
+                    "операционного восстановления закрытого/отменённого визита."
+                ),
+                "current_status": visit.status,
+                "target_status": status_new,
+            },
+        )
 
     visit.status = status_new
     if status_new == "in_progress" and hasattr(visit, "started_at"):
@@ -322,6 +386,138 @@ def set_status(
         finished_at=getattr(visit, "finished_at", None),
         notes=visit.notes,
         planned_date=visit.visit_date
+    )
+
+
+# ─── H-3: Admin force-reopen ─────────────────────────────────────────────
+#
+# Break-glass endpoint for operational recovery: move a visit OUT of
+# a terminal status (``closed`` or ``canceled``) back to a
+# non-terminal status. Required because the regular ``set_status``
+# endpoint now rejects terminal → non-terminal transitions (see
+# ``visit_state_checks.py``).
+#
+# Use cases (real examples from clinic operations):
+# - A registrar accidentally clicked "Close visit" before the doctor
+#   finished the EMR. The EMR is still unsigned; the visit must be
+#   reopened to ``in_progress``.
+# - A visit was marked ``canceled`` due to a no-show, but the patient
+#   arrived 10 minutes later and the doctor agrees to see them.
+# - A cashier closed the visit, then realised the wrong patient was
+#   selected and the real visit needs to be reopened.
+#
+# Constraints:
+# - Admin-only (NOT Doctor/Registrar) — this is an operational
+#   override, not a routine workflow.
+# - ``reason`` is REQUIRED (≥10 chars) and is logged at WARNING
+#   level. Future improvement: write to the unified ``audit_logs``
+#   table once coverage is added (see H-5).
+# - ``target_status`` must be a non-terminal status (``open``,
+#   ``in_progress``, or ``completed``). Reopening to another terminal
+#   status makes no sense (and would be a no-op).
+# - ``finished_at`` is cleared when reopening, so the visit's
+#   duration metrics are not corrupted by the gap.
+class ForceReopenRequest(BaseModel):
+    target_status: str = Field(
+        ...,
+        description="Non-terminal target status: open | in_progress | completed",
+    )
+    reason: str = Field(
+        ...,
+        min_length=10,
+        max_length=512,
+        description="Operational reason for the override (≥10 chars). Logged.",
+    )
+
+
+@router.post(
+    "/visits/{visit_id}/force-reopen",
+    summary="Admin override: reopen a closed/canceled visit (H-3 break-glass)",
+    response_model=VisitOut,
+)
+def force_reopen_visit(
+    visit_id: int,
+    payload: ForceReopenRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Admin")),
+):
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(404, "Visit not found")
+
+    # Target must be a non-terminal status.
+    if not force_reopen_target_allowed(payload.target_status):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "reason": "invalid_target_status",
+                "message": (
+                    f"target_status must be one of: open, in_progress, completed. "
+                    f"Got: {payload.target_status!r}"
+                ),
+            },
+        )
+
+    # Current status must be terminal — otherwise the regular
+    # set_status endpoint should be used, not the override.
+    # BUG 6 fix (Codex P2): accept 'expired' as a valid terminal status
+    # for force_reopen. Previously only 'closed' and 'canceled' were
+    # accepted, but 'expired' is also terminal — admin should be able to
+    # reopen accidentally expired visits.
+    if visit.status not in ("closed", "canceled", "expired"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "visit_not_terminal",
+                "message": (
+                    f"Visit {visit_id} is in status '{visit.status}' — "
+                    "force-reopen is only for closed/canceled visits. "
+                    "Use POST /visits/{id}/status for non-terminal transitions."
+                ),
+                "current_status": visit.status,
+            },
+        )
+
+    # P1 #2 fix (PR 2723): remove reason from application log.
+    # Reason is AUDIT DATA — stored in visit.notes (DB) below.
+    # WARNING level auto-captured as Sentry breadcrumb → PII risk.
+    logger.warning(
+        "visit.force_reopen visit_id=%s current=%s target=%s admin_id=%s",
+        visit_id,
+        visit.status,
+        payload.target_status,
+        getattr(current_user, "id", None),
+    )
+
+    visit.status = payload.target_status
+    # P1 #2 fix (PR 2723): store reason in visit.notes (DB audit).
+    # Atomic with the status change — same db.commit() below.
+    # Append (not overwrite) to preserve existing clinical notes.
+    if payload.reason and hasattr(visit, "notes"):
+        existing_notes = visit.notes or ""
+        visit.notes = (
+            existing_notes
+            + f"\n[Force reopen: → {payload.target_status}] "
+            f"Reason: {payload.reason}"
+        )
+    # Clear the finished_at timestamp so the visit's duration metrics
+    # are not corrupted by the gap between close and reopen.
+    if hasattr(visit, "finished_at"):
+        visit.finished_at = None
+
+    db.commit()
+    db.refresh(visit)
+
+    return VisitOut(
+        id=visit.id,
+        patient_id=visit.patient_id,
+        doctor_id=visit.doctor_id,
+        status=visit.status,
+        created_at=visit.created_at,
+        started_at=getattr(visit, "started_at", None),
+        finished_at=getattr(visit, "finished_at", None),
+        notes=visit.notes,
+        planned_date=visit.visit_date,
     )
 
 

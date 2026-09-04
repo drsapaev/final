@@ -15,6 +15,30 @@ const readSource = (fileName: string) =>
 const readPanel = () =>
   fs.readFileSync(PANEL_PATH, 'utf8').replace(/\r\n/g, '\n');
 
+// PR-UI-15-6: the renderVisits JSX moved verbatim to
+// pages/dentist/views/DentistVisitsView.tsx — the panel contract surface is
+// the union of the panel and its extracted dentist modules (same pattern as
+// DentistPanel safety/i18n contracts and DoctorPanels.contract).
+const readDentistModules = () => {
+  const dentistDir = path.resolve(__dirname, '../../../pages/dentist');
+  const parts: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === '__tests__') continue;
+        walk(full);
+      } else if (/\.tsx?$/.test(entry.name)) {
+        parts.push(fs.readFileSync(full, 'utf8'));
+      }
+    }
+  };
+  if (fs.existsSync(dentistDir)) walk(dentistDir);
+  return parts.join('\n');
+};
+
+const readPanelUnion = () => `${readPanel()}\n${readDentistModules()}`;
+
 describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => {
   it('imports SSOT constants from dentalConstants (no local redefinition)', () => {
     const source = readSource('DentalVisitScreen.tsx');
@@ -104,18 +128,25 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
   });
 
   it('DentistPanelUnified uses DentalVisitScreen in renderVisits when patient is selected', () => {
-    const source = readPanel();
+    const source = readPanelUnion();
 
-    expect(source).toContain('import DentalVisitScreen from \'../components/dental/DentalVisitScreen\'');
+    // PR-UI-15-6: the import + JSX live in views/DentistVisitsView now.
+    expect(source).toContain('import DentalVisitScreen from \'../../../components/dental/DentalVisitScreen\'');
     expect(source).toContain('<DentalVisitScreen');
-    expect(source).toContain('onCompleteVisit={handleCompleteVisit}');
+    // The panel wires the completion flow into the view.
+    expect(readPanel()).toContain('onCompleteVisit={handleCompleteVisit}');
 
     // Must NOT use the old EMRContainerV2 for selectedPatient visits
     // (EMRContainerV2 may still be imported for other uses, but not in renderVisits).
     const renderVisitsBlock = source.slice(
-      source.indexOf('const renderVisits = () => {'),
+      source.indexOf('const renderVisits = () =>'),
       source.indexOf('const renderPhotos = () =>'),
     );
     expect(renderVisitsBlock).not.toContain('<EMRContainerV2');
+    const visitsViewBlock = source.slice(
+      source.indexOf('export default function DentistVisitsView'),
+      source.indexOf('export default function DentistPhotosView'),
+    );
+    expect(visitsViewBlock).not.toContain('<EMRContainerV2');
   });
 });

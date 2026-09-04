@@ -54,7 +54,7 @@ def test_online_join_characterization_service_path_assigns_waiting_online_entry(
         db_session,
         token_str=token.token,
         patient_name="Characterization Patient",
-        phone="+998901111111",
+        phone="+998900000110",
         source="online",
     )
 
@@ -96,7 +96,7 @@ def test_qr_session_join_characterization_assigns_waiting_entry(
         json={
             "session_token": session_token,
             "patient_name": "QR Session Patient",
-            "phone": "+998902222222",
+            "phone": "+998900000134",
         },
     )
     assert complete_response.status_code == 200

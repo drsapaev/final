@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core.audit import log_critical_change
 from app.core.i18n import t  # noqa: F401
+from app.core.roles import DOCTOR_FAMILY_GATE_ROLES
 from app.crud.patient import patient as patient_crud
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
@@ -86,7 +87,7 @@ def list_patients(
     limit: int = Query(100, ge=1, le=1000),
     q: str | None = Query(None, description="Поиск по ФИО, телефону или документу"),
     phone: str | None = Query(None, description="Точный поиск по номеру телефона"),
-    current_user: User = Depends(deps.require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "Nurse")),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Lab", "Cashier", "Nurse")),
 ):
     """
     Получить список пациентов с возможностью поиска и пагинации
@@ -132,7 +133,7 @@ def get_patient(
     *,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "Nurse", "Patient")),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Lab", "Cashier", "Nurse", "Patient")),
 ):
     """
     Получить пациента по ID
@@ -181,7 +182,7 @@ def get_patient_appointments(
     *,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.require_roles("Admin", "Registrar", "Doctor", "Patient")),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Patient")),
 ):
     """
     Получить все записи пациента
@@ -277,7 +278,7 @@ def get_patient_family(
     *,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
     """
     Получить семью/родственников пациента.
@@ -378,7 +379,7 @@ def get_primary_contact(
     *,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)),
 ):
     """
     Получить основное контактное лицо для пациента.

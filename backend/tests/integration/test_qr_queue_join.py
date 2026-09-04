@@ -53,7 +53,7 @@ def test_qr_join_flow_success(client, db_session, test_doctor, monkeypatch):
         json={
             "session_token": session_token,
             "patient_name": "Test Patient",
-            "phone": "+998901112233",
+            "phone": "+998900000111",
         },
     )
     assert complete_resp.status_code == 200
@@ -101,7 +101,7 @@ def test_qr_join_duplicate_is_not_recreated(client, db_session, test_doctor, mon
         json={
             "session_token": session_token,
             "patient_name": "Test Patient",
-            "phone": "+998901112233",
+            "phone": "+998900000111",
         },
     )
     assert complete_resp.status_code == 200
@@ -117,7 +117,7 @@ def test_qr_join_duplicate_is_not_recreated(client, db_session, test_doctor, mon
         json={
             "session_token": session_token_2,
             "patient_name": "Test Patient",
-            "phone": "+998901112233",
+            "phone": "+998900000111",
         },
     )
     assert complete_resp_2.status_code == 200
@@ -249,7 +249,7 @@ def test_clinic_wide_qr_rejects_non_selectable_specialist_ids(
         json={
             "session_token": start_resp.json()["session_token"],
             "patient_name": "Hidden Doctor Patient",
-            "phone": "+998909991111",
+            "phone": "+998900000148",
             "specialist_ids": [hidden_doctor.id],
         },
     )
@@ -262,7 +262,7 @@ def test_clinic_wide_qr_rejects_non_selectable_specialist_ids(
         json={
             "session_token": start_resp.json()["session_token"],
             "patient_name": "Hidden Profile Patient",
-            "phone": "+998909992222",
+            "phone": "+998900000149",
             "specialist_ids": [hidden_profile.id],
         },
     )

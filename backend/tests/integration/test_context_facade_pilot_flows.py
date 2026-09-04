@@ -18,7 +18,7 @@ def test_patient_facade_adapter_bridge_reads_birth_date(monkeypatch) -> None:
     patient_obj = SimpleNamespace(
         id=11,
         full_name="Facade Patient",
-        phone="+998901111111",
+        phone="+998900000110",
         birth_date=date(1988, 7, 7),
     )
     monkeypatch.setattr("app.crud.patient.get", lambda db, id: patient_obj)

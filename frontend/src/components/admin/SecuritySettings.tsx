@@ -24,7 +24,7 @@ import {
   Checkbox,
   Badge,
   SegmentedControl,
-  MacOSCard,
+  Card,
 } from '../ui/macos';
 import type { SelectChangeEvent } from '../ui/macos/Select';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -254,7 +254,7 @@ const SecuritySettings = ({
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         {/* Смена пароля */}
         {activeTab === 'password' &&
-        <MacOSCard className="p-6">
+        <Card className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
               {t('admin2.ss_title_change_password')}
             </h3>
@@ -352,12 +352,12 @@ const SecuritySettings = ({
               }
               </div>
             </div>
-          </MacOSCard>
+          </Card>
         }
 
         {/* Двухфакторная аутентификация */}
         {activeTab === 'two-factor' &&
-        <MacOSCard className="p-6">
+        <Card className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
               {t('admin2.ss_title_2fa')}
             </h3>
@@ -395,12 +395,12 @@ const SecuritySettings = ({
                 </div>
             }
             </div>
-          </MacOSCard>
+          </Card>
         }
 
         {/* Активные сессии */}
         {activeTab === 'sessions' &&
-        <MacOSCard className="p-6">
+        <Card className="p-6">
             <div className="admin-flex-ai-center-jc-between-mb-20">
               <h3 className="admin-lg-semi-primary-m-0">
                 {t('admin2.ss_title_sessions')}
@@ -459,12 +459,12 @@ const SecuritySettings = ({
                 </div>
             )}
             </div>
-          </MacOSCard>
+          </Card>
         }
 
         {/* Настройки безопасности */}
         {activeTab === 'security' &&
-        <MacOSCard className="p-6">
+        <Card className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
               {t('admin2.ss_title_security_settings')}
             </h3>
@@ -547,12 +547,12 @@ const SecuritySettings = ({
               label={t('admin2.ss_label_block_suspicious_ips')} />
             
             </div>
-          </MacOSCard>
+          </Card>
         }
 
         {/* Логи безопасности */}
         {activeTab === 'audit' &&
-        <MacOSCard className="p-6">
+        <Card className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
               {t('admin2.ss_title_audit_logs')}
             </h3>
@@ -597,7 +597,7 @@ const SecuritySettings = ({
 
             })}
             </div>
-          </MacOSCard>
+          </Card>
         }
 
         {/* Кнопки действий */}

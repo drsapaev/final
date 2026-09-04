@@ -35,8 +35,7 @@ function ThemeHarness() {
     <div>
       <div data-testid="theme">{theme}</div>
       <div data-testid="color-scheme">{colorScheme}</div>
-      <button type="button" onClick={() => setColorScheme('glass')}>glass</button>
-      <button type="button" onClick={() => setColorScheme('vibrant')}>vibrant</button>
+      <button type="button" onClick={() => setColorScheme('dark')}>dark</button>
       <button type="button" onClick={() => setColorScheme('light')}>light</button>
     </div>);
 
@@ -70,25 +69,21 @@ describe('ThemeContext', () => {
     });
   });
 
-  it('applies custom color schemes through a single context state', async () => {
+  it('applies standard color schemes through a single context state', async () => {
+    // PR-UI-02: custom schemes (vibrant/glass/gradient) deleted.
+    // Test now verifies standard schemes (light/dark/auto) work via context.
     renderWithProvider();
 
-    fireEvent.click(screen.getByRole('button', { name: 'glass' }));
+    fireEvent.click(screen.getByRole('button', { name: 'dark' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('color-scheme')).toHaveTextContent('glass');
+      expect(screen.getByTestId('color-scheme')).toHaveTextContent('dark');
       expect(screen.getByTestId('theme')).toHaveTextContent('dark');
-      expect(document.documentElement.getAttribute('data-color-scheme')).toBe('glass');
-      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
-      expect(document.body.getAttribute('data-color-scheme')).toBe('glass');
-      expect(document.body.classList.contains('dark-theme')).toBe(true);
-      expect(document.body.classList.contains('scheme-glass')).toBe(true);
-      expect(document.documentElement.classList.contains('scheme-glass')).toBe(true);
     });
   });
 
   it('loads and saves theme preferences for authenticated users', async () => {
-    apiMockTyped.get.mockResolvedValue({ data: { theme: 'gradient' } });
+    apiMockTyped.get.mockResolvedValue({ data: { theme: 'auto' } });
     apiMockTyped.put.mockResolvedValue({ data: { success: true } });
 
     renderWithProvider();
@@ -101,14 +96,14 @@ describe('ThemeContext', () => {
 
     await waitFor(() => {
       expect(apiMockTyped.get).toHaveBeenCalledWith('/users/me/preferences');
-      expect(screen.getByTestId('color-scheme')).toHaveTextContent('gradient');
+      expect(screen.getByTestId('color-scheme')).toHaveTextContent('auto');
     });
     expect(apiMockTyped.put).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'vibrant' }));
+    fireEvent.click(screen.getByRole('button', { name: 'light' }));
 
     await waitFor(() => {
-      expect(apiMockTyped.put).toHaveBeenCalledWith('/users/me/preferences', { theme: 'vibrant' });
+      expect(apiMockTyped.put).toHaveBeenCalledWith('/users/me/preferences', { theme: 'light' });
     }, { timeout: 2000 });
   });
 
@@ -127,15 +122,6 @@ describe('ThemeContext', () => {
     expect(apiMockTyped.get).not.toHaveBeenCalledWith('/users/me/preferences');
     expect(apiMockTyped.put).not.toHaveBeenCalled();
   });
-
-  it('keeps vibrant and gradient as visually distinct custom schemes', () => {
-    const vibrant = getColorSchemeDefinition('vibrant');
-    const gradient = getColorSchemeDefinition('gradient');
-
-    expect(vibrant.preview.background).not.toBe(gradient.preview.background);
-    expect(vibrant.tokens?.['--mac-gradient-window']).not.toBe(gradient.tokens?.['--mac-gradient-window']);
-    expect(vibrant.tokens?.['--mac-card-bg']).not.toBe(gradient.tokens?.['--mac-card-bg']);
-    expect(vibrant.tokens?.['--mac-main-shell-bg']).not.toBe(gradient.tokens?.['--mac-main-shell-bg']);
-    expect(vibrant.tokens?.['--mac-scheme-accent']).not.toBe(gradient.tokens?.['--mac-scheme-accent']);
-  });
+  // PR-UI-02: 'keeps vibrant and gradient as visually distinct custom schemes' test removed
+  // because vibrant/glass/gradient custom schemes were deleted.
 });

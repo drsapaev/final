@@ -40,17 +40,20 @@ test.describe('Queue System Tests', () => {
       
       const OriginalDate = Date;
       global.Date = class extends OriginalDate {
-        constructor(...args) {
+        constructor(...args: unknown[]) {
           if (args.length === 0) {
+            super();
             return mockDate;
           }
-          return new OriginalDate(...args);
+          return new OriginalDate(...(args as ConstructorParameters<typeof Date>));
         }
-        
+
         static now() {
           return mockDate.getTime();
         }
-      };
+        // Type-level only: the mock class's shape is not assignable to the
+        // overloaded DateConstructor type, but the runtime behavior is exact.
+      } as unknown as DateConstructor;
     });
 
     await page.goto('/registrar');
@@ -74,17 +77,20 @@ test.describe('Queue System Tests', () => {
       
       const OriginalDate = Date;
       global.Date = class extends OriginalDate {
-        constructor(...args) {
+        constructor(...args: unknown[]) {
           if (args.length === 0) {
+            super();
             return mockDate;
           }
-          return new OriginalDate(...args);
+          return new OriginalDate(...(args as ConstructorParameters<typeof Date>));
         }
-        
+
         static now() {
           return mockDate.getTime();
         }
-      };
+        // Type-level only: the mock class's shape is not assignable to the
+        // overloaded DateConstructor type, but the runtime behavior is exact.
+      } as unknown as DateConstructor;
     });
 
     await page.goto('/registrar');
@@ -110,7 +116,7 @@ test.describe('Queue System Tests', () => {
       await addToQueueButton.first().click();
       
       // Заполняем форму
-      await page.fill('input[placeholder*="Телефон"], input[name="phone"]', '+998901234567');
+      await page.fill('input[placeholder*="Телефон"], input[name="phone"]', '+998900000000');
       await page.fill('input[placeholder*="Имя"], input[name="name"]', 'Тестовый Пациент');
       
       // Выбираем специалиста
@@ -135,7 +141,7 @@ test.describe('Queue System Tests', () => {
     if (await addButton.count() > 0) {
       // Добавляем первого пациента
       await addButton.first().click();
-      await page.fill('input[name="phone"]', '+998901111111');
+      await page.fill('input[name="phone"]', '+998900000000');
       await page.fill('input[name="name"]', 'Первый Пациент');
       await page.click('button[type="submit"]');
       
@@ -144,7 +150,7 @@ test.describe('Queue System Tests', () => {
       
       // Пытаемся добавить с тем же номером
       await addButton.first().click();
-      await page.fill('input[name="phone"]', '+998901111111');
+      await page.fill('input[name="phone"]', '+998900000000');
       await page.fill('input[name="name"]', 'Второй Пациент');
       await page.click('button[type="submit"]');
       

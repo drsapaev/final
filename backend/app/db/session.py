@@ -92,6 +92,7 @@ logger.info(
     _safe_database_url_for_log(DATABASE_URL),
 )
 
+
 # Создаём СИНХРОННЫЙ движок
 # ✅ SECURITY: Enable foreign key enforcement for SQLite via event listener
 def _enable_sqlite_fk(dbapi_conn, connection_record):
@@ -122,6 +123,7 @@ def _enable_sqlite_fk(dbapi_conn, connection_record):
             )
             raise
 
+
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 _engine_kwargs: dict[str, object] = {
     "future": True,
@@ -138,9 +140,52 @@ if not _is_sqlite:
         }
     )
 
+
+def _postgres_connect_args() -> dict[str, object]:
+    """libpq-level resilience for the remote PostgreSQL (Supabase pooler).
+
+    P0 2026-08-28 follow-up: a blackholed TCP route left psycopg's
+    ``wait_select`` spinning forever (sync I/O in worker threads), and a
+    single runaway query pinned a pool connection. These knobs turn
+    indefinite waits into bounded failures:
+    - ``connect_timeout``: TCP+TLS+auth must complete within N seconds;
+    - TCP keepalives detect half-dead routes mid-query (libpq accepts the
+      keywords on every platform; on Windows clients they are no-ops, on
+      Linux they work — keep them so a future Linux host is covered);
+    - ``statement_timeout``: a runaway statement is cancelled server-side
+      instead of pinning the connection. Alembic builds its own engine and
+      pg_dump runs as a subprocess, so migrations and backups are exempt.
+    """
+    connect_args: dict[str, object] = {
+        "connect_timeout": _get_int_env("DB_CONNECT_TIMEOUT_S", 10),
+        "application_name": os.getenv("DB_APPLICATION_NAME", "clinic-api"),
+    }
+    keepalives_idle = _get_int_env("DB_TCP_KEEPALIVE_IDLE_S", 30)
+    if keepalives_idle > 0:
+        connect_args.update(
+            {
+                "keepalives": 1,
+                "keepalives_idle": keepalives_idle,
+                "keepalives_interval": _get_int_env("DB_TCP_KEEPALIVE_INTERVAL_S", 10),
+                "keepalives_count": _get_int_env("DB_TCP_KEEPALIVE_COUNT", 5),
+            }
+        )
+    statement_timeout_ms = _get_int_env("DB_STATEMENT_TIMEOUT_MS", 60000)
+    if statement_timeout_ms > 0:
+        connect_args["options"] = f"-c statement_timeout={statement_timeout_ms}"
+    return connect_args
+
+
+if _is_sqlite:
+    _connect_args: dict[str, object] = {"check_same_thread": False}
+elif DATABASE_URL.startswith("postgresql"):
+    _connect_args = _postgres_connect_args()
+else:
+    _connect_args = {}
+
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if _is_sqlite else {},
+    connect_args=_connect_args,
     **_engine_kwargs,
 )
 

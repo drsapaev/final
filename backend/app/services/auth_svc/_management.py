@@ -200,7 +200,7 @@ class ManagementMixin(AuthenticationServiceMixinBase):
             session = db.query(UserSession).filter(UserSession.id == session_id).first()
             if session and not session.revoked:
                 session.revoked = True
-                session.revoked_at = datetime.now(UTC)
+
                 # session.revoke_reason = reason  # Поле может не существовать в модели
 
                 db.commit()
@@ -249,7 +249,7 @@ class ManagementMixin(AuthenticationServiceMixinBase):
 
             for session in sessions:
                 session.revoked = True
-                session.revoked_at = datetime.now(UTC)
+
                 # session.revoke_reason = reason  # Поле может не существовать в модели
                 revoked_count += 1
 

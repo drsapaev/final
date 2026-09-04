@@ -101,7 +101,7 @@ INITIAL_QUEUE_PROFILES = [
         "key": "stomatology",
         "title": "Dental",
         "title_ru": "Стоматология",
-        "queue_tags": ["dental", "stomatology", "dentist"],
+        "queue_tags": ["dental", "stomatology", "dentist", "dentistry"],
         "department_key": "stomatology",
         "order": 4,
         "icon": "Smile",

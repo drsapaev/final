@@ -76,7 +76,7 @@ const DoctorModal = ({
   availableUsers = [],
   departments = [],
 }: DoctorModalProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT;
+  const { t: rawT, language } = useTranslation(); const t = rawT;
   const [formData, setFormData] = useState<DoctorFormState>({
     userId: '',
     specialty: '',
@@ -88,6 +88,67 @@ const DoctorModal = ({
   });
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Catalog-backed specialty options (Codex P1): the specialty written to
+  // Doctor.specialty must be an ACTIVE medical_specialties code; department
+  // keys (cardio/dental/...) are a DIFFERENT domain and now rejected by the
+  // backend write guard. Loaded from the vocabulary endpoint; on failure the
+  // select stays empty and the backend 400/503 detail surfaces on submit.
+  const [specialtyOptions, setSpecialtyOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    // Locale resolution per owner spec: ru→title_ru, en→title_en,
+    // uz-Latn→title_uz, everything else (uz-Cyrl, kk, unknown) → title_ru
+    // compatibility fallback, then code (Codex P2: translations were
+    // unreachable outside the Russian locale).
+    const titleFieldForLocale: Record<string, 'title_ru' | 'title_uz' | 'title_en'> = {
+      ru: 'title_ru',
+      en: 'title_en',
+      'uz-Latn': 'title_uz',
+    };
+    const titleField =
+      titleFieldForLocale[language] ?? 'title_ru';
+    import('../../api/client')
+      .then(({ api }) =>
+        api.get('/admin/doctors/specialty-vocabulary').catch(() => null),
+      )
+      .then(
+        (
+          response: {
+            data?: Array<{
+              code: string;
+              title_ru?: string | null;
+              title_uz?: string | null;
+              title_en?: string | null;
+            }>;
+          } | null,
+        ) => {
+          if (cancelled) return;
+          // Catalog unavailable (network error / 503): clear the previous
+          // options instead of leaving a stale, selectable list that only
+          // fails on save (Codex P2 round 5).
+          if (!response?.data) {
+            setSpecialtyOptions([]);
+            return;
+          }
+          setSpecialtyOptions(
+            response.data.map((item) => ({
+              value: item.code,
+              label: item[titleField] || item.title_ru || item.code,
+            })),
+          );
+        },
+      )
+      .catch(() => {
+        if (!cancelled) setSpecialtyOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, language]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -280,13 +341,28 @@ const DoctorModal = ({
             <Label required className="admin-label-block-mb-8">
               {t('admin2.dmdl_label_specialty')}
             </Label>
-            {departments.length > 0 ? (
+            {specialtyOptions.length > 0 ? (
               <Select
                 value={formData.specialty}
                 onChange={(e: SelectChangeEvent) => handleChange('specialty', e.target.value)}
                 options={[
                   { value: '', label: t('admin2.dmdl_select_department_placeholder') },
-                  ...departments.map((d) => ({ value: d.value, label: d.label })),
+                  ...specialtyOptions,
+                  // Editing a doctor whose stored specialty is inactive/absent
+                  // from the active catalog: keep the value visible as a
+                  // clearly-marked historical option so unrelated edits do not
+                  // look like a blank/reassigned specialty (the backend accepts
+                  // the unchanged historical value — no-cascade contract).
+                  ...(doctor?.specialty &&
+                  doctor.specialty === formData.specialty &&
+                  !specialtyOptions.some((o) => o.value === formData.specialty)
+                    ? [
+                        {
+                          value: doctor.specialty,
+                          label: `${doctor.specialty} (${t('admin2.dmdl_specialty_historical')})`,
+                        },
+                      ]
+                    : []),
                 ]}
                 size="large"
               />

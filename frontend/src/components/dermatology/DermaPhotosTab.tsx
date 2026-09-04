@@ -4,7 +4,7 @@ import logger from '../../utils/logger';
  * DermaPhotosTab — R-15: extracted from DermatologistPanelUnified.
  * Renders the "Фото" tab: PhotoUploader + SkinAnalysis + PhotoComparison.
  */
-import { MacOSCard, MacOSEmptyState, Button } from '../ui/macos';
+import { Card, AppEmpty, Button } from '../ui/macos';
 import React from 'react';
 import { Camera } from 'lucide-react';
 import PhotoUploader from './PhotoUploader';
@@ -49,7 +49,7 @@ export function DermaPhotosTab({
   const { t: rawT } = useTranslation(); const t = rawT as TFunc;
   if (!hasPatient) {
     return (
-      <MacOSEmptyState
+      <AppEmpty
         icon={Camera}
         title={t('derma.derma_photos_select_patient_title')}
         description={t('derma.derma_photos_select_patient_desc')}
@@ -60,7 +60,7 @@ export function DermaPhotosTab({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-6)' }}>
         <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
           {t('derma.derma_photos_upload_title')}
         </h3>
@@ -69,9 +69,9 @@ export function DermaPhotosTab({
           patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
           onDataUpdate={onPhotoUpdate}
         />
-      </MacOSCard>
+      </Card>
 
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-6)' }}>
         <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
           {t('derma.derma_photos_ai_title')}
         </h3>
@@ -83,9 +83,9 @@ export function DermaPhotosTab({
             logger.info('AI анализ завершен:', result);
           }}
         />
-      </MacOSCard>
+      </Card>
 
-      <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
+      <Card style={{ padding: 'var(--mac-spacing-6)' }}>
         <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
           {t('derma.derma_photos_compare_title')}
         </h3>
@@ -94,7 +94,7 @@ export function DermaPhotosTab({
           afterPhoto={typeof photoData.after?.[0] === 'string' ? photoData.after[0] as string : (photoData.after?.[0] as { url?: string } | undefined)?.url ?? null}
           metadata={{ visitId: currentAppointment?.visit_id, patientId: currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id }}
         />
-      </MacOSCard>
+      </Card>
     </div>
   );
 }

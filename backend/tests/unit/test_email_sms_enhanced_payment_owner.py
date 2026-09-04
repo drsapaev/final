@@ -66,7 +66,7 @@ async def test_send_payment_confirmation_enhanced_preserves_no_id_payload(
 ):
     patient = SimpleNamespace(
         id=123,
-        phone="+998901234567",
+        phone="+998900000121",
         email="patient@example.com",
         full_name="Sensitive Patient",
     )
@@ -108,7 +108,7 @@ async def test_send_payment_confirmation_enhanced_rejects_other_patient_payment(
 ):
     patient = SimpleNamespace(
         id=123,
-        phone="+998901234567",
+        phone="+998900000121",
         email="patient@example.com",
         full_name="Sensitive Patient",
     )

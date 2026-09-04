@@ -1,15 +1,21 @@
 import React, { useState, useEffect, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import Button from './Button';
-import Icon from './Icon';
 import { useTranslation } from '@/i18n/useTranslation';
 
 type SidebarVariant = 'default' | 'compact' | 'inset';
 
 interface SidebarItemData {
   id: string;
-  label: ReactNode;
-  icon?: string;
+  /** PR-UI-19 (C-6): i18n keys (nav.*) — resolved here via useTranslation. */
+  labelKey?: string;
+  badgeKey?: string;
+  tooltipKey?: string;
+  ariaLabelKey?: string;
+  /** Fallback text (e.g. route title) when labelKey absent/missing. */
+  label?: ReactNode;
+  icon?: LucideIcon;
   badge?: ReactNode;
   tooltip?: string;
   title?: string;
@@ -18,6 +24,8 @@ interface SidebarItemData {
 }
 
 interface SidebarSectionData {
+  /** PR-UI-19 (C-6): i18n key for the section heading, resolved here. */
+  titleKey?: string;
   title?: string;
   items?: SidebarItemData[];
 }
@@ -39,7 +47,7 @@ interface SidebarProps extends Omit<React.HTMLAttributes<HTMLElement>, 'children
 }
 
 interface SidebarItemProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style' | 'onClick'> {
-  icon?: string;
+  icon?: LucideIcon;
   label: ReactNode;
   badge?: ReactNode;
   active?: boolean;
@@ -125,8 +133,6 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
     display: 'flex',
     flexDirection: 'column',
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
-    backdropFilter: 'var(--mac-blur-light)',
-    WebkitBackdropFilter: 'var(--mac-blur-light)',
     position: 'relative',
     ...style
   };
@@ -195,10 +201,9 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
             color: 'var(--mac-text-primary)'
           }}>
 
-              <Icon
-            name={isCollapsed ? 'chevron.right' : 'chevron.left'}
-            size="small"
-            style={{ color: 'var(--mac-text-primary)' }} />
+              {isCollapsed
+              ? <ChevronRight size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />
+              : <ChevronLeft size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />}
 
             </Button>
         }
@@ -221,10 +226,9 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
             color: 'var(--mac-text-primary)'
           }}>
 
-          <Icon
-            name={isCollapsed ? 'chevron.right' : 'chevron.left'}
-            size="small"
-            style={{ color: 'var(--mac-text-primary)' }} />
+          {isCollapsed
+              ? <ChevronRight size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />
+              : <ChevronLeft size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />}
 
         </Button>
       </div>
@@ -236,8 +240,31 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
           // P-010 fix: helper to render a single sidebar item button.
           const renderItem = (item: SidebarItemData) => {
             const isActive = activeItem === item.id;
-            const itemAriaLabel = (item.ariaLabel || item.tooltip || item.label) as string;
-            const itemTitle = (item.tooltip || item.title || (isCollapsed ? (item.label as string) : undefined)) as string | undefined;
+            // PR-UI-19 (C-6): resolve nav labels through i18n HERE. Sidebar is the
+            // only useTranslation() subscriber in the chrome data flow (App.tsx
+            // computes getRouteChromeState() without an i18n subscription), so
+            // translating inside routeSelectors would freeze the previous
+            // language until an unrelated rerender. Missing key in every locale
+            // falls back to the item's fallback label (or the key itself).
+            const displayLabel: ReactNode = item.labelKey
+              ? t(item.labelKey, {
+                  defaultValue: typeof item.label === 'string' ? item.label : item.labelKey,
+                })
+              : item.label;
+            // PR-UI-19 (C-6, Codex round 1): badge/tooltip/ariaLabel follow the
+            // active language too (AI safety disclaimer et al.), with the raw
+            // values kept as fallbacks so nothing breaks on a missing key.
+            const displayBadge = item.badgeKey
+              ? t(item.badgeKey, { defaultValue: typeof item.badge === 'string' ? item.badge : item.badgeKey })
+              : item.badge;
+            const displayTooltip = item.tooltipKey
+              ? t(item.tooltipKey, { defaultValue: item.tooltip })
+              : item.tooltip;
+            const displayAriaLabel = item.ariaLabelKey
+              ? t(item.ariaLabelKey, { defaultValue: item.ariaLabel })
+              : item.ariaLabel;
+            const itemAriaLabel = (displayAriaLabel || displayTooltip || displayLabel) as string;
+            const itemTitle = (displayTooltip || item.title || (isCollapsed ? (displayLabel as string) : undefined)) as string | undefined;
             const itemStyles: CSSProperties = {
               display: 'flex',
               alignItems: 'center',
@@ -245,10 +272,16 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
               borderRadius: 'var(--mac-radius-md, 6px)',
               // Sprint 8: macOS Finder-style active state — accent bg, no border, subtle
               background: isActive ? 'var(--mac-accent-bg)' : 'transparent',
-              color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-primary)',
+              // CC-1: active ink was var(--mac-accent) — blue-on-blue (1.0:1) against
+              // the solid --mac-nav-item-active !important background from the
+              // embedded style block below; invisible in light and (after the
+              // visibility-fix decommission) dark. The canonical pair token is
+              // --mac-nav-item-active-text (= --mac-text-on-accent, white), the
+              // same one SidebarItem already uses.
+              color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)',
               textDecoration: 'none',
               fontSize: 'var(--mac-font-size-base, 13px)',
-              fontWeight: isActive ? 'var(--mac-font-weight-semibold, 600)' : 'var(--mac-font-weight-normal, 400)',
+              fontWeight: isActive ? 'var(--mac-font-weight-semibold, 600)' : 'var(--mac-font-weight-regular, 400)',
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
               cursor: 'pointer',
               transition: 'background-color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease), color var(--mac-duration-fast, 0.15s) var(--mac-ease, ease)',
@@ -266,6 +299,9 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
               }
             };
 
+            // Track 3-1: item.icon is now a LucideIcon component reference.
+            const ItemIcon = item.icon;
+
             return (
               <button
                 key={item.id}
@@ -275,13 +311,15 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                 onClick={handleItemClick}
                 title={itemTitle}>
 
-                {item.icon &&
-                <Icon
-                  name={item.icon}
-                  size="default"
+                {ItemIcon &&
+                <ItemIcon
+                  size={20}
+                  aria-hidden="true"
                   style={{
                     // Sprint 8: active icon = accent color, inactive = secondary
-                    color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                    // CC-1: active icon mirrors the label fix — nav-item-active-text
+                    // on the solid active background (was var(--mac-accent), 1.0:1).
+                    color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-secondary)',
                     opacity: isActive ? 1 : 0.85,
                   }} />
 
@@ -296,14 +334,17 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                   textOverflow: 'ellipsis',
                   color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-primary)'
                 }}>
-                    {item.label}
+                    {displayLabel}
                   </span>
                 }
 
-                {!isCollapsed && item.badge &&
+                {!isCollapsed && displayBadge &&
                 <span style={{
                   backgroundColor: isActive ? 'var(--mac-accent-bg)' : 'var(--mac-bg-tertiary)',
-                  color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                  // AXE-EXP-2: inactive badge ink — secondary was 3.95:1 on
+                  // the tertiary surface in dark; on-tertiary ink passes both
+                  // themes (5.71:1 light / 6.74:1 dark).
+                  color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-on-tertiary)',
                   fontSize: 'var(--mac-font-size-xs, 11px)',
                   fontWeight: 'var(--mac-font-weight-semibold, 600)',
                   padding: '2px 7px',
@@ -311,7 +352,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                   minWidth: '18px',
                   textAlign: 'center'
                 }}>
-                    {item.badge}
+                    {displayBadge}
                   </span>
                 }
               </button>);
@@ -333,9 +374,13 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
           // If sections provided AND sidebar is expanded (not collapsed),
           // render grouped with macOS-native visual separators between sections.
           if (Array.isArray(sections) && sections.length > 0 && !isCollapsed) {
-            return sections.map((section, sectionIdx) => (
-              <div key={`section-${sectionIdx}-${section.title || ''}`} style={{ marginBottom: '2px' }}>
-                {section.title && (
+            return sections.map((section, sectionIdx) => {
+              const sectionTitle: ReactNode = section.titleKey
+                ? t(section.titleKey, { defaultValue: section.title })
+                : section.title;
+              return (
+              <div key={`section-${sectionIdx}-${section.titleKey || section.title || ''}`} style={{ marginBottom: '2px' }}>
+                {sectionTitle && (
                   <div
                     style={{
                       ...sectionHeaderBaseStyle,
@@ -345,14 +390,13 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                     role="heading"
                     aria-level={3}
                     className="mac-sidebar-section-header">
-                    {section.title}
+                    {sectionTitle}
                   </div>
                 )}
                 {(section.items || []).map(renderItem)}
               </div>
-            ));
-          }
-
+              );
+            })}
           // Flat fallback (original behavior)
           return items.map(renderItem);
         })()}
@@ -449,7 +493,7 @@ Sidebar.displayName = 'macOS Sidebar';
  * Sidebar Item Component
  */
 export const SidebarItem = React.forwardRef<HTMLButtonElement, SidebarItemProps>(({
-  icon,
+  icon: ItemIcon,
   label,
   badge,
   active = false,
@@ -485,10 +529,10 @@ export const SidebarItem = React.forwardRef<HTMLButtonElement, SidebarItemProps>
       onClick={onClick}
       {...props}>
 
-      {icon &&
-      <Icon
-        name={icon}
-        size="default"
+      {ItemIcon &&
+      <ItemIcon
+        size={20}
+        aria-hidden="true"
         style={{
           color: active ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)'
         }} />
@@ -602,14 +646,17 @@ export const SidebarSection = React.forwardRef<HTMLDivElement, SidebarSectionPro
             {title}
           </span>
 
-          <Icon
-          name={isCollapsed ? 'chevron.right' : 'chevron.down'}
-          size="small"
-          style={{
-            color: 'var(--mac-text-tertiary)',
-            transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
-            transform: isCollapsed ? 'rotate(0deg)' : 'rotate(0deg)'
-          }} />
+          {isCollapsed
+            ? <ChevronRight size={16} aria-hidden="true" style={{
+                color: 'var(--mac-text-tertiary)',
+                transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                transform: 'rotate(0deg)'
+              }} />
+            : <ChevronDown size={16} aria-hidden="true" style={{
+                color: 'var(--mac-text-tertiary)',
+                transition: 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                transform: 'rotate(0deg)'
+              }} />}
         </div>
       }
       {title && !collapsible &&

@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
   Select,
   SegmentedControl,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
 } from '../ui/macos';
 import {
   Activity,
@@ -285,45 +285,45 @@ const MedicalEquipmentManager = () => {
 
       {overview ?
     <div className="admin-grid-auto-200-mb-24">
-          <MacOSCard className="p-0">
+          <Card className="p-0">
             <div className="admin-stat-number-accent-mb-8">
               {String(overview.total_devices ?? '')}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.equip_stat_total_devices')}
             </div>
-          </MacOSCard>
-          <MacOSCard className="p-0">
+          </Card>
+          <Card className="p-0">
             <div className="admin-stat-number-success-mb-8">
               {String(overview.online_devices ?? '')}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.equip_stat_online')}
             </div>
-          </MacOSCard>
-          <MacOSCard className="p-0">
+          </Card>
+          <Card className="p-0">
             <div className="admin-stat-number-error-mb-8">
               {String(overview.offline_devices ?? '')}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.equip_stat_offline')}
             </div>
-          </MacOSCard>
-          <MacOSCard className="p-0">
+          </Card>
+          <Card className="p-0">
             <div className="admin-stat-number-purple-mb-8">
               {String(overview.total_measurements ?? '')}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.equip_stat_total_measurements')}
             </div>
-          </MacOSCard>
+          </Card>
         </div> :
 
     <Skeleton type="card" count={4} />
     }
 
       <div className="admin-grid-auto-300-24">
-        <MacOSCard className="p-0">
+        <Card className="p-0">
           <h4 className="admin-rule-header mb-4">
             {t('admin2.equip_stat_by_type')}
           </h4>
@@ -342,9 +342,9 @@ const MedicalEquipmentManager = () => {
 
         <Skeleton type="text" count={3} />
         }
-        </MacOSCard>
+        </Card>
 
-        <MacOSCard className="p-0">
+        <Card className="p-0">
           <h4 className="admin-rule-header mb-4">
             {t('admin2.equip_quick_actions')}
           </h4>
@@ -374,7 +374,7 @@ const MedicalEquipmentManager = () => {
               {t('admin2.equip_take_measurement')}
             </Button>
           </div>
-        </MacOSCard>
+        </Card>
       </div>
     </div>;
 
@@ -390,7 +390,7 @@ const MedicalEquipmentManager = () => {
       </div>
 
       {/* Фильтры */}
-      <MacOSCard className="p-0">
+      <Card className="p-0">
         <div className="admin-grid-auto-200">
           <div>
             <label htmlFor="device-type-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_filter_device_type')}</label>
@@ -436,14 +436,14 @@ const MedicalEquipmentManager = () => {
           
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Список устройств */}
       <div className="admin-grid-auto-300">
         {filteredDevices.map((device) => {
         const DeviceIcon = getDeviceIcon(device.device_type);
         return (
-          <MacOSCard key={String(device.id ?? '')} className="p-4">
+          <Card key={String(device.id ?? '')} className="p-4">
               <div className="admin-flex-between-flex-start-mb-12">
                 <div className="flex items-center justify-center gap-2">
                   <DeviceIcon size={20} className="admin-icon-blue" />
@@ -505,13 +505,13 @@ const MedicalEquipmentManager = () => {
                   {t('admin2.equip_action_details')}
                 </Button>
               </div>
-            </MacOSCard>);
+            </Card>);
 
       })}
       </div>
 
       {filteredDevices.length === 0 && !loading &&
-    <MacOSEmptyState
+    <AppEmpty
       icon={Stethoscope}
       title={devicesEmptyTitle}
       description={devicesEmptyDescription} />
@@ -524,7 +524,7 @@ const MedicalEquipmentManager = () => {
   <div className="flex flex-col gap-6">
       <h3 className="admin-section-h3-m0">{t('admin2.equip_take_measurement')}</h3>
 
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <div className="admin-grid-auto-300-24">
           <div className="flex flex-col gap-4">
             <div>
@@ -586,7 +586,7 @@ const MedicalEquipmentManager = () => {
             </div>
 
             {devices.filter((d) => d.status === 'online').length === 0 &&
-          <MacOSEmptyState
+          <AppEmpty
             icon={WifiOff}
             title={t('admin2.equip_no_available_devices_title')}
             description={t('admin2.equip_no_available_devices_desc')} />
@@ -594,7 +594,7 @@ const MedicalEquipmentManager = () => {
           }
           </div>
         </div>
-      </MacOSCard>
+      </Card>
     </div>;
 
 
@@ -616,7 +616,7 @@ const MedicalEquipmentManager = () => {
         </div>
 
         {/* Фильтры для измерений */}
-        <MacOSCard className="p-0">
+        <Card className="p-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="measurements-device-type" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_filter_device_type')}</label>
@@ -641,12 +641,12 @@ const MedicalEquipmentManager = () => {
               </Button>
             </div>
           </div>
-        </MacOSCard>
+        </Card>
 
         {/* Список измерений */}
         <div className="flex flex-col gap-4">
           {measurements.map((measurement, index) =>
-          <MacOSCard key={index} className="p-4">
+          <Card key={index} className="p-4">
               <div className="admin-flex-between-flex-start">
                 <div className="admin-flex-1">
                   <div className="admin-flex-center-8-mb-8">
@@ -688,7 +688,7 @@ const MedicalEquipmentManager = () => {
                   </div>
                 </div>
               </div>
-            </MacOSCard>
+            </Card>
           )}
         </div>
 

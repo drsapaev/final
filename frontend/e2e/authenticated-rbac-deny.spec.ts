@@ -1,11 +1,14 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import {
   AUTHENTICATED_RBAC_DENY_QA_ROUTES,
+  attachRuntimeErrorCapture,
   installAuthenticatedQaHarness,
-} from './support/authenticatedQa.js';
+} from './support/authenticatedQa';
+import type { DenyQaRoute } from './support/authenticatedQa';
 
-async function expectForbiddenForSeededRole(page, route) {
+async function expectForbiddenForSeededRole(page: Page, route: DenyQaRoute) {
   await expect(page).not.toHaveURL(/\/login$/);
   await expect(page).toHaveURL(/\/forbidden$/);
   await expect(page.locator(`.app-shell[data-route-id="${route.deniedRouteId}"]`)).toHaveCount(0);
@@ -15,10 +18,13 @@ async function expectForbiddenForSeededRole(page, route) {
 test.describe('Authenticated RBAC denial UI QA harness', () => {
   for (const route of AUTHENTICATED_RBAC_DENY_QA_ROUTES) {
     test(`${route.key} redirects seeded ${route.role} session to forbidden`, async ({ page }, testInfo) => {
-      const pageErrors = [];
-      page.on('pageerror', (error) => {
-        pageErrors.push(error.message);
-      });
+      // PR-QA-04: adopt the role-smoke runtime crash-capture standard
+      // (pageerror + CRASH-signature console.error). These deny tests are
+      // destined for blocking Tier-1, so a masked React crash behind the
+      // ErrorBoundary must fail them exactly like the role/specialty/
+      // action suites. The positive /forbidden assertions below stay the
+      // primary gates; these are the crash-parity gates.
+      const { pageErrors, consoleErrors } = attachRuntimeErrorCapture(page);
 
       await installAuthenticatedQaHarness(page, { role: route.role });
       await page.setViewportSize({ width: 1280, height: 800 });
@@ -34,7 +40,8 @@ test.describe('Authenticated RBAC denial UI QA harness', () => {
         contentType: 'image/png',
       });
 
-      expect(pageErrors).toEqual([]);
+      expect(pageErrors, `${route.key} unexpected pageerror`).toEqual([]);
+      expect(consoleErrors, `${route.key} unexpected console.error (possible masked crash)`).toEqual([]);
     });
   }
 });

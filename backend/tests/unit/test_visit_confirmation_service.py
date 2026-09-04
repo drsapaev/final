@@ -47,7 +47,10 @@ class TestVisitConfirmationService:
         try:
             service.confirm_by_pwa(
                 token=test_visit.confirmation_token,
-                patient_phone="+998900000000",
+                # Use a DIFFERENT phone from the visit's patient phone
+                # to trigger the mismatch error. The visit's patient phone
+                # is +998900000000 (canonical synthetic in conftest.py).
+                patient_phone="+998900000999",
                 source_ip="127.0.0.1",
                 user_agent="Mozilla/5.0",
             )

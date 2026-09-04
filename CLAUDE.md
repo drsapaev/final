@@ -112,7 +112,7 @@ For backend pytest in this Windows checkout, prefer `C:\final\scripts\run_backen
 
 **Canonical Anchors in This Project:**
 - Roles: `backend/app/models/role_permission.py` (SINGLE SOURCE OF TRUTH)
-- Routes: `frontend/src/routing/routeRegistry.js`
+- Routes: `frontend/src/routing/routeRegistry.ts`
 - Service codes: `backend/app/services/service_mapping.py`
 - Queue groups: `backend/app/services/service_mapping.py` (QUEUE_GROUPS)
 - Auth flow: `backend/app/services/authentication_service.py`
@@ -235,9 +235,9 @@ docker compose logs -f frontend
 
 ### Frontend Structure
 
-**Framework:** React 18 with React Router v6, Vite bundler
+**Framework:** React 19 with React Router v6, Vite bundler, TypeScript (strict)
 
-**Entry Point:** `frontend/src/main.jsx` → `App.jsx`
+**Entry Point:** `frontend/src/main.tsx` → `App.tsx`
 
 **Key Frontend Features:**
 - **macOS-inspired UI** with custom design system (CSS variables in `styles/macos.css`)
@@ -248,7 +248,7 @@ docker compose logs -f frontend
 **Important Frontend Directories:**
 - `src/pages/` - Page components (AdminPanel, DoctorPanel, RegistrarPanel, etc.)
 - `src/components/` - Reusable UI components
-  - `components/auth/` - Authentication forms (**USE LoginFormStyled.jsx, NOT Login.jsx**)
+  - `components/auth/` - Authentication forms (**USE LoginFormStyled.tsx**)
   - `components/medical/` - EMR, medical records
   - `components/ui/macos/` - macOS UI components (Sidebar, Header, Icon)
   - `components/tables/` - Data tables
@@ -280,7 +280,7 @@ docker compose logs -f frontend
 - Specialized: cardio, derma, dentist
 
 **Role Routing:**
-- Frontend: `App.jsx` defines role-based routes
+- Frontend: `App.tsx` defines role-based routes
 - Backend: Role checks in endpoints via dependencies
 - Test after changes: `python test_role_routing.py`
 
@@ -291,7 +291,7 @@ docker compose logs -f frontend
 1. **Blocking 2FA Flow:** Never issue `access_token` before 2FA verification
 2. **Single Role Source:** Use ONLY `app/models/role_permission.py`
 3. **Password Hashing:** argon2 for new passwords, maintain bcrypt compatibility
-4. **Login Form:** Use `LoginFormStyled.jsx` as primary, NOT `Login.jsx`
+4. **Login Form:** Use `LoginFormStyled.tsx` as primary
 5. **Protected Users:** Never delete: admin, registrar, doctor, cardio, derma, dentist
 
 **Authentication Flow:**
@@ -324,7 +324,7 @@ docker compose logs -f frontend
 - Black formatter (line length 88)
 - Import order: isort with black profile
 
-**JavaScript/React (Frontend):**
+**TypeScript/React (Frontend):**
 - Functional components with hooks
 - ESLint for linting (`npm run lint`)
 - Avoid direct CSS class manipulation - use theme system
@@ -413,7 +413,7 @@ For risky tasks that should not execute yet, output `plan`, `dossier`, or `hando
 
 1. **DON'T** bypass the blocking 2FA flow
 2. **DON'T** create duplicate role models outside `role_permission.py`
-3. **DON'T** use `Login.jsx` - use `LoginFormStyled.jsx`
+3. **DON'T** create a new login form - use `LoginFormStyled.tsx`
 4. **DON'T** import designTokens directly - use theme hooks
 5. **DON'T** run backend commands from root directory - always use `backend/`
 6. **DON'T** hardcode secrets - use environment variables
@@ -429,7 +429,7 @@ For risky tasks that should not execute yet, output `plan`, `dossier`, or `hando
 ## Domain Guardrails (from AGENTS.md)
 
 ### Routing
-- Start from routing SSOT: `frontend/src/routing/routeRegistry.js`
+- Start from routing SSOT: `frontend/src/routing/routeRegistry.ts`
 - Verify route contract/snapshot tests before broad cleanup
 - Do not mass-edit unrelated routes in first slice
 
@@ -485,7 +485,7 @@ For risky tasks that should not execute yet, output `plan`, `dossier`, or `hando
 - `ADMIN_USERNAME`, `ADMIN_PASSWORD` - Default admin credentials
 
 **Frontend:**
-- API endpoint configured in `src/api/interceptors.js`
+- API endpoint configured in `src/api/interceptors.ts`
 - Uses `http://localhost:18000` for backend in dev mode
 
 ## Project-Specific Conventions
@@ -556,7 +556,7 @@ GraphQL endpoint available at `/api/graphql` with schema explorer in admin panel
 
 **Key Files:**
 - Backend: `app/api/v1/endpoints/services.py`, `app/services/service_audit_service.py`, `app/models/service_audit.py`
-- Frontend: `components/admin/ServiceCatalog.jsx`, `components/admin/ServiceAuditHistory.jsx`, `components/admin/ServiceChangesPreview.jsx`, `components/admin/ServiceBatchEdit.jsx`
+- Frontend: `components/admin/ServiceCatalog.tsx`, `components/admin/ServiceAuditHistory.tsx`, `components/admin/ServiceChangesPreview.tsx`, `components/admin/ServiceBatchEdit.tsx`
 - Migration: `alembic/versions/0022_service_audit_log.py`
 
 ## Local Dev-Brain Commands (from AGENTS.md)

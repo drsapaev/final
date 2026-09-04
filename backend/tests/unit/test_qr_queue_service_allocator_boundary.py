@@ -108,7 +108,7 @@ def test_complete_join_session_uses_queue_domain_boundary(monkeypatch):
     result = service.complete_join_session(
         session_token="session-token",
         patient_name="Boundary Patient",
-        phone="+998904040404",
+        phone="+998900000137",
         telegram_id=77,
     )
 
@@ -123,7 +123,7 @@ def test_complete_join_session_uses_queue_domain_boundary(monkeypatch):
         allocation_mode="join_with_token",
         token_str="qr-token",
         patient_name="Boundary Patient",
-        phone="+998904040404",
+        phone="+998900000137",
         telegram_id=77,
         patient_id=123,
         source="online",
@@ -177,7 +177,7 @@ def test_complete_join_session_multiple_uses_queue_domain_boundary(monkeypatch):
         session_token="session-token",
         specialist_ids=[11, 22],
         patient_name="Boundary Patient",
-        phone="+998905050505",
+        phone="+998900000139",
         telegram_id=99,
     )
 
@@ -240,7 +240,7 @@ def test_complete_join_session_claim_rejects_replay_before_allocator(monkeypatch
     service.complete_join_session(
         session_token="session-token",
         patient_name="Boundary Patient",
-        phone="+998904040404",
+        phone="+998900000137",
         telegram_id=77,
     )
 
@@ -248,7 +248,7 @@ def test_complete_join_session_claim_rejects_replay_before_allocator(monkeypatch
         service.complete_join_session(
             session_token="session-token",
             patient_name="Replay Patient",
-            phone="+998904040405",
+            phone="+998900000138",
             telegram_id=78,
         )
 

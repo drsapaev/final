@@ -19,10 +19,16 @@ const cssSource = fs.readFileSync(
 );
 
 describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
-  it('uses eye/eye.slash icons in MaskedPhone component', () => {
-    // FIX11: иконка глаза — визуальный cue кликабельности.
-    expect(source).toContain('<Icon name={revealed ? \'eye.slash\' : \'eye\'}');
-    expect(source).toContain('<Icon name="eye.slash"');
+  it('uses eye/eye-off lucide icons in MaskedPhone component', () => {
+    // FIX11 (intent preserved): the eye icon is the visual clickability cue.
+    // Track 3-2 supersession: <Icon name={revealed ? 'eye.slash' : 'eye'}> was
+    // migrated to direct lucide <EyeOff /> / <Eye /> components (canonical
+    // icon system per §3.3 / Plan v2.10 §4.1.21 — reversal of the historic
+    // macos-Icon direction, same architectural intent).
+    expect(source).toContain("from 'lucide-react'");
+    expect(source).toContain('EyeOff');
+    expect(source).toContain('<Eye');
+    expect(source).not.toContain('<Icon');
   });
 
   it('adds aria-pressed to indicate toggle state', () => {

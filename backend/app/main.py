@@ -1,6 +1,7 @@
 # --- BEGIN app/main.py ---
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import json
 import logging
@@ -13,6 +14,7 @@ from urllib.parse import urlsplit, urlunsplit
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.background_jobs import spawn_daemon_job
 from app.core.config import get_settings
 from app.core.logging_config import setup_logging
 from app.core.prometheus import init_prometheus
@@ -121,6 +123,54 @@ if IS_PROD and (CORS_DISABLE or CORS_ALLOW_ALL):
 # -----------------------------------------------------------------------------
 # Lifespan Context Manager (replaces deprecated on_event)
 # -----------------------------------------------------------------------------
+# P0 2026-08-28: periodic background jobs (lab notifications, scheduled
+# backups) execute sync SQLAlchemy / pg_dump work in worker threads. Their
+# tasks and in-flight executor jobs are tracked here so shutdown can wait
+# (bounded) instead of leaving detached threads behind.
+_background_tasks: set[asyncio.Task] = set()
+_inflight_thread_jobs: set[asyncio.Future] = set()
+_scheduled_backup_service = None
+_BACKGROUND_SHUTDOWN_GRACE_SECONDS = 30
+
+
+def _run_coroutine_in_thread(coro_func, /, *args):
+    """Execute an async function to completion on a dedicated loop in the
+    current worker thread. Used by periodic background jobs whose call tree
+    mixes sync SQLAlchemy I/O with awaits: the sync I/O then never blocks the
+    app's event loop (P0 2026-08-28 origin-freeze root cause). All clients
+    created inside the call tree are per-call and loop-agnostic."""
+    return asyncio.run(coro_func(*args))
+
+
+async def _shutdown_background_tasks() -> None:
+    """Cancel periodic scheduler tasks and wait (bounded) for in-flight
+    worker-thread jobs, so shutdown never abandons a half-running DB query
+    or pg_dump as uncontrolled background work."""
+    for task in list(_background_tasks):
+        task.cancel()
+    if _background_tasks:
+        await asyncio.gather(*_background_tasks, return_exceptions=True)
+        _background_tasks.clear()
+
+    backup_service = _scheduled_backup_service
+    if backup_service is not None:
+        await backup_service.stop()
+
+    if _inflight_thread_jobs:
+        pending = list(_inflight_thread_jobs)
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*pending, return_exceptions=True),
+                timeout=_BACKGROUND_SHUTDOWN_GRACE_SECONDS,
+            )
+        except TimeoutError:
+            log.warning(
+                "Background job shutdown grace expired; %d job(s) will finish"
+                " detached",
+                len(pending),
+            )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
@@ -130,7 +180,8 @@ async def lifespan(app: FastAPI):
     yield  # Application is running
 
     # === SHUTDOWN ===
-    # Add any cleanup code here if needed
+    # Cancel periodic schedulers and wait (bounded) for in-flight jobs.
+    await _shutdown_background_tasks()
     log.info("Application shutdown complete")
 
 
@@ -472,8 +523,87 @@ _app_start_time = _time.time()
 # -----------------------------------------------------------------------------
 # Диагностика подключённых маршрутов (called from lifespan)
 # -----------------------------------------------------------------------------
+def _warm_table_reflection() -> None:
+    """Pre-reflect service tables once per process (perf P0 2026-09-03).
+
+    visits_api_service reflects schema tables lazily; the first reflection
+    costs dozens of pg_catalog roundtrips (~25s against the remote
+    Supabase). Warming the shared cache in a daemon thread right after
+    boot keeps the FIRST user request fast without blocking startup.
+    Best-effort: any failure logs and leaves the lazy path in place.
+    """
+    import threading
+
+    def _warm() -> None:
+        try:
+            import os as _os
+
+            if _os.getenv("TESTING") == "1":
+                # Test container: per-test databases (and monkeypatched
+                # session factories) make process-level warmup meaningless;
+                # running it here only leaks fake sessions into
+                # worker-thread assertions. Production runtime only.
+                return
+            from sqlalchemy import Table
+            from sqlalchemy import select as _select
+
+            from app.db.session import SessionLocal
+            from app.models.clinic import Doctor as _Doctor
+            from app.models.patient import Patient as _Patient
+            from app.models.user import User as _User
+            from app.services.lab_reporting_service import LabReportingService
+            from app.services.visits_api_service import _REFLECTED_META
+
+            session = SessionLocal()
+            try:
+                bind = session.get_bind()
+                for name in ("visits", "visit_services", "patients", "doctors", "users"):
+                    Table(name, _REFLECTED_META, autoload_with=bind)
+
+                # ORM compile touch: the FIRST query per mapper also pays a
+                # per-process compilation/catalog cost — touch the hot
+                # mappers once so user-facing requests skip it.
+                for _mapper_stmt in (
+                    _select(_User).limit(1),
+                    _select(_Patient).limit(1),
+                    _select(_Doctor).limit(1),
+                ):
+                    session.execute(_mapper_stmt)
+
+                # Lab self-heal seeders: first pass costs hundreds of
+                # statements against the remote DB — pay it here, once per
+                # process. Cross-PROCESS losers (multi-worker deploys) hit
+                # IntegrityError; the seeders treat it as "already seeded".
+                try:
+                    LabReportingService(session).list_templates()
+                except Exception as lab_exc:
+                    log.info(
+                        "Warmup lab seed skipped (%s) — seeders re-arm lazily",
+                        type(lab_exc).__name__,
+                    )
+                    try:
+                        session.rollback()
+                    except Exception:
+                        pass
+            finally:
+                try:
+                    session.close()
+                except Exception:
+                    pass
+            log.info(
+                "✅ Warmup complete (reflection %s tables + ORM touch + lab seed)",
+                len(_REFLECTED_META.tables),
+            )
+        except Exception as exc:  # pragma: no cover - startup best-effort
+            log.warning("Table reflection warmup skipped: %s", type(exc).__name__)
+
+    threading.Thread(target=_warm, name="schema-reflection-warmup", daemon=True).start()
+
+
+
 async def _startup_tasks() -> None:
     """Startup tasks - validates security settings and prints routes"""
+    _warm_table_reflection()
     # Validate SECRET_KEY on startup
     try:
         from app.core.config import _DEFAULT_SECRET_KEY, get_settings
@@ -518,6 +648,11 @@ async def _startup_tasks() -> None:
             backup_db = SessionLocal()
             backup_service = ScheduledBackupService(backup_db)
 
+            # P0 2026-08-28: keep a reference so shutdown can stop the
+            # scheduler and wait out an in-flight pg_dump worker thread.
+            global _scheduled_backup_service
+            _scheduled_backup_service = backup_service
+
             # Get backup time from env (default: 2 AM)
             backup_hour = int(os.getenv("BACKUP_HOUR", "2"))
             backup_minute = int(os.getenv("BACKUP_MINUTE", "0"))
@@ -529,6 +664,15 @@ async def _startup_tasks() -> None:
         except Exception as e:
             log.error(f"Failed to start backup scheduler: {e}")
 
+    if TESTING and os.getenv("LAB_SCHEDULER_FORCE_START") != "1":
+        # Test container: the every-5-minutes worker shares the sqlite engine
+        # with live per-test transactions — its periodic commits surface as
+        # flaky "no such savepoint"/"database is locked" teardown errors in
+        # whichever test is running when it fires. The scheduler's own
+        # behavior is covered by its dedicated regression tests, which arm it
+        # explicitly via LAB_SCHEDULER_FORCE_START=1.
+        log.info("Lab notification scheduler autostart skipped (TESTING=1)")
+        return
     # #8 fix: Start lab notification scheduler as a safety net.
     # The primary notification path is inline in lab_reporting_service.finalize(),
     # but this scheduler catches any missed events (e.g. if the inline call
@@ -537,19 +681,38 @@ async def _startup_tasks() -> None:
         import asyncio
 
         from app.db.session import SessionLocal
-        from app.services.lab_notification_service import LabNotificationService
+        from app.services.lab_notification_service import run_lab_notifications
 
         async def _run_lab_notifications_periodically():
             while True:
+                # run_all_notifications не существует с рефакторинга сервиса
+                # (#1933 ввёл вызов, поздний рефакторинг переименовал метод);
+                # канонический путь — модульный оркестратор run_lab_notifications.
+                # P0 2026-08-28: the call tree performs sync SQLAlchemy I/O; on
+                # the event loop a stalled Supabase socket froze every request
+                # (origin-wide outage). Must run in a worker thread.
+                lab_db = SessionLocal()
+
+                def _run_lab_job(db=lab_db):
+                    try:
+                        return _run_coroutine_in_thread(run_lab_notifications, db)
+                    finally:
+                        db.close()
+
                 try:
-                    lab_db = SessionLocal()
-                    LabNotificationService(lab_db).run_all_notifications()
-                    lab_db.close()
+                    job = spawn_daemon_job(_run_lab_job)
+                    _inflight_thread_jobs.add(job)
+                    job.add_done_callback(_inflight_thread_jobs.discard)
+                    # shield(): cancelling the scheduler task must not cancel
+                    # the tracked job itself, or shutdown would lose sight of
+                    # the still-running worker thread.
+                    await asyncio.shield(job)
                 except Exception as exc:
                     log.warning("Lab notification scheduler error: %s", exc)
                 await asyncio.sleep(300)  # 5 minutes
 
-        asyncio.create_task(_run_lab_notifications_periodically())
+        _task = asyncio.create_task(_run_lab_notifications_periodically())
+        _background_tasks.add(_task)
         log.info("✅ Lab notification scheduler started (every 5 minutes)")
     except ImportError:
         log.debug("Lab notification service not available — scheduler skipped")

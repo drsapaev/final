@@ -207,8 +207,27 @@ class MorningAssignmentService:
                         processed_count += 1
                         assigned_queues_count += len(queue_assignments)
 
-                        # Обновляем статус визита
-                        visit.status = "open"  # Готов к приему
+                        # Issue #06 Phase 3: delegate to VisitLifecycleService.
+                        # activate_confirmed_visit() does confirmed → open.
+                        # This is a system-initiated transition (batch job),
+                        # so current_user is None.
+                        #
+                        # P2-1 (post-merge stabilization): commit=False is
+                        # MANDATORY here. The default commit=True fires
+                        # db.commit() per-visit inside this batch loop,
+                        # breaking the commit=False composition contract
+                        # established by Issue #06. With commit=True the
+                        # top-level rollback at L253 cannot undo visits
+                        # processed before a mid-batch failure, leaving
+                        # partial state (some visits 'open' with queue
+                        # entries, others 'confirmed' without).
+                        # See tests/regression/test_p2_1_morning_assignment_txn.py.
+                        from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                        VisitLifecycleService(self.db).activate_confirmed_visit(
+                            visit_id=visit.id,
+                            commit=False,
+                        )
 
                         logger.info(
                             f"✅ Визит {visit.id}: присвоено {len(queue_assignments)} номеров"
@@ -346,7 +365,26 @@ class MorningAssignmentService:
         target_date: date,
         source: str = "morning_assignment",
     ) -> list[dict[str, any]]:
-        """Присваивает номера в очередях для конкретного визита"""
+        """Присваивает номера в очередях для конкретного визита
+
+        P2-1b (post-merge stabilization): the original code called
+        self.db.rollback() on per-queue_tag failure, which discarded ALL
+        staged work AND left stale dicts in queue_assignments. The loop
+        continued, and the visit was activated with stale data (non-empty
+        queue_assignments but 0 real DB entries).
+
+        Fix: on failure, rollback restores the session, then
+        queue_assignments is CLEARED to remove stale dicts. The loop
+        BREAKS — no further tags are attempted. The visit is NOT
+        activated (queue_assignments is empty).
+
+        Trade-off: a single tag failure causes the entire visit's queue
+        assignment to fail (no partial assignment). This is more
+        conservative than the savepoint approach but avoids conflicts
+        with test infrastructure that uses begin_nested() for test
+        isolation. Partial assignment support can be added later with
+        proper savepoint-aware test infrastructure.
+        """
 
         # Получаем уникальные queue_tag из услуг визита
         unique_queue_tags = self._get_visit_queue_tags(visit)
@@ -372,11 +410,18 @@ class MorningAssignmentService:
                     f"Ошибка присвоения очереди {queue_tag} для визита {visit.id}: {e}",
                     exc_info=True
                 )
-                # ✅ SECURITY: Rollback session при ошибке foreign key
-                try:
-                    self.db.rollback()
-                except Exception as rollback_error:
-                    logger.error(f"Ошибка при rollback: {rollback_error}")
+                # P2-1b: rollback to restore the session after flush failure.
+                # No try/except — if rollback fails, the error should propagate.
+                self.db.rollback()
+                # P2-1b: CLEAR stale data. The rollback destroyed all
+                # flushed entries, so any dicts in queue_assignments
+                # reference non-existent DB rows. Without clearing, the
+                # caller would see non-empty queue_assignments and
+                # activate the visit with 0 real queue entries.
+                queue_assignments.clear()
+                # BREAK — after a full rollback, the session state is
+                # reset. Continuing the loop would re-query stale data.
+                break
 
         return queue_assignments
 

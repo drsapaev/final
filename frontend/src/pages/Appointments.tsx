@@ -156,7 +156,16 @@ export default function Appointments() {
 
           {useAdvancedTable ? (
             <EnhancedAppointmentsTable
-              appointments={filtered}
+              // PR-UI-12-4 fix (pre-existing dead-prop bug): EAT's canonical
+              // rows prop is `data` (every other consumer — registrar
+              // WelcomeView, cardiology AppointmentsTab, doctor panels —
+              // passes it); the legacy `appointments` prop exists in EAT's
+              // interface but is never destructured, so the "Расширенная
+              // таблица" toggle has always rendered an EMPTY table on this
+              // screen. Passing `data` makes the advanced table actually
+              // render — required for the PR-UI-12-4 sticky-header wiring on
+              // the Appointments surface to be observable.
+              data={filtered}
               appointmentsSelected={selectedAppointments}
               setAppointmentsSelected={setSelectedAppointments}
               updateAppointmentStatus={(id: unknown, status: unknown) => logger.log('Update status:', id, status)}

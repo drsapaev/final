@@ -1,13 +1,17 @@
 /**
  * Единый brand config для всего приложения.
  *
- * До этого рефакторинга в проекте использовались 3 разных имени продукта:
+ * PR-UI-10 (28.08.2026): унификация имени продукта на "Clinic OS" — см.
+ * docs/UI_REMEDIATION_PLAN.md §7 PR-UI-10. До этого рефакторинга в проекте
+ * использовались 3 разных имени продукта (см. git history для аудита):
  *   - "Система управления клиникой" (README, t('title'))
- *   - "MediClinic Pro" (Landing hero description)
+ *   - прежнее product name на лендинге (Landing hero description, footer) ← REMOVED
  *   - "Clinic OS" (Landing liveStatus badge)
- *
- * UX Audit (cross-cutting issue 10.5) выявил, что это путает пользователя.
- * Теперь все экраны должны импортировать BRAND из этого файла.
+ * Теперь ВСЕ экраны используют BRAND.name = 'Clinic OS'. Связанные ассеты:
+ *   - /public/brand/logo.svg — горизонтальный lockup (mark + "Clinic OS" wordmark)
+ *   - /public/brand/logo-mark.svg — 32×32 монограмма (favicon + header)
+ *   - /public/manifest.json — PWA name/short_name/icons синхронизированы
+ *   - frontend/index.html — <title>, <link rel="icon">, meta-теги
  *
  * Usage:
  *   import { BRAND } from '../config/brand';
@@ -17,13 +21,18 @@
  * Migration:
  *   - Заменить хардкоженные строки в Landing.jsx, LoginFormStyled.jsx,
  *     EMRContainerV2.jsx, footer и т.д. на BRAND.name / BRAND.shortName.
- *   - LANDING_COPY в landingContent.js может использовать BRAND как fallback.
+ *   - LANDING_COPY в landingContent.ts использует BRAND как fallback.
+ *   - Все 5 локалей (en/ru/kk/uz-Cyrl/uz-Latn) мигрированы на 'Clinic OS'.
+ *
+ * Acceptance criterion (PR-UI-10 §7): `grep -r "прежнее имя" src/` — 0
+ * результатов (историческое имя сохраняется только в git history, не в
+ * текущем исходном коде).
  *
  * @type {object}
  */
 export const BRAND = {
   /** Полное имя продукта для заголовков, hero, документации. */
-  name: 'MediClinic Pro',
+  name: 'Clinic OS',
   /** Короткое имя для шапки, таб-названия, mobile-header. */
   shortName: 'Clinic OS',
   /** Подзаголовок / elevator pitch. */
@@ -37,9 +46,9 @@ export const BRAND = {
   /** Путь к монограмме (32×32) — для favicon и шапки. */
   logoMark: '/brand/logo-mark.svg',
   /** Email поддержки. */
-  supportEmail: 'support@mediclinic.pro',
+  supportEmail: 'support@clinic-os.example',
   /** Текущая версия продукта — показывается в footer и help-диалогах. */
-  version: '1.0.0',
+  version: '2.0.0',
 };
 
 /**

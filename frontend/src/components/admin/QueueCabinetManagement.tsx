@@ -19,12 +19,12 @@ import React from "react";
 import {
   Badge,
   Button,
-  MacOSCard,
-  MacOSEmptyState,
+  Card,
+  AppEmpty,
   Input,
-  MacOSStatCard,
-  Table,
+  StatCard,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 
 const INITIAL_FILTERS = {
   day: '',
@@ -339,7 +339,7 @@ const QueueCabinetManagement = () => {
 
   return (
     <div className="admin-p-0-bgc-bg-primary">
-      <MacOSCard className="p-0">
+      <Card className="p-0">
         <div className="p-6">
           <div
             className="admin-d-flex-ai-start-jc-between-gap-16-mb-24-pb-24-bd-b-1px-solid-var-mac-bo">
@@ -375,28 +375,28 @@ const QueueCabinetManagement = () => {
 
           <div
             className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-mb-24">
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.qcm_stat_queues')}
               value={summary.totalQueues}
               icon={CalendarDays}
               color="blue"
               loading={loading}
             />
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.qcm_stat_with_cabinet')}
               value={summary.queuesWithCabinet}
               icon={MapPin}
               color="green"
               loading={loading}
             />
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.qcm_stat_cabinets')}
               value={summary.uniqueCabinets}
               icon={Building2}
               color="purple"
               loading={loading}
             />
-            <MacOSStatCard
+            <StatCard
               title={t('admin2.qcm_stat_entries')}
               value={summary.totalEntries}
               icon={Users}
@@ -405,7 +405,7 @@ const QueueCabinetManagement = () => {
             />
           </div>
 
-          <MacOSCard
+          <Card
             className="admin-p-20-mb-24-bgc-bg-secondary">
             <div
               className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-12-ai-end">
@@ -474,10 +474,10 @@ const QueueCabinetManagement = () => {
                 </Button>
               </div>
             </div>
-          </MacOSCard>
+          </Card>
 
           {!loading && queues.length === 0 ? (
-            <MacOSEmptyState
+            <AppEmpty
               icon={Building2}
               title={t('admin2.qcm_empty_title')}
               description={t('admin2.qcm_empty_description')}
@@ -491,7 +491,7 @@ const QueueCabinetManagement = () => {
               }
             />
           ) : (
-            <Table
+            <DataTable
               columns={[
                 { key: 'day', title: t('admin2.col_day'), sortable: false },
                 { key: 'specialist_name', title: t('admin2.col_specialist'), sortable: false },
@@ -520,7 +520,7 @@ const QueueCabinetManagement = () => {
             />
           )}
         </div>
-      </MacOSCard>
+      </Card>
     </div>
   );
 };

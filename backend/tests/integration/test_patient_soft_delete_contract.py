@@ -12,7 +12,7 @@ def test_patient_soft_delete_hides_normal_paths_and_restore_reenables(
     patient = Patient(
         first_name="Soft",
         last_name="Deleted",
-        phone="+998901234567",
+        phone="+998900000121",
     )
     db_session.add(patient)
     db_session.commit()

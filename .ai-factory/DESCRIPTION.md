@@ -20,7 +20,7 @@ System covers patient lifecycle from registration and queue to visit documentati
 - **Backend:** Python 3.11, FastAPI, SQLAlchemy, Pydantic v2
 - **Database:** PostgreSQL (primary), Alembic migrations
 - **Realtime/Infra:** Redis pub/sub for multi-instance WebSocket broadcast
-- **Frontend:** React 18, Vite, React Router, Axios
+- **Frontend:** React 19, Vite, React Router, Axios, TypeScript (strict)
 - **Testing:** Pytest, Vitest, Playwright, k6 (CI load tests)
 - **CI/CD:** GitHub Actions workflows for lint/test/security/deploy gates
 

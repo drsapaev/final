@@ -47,6 +47,37 @@ running staging environment.
 
 ---
 
+## Check 0 — Doctor-linkage reconciliation (decision #13)
+
+Blocked upgrade / blocked service is the expected outcome when
+pre-existing data violates the linkage contract, so this check runs
+BEFORE anything else.
+
+### Run
+
+```bash
+cd backend
+python scripts/reconcile_userless_active_doctors.py
+```
+
+### Expected output
+
+- `OK: no active Doctor rows violate the linkage contract ...` — pass;
+- `BLOCKED: N active Doctor row(s) ...` — the deployment must not serve
+  until every listed row is resolved (link a live doctor-role User via
+  AdminDoctors -> "Add doctor", or deactivate the Doctor profile; no
+  deletion, no auto-link).
+
+The canonical deployment entrypoint (`ops/backend.entrypoint.sh`) runs
+this same check automatically after `alembic upgrade head` and refuses
+to start uvicorn on violations. Break-glass override:
+`ALLOW_ACTIVE_USERLESS_DOCTORS=1` (logged as a warning).
+
+### If it fails
+
+Operational failures (missing `DATABASE_URL`, unreachable DB) exit with
+code 2 and also block — fix the environment before retrying.
+
 ## Check 1 — Sentry smoke test (frontend + backend)
 
 **Purpose**: prove Sentry is receiving events from both frontend and backend.

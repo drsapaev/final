@@ -189,6 +189,7 @@ def create_cart_appointments(
             created_visits,
             target_day=today,
             source="desk",
+            current_user=current_user,
         )
 
         db.commit()

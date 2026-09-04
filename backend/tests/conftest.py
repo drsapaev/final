@@ -44,6 +44,7 @@ from app.models import (  # noqa: F401
     emr,
     file_system,
     lab,
+    medical_specialty,  # Medical Specialty Catalog (migration 0051)
     online_queue,
     payment,
     payment_webhook,
@@ -84,6 +85,17 @@ def test_db():
     tables = inspector.get_table_names()
     if "users" not in tables:
         raise RuntimeError(f"CRITICAL: Table 'users' not created! Available tables: {tables}")
+
+    # Medical Specialty Catalog (0051): production seeds the baseline via
+    # Alembic; the test world builds schema via create_all, so the same
+    # deterministic baseline is applied here once per test database. The
+    # catalog is the write-boundary SSOT — without it every doctor-creating
+    # test would hit the 400/503 guard.
+    from app.services.medical_specialty_seed import seed_medical_specialties
+
+    with engine.connect() as catalog_conn:
+        seed_medical_specialties(catalog_conn)
+        catalog_conn.commit()
 
     yield engine
 
@@ -252,7 +264,7 @@ def test_patient(db_session):
         first_name="Иван",
         last_name="Иванов",
         middle_name="Иванович",
-        phone="+998901234567",
+        phone="+998900000000",
         birth_date=date(1990, 1, 1),
         address="Тестовый адрес",
     )
@@ -389,16 +401,32 @@ def test_queue_entry(db_session, test_daily_queue, test_patient, test_visit):
     return entry
 
 
-@pytest.fixture(scope="function")
-def auth_headers(client, admin_user, admin_password):
-    """Создает заголовки авторизации для администратора"""
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
+def mint_access_token(user) -> str:
+    """Mint an access JWT directly for critical-role (Admin/Cashier) test users.
+
+    Real /login for these roles always routes through the two-stage 2FA flow
+    (enrollment token or TOTP challenge) and never returns an access_token,
+    so endpoint tests mint the same stateless token the service issues on a
+    completed login. The /login 2FA paths themselves are covered by
+    test_2fa_enforcement.py and test_2fa_enrollment_flow.py.
+    """
+    from app.services.authentication_service import authentication_service
+
+    return authentication_service.create_access_token(
+        {
+            "sub": str(user.id),
+            "username": user.username,
+            "role": user.role,
+            "is_active": user.is_active,
+            "is_superuser": user.is_superuser,
+        }
     )
-    assert response.status_code == 200
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(scope="function")
+def auth_headers(admin_user):
+    """Создает заголовки авторизации для администратора"""
+    return {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
 
 
 @pytest.fixture(scope="function")
@@ -442,7 +470,6 @@ def pytest_pyfunc_call(pyfuncitem):
 
 def pytest_configure(config):
     """Конфигурация pytest"""
-    os.environ.setdefault("DISABLE_2FA_REQUIREMENT", "true")  # Disable 2FA for most tests
     config.addinivalue_line("markers", "asyncio: asynchronous tests")
     config.addinivalue_line("markers", "unit: Юнит тесты")
     config.addinivalue_line("markers", "integration: Интеграционные тесты")
@@ -455,15 +482,9 @@ def pytest_configure(config):
 
 
 @pytest.fixture(scope="function")
-def admin_auth_headers(client, admin_user, admin_password):
+def admin_auth_headers(admin_user):
     """Alias for auth_headers — some tests use admin_auth_headers."""
-    response = client.post(
-        "/api/v1/authentication/login",
-        json={"username": admin_user.username, "password": admin_password},
-    )
-    assert response.status_code == 200
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
 
 
 @pytest.fixture
@@ -481,7 +502,6 @@ def prod_env(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ENV", "production")
     monkeypatch.setenv("SECRET_KEY", "test-only-prod-secret-key-32chars!!")
     monkeypatch.delenv("TESTING", raising=False)               # SEC-005
-    monkeypatch.delenv("DISABLE_2FA_REQUIREMENT", raising=False)
     monkeypatch.delenv("CORS_ALLOW_ALL", raising=False)
 
     # ── DB ───────────────────────────────────────────────────

@@ -72,7 +72,7 @@ def _create_queue_entry_for_doctor(
         queue_id=queue.id,
         number=1,
         patient_name="Guarded Patient",
-        phone="+998901555555",
+        phone="+998900000131",
         source="online",
         status=status,
         services=json.dumps(
@@ -596,7 +596,7 @@ def test_full_update_without_visit_id_matches_same_session_phone_digits(
         number=21,
         patient_id=None,
         patient_name="Phone Format Patient",
-        phone="+998901234567",
+        phone="+998900000121",
         visit_id=None,
         session_id=None,
         source="online",

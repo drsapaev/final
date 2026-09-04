@@ -14,14 +14,14 @@ import {
   Users } from
 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Badge,
   Input,
   Select,
   Checkbox,
   Skeleton,
-  MacOSEmptyState,
+  AppEmpty,
   Alert,
 } from '../ui/macos';
 import { api } from '../../api/client';
@@ -327,7 +327,7 @@ const BranchManagement = () => {
       }
 
       {/* Фильтры и поиск */}
-      <MacOSCard className="p-6">
+      <Card className="p-6">
         <div className="admin-d-flex-fd-column-gap-16-fw-wrap-1">
           <div className="admin-flex-1-pos-relative">
             <Input
@@ -360,11 +360,11 @@ const BranchManagement = () => {
             </Button>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Форма добавления/редактирования */}
       {showAddForm &&
-      <MacOSCard className="admin-p-24-ov-hidden-1">
+      <Card className="admin-p-24-ov-hidden-1">
           <div className="admin-d-flex-jc-between-ai-center-mb-16-1">
             <h3 className="admin-fs-lg-fw-semi-primary-m-0-1">
               {editingBranch ? t('admin2.br_form_edit_title') : t('admin2.br_add_branch')}
@@ -538,20 +538,20 @@ const BranchManagement = () => {
               </Button>
             </div>
           </form>
-        </MacOSCard>
+        </Card>
       }
 
       {/* Список филиалов */}
       {loading ?
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-3">
           {[1, 2, 3].map((i) =>
-        <MacOSCard key={i} className="p-6">
+        <Card key={i} className="p-6">
               <Skeleton height="200px" />
-            </MacOSCard>
+            </Card>
         )}
         </div> :
       filteredBranches.length === 0 ?
-      <MacOSEmptyState
+      <AppEmpty
         icon={Building2}
         title={branchEmptyTitle}
         description={branchEmptyDescription}
@@ -565,7 +565,7 @@ const BranchManagement = () => {
 
       <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24-ov-hidden-2">
           {filteredBranches.map((branch) =>
-        <MacOSCard key={branch.id} className="p-6">
+        <Card key={branch.id} className="p-6">
               <div className="admin-d-flex-jc-between-ai-start-mb-16-1">
                 <div>
                   <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0-1">
@@ -647,7 +647,7 @@ const BranchManagement = () => {
                   <Trash2 aria-hidden="true" className="w-4 h-4" />
                 </Button>
               </div>
-            </MacOSCard>
+            </Card>
         )}
         </div>
       }

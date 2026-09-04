@@ -15,7 +15,7 @@ import {
   Power
 } from 'lucide-react';
 import {
-  MacOSCard,
+  Card,
   Button,
   Input,
   Checkbox,
@@ -130,7 +130,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
   };
   if (result) {
     return (
-      <MacOSCard variant="default" className="admin-p-24">
+      <Card variant="default" className="admin-p-24">
         <div className="admin-text-center">
           {result.failed_count === 0 ? (
             <>
@@ -173,12 +173,12 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
             {t('admin2.sbe_close')}
           </Button>
         </div>
-      </MacOSCard>
+      </Card>
     );
   }
 
   return (
-    <MacOSCard variant="default" className="admin-p-0">
+    <Card variant="default" className="admin-p-0">
       <div className="admin-p-20px-24px-bd-b-1px-solid-var-mac-bo">
         <h3 className="admin-fs-18-fw-600-primary-m-0-0-8px-0">
           {t('admin2.sbe_title')}
@@ -311,7 +311,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
           {loading ? t('admin2.sbe_saving') : t('admin2.sbe_update_count', { count: selectedServices.length })}
         </Button>
       </div>
-    </MacOSCard>
+    </Card>
   );
 };
 

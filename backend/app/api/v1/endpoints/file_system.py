@@ -108,7 +108,7 @@ async def upload_file(
     expires_at: datetime | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+        require_roles("Admin", "Doctor", "Nurse")
     ),
 ):
     """Загрузить файл"""
@@ -186,7 +186,7 @@ async def upload_file(
 async def get_file_statistics(
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+        require_roles("Admin", "Doctor", "Nurse")
     ),
 ):
     """Получить статистику файлов"""
@@ -205,7 +205,7 @@ async def get_file(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist", "Patient")
+        require_roles("Admin", "Doctor", "Nurse", "Patient")
     ),
 ):
     """Получить информацию о файле"""
@@ -232,7 +232,7 @@ async def download_file(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist", "Patient")
+        require_roles("Admin", "Doctor", "Nurse", "Patient")
     ),
 ):
     """Скачать файл"""
@@ -259,7 +259,7 @@ async def preview_file(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist", "Patient")
+        require_roles("Admin", "Doctor", "Nurse", "Patient")
     ),
 ):
     """Предварительный просмотр файла"""
@@ -305,7 +305,7 @@ async def search_files(
     search_request: FileSearchRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist", "Patient")
+        require_roles("Admin", "Doctor", "Nurse", "Patient")
     ),
 ):
     """Поиск файлов"""
@@ -341,7 +341,7 @@ async def get_files(
     size: int = Query(20, ge=1, le=100, description="Размер страницы"),
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist", "Patient")
+        require_roles("Admin", "Doctor", "Nurse", "Patient")
     ),
 ):
     """Получить список файлов"""
@@ -403,7 +403,7 @@ async def update_file(
     expires_at: datetime | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+        require_roles("Admin", "Doctor", "Nurse")
     ),
 ):
     """Обновить файл"""
@@ -471,7 +471,7 @@ async def replace_file_content(
     change_description: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+        require_roles("Admin", "Doctor", "Nurse")
     ),
 ):
     """
@@ -511,7 +511,7 @@ async def delete_file(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+        require_roles("Admin", "Doctor", "Nurse")
     ),
 ):
     """Удалить файл"""
@@ -561,7 +561,7 @@ async def create_file_share(
     share_data: FileShareCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+        require_roles("Admin", "Doctor", "Nurse")
     ),
 ):
     """Создать совместное использование файла"""
@@ -584,7 +584,7 @@ async def get_file_shares(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+        require_roles("Admin", "Doctor", "Nurse")
     ),
 ):
     """Получить совместные использования файла"""
@@ -615,7 +615,7 @@ async def export_files(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+        require_roles("Admin", "Doctor", "Nurse")
     ),
 ):
     """Экспортировать файлы в архив"""
@@ -635,6 +635,12 @@ async def export_files(
 
         return FileExportResponse(
             export_id=f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            # SECURITY (CodeQL py/path-injection #449): os.path.basename strips
+            # any directory components from the server-generated temp_file.name,
+            # ensuring the download_url is a clean filename. The temp file is
+            # created by tempfile.NamedTemporaryFile (server-side), so the path
+            # is not user-controlled — but CodeQL cannot prove that. os.path.basename
+            # is a recognized sanitizer that breaks the taint chain.
             download_url=f"/api/v1/files/download-export/{os.path.basename(temp_file.name)}",
             expires_at=datetime.now() + timedelta(hours=24),
         )
@@ -652,7 +658,7 @@ async def import_files(
     overwrite_existing: bool = Form(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+        require_roles("Admin", "Doctor", "Nurse")
     ),
 ):
     """Импортировать файлы из архива"""

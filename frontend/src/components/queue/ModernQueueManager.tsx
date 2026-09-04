@@ -509,7 +509,7 @@ const ModernQueueManager = ({
               const isDisabled = !effectiveDoctor || loading || queueData?.is_open;
               return (
                 <Button
-                  variant="success"
+                  variant="primary"
                   size="default"
                   className="mqm-reception-btn"
                   onClick={openReception}

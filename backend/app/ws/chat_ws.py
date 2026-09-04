@@ -141,7 +141,9 @@ class ChatConnectionManager:
                     await self.active_connections[user_id].close()
                 except Exception:
                     pass
-            await websocket.accept()
+            # ASGI: хендлер уже вызвал accept() до аутентификации — повторный
+            # accept() даёт протокольную ошибку ("Expected websocket.send or
+            # websocket.close, but got websocket.accept") и роняет соединение.
             self.active_connections[user_id] = websocket
             await self._ensure_redis_bridge()
             logger.info(f"Chat WebSocket connected: user_id={user_id}")

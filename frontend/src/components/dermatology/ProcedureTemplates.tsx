@@ -635,7 +635,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
           <Button onClick={() => setDialogOpen(false)}>
             {t('derma.derma_proc_cancel')}
           </Button>
-          <Button variant="contained" onClick={handleSave}>
+          <Button variant="primary" onClick={handleSave}>
             {editMode ? t('derma.derma_proc_save') : t('derma.derma_proc_create')}
           </Button>
         </DialogActions>

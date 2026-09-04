@@ -15,6 +15,11 @@ import { describe, expect, it } from 'vitest';
 const ROOT = path.resolve(process.cwd());
 const BILLING_MANAGER = path.join(ROOT, 'src/components/admin/BillingManager.tsx');
 const DENTIST_PANEL = path.join(ROOT, 'src/pages/DentistPanelUnified.tsx');
+// PR-UI-15-3: data lifecycle moved verbatim to pages/dentist/* — the
+// P0-14 duplicate-loadPatients contract reads the union surface.
+const DENTIST_DATA_HOOK = path.join(ROOT, 'src/pages/dentist/useDentistWorklistData.ts');
+const readDentistSource = () =>
+  fs.readFileSync(DENTIST_PANEL, 'utf-8') + '\n' + fs.readFileSync(DENTIST_DATA_HOOK, 'utf-8');
 const NGINX_PROD = path.join(ROOT, 'docker/nginx.conf');
 const NGINX_STAGING = path.join(ROOT, 'docker/nginx.staging.conf');
 
@@ -45,7 +50,7 @@ describe('P0-7: BillingManager document.write sanitization', () => {
 // ---------- 2. P0-14: DentistPanelUnified no duplicate loadPatients ----------
 
 describe('P0-14: DentistPanelUnified duplicate loadPatients removal', () => {
-  const src = fs.readFileSync(DENTIST_PANEL, 'utf-8');
+  const src = readDentistSource();
 
   it('does not have an executable Promise.all with two loadPatients() calls', () => {
     // Strip comments before checking — the comment explaining the fix is allowed

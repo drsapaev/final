@@ -139,7 +139,7 @@ def test_queue_mark_paid_rejects_entry_linked_to_other_patient_visit(
     other_patient = Patient(
         first_name="Other",
         last_name="Patient",
-        phone="+998901119999",
+        phone="+998900000116",
     )
     db_session.add(other_patient)
     db_session.flush()

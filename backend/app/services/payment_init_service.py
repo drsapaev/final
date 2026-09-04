@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from decimal import Decimal
 
 from fastapi import Request
 
@@ -69,13 +70,32 @@ class PaymentInitService:
                 }
 
             billing_service = BillingService(self.repository.db)
-            payment = billing_service.create_payment(
+            # Issue #06 Phase 4b B1: Replaced BillingService.create_payment()
+            # with PaymentInvariantService.create_pending_payment().
+            #
+            # This caller creates PENDING payments for online provider
+            # redirect (PayMe/Click/Kaspi). The pending payment will be
+            # settled later via provider webhook.
+            #
+            # create_pending_payment() provides:
+            #   1. with_for_update() row lock on the visit
+            #   2. B1/B4 coordination: checks for existing pending payment
+            #      with the same provider (prevents duplicates)
+            #   3. IntegrityError defense-in-depth
+            #
+            # commit=False because this caller owns the transaction
+            # (audit logging + queue timestamp comparison after payment
+            # creation, then single commit).
+            from app.services.payment_invariant_service import PaymentInvariantService
+
+            payment = PaymentInvariantService(self.repository.db).create_pending_payment(
                 visit_id=visit_id,
-                amount=float(amount),
+                amount=Decimal(str(amount)),
                 currency=currency,
                 method="online",
-                status=PaymentStatus.PENDING.value,
                 provider=provider,
+                note=description,
+                current_user=type("User", (), {"id": current_user_id})(),
                 commit=False,
             )
 

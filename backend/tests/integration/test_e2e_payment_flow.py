@@ -35,13 +35,13 @@ from app.models.visit import Visit
 def payment_test_data(db_session):
     """Создает тестовые данные для потока оплаты"""
     # Пациент
-    patient = db_session.query(Patient).filter(Patient.phone == "+998901234999").first()
+    patient = db_session.query(Patient).filter(Patient.phone == "+998900000020").first()
     if not patient:
         patient = Patient(
             first_name="Оплата",
             last_name="Тестов",
             middle_name="Тестович",
-            phone="+998901234999",
+            phone="+998900000020",
             birth_date=date(1995, 3, 20),
         )
         db_session.add(patient)

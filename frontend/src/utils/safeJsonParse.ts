@@ -19,7 +19,6 @@
  * Returns `any` for drop-in compatibility with safeJsonParse.
  */
 // TECH-DEBT(c3-safejsonparse-any): Returns `any` for drop-in JSON.parse compat.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function safeJsonParse(raw: string | null | undefined, fallback: any = null): any {
   if (raw == null || raw === '') return fallback;
   try {

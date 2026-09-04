@@ -24,7 +24,7 @@ function readIds() {
   return JSON.parse(fs.readFileSync(idFile, 'utf8'));
 }
 
-function writeIds(patch) {
+function writeIds(patch: Record<string, unknown>) {
   const current = readIds();
   const next = { ...current, ...patch };
   fs.writeFileSync(idFile, JSON.stringify(next, null, 2), 'utf8');

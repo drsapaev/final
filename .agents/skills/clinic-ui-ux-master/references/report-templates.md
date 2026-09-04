@@ -16,7 +16,7 @@ Browser evidence:
 Canonical components:
 Inline styles:
 Legacy classes:
-MUI imports:
+MUI imports (must be zero — MUI is removed):
 Hardcoded tokens:
 Relevant tests:
 

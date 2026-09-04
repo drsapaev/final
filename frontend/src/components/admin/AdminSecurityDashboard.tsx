@@ -1,11 +1,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
-} from '../ui/macos';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Alert, Input } from '../ui/macos';
 import { api } from '../../api/client';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+import { AlertTriangle, BarChart3, CheckCircle2, Cloud, KeyRound, RotateCw, ShieldCheck } from 'lucide-react';
 
 /**
  * Admin Security Dashboard — M5.6 frontend integration.
@@ -47,10 +46,10 @@ export default function AdminSecurityDashboard() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const tabs = [
-    { id: 'dashboard', label: t('admin2.asd_tab_dashboard'), icon: 'chart.bar' },
-    { id: 'compliance', label: t('admin2.asd_tab_compliance'), icon: 'checkmark.shield' },
-    { id: 'secrets', label: t('admin2.asd_tab_secrets'), icon: 'key' },
-    { id: 'backup', label: t('admin2.asd_tab_backup'), icon: 'cloud' },
+    { id: 'dashboard', label: t('admin2.asd_tab_dashboard'), icon: BarChart3 },
+    { id: 'compliance', label: t('admin2.asd_tab_compliance'), icon: ShieldCheck },
+    { id: 'secrets', label: t('admin2.asd_tab_secrets'), icon: KeyRound },
+    { id: 'backup', label: t('admin2.asd_tab_backup'), icon: Cloud },
   ];
 
   if (loading) {
@@ -69,7 +68,7 @@ export default function AdminSecurityDashboard() {
         <CardContent>
           <Alert severity="error">{error}</Alert>
           <Button variant="outline" onClick={loadData} style={{ marginTop: 12 }}>
-            <Icon name="arrow.clockwise" size={16} />
+            <RotateCw size={16} aria-hidden="true" />
             {t('admin2.asd_retry')}
           </Button>
         </CardContent>
@@ -96,7 +95,7 @@ export default function AdminSecurityDashboard() {
               fontWeight: activeTab === tab.id ? 600 : 400,
             }}
           >
-            <Icon name={tab.icon} size={14} />
+            <tab.icon size={14} aria-hidden="true" />
             {tab.label}
           </button>
         ))}
@@ -142,7 +141,7 @@ function DashboardTab({ data }: { data: Record<string, unknown> }) {
         <Card variant="filled" padding="none">
           <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '12px 16px' }}>
             <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon name="exclamationmark.triangle" size={18} />
+              <AlertTriangle size={18} aria-hidden="true" />
               {t('admin2.asd_failed_logins', { count: failed_logins.length })}
             </CardTitle>
           </CardHeader>
@@ -150,7 +149,7 @@ function DashboardTab({ data }: { data: Record<string, unknown> }) {
             {failed_logins.slice(0, 10).map((entry) => (
               <div key={String(entry.id)} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--mac-border)' }}>
                 <span>{String(entry.ip_address || 'N/A')} · {String(entry.actor_role || 'unknown')}</span>
-                <span style={{ color: 'var(--mac-text-muted)', fontSize: '12px' }}>
+                <span style={{ color: 'var(--mac-text-tertiary)', fontSize: '12px' }}>
                   {entry.timestamp ? new Date(entry.timestamp as string).toLocaleString('ru-RU') : ''}
                 </span>
               </div>
@@ -218,10 +217,10 @@ function ComplianceTab({ data }: { data: Record<string, unknown> }) {
         </div>
         {checks.map((check) => (
           <div key={String(check.name)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
-            <Icon name={check.passed ? 'checkmark.circle.fill' : 'exclamationmark.triangle'} size={16} />
+            {check.passed  ? <CheckCircle2 size={16} aria-hidden="true" /> : <AlertTriangle size={16} aria-hidden="true" />}
             <div>
               <div style={{ fontWeight: 500, color: 'var(--mac-text-primary)' }}>{String(check.label)}</div>
-              <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{String(check.details)}</div>
+              <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>{String(check.details)}</div>
             </div>
           </div>
         ))}
@@ -244,7 +243,7 @@ function SecretsTab({ data }: { data: Record<string, unknown> }) {
           <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
             <div>
               <div style={{ fontWeight: 500 }}>{name}</div>
-              <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>
                 {status.last_rotated ? t('admin2.asd_secrets_rotation', { date: new Date(status.last_rotated as string).toLocaleDateString('ru-RU') }) : t('admin2.asd_secrets_never_rotated')}
                 {status.days_since_rotation != null ? t('admin2.asd_secrets_days_ago', { days: status.days_since_rotation }) : ''}
               </div>
@@ -291,7 +290,7 @@ function BackupTab({ data, onVerify }: { data: Record<string, unknown>; onVerify
             <div style={{ fontWeight: 500 }}>
               {t('admin2.asd_backup_last', { date: last_backup_at ? new Date(last_backup_at).toLocaleString('ru-RU') : t('admin2.asd_backup_never') })}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>
               {hours_since_last_backup != null ? t('admin2.asd_backup_hours_ago', { hours: hours_since_last_backup }) : ''}
               {t('admin2.asd_backup_interval', { hours: expected_interval_hours })}
             </div>
@@ -301,7 +300,7 @@ function BackupTab({ data, onVerify }: { data: Record<string, unknown>; onVerify
           </Badge>
         </div>
         <Button variant="outline" onClick={handleVerify} loading={verifying}>
-          <Icon name="checkmark.circle" size={16} />
+          <CheckCircle2 size={16} aria-hidden="true" />
           {t('admin2.asd_backup_mark_verified')}
         </Button>
       </CardContent>
@@ -322,7 +321,7 @@ function SummaryCard({ label, value, variant }: Record<string, unknown>) {
       border: '1px solid var(--mac-border)',
       background: 'var(--mac-bg-tertiary)',
     }}>
-      <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{String(label)}</div>
+      <div style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)' }}>{String(label)}</div>
       <div style={{ fontSize: '24px', fontWeight: 600, color: colors[variant as keyof typeof colors] || colors.default }}>
         {String(value)}
       </div>

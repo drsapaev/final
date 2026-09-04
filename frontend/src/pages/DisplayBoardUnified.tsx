@@ -494,8 +494,33 @@ export default function DisplayBoardUnified({
     connectWebSocketRef.current();
 
     const clock = setInterval(() => setNowStr(timeNow()), 1000);
-    const tb = isBoardView ? null : setInterval(() => loadBoardStateRef.current(), Math.max(15000, Number(refreshMs || 0)));
-    const tw = isBoardView ? null : setInterval(() => loadWindowsRef.current(), Math.max(5000, Number(refreshMs || 0)));
+
+    // H-7 (Launch Blockers Audit): polling fallback MUST run in
+    // board view too. Previously the condition `isBoardView ? null`
+    // disabled polling entirely when the page ran on a TV/kiosk at
+    // /queue-board or /display-board, so after 5 failed WS reconnect
+    // attempts (~15s) the board silently froze on stale data until
+    // a staff member manually refreshed the page.
+    //
+    // Now polling runs unconditionally:
+    //   - In admin/preview view: 15s / 5s (unchanged).
+    //   - In board view: 30s / 10s (slower to avoid hammering the
+    //     server from many kiosks, but fast enough that a missed WS
+    //     update is recovered within 30s — well within patient
+    //     tolerance for "where is my number?").
+    //
+    // WS remains the primary channel (instant updates); polling is
+    // the safety net for WS dropout. If both work, polling is a
+    // cheap no-op (server returns 304 / identical snapshot).
+    const boardStateIntervalMs = isBoardView
+      ? Math.max(30000, Number(refreshMs || 0))
+      : Math.max(15000, Number(refreshMs || 0));
+    const windowsIntervalMs = isBoardView
+      ? Math.max(10000, Number(refreshMs || 0))
+      : Math.max(5000, Number(refreshMs || 0));
+
+    const tb = setInterval(() => loadBoardStateRef.current(), boardStateIntervalMs);
+    const tw = setInterval(() => loadWindowsRef.current(), windowsIntervalMs);
 
     return () => {
       if (tb) clearInterval(tb);
@@ -610,27 +635,38 @@ export default function DisplayBoardUnified({
   };
 
   // Темы оформления (новое)
+  // CC-4 (UI color-contrast track): board themes are SELF-CONTAINED constant
+  // palettes. The previous light/medical entries mixed constant dark ink
+  // (#1a202c) with app-theme-resolving tokens (var(--mac-bg-primary) etc.) —
+  // under a dark app the card surfaces resolved dark while the ink stayed
+  // dark → 1.04:1, invisible (axe color-contrast, e2e/a11y-baseline.json,
+  // display-board:dark). The constants below are exactly the values the
+  // tokens resolved to in the light app, so the light-app rendering is
+  // pixel-identical; the board no longer depends on the viewer's app theme
+  // (it is a stable TV/waiting-room surface). boardSettings.theme is never
+  // overridden from the API (only sound_default is), so 'light' remains the
+  // de-facto board theme; 'dark'/'medical' keep their self-contained palettes.
   const themes = {
     light: {
-      background: 'linear-gradient(135deg, var(--mac-bg-secondary) 0%, var(--mac-border) 100%)',
-      cardBg: 'var(--mac-bg-primary)',
-      textPrimary: '#1a202c',
-      textSecondary: 'var(--mac-text-secondary)',
-      border: 'var(--mac-border)'
+      background: 'var(--displayboard-light-bg)',
+      cardBg: 'var(--displayboard-light-card)',
+      textPrimary: 'var(--displayboard-light-ink)',
+      textSecondary: 'var(--displayboard-light-ink-muted)',
+      border: 'var(--displayboard-light-border)'
     },
     dark: {
-      background: 'linear-gradient(135deg, #1a202c 0%, #2d3748 100%)',
-      cardBg: '#2d3748',
-      textPrimary: '#f7fafc',
-      textSecondary: '#a0aec0',
-      border: 'var(--mac-text-secondary)'
+      background: 'var(--displayboard-dark-bg)',
+      cardBg: 'var(--displayboard-dark-card)',
+      textPrimary: 'var(--displayboard-dark-ink)',
+      textSecondary: 'var(--displayboard-dark-ink-muted)',
+      border: 'var(--displayboard-dark-border)'
     },
     medical: {
-      background: 'linear-gradient(135deg, #f0fff4 0%, var(--mac-success-bg) 100%)',
-      cardBg: 'var(--mac-bg-primary)',
-      textPrimary: '#1a202c',
-      textSecondary: 'var(--mac-text-secondary)',
-      border: '#c6f6d5'
+      background: 'var(--displayboard-medical-bg)',
+      cardBg: 'var(--displayboard-medical-card)',
+      textPrimary: 'var(--displayboard-medical-ink)',
+      textSecondary: 'var(--displayboard-medical-ink-muted)',
+      border: 'var(--displayboard-medical-border)'
     }
   };
 

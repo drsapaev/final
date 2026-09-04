@@ -1,11 +1,10 @@
 
-import {
-  Badge, Icon,
-} from '../ui/macos';
+import { Badge } from '../ui/macos';
 import { formatRegistrarTime } from '../../utils/dateUtils';
-// UX Audit Registrar #3: все inline-стили перенесены в QueueTable.css.
+import { DataTable, type DataTableColumn } from '../ui/DataTable';
+// UX Audit Registrar #3: inline-стили перенесены в QueueTable.css.
 import './QueueTable.css';
-import { useTranslation } from '../../i18n/useTranslation';
+import { AlertTriangle, Bell, CheckCircle2, CircleHelp, Clock, UserRound, UserRoundSearch, UserRoundX, XCircle, type LucideIcon } from 'lucide-react';
 
 // === Domain types ===
 // QueueTable is a pure display component driven by ModernQueueManager.
@@ -65,9 +64,73 @@ export interface QueueTableProps {
   [key: string]: unknown;
 }
 
+// PR-UI-09c-2: status → {variant, label, icon} mapping (moved out of component
+// body for stable identity). 6 statuses preserved verbatim from original.
+const STATUS_MAP: Record<string, { variant: string; label: string; icon: LucideIcon }> = {
+  'waiting':     { variant: 'warning',   label: 'Ожидает',   icon: Clock },
+  'called':      { variant: 'info',      label: 'Вызван',    icon: Bell },
+  'in_progress': { variant: 'primary',   label: 'На приеме', icon: UserRound },
+  'completed':   { variant: 'success',   label: 'Завершен',  icon: CheckCircle2 },
+  'cancelled':   { variant: 'secondary', label: 'Отменен',   icon: XCircle },
+  'no_show':     { variant: 'secondary', label: 'Не явился', icon: UserRoundX }
+};
+
+// PR-UI-09c-2: formatTime helper (moved out of component body). Fixes the
+// original mojibake typo `'вЂ”'` (corrupted em-dash) → proper `'—'` per §5.
+const formatTime = (timestamp: string | number | null | undefined): string => {
+  if (!timestamp) return '—';
+  try {
+    return formatRegistrarTime(timestamp) || '—';
+  } catch {
+    return '—';
+  }
+};
+
+// PR-UI-09c-2: renderStatusBadge helper — uses STATUS_MAP.
+const renderStatusBadge = (status: string) => {
+  const config = STATUS_MAP[status] || {
+    variant: 'secondary', label: status || '—', icon: CircleHelp
+  };
+  return (
+    <Badge variant={config.variant}>
+      <config.icon size={16} className="qt-status-badge-icon" aria-hidden="true" />
+      {config.label}
+    </Badge>
+  );
+};
+
+// PR-UI-09c-2: source classification (QR vs Desk) — used to pick CSS class.
+const isOnlineSource = (entry: QueueTableEntry): boolean =>
+  entry.source === 'online' ||
+  entry.source_kind === 'online_queue' ||
+  entry.source === 'qr';
+
 /**
- * QueueTable Component
- * Displays the current queue entries in a table format
+ * PR-UI-12-4: bounded scroll-viewport height (px) for the queue table.
+ *
+ * Layout parameter for the sticky-header viewport (see DataTable
+ * "Sticky header viewport" doc note) — NOT a sticky offset; the kit measures
+ * header/filter row offsets itself. 480px ≈ 9 visible rows (md size ≈ 48px
+ * per row incl. borders): the queue stays inside the registrar queue card on
+ * a 720px viewport while the manager's call-next controls remain reachable,
+ * and queues longer than ~9 entries scroll internally under a sticky header.
+ */
+const QUEUE_TABLE_VIEWPORT_MAX_HEIGHT = 480;
+
+/**
+ * QueueTable Component — displays the current queue entries in a canonical
+ * DataTable format.
+ *
+ * PR-UI-09c-2 migration:
+ * - Replaced bespoke native <table> with canonical DataTable + column config
+ * - Preserved 4 external early-return states (selectDoctor / loading /
+ *   queueNotFound / queueEmpty) per QueueTable 4-state strategy (NOT
+ *   collapsed into single DataTable emptyState)
+ * - Moved inline QR/Desk badge styles to CSS classes (.qt-source-badge-*)
+ * - Preserved "called" row highlight via CSS :has() on .qt-called-marker
+ *   (canonical DataTable has no rowClassName prop — CSS-only solution)
+ * - Contract invariants preserved (see QueueManager.contract.test.tsx):
+ *   no row-level action invocations, no early-return collapsed branches.
  */
 const QueueTable = ({
     queueData = null,
@@ -75,17 +138,17 @@ const QueueTable = ({
     loading = false,
     t = {}
 }: QueueTableProps) => {
-    // If no queue data or no doctor selected
+    // State 1: no doctor selected (preserved verbatim per contract test)
     if (!effectiveDoctor) {
         return (
             <div className="qt-empty-state">
-                <Icon name="person.crop.circle.badge.questionmark" size="large" className="qt-empty-state-icon" />
+                <UserRoundSearch size={24} className="qt-empty-state-icon" aria-hidden="true" />
                 <p>{(t as Record<string, string>)?.selectDoctor || 'Выберите специалиста'}</p>
             </div>
         );
     }
 
-    // If loading
+    // State 2: loading (preserved)
     if (loading) {
         return (
             <div className="qt-empty-state">
@@ -95,11 +158,11 @@ const QueueTable = ({
         );
     }
 
-    // If no queue data
+    // State 3: no queue data (preserved)
     if (!queueData) {
         return (
             <div className="qt-empty-state">
-                <Icon name="exclamationmark.triangle" size="large" className="qt-empty-state-icon-warning" />
+                <AlertTriangle size={24} className="qt-empty-state-icon-warning" aria-hidden="true" />
                 <p>{(t as Record<string, string>)?.queueNotFound || 'Очередь не найдена'}</p>
                 <p className="qt-empty-state-hint">
                     Попробуйте сгенерировать QR код для создания очереди
@@ -108,14 +171,13 @@ const QueueTable = ({
         );
     }
 
-    // Get queue entries
     const entries = queueData?.entries || [];
 
-    // If queue is empty
+    // State 4: empty queue (preserved)
     if (entries.length === 0) {
         return (
             <div className="qt-empty-state">
-                <Icon name="person.2.slash" size="large" className="qt-empty-state-icon" />
+                <UserRoundX size={24} className="qt-empty-state-icon" aria-hidden="true" />
                 <p>{(t as Record<string, string>)?.queueEmpty || 'Очередь пуста'}</p>
                 <p className="qt-empty-state-hint">
                     Пациенты могут записаться через QR код
@@ -124,113 +186,107 @@ const QueueTable = ({
         );
     }
 
-    // Status badge variants
-    const getStatusBadge = (status: string) => {
-        const statusMap: Record<string, { variant: string; label: string; icon: string }> = {
-            'waiting': { variant: 'warning', label: 'Ожидает', icon: 'clock' },
-            'called': { variant: 'info', label: 'Вызван', icon: 'bell' },
-            'in_progress': { variant: 'primary', label: 'На приеме', icon: 'person.fill' },
-            'completed': { variant: 'success', label: 'Завершен', icon: 'checkmark.circle' },
-            'cancelled': { variant: 'secondary', label: 'Отменен', icon: 'xmark.circle' },
-            'no_show': { variant: 'secondary', label: 'Не явился', icon: 'person.crop.circle.badge.xmark' }
-        };
-
-        const config = statusMap[status] || {
-            variant: 'secondary',
-            label: status || '—',
-            icon: 'questionmark.circle'
-        };
-
-        return (
-            <Badge variant={config.variant}>
-                <Icon name={config.icon} size="small" className="qt-status-badge-icon" />
-                {config.label}
-            </Badge>
-        );
-    };
-
-    // Format time
-    const formatTime = (timestamp: string | number | null | undefined) => {
-        if (!timestamp) return '—';
-        try {
-            return formatRegistrarTime(timestamp) || 'вЂ”';
-        } catch {
-            return '—';
+    // PR-UI-09c-2: canonical DataTable column config (replaces native <table>)
+    const columns: DataTableColumn<QueueTableEntry>[] = [
+        {
+            key: 'queue_number',
+            title: '№',
+            render: (_v: unknown, entry: QueueTableEntry, index: number) => (
+                <span className="qt-table-cell-number">
+                    {entry.queue_number || entry.number || index + 1}
+                </span>
+            )
+        },
+        {
+            key: 'patient_name',
+            title: (t as Record<string, string>)?.patient || 'Пациент',
+            render: (_v: unknown, entry: QueueTableEntry) => {
+                const online = isOnlineSource(entry);
+                return (
+                    <span className="qt-table-cell-primary">
+                        {entry.patient_name || entry.name || '—'}
+                        <span className={online ? 'qt-source-badge qt-source-badge-qr' : 'qt-source-badge qt-source-badge-desk'}>
+                            {online ? 'QR' : 'Desk'}
+                        </span>
+                    </span>
+                );
+            }
+        },
+        {
+            key: 'patient_phone',
+            title: (t as Record<string, string>)?.phone || 'Телефон',
+            render: (_v: unknown, entry: QueueTableEntry) => (
+                <span className="qt-table-cell-phone">
+                    {entry.patient_phone || entry.phone || '—'}
+                </span>
+            )
+        },
+        {
+            key: 'queue_time',
+            title: (t as Record<string, string>)?.time || 'Время',
+            render: (_v: unknown, entry: QueueTableEntry) => (
+                <span className="qt-table-cell-secondary">
+                    {formatTime(entry.queue_time || entry.created_at || entry.timestamp)}
+                </span>
+            )
+        },
+        {
+            key: 'status',
+            title: (t as Record<string, string>)?.status || 'Статус',
+            render: (status: unknown) => renderStatusBadge(String(status ?? ''))
+        },
+        {
+            key: 'actions',
+            title: (t as Record<string, string>)?.actions || 'Действия',
+            render: (_v: unknown, entry: QueueTableEntry) => (
+                <div className="qt-table-cell-actions">
+                    {entry.status === 'called' && (
+                        <Badge variant="info" className="qt-called-marker">
+                            <Bell size={16} className="qt-status-badge-icon" aria-hidden="true" />
+                            {(t as Record<string, string>)?.called || 'Вызван'}
+                        </Badge>
+                    )}
+                </div>
+            )
         }
-    };
+    ];
 
     return (
         <div className="qt-table-container">
-            <div className="admin-table-wrapper">
-                <table className="qt-table">
-                    <thead>
-                        <tr className="qt-table-header-row">
-                            <th className="qt-table-th">№</th>
-                            <th className="qt-table-th">{(t as Record<string, string>)?.patient || 'Пациент'}</th>
-                            <th className="qt-table-th">{(t as Record<string, string>)?.phone || 'Телефон'}</th>
-                            <th className="qt-table-th">{(t as Record<string, string>)?.time || 'Время'}</th>
-                            <th className="qt-table-th">{(t as Record<string, string>)?.status || 'Статус'}</th>
-                            <th className="qt-table-th-right">{(t as Record<string, string>)?.actions || 'Действия'}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {entries.map((entry, index) => (
-                            <tr
-                                key={entry.id || index}
-                                className={entry.status === 'called' ? 'qt-table-row-called' : 'qt-table-row'}
-                            >
-                                <td className="qt-table-cell-number">
-                                    {entry.queue_number || entry.number || index + 1}
-                                </td>
-                                <td className="qt-table-cell-primary">
-                                    {entry.patient_name || entry.name || '—'}
-                                    {/* PR-23 P0 #3: source badge (QR vs Desk) */}
-                                    {entry.source === 'online' || entry.source_kind === 'online_queue' || entry.source === 'qr' ? (
-                                        <span style={{
-                                            display: 'inline-block',
-                                            marginLeft: '6px',
-                                            padding: '1px 6px',
-                                            borderRadius: '4px',
-                                            fontSize: '10px',
-                                            fontWeight: 600,
-                                            background: 'rgba(139, 92, 246, 0.15)',
-                                            color: '#7c3aed'
-                                        }}>QR</span>
-                                    ) : (
-                                        <span style={{
-                                            display: 'inline-block',
-                                            marginLeft: '6px',
-                                            padding: '1px 6px',
-                                            borderRadius: '4px',
-                                            fontSize: '10px',
-                                            fontWeight: 500,
-                                            background: 'rgba(100, 116, 139, 0.15)',
-                                            color: '#475569'
-                                        }}>Desk</span>
-                                    )}
-                                </td>
-                                <td className="qt-table-cell-phone">
-                                    {entry.patient_phone || entry.phone || '—'}
-                                </td>
-                                <td className="qt-table-cell-secondary">
-                                    {formatTime(entry.queue_time || entry.created_at || entry.timestamp)}
-                                </td>
-                                <td className="qt-table-cell-status">
-                                    {getStatusBadge(String(entry.status ?? ''))}
-                                </td>
-                                <td className="qt-table-cell-actions">
-                                    {entry.status === 'called' && (
-                                        <Badge variant="info">
-                                            <Icon name="bell.fill" size="small" className="qt-status-badge-icon" />
-                                            {(t as Record<string, string>)?.called || 'Вызван'}
-                                        </Badge>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable
+                columns={columns}
+                data={entries}
+                sortable={false}
+                hoverable={true}
+                size="md"
+                variant="default"
+                // PR-UI-12-2 (plan §PR-UI-12 item 2): roving keyboard navigation
+                // — ArrowUp/ArrowDown/Home/End move focus between queue rows so
+                // keyboard and screen-reader users can review the queue without
+                // a pointer.
+                //
+                // Contract reconciliation (AGENTS_UI workflow step 4 / §18):
+                // the plan's original wording "Enter для вызова пациента" (a
+                // per-row call action) is superseded by the repo invariant in
+                // QueueManager.contract.test.tsx — "keeps registrar queue
+                // call-next as a backend-owned command, not a row command".
+                // Queue calling stays strictly ordered through the manager's
+                // call-next button (already keyboard-accessible via Tab+Enter);
+                // rows expose focus movement only, no row-level actions.
+                keyboardNavigation
+                // PR-UI-12-4 (plan §PR-UI-12 item 4 "sticky header при скролле"):
+                // sticky header + bounded scroll viewport. The viewport bound
+                // is a layout parameter (NOT a sticky offset — the header/filter
+                // offsets are measured by the kit): 480px keeps the queue table
+                // inside the registrar queue card on a 720px e2e viewport
+                // (~9 rows visible) so the call-next controls above it stay
+                // reachable; longer operational queues get an internal scrollbar
+                // with the header row staying visible. Queues that fit (~9 rows
+                // or fewer) render pixel-identically to the unbounded table.
+                stickyHeader
+                maxHeight={QUEUE_TABLE_VIEWPORT_MAX_HEIGHT}
+                getRowId={(row: QueueTableEntry, index: number) => row.id ?? `qt-row-${index}`}
+            />
         </div>
     );
 };

@@ -12,8 +12,6 @@
 
 .qj-glass-card {
   background: var(--mac-card-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border-radius: var(--mac-radius-xl);
   box-shadow: var(--mac-main-shell-shadow);
   border: 1px solid var(--mac-card-border);
@@ -83,20 +81,26 @@
   transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* CC-1: white-ink fills moved to the *-strong tokens — the base accent
+ * (#007aff / #ff453a / #30d158) measures 4.02 / 3.41 / 2.02:1 against white,
+ * below the WCAG AA 4.5:1 floor (axe color-contrast on both themes; the dark
+ * finding appeared after the legacy button-ink patch in
+ * dark-theme-visibility-fix.css was decommissioned and the class fills
+ * stopped being masked by a forced white background). */
 .qj-recovery-btn-primary {
-  background: var(--mac-accent-blue);
+  background: var(--mac-accent-blue-strong, var(--mac-accent-blue));
   color: var(--mac-text-on-accent);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%);
 }
 
 .qj-recovery-btn-danger {
-  background: var(--mac-error);
+  background: var(--mac-danger-strong, var(--mac-error));
   color: var(--mac-text-on-accent);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--mac-error), transparent 70%);
 }
 
 .qj-recovery-btn-success {
-  background: var(--mac-success);
+  background: var(--mac-success-strong, var(--mac-success));
   color: var(--mac-text-on-accent);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--mac-success), transparent 70%);
 }

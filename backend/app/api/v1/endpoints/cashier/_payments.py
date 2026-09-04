@@ -468,6 +468,10 @@ async def create_grouped_payment(
     allocation_rows: list[tuple[Payment, Visit, Decimal, Decimal, Decimal]] = []
 
     try:
+        from app.services.payment_invariant_service import PaymentInvariantService
+
+        payment_service = PaymentInvariantService(db)
+
         for candidate in allocation_candidates:
             if remaining_to_allocate <= 0:
                 break
@@ -478,17 +482,20 @@ async def create_grouped_payment(
             if allocation_amount <= 0:
                 continue
 
-            payment = Payment(
+            # Issue #06 Phase 4b Fix #3: Replaced direct Payment() +
+            # db.add/flush with PaymentInvariantService.create_payment_for_visit(commit=False).
+            #
+            # This provides per-visit with_for_update() lock + paid_amount
+            # check + IntegrityError handler, while preserving the caller-
+            # owned transaction (single commit at the end of the loop).
+            payment = payment_service.create_payment_for_visit(
                 visit_id=visit.id,
                 amount=allocation_amount,
                 method=payment_data.method,
-                status="paid",
                 note=payment_data.note,
-                created_at=created_at,
-                paid_at=created_at,
+                current_user=current_user,
+                commit=False,  # CRITICAL: grouped payment owns the transaction
             )
-            db.add(payment)
-            db.flush()
 
             remaining_after = remaining_before - allocation_amount
             created_payments.append(payment)
@@ -507,6 +514,7 @@ async def create_grouped_payment(
                 detail="Grouped cashier payment could not allocate full amount",
             )
 
+        # Single commit for the whole grouped payment (caller-owned transaction)
         db.commit()
         for payment in created_payments:
             db.refresh(payment)
@@ -619,7 +627,38 @@ async def create_payment(
                     )
 
             # ✅ FIX: Use lazy load to ensure consistency with get_pending_payments
-            visit = db.query(Visit).filter(Visit.id == payment_data.visit_id).first()
+            #
+            # H-4 (Launch Blockers Audit, REVISED): acquire a row-level
+            # lock on the visit row with ``with_for_update()``. This
+            # serializes concurrent ``create_payment`` attempts on the
+            # same visit so the application-level overpayment check
+            # (paid_amount vs remaining_debt, see below) runs atomically.
+            #
+            # Why a row lock instead of a UNIQUE INDEX on payments?
+            # The clinic supports partial payments — a patient can pay
+            # 5000 of 10000, then return later to pay the remaining
+            # 5000. A unique index on ``payments(visit_id) WHERE
+            # status IN ('paid','completed')`` would reject the second
+            # (legitimate) payment. See migration 0045 docstring for
+            # the full design rationale.
+            #
+            # Concurrent flow:
+            #   Request A: acquires lock, reads paid_amount=0, creates
+            #              payment, commits → lock released.
+            #   Request B: blocks on lock until A commits, then reads
+            #              paid_amount=10000 (now visible), the
+            #              application check fires, B gets HTTP 400
+            #              "Все услуги уже оплачены".
+            #
+            # This pattern is already used in:
+            #   - billing_service_pkg/_payments.py:412 (update_payment_status)
+            #   - repositories/provider_webhook_repository.py:61-117
+            visit = (
+                db.query(Visit)
+                .filter(Visit.id == payment_data.visit_id)
+                .with_for_update()
+                .first()
+            )
             _ensure_appointment_matches_visit()
             if not visit:
                 raise HTTPException(
@@ -706,20 +745,34 @@ async def create_payment(
                 detail="Для создания платежа необходимо указать visit_id"
             )
 
-        # Создаем платеж
-        new_payment = Payment(
+        # Issue #06 Phase 4b Fix #2: Replaced direct Payment() construction
+        # + inline with_for_update()/IntegrityError handler with a call to
+        # PaymentInvariantService.create_payment_for_visit().
+        #
+        # Previously (H-4 fix), the lock and handler were added inline in
+        # the endpoint, but the Payment() construction was NOT delegated
+        # to the service. This made PaymentInvariantService declarative
+        # but not the actual source of truth.
+        #
+        # Now the endpoint delegates to the service, which provides:
+        #   1. with_for_update() row lock on the visit
+        #   2. paid_amount vs total_cost check
+        #   3. overpayment-as-deposit policy (logged at WARNING)
+        #   4. IntegrityError defense-in-depth (409, not 500)
+        #
+        # The application-level overpayment check ABOVE (lines 656-701)
+        # is preserved for UX clarity (nicer error messages) and runs
+        # BEFORE the service call. The service's own check is the
+        # authoritative runtime guard.
+        from app.services.payment_invariant_service import PaymentInvariantService
+
+        new_payment = PaymentInvariantService(db).create_payment_for_visit(
             visit_id=payment_data.visit_id,
             amount=payment_data.amount,
             method=payment_data.method,
-            status="paid",
             note=payment_data.note,
-            created_at=datetime.now(UTC),
-            paid_at=datetime.now(UTC),
+            current_user=current_user,
         )
-
-        db.add(new_payment)
-        db.commit()
-        db.refresh(new_payment)
 
         await _emit_payment_notification(
             db=db,
@@ -927,18 +980,37 @@ async def cancel_payment(
         )
 
     try:
-        # Отменяем платеж
-        payment.status = "cancelled"
+        # Issue #06 Phase 4b B2: Replaced direct payment.status = "cancelled"
+        # with billing_service.update_payment_status() to enforce payment
+        # state machine validation.
+        from app.services.billing_service import BillingService
+
+        try:
+            payment = BillingService(db).update_payment_status(
+                payment_id=payment.id,
+                new_status="cancelled",
+                commit=False,
+            )
+        except ValueError as ve:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Cannot cancel payment: {ve}",
+            ) from ve
         if hasattr(payment, 'note') and cancel_data.reason:
             payment.note = f"Отменён: {cancel_data.reason}"
 
-        # Возвращаем только operational статус визита; registration type не трогаем.
+        # Issue #06 Phase 3: delegate visit status normalization to
+        # VisitLifecycleService. The service acquires FOR UPDATE lock
+        # and ensures terminal visits are NOT reopened by payment changes.
+        # The payment.status change above will be committed together with
+        # the visit status change (same SQLAlchemy session).
         visit = None
         if payment.visit_id:
-            visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
-            if visit and visit.status == 'paid':
-                visit.status = _preserve_cashier_visit_status(visit.status)
-                db.add(visit)
+            from app.services.visit_lifecycle_service import VisitLifecycleService
+
+            visit = VisitLifecycleService(db).restore_operational_status_after_payment_change(
+                visit_id=payment.visit_id,
+            )
 
         db.commit()
 
@@ -988,19 +1060,29 @@ async def confirm_payment(
     if payment_status in {'cancelled', 'refunded', 'void'}:
          raise HTTPException(status_code=400, detail="Нельзя подтвердить отмененный платеж")
 
-    # Обновляем статус платежа
-    payment.status = 'paid'
+    # Issue #06 Phase 4b B2: Replaced direct payment.status = 'paid'
+    # with billing_service.update_payment_status() to enforce payment
+    # state machine validation.
+    from app.services.billing_service import BillingService
+
+    payment = BillingService(db).update_payment_status(
+        payment_id=payment.id,
+        new_status="paid",
+        commit=False,
+    )
     if not payment.provider_transaction_id:
         from datetime import datetime
         payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.now(UTC).timestamp())}"
 
-    # Обновляем только operational статус визита; registration type не меняем.
+    # Issue #06 Phase 3: delegate visit status normalization to
+    # VisitLifecycleService (replaces _preserve_cashier_visit_status).
     visit = None
     if payment.visit_id:
-         visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
-         if visit:
-              visit.status = _preserve_cashier_visit_status(visit.status)
-              db.add(visit)
+        from app.services.visit_lifecycle_service import VisitLifecycleService
+
+        visit = VisitLifecycleService(db).restore_operational_status_after_payment_change(
+            visit_id=payment.visit_id,
+        )
 
     db.commit()
     await _emit_payment_notification(
@@ -1123,14 +1205,30 @@ async def refund_payment(
 
         # Если возвращена вся сумма — статус "refunded"
         if new_refunded_amount >= payment.amount:
-            payment.status = "refunded"
+            # Issue #06 Phase 4b B3: Replaced direct payment.status = "refunded"
+            # with billing_service.update_payment_status() to enforce payment
+            # state machine validation. The atomic SQL guard above already
+            # protected the refund_amount update; this ensures the status
+            # transition is also validated.
+            #
+            # commit=False because we're inside the refund transaction —
+            # the caller commits after this.
+            from app.services.billing_service import BillingService
 
-            # Возвращаем только operational статус при полном возврате.
+            payment = BillingService(db).update_payment_status(
+                payment_id=payment.id,
+                new_status="refunded",
+                commit=False,
+            )
+
+            # Issue #06 Phase 3: delegate visit status normalization to
+            # VisitLifecycleService (replaces _preserve_cashier_visit_status).
             if payment.visit_id:
-                visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
-                if visit and visit.status == 'paid':
-                    visit.status = _preserve_cashier_visit_status(visit.status)
-                    db.add(visit)
+                from app.services.visit_lifecycle_service import VisitLifecycleService
+
+                VisitLifecycleService(db).restore_operational_status_after_payment_change(
+                    visit_id=payment.visit_id,
+                )
             db.commit()
             db.refresh(payment)
 

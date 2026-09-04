@@ -4,17 +4,17 @@ import type { CSSProperties } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
-  MacOSCard,
+  Card,
   Button,
   Input,
   Select,
-  Table,
   Badge,
   Modal,
   Alert,
   Box,
   Typography,
 } from '../ui/macos';
+import { DataTable } from '../ui/DataTable';
 import {
   Plus,
   Edit,
@@ -81,11 +81,13 @@ const UserManagement = () => {
   const { roleOptions: apiRoleOptions } = useRoles({ includeAll: true });
 
   // Fallback roles if API fails
+  // REC-1 (Receptionist deprecation): 'Receptionist' removed — Registrar is
+  // the canonical front-desk role; new Receptionist users are frozen out.
   const roles = apiRoleOptions.filter((r) => r.value !== '') || [
   { value: 'Admin', label: t('admin2.um_role_admin') },
   { value: 'Doctor', label: t('admin2.um_role_doctor') },
   { value: 'Nurse', label: t('admin2.um_role_nurse') },
-  { value: 'Receptionist', label: t('admin2.um_role_receptionist') },
+  { value: 'Registrar', label: t('admin2.um_role_registrar') },
   { value: 'Cashier', label: t('admin2.um_role_cashier') },
   { value: 'Lab', label: t('admin2.um_role_lab') },
   { value: 'Patient', label: t('admin2.um_role_patient') }];
@@ -369,7 +371,7 @@ const UserManagement = () => {
       'Admin': 'error',
       'Doctor': 'primary',
       'Nurse': 'info',
-      'Receptionist': 'warning',
+      'Registrar': 'warning',
       'Lab': 'secondary',
       'Cashier': 'success',
       'Patient': 'default'
@@ -523,7 +525,7 @@ const UserManagement = () => {
       }
 
       {/* Filters */}
-      <MacOSCard className="admin-mb-24-p-16">
+      <Card className="admin-mb-24-p-16">
         <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-ai-end">
 
           {/* Search */}
@@ -545,7 +547,7 @@ const UserManagement = () => {
             <Select
               label={t('admin2.um_filter_role_label')}
               value={roleFilter}
-              onChange={(v: unknown) => setRoleFilter(String(v))}
+              onValueChange={(v) => setRoleFilter(String(v))}
               options={roleOptions}
               placeholder={t('admin2.um_filter_all_roles')}
               size="large"
@@ -558,7 +560,7 @@ const UserManagement = () => {
             <Select
               label={t('admin2.um_filter_status_label')}
               value={statusFilter}
-              onChange={(v: unknown) => setStatusFilter(String(v))}
+              onValueChange={(v) => setStatusFilter(String(v))}
               options={statusOptions}
               placeholder={t('admin2.um_filter_all_statuses')}
               size="large"
@@ -579,11 +581,11 @@ const UserManagement = () => {
             </Button>
           </div>
         </div>
-      </MacOSCard>
+      </Card>
 
       {/* Table */}
-      <MacOSCard>
-        <Table
+      <Card>
+        <DataTable
           columns={columns}
           data={filteredUsers}
           loading={loading}
@@ -614,7 +616,7 @@ const UserManagement = () => {
           </div>
         )}
 
-      </MacOSCard>
+      </Card>
 
       {/* Actions Menu */}
       {actionsMenuUser && actionsMenuPosition &&

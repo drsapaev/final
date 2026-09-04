@@ -597,7 +597,7 @@ class TestLabReportingService:
         other_patient = Patient(
             first_name="Other",
             last_name="Patient",
-            phone="+998901111111",
+            phone="+998900000110",
             birth_date=date(1985, 1, 1),
         )
         db_session.add(other_patient)
@@ -638,7 +638,7 @@ class TestLabReportingService:
         other_patient = Patient(
             first_name="Order",
             last_name="Owner",
-            phone="+998902222222",
+            phone="+998900000134",
             birth_date=date(1986, 1, 1),
         )
         db_session.add(other_patient)
@@ -686,7 +686,7 @@ class TestLabReportingService:
         other_patient = Patient(
             first_name="Appointment",
             last_name="Owner",
-            phone="+998903333333",
+            phone="+998900000136",
             birth_date=date(1987, 1, 1),
         )
         db_session.add(other_patient)

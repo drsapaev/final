@@ -42,7 +42,6 @@ jobs:
       DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb
       CORS_DISABLE: "1"
       WS_DEV_ALLOW: "1"
-      DISABLE_2FA_REQUIREMENT: "1"
       SECRET_KEY: "test-secret-key-for-ci-cd-minimum-32-characters-long"
       PYTHONIOENCODING: "utf-8"
       PYTHONUTF8: "1"
@@ -51,7 +50,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11.10"
           cache: "pip"
