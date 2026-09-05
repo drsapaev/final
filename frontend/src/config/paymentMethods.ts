@@ -4,7 +4,7 @@
  * UX Audit R-4.3: centralized payment methods definition.
  *
  * Currently hardcoded — future: fetch from backend API
- * (GET /api/v1/payment-methods) when backend endpoint is available.
+ * (GET /api/v1/payments/payment-methods).
  *
  * Migration path:
  * 1. (this PR) Extract to config module with unique icons

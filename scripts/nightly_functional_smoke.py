@@ -31,6 +31,17 @@ Accounts must exist first (backend/app/scripts/ensure_smoke_users.py).
 Credentials come from backend/.env: SMOKE_USER_PASSWORD, optional
 SMOKE_CASHIER_USERNAME / SMOKE_CASHIER_TOTP_SECRET, optional SMOKE_BASE_URL.
 
+SMOKE_MODE contract (P1):
+- safe (default, production scheduled task): health + login + auth/me +
+  doctor-profile invariant + READ-ONLY endpoint checks only. Clinical
+  tables are never written.
+- deep (staging only, SMOKE_MODE=deep): additionally exercises the write
+  path - patient create, visit create, lab order create, payment create.
+
+A FAIL in safe mode is an environment/availability signal, never something
+the smoke repairs. Provision accounts/profiles via
+backend/app/scripts/ensure_smoke_users.py (controlled ops operation).
+
 Exit codes: 0 = no FAIL, 2 = at least one FAIL. FAILs are also reported to
 Sentry (backend DSN) so the nightly run is visible in the usual dashboard.
 
@@ -82,6 +93,12 @@ def load_env(path: Path) -> dict[str, str]:
 ENV = {**load_env(ENV_PATH), **{k: v for k, v in os.environ.items() if v}}
 
 BASE_URL = (ENV.get("SMOKE_BASE_URL") or "http://127.0.0.1:18000").rstrip("/")
+# P1 smoke contract: production runs the SAFE profile (health/login/auth/
+# read-only checks). Deep clinical writes (patient/visit/lab order/payment)
+# are staging-only and require SMOKE_MODE=deep explicitly. A production
+# nightly must never create visits/lab orders in clinical tables.
+SMOKE_MODE = (ENV.get("SMOKE_MODE") or "safe").strip().lower()
+DEEP_WRITES = SMOKE_MODE == "deep"
 SMOKE_PASSWORD = ENV.get("SMOKE_USER_PASSWORD", "")
 CASHIER_USERNAME = ENV.get("SMOKE_CASHIER_USERNAME", "")
 CASHIER_TOTP_SECRET = ENV.get("SMOKE_CASHIER_TOTP_SECRET", "")
@@ -269,25 +286,48 @@ def main() -> int:
     reg = tokens.get("smoke_registrar", "")
     doc = tokens.get("smoke_doctor", "")
 
-    # 3. patient create (registrar) ----------------------------------------
+    # 2b. doctor profile invariant (read-only, P1 smoke contract) -----------
+    # Login proves the user exists and credentials work; this step proves
+    # role=Doctor still resolves to a linked ACTIVE Doctor profile. A FAIL
+    # here is an ENVIRONMENT MISCONFIGURATION: run backend/app/scripts/
+    # ensure_smoke_users.py (provisioning) - the smoke never fixes the DB.
+    if doc and user_ids.get("smoke_doctor"):
+        status, body = http(
+            "GET", f"/api/v1/doctors/by-user/{user_ids['smoke_doctor']}", token=doc
+        )
+        # /doctors/by-user exposes is_active (DoctorOut), not `active`.
+        active = isinstance(body, dict) and body.get("is_active") is True
+        record(
+            "doctor profile invariant",
+            "PASS" if (status == 200 and active) else "FAIL",
+            f"ENVIRONMENT {'OK' if (status == 200 and active) else 'MISCONFIGURATION'}"
+            f" — GET /doctors/by-user/{user_ids['smoke_doctor']} -> {status}"
+            f"{'' if active else ' (profile missing or inactive)'}",
+        )
+
+    # 3. patient create (registrar) — DEEP WRITE (staging only) -------------
     patient_id = None
-    # phone must be unique per run: backend enforces patient phone uniqueness
-    run_digits = RUN_TAG.replace("-", "")
-    status, body = http("POST", "/api/v1/patients/", token=reg, body={
-        "last_name": f"SYNTHETIC-SMOKE-{RUN_TAG}",
-        "first_name": "Nightly",
-        "phone": f"+998{run_digits[-9:]}",
-        "doc_type": "passport",
-        "doc_number": f"SMOKE{RUN_TAG.replace('-', '')}",
-        "birth_date": "1990-01-01",
-        "address": "SYNTHETIC-SMOKE address — nightly smoke artifact",
-    })
-    if status in (200, 201) and isinstance(body, dict):
-        patient_id = body.get("id")
-        CREATED["patient_id"] = patient_id
-        record("patient create", "PASS", f"id={patient_id}")
+    if not DEEP_WRITES:
+        record("patient create", "SKIP",
+               "deep write - staging only (SMOKE_MODE=deep)")
     else:
-        record("patient create", "FAIL", f"HTTP {status}: {json.dumps(body, ensure_ascii=False)[:200]}")
+        # phone must be unique per run: backend enforces patient phone uniqueness
+        run_digits = RUN_TAG.replace("-", "")
+        status, body = http("POST", "/api/v1/patients/", token=reg, body={
+            "last_name": f"SYNTHETIC-SMOKE-{RUN_TAG}",
+            "first_name": "Nightly",
+            "phone": f"+998{run_digits[-9:]}",
+            "doc_type": "passport",
+            "doc_number": f"SMOKE{RUN_TAG.replace('-', '')}",
+            "birth_date": "1990-01-01",
+            "address": "SYNTHETIC-SMOKE address — nightly smoke artifact",
+        })
+        if status in (200, 201) and isinstance(body, dict):
+            patient_id = body.get("id")
+            CREATED["patient_id"] = patient_id
+            record("patient create", "PASS", f"id={patient_id}")
+        else:
+            record("patient create", "FAIL", f"HTTP {status}: {json.dumps(body, ensure_ascii=False)[:200]}")
 
     # 4. doctors list (registrar) ------------------------------------------
     doctor_id = None
@@ -316,9 +356,12 @@ def main() -> int:
     else:
         record("doctors list", "FAIL", f"HTTP {status}: {json.dumps(body, ensure_ascii=False)[:200]}")
 
-    # 5. visit create (doctor) ---------------------------------------------
+    # 5. visit create (doctor) — DEEP WRITE (staging only) ------------------
     visit_id = None
-    if patient_id is None or doctor_id is None:
+    if not DEEP_WRITES:
+        record("visit create", "SKIP",
+               "deep write - staging only (SMOKE_MODE=deep)")
+    elif patient_id is None or doctor_id is None:
         record("visit create", "SKIP", "needs patient_id and doctor_id from earlier steps")
     else:
         status, body = http("POST", "/api/v1/visits/visits", token=doc, body={
@@ -346,8 +389,11 @@ def main() -> int:
     else:
         record("lab templates", "FAIL", f"HTTP {status}: {json.dumps(body, ensure_ascii=False)[:200]}")
 
-    # 7. lab order create (doctor) -----------------------------------------
-    if template_id is None or patient_id is None:
+    # 7. lab order create (doctor) — DEEP WRITE (staging only) --------------
+    if not DEEP_WRITES:
+        record("lab order create", "SKIP",
+               "deep write - staging only (SMOKE_MODE=deep)")
+    elif template_id is None or patient_id is None:
         record("lab order create", "SKIP", "needs template_id and patient_id")
     else:
         status, body = http("POST", "/api/v1/lab/orders", token=doc, body={
@@ -364,10 +410,13 @@ def main() -> int:
 
     # 8. payment create (cashier — 2FA-protected role) ----------------------
     cashier_token = tokens.get(CASHIER_USERNAME, "") if CASHIER_USERNAME else ""
-    if not cashier_token:
+    if not DEEP_WRITES:
         record("payment create", "SKIP",
-               "cashier is a mandatory-2FA role; set SMOKE_CASHIER_USERNAME + "
-               "SMOKE_CASHIER_TOTP_SECRET in backend/.env to enable this step")
+               "deep write - staging only (SMOKE_MODE=deep)")
+    elif not cashier_token:
+        record("payment create", "SKIP",
+               "deep write - staging only (SMOKE_MODE=deep); cashier also "
+               "requires SMOKE_CASHIER_USERNAME + SMOKE_CASHIER_TOTP_SECRET")
     elif visit_id is None:
         record("payment create", "SKIP", "needs visit_id from earlier step")
     else:
