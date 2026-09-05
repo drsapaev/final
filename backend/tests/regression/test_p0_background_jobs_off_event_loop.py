@@ -272,3 +272,43 @@ async def test_shutdown_grace_is_actually_bounded_and_job_thread_is_daemon(
         "the grace is not actually bounded"
     )
     release.set()
+
+
+@pytest.mark.asyncio
+async def test_scheduled_backup_retries_transient_failures(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Sentry PYTHON-FASTAPI-36: pg_dump against the remote pooler died to a
+    network drop and the night was left without ANY backup. The loop must
+    retry transient failures (bounded attempts + backoff) before giving up."""
+    import os as os_module
+
+    from app.services import scheduled_backup as sb_module
+
+    attempts: list[int] = []
+
+    class FlakyBackupService:
+        def create_backup(self, backup_type: str) -> dict:
+            attempts.append(backup_type)
+            if len(attempts) < 3:
+                raise RuntimeError("server closed the connection unexpectedly")
+            return {"filename": f"backup_{backup_type}_recovered.db"}
+
+    service = sb_module.ScheduledBackupService(
+        db=_FakeSession(), backup_dir=str(tmp_path)
+    )
+    service.backup_service = FlakyBackupService()
+
+    monkeypatch.setenv("BACKUP_ATTEMPTS", "3")
+    monkeypatch.setenv("BACKUP_RETRY_BACKOFF_S", "1")
+
+    run_at = (datetime.now() + timedelta(seconds=1)).time()
+    await service.start_daily_backups(run_at)
+
+    deadline = time_module.monotonic() + 15
+    while len(attempts) < 3 and time_module.monotonic() < deadline:
+        await asyncio.sleep(0.05)
+    await service.stop()
+
+    assert len(attempts) == 3, "retry attempts did not run"
+    assert attempts == ["scheduled"] * 3

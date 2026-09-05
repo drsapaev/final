@@ -5,6 +5,7 @@ Scheduled Backup Service
 """
 import asyncio
 import logging
+import os
 from datetime import datetime, time, timedelta
 
 from sqlalchemy.orm import Session
@@ -62,27 +63,39 @@ class ScheduledBackupService:
 
                     if self.running:
                         logger.info("🔄 Starting scheduled backup...")
-                        try:
-                            # P0 2026-08-28: create_backup shells out to
-                            # pg_dump (subprocess.run). On the event loop it
-                            # froze every HTTP request for the whole dump, so
-                            # it must run in a worker thread. Daemon thread:
-                            # a dump outliving the shutdown grace dies with
-                            # the process instead of blocking exit.
-                            job = spawn_daemon_job(
-                                self.backup_service.create_backup, "scheduled"
-                            )
-                            self._inflight.add(job)
-                            job.add_done_callback(self._inflight.discard)
-                            # shield(): cancelling the scheduler task must not
-                            # cancel the tracked job itself, or stop() would
-                            # lose sight of the still-running pg_dump thread.
-                            backup_info = await asyncio.shield(job)
-                            logger.info(
-                                f"✅ Scheduled backup completed: {backup_info['filename']}"
-                            )
-                        except Exception as e:
-                            logger.error(f"❌ Scheduled backup failed: {e}")
+                        # P1 2026-09-05: pg_dump against a remote pooler dies to
+                        # network drops ("server closed the connection
+                        # unexpectedly" - Sentry PYTHON-FASTAPI-36). One failed
+                        # attempt used to leave the night without any backup;
+                        # retry on a bounded backoff within the same window.
+                        max_attempts = int(os.getenv("BACKUP_ATTEMPTS", "3"))
+                        retry_backoff_s = int(os.getenv("BACKUP_RETRY_BACKOFF_S", "60"))
+                        for attempt in range(1, max_attempts + 1):
+                            try:
+                                job = spawn_daemon_job(
+                                    self.backup_service.create_backup, "scheduled"
+                                )
+                                self._inflight.add(job)
+                                job.add_done_callback(self._inflight.discard)
+                                # shield(): cancelling the scheduler task must not
+                                # cancel the tracked job itself, or stop() would
+                                # lose sight of the still-running pg_dump thread.
+                                backup_info = await asyncio.shield(job)
+                                logger.info(
+                                    f"✅ Scheduled backup completed (attempt {attempt}/{max_attempts}): {backup_info['filename']}"
+                                )
+                                break
+                            except Exception as e:
+                                if attempt >= max_attempts:
+                                    logger.error(
+                                        f"❌ Scheduled backup failed after {attempt}/{max_attempts} attempts: {e}"
+                                    )
+                                else:
+                                    backoff = retry_backoff_s * attempt
+                                    logger.error(
+                                        f"❌ Scheduled backup attempt {attempt}/{max_attempts} failed: {e} — retrying in {backoff}s"
+                                    )
+                                    await asyncio.sleep(backoff)
 
                 except asyncio.CancelledError:
                     break

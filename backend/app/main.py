@@ -488,7 +488,36 @@ def detailed_health():
     except Exception:
         checks["sentry"] = {"status": "disabled"}
 
-    # 4. App version + environment
+    # 4. Backup freshness (newest *.gz in backend/backups) --------------------
+    # P1 2026-09-05: two consecutive nightly backups were silently missed
+    # (host powered off at 02:00). Surface the freshest backup age so the
+    # external monitor can alert when the data-safety window (>26h) is
+    # exceeded. Stale backup is NOT an API availability failure: it must not
+    # flip overall_ok / 503 — monitors read this block and alert separately.
+    try:
+        from pathlib import Path as _Path
+
+        backup_dir = _Path(__file__).resolve().parent.parent / "backups"
+        newest_mtime = 0.0
+        newest_name = None
+        if backup_dir.is_dir():
+            for entry in list(backup_dir.glob("*.gz")) + list(backup_dir.glob("*.db")):
+                if entry.is_file() and entry.stat().st_mtime > newest_mtime:
+                    newest_mtime = entry.stat().st_mtime
+                    newest_name = entry.name
+        if newest_mtime:
+            age_hours = round((time.time() - newest_mtime) / 3600.0, 1)
+            checks["backup"] = {
+                "status": "stale" if age_hours > 26 else "ok",
+                "last_backup_file": newest_name,
+                "age_hours": age_hours,
+            }
+        else:
+            checks["backup"] = {"status": "none"}
+    except Exception as e:
+        checks["backup"] = {"status": "unknown", "error": str(e)[:100]}
+
+    # 5. App version + environment
     checks["app"] = {
         "version": os.getenv("APP_VERSION", "0.9.0"),
         "env": os.getenv("ENV", "dev"),
