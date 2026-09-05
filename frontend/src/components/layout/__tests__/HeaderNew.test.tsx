@@ -216,7 +216,16 @@ describe('HeaderNew chrome (HDR-FX-1)', () => {
     const logoutItem = screen.getByRole('menuitem', { name: 'Выйти' });
     expect(logoutItem).toHaveFocus();
 
-    fireEvent.keyDown(logoutItem, { key: 'Escape' });
+    // Codex round 5 (P2): Tab-out closes the menu while traversal proceeds —
+    // no orphaned open menu with focus elsewhere.
+    fireEvent.keyDown(logoutItem, { key: 'Tab' });
+    expect(screen.queryByRole('menu', { name: 'Меню профиля' })).not.toBeInTheDocument();
+
+    // Escape still closes and restores the trigger.
+    fireEvent.click(trigger);
+    const firstAgain = await screen.findByRole('menuitem', { name: 'Профиль' });
+    await waitFor(() => expect(firstAgain).toHaveFocus());
+    fireEvent.keyDown(firstAgain, { key: 'Escape' });
     expect(screen.queryByRole('menu', { name: 'Меню профиля' })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });

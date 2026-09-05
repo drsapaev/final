@@ -114,7 +114,10 @@ export default function HeaderNew() {
   }, [showThemeMenu]);
 
   // HDR-FX-1 (P1-2/P1-3): shared menu keyboard contract — Escape closes and
-  // restores trigger focus, ArrowDown/ArrowUp cycle items with wrap-around.
+  // restores trigger focus, ArrowDown/ArrowUp cycle items with wrap-around,
+  // Tab/Shift+Tab close the menu while focus traversal proceeds naturally
+  // (Codex round 5): otherwise focus leaves an open menu behind and its
+  // Escape handler becomes unreachable.
   const handleMenuKeyDown = useCallback(
     (close: () => void, triggerRef: React.RefObject<HTMLElement | null>) =>
       (event: React.KeyboardEvent<HTMLElement>) => {
@@ -123,6 +126,10 @@ export default function HeaderNew() {
           event.stopPropagation();
           close();
           triggerRef.current?.focus();
+          return;
+        }
+        if (event.key === 'Tab') {
+          close();
           return;
         }
         if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
