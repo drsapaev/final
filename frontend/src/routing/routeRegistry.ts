@@ -65,12 +65,12 @@ export const SIDEBAR_PRESETS = {
     ],
   },
   // PR-UI-04b: restored cashier preset (completes AppShell migration).
-  // P-014 TIGHTEN: 'Записи' (clinical-appointments) removed from the Cashier
-  // sidebar — that route is canonical trio (Admin/Doctor/Registrar) again, and
-  // non-admin presets are not access-filtered, so a stale entry here would
-  // render a dead link that lands Cashier on /forbidden. Payment workflows for
-  // Cashier live on /cashier (pending-payments feed), not on the shared
-  // appointments screen.
+  // P-014 TIGHTEN: the appointments nav item (clinical-appointments) was
+  // removed from the Cashier sidebar — that route is canonical trio
+  // (Admin/Doctor/Registrar) again, and non-admin presets are not
+  // access-filtered, so a stale entry here would render a dead link that
+  // lands Cashier on /forbidden. Payment workflows for Cashier live on
+  // /cashier (pending-payments feed), not on the shared appointments screen.
   // admin-finance excluded — role-scoped to Admin only.
   cashier: {
     navigation: 'path',
@@ -1252,7 +1252,7 @@ export const ROUTE_REGISTRY = [
     // decorative: those roles were 403-rejected by the backend list endpoint
     // (doctor-family scoping; page never sends doctor_id), so the extra entry
     // points exposed dead UI reachability and /forbidden landings, not access.
-    // Cashier's payment-facing surface (/appointments/pending-payments and
+    // The Cashier payment-facing surface (/appointments/pending-payments and
     // /cashier) is preserved separately — see APPOINTMENT_PENDING_PAYMENT_ROLES.
     roles: ['Admin', 'Doctor', 'Registrar'],
     entry: 'menu',
