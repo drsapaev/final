@@ -2,6 +2,12 @@
 
 Status: active · Owner: CI/reliability · Created: 2026-08-16 (post-vacuous-run findings)
 
+Real-injection companion: issue #2774's contract for REAL component-kill
+scenarios (uvicorn/postgres/process restarts, production-host drills) lives
+in `CHAOS_REAL_INJECTION_CONTRACT.md` — separate workflow, contract first,
+implementation second. This document remains the environment contract for
+the existing mock-based load/chaos jobs.
+
 This document is the contract between `load.yml` / `chaos.yml` and the system
 under test. Rule of order: **the environment contract comes before fixing the
 tests** — a green workflow that cannot reach its subject tests nothing.
