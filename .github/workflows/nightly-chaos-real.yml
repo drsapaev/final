@@ -172,7 +172,7 @@ jobs:
         working-directory: backend
         continue-on-error: true
         run: |
-          python tests/load/chaos_eval.py \
+          python "$GITHUB_WORKSPACE/tests/load/chaos_eval.py" \
             --k6-json /tmp/s1-k6.json \
             --ceiling-ms 10000 \
             --before-file /tmp/s1_before.txt \
@@ -230,7 +230,7 @@ jobs:
         id: s2_eval
         continue-on-error: true
         run: |
-          python tests/load/chaos_eval.py \
+          python "$GITHUB_WORKSPACE/tests/load/chaos_eval.py" \
             --k6-json /tmp/s2-k6.json \
             --ceiling-ms 15000 \
             --scenario "S2 postgres sever 60s"
