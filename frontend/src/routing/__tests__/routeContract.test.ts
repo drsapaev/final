@@ -135,6 +135,23 @@ function assertRouteSpecificChromeHeadings(routeHeadingContract: RouteHeadingCon
 }
 
 describe('route contract invariants', () => {
+  it('hides the sidebar chrome on registrar routes while keeping the preset resolvable (REG-NS-1)', () => {
+    // REG-NS-1: the registrar panel is self-sufficient (in-panel breadcrumb,
+    // worklist Tabs, WelcomeView queue link, hotkeys), so the shell column is
+    // hidden and the worklist gets the full width. The sidebar preset stays
+    // declared on purpose: getRouteChromeState resolves sidebarItems from the
+    // preset independently of hideSidebar, so chrome consumers (navI18n
+    // contract) keep their contract while AppShell hides the column.
+    const registrarPaths = ['/registrar', '/registrar/welcome', '/registrar/queue'];
+    const registrarProfile = { role: 'registrar' };
+    for (const path of registrarPaths) {
+      const chrome = getRouteChromeState(path, '', registrarProfile);
+      expect(chrome.hideSidebar).toBe(true);
+      expect(chrome.sidebarItems.length).toBeGreaterThan(0);
+      expect(chrome.sidebarPreset?.navigation).toBe('path');
+    }
+  });
+
   it('keeps protected patient forms entry as query-route fallback', () => {
     const route = getRouteById('patient-forms-entry');
 

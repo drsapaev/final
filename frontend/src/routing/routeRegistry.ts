@@ -1050,7 +1050,14 @@ export const ROUTE_REGISTRY = [
     owner: 'clinical.registrar',
     component: 'RegistrarPanel',
     legacyRedirectFrom: ['/registrar-panel'],
-    layout: layout({ sidebarPreset: 'registrar', activeSidebarItem: 'registrar-home', pageTitle: 'Registrar Panel' }),
+    // REG-NS-1: sidebar removed from the registrar panel — the panel is
+    // self-sufficient (in-panel breadcrumb, worklist Tabs, WelcomeView queue
+    // link, hotkeys) and the freed width goes to the worklist table.
+    // sidebarPreset stays declared on purpose: getRouteChromeState resolves
+    // sidebarItems from the preset independently of hideSidebar, so chrome
+    // consumers (navI18n contract) keep their contract while the shell hides
+    // the column. Parser-safe comment (no ASCII quote characters).
+    layout: layout({ sidebarPreset: 'registrar', hideSidebar: true, activeSidebarItem: 'registrar-home', pageTitle: 'Registrar Panel' }),
   },
   // Strategic Direction 3: canonical nested routes for registrar views.
   // These replace the legacy ?view= query param pattern. Backward compat
@@ -1070,7 +1077,7 @@ export const ROUTE_REGISTRY = [
     title: 'Registrar — Welcome Dashboard',
     owner: 'clinical.registrar',
     component: 'RegistrarPanel',
-    layout: layout({ sidebarPreset: 'registrar', activeSidebarItem: 'registrar-home', pageTitle: 'Registrar — Welcome' }),
+    layout: layout({ sidebarPreset: 'registrar', hideSidebar: true, activeSidebarItem: 'registrar-home', pageTitle: 'Registrar — Welcome' }),
   },
   {
     id: 'registrar-queue',
@@ -1086,7 +1093,7 @@ export const ROUTE_REGISTRY = [
     title: 'Registrar — Online Queue',
     owner: 'clinical.registrar',
     component: 'RegistrarPanel',
-    layout: layout({ sidebarPreset: 'registrar', activeSidebarItem: 'registrar-queue', pageTitle: 'Registrar — Queue' }),
+    layout: layout({ sidebarPreset: 'registrar', hideSidebar: true, activeSidebarItem: 'registrar-queue', pageTitle: 'Registrar — Queue' }),
   },
   {
     id: 'doctor-home',
