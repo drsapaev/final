@@ -92,7 +92,7 @@ jobs:
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 18000 > /tmp/uvicorn.log 2>&1 &
           echo $! > /tmp/uvicorn.pid
           for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:18000/health >/dev/null 2>&1 && { echo "api ready"; exit 0; }
+            curl -sf http://127.0.0.1:18000/api/v1/health >/dev/null 2>&1 && { echo "api ready"; exit 0; }
             sleep 2
           done
           echo "api readiness failed"; tail -50 /tmp/uvicorn.log; exit 1
@@ -161,10 +161,10 @@ jobs:
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 18000 >> /tmp/uvicorn.log 2>&1 &
           echo $! > /tmp/uvicorn.pid
           for i in $(seq 1 15); do
-            curl -sf http://127.0.0.1:18000/health >/dev/null 2>&1 && break
+            curl -sf http://127.0.0.1:18000/api/v1/health >/dev/null 2>&1 && break
             sleep 2
           done
-          curl -sf http://127.0.0.1:18000/health >/dev/null || { echo "no recovery"; exit 1; }
+          curl -sf http://127.0.0.1:18000/api/v1/health >/dev/null || { echo "no recovery"; exit 1; }
           wait $K6_PID || true
 
       - name: S1 — evaluate contract assertions
