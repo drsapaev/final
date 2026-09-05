@@ -331,6 +331,9 @@ def call_patient(
         changed_at = datetime.now(UTC)
         queue_entry.status = "called"
         queue_entry.called_at = changed_at
+        # QF-1 (operator attribution): the doctor-panel call surface keeps
+        # the caller identity, same as the canonical call-next service.
+        queue_entry.called_by_user_id = current_user.id
         queue_entry.updated_at = changed_at
 
         db.commit()
@@ -664,6 +667,12 @@ def complete_patient_visit(
             changed_at = datetime.now(UTC)
             queue_entry.status = "served"
             queue_entry.updated_at = changed_at
+            # QF-1 (operator attribution): persist WHO completed the entry —
+            # the live human operator, deliberately separate from the routing
+            # owner (specialist_id / resource doctor). Nullable FK: deleting
+            # the user keeps the history row with NULL attribution.
+            queue_entry.served_by_user_id = current_user.id
+            queue_entry.served_at = changed_at
             db.commit()
             db.refresh(queue_entry)
 

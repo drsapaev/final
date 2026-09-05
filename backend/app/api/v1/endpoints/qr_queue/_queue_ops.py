@@ -76,6 +76,43 @@ async def call_next_patient(
         if result.get("success") and result.get("patient") and result["patient"].get("id"):
             entry_id = result["patient"]["id"]
 
+            # QF-1 (REST/GQL audit parity): QRQueueService.call_next_patient
+            # has already COMMITTED the waiting->called transition (and, since
+            # QF-1, the called_by_user_id column). Mirror the GraphQL path:
+            # the row-level critical audit is best-effort AFTER the committed
+            # transition (Codex round-7 P1 added online_queue_entries to
+            # CRITICAL_TABLES; round-15: an audit failure must not return 5xx
+            # — a client retry would call a SECOND patient while the first
+            # stays durably called).
+            try:
+                from app.core.audit import log_critical_change
+
+                log_critical_change(
+                    db=db,
+                    user_id=current_user.id,
+                    action="CALL_NEXT",
+                    table_name="online_queue_entries",
+                    row_id=entry_id,
+                    old_data={"status": "waiting"},
+                    new_data={
+                        "status": "called",
+                        "called_by_user_id": current_user.id,
+                    },
+                    request=None,
+                    description=(
+                        "Вызов следующего пациента "
+                        "(REST POST /queue/{specialist_id}/call-next)"
+                    ),
+                )
+                db.commit()
+            except Exception as audit_exc:  # noqa: BLE001 — non-fatal by design
+                logger.warning(
+                    "REST call-next: critical audit failed after committed "
+                    "call (transition preserved): %s",
+                    audit_exc,
+                )
+                db.rollback()
+
             # 1. User Notification (Mobile/PWA)
             try:
                 from app.models.online_queue import OnlineQueueEntry
