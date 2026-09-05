@@ -32,8 +32,10 @@ router = APIRouter(prefix="/batch", tags=["registrar-batch"])
 # SCHEMAS
 # ============================================================================
 
+
 class PatientEntriesResponse(BaseModel):
     """Ответ с записями пациента за день"""
+
     patient_id: int
     date: str
     online_queue_entries: list[dict[str, Any]]
@@ -48,6 +50,7 @@ class StructuredErrorResponse(BaseModel):
     ambiguous_entry_id, entry_not_found). When error_code is None,
     the detail is a plain string for backward compatibility.
     """
+
     code: str = Field(..., description="Machine-readable error code")
     message: str = Field(..., description="Human-readable error message")
 
@@ -56,10 +59,11 @@ class StructuredErrorResponse(BaseModel):
 # ENDPOINTS
 # ============================================================================
 
+
 @router.get(
     "/patients/{patient_id}/entries/{date}",
     response_model=PatientEntriesResponse,
-    summary="Получить все записи пациента за день"
+    summary="Получить все записи пациента за день",
 )
 async def get_patient_entries(
     patient_id: int = Path(..., description="ID пациента"),
@@ -82,7 +86,7 @@ async def get_patient_entries(
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid date format. Use YYYY-MM-DD"
+            detail="Invalid date format. Use YYYY-MM-DD",
         )
 
     service = get_batch_patient_service(db)
@@ -101,7 +105,7 @@ async def get_patient_entries(
                 "queue_tag": e.queue_tag,
                 "service_code": e.service_code,
                 "service_id": e.service_id,
-                "queue_time": e.queue_time.isoformat() if e.queue_time else None
+                "queue_time": e.queue_time.isoformat() if e.queue_time else None,
             }
             for e in result["online_queue_entries"]
         ],
@@ -112,11 +116,11 @@ async def get_patient_entries(
                 "status": v.status,
                 "doctor_id": v.doctor_id,
                 "visit_date": str(v.visit_date) if v.visit_date else None,
-                "cost": float(v.cost) if hasattr(v, 'cost') and v.cost else 0
+                "cost": float(v.cost) if hasattr(v, 'cost') and v.cost else 0,
             }
             for v in result["visits"]
         ],
-        "aggregated": result["aggregated"]
+        "aggregated": result["aggregated"],
     }
 
     return PatientEntriesResponse(**response)
@@ -178,19 +182,23 @@ async def batch_update_patient_entries(
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid date format. Use YYYY-MM-DD"
+            detail="Invalid date format. Use YYYY-MM-DD",
         )
 
     service = get_batch_patient_service(db)
-    result = service.batch_update(patient_id, target_date, request)
+    # QF-1 (operator attribution, Codex round-2 P1): thread the operator so
+    # batch status updates (e.g. the documented {"action":"update",
+    # "status":"called"} example) attribute the caller.
+    result = service.batch_update(
+        patient_id, target_date, request, actor_user_id=current_user.id
+    )
 
     if not result.success:
         error_detail = result.error or "Batch update failed"
         if result.error_code:
             error_detail = {"code": result.error_code, "message": error_detail}
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail
+            status_code=status.HTTP_400_BAD_REQUEST, detail=error_detail
         )
 
     return result
@@ -221,7 +229,7 @@ async def cancel_all_patient_entries(
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid date format. Use YYYY-MM-DD"
+            detail="Invalid date format. Use YYYY-MM-DD",
         )
 
     service = get_batch_patient_service(db)
@@ -233,33 +241,36 @@ async def cancel_all_patient_entries(
     cancel_actions = []
 
     for entry in entries_data["online_queue_entries"]:
-        cancel_actions.append({
-            "id": entry.id,
-            "entry_type": "online_queue",
-            "action": "cancel",
-            "reason": reason
-        })
+        cancel_actions.append(
+            {
+                "id": entry.id,
+                "entry_type": "online_queue",
+                "action": "cancel",
+                "reason": reason,
+            }
+        )
 
     for visit in entries_data["visits"]:
-        cancel_actions.append({
-            "id": visit.id,
-            "entry_type": "visit",
-            "action": "cancel",
-            "reason": reason
-        })
+        cancel_actions.append(
+            {
+                "id": visit.id,
+                "entry_type": "visit",
+                "action": "cancel",
+                "reason": reason,
+            }
+        )
 
     if not cancel_actions:
         return {
             "success": True,
             "message": "No entries to cancel",
-            "cancelled_count": 0
+            "cancelled_count": 0,
         }
 
     # Выполняем batch-отмену
     from app.services.batch_patient_service import EntryAction
-    request = BatchUpdateRequest(
-        entries=[EntryAction(**a) for a in cancel_actions]
-    )
+
+    request = BatchUpdateRequest(entries=[EntryAction(**a) for a in cancel_actions])
 
     result = service.batch_update(patient_id, target_date, request)
 
@@ -267,5 +278,5 @@ async def cancel_all_patient_entries(
         "success": result.success,
         "message": f"Cancelled {len(cancel_actions)} entries",
         "cancelled_count": len(cancel_actions),
-        "details": result.updated_entries
+        "details": result.updated_entries,
     }

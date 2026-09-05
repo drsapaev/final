@@ -199,8 +199,10 @@ class OnlineQueueEntry(Base):
     #   as a real column EVERY live call surface keeps the caller identity:
     #   canonical call-next (REST + GraphQL + Telegram staff_call), the
     #   doctor-panel /doctor/queue/{id}/call route, the display-board
-    #   call-patient / quick/call-next service, and the legacy
-    #   /queue/call/{id} route (Codex QF-1 round-1 P1 closure).
+    #   call-patient / quick/call-next service, the legacy
+    #   /queue/legacy/call/{id} route, and the registrar batch update
+    #   ({"action":"update","status":"called"}) — Codex QF-1 round-1/2 P1
+    #   closure.
     # - served_by_user_id / served_at: who completed the entry and when
     #   (complete_patient_visit; timestamp precedent: diagnostics_started_at).
     # Nullable FKs ON DELETE SET NULL: deleting the operator user preserves

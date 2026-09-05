@@ -416,6 +416,30 @@ def test_legacy_queue_call_persists_called_by(client, db_session, test_doctor):
     assert called_by == operator.id
 
 
+@pytest.mark.queue
+@pytest.mark.integration
+def test_registrar_batch_update_called_persists_caller(
+    client, db_session, test_doctor, test_patient
+):
+    """Codex round-2 P1: the documented PATCH batch payload
+    {"action":"update","status":"called"} must attribute the operator."""
+    operator = _create_staff_user(db_session, "qf1_operator_h", "operator-h-pass")
+    headers = _login_headers(client, "qf1_operator_h", "operator-h-pass")
+    queue = _make_queue(db_session, test_doctor.id)
+    entry = _make_entry(db_session, queue.id, number=1, patient_id=test_patient.id)
+
+    resp = client.patch(
+        f"/api/v1/registrar/batch/patients/{test_patient.id}/entries/"
+        f"{date.today().isoformat()}",
+        json={"entries": [{"id": entry.id, "action": "update", "status": "called"}]},
+        headers=headers,
+    )
+
+    assert resp.status_code == 200, resp.text
+    called_by, _, _ = _raw_attribution(db_session, entry.id)
+    assert called_by == operator.id
+
+
 # ---------------------------------------------------------------------------
 # RBAC vocabulary untouched (tripwire)
 # ---------------------------------------------------------------------------
