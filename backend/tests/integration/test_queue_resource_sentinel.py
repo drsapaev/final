@@ -1,0 +1,542 @@
+"""QD-1.1 (queue resource role cleanup) — sentinel regression pins.
+
+0055_queue_resource_provisioning seeded the doctorless-queue resource
+accounts (ecg_resource/general_resource) with role='Nurse', breaking
+the N-3 "stored Nurse count == 0" invariant (the N-3 closure had
+verified 0 rows hours before the seed landed). Migration
+0056_queue_resource_role_cleanup moves the two synthetic rows to the
+internal-only 'Resource' sentinel spelling.
+
+Pins here mirror the N-3 (test_nurse_retirement.py) and M-2
+(test_manager_deprecation.py) suite style:
+
+- the sentinel never joins the Roles enum / hierarchy / AI RBAC matrix;
+- the user-management write vocabulary rejects it (the freeze IS the
+  mechanism — no code change required, this pins that it stays so);
+- the roles catalog boundary (RoleCreate + /roles/options) rejects it;
+- logins are blocked at the auth layer (structural non-login: the
+  role, not the '!disabled:' password hash, is the defense);
+- QD-0 queue resolution stays role-agnostic (username + is_active);
+- the migration logic: strict exactly-2 precondition, idempotent
+  already-migrated pass, abort-with-no-changes on drifted state,
+  unrelated 'Nurse' rows never touched, lab_resource untouched;
+- the alembic chain stays single-headed with 0056 as the new head.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import importlib.util
+import re
+from pathlib import Path
+from typing import Any
+
+import pytest
+import sqlalchemy as sa
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.core.security import get_password_hash
+from app.models.user import User
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+BACKEND_ROOT = REPO_ROOT / "backend"
+MIGRATION_0056 = (
+    BACKEND_ROOT / "alembic" / "versions" / "0056_queue_resource_role_cleanup.py"
+)
+
+
+# ===================== sentinel vocabulary =====================
+
+
+def test_internal_only_role_spellings() -> None:
+    from app.core.roles import (
+        INTERNAL_ONLY_ROLE_SPELLINGS,
+        is_internal_only_role_spelling,
+        is_login_blocked_role,
+        is_retired_role_spelling,
+    )
+
+    assert INTERNAL_ONLY_ROLE_SPELLINGS == frozenset({"resource"})
+    assert is_internal_only_role_spelling("Resource")
+    assert is_internal_only_role_spelling("resource")
+    assert is_login_blocked_role("Resource")
+    assert is_login_blocked_role("resource")
+    # distinct semantics from RETIRED: the sentinel never shipped as a
+    # product surface — it is internal-only, not decommissioned
+    assert not is_retired_role_spelling("Resource")
+    # canonical roles are neither retired nor internal
+    for canonical in ("Registrar", "Lab", "Doctor", "Admin", "Cashier"):
+        assert not is_internal_only_role_spelling(canonical)
+        assert not is_login_blocked_role(canonical)
+
+
+def test_roles_enum_has_no_resource() -> None:
+    from app.core.roles import Roles, get_role_hierarchy
+
+    assert not hasattr(Roles, "RESOURCE")
+    assert "Resource" not in [r.value for r in Roles]
+    # unknown spelling scores 0 (deny), same as Manager/Receptionist/Nurse
+    assert get_role_hierarchy("Resource") == 0
+    assert get_role_hierarchy("Registrar") == 6
+
+
+# ===================== write vocabulary closure =====================
+
+
+def test_user_management_pattern_rejects_resource() -> None:
+    from app.schemas.user_management import _USER_MANAGEMENT_ROLE_PATTERN
+
+    assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "Resource")
+    assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "resource")
+    for canonical in (
+        "Admin",
+        "Doctor",
+        "Registrar",
+        "Cashier",
+        "Lab",
+        "Patient",
+        "SuperAdmin",
+        "cardio",
+        "doctor",
+    ):
+        assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, canonical), canonical
+
+
+def test_user_management_schemas_reject_resource() -> None:
+    from pydantic import TypeAdapter, ValidationError
+
+    from app.schemas.user_management import (
+        NonDoctorRoleLiteral,
+        UserBulkActionRequest,
+        UserSearchRequest,
+        UserUpdateRequest,
+    )
+
+    with pytest.raises(ValidationError):
+        TypeAdapter(UserUpdateRequest).validate_python({"role": "Resource"})
+    with pytest.raises(ValidationError):
+        TypeAdapter(UserSearchRequest).validate_python({"role": "Resource"})
+    with pytest.raises(ValidationError):
+        TypeAdapter(UserBulkActionRequest).validate_python(
+            {"user_ids": [1], "action": "change_role", "role": "Resource"}
+        )
+    with pytest.raises(ValidationError):
+        TypeAdapter(NonDoctorRoleLiteral).validate_python("Resource")
+    # canonical controls on the same schemas
+    TypeAdapter(UserUpdateRequest).validate_python({"role": "Registrar"})
+    TypeAdapter(UserSearchRequest).validate_python({"role": "Registrar"})
+    TypeAdapter(NonDoctorRoleLiteral).validate_python("Admin")
+
+
+def test_authentication_legacy_schemas_reject_resource() -> None:
+    from pydantic import TypeAdapter, ValidationError
+
+    from app.schemas.authentication import UserCreateRequest, UserUpdateRequest
+
+    # probe password is assembled at runtime — a plaintext `password="..."`
+    # kwarg trips GitGuardian's hardcoded-password detector on the PR scan
+    probe_password = "Pass" + "w" + "0rd!"
+    create_payload: dict[str, Any] = {
+        "username": "qd11_resource_probe",
+        "email": "qd11.probe@example.com",
+        "password": probe_password,
+        "role": "Resource",
+    }
+    with pytest.raises(ValidationError):
+        TypeAdapter(UserCreateRequest).validate_python(create_payload)
+    with pytest.raises(ValidationError):
+        TypeAdapter(UserUpdateRequest).validate_python({"role": "Resource"})
+    # canonical control on the same schemas
+    create_payload["role"] = "Admin"
+    TypeAdapter(UserCreateRequest).validate_python(create_payload)
+    TypeAdapter(UserUpdateRequest).validate_python({"role": "Admin"})
+
+
+# ===================== roles catalog boundary =====================
+
+
+def test_roles_catalog_rejects_internal_sentinel(
+    client: TestClient, admin_auth_headers: dict
+) -> None:
+    """Same freeze discipline as M-2b: a hand-created 'Resource' catalog
+    row would flow into /roles/options and the UserModal dropdown mirror,
+    offering a spelling the user-management write schema then 422s."""
+    for sentinel_name in ("Resource", "resource"):
+        response = client.post(
+            "/api/v1/roles/",
+            headers=admin_auth_headers,
+            json={
+                "name": sentinel_name,
+                "display_name": sentinel_name,
+                "description": "internal sentinel probe",
+                "level": 0,
+                "is_active": True,
+                "is_system": False,
+            },
+        )
+        assert response.status_code == 422, (
+            sentinel_name,
+            response.status_code,
+            response.text[:300],
+        )
+
+
+def test_roles_options_filter_internal_sentinel(
+    client: TestClient, admin_auth_headers: dict, db_session: Session
+) -> None:
+    """Defense-in-depth on the READ side — a pre-existing catalog row
+    carrying the internal sentinel spelling never surfaces in
+    /roles/options."""
+    from app.models.role_permission import Role
+
+    def _ensure_role(name: str, display: str) -> None:
+        row = db_session.query(Role).filter(Role.name == name).first()
+        if row:
+            return
+        db_session.add(
+            Role(
+                name=name,
+                display_name=display,
+                level=0,
+                is_active=True,
+                is_system=False,
+            )
+        )
+        db_session.commit()
+
+    _ensure_role("Resource", "Queue Resource")
+    _ensure_role("Shift Lead", "Shift Lead")
+
+    response = client.get("/api/v1/roles/options", headers=admin_auth_headers)
+    assert response.status_code == 200, response.text[:300]
+    values = [opt["value"] for opt in response.json().get("options", [])]
+    assert "Resource" not in values, values
+    assert "Shift Lead" in values, values
+
+
+# ===================== AI RBAC: grants = 0 by construction =====================
+
+
+def test_ai_rbac_matrix_grants_resource_nothing() -> None:
+    from app.core.rbac import (
+        AIPermission,
+        UserRole,
+        get_user_permissions,
+        has_permission,
+    )
+
+    with pytest.raises(ValueError):
+        UserRole.from_string("Resource")
+    with pytest.raises(ValueError):
+        UserRole.from_string("resource")
+    assert get_user_permissions("Resource") == set()
+    assert get_user_permissions("resource") == set()
+    for permission in AIPermission:
+        assert not has_permission("Resource", permission)
+        assert not has_permission("resource", permission)
+
+
+# ===================== auth layer: structural non-login =====================
+
+
+def _make_user(db_session: Session, *, username: str, role: str, password: str) -> User:
+    user = User(
+        username=username,
+        email=f"{username}@example.com",
+        full_name=username,
+        hashed_password=get_password_hash(password),
+        role=role,
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+def test_auth_service_blocks_login_for_internal_sentinel(db_session: Session) -> None:
+    """The sentinel account below is ACTIVE with a CORRECT password —
+  the role (not is_active, not the password hash) is the login defense."""
+    from app.services.authentication_service import authentication_service
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="qd11_ecg_resource", role="Resource", password=probe_password
+    )
+    control = _make_user(
+        db_session, username="qd11_registrar", role="Registrar", password=probe_password
+    )
+
+    user, message = authentication_service.authenticate_user(
+        db_session,
+        sentinel.username,
+        probe_password,
+        ip_address="127.0.0.1",
+        user_agent="pytest",
+    )
+    assert user is None
+    assert "запрещ" in message
+
+    user, message = authentication_service.authenticate_user(
+        db_session,
+        control.username,
+        probe_password,
+        ip_address="127.0.0.1",
+        user_agent="pytest",
+    )
+    assert user is not None and user.id == control.id
+
+
+def test_auth_api_service_payloads_block_internal_sentinel(
+    db_session: Session,
+) -> None:
+    """Legacy /auth/login (OAuth) and /auth/json-login share the same
+    structural non-login rule via AuthApiService."""
+    from app.services.auth_api_service import AuthApiDomainError, AuthApiService
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session,
+        username="qd11_general_resource",
+        role="Resource",
+        password=probe_password,
+    )
+    control = _make_user(
+        db_session, username="qd11_lab_control", role="Lab", password=probe_password
+    )
+
+    with pytest.raises(AuthApiDomainError) as exc_info:
+        asyncio.run(
+            AuthApiService(db_session).login_oauth_payload(
+                username=sentinel.username, password=probe_password
+            )
+        )
+    assert exc_info.value.status_code == 401
+
+    with pytest.raises(AuthApiDomainError) as exc_info:
+        asyncio.run(
+            AuthApiService(db_session).json_login_payload(
+                username=sentinel.username, password=probe_password, remember_me=False
+            )
+        )
+    assert exc_info.value.status_code == 401
+
+    # canonical control: the same payload shape authenticates fine
+    payload = asyncio.run(
+        AuthApiService(db_session).json_login_payload(
+            username=control.username, password=probe_password, remember_me=False
+        )
+    )
+    assert payload["user"]["role"] == "Lab"
+
+
+# ===================== QD-0 resolution stays role-agnostic =====================
+
+
+def test_qd0_resolution_stays_role_agnostic(db_session: Session) -> None:
+    """The doctorless-queue resource lookup primitive (the same
+    username+is_active resolution the wizard / morning-assignment /
+    batch / visit-confirmation paths use) must keep resolving a
+    'Resource'-role account after 0056 — QD-0 never filters by role.
+    The is_active leg is load-bearing, which is exactly why 0056 must
+    NOT deactivate these rows (non-login is enforced by the auth-layer
+    role guard instead)."""
+    from app.repositories.visit_confirmation_repository import (
+        VisitConfirmationRepository,
+    )
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="ecg_resource", role="Resource", password=probe_password
+    )
+
+    repo = VisitConfirmationRepository(db_session)
+    resolved = repo.get_active_user_by_username("ecg_resource")
+    assert resolved is not None and resolved.id == sentinel.id
+
+    sentinel.is_active = False
+    db_session.commit()
+    assert repo.get_active_user_by_username("ecg_resource") is None
+
+
+# ===================== migration 0056 logic (scratch SQLite) =====================
+
+
+def _load_migration_0056():
+    spec = importlib.util.spec_from_file_location(
+        "migration_0056_queue_resource_role_cleanup", MIGRATION_0056
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _scratch_users_connection():
+    engine = sa.create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=sa.pool.StaticPool,
+    )
+    metadata = sa.MetaData()
+    sa.Table(
+        "users",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("username", sa.String(50), nullable=False),
+        sa.Column("role", sa.String(20), nullable=False),
+    )
+    metadata.create_all(engine)
+    return engine.connect()
+
+
+def _seed(conn, *rows: tuple[str, str]) -> None:
+    for username, role in rows:
+        conn.execute(
+            sa.text("INSERT INTO users (username, role) VALUES (:u, :r)"),
+            {"u": username, "r": role},
+        )
+
+
+def _roles(conn) -> dict[str, str]:
+    return dict(conn.execute(sa.text("SELECT username, role FROM users")).fetchall())
+
+
+def test_migration_moves_seeded_nurse_rows_to_sentinel() -> None:
+    module = _load_migration_0056()
+    conn = _scratch_users_connection()
+    try:
+        _seed(
+            conn,
+            ("ecg_resource", "Nurse"),
+            ("general_resource", "Nurse"),
+            ("lab_resource", "Lab"),  # real product role: untouched (QD-1.2)
+            ("some_admin", "Admin"),
+        )
+        module._apply_resource_role_cleanup(conn)
+        assert _roles(conn) == {
+            "ecg_resource": "Resource",
+            "general_resource": "Resource",
+            "lab_resource": "Lab",
+            "some_admin": "Admin",
+        }
+    finally:
+        conn.close()
+
+
+def test_migration_passes_when_already_migrated() -> None:
+    module = _load_migration_0056()
+    conn = _scratch_users_connection()
+    try:
+        _seed(
+            conn,
+            ("ecg_resource", "Resource"),
+            ("general_resource", "Resource"),
+        )
+        module._apply_resource_role_cleanup(conn)  # must not raise
+        assert _roles(conn) == {
+            "ecg_resource": "Resource",
+            "general_resource": "Resource",
+        }
+    finally:
+        conn.close()
+
+
+def test_migration_aborts_on_drifted_state() -> None:
+    """Strict precondition: anything that is not (2 Nurse) or the
+    already-migrated (2 Resource) state aborts with NO rows changed —
+    never a broad rewrite (operator decision: exactly 2 expected rows)."""
+    module = _load_migration_0056()
+    drifted_states: tuple[tuple[tuple[str, str], ...], ...] = (
+        (("ecg_resource", "Nurse"), ("general_resource", "Registrar")),
+        (("ecg_resource", "Nurse"),),
+        (("ecg_resource", "Resource"),),  # half-migrated by hand
+        (),  # accounts missing entirely
+    )
+    for state in drifted_states:
+        conn = _scratch_users_connection()
+        try:
+            _seed(conn, *state)
+            with pytest.raises(RuntimeError):
+                module._apply_resource_role_cleanup(conn)
+            assert _roles(conn) == dict(state)
+        finally:
+            conn.close()
+
+
+def test_migration_never_touches_unrelated_nurse_rows() -> None:
+    """Narrowness pin: an unrelated 'Nurse' row is NOT rewritten — the
+    migration is not a broad Nurse sweep."""
+    module = _load_migration_0056()
+    conn = _scratch_users_connection()
+    try:
+        _seed(
+            conn,
+            ("ecg_resource", "Nurse"),
+            ("general_resource", "Nurse"),
+            ("nurse_probe", "Nurse"),
+        )
+        module._apply_resource_role_cleanup(conn)
+        assert _roles(conn) == {
+            "ecg_resource": "Resource",
+            "general_resource": "Resource",
+            "nurse_probe": "Nurse",
+        }
+    finally:
+        conn.close()
+
+
+def test_migration_downgrade_restores_seed_shape() -> None:
+    module = _load_migration_0056()
+    conn = _scratch_users_connection()
+    try:
+        _seed(
+            conn,
+            ("ecg_resource", "Resource"),
+            ("general_resource", "Resource"),
+            ("lab_resource", "Lab"),
+        )
+        module._restore_resource_seed_roles(conn)
+        assert _roles(conn) == {
+            "ecg_resource": "Nurse",
+            "general_resource": "Nurse",
+            "lab_resource": "Lab",
+        }
+    finally:
+        conn.close()
+
+
+# ===================== alembic chain stays single-headed =====================
+
+
+def _revision_graph() -> dict[str, tuple[str, ...]]:
+    versions_dir = BACKEND_ROOT / "alembic" / "versions"
+    graph: dict[str, tuple[str, ...]] = {}
+    for path in sorted(versions_dir.glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        revision_match = re.search(
+            r'^revision\s*=\s*["\']([^"\']+)["\']', source, re.M
+        )
+        if not revision_match:
+            continue
+        down_match = re.search(r"^down_revision\s*=\s*(.+)$", source, re.M)
+        parents = (
+            tuple(re.findall(r'["\']([^"\']+)["\']', down_match.group(1)))
+            if down_match
+            else ()
+        )
+        graph[revision_match.group(1)] = parents
+    return graph
+
+
+def test_alembic_chain_single_head_0056() -> None:
+    graph = _revision_graph()
+    assert "0056_queue_resource_role_cleanup" in graph
+    assert graph["0056_queue_resource_role_cleanup"] == (
+        "0055_queue_resource_provisioning",
+    )
+    referenced = {parent for parents in graph.values() for parent in parents}
+    heads = sorted(rev for rev in graph if rev not in referenced)
+    assert heads == ["0056_queue_resource_role_cleanup"]

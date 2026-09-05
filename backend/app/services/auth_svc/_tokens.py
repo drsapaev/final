@@ -5,6 +5,7 @@ Split from authentication_service.py.
 from __future__ import annotations
 
 from app.core.pii_masker import mask_identifier  # PR-31: mask usernames in logs
+from app.core.roles import is_login_blocked_role
 from app.services.auth_svc._base import *  # noqa: F401, F403
 from app.services.auth_svc._base import AuthenticationServiceMixinBase
 
@@ -154,6 +155,23 @@ class TokensMixin(AuthenticationServiceMixinBase):
                     "user_inactive",
                 )
                 return None, "Пользователь деактивирован"
+
+            # QD-1.1 (queue resource role cleanup): internal-only sentinel
+            # roles are structural non-logins. Synthetic queue-resource
+            # accounts (0055) must never authenticate whatever their password
+            # state — the '!disabled:' hash is not the defense, the role is.
+            if is_login_blocked_role(user.role):
+                logger.debug("Login blocked for internal-only role user_id=%s", user.id)
+                self._log_login_attempt(
+                    db,
+                    user.id,
+                    username,
+                    ip_address,
+                    user_agent,
+                    False,
+                    "internal_role_login_blocked",
+                )
+                return None, "Аккаунт технический, вход запрещён"
 
             logger.debug("Verifying password...")
             password_valid = verify_password(password, user.hashed_password)

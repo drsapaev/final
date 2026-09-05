@@ -25,15 +25,26 @@ class RoleCreate(RoleBase):
     # UserModal dropdown mirror, offering a spelling the user-management
     # write schema then rejects with 422. Case-insensitive (catalog names
     # are free-form; the retired set lives in core/roles.py SSOT).
+    # QD-1.1 (queue resource role cleanup): the internal-only 'Resource'
+    # sentinel is rejected the same way — synthetic queue-resource rows
+    # are migration-provisioned (0056), never a catalog/product role.
     @field_validator("name")
     @classmethod
     def validate_name_not_retired(cls, v: str) -> str:
-        from app.core.roles import is_retired_role_spelling
+        from app.core.roles import (
+            is_internal_only_role_spelling,
+            is_retired_role_spelling,
+        )
 
         if is_retired_role_spelling(v):
             raise ValueError(
                 "Роль выведена из эксплуатации (retired spelling): используйте"
                 " канонический словарь ролей"
+            )
+        if is_internal_only_role_spelling(v):
+            raise ValueError(
+                "Роль является внутренним техническим маркером (internal-only):"
+                " создание в каталоге запрещено"
             )
         return v
 
