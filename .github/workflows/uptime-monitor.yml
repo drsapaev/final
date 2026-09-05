@@ -52,7 +52,17 @@ jobs:
           fi
           ok=$(python3 -c "import json;d=json.load(open('/tmp/body'));print('ok' if d.get('ok') else 'bad')" 2>/dev/null || echo bad)
           echo "result=$([ "$ok" = "ok" ] && echo success || echo failure)" >> "$GITHUB_OUTPUT"
-          [ "$ok" = "ok" ]
+          [ "$ok" = "ok" ] || exit 1
+
+          # P1 backup freshness (production-safe smoke contract): the nightly
+          # writes no clinical rows, so the data-safety signal is the age of
+          # the newest backup file exposed via /health/detailed.
+          code2=$(curl -s -o /tmp/detailed -w '%{http_code}' \n            -A "$UPTIME_UA" -m 20 "$HEALTH_URL/detailed") || code2=000
+          backup_status=$(python3 -c "import json;d=json.load(open('/tmp/detailed'));b=d.get('checks',{}).get('backup',{});print(b.get('status','unknown'))" 2>/dev/null || echo unknown)
+          backup_age=$(python3 -c "import json;d=json.load(open('/tmp/detailed'));b=d.get('checks',{}).get('backup',{});print(b.get('age_hours','?'))" 2>/dev/null || echo '?')
+          echo "backup_status=$backup_status" >> "$GITHUB_OUTPUT"
+          echo "backup_age=$backup_age" >> "$GITHUB_OUTPUT"
+          echo "detailed status=$code2 backup=$backup_status age=$backup_age hours"
 
       - name: Manage incident issue
         if: always()
@@ -92,6 +102,49 @@ jobs:
               per_page: 10
             });
             const incident = open.find(i => i.title.includes('[uptime]'));
+            // P1 backup freshness: staleness is monotonic (age only grows
+            // until a backup succeeds), so a single probe is enough evidence
+            // - no consecutive-failure window needed for this incident type.
+            const backupStatus = '${{ steps.probe.outputs.backup_status }}';
+            const backupAge = '${{ steps.probe.outputs.backup_age }}';
+            const backupLabel = 'backup-stale';
+            const backupOpen = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: backupLabel,
+              per_page: 10
+            });
+            const backupIncident = backupOpen.find(i => i.title.includes('[backup]'));
+            if (backupStatus === 'stale') {
+              const note = `- ${now} - newest backup is ${backupAge}h old (threshold: 26h)\n- [run](${runUrl})`;
+              if (backupIncident) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: backupIncident.number,
+                  body: `Still stale.\n\n${note}`
+                });
+              } else {
+                await github.rest.issues.create({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  title: `[backup] production backup stale (>26h) (${now})`,
+                  labels: [backupLabel],
+                  body: `No successful backup in over 26 hours.\n\n${note}\n\nAuto-updated while stale; auto-closed when the next backup lands.`
+                });
+              }
+            }
+            if (backupStatus === 'ok' && backupIncident) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: backupIncident.number,
+                body: `Recovered at ${now} - backup age ${backupAge}h. [Run](${runUrl}).`
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: backupIncident.number,
+                state: 'closed', state_reason: 'completed'
+              });
+            }
 
             if (result === 'failure' && consecutive >= threshold) {
               const note = `- ${now} — status \`${status}\`, body: \`${body}\`\n- consecutive failures: ${consecutive}\n- [run](${runUrl})`;
