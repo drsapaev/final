@@ -300,6 +300,7 @@ jobs:
 
       - name: S3 — seed idempotency + k6 smoke stage
         id: s3_eval
+        working-directory: backend
         run: |
           USERS=$(python - <<'PY'
           from app.db.session import SessionLocal
