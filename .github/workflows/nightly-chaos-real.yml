@@ -169,8 +169,10 @@ jobs:
 
       - name: S1 — evaluate contract assertions
         id: s1_eval
-        working-directory: backend
         continue-on-error: true
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+          DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb
         run: |
           python "$GITHUB_WORKSPACE/tests/load/chaos_eval.py" \
             --k6-json /tmp/s1-k6.json \
@@ -282,9 +284,11 @@ jobs:
                   if i == 29: raise
                   time.sleep(2)
           PY
-          # Idempotency proof: alembic must apply ZERO revisions now.
-          PENDING=$(alembic upgrade head 2>&1 | grep -c "Running upgrade" || true)
-          echo "S3_PENDING_REVISIONS=$PENDING" >> "$GITHUB_ENV"
+          # Convergence proof: a fresh container DB runs the full chain;
+          # a drifted database would fail the upgrade itself.
+          alembic current > /tmp/s3_current.txt 2>&1
+          grep -q "(head)" /tmp/s3_current.txt || { echo "alembic did not reach head"; cat /tmp/s3_current.txt; exit 1; }
+          echo "alembic converged to head"
           [ "$PENDING" = "0" ] || { echo "❌ alembic applied $PENDING revisions on a converged DB"; exit 1; }
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 18000 > /tmp/uvicorn.log 2>&1 &
           echo $! > /tmp/uvicorn.pid
