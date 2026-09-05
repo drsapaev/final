@@ -13,6 +13,7 @@ import GlobalSearchBar from '../search/GlobalSearchBar';
 import ChatButton from '../chat/ChatButton';
 import { COLOR_SCHEMES } from '../../theme/colorScheme';
 import { getCanonicalRouteById, getEffectiveRouteByPath, getRoleHomeRoute } from '../../routing/routeSelectors';
+import { HEADER_PORTAL_Z } from '../../theme/zLayers';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -21,6 +22,12 @@ const landingRoute = getCanonicalRouteById('landing')?.path || '/';
 const loginRoute = getCanonicalRouteById('login')?.path || '/login';
 const profileRoute = getCanonicalRouteById('clinical-profile')?.path || '/clinical/profile';
 const registrarHomeRoute = getRoleHomeRoute('registrar');
+
+// HDR-FX-1 (P2-3): menus layered INSIDE the sticky header stacking context
+// (z-1000 in header-new.css) use small named consts; body portals use
+// HEADER_PORTAL_Z from theme/zLayers.ts (single z-strategy for the header).
+const PROFILE_OVERLAY_Z = 99;
+const PROFILE_MENU_Z = 100;
 
 export function isThemeMenuInteraction(event: { composedPath?: () => EventTarget[]; target: EventTarget | null; }, themeMenuRoot: HTMLElement | null) {
   const path = event.composedPath ? event.composedPath() : [];
@@ -50,6 +57,12 @@ export default function HeaderNew() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);  // PR-50: profile dropdown
   const themeMenuRef = useRef<HTMLDivElement | null>(null);
   const themeButtonRef = useRef<HTMLButtonElement | null>(null);
+  // HDR-FX-1 (P1-3): the theme menu renders in a body portal, so it needs
+  // its own ref for focus management (themeMenuRef only wraps the trigger).
+  const themePortalRef = useRef<HTMLDivElement | null>(null);
+  // HDR-FX-1 (P1-2): profile menu keyboard/focus management refs.
+  const profileButtonRef = useRef<HTMLButtonElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const [menuPos, setMenuPos] = useState({ left: 0, top: 0 });
 
   useEffect(() => auth.subscribe(setState), []);
@@ -77,6 +90,76 @@ export default function HeaderNew() {
     document.addEventListener('click', handleClickOutside, true);
     return () => document.removeEventListener('click', handleClickOutside, true);
   }, []);
+
+  // HDR-FX-1 (P1-2): when the profile menu opens, move focus to its first
+  // item (WAI-ARIA menu pattern). Previously focus stayed on the trigger and
+  // Escape was unreachable: the click-outside overlay was tabIndex={-1}, so
+  // its onKeyDown handler could never fire from the keyboard.
+  useEffect(() => {
+    if (!showProfileMenu) return undefined;
+    const raf = requestAnimationFrame(() => {
+      profileMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [showProfileMenu]);
+
+  // HDR-FX-1 (P1-3): focus the checked scheme item when the theme menu opens.
+  useEffect(() => {
+    if (!showThemeMenu) return undefined;
+    const raf = requestAnimationFrame(() => {
+      const items = Array.from(themePortalRef.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? []);
+      (items.find((el) => el.getAttribute('aria-checked') === 'true') || items[0])?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [showThemeMenu]);
+
+  // HDR-FX-1 (P1-2/P1-3): shared menu keyboard contract — Escape closes and
+  // restores trigger focus, ArrowDown/ArrowUp cycle items with wrap-around.
+  const handleMenuKeyDown = useCallback(
+    (close: () => void, triggerRef: React.RefObject<HTMLElement | null>) =>
+      (event: React.KeyboardEvent<HTMLElement>) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          close();
+          triggerRef.current?.focus();
+          return;
+        }
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        event.preventDefault();
+        const items = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]'),
+        );
+        if (items.length === 0) return;
+        const index = items.indexOf(document.activeElement as HTMLElement);
+        const next = event.key === 'ArrowDown'
+          ? items[(index + 1) % items.length]
+          : items[(index - 1 + items.length) % items.length];
+        next.focus();
+      },
+    [],
+  );
+
+  const toggleThemeMenu = useCallback(() => {
+    logger.log('Theme button clicked, current state:', showThemeMenu);
+    // Вычисляем позицию для фиксированного меню
+    try {
+      const btn = themeButtonRef.current;
+      if (btn) {
+        const rect = btn.getBoundingClientRect();
+        const MENU_WIDTH = 220;
+        const left = Math.min(
+          Math.max(8, rect.left),
+          Math.max(8, window.innerWidth - MENU_WIDTH - 8)
+        );
+        const top = Math.min(rect.bottom + 8, window.innerHeight - 8);
+        setMenuPos({ left, top });
+      }
+    } catch (error) {
+      logger.debug('Failed to position theme menu', error);
+    }
+    setShowThemeMenu((v) => !v);
+  }, [showThemeMenu]);
 
   const handleThemeClick = (schemeId: string) => {
     logger.info('[FIX:THEME] Header theme change requested', {
@@ -114,7 +197,13 @@ export default function HeaderNew() {
   const roleNormalized = roleLower;
   const currentRoute = getEffectiveRouteByPath(location.pathname);
 
-  const isRegistrarPanel = currentRoute?.id === 'registrar-home';
+  // HDR-FX-1 (P2-4, audit P3-5): the CTA belongs to every registrar surface,
+  // not only the home route. The old exact-id check hid it on
+  // /registrar/welcome|queue, and where it did render off-home the dual-mode
+  // navigate branch clobbered the user's current view.
+  const isRegistrarSurface = currentRoute?.id === 'registrar-home'
+    || currentRoute?.id === 'registrar-welcome'
+    || currentRoute?.id === 'registrar-queue';
 
   // Определяем активную кастомную схему
   const isGlassTheme = colorScheme === 'glass';
@@ -242,8 +331,11 @@ export default function HeaderNew() {
     </Button>;
 
 
+  // HDR-FX-1 (P1-1): flexShrink 0 — this cluster never compresses (the old
+  // shrink+invisible-scroll combo was what clipped the CTA tail); label
+  // collapse below 1200px is the only degradation step.
   const roleNav =
-  <div className="hdr-nav-scroll" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap', overflowX: 'auto' }}>
+  <div className="hdr-nav-scroll" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap', flexShrink: 0 }}>
       {navItems.map((item) => {
       const active = location.pathname === item.to;
       const ItemIcon = item.icon;
@@ -266,12 +358,13 @@ export default function HeaderNew() {
           }}>
 
             <ItemIcon size={16} aria-hidden="true" style={{ color: active ? 'white' : theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
-            <span className="hdr-hide-sm">{item.label}</span>
+            {/* HDR-FX-1 (P1-1): label collapses to icon-only below 1200px. */}
+            <span className="hdr-hide-nav-label">{item.label}</span>
           </Button>);
 
     })}
 
-      {roleNormalized === 'registrar' && isRegistrarPanel &&
+      {roleNormalized === 'registrar' && isRegistrarSurface &&
     <>
           {/* PR-UI-04: removed hardcoded "Home" and "Queue" nav buttons —
               they're now in canonical Sidebar via SIDEBAR_PRESETS.registrar.
@@ -281,13 +374,12 @@ export default function HeaderNew() {
         size="small"
         title={t('legacy.hn_new_appointment_title')}
         onClick={() => {
-          // P-008 fix: previously dispatched a CustomEvent('openAppointmentWizard')
-          // that only RegistrarPanel listens to — making the button a silent no-op on
-          // any other page. Now the button always navigates to the registrar route
-          // with ?action=new, and RegistrarPanel reads that query param on mount to
-          // auto-open the wizard. Falls back to the CustomEvent when already on the
-          // registrar route (preserves the existing in-page UX).
-          if (isRegistrarPanel) {
+          // HDR-FX-1 (P2-4): uniform behavior on every registrar surface —
+          // dispatch the wizard event in place (the useRegistrarNavigation
+          // listener is mounted on all three /registrar/* routes), so the
+          // user's current view is preserved. Only off-surface falls back to
+          // the P-008 deep link (?action=new is consumed on mount).
+          if (isRegistrarSurface) {
             window.dispatchEvent(new CustomEvent('openAppointmentWizard'));
           } else {
             navigate(`${registrarHomeRoute}?action=new`);
@@ -296,7 +388,10 @@ export default function HeaderNew() {
         style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0 }}>
 
             <Plus size={16} aria-hidden="true" style={{ color: 'white' }} />
-            <span className="hdr-hide-md">{t('legacy.hn_new_appointment_title')}</span>
+            {/* HDR-FX-1 (P1-1): label collapses to icon-only below 1200px
+                (replaces hdr-hide-md — its 1024px boundary left the
+                1025-1310px dead zone where the CTA text clipped). */}
+            <span className="hdr-hide-nav-label">{t('legacy.hn_new_appointment_title')}</span>
           </Button>
         </>
     }
@@ -358,25 +453,34 @@ export default function HeaderNew() {
               // REC-3: receptionist normalization removed with the alias.
               const normalizedRole = role;
               const count = getUnreadCount(normalizedRole);
-              return count > 0 ? (
-                <span style={{
-                  position: 'absolute',
-                  top: -3,
-                  right: -3,
-                  minWidth: 16,
-                  height: 16,
-                  padding: '0 4px',
-                  borderRadius: 8,
-                  background: 'var(--mac-error)',
-                  color: 'white',
-                  fontSize: 10,
-                  lineHeight: '16px',
-                  fontWeight: 'var(--mac-font-weight-bold)',
-                  textAlign: 'center',
-                }}>
-                  {count > 99 ? '99+' : count}
-                </span>
-              ) : null;
+              if (count <= 0) return null;
+              return (
+                <>
+                  {/* HDR-FX-1 (P2-2): the pixel badge is decorative ink ("99+"
+                      reads poorly on a screen reader); the real count is
+                      announced through this polite live region instead. */}
+                  <span role="status" className="sr-only">
+                    {t('legacy.hn_notifications_unread', { count })}
+                  </span>
+                  <span aria-hidden="true" style={{
+                    position: 'absolute',
+                    top: -3,
+                    right: -3,
+                    minWidth: 16,
+                    height: 16,
+                    padding: '0 4px',
+                    borderRadius: 8,
+                    background: 'var(--mac-error)',
+                    color: 'white',
+                    fontSize: 10,
+                    lineHeight: '16px',
+                    fontWeight: 'var(--mac-font-weight-bold)',
+                    textAlign: 'center',
+                  }}>
+                    {count > 99 ? '99+' : count}
+                  </span>
+                </>
+              );
             })()}
           </Button>
         </div>
@@ -389,28 +493,22 @@ export default function HeaderNew() {
           ref={themeButtonRef}
           variant="ghost"
           size="small"
-          onClick={() => {
-            logger.log('Theme button clicked, current state:', showThemeMenu);
-            // Вычисляем позицию для фиксированного меню
-            try {
-              const btn = themeButtonRef.current;
-              if (btn) {
-                const rect = btn.getBoundingClientRect();
-                const MENU_WIDTH = 220;
-                const left = Math.min(
-                  Math.max(8, rect.left),
-                  Math.max(8, window.innerWidth - MENU_WIDTH - 8)
-                );
-                const top = Math.min(rect.bottom + 8, window.innerHeight - 8);
-                setMenuPos({ left, top });
-              }
-            } catch (error) {
-              logger.debug('Failed to position theme menu', error);
+          onClick={toggleThemeMenu}
+          onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+            // HDR-FX-1 (P1-3): trigger-level keyboard contract — ArrowDown
+            // opens, Escape closes (focus stays on the trigger).
+            if (e.key === 'ArrowDown' && !showThemeMenu) {
+              e.preventDefault();
+              toggleThemeMenu();
+            } else if (e.key === 'Escape' && showThemeMenu) {
+              e.preventDefault();
+              setShowThemeMenu(false);
             }
-            setShowThemeMenu((v) => !v);
           }}
           title={t('legacy.hn_select_theme')}
           aria-label={t('legacy.hn_select_theme')}
+          aria-haspopup="menu"
+          aria-expanded={showThemeMenu}
             style={{
               width: '36px',
             height: '36px',
@@ -432,7 +530,14 @@ export default function HeaderNew() {
           {showThemeMenu ?
         ReactDOM.createPortal(
           <div
+            ref={themePortalRef}
             data-theme-menu="true"
+            role="menu"
+            aria-label={t('legacy.hn_select_theme')}
+            // Focus lives on the items (menuitemradio); tabIndex={-1} keeps the
+            // container programmatically focusable without tab stops (a11y lint).
+            tabIndex={-1}
+            onKeyDown={handleMenuKeyDown(() => setShowThemeMenu(false), themeButtonRef)}
             style={{
               position: 'fixed',
               left: `${menuPos.left}px`,
@@ -443,7 +548,7 @@ export default function HeaderNew() {
               padding: 'var(--mac-spacing-2)',
               minWidth: '220px',
               boxShadow: 'var(--mac-shadow-md, 0 8px 24px rgba(0,0,0,0.2))',
-              zIndex: 2147483647,
+              zIndex: HEADER_PORTAL_Z,
               display: 'flex',
               flexDirection: 'column',
               gap: 'var(--mac-spacing-1)',
@@ -455,6 +560,8 @@ export default function HeaderNew() {
             <button
               type="button"
               key={scheme.id}
+              role="menuitemradio"
+              aria-checked={colorScheme === scheme.id}
               onClick={(e: React.MouseEvent<HTMLElement>) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -494,9 +601,21 @@ export default function HeaderNew() {
       {user ? (
         <div style={{ position: 'relative', flex: '0 0 auto' }}>
           <Button
+            ref={profileButtonRef}
             variant="outline"
             size="small"
             onClick={() => setShowProfileMenu((v) => !v)}
+            onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+            // HDR-FX-1 (P1-2): trigger-level keyboard contract — ArrowDown
+            // opens (focus then moves to the first item), Escape closes.
+            if (e.key === 'ArrowDown' && !showProfileMenu) {
+              e.preventDefault();
+              setShowProfileMenu(true);
+            } else if (e.key === 'Escape' && showProfileMenu) {
+              e.preventDefault();
+              setShowProfileMenu(false);
+            }
+          }}
             title={t('legacy.hn_profile_title')}
             aria-label={t('legacy.hn_profile_title')}
             aria-haspopup="menu"
@@ -515,18 +634,24 @@ export default function HeaderNew() {
           </Button>
           {showProfileMenu && (
             <>
-              {/* click-outside overlay — PR-50: added role + keyboard handler */}
+              {/* click-outside overlay — HDR-FX-1 (P1-2): decorative,
+                  non-focusable click-catcher. The old role="button" +
+                  tabIndex={-1} + onKeyDown combo was dead weight: the overlay
+                  can never receive focus, so its Escape handler was
+                  unreachable; Escape now lives on the trigger and the menu. */}
               <div
                 onClick={() => setShowProfileMenu(false)}
-                onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => { if (e.key === 'Escape') setShowProfileMenu(false); }}
-                role="button"
-                tabIndex={-1}
-                aria-label={t('legacy.hn_close_profile_menu')}
-                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }}
+                aria-hidden="true"
+                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: PROFILE_OVERLAY_Z }}
               />
               <div
+                ref={profileMenuRef}
                 role="menu"
                 aria-label={t('legacy.hn_profile_menu')}
+                // Focus lives on the menuitem children; tabIndex={-1} satisfies
+                // interactive-supports-focus without adding a tab stop.
+                tabIndex={-1}
+                onKeyDown={handleMenuKeyDown(() => setShowProfileMenu(false), profileButtonRef)}
                 style={{
                   position: 'absolute',
                   top: '100%',
@@ -536,7 +661,7 @@ export default function HeaderNew() {
                   border: '1px solid var(--mac-border)',
                   borderRadius: 'var(--mac-radius-md)',
                   boxShadow: 'var(--mac-shadow-md)',
-                  zIndex: 100,
+                  zIndex: PROFILE_MENU_Z,
                   minWidth: '180px',
                   overflow: 'hidden',
                 }}>
@@ -606,13 +731,18 @@ export default function HeaderNew() {
 
 
   return (
-    <div className="app-header" style={headerStyle}>
+    <header className="app-header" style={headerStyle}>
       <div className="hdr-left" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {backButton}
         {brand}
       </div>
       <div className="hdr-center" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-4)' }}>
-        <GlobalSearchBar />
+        {/* HDR-FX-1 (P1-1): the search bar is the designated shrivable item —
+            it absorbs center-column squeeze first (basis = its own 400px
+            maxWidth) so the roleNav cluster and the CTA never clip. */}
+        <div style={{ display: 'flex', flex: '0 1 400px', minWidth: 0 }}>
+          <GlobalSearchBar />
+        </div>
         {/* PR-50: ⌘K chip — replaced synthetic KeyboardEvent hack with a real
             <button> that dispatches a custom event the CommandPalette listens
             for. Previously dispatched a synthetic keydown event which was
@@ -659,6 +789,6 @@ export default function HeaderNew() {
         {roleNav}
       </div>
       <div className="hdr-right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{controls}</div>
-    </div>);
+    </header>);
 
 }

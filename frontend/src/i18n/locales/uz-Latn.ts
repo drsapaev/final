@@ -9968,6 +9968,7 @@ const uzLatn = {
     hn_profile_menu_item: 'Profil',
     hn_logout: 'Chiqish',
     hn_login: 'Kirish',
+    hn_notifications_unread: "O'qilmagan: {count}",
     hn_command_palette_title: 'Buyruqlar panelini ochish (Cmd+K / Ctrl+K)',
     hn_command_palette_aria: 'Buyruqlar panelini ochish',
   },

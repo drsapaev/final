@@ -1,92 +1,52 @@
+/* HDR-FX-1: header chrome styles.
+ *
+ * P2-6: every structural value the inline headerStyle in HeaderNew.tsx owns
+ * (grid template, column gap, padding, height, overflow, radius) lives ONLY
+ * there — this file keeps the non-conflicting shell (sticky positioning)
+ * plus the responsive visibility utilities that inline styles cannot express.
+ * P2-5: the dead .hdr-btn*/.hdr-select/.hdr-title/.hdr-logo layer (zero TSX
+ * usage since the ui/macos Button migration) was removed together with the
+ * media-block remnants that inline styles had already been overriding. */
+
 .app-header {
   position: sticky;
   top: 0;
   left: 0;
   right: 0;
   z-index: 1000;
-  display: grid;
-  grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
-  align-items: center;
-  gap: 12px;
-  padding: 12px 24px;
   box-sizing: border-box;
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
 }
 
-.hdr-left, .hdr-center, .hdr-right { 
-  min-width: 0; 
-  overflow: hidden;
-}
-
-.hdr-left {
-  flex-shrink: 0;
-}
-
+/* P1-1/P2-6: hdr-center keeps its overflow clip as the last-resort safety
+   net (grid 1fr column). hdr-left/hdr-right must NOT clip: the profile
+   dropdown paints below the header box (top: 100%) and was FULLY invisible
+   under .hdr-right overflow:hidden — found during HDR-FX-1 (menu bottom
+   134px vs hdr-right bottom 57px, paint probe on main f9a6eca). Grid auto
+   columns default to min-width:auto, so the two side columns refuse to
+   shrink below their content and the 1fr center absorbs all squeeze. */
 .hdr-center {
-  flex-shrink: 1;
   min-width: 0;
-}
-
-.hdr-right {
-  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .hdr-nav-scroll {
   display: flex;
   align-items: center;
   gap: 8px;
-  overflow-x: hidden;
-  scrollbar-width: none;
   flex-wrap: nowrap;
   min-width: 0;
 }
 
 .hdr-controls { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 
-.hdr-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.hdr-btn--icon { width: 40px; justify-content: center; border: 1px solid rgba(148,163,184,.3); }
-.hdr-btn--ghost { border: 1px solid rgba(148,163,184,.3); }
-.hdr-btn--primary { background: linear-gradient(135deg, var(--mac-accent-blue), var(--mac-accent-blue-hover)); color: var(--mac-bg-primary); border: none; }
-.hdr-btn--danger { background: linear-gradient(135deg, var(--mac-error), var(--mac-error)); color: var(--mac-bg-primary); border: none; }
-.hdr-btn--nav { border: 1px solid rgba(148,163,184,.3); }
-.hdr-btn--nav.is-active { background: rgba(59,130,246,.15); border-color: rgba(59,130,246,.4); color: var(--mac-accent-blue-light, color-mix(in srgb, var(--mac-accent-blue), white 60%)); }
-.hdr-btn--brand { font-weight: 800; border: none; }
-
-.hdr-title { font-weight: 800; }
-.hdr-logo { font-size: 18px; }
-
-.hdr-select {
-  height: 40px;
-  padding: 8px 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(148,163,184,.3);
-  background: transparent;
-  color: inherit;
-  flex: 0 0 auto;
-}
-
 /* Глобально запрещаем тянуться кнопкам в header и горизонтальный скролл */
-.app-header button { 
-  display: inline-flex; 
-  flex: 0 0 auto; 
-  width: auto; 
-  white-space: nowrap; 
+.app-header button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
   max-width: fit-content;
   overflow: hidden;
 }
@@ -104,100 +64,27 @@ html {
   overflow-x: hidden;
 }
 
-/* Улучшенная адаптивность */
+/* Улучшенная адаптивность: visibility utilities (inline styles cannot
+   express media queries, so these remain the single CSS-owned behavior). */
 @media (max-width: 1024px) {
   .hdr-hide-md { display: none; }
 }
 
 @media (max-width: 768px) {
   .hdr-hide-sm { display: none; }
-  .app-header { 
-    padding: 6px 8px; 
-    gap: 4px;
-    grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-  
-  .hdr-nav-scroll {
-    gap: 2px;
-    overflow-x: hidden;
-    flex-wrap: nowrap;
-    justify-content: center;
-    min-width: 0;
-  }
-  
-  .hdr-btn {
-    height: 32px;
-    padding: 4px 6px;
-    font-size: 12px;
-    min-width: 32px;
-  }
-  
-  .hdr-btn--nav {
-    min-width: 32px;
-    justify-content: center;
-    padding: 4px;
-  }
-  
-  .hdr-controls {
-    gap: 2px;
-    flex-shrink: 0;
-  }
-  
-  .hdr-select {
-    height: 32px;
-    padding: 4px;
-    font-size: 12px;
-    min-width: 40px;
-  }
 }
 
 @media (max-width: 480px) {
   .hdr-hide-xs { display: none; }
-  
-  .app-header {
-    padding: 4px 6px;
-    gap: 2px;
-    grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-  
-  .hdr-nav-scroll {
-    gap: 1px;
-    overflow-x: hidden;
-    min-width: 0;
-  }
-  
-  .hdr-btn {
-    height: 28px;
-    padding: 2px 4px;
-    font-size: 11px;
-    min-width: 28px;
-  }
-  
-  .hdr-btn--nav {
-    min-width: 28px;
-    padding: 2px;
-  }
-  
-  .hdr-logo {
-    font-size: 14px;
-  }
-  
-  .hdr-title {
-    font-size: 12px;
-  }
-  
-  .hdr-controls {
-    gap: 1px;
-  }
-  
-  .hdr-select {
-    height: 28px;
-    padding: 2px;
-    font-size: 10px;
-    min-width: 35px;
-  }
-} 
+}
+
+/* P1-1: roleNav label collapse (Кассир link + CTA text). Measured on main
+   f9a6eca: left+right chrome costs 666px, so the 1fr center is W-746 and
+   full labels (219px nav cluster + 44px cmd chip + 32px gaps + search
+   flex-basis) only fit at >= 1191px. Between ~1025 and 1310 the header
+   center clipped the CTA tail with no scroll indicator (the audit's dead
+   zone: pr18-registrar baseline showed the CTA cut to "+ На" at 1280).
+   Below 1200px both labels collapse to icon-only (title/aria-label kept). */
+@media (max-width: 1200px) {
+  .hdr-hide-nav-label { display: none; }
+}

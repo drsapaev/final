@@ -117,8 +117,11 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
   const lastSync = formatLastSync();
 
   return (
-    <div 
+    <div
       className={`flex items-center gap-1 ${className}`}
+      // HDR-FX-1 (header audit P2-2): status flips (online/offline/sync) are
+      // now announced by screen readers — role="status" is a polite live region.
+      role="status"
       title={showTooltip ? `${label}${lastSync ? t('misc.ccs_sinhronizatsiya_lastsync', { lastSync: lastSync }) : ''}` : ''}
     >
       <Icon 
