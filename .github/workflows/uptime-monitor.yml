@@ -1,0 +1,132 @@
+name: Uptime Monitor (external)
+
+# P3 external monitoring: probes the PUBLIC production health endpoint from
+# GitHub runners (an outside vantage point — unlike the on-host watchdog,
+# this catches power/network/tunnel/host failures). Explicit monitor
+# User-Agent — no browser spoofing; if Cloudflare blocks it (error 1010),
+# the fix is a narrow WAF allow-rule for this UA on the health path.
+#
+# Alert-storm protection: an incident issue is opened only after
+# CONSECUTIVE_FAILURES consecutive failed runs, updated (not duplicated)
+# while the outage continues, and closed with a recovery comment on the
+# first successful probe.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  actions: read
+
+concurrency:
+  group: uptime-monitor
+  cancel-in-progress: false
+
+env:
+  HEALTH_URL: https://api.finalclinic.fyi/api/v1/health
+  UPTIME_UA: finalclinic-uptime/1.0
+  CONSECUTIVE_FAILURES: '2'
+  INCIDENT_LABEL: uptime-incident
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe public /api/v1/health
+        id: probe
+        run: |
+          set +e
+          code=$(curl -s -o /tmp/body -w '%{http_code}' \
+            -A "$UPTIME_UA" -m 20 "$HEALTH_URL")
+          code=${code:-000}
+          body=$(head -c 300 /tmp/body 2>/dev/null | tr -d '\n`')
+          echo "status=$code" >> "$GITHUB_OUTPUT"
+          echo "body=$body" >> "$GITHUB_OUTPUT"
+          echo "probe status=$code body=$body"
+          if [ "$code" != "200" ]; then
+            echo "result=failure" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          ok=$(python3 -c "import json;d=json.load(open('/tmp/body'));print('ok' if d.get('ok') else 'bad')" 2>/dev/null || echo bad)
+          echo "result=$([ "$ok" = "ok" ] && echo success || echo failure)" >> "$GITHUB_OUTPUT"
+          [ "$ok" = "ok" ]
+
+      - name: Manage incident issue
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const threshold = parseInt(process.env.CONSECUTIVE_FAILURES || '2', 10);
+            const label = process.env.INCIDENT_LABEL;
+            const result = '${{ steps.probe.outputs.result }}';
+            const status = '${{ steps.probe.outputs.status }}';
+            const body = '${{ steps.probe.outputs.body }}'.replace(/'/g, '');
+            const now = new Date().toISOString();
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // Trailing failures among COMPLETED runs of this workflow,
+            // excluding the current (in-progress) run.
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'uptime-monitor.yml',
+              per_page: 8
+            });
+            let priorConsecutive = 0;
+            for (const r of runs) {
+              if (r.status !== 'completed') continue;
+              if (r.conclusion === 'failure') priorConsecutive += 1;
+              else break;
+            }
+            const consecutive = result === 'failure' ? priorConsecutive + 1 : 0;
+            core.info(`probe result=${result} status=${status} consecutive=${consecutive} threshold=${threshold}`);
+
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+              per_page: 10
+            });
+            const incident = open.find(i => i.title.includes('[uptime]'));
+
+            if (result === 'failure' && consecutive >= threshold) {
+              const note = `- ${now} — status \`${status}\`, body: \`${body}\`\n- consecutive failures: ${consecutive}\n- [run](${runUrl})`;
+              if (incident) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: incident.number,
+                  body: `Still down.\n\n${note}`
+                });
+                core.info(`updated incident #${incident.number}`);
+              } else {
+                await github.rest.issues.create({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  title: `[uptime] api.finalclinic.fyi health degraded (${now})`,
+                  labels: [label],
+                  body: `External probe failed ${consecutive} consecutive time(s) (threshold ${threshold}).\n\n` +
+                        `- First failure recorded: ${now}\n- Status: \`${status}\`\n- Body: \`${body}\`\n- [Failing run](${runUrl})\n\n` +
+                        `This issue is auto-updated while the outage continues and auto-closed on recovery.\n\n` +
+                        `If status is \`000\`/\`403\` with a Cloudflare body, check the tunnel/host first; ` +
+                        `for Cloudflare error 1010 against \`${process.env.UPTIME_UA}\` add a narrow WAF allow-rule for the health path.`
+                });
+                core.info('opened new incident issue');
+              }
+            }
+
+            if (result === 'success' && incident) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: incident.number,
+                body: `✅ Recovered at ${now} — probe returned 200 {"ok":true}. [Run](${runUrl}).`
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: incident.number,
+                state: 'closed', state_reason: 'completed'
+              });
+              core.info(`closed incident #${incident.number}`);
+            }
