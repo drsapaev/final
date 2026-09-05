@@ -546,13 +546,55 @@ export function resolvePanelTicketPayloads(row: Record<string, unknown>, overrid
 export function buildPanelTicketPayload(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const queueNumber = resolveQueueNumber(row);
   if (!queueNumber) {
-    logger.warn('[PanelPrint] Queue number missing in row payload', {
-      rowKeys: row && typeof row === 'object' ? Object.keys(row) : [],
-      appointmentId: row?.appointment_id || row?.id || null,
-      visitId: row?.visit_id || null,
-      specialty: row?.specialty_name || row?.specialty || row?.department || null,
+    // Desk/laboratory visits never join the queue machinery (prod:
+    // queue_entries is empty by workflow — visits carry their own id), so
+    // a missing queue number is EXPECTED there. Fall back to the visit
+    // identifier instead of failing the print: "В-<id>" identifies the
+    // talon just as well for these flows. Only rows with no identifier at
+    // all still fail.
+    const visitFallback = getFirstDefined(row?.visit_id, row?.id);
+    if (visitFallback === null || visitFallback === undefined || visitFallback === '') {
+      logger.warn('[PanelPrint] Queue number missing in row payload', {
+        rowKeys: row && typeof row === 'object' ? Object.keys(row) : [],
+        appointmentId: row?.appointment_id || row?.id || null,
+        visitId: row?.visit_id || null,
+        specialty: row?.specialty_name || row?.specialty || row?.department || null,
+      });
+      throw new Error('Не удалось определить номер талона для печати');
+    }
+    logger.info('[PanelPrint] No queue entry — printing visit-based talon', {
+      visitId: visitFallback,
     });
-    throw new Error('Не удалось определить номер талона для печати');
+    return {
+      queue_number: `В-${visitFallback}`,
+      doctor_name:
+        overrides.doctorName ||
+        row?.doctor_name ||
+        row?.doctor ||
+        row?.specialist_name ||
+        row?.specialty_doctor_name ||
+        'Специалист',
+      specialty_name:
+        overrides.specialtyName ||
+        row?.specialty_name ||
+        row?.queue_name ||
+        row?.specialty ||
+        row?.department ||
+        row?.service_name ||
+        'Прием',
+      cabinet: resolveTicketCabinet(row, null, overrides) || null,
+      patient_name:
+        row?.patient_fio ||
+        row?.patient_name ||
+        row?.name ||
+        'Пациент',
+      clinic_name: getFirstDefined(overrides.clinicName, row?.clinic_name, row?.clinic),
+      logo_url: getFirstDefined(overrides.logoUrl, row?.logo_url, row?.clinic_logo_url),
+      service_price: resolveServicePrice(row, overrides),
+      qr_payload: resolveQrPayload(row, overrides),
+      time_window: formatTicketTimeWindow(row),
+      printer_name: overrides.printerName || null
+    };
   }
 
   return {

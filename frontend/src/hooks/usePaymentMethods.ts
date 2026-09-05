@@ -4,7 +4,7 @@
  * UX Audit R-4.3 (Phase 2): backend-driven payment methods.
  *
  * Currently uses DEFAULT_PAYMENT_METHODS from config.
- * When backend endpoint GET /api/v1/payment-methods becomes available,
+ * Backend endpoint: GET /api/v1/payments/payment-methods.
  * this hook will fetch from API with fallback to defaults.
  *
  * Usage:
@@ -38,7 +38,7 @@ export function usePaymentMethods(options: Record<string, unknown> = {}) {
     const fetchPaymentMethods = async () => {
       setPaymentMethodsState(loadingState<typeof DEFAULT_PAYMENT_METHODS>());
       try {
-        const response = await api.get('/payment-methods');
+        const response = await api.get('/payments/payment-methods');
         if (!cancelled) {
           // If backend returns no methods, fall back to defaults — getData
           // returns the fallback automatically when state is not 'success',
