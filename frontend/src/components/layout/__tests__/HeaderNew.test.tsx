@@ -114,6 +114,9 @@ describe('HeaderNew theme menu', () => {
       expect(document.body.classList.contains('dark-theme')).toBe(true);
       expect(screen.queryByRole('menuitemradio', { name: 'Темная' })).not.toBeInTheDocument();
     });
+    // Codex round 4 (P2): selection unmounts the focused item - the trigger
+    // must regain focus instead of dropping it to <body>.
+    expect(screen.getByRole('button', { name: 'Выбрать тему' })).toHaveFocus();
   });
 
   it('treats clicks from a text node inside the portal menu as internal', () => {

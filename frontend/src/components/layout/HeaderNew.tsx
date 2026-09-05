@@ -167,6 +167,10 @@ export default function HeaderNew() {
       nextColorScheme: schemeId,
     });
     setColorScheme(schemeId);
+    // Codex round 4 (P2): the focused menuitemradio is about to unmount —
+    // restore the trigger focus BEFORE closing, or keyboard users fall back
+    // to <body> and must restart the header tab sequence.
+    themeButtonRef.current?.focus();
     setShowThemeMenu(false);
   };
 
@@ -339,11 +343,11 @@ export default function HeaderNew() {
     </Button>;
 
 
-  // HDR-FX-1 (P1-1): flexShrink 0 — this cluster never compresses (the old
-  // shrink+invisible-scroll combo was what clipped the CTA tail); label
-  // collapse below 1200px is the only degradation step.
+  // HDR-FX-1 (P1-1): this cluster never compresses on desktop (flexShrink is
+  // owned by .hdr-nav-scroll in header-new.css — a <=900px media query trades
+  // it for shrink+pan where the center column is starved).
   const roleNav =
-  <div className="hdr-nav-scroll" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap', flexShrink: 0 }}>
+  <div className="hdr-nav-scroll" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
       {navItems.map((item) => {
       const active = location.pathname === item.to;
       const ItemIcon = item.icon;

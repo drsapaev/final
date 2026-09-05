@@ -40,6 +40,10 @@
   gap: 8px;
   flex-wrap: nowrap;
   min-width: 0;
+  /* P1-1: desktop keeps this cluster incompressible so the CTA tail can
+     never be silently squeezed (the old shrink+invisible-scroll combo was
+     the clipping path); label collapse below 1200px is the degradation. */
+  flex-shrink: 0;
 }
 
 .hdr-controls { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
@@ -90,6 +94,21 @@ html {
 
 @media (max-width: 480px) {
   .hdr-hide-xs { display: none; }
+}
+
+/* P1 (Codex round 4): below ~900px the 1fr center is narrower than the fixed
+   nav cluster (measured: side chrome costs ~666px, so center = W - 746), and
+   pure clipping left the registrar CTA unreachable. Below this line the
+   cluster shrinks and pans instead of being cut off; touch scrolling shows
+   native indicators, so the pan stays discoverable on the devices that need
+   it. In-panel affordances (RegistrarPanel CTA, breadcrumb quick links,
+   command palette) remain the primary narrow-width paths. */
+@media (max-width: 900px) {
+  .hdr-nav-scroll {
+    flex-shrink: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
 }
 
 /* P1-1: roleNav label collapse (Кассир link + CTA text). Measured on main
