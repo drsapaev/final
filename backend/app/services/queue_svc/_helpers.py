@@ -80,6 +80,11 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
         changed_at = self.get_local_timestamp(db)
         entry.status = "called"
         entry.called_at = changed_at
+        # QF-1 (operator attribution): actor_user_id was accepted but never
+        # persisted here — the Telegram/admin staff path lost the caller.
+        # The column is nullable: actor_user_id=None keeps NULL (unknown
+        # caller), never fabricates an attribution.
+        entry.called_by_user_id = actor_user_id
         entry.updated_at = changed_at
         if commit:
             db.commit()

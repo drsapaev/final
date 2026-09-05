@@ -189,10 +189,48 @@ class OnlineQueueEntry(Base):
     )
     called_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # QF-1 (queue entry operator attribution): the LIVE human operator axis,
+    # orthogonal to the ROUTING owner (DailyQueue.specialist_id — a real
+    # doctor or a synthetic resource doctor like lab_resource/ecg_resource
+    # for doctorless queues). specialist_id is never replaced by these.
+    # - called_by_user_id: who called the patient next. Until QF-1 this was
+    #   a TRANSIENT attribute set by QRQueueService.call_next_patient (only
+    #   the GraphQL critical-audit path persisted it — Codex round-7 P1);
+    #   as a real column every surface (REST/GQL/Telegram staff path) keeps
+    #   the caller identity.
+    # - served_by_user_id / served_at: who completed the entry and when
+    #   (complete_patient_visit; timestamp precedent: diagnostics_started_at).
+    # Nullable FKs ON DELETE SET NULL: deleting the operator user preserves
+    # the queue history row with NULL attribution — the same
+    # audit-preservation contract as patient_id/visit_id on this table.
+    # No backfill: pre-QF-1 caller identity was transient (lost between
+    # requests), so historical rows stay NULL rather than being guessed.
+    called_by_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    served_by_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    served_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # Relationships
     queue: Mapped[DailyQueue] = relationship("DailyQueue", back_populates="entries")
     patient: Mapped[Patient | None] = relationship("Patient", foreign_keys=[patient_id])
     visit: Mapped[Visit | None] = relationship("Visit", foreign_keys=[visit_id])
+    called_by_user: Mapped[User | None] = relationship(
+        "User", foreign_keys=[called_by_user_id]
+    )
+    served_by_user: Mapped[User | None] = relationship(
+        "User", foreign_keys=[served_by_user_id]
+    )
 
 
 class QueueToken(Base):
