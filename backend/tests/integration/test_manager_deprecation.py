@@ -741,6 +741,103 @@ def test_legacy_migration_preserves_manager_verbatim() -> None:
     assert _normalize_legacy_role("") == "Admin"
 
 
+# ===================== M-2b: CODEX REVIEW FOLLOW-UP (P1/P2) =====================
+
+
+def test_roles_catalog_rejects_retired_spelling(
+    client: TestClient, admin_headers_fixture: dict
+) -> None:
+    """Codex review P2 (#3049): the DB-backed role catalog must not accept
+    the retired spellings — a hand-created 'Manager' catalog row would flow
+    into /roles/options and the UserModal dropdown mirror, offering a
+    spelling the user-management write schema then 422s. RoleCreate rejects
+    it at the schema boundary (case-insensitive), same freeze discipline as
+    the user-management write vocabulary."""
+    for retired_name in ("Manager", "manager", "Receptionist"):
+        response = client.post(
+            "/api/v1/roles/",
+            headers=admin_headers_fixture,
+            json={
+                "name": retired_name,
+                "display_name": retired_name,
+                "description": "retired spelling probe",
+                "level": 0,
+                "is_active": True,
+                "is_system": False,
+            },
+        )
+        assert response.status_code == 422, (
+            retired_name,
+            response.status_code,
+            response.text[:300],
+        )
+
+
+def test_roles_options_filter_retired_spelling(
+    client: TestClient, admin_headers_fixture: dict, db_session: Session
+) -> None:
+    """Codex review P2 (#3049): defense-in-depth on the READ side — a
+    pre-existing catalog row carrying a retired spelling (legacy or
+    compatible deployment) never surfaces in /roles/options."""
+    from app.models.role_permission import Role
+
+    def _ensure_role(name: str, display: str) -> Role:
+        row = db_session.query(Role).filter(Role.name == name).first()
+        if row:
+            return row
+        row = Role(name=name, display_name=display, level=0,
+                   is_active=True, is_system=False)
+        db_session.add(row)
+        db_session.commit()
+        db_session.refresh(row)
+        return row
+
+    _ensure_role("Manager", "Legacy Manager")
+    _ensure_role("Shift Supervisor", "Shift Supervisor")
+
+    response = client.get("/api/v1/roles/options", headers=admin_headers_fixture)
+    assert response.status_code == 200, response.text[:300]
+    values = [opt["value"] for opt in response.json().get("options", [])]
+    assert "Manager" not in values, values
+    assert "Shift Supervisor" in values, values
+
+
+def test_migration_forces_manager_tombstone() -> None:
+    """Codex review P1 (#3049): a legacy 'Manager' row (even an active or
+    superuser one) must arrive in the target DB as a TOMBSTONE — role
+    spelling preserved verbatim (no-alias rule), but is_active=False (login
+    dead) and is_superuser=False (superuser bypasses every role check).
+    Case-insensitive: every 'manager' spelling matches zero grant lists
+    after M-1D/M-2, so none may stay active or privileged."""
+    from app.scripts.migrate_users_to_postgres import LegacyUserRow
+
+    def _row(role: str, active: bool, superuser: bool) -> LegacyUserRow:
+        return LegacyUserRow(
+            id=1,
+            username="legacy_probe",
+            email=None,
+            full_name=None,
+            hashed_password="x",
+            role=role,
+            is_active=active,
+            is_superuser=superuser,
+            must_change_password=False,
+            created_at=None,
+            updated_at=None,
+        )
+
+    for spelling in ("Manager", "manager"):
+        tomb = _row(spelling, active=True, superuser=True)
+        assert tomb.role == spelling  # verbatim preservation (audit history)
+        assert tomb.is_active is False, spelling
+        assert tomb.is_superuser is False, spelling
+
+    # canonical rows keep their flags untouched
+    healthy = _row("Registrar", active=True, superuser=False)
+    assert healthy.is_active is True
+    assert healthy.is_superuser is False
+
+
 # ===================== ROLE PATTERN CONTRACT =====================
 
 
