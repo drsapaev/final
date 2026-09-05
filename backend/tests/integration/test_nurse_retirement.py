@@ -134,6 +134,45 @@ def test_registrar_keeps_symptom_check_after_nurse_removal() -> None:
     assert AIPermission.SYMPTOM_CHECK in ROLE_PERMISSIONS[UserRole.REGISTRAR]
 
 
+def test_migration_forces_nurse_tombstone() -> None:
+    """Codex review P1 (#3054): a legacy 'Nurse' row (even an active or
+    superuser one) must arrive as a TOMBSTONE — role preserved verbatim
+    (no-successor rule, like Manager), is_active=False, is_superuser=False
+    (a superuser row would bypass every role check)."""
+    from app.scripts.migrate_users_to_postgres import (
+        LegacyUserRow,
+        _normalize_legacy_role,
+    )
+
+    def _row(role: str, active: bool, superuser: bool) -> LegacyUserRow:
+        return LegacyUserRow(
+            id=1,
+            username="legacy_probe",
+            email=None,
+            full_name=None,
+            hashed_password="x",
+            role=role,
+            is_active=active,
+            is_superuser=superuser,
+            must_change_password=False,
+            created_at=None,
+            updated_at=None,
+        )
+
+    for spelling in ("Nurse", "nurse"):
+        tomb = _row(spelling, active=True, superuser=True)
+        assert tomb.role == spelling  # verbatim preservation (audit history)
+        assert tomb.is_active is False, spelling
+        assert tomb.is_superuser is False, spelling
+        # no canonical successor -> verbatim no-remap on write either
+        assert _normalize_legacy_role(spelling) == spelling
+
+    # canonical rows keep their flags untouched
+    healthy = _row("Registrar", active=True, superuser=False)
+    assert healthy.is_active is True
+    assert healthy.is_superuser is False
+
+
 # ===================== grant-list closure (imports) =====================
 
 def test_analytics_role_lists_drop_nurse() -> None:
