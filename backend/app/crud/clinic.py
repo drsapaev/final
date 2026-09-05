@@ -5,7 +5,7 @@ CRUD операции для управления клиникой в админ
 from datetime import date
 from typing import Any
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.specialties import (
@@ -181,6 +181,7 @@ def get_doctors(
     limit: int = 100,
     active_only: bool = False,
     eligible_only: bool = False,
+    exclude_internal_only: bool = False,
 ) -> list[Doctor]:
     """Получить список врачей
 
@@ -189,6 +190,12 @@ def get_doctors(
     doctors out of the result (filtering the "general" sentinel AFTER the
     row cap omitted eligible doctors beyond the cap while the caller's
     limit allowed more rows).
+
+    ``exclude_internal_only`` (QD-1.1, Codex round-4 P2): hide the
+    synthetic queue-resource rows (internal-only sentinel owners) from
+    human-facing doctor selectors — picking them would fail booking
+    eligibility with a guaranteed 409. Opt-in on purpose: queue-machinery
+    callers (queue settings per specialty) keep seeing resource rows.
 
     Deterministic ordering (doctor id ascending) — the registrar doctor
     selector and the admin doctor list render this list as-is, so an
@@ -208,6 +215,17 @@ def get_doctors(
             func.trim(Doctor.specialty) != '',
             Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
         )
+    if exclude_internal_only:
+        from app.core.roles import INTERNAL_ONLY_ROLE_SPELLINGS
+        from app.models.user import User
+
+        query = query.outerjoin(User, User.id == Doctor.user_id).filter(
+            or_(
+                Doctor.user_id.is_(None),
+                User.role.is_(None),
+                func.lower(User.role).notin_(INTERNAL_ONLY_ROLE_SPELLINGS),
+            )
+        )
 
     return query.order_by(Doctor.id.asc()).offset(skip).limit(limit).all()
 
@@ -223,12 +241,15 @@ def get_doctor_by_user_id(db: Session, user_id: int) -> Doctor | None:
 
 
 def get_doctors_by_specialty(
-    db: Session, specialty: str, eligible_only: bool = False
+    db: Session, specialty: str, eligible_only: bool = False,
+    exclude_internal_only: bool = False,
 ) -> list[Doctor]:
     """Получить врачей по специальности
 
     ``eligible_only`` hides the incomplete-profile sentinel ("general")
     from patient-facing selectors — see get_doctors.
+    ``exclude_internal_only`` (QD-1.1) hides synthetic queue-resource rows
+    — see get_doctors.
 
     D-1 canonical vocabulary: ``specialty`` matches via
     ``specialty_variants`` (any dental-family spelling finds every
@@ -244,7 +265,20 @@ def get_doctors_by_specialty(
             func.trim(Doctor.specialty) != '',
             Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
         ]
-    return db.query(Doctor).filter(and_(*predicates)).order_by(Doctor.id.asc()).all()
+    query = db.query(Doctor)
+    if exclude_internal_only:
+        from app.core.roles import INTERNAL_ONLY_ROLE_SPELLINGS
+        from app.models.user import User
+
+        query = query.outerjoin(User, User.id == Doctor.user_id)
+        predicates += [
+            or_(
+                Doctor.user_id.is_(None),
+                User.role.is_(None),
+                func.lower(User.role).notin_(INTERNAL_ONLY_ROLE_SPELLINGS),
+            )
+        ]
+    return query.filter(and_(*predicates)).order_by(Doctor.id.asc()).all()
 
 
 def create_doctor(db: Session, doctor: DoctorCreate) -> Doctor:
@@ -527,11 +561,14 @@ def search_doctors(
     name: str | None = None,
     available_date: str | None = None,
     limit: int = 10,
+    exclude_internal_only: bool = False,
 ) -> list[Doctor]:
     """Search doctors by specialty and/or name (ILIKE on user.full_name).
 
     ``available_date`` is currently ignored (no DaySchedule exists) but
     accepted to preserve the endpoint contract.
+    ``exclude_internal_only`` (QD-1.1, Codex round-4 P2): hide synthetic
+    queue-resource rows from the search selector — see get_doctors.
     """
     query = db.query(Doctor).filter(Doctor.active == True)  # noqa: E712
 
@@ -540,11 +577,25 @@ def search_doctors(
         # family row (mobile /doctors/search contract).
         query = query.filter(Doctor.specialty.in_(specialty_variants(specialty)))
 
-    if name:
-        # Name lives on the linked User; join via user_id.
+    if name or exclude_internal_only:
+        # Name lives on the linked User; join via user_id (single join —
+        # the sentinel filter and the name filter share it).
         from app.models.user import User
 
-        query = query.join(User, Doctor.user_id == User.id, isouter=True)
+        query = query.outerjoin(User, User.id == Doctor.user_id)
+
+    if exclude_internal_only:
+        from app.core.roles import INTERNAL_ONLY_ROLE_SPELLINGS
+
+        query = query.filter(
+            or_(
+                Doctor.user_id.is_(None),
+                User.role.is_(None),
+                func.lower(User.role).notin_(INTERNAL_ONLY_ROLE_SPELLINGS),
+            )
+        )
+
+    if name:
         query = query.filter(User.full_name.ilike(f"%{name}%"))
 
     return query.limit(limit).all()

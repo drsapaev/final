@@ -188,7 +188,12 @@ def get_registrar_doctors(
     Из detail.md стр. 106: "Специалист/Кабинет"
     """
     try:
-        doctors = crud_clinic.get_doctors(db, active_only=True)
+        # QD-1.1 (queue resource role cleanup, Codex round-4 P2): the
+        # registrar doctor selector hides synthetic queue-resource rows —
+        # picking one would fail booking eligibility with a guaranteed 409.
+        doctors = crud_clinic.get_doctors(
+            db, active_only=True, exclude_internal_only=True
+        )
 
         # Lifecycle invariant (decision #5 / Codex P1-D): auto-created
         # incomplete profiles (specialty="general" sentinel) are NOT

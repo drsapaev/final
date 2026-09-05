@@ -828,11 +828,13 @@ def list_mobile_doctors(
         # the requested limit allowed more rows.
         if specialty:
             doctors = crud_clinic.get_doctors_by_specialty(
-                db, specialty=specialty, eligible_only=True
+                db, specialty=specialty, eligible_only=True,
+                exclude_internal_only=True,
             )
         else:
             doctors = crud_clinic.get_doctors(
-                db, active_only=True, eligible_only=True
+                db, active_only=True, eligible_only=True,
+                exclude_internal_only=True,
             )
         # Limit
         doctors = doctors[:limit]

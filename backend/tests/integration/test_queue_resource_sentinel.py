@@ -882,3 +882,114 @@ def test_queue_ws_auth_ok_rejects_sentinel(
 
     assert _auth_ok({"authorization": f"Bearer {sentinel_token}"}, None) is False
     assert _auth_ok({"authorization": f"Bearer {control_token}"}, None) is True
+
+
+# ============ Codex round-4: booking selectors + department mutations ============
+
+
+def test_doctor_selectors_exclude_sentinel(
+    client: TestClient,
+    admin_auth_headers: dict,
+    patient_token: str,
+    db_session: Session,
+) -> None:
+    """Codex round-4 P2: every human-facing doctor selector (mobile list,
+    mobile search, registrar selector, admin list) hides the synthetic
+    queue-resource rows — picking one would fail booking eligibility with
+    a guaranteed 409 (owner role is not doctor-family)."""
+    from app.models.clinic import Doctor
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="qd11_sel_resource", role="Resource", password=probe_password
+    )
+    control_user = _make_user(
+        db_session, username="qd11_sel_doctor", role="Doctor", password=probe_password
+    )
+    sentinel_doctor = Doctor(user_id=sentinel.id, specialty="ecg", active=True)
+    control_doctor = Doctor(user_id=control_user.id, specialty="cardio", active=True)
+    db_session.add_all([sentinel_doctor, control_doctor])
+    db_session.commit()
+    db_session.refresh(sentinel_doctor)
+    db_session.refresh(control_doctor)
+
+    # mobile list (patient-facing booking selector)
+    response = client.get(
+        "/api/v1/mobile/doctors",
+        headers={"Authorization": f"Bearer {patient_token}"},
+    )
+    assert response.status_code == 200, (response.status_code, response.text[:300])
+    mobile_ids = {d["id"] for d in response.json()}
+    assert sentinel_doctor.id not in mobile_ids, mobile_ids
+    assert control_doctor.id in mobile_ids, mobile_ids
+
+    # mobile search selector
+    response = client.post(
+        "/api/v1/mobile/doctors/search",
+        headers={"Authorization": f"Bearer {patient_token}"},
+        json={"limit": 100},
+    )
+    assert response.status_code == 200, (response.status_code, response.text[:300])
+    search_ids = {d["id"] for d in response.json().get("doctors", [])}
+    assert sentinel_doctor.id not in search_ids, search_ids
+    assert control_doctor.id in search_ids, search_ids
+
+    # registrar selector (specialty filter would still match 'ecg' — the
+    # exclusion is what hides the resource row)
+    response = client.get(
+        "/api/v1/registrar/doctors", headers=admin_auth_headers
+    )
+    assert response.status_code == 200, (response.status_code, response.text[:300])
+    registrar_ids = {d["id"] for d in response.json().get("doctors", [])}
+    assert sentinel_doctor.id not in registrar_ids, registrar_ids
+    assert control_doctor.id in registrar_ids, registrar_ids
+
+
+def test_department_mutations_reject_sentinel(
+    client: TestClient, admin_auth_headers: dict, db_session: Session
+) -> None:
+    """Codex round-4 P2: department assign/remove cannot mutate the
+    sentinel-linked resource rows; normal doctors keep flowing."""
+    from app.models.clinic import Doctor
+    from app.models.department import Department
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="qd11_dep_resource", role="Resource", password=probe_password
+    )
+    control_user = _make_user(
+        db_session, username="qd11_dep_doctor", role="Doctor", password=probe_password
+    )
+    sentinel_doctor = Doctor(user_id=sentinel.id, specialty="ecg", active=True)
+    control_doctor = Doctor(user_id=control_user.id, specialty="cardio", active=True)
+    department = Department(
+        key="qd11_dep", name_ru="QD11 отдел", display_order=99, active=True
+    )
+    db_session.add_all([sentinel_doctor, control_doctor, department])
+    db_session.commit()
+    db_session.refresh(sentinel_doctor)
+    db_session.refresh(control_doctor)
+    db_session.refresh(department)
+
+    response = client.post(
+        f"/api/v1/admin/departments/{department.id}/doctors/{sentinel_doctor.id}",
+        headers=admin_auth_headers,
+    )
+    assert response.status_code == 404, (response.status_code, response.text[:300])
+    db_session.expire_all()
+    assert db_session.get(Doctor, sentinel_doctor.id).department_id is None
+
+    # control doctor keeps flowing through the same surface
+    response = client.post(
+        f"/api/v1/admin/departments/{department.id}/doctors/{control_doctor.id}",
+        headers=admin_auth_headers,
+    )
+    assert response.status_code == 200, (response.status_code, response.text[:300])
+    db_session.expire_all()
+    assert db_session.get(Doctor, control_doctor.id).department_id == department.id
+
+    response = client.delete(
+        f"/api/v1/admin/departments/{department.id}/doctors/{control_doctor.id}",
+        headers=admin_auth_headers,
+    )
+    assert response.status_code == 200, (response.status_code, response.text[:300])

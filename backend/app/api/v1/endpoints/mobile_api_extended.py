@@ -177,6 +177,7 @@ async def search_doctors(
             name=request.name,
             available_date=request.available_date,
             limit=request.limit,
+            exclude_internal_only=True,
         )
 
         result = []
