@@ -205,6 +205,14 @@ export default function HeaderNew() {
     || currentRoute?.id === 'registrar-welcome'
     || currentRoute?.id === 'registrar-queue';
 
+  // HDR-FX-1 (P2-2 + Codex round 2): unread count for the bell, computed
+  // once. The polite live region must be a SIBLING of the bell button —
+  // button descendants are flattened as presentational in the accessibility
+  // tree, so a role="status" inside it may never be announced.
+  const bellRole = user ? String(user?.role || user?.role_name || '').toLowerCase() : '';
+  // REC-3: receptionist normalization removed with the alias.
+  const bellCount = user ? getUnreadCount(bellRole) : 0;
+
   // Определяем активную кастомную схему
   const isGlassTheme = colorScheme === 'glass';
   const isGradientTheme = colorScheme === 'gradient';
@@ -429,6 +437,13 @@ export default function HeaderNew() {
       {/* 2.6) Уведомления — global notification bell, opens inbox via context */}
       {user &&
         <div style={{ flex: '0 0 auto' }}>
+          {/* HDR-FX-1 (P2-2): the real count is announced through this polite
+              live region; it stays OUTSIDE the button (see bellCount note). */}
+          {bellCount > 0 &&
+            <span role="status" className="sr-only">
+              {t('legacy.hn_notifications_unread', { count: bellCount })}
+            </span>
+          }
           <Button
             variant="ghost"
             size="small"
@@ -448,40 +463,25 @@ export default function HeaderNew() {
               position: 'relative',
             }}>
             <BellIcon size={16} style={{ color: 'var(--mac-text-primary)' }} />
-            {(() => {
-              const role = String(user?.role || user?.role_name || '').toLowerCase();
-              // REC-3: receptionist normalization removed with the alias.
-              const normalizedRole = role;
-              const count = getUnreadCount(normalizedRole);
-              if (count <= 0) return null;
-              return (
-                <>
-                  {/* HDR-FX-1 (P2-2): the pixel badge is decorative ink ("99+"
-                      reads poorly on a screen reader); the real count is
-                      announced through this polite live region instead. */}
-                  <span role="status" className="sr-only">
-                    {t('legacy.hn_notifications_unread', { count })}
-                  </span>
-                  <span aria-hidden="true" style={{
-                    position: 'absolute',
-                    top: -3,
-                    right: -3,
-                    minWidth: 16,
-                    height: 16,
-                    padding: '0 4px',
-                    borderRadius: 8,
-                    background: 'var(--mac-error)',
-                    color: 'white',
-                    fontSize: 10,
-                    lineHeight: '16px',
-                    fontWeight: 'var(--mac-font-weight-bold)',
-                    textAlign: 'center',
-                  }}>
-                    {count > 99 ? '99+' : count}
-                  </span>
-                </>
-              );
-            })()}
+            {bellCount > 0 &&
+              <span aria-hidden="true" style={{
+                position: 'absolute',
+                top: -3,
+                right: -3,
+                minWidth: 16,
+                height: 16,
+                padding: '0 4px',
+                borderRadius: 8,
+                background: 'var(--mac-error)',
+                color: 'white',
+                fontSize: 10,
+                lineHeight: '16px',
+                fontWeight: 'var(--mac-font-weight-bold)',
+                textAlign: 'center',
+              }}>
+                {bellCount > 99 ? '99+' : bellCount}
+              </span>
+            }
           </Button>
         </div>
       }
