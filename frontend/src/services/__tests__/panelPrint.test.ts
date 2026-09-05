@@ -197,3 +197,26 @@ describe('panelPrint ticket renderer', () => {
     expect(html).not.toContain('payment?.status || \'paid\'');
   });
 });
+
+
+describe('desk/lab visits without queue machinery (#3006 incident follow-up)', () => {
+  it('falls back to a visit-based talon number when no queue entry exists', async () => {
+    const { buildPanelTicketPayload } = await import('../panelPrint');
+    const payload = buildPanelTicketPayload({
+      visit_id: 25,
+      department: 'laboratory',
+      patient_name: 'Тест Т.',
+      services: [{ name: 'ОАК' }],
+    });
+    expect(payload.queue_number).toBe('В-25');
+    expect(payload.specialty_name).toBe('laboratory');
+    expect(payload.patient_name).toBe('Тест Т.');
+  });
+
+  it('still fails when the row carries no identifiers at all', async () => {
+    const { buildPanelTicketPayload } = await import('../panelPrint');
+    expect(() => buildPanelTicketPayload({ department: 'laboratory' })).toThrow(
+      'Не удалось определить номер талона',
+    );
+  });
+});
