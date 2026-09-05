@@ -501,7 +501,7 @@ def detailed_health():
         newest_mtime = 0.0
         newest_name = None
         if backup_dir.is_dir():
-            for entry in backup_dir.glob("*.gz"):
+            for entry in list(backup_dir.glob("*.gz")) + list(backup_dir.glob("*.db")):
                 if entry.is_file() and entry.stat().st_mtime > newest_mtime:
                     newest_mtime = entry.stat().st_mtime
                     newest_name = entry.name
