@@ -3928,7 +3928,6 @@ const uzCyrl = {
     // ─── UserManagement (um_*) ──────────────────────────────────────────────
     um_role_admin: 'Администратор',
     um_role_doctor: 'Врач',
-    um_role_nurse: 'Медсестра',
 
     um_role_registrar: 'Регистратор',
     um_role_cashier: 'Кассир',
@@ -4620,7 +4619,6 @@ const uzCyrl = {
     umdl_role_cardio: 'Кардиолог',
     umdl_role_derma: 'Дерматолог',
     umdl_role_dentist: 'Стоматолог',
-    umdl_role_nurse: 'Медсестра',
 
     umdl_role_registrar: 'Регистратор',
     umdl_role_cashier: 'Кассир',
@@ -8402,7 +8400,6 @@ const uzCyrl = {
     id_golovnaya_bol_toshnota: 'головная боль, тошнота',
     id_migren: 'мигрень',
     id_doktor_ivanov: 'Доктор Иванов',
-    id_medsestra_petrova: 'Медсестра Петрова',
     id_vvedite_simptomy: 'Введите симптомы',
     id_vvedite_diagnoz: 'Введите диагноз',
     id_analiz: 'Анализ...',

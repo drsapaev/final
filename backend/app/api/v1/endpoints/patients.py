@@ -87,7 +87,7 @@ def list_patients(
     limit: int = Query(100, ge=1, le=1000),
     q: str | None = Query(None, description="Поиск по ФИО, телефону или документу"),
     phone: str | None = Query(None, description="Точный поиск по номеру телефона"),
-    current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Lab", "Cashier", "Nurse")),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Lab", "Cashier")),
 ):
     """
     Получить список пациентов с возможностью поиска и пагинации
@@ -133,7 +133,7 @@ def get_patient(
     *,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Lab", "Cashier", "Nurse", "Patient")),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Lab", "Cashier", "Patient")),
 ):
     """
     Получить пациента по ID

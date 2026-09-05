@@ -16,7 +16,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 ANALYTICS_PUBLIC_ERROR = "Internal server error"
-CLINICAL_ANALYTICS_ROLES = ["admin", "doctor", "nurse"]
+CLINICAL_ANALYTICS_ROLES = ["admin", "doctor"]
 # M-1 (Manager deprecation): 'manager' removed from this role set —
 # the deprecated role loses all financial/KPI/predictive/revenue/export and
 # specialized-panel privileges. Admin keeps the surface unchanged; no role

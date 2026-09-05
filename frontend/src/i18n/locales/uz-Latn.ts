@@ -3918,7 +3918,6 @@ const uzLatn = {
     // ─── UserManagement (admin2.um_*) ────────────────────────────────────────
     um_role_admin: 'Administrator',
     um_role_doctor: 'Shifokor',
-    um_role_nurse: 'Hamshira',
 
     um_role_registrar: 'Registrator',
     um_role_cashier: 'Kassir',
@@ -4610,7 +4609,6 @@ const uzLatn = {
     umdl_role_cardio: 'Kardiolog',
     umdl_role_derma: 'Dermatolog',
     umdl_role_dentist: 'Stomatolog',
-    umdl_role_nurse: 'Hamshira',
 
     umdl_role_registrar: 'Registrator',
     umdl_role_cashier: 'Kassir',
@@ -8392,7 +8390,6 @@ const uzLatn = {
     id_golovnaya_bol_toshnota: 'головная боль, тошнота',
     id_migren: 'мигрень',
     id_doktor_ivanov: 'Доктор Иванов',
-    id_medsestra_petrova: 'Медсестра Петрова',
     id_vvedite_simptomy: 'Введите симптомы',
     id_vvedite_diagnoz: 'Введите диагноз',
     id_analiz: 'Анализ...',

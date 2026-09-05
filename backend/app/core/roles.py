@@ -33,7 +33,11 @@ class Roles(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs
     DENTIST = "dentist"
 
     # Дополнительные роли
-    NURSE = "Nurse"
+    # N-3 (Nurse retirement): NURSE removed — production census 2026-09-05
+    # found 0 stored rows (normalized census clean); every grant list
+    # (analytics/files/notifications/patients/require_staff) dropped the
+    # spelling in this change. No canonical successor: the role never
+    # shipped as a product surface.
     # E-4 (Receptionist alias removal): RECEPTIONIST decommissioned — the
     # legacy spelling had a canonical successor (Registrar, REC track), the
     # production table held 0 rows (SQL evidence 2026-09-02), and the last
@@ -150,7 +154,6 @@ STAFF_ROLES = {
     Roles.REGISTRAR,
     Roles.LAB,
     Roles.CASHIER,
-    Roles.NURSE,
 }
 
 # NOTE (M-2): the hierarchy map covers the canonical vocabulary only — the
@@ -186,7 +189,8 @@ def get_role_hierarchy(role: str) -> int:
     """Возвращает уровень иерархии роли (чем выше число, тем больше прав)"""
     hierarchy = {
         Roles.PATIENT: 1,
-        Roles.NURSE: 2,
+        # N-3: Roles.NURSE: 2 retired with the spelling (the level table
+        # covers the canonical vocabulary only).
         # E-4: Roles.RECEPTIONIST: 3 removed — the level table covers the
         # canonical vocabulary only (level 3 retired with the spelling).
         Roles.CASHIER: 4,

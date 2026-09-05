@@ -32,7 +32,6 @@ VISIT_READ_ROLES = (
     *DOCTOR_FAMILY_GATE_ROLES,
     "Cashier",
     "Lab",
-    "Nurse",
 )
 
 

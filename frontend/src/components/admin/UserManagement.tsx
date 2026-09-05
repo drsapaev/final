@@ -86,7 +86,6 @@ const UserManagement = () => {
   const roles = apiRoleOptions.filter((r) => r.value !== '') || [
   { value: 'Admin', label: t('admin2.um_role_admin') },
   { value: 'Doctor', label: t('admin2.um_role_doctor') },
-  { value: 'Nurse', label: t('admin2.um_role_nurse') },
   { value: 'Registrar', label: t('admin2.um_role_registrar') },
   { value: 'Cashier', label: t('admin2.um_role_cashier') },
   { value: 'Lab', label: t('admin2.um_role_lab') },
@@ -370,7 +369,6 @@ const UserManagement = () => {
     const variants: Record<string, string> = {
       'Admin': 'error',
       'Doctor': 'primary',
-      'Nurse': 'info',
       'Registrar': 'warning',
       'Lab': 'secondary',
       'Cashier': 'success',

@@ -482,7 +482,7 @@ class TestRegressionRBAC:
         token = mint_access_token(user)
         headers = {"Authorization": f"Bearer {token}"}
 
-        # Admin/Registrar/Doctor/Lab/Cashier/Nurse-гейт списка пациентов
+        # Admin/Registrar/Doctor/Lab/Cashier-гейт списка пациентов
         patients = client.get("/api/v1/patients/", headers=headers)
         assert patients.status_code == 200
 
@@ -602,7 +602,7 @@ def test_role_pattern_covers_full_doctor_family_ssot() -> None:
     # M-1 (Manager deprecation): 'Manager' left the WRITE vocabulary; M-2
     # (vocabulary closure) removed the read/filter compatibility entry too —
     # every surface 422s the deprecated spelling now.
-    for role in ("Admin", "Doctor", "Registrar", "SuperAdmin", "Nurse"):
+    for role in ("Admin", "Doctor", "Registrar", "SuperAdmin"):
         assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, role), role
     assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "Manager")
 

@@ -432,7 +432,7 @@ def _build_analytics_docs():
         "endpoints": {
             "GET /api/v1/analytics/payment-providers": {
                 "description": "Аналитика по провайдерам платежей",
-                "authorization": "Admin, Doctor, Nurse",
+                "authorization": "Admin, Doctor",
                 "query_parameters": {
                     "start_date": {
                         "type": "string",
@@ -462,7 +462,7 @@ def _build_analytics_docs():
             },
             "GET /api/v1/analytics/revenue-breakdown": {
                 "description": "Детальная аналитика доходов",
-                "authorization": "Admin, Doctor, Nurse",
+                "authorization": "Admin, Doctor",
                 "query_parameters": {
                     "start_date": {
                         "type": "string",
@@ -796,7 +796,6 @@ async def get_authentication_documentation():
         "roles": {
             "Admin": "Полный доступ ко всем функциям системы",
             "Doctor": "Доступ к пациентам, визитам, аналитике",
-            "Nurse": "Доступ к пациентам, визитам, аналитике",
             "Registrar": "Доступ к пациентам и визитам",
             "Cashier": "Доступ к платежам",
         },

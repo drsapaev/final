@@ -581,7 +581,6 @@ def test_roles_enum_has_no_manager_member() -> None:
         "cardio",
         "derma",
         "dentist",
-        "Nurse",
         "Patient",
         "SuperAdmin",
     ]

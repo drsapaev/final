@@ -108,7 +108,7 @@ async def upload_file(
     expires_at: datetime | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse")
+        require_roles("Admin", "Doctor")
     ),
 ):
     """Загрузить файл"""
@@ -186,7 +186,7 @@ async def upload_file(
 async def get_file_statistics(
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse")
+        require_roles("Admin", "Doctor")
     ),
 ):
     """Получить статистику файлов"""
@@ -205,7 +205,7 @@ async def get_file(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Patient")
+        require_roles("Admin", "Doctor", "Patient")
     ),
 ):
     """Получить информацию о файле"""
@@ -232,7 +232,7 @@ async def download_file(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Patient")
+        require_roles("Admin", "Doctor", "Patient")
     ),
 ):
     """Скачать файл"""
@@ -259,7 +259,7 @@ async def preview_file(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Patient")
+        require_roles("Admin", "Doctor", "Patient")
     ),
 ):
     """Предварительный просмотр файла"""
@@ -305,7 +305,7 @@ async def search_files(
     search_request: FileSearchRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Patient")
+        require_roles("Admin", "Doctor", "Patient")
     ),
 ):
     """Поиск файлов"""
@@ -341,7 +341,7 @@ async def get_files(
     size: int = Query(20, ge=1, le=100, description="Размер страницы"),
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse", "Patient")
+        require_roles("Admin", "Doctor", "Patient")
     ),
 ):
     """Получить список файлов"""
@@ -403,7 +403,7 @@ async def update_file(
     expires_at: datetime | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse")
+        require_roles("Admin", "Doctor")
     ),
 ):
     """Обновить файл"""
@@ -471,7 +471,7 @@ async def replace_file_content(
     change_description: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse")
+        require_roles("Admin", "Doctor")
     ),
 ):
     """
@@ -511,7 +511,7 @@ async def delete_file(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse")
+        require_roles("Admin", "Doctor")
     ),
 ):
     """Удалить файл"""
@@ -561,7 +561,7 @@ async def create_file_share(
     share_data: FileShareCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse")
+        require_roles("Admin", "Doctor")
     ),
 ):
     """Создать совместное использование файла"""
@@ -584,7 +584,7 @@ async def get_file_shares(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse")
+        require_roles("Admin", "Doctor")
     ),
 ):
     """Получить совместные использования файла"""
@@ -615,7 +615,7 @@ async def export_files(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse")
+        require_roles("Admin", "Doctor")
     ),
 ):
     """Экспортировать файлы в архив"""
@@ -658,7 +658,7 @@ async def import_files(
     overwrite_existing: bool = Form(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Nurse")
+        require_roles("Admin", "Doctor")
     ),
 ):
     """Импортировать файлы из архива"""

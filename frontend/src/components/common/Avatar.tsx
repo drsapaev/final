@@ -6,7 +6,6 @@ const roleGradients = {
     doctor: 'linear-gradient(135deg, #11998e, #38ef7d)',
     registrar: 'linear-gradient(135deg, #fc4a1a, #f7b733)',
     patient: 'linear-gradient(135deg, #00c6ff, #0072ff)',
-    nurse: 'linear-gradient(135deg, #ff9a9e, #fecfef)',
     default: 'linear-gradient(135deg, #a8c0ff, #3f2b96)'
 };
 

@@ -31,12 +31,6 @@ class CoreMixin(UserManagementServiceMixinBase):
                 "schedules:read",
                 "schedules:write",
             ],
-            "Nurse": [
-                "patients:read",
-                "appointments:read",
-                "emr:read",
-                "schedules:read",
-            ],
             # E-4 (Receptionist alias removal): the legacy 'Receptionist'
             # entry was removed — canonical Registrar is the front-desk role
             # (REC track; stored Receptionist rows = 0, §4.1.27).

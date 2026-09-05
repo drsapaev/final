@@ -37,9 +37,13 @@ describe('RBAC route parity', () => {
     expect(hasRouteAccess(profile, '/clinical/appointments')).toBe(true);
   });
 
-  it('keeps nurse compatibility through doctor alias', () => {
+  it('drops the nurse -> doctor alias (N-3 retirement)', () => {
+    // N-3: Nurse had 0 stored rows (production census 2026-09-05) and no
+    // shipped UI surface; the routing alias was the last reachability
+    // grant, so the spelling lands on deny like any retired role —
+    // parity with the backend enum closure.
     const profile = { role: 'Nurse' };
-    expect(hasRouteAccess(profile, '/clinical/scheduler')).toBe(true);
+    expect(hasRouteAccess(profile, '/clinical/scheduler')).toBe(false);
   });
 
   it('pins the canonical trio on the appointments route (P-014 TIGHTEN)', () => {

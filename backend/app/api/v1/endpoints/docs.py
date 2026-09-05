@@ -137,21 +137,21 @@ async def get_api_docs():
             <div class="method">GET</div>
             <div class="path">/api/v1/analytics/payment-providers</div>
             <div class="description">Аналитика по провайдерам платежей</div>
-            <div class="auth">Требуется роль: Admin, Doctor, Nurse</div>
+            <div class="auth">Требуется роль: Admin, Doctor</div>
         </div>
 
         <div class="endpoint">
             <div class="method">GET</div>
             <div class="path">/api/v1/analytics/appointment-flow</div>
             <div class="description">Аналитика потока записей</div>
-            <div class="auth">Требуется роль: Admin, Doctor, Nurse</div>
+            <div class="auth">Требуется роль: Admin, Doctor</div>
         </div>
 
         <div class="endpoint">
             <div class="method">GET</div>
             <div class="path">/api/v1/analytics/revenue-breakdown</div>
             <div class="description">Детальная аналитика доходов</div>
-            <div class="auth">Требуется роль: Admin, Doctor, Nurse</div>
+            <div class="auth">Требуется роль: Admin, Doctor</div>
         </div>
 
         <h2>🔔 Уведомления</h2>
@@ -198,7 +198,6 @@ async def get_api_docs():
         <ul>
             <li><strong>Admin</strong> - полный доступ ко всем функциям</li>
             <li><strong>Doctor</strong> - доступ к пациентам, визитам, аналитике</li>
-            <li><strong>Nurse</strong> - доступ к пациентам, визитам, аналитике</li>
             <li><strong>Registrar</strong> - доступ к пациентам и визитам</li>
             <li><strong>Cashier</strong> - доступ к платежам</li>
         </ul>

@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/quick-stats", response_model=dict[str, Any])
 async def get_quick_stats(
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
 ):
     """Получение быстрой статистики"""
@@ -27,7 +27,7 @@ async def get_quick_stats(
 
 @router.get("/dashboard", response_model=dict[str, Any])
 async def get_dashboard_data(
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
 ):
     """Получение данных для дашборда"""
@@ -41,7 +41,7 @@ async def get_dashboard_data(
 @router.get("/trends", response_model=dict[str, Any])
 async def get_trends_analytics(
     days: int = Query(30, ge=1, le=365, description="Количество дней для анализа"),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
 ):
     """Получение трендов за последние N дней"""

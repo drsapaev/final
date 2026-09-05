@@ -16,10 +16,9 @@ export const ROUTE_ENTRY = ['menu', 'contextual', 'direct', 'callback', 'interna
 // Registrar is the canonical front-desk role; legacy 'Receptionist'
 // profiles no longer reach registrar routes (route parity test pins the
 // deny; stale cached profiles are purged by clearAuthCache). The
-// nurse -> doctor alias is a separate policy decision, untouched here.
-export const ROLE_ALIASES = {
-  nurse: 'doctor',
-};
+// N-3 (Nurse retirement): the nurse -> doctor alias removed — the role had
+// 0 stored rows (production census 2026-09-05) and no shipped UI surface.
+export const ROLE_ALIASES = {};
 
 export const ROLE_HOME_PRIORITY = [
   'admin',
@@ -1098,7 +1097,7 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'role-scoped',
     roles: ['Admin', 'Doctor'],
-    homeForRoles: ['doctor', 'nurse'],
+    homeForRoles: ['doctor'],
     entry: 'menu',
     nav: nav({ labelKey: 'nav.doctor', icon: Stethoscope, sectionKey: 'nav.section_clinical', order: 20, menu: true }),
     title: 'Doctor Panel',

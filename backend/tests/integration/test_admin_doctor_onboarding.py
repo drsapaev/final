@@ -272,7 +272,7 @@ class TestConditionalCreateContract:
         # M-1 (main post-#3032): 'Manager' is equally write-frozen — the
         # merged vocabulary rejects it on create (asserted below).
         accepted = [
-            "Admin", "Registrar", "Doctor", "Nurse",
+            "Admin", "Registrar", "Doctor",
             "Cashier", "Lab", "Patient", "SuperAdmin",
         ] + [
             "cardio", "cardiologist", "cardiology", "dentist", "dentistry",
