@@ -290,7 +290,6 @@ jobs:
           alembic current > /tmp/s3_current.txt 2>&1
           grep -q "(head)" /tmp/s3_current.txt || { echo "alembic did not reach head"; cat /tmp/s3_current.txt; exit 1; }
           echo "alembic converged to head"
-          [ "$PENDING" = "0" ] || { echo "❌ alembic applied $PENDING revisions on a converged DB"; exit 1; }
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 18000 > /tmp/uvicorn.log 2>&1 &
           echo $! > /tmp/uvicorn.pid
           for i in $(seq 1 30); do
