@@ -293,7 +293,7 @@ def main() -> int:
     # ensure_smoke_users.py (provisioning) - the smoke never fixes the DB.
     if doc and user_ids.get("smoke_doctor"):
         status, body = http(
-            "GET", f"/api/v1/doctors/by-user/{user_ids['smoke_doctor']}", token=doc
+            "GET", f"/api/v1/doctor-info/doctors/by-user/{user_ids['smoke_doctor']}", token=doc
         )
         # /doctors/by-user exposes is_active (DoctorOut), not `active`.
         active = isinstance(body, dict) and body.get("is_active") is True
