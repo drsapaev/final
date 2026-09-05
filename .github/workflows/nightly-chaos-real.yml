@@ -293,13 +293,14 @@ jobs:
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 18000 > /tmp/uvicorn.log 2>&1 &
           echo $! > /tmp/uvicorn.pid
           for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:18000/health >/dev/null 2>&1 && { echo "api ready (cold)"; exit 0; }
+            curl -sf http://127.0.0.1:18000/api/v1/health >/dev/null 2>&1 && { echo "api ready (cold)"; exit 0; }
             sleep 2
           done
           echo "cold start failed"; tail -30 /tmp/uvicorn.log; exit 1
 
       - name: S3 — seed idempotency + k6 smoke stage
         id: s3_eval
+        working-directory: backend
         run: |
           USERS=$(python - <<'PY'
           from app.db.session import SessionLocal
