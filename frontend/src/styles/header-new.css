@@ -41,6 +41,17 @@
 
 .hdr-controls { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 
+/* P1-1: the search bar wrapper is the designated shrivable item of the
+   center column — flex-basis equals GlobalSearchBar's own 400px maxWidth,
+   so it absorbs squeeze first and the roleNav cluster never clips.
+   A class (not inline style) on purpose: the UI ratchet counts inline
+   style objects in TSX. */
+.hdr-search-shrink {
+  display: flex;
+  flex: 0 1 400px;
+  min-width: 0;
+}
+
 /* Глобально запрещаем тянуться кнопкам в header и горизонтальный скролл */
 .app-header button {
   display: inline-flex;

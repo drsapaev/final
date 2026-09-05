@@ -739,8 +739,10 @@ export default function HeaderNew() {
       <div className="hdr-center" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-4)' }}>
         {/* HDR-FX-1 (P1-1): the search bar is the designated shrivable item —
             it absorbs center-column squeeze first (basis = its own 400px
-            maxWidth) so the roleNav cluster and the CTA never clip. */}
-        <div style={{ display: 'flex', flex: '0 1 400px', minWidth: 0 }}>
+            maxWidth) so the roleNav cluster and the CTA never clip. Styles
+            live in .hdr-search-shrink (header-new.css) — the UI ratchet
+            counts inline style objects, so none is added here. */}
+        <div className="hdr-search-shrink">
           <GlobalSearchBar />
         </div>
         {/* PR-50: ⌘K chip — replaced synthetic KeyboardEvent hack with a real
