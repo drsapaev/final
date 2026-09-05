@@ -286,6 +286,7 @@ jobs:
           PY
           # Convergence proof: a fresh container DB runs the full chain;
           # a drifted database would fail the upgrade itself.
+          alembic upgrade head || { echo "alembic upgrade failed on cold DB"; exit 1; }
           alembic current > /tmp/s3_current.txt 2>&1
           grep -q "(head)" /tmp/s3_current.txt || { echo "alembic did not reach head"; cat /tmp/s3_current.txt; exit 1; }
           echo "alembic converged to head"
