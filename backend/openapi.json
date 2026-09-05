@@ -53714,7 +53714,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor|Manager)$"
+                  "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
                 },
                 {
                   "type": "null"
@@ -104748,7 +104748,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor|Manager)$"
+                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"

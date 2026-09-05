@@ -15,7 +15,17 @@ class Roles(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs
     DOCTOR = "Doctor"
     LAB = "Lab"
     CASHIER = "Cashier"
-    MANAGER = "Manager"
+    # M-2 (Manager vocabulary closure): MANAGER removed. The member was kept
+    # through M-1 only as a read-compatibility carrier; the ops deactivation
+    # of the single production row (smoke_manager, id=20, 2026-09-04) closed
+    # that window. The stored tombstone row keeps role='Manager' as a RAW
+    # STRING — users.role is String(20) and every read/serialization surface
+    # uses plain str, so the row survives intact (audit history) with zero
+    # privileges: logins are rejected at the auth layer (is_active=false)
+    # and every require_roles grant list dropped the spelling in M-1D. Like
+    # Receptionist (E-4) the enum no longer admits the deprecated spelling;
+    # unlike Receptionist there is no canonical successor (privileges were
+    # removed, not aliased).
 
     # Специализированные роли врачей
     CARDIO = "cardio"
@@ -27,8 +37,7 @@ class Roles(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs
     # E-4 (Receptionist alias removal): RECEPTIONIST decommissioned — the
     # legacy spelling had a canonical successor (Registrar, REC track), the
     # production table held 0 rows (SQL evidence 2026-09-02), and the last
-    # read/alias surfaces were removed in E-4. Unlike Manager there is no
-    # read-compat window to preserve.
+    # read/alias surfaces were removed in E-4.
     PATIENT = "Patient"
     SUPER_ADMIN = "SuperAdmin"
 
@@ -46,14 +55,13 @@ CRITICAL_ROLES = {
 }
 
 # Роли с административными правами
-# M-1 (Manager deprecation): Roles.MANAGER removed — Manager is a deprecated
-# legacy/synthetic role (production: 1 automated row, 0 human users) and must
-# not be treated as administrative anywhere. Caller evidence before the
-# change (exhaustive repo search, app + tests): is_admin_role()/ADMIN_ROLES
-# had ZERO call sites, so removal is behavior-neutral at runtime; the set is
-# now consistent with the M-1D grant removal (no Manager admin-equivalence).
-# Roles.MANAGER itself stays in the enum above for read compatibility until
-# the post-deploy ops cleanup + M-2.
+# M-1 (Manager deprecation): Manager removed from the administrative set —
+# a deprecated legacy/synthetic role (production: 1 automated row, 0 human
+# users) must not be treated as administrative anywhere. Caller evidence at
+# the M-1 change (exhaustive repo search, app + tests): is_admin_role()/
+# ADMIN_ROLES had ZERO call sites, so the change was behavior-neutral.
+# M-2 (vocabulary closure): the enum member itself is gone; this set no
+# longer mentions Manager at all.
 ADMIN_ROLES = {
     Roles.ADMIN,
     Roles.SUPER_ADMIN,
@@ -130,11 +138,13 @@ STAFF_ROLES = {
     Roles.NURSE,
 }
 
-# NOTE (M-1): get_role_hierarchy keeps the legacy Roles.MANAGER: 8 entry —
-# the hierarchy map is a descriptive level table, not a grant: it is only
-# consulted via has_role_permission(), which has zero external callers
-# (verified by exhaustive search). Manager's privileges are governed by the
-# require_roles() grant lists, all of which dropped Manager in M-1D.
+# NOTE (M-2): the hierarchy map covers the canonical vocabulary only — the
+# legacy Manager entry (level 8) was retired with the spelling, the same
+# way E-4 retired Receptionist's level 3. A stored raw 'Manager' string
+# now scores 0 here; this is descriptive only: the table is consulted via
+# has_role_permission(), which has zero external callers (verified by
+# exhaustive search), and Manager's privileges were governed by the
+# require_roles() grant lists, all of which dropped the spelling in M-1D.
 
 
 def is_admin_role(role: str) -> bool:
@@ -171,7 +181,7 @@ def get_role_hierarchy(role: str) -> int:
         Roles.CARDIO: 7,
         Roles.DERMA: 7,
         Roles.DENTIST: 7,
-        Roles.MANAGER: 8,
+        # M-2: Manager (8) retired with the deprecated spelling.
         Roles.ADMIN: 9,
         Roles.SUPER_ADMIN: 10,
     }

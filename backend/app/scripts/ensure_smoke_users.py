@@ -9,11 +9,12 @@ The password comes from SMOKE_USER_PASSWORD (backend/.env) — never hardcoded.
 
 M-1 (Manager deprecation): smoke_manager is no longer provisioned, pinned or
 password-reset here — the deprecated Manager role carries zero privileges
-after M-1D and the nightly smoke was repointed to smoke_doctor. A legacy
-smoke_manager row that already exists in production (inventory 2026-09-03:
-id=20, is_active=true) is deliberately NOT deleted, NOT deactivated and NOT
-modified by this script: deactivation is a production data operation owned by
-the post-deploy ops step (DEACTIVATE, not DELETE — audit history preserved).
+after M-1D and the nightly smoke was repointed to smoke_doctor. The legacy
+smoke_manager row (id=20) was DEACTIVATED by the post-deploy ops step on
+2026-09-04 (is_active=false, guarded transaction, audit history preserved —
+DEACTIVATE, not DELETE). This script still deliberately never touches that
+row: the tombstone is a production data artifact owned by ops, and code
+keeps it report-only (see RETIRED_SMOKE_USERNAMES below).
 
 Usage:
     powershell -File scripts/run_python.ps1 -m app.scripts.ensure_smoke_users
@@ -46,7 +47,8 @@ SMOKE_USERS = [
 
 # Deprecated smoke accounts this script must never provision again, but
 # whose EXISTING production rows must not be touched by code either —
-# see the module docstring (post-deploy ops owns the deactivation).
+# see the module docstring (ops deactivated smoke_manager on 2026-09-04;
+# the row stays as a tombstone and remains off-limits to code).
 RETIRED_SMOKE_USERNAMES = ("smoke_manager",)
 
 
