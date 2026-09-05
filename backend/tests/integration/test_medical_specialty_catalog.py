@@ -1514,3 +1514,96 @@ class TestActivationOnlyCatalogGuard:
         finally:
             row.active = True
             seeded_catalog.commit()
+
+
+class TestAdminCatalogCRUD:
+    """Catalog Admin UI backend contract (follow-up PR to the foundation)."""
+
+    def test_catalog_crud_roundtrip(self, client, auth_headers, db_session):
+        code = "test_catalog_rt"
+        # create
+        r = client.post(
+            "/api/v1/admin/doctors-catalog",
+            headers=auth_headers,
+            json={"code": code, "title_ru": "Тест-каталог", "title_en": "Test Catalog"},
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["code"] == code
+        # read (full list includes it)
+        rows = client.get("/api/v1/admin/doctors-catalog", headers=auth_headers).json()
+        assert any(item["code"] == code for item in rows)
+        # update title + deactivate
+        r = client.put(
+            f"/api/v1/admin/doctors-catalog/{code}",
+            headers=auth_headers,
+            json={"title_ru": "Тест-каталог v2", "active": False},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["title_ru"] == "Тест-каталог v2"
+        # cleanup (never referenced by a doctor — physical delete allowed)
+        r = client.delete(f"/api/v1/admin/doctors-catalog/{code}", headers=auth_headers)
+        assert r.status_code == 200, r.text
+
+    def test_deactivated_catalog_code_rejected_by_onboarding(
+        self, client, auth_headers, db_session
+    ):
+        code = "catalog_deact"
+        r = client.post(
+            "/api/v1/admin/doctors-catalog",
+            headers=auth_headers,
+            json={"code": code, "title_ru": "Тест-деактивация"},
+        )
+        assert r.status_code == 201, r.text
+
+        # Deactivate through the catalog admin surface.
+        r = client.put(
+            f"/api/v1/admin/doctors-catalog/{code}",
+            headers=auth_headers,
+            json={"active": False},
+        )
+        assert r.status_code == 200
+
+        # Onboarding with a deactivated catalog code is rejected (422) —
+        # the onboarding write boundary validates against active catalog rows.
+        r = client.post(
+            "/api/v1/users/users",
+            headers=auth_headers,
+            json={
+                "username": "catalog_deact_doc",
+                "email": "catalog.deact@clinic.test",
+                "password": "Doctor1234",
+                "role": "Doctor",
+                "doctor_profile": {"specialty": code},
+            },
+        )
+        assert r.status_code == 422
+
+    def test_delete_rejected_when_doctor_references_code(
+        self, client, auth_headers, db_session, test_doctor_user
+    ):
+        from app.models.clinic import Doctor
+
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="cardiology",
+            active=True,
+        )
+        db_session.add(doctor)
+        db_session.commit()
+
+        r = client.delete(
+            "/api/v1/admin/doctors-catalog/cardiology", headers=auth_headers
+        )
+        assert r.status_code == 409
+        assert "врач" in r.json()["detail"].lower()
+
+    def test_create_duplicate_returns_409(self, client, auth_headers):
+        payload = {"code": "dup_check_rt", "title_ru": "Дубль-тест"}
+        r1 = client.post("/api/v1/admin/doctors-catalog", headers=auth_headers, json=payload)
+        assert r1.status_code == 201
+        r2 = client.post("/api/v1/admin/doctors-catalog", headers=auth_headers, json=payload)
+        assert r2.status_code == 409
+
+    def test_catalog_requires_admin(self, client):
+        r = client.get("/api/v1/admin/doctors-catalog")
+        assert r.status_code in (401, 403)

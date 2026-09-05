@@ -3,7 +3,8 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -233,6 +234,23 @@ def get_doctors_stats(
     return _get_doctors_stats_payload(db)
 
 
+class SpecialtyCatalogCreateIn(BaseModel):
+    code: str = Field(..., min_length=2, max_length=100)
+    title_ru: str = Field(..., min_length=1, max_length=200)
+    title_uz: str | None = Field(None, max_length=200)
+    title_en: str | None = Field(None, max_length=200)
+    active: bool = True
+    sort_order: int = 0
+
+
+class SpecialtyCatalogUpdateIn(BaseModel):
+    title_ru: str | None = Field(None, min_length=1, max_length=200)
+    title_uz: str | None = Field(None, max_length=200)
+    title_en: str | None = Field(None, max_length=200)
+    active: bool | None = None
+    sort_order: int | None = None
+
+
 @router.get(
     "/doctors/specialty-vocabulary",
     response_model=list[SpecialtyVocabularyItem],
@@ -276,6 +294,104 @@ def get_doctor_specialty_vocabulary(
         )
         for row in rows
     ]
+
+
+
+
+@router.get("/doctors-catalog", response_model=list[SpecialtyVocabularyItem])
+def admin_list_medical_specialties(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Полный каталог специальностей (включая неактивные) — Admin UI."""
+    from app.services.specialty_catalog_admin import list_all
+
+    return [
+        SpecialtyVocabularyItem(
+            code=row.code, title_ru=row.title_ru,
+            title_uz=row.title_uz, title_en=row.title_en,
+        )
+        for row in list_all(db)
+    ]
+
+
+@router.post("/doctors-catalog", response_model=SpecialtyVocabularyItem, status_code=201)
+def admin_create_medical_specialty(
+    payload: SpecialtyCatalogCreateIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Создать специальность в каталоге (canonical code + titles)."""
+    from app.services.specialty_catalog_admin import (
+        SpecialtyCatalogConflictError,
+        SpecialtyCatalogValidationError,
+        create as catalog_create,
+    )
+
+    try:
+        row = catalog_create(
+            db, code=payload.code, title_ru=payload.title_ru,
+            title_uz=payload.title_uz, title_en=payload.title_en,
+            active=payload.active, sort_order=payload.sort_order,
+        )
+    except SpecialtyCatalogValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SpecialtyCatalogConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return SpecialtyVocabularyItem(
+        code=row.code, title_ru=row.title_ru,
+        title_uz=row.title_uz, title_en=row.title_en,
+    )
+
+
+@router.put("/doctors-catalog/{code}", response_model=SpecialtyVocabularyItem)
+def admin_update_medical_specialty(
+    code: str,
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Обновить titles/active/sort_order специальности каталога.
+
+    ``code`` — неизменяемый идентификатор: переименование запрещено,
+    потому что значение хранится в ``Doctor.specialty`` существующих врачей.
+    """
+    from app.services.specialty_catalog_admin import update as catalog_update
+
+    row = catalog_update(
+        db, code,
+        title_ru=payload.get("title_ru"),
+        title_uz=payload.get("title_uz"),
+        title_en=payload.get("title_en"),
+        active=payload.get("active"),
+        sort_order=payload.get("sort_order"),
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Специальность не найдена")
+    return SpecialtyVocabularyItem(
+        code=row.code, title_ru=row.title_ru,
+        title_uz=row.title_uz, title_en=row.title_en,
+    )
+
+
+@router.delete("/doctors-catalog/{code}")
+def admin_delete_medical_specialty(
+    code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """Удалить специальность каталога (только если её не использует врач)."""
+    from app.services.specialty_catalog_admin import delete as catalog_delete
+
+    deleted, refs = catalog_delete(db, code)
+    if refs:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Специальность используется {refs}+ врач(ом) — сначала деактивируйте её",
+        )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Специальность не найдена")
+    return {"deleted": code}
 
 
 @router.get("/doctors/{doctor_id}", response_model=DoctorOut)

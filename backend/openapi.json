@@ -28951,6 +28951,186 @@
         ]
       }
     },
+    "/api/v1/admin/doctors-catalog": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin List Medical Specialties",
+        "description": "Полный каталог специальностей (включая неактивные) — Admin UI.",
+        "operationId": "admin_list_medical_specialties_api_v1_admin_doctors_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SpecialtyVocabularyItem"
+                  },
+                  "type": "array",
+                  "title": "Response Admin List Medical Specialties Api V1 Admin Doctors Catalog Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Create Medical Specialty",
+        "description": "Создать специальность в каталоге (canonical code + titles).",
+        "operationId": "admin_create_medical_specialty_api_v1_admin_doctors_catalog_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecialtyCatalogCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialtyVocabularyItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/doctors-catalog/{code}": {
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Update Medical Specialty",
+        "description": "Обновить titles/active/sort_order специальности каталога.\n\n``code`` — неизменяемый идентификатор: переименование запрещено,\nпотому что значение хранится в ``Doctor.specialty`` существующих врачей.",
+        "operationId": "admin_update_medical_specialty_api_v1_admin_doctors_catalog__code__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialtyVocabularyItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin Delete Medical Specialty",
+        "description": "Удалить специальность каталога (только если её не использует врач).",
+        "operationId": "admin_delete_medical_specialty_api_v1_admin_doctors_catalog__code__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/doctors/{doctor_id}": {
       "get": {
         "tags": [
@@ -99475,6 +99655,62 @@
           "initialized"
         ],
         "title": "SetupStatusOut"
+      },
+      "SpecialtyCatalogCreateIn": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Code"
+          },
+          "title_ru": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title Ru"
+          },
+          "title_uz": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Uz"
+          },
+          "title_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title En"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "title_ru"
+        ],
+        "title": "SpecialtyCatalogCreateIn"
       },
       "SpecialtyVocabularyItem": {
         "properties": {

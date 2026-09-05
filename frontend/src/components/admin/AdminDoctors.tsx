@@ -1,8 +1,9 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
-import { Edit, Link2, MoreHorizontal, RefreshCw, Search, Stethoscope, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit, Link2, MoreHorizontal, RefreshCw, Search, Stethoscope, Trash2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
+import AdminSpecialtyCatalog from './AdminSpecialtyCatalog';
 import DoctorModal from './DoctorModal';
 import useDoctors from '../../hooks/useDoctors';
 import useModal from '../../hooks/useModal';
@@ -93,6 +94,7 @@ const AdminDoctors = () => {
   // ⋯ / Дополнительно — normal doctor creation moved to the Users module
   // (canonical User+Doctor onboarding, owner decision 2026-09-01).
   const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
   // PR-19: load departments dynamically (was hardcoded)
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
@@ -434,6 +436,25 @@ const AdminDoctors = () => {
         loading={doctorModal.loading}
         departments={departmentOptions.filter((d) => d.value) as never[]}
       />
+      {/* Medical Specialty Catalog — runtime SSOT for onboarding */}
+      <Card variant="default" shadow="none" className="admin-patients-header-card">
+        <button
+          type="button"
+          aria-expanded={catalogOpen}
+          onClick={() => setCatalogOpen((open) => !open)}
+          className="admin-w-100pct admin-flex admin-items-center admin-gap-8 admin-p-12 admin-bg-transparent admin-border-0 admin-cursor-pointer admin-text-left"
+        >
+          {catalogOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          <Stethoscope size={18} />
+          <span className="admin-title-20">{t('admin2.spec_catalog_title')}</span>
+        </button>
+        {catalogOpen && (
+          <div className="admin-p-16">
+            <AdminSpecialtyCatalog />
+          </div>
+        )}
+      </Card>
+
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}
     </div>
