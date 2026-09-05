@@ -3,7 +3,7 @@ Pydantic schemas for Role management
 """
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RoleBase(BaseModel):
@@ -18,7 +18,24 @@ class RoleBase(BaseModel):
 
 class RoleCreate(RoleBase):
     """Schema for creating a new role"""
-    pass
+
+    # M-2b (Codex review P2 follow-up on #3049): reject the retired RBAC
+    # spellings at the schema boundary — a hand-created catalog row named
+    # 'Manager' (or 'Receptionist') would flow into /roles/options and the
+    # UserModal dropdown mirror, offering a spelling the user-management
+    # write schema then rejects with 422. Case-insensitive (catalog names
+    # are free-form; the retired set lives in core/roles.py SSOT).
+    @field_validator("name")
+    @classmethod
+    def validate_name_not_retired(cls, v: str) -> str:
+        from app.core.roles import is_retired_role_spelling
+
+        if is_retired_role_spelling(v):
+            raise ValueError(
+                "Роль выведена из эксплуатации (retired spelling): используйте"
+                " канонический словарь ролей"
+            )
+        return v
 
 
 class RoleUpdate(BaseModel):

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
+from app.core.roles import is_retired_role_spelling
 from app.models.user import User
 from app.schemas.role import (
     RoleCreate,
@@ -85,7 +86,15 @@ async def get_role_options(
             options.append(RoleOptionResponse(value="", label="Все роли"))
 
         # Add each role
+        # M-2b (Codex review P2 follow-up on #3049): retired RBAC spellings
+        # never surface as selectable options — a legacy/compatible-deployment
+        # catalog row named 'Manager'/'Receptionist' must not leak into the
+        # UserModal dropdown mirror (the user-management write schema would
+        # 422 any submission with it anyway; the options list is the UI trust
+        # boundary). Case-insensitive, per the core/roles.py SSOT set.
         for role in roles:
+            if is_retired_role_spelling(role.name):
+                continue
             options.append(RoleOptionResponse(
                 value=role.name,
                 label=role.display_name
