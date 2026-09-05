@@ -334,9 +334,10 @@ const Tabs = ({
             <TrendingUp size={16} />
           </div>
           {/* REG-NS-1 follow-up (Codex P2): queue.all does not exist in any
-              locale — the exposed tab rendered the literal key. Reuse the
-              existing queue.filter_all key instead of duplicating it. */}
-          <span className="tab-label">{t('queue.filter_all')}</span>
+              locale — the exposed tab rendered the literal key. Use the
+              locale-complete all_departments key (all five locales define
+              it with real translations). */}
+          <span className="tab-label">{t('queue.all_departments')}</span>
         </button>
 
         {/* Разделитель */}

@@ -6,12 +6,13 @@
  * query, wizard state). Pure presentation; navigation callback is delegated.
  *
  * REG-NS-1 follow-up (Codex P2): the registrar sidebar no longer renders, so
- * the two shared-clinical destinations from SIDEBAR_PRESETS.registrar that are
- * not registrar-panel views (/clinical/appointments, /clinical/search) keep a
- * visible, touch-reachable entry point in this row — rendered on every
- * registrar route and viewport.
+ * the shared-clinical destinations from SIDEBAR_PRESETS.registrar that are
+ * not registrar-panel views (/registrar/queue, /clinical/appointments,
+ * /clinical/search) keep visible, touch-reachable (44px hit area) entry
+ * points in this row — rendered on every registrar route and viewport,
+ * with the sidebar's own localized nav.* labels.
  */
-import { Calendar, ChevronRight, Search } from 'lucide-react';
+import { Calendar, ChevronRight, Search, Users } from 'lucide-react';
 ;
 
 interface RegistrarBreadcrumbProps {
@@ -24,6 +25,8 @@ interface RegistrarBreadcrumbProps {
   onNavigateToWelcome: () => void;
   /** REG-NS-1: sidebar replacement — shared Appointments screen. */
   onNavigateToAppointments: () => void;
+  /** REG-NS-1: sidebar replacement — online queue screen. */
+  onNavigateToQueue: () => void;
   /** REG-NS-1: sidebar replacement — patient search. */
   onNavigateToPatients: () => void;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
@@ -37,6 +40,7 @@ const RegistrarBreadcrumb = ({
   showWizard,
   onNavigateToWelcome,
   onNavigateToAppointments,
+  onNavigateToQueue,
   onNavigateToPatients,
   tI18n,
 }: RegistrarBreadcrumbProps) => (
@@ -67,6 +71,14 @@ const RegistrarBreadcrumb = ({
       </>
     )}
     <span className="registrar-breadcrumb-quicklinks">
+      <button
+        type="button"
+        className="registrar-breadcrumb-link registrar-breadcrumb-quicklink"
+        onClick={onNavigateToQueue}
+      >
+        <Users size={14} aria-hidden="true" />
+        <span>{tI18n('nav.queue')}</span>
+      </button>
       <button
         type="button"
         className="registrar-breadcrumb-link registrar-breadcrumb-quicklink"

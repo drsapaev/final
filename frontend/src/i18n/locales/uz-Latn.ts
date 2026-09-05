@@ -241,6 +241,7 @@ const uzLatn = {
     no_entries: 'Bugun laboratoriya yozuvlari topilmadi.',
     no_matches: 'Hech narsa topilmadi. So\'rovni yoki filtrni o\'zgartiring.',
     filter_all: 'Barchasi',
+    all_departments: 'Barcha bo\'limlar',
     filter_active: 'Ishda',
     filter_completed: 'Tugatilgan',
     sort_default: 'Standart bo\'yicha',

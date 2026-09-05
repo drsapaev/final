@@ -326,6 +326,7 @@ const RegistrarPanel = () => {
         // registrar routes, so the shared-clinical destinations from
         // SIDEBAR_PRESETS.registrar keep visible in-panel entry points.
         onNavigateToAppointments={() => navigate('/clinical/appointments')}
+        onNavigateToQueue={() => navigate('/registrar/queue')}
         onNavigateToPatients={() => navigate('/clinical/search')}
         tI18n={tI18n}
       />

@@ -457,16 +457,38 @@ describe('RegistrarPanel command contract', () => {
 
     expect(breadcrumb).toContain('registrar-breadcrumb-quicklinks');
     expect(breadcrumb).toContain('onNavigateToAppointments');
+    expect(breadcrumb).toContain('onNavigateToQueue');
     expect(breadcrumb).toContain('onNavigateToPatients');
     expect(breadcrumb).toContain("tI18n('nav.appointments')");
+    expect(breadcrumb).toContain("tI18n('nav.queue')");
     expect(breadcrumb).toContain("tI18n('nav.patients')");
+    // Codex P2 round 2: coarse-pointer hit areas — 44px minimum on every
+    // link in the row (root crumb + quick links).
+    expect(breadcrumb).toContain('registrar-breadcrumb-quicklink');
   });
 
   it('wires breadcrumb quick links to the shared clinical routes (REG-NS-1)', () => {
     const source = readRegistrarPanelSource();
 
     expect(source).toContain("onNavigateToAppointments={() => navigate('/clinical/appointments')}");
+    expect(source).toContain("onNavigateToQueue={() => navigate('/registrar/queue')}");
     expect(source).toContain("onNavigateToPatients={() => navigate('/clinical/search')}");
+  });
+
+  it('renders the locale-complete all-departments tab label (REG-NS-1, Codex P2 round 2)', () => {
+    const tabsPath = path.resolve(__dirname, '../../components/navigation/Tabs.tsx');
+    const tabs = normalizeSource(fs.readFileSync(tabsPath, 'utf8'));
+
+    // queue.all never existed; queue.filter_all is untranslated in en/kk/uz-Cyrl.
+    // The tab must use the locale-complete all_departments key.
+    expect(tabs).toContain("t('queue.all_departments')");
+    expect(tabs).not.toContain("t('queue.all')");
+    expect(tabs).not.toContain("t('queue.filter_all')");
+
+    for (const locale of ['ru', 'en', 'kk', 'uz-Cyrl', 'uz-Latn']) {
+      const localeSrc = normalizeSource(fs.readFileSync(path.resolve(__dirname, `../../i18n/locales/${locale}.ts`), 'utf8'));
+      expect(localeSrc).toContain('all_departments:');
+    }
   });
 });
 

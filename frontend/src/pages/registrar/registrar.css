@@ -556,7 +556,10 @@
   marginBottom: 12px;
 }
 
-/* Breadcrumb link button (reset to inline text) */
+/* Breadcrumb link button (reset to inline text).
+   REG-NS-1 follow-up (Codex P2): the row now replaces the removed sidebar
+   navigation, so every link here carries a 44px minimum hit area
+   (coarse-pointer touch target); the box stays visually quiet. */
 .registrar-breadcrumb-link {
   background: none;
   border: none;
@@ -564,14 +567,17 @@
   color: var(--mac-accent);
   font: inherit;
   padding: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 
 /* REG-NS-1 follow-up: container + padding override for the sidebar-
-   replacement quick links (Appointments, patient search), right-aligned
-   in the breadcrumb row. Colors/borders come from the existing
-   registrar-breadcrumb-link utility — this rule only positions the
-   cluster and adds a touch-sized hit area (kept free of new var() token
-   usages on purpose: UI baseline ratchet varUsagesNoFallback). */
+   replacement quick links (Queue, Appointments, patient search),
+   right-aligned in the breadcrumb row. Colors/borders come from the
+   existing registrar-breadcrumb-link utility — this rule only positions
+   the cluster and widens the hit area horizontally (kept free of new
+   var() token usages on purpose: UI baseline ratchet varUsagesNoFallback). */
 .registrar-breadcrumb-quicklinks {
   margin-left: auto;
   display: inline-flex;
@@ -583,7 +589,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
+  padding: 4px 12px;
   font-size: 13px;
 }
 
