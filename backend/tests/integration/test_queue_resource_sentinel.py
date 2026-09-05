@@ -540,3 +540,151 @@ def test_alembic_chain_single_head_0056() -> None:
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
     assert heads == ["0056_queue_resource_role_cleanup"]
+
+
+# ============ Codex round-1: remaining credential surfaces ============
+
+
+def test_mobile_login_blocks_internal_sentinel(
+    client: TestClient, db_session: Session
+) -> None:
+    """Codex round-1: the phone-based mobile login funnel mints tokens
+    without the AuthenticationService.authenticate_user checks — it must
+    reject the sentinel exactly like the web funnels."""
+    from datetime import date
+
+    from app.models.patient import Patient
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="qd11_mobile_resource", role="Resource", password=probe_password
+    )
+    control = _make_user(
+        db_session, username="qd11_mobile_patient", role="Patient", password=probe_password
+    )
+    db_session.add_all(
+        [
+            Patient(
+                first_name="Ресурс",
+                last_name="ЭКГ",
+                phone="+998901110001",
+                birth_date=date(1990, 1, 1),
+                user_id=sentinel.id,
+            ),
+            Patient(
+                first_name="Иван",
+                last_name="Иванов",
+                phone="+998901110002",
+                birth_date=date(1990, 1, 1),
+                user_id=control.id,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/mobile/auth/login",
+        json={"phone": "+998901110001", "password": probe_password},
+    )
+    assert response.status_code == 401, (response.status_code, response.text[:300])
+
+    response = client.post(
+        "/api/v1/mobile/auth/login",
+        json={"phone": "+998901110002", "password": probe_password},
+    )
+    assert response.status_code == 200, (response.status_code, response.text[:300])
+    assert response.json().get("access_token")
+
+
+def test_get_current_user_rejects_sentinel_token(
+    client: TestClient, db_session: Session
+) -> None:
+    """Codex round-1: even a hand-minted valid-signature token must not
+    authenticate a sentinel account (this also closes the 2FA-exchange
+    surface: pending tokens cannot be issued for a blocked login, and
+    any pre-existing token fails here)."""
+    from app.services.authentication_service import authentication_service
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="qd11_token_resource", role="Resource", password=probe_password
+    )
+    control = _make_user(
+        db_session, username="qd11_token_registrar", role="Registrar", password=probe_password
+    )
+
+    def _token(user: User) -> str:
+        return authentication_service.create_access_token(
+            {
+                "sub": str(user.id),
+                "username": user.username,
+                "role": user.role,
+                "is_active": user.is_active,
+                "is_superuser": user.is_superuser,
+            }
+        )
+
+    response = client.get(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {_token(sentinel)}"}
+    )
+    assert response.status_code == 401, (response.status_code, response.text[:300])
+
+    response = client.get(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {_token(control)}"}
+    )
+    assert response.status_code == 200, (response.status_code, response.text[:300])
+
+
+def test_refresh_token_rejected_for_internal_sentinel(db_session: Session) -> None:
+    """Codex round-1: refresh rotation must never re-mint credentials for
+    the sentinel — the structural non-login invariant holds on the token
+    surface too, not only at password verification."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.authentication import RefreshToken
+    from app.services.authentication_service import authentication_service
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="qd11_refresh_resource", role="Resource", password=probe_password
+    )
+
+    jti = "qd11-refresh-jti"
+    refresh_token = authentication_service.create_refresh_token(sentinel.id, jti)
+    db_session.add(
+        RefreshToken(
+            user_id=sentinel.id,
+            token=refresh_token,
+            jti=jti,
+            expires_at=datetime.now(UTC) + timedelta(days=1),
+        )
+    )
+    db_session.commit()
+
+    result = authentication_service.refresh_access_token(db_session, refresh_token)
+    assert result.get("success") is False
+
+
+def test_users_list_hides_internal_sentinel_rows(
+    client: TestClient, admin_auth_headers: dict, db_session: Session
+) -> None:
+    """Codex round-1: the user-management listing hides sentinel rows —
+    synthetic queue-resource accounts are queue machinery, not manageable
+    staff accounts (UserModal would otherwise offer their unknown role
+    and 422 on every edit)."""
+    probe_password = "Pass" + "w" + "0rd!"
+    _make_user(
+        db_session, username="qd11_list_resource", role="Resource", password=probe_password
+    )
+    _make_user(
+        db_session,
+        username="qd11_list_registrar",
+        role="Registrar",
+        password=probe_password,
+    )
+
+    response = client.get("/api/v1/users/users", headers=admin_auth_headers)
+    assert response.status_code == 200, (response.status_code, response.text[:300])
+    usernames = [u["username"] for u in response.json().get("users", [])]
+    assert "qd11_list_resource" not in usernames, usernames
+    assert "qd11_list_registrar" in usernames, usernames

@@ -458,6 +458,20 @@ class TokensMixin(AuthenticationServiceMixinBase):
                     "message": "Пользователь не найден или неактивен",
                 }
 
+            # QD-1.1 (queue resource role cleanup, Codex round-1): a refresh
+            # token must never re-mint credentials for an internal-only
+            # sentinel role — the structural non-login invariant holds on
+            # the token surface too, not only at password verification.
+            if is_login_blocked_role(user.role):
+                logger.warning(
+                    "Refresh rejected for internal-only role user_id=%s",
+                    user.id,
+                )
+                return {
+                    "success": False,
+                    "message": "Пользователь не найден или неактивен",
+                }
+
             # 5) Создаём НОВЫЕ access + refresh токены (rotation).
             new_jti = str(uuid.uuid4())
             access_token = self.create_access_token(

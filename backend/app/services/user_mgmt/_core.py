@@ -699,6 +699,19 @@ class CoreMixin(UserManagementServiceMixinBase):
         try:
             query = db.query(User)
 
+            # QD-1.1 (queue resource role cleanup, Codex round-1): the
+            # user-management listing deliberately hides internal-only
+            # sentinel rows — synthetic queue-resource accounts are queue
+            # machinery, not manageable staff accounts (UserModal would
+            # otherwise offer their unknown role and 422 on every edit).
+            from sqlalchemy import func
+
+            from app.core.roles import INTERNAL_ONLY_ROLE_SPELLINGS
+
+            query = query.filter(
+                func.lower(User.role).notin_(INTERNAL_ONLY_ROLE_SPELLINGS)
+            )
+
             # Фильтр по тексту
             if search_params.query:
                 query = query.join(
