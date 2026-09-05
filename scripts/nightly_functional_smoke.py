@@ -295,7 +295,8 @@ def main() -> int:
         status, body = http(
             "GET", f"/api/v1/doctors/by-user/{user_ids['smoke_doctor']}", token=doc
         )
-        active = isinstance(body, dict) and body.get("active") is True
+        # /doctors/by-user exposes is_active (DoctorOut), not `active`.
+        active = isinstance(body, dict) and body.get("is_active") is True
         record(
             "doctor profile invariant",
             "PASS" if (status == 200 and active) else "FAIL",
@@ -309,23 +310,24 @@ def main() -> int:
     if not DEEP_WRITES:
         record("patient create", "SKIP",
                "deep write - staging only (SMOKE_MODE=deep)")
-    # phone must be unique per run: backend enforces patient phone uniqueness
-    run_digits = RUN_TAG.replace("-", "")
-    status, body = http("POST", "/api/v1/patients/", token=reg, body={
-        "last_name": f"SYNTHETIC-SMOKE-{RUN_TAG}",
-        "first_name": "Nightly",
-        "phone": f"+998{run_digits[-9:]}",
-        "doc_type": "passport",
-        "doc_number": f"SMOKE{RUN_TAG.replace('-', '')}",
-        "birth_date": "1990-01-01",
-        "address": "SYNTHETIC-SMOKE address — nightly smoke artifact",
-    })
-    if status in (200, 201) and isinstance(body, dict):
-        patient_id = body.get("id")
-        CREATED["patient_id"] = patient_id
-        record("patient create", "PASS", f"id={patient_id}")
     else:
-        record("patient create", "FAIL", f"HTTP {status}: {json.dumps(body, ensure_ascii=False)[:200]}")
+        # phone must be unique per run: backend enforces patient phone uniqueness
+        run_digits = RUN_TAG.replace("-", "")
+        status, body = http("POST", "/api/v1/patients/", token=reg, body={
+            "last_name": f"SYNTHETIC-SMOKE-{RUN_TAG}",
+            "first_name": "Nightly",
+            "phone": f"+998{run_digits[-9:]}",
+            "doc_type": "passport",
+            "doc_number": f"SMOKE{RUN_TAG.replace('-', '')}",
+            "birth_date": "1990-01-01",
+            "address": "SYNTHETIC-SMOKE address — nightly smoke artifact",
+        })
+        if status in (200, 201) and isinstance(body, dict):
+            patient_id = body.get("id")
+            CREATED["patient_id"] = patient_id
+            record("patient create", "PASS", f"id={patient_id}")
+        else:
+            record("patient create", "FAIL", f"HTTP {status}: {json.dumps(body, ensure_ascii=False)[:200]}")
 
     # 4. doctors list (registrar) ------------------------------------------
     doctor_id = None
