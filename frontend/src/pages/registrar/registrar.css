@@ -566,6 +566,34 @@
   padding: 0;
 }
 
+/* REG-NS-1 follow-up: sidebar replacements — quick links to the shared
+   clinical destinations (Appointments, patient search), right-aligned in
+   the breadcrumb row, visible on every registrar route and viewport. */
+.registrar-breadcrumb-quicklinks {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+}
+
+.registrar-breadcrumb-quicklink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--mac-text-primary);
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-separator);
+  border-radius: var(--mac-radius-md);
+  cursor: pointer;
+}
+
+.registrar-breadcrumb-quicklink:hover {
+  background: var(--mac-card-hover-bg);
+}
+
 /* Data source indicator count text */
 .registrar-ds-count {
   margin-left: auto;

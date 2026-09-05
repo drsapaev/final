@@ -333,7 +333,10 @@ const Tabs = ({
           <div className="tab-icon">
             <TrendingUp size={16} />
           </div>
-          <span className="tab-label">{t('queue.all')}</span>
+          {/* REG-NS-1 follow-up (Codex P2): queue.all does not exist in any
+              locale — the exposed tab rendered the literal key. Reuse the
+              existing queue.filter_all key instead of duplicating it. */}
+          <span className="tab-label">{t('queue.filter_all')}</span>
         </button>
 
         {/* Разделитель */}

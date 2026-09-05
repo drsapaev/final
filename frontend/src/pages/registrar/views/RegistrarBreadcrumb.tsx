@@ -4,8 +4,14 @@
  * PR-UI-13-5: extracted verbatim from RegistrarPanel.tsx JSX — the R-03 fix
  * breadcrumb (current view, selected department from queue profiles, search
  * query, wizard state). Pure presentation; navigation callback is delegated.
+ *
+ * REG-NS-1 follow-up (Codex P2): the registrar sidebar no longer renders, so
+ * the two shared-clinical destinations from SIDEBAR_PRESETS.registrar that are
+ * not registrar-panel views (/clinical/appointments, /clinical/search) keep a
+ * visible, touch-reachable entry point in this row — rendered on every
+ * registrar route and viewport.
  */
-import { ChevronRight } from 'lucide-react';
+import { Calendar, ChevronRight, Search } from 'lucide-react';
 ;
 
 interface RegistrarBreadcrumbProps {
@@ -16,6 +22,10 @@ interface RegistrarBreadcrumbProps {
   showWizard: boolean;
   /** Root-crumb click: navigate to the canonical welcome path. */
   onNavigateToWelcome: () => void;
+  /** REG-NS-1: sidebar replacement — shared Appointments screen. */
+  onNavigateToAppointments: () => void;
+  /** REG-NS-1: sidebar replacement — patient search. */
+  onNavigateToPatients: () => void;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -26,6 +36,8 @@ const RegistrarBreadcrumb = ({
   wizardEditMode,
   showWizard,
   onNavigateToWelcome,
+  onNavigateToAppointments,
+  onNavigateToPatients,
   tI18n,
 }: RegistrarBreadcrumbProps) => (
   <nav aria-label={tI18n('registrarPanel.rp_aria_breadcrumb_nav')} className="registrar-breadcrumb-nav">
@@ -54,6 +66,24 @@ const RegistrarBreadcrumb = ({
         <span>{wizardEditMode ? tI18n('registrarPanel.rp_breadcrumb_edit') : tI18n('registrarPanel.rp_breadcrumb_new')}</span>
       </>
     )}
+    <span className="registrar-breadcrumb-quicklinks">
+      <button
+        type="button"
+        className="registrar-breadcrumb-quicklink"
+        onClick={onNavigateToAppointments}
+      >
+        <Calendar size={14} aria-hidden="true" />
+        <span>{tI18n('nav.appointments')}</span>
+      </button>
+      <button
+        type="button"
+        className="registrar-breadcrumb-quicklink"
+        onClick={onNavigateToPatients}
+      >
+        <Search size={14} aria-hidden="true" />
+        <span>{tI18n('nav.patients')}</span>
+      </button>
+    </span>
   </nav>
 );
 

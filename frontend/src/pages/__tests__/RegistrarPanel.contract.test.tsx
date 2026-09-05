@@ -447,5 +447,26 @@ describe('RegistrarPanel command contract', () => {
     expect(resolverBlock).not.toContain('appointmentRow?.id');
     expect(source).toContain("tI18n('registrar.no_visit_for_postpone')");
   });
+
+  // REG-NS-1 follow-up (Codex P2): the registrar sidebar no longer renders,
+  // so the two shared-clinical destinations from SIDEBAR_PRESETS.registrar
+  // that are not registrar-panel views must keep visible, touch-reachable
+  // in-panel entry points on every registrar route.
+  it('keeps sidebar-clinical destinations reachable via breadcrumb quick links (REG-NS-1)', () => {
+    const breadcrumb = normalizeSource(fs.readFileSync(RegistrarBreadcrumbPath, 'utf8'));
+
+    expect(breadcrumb).toContain('registrar-breadcrumb-quicklinks');
+    expect(breadcrumb).toContain('onNavigateToAppointments');
+    expect(breadcrumb).toContain('onNavigateToPatients');
+    expect(breadcrumb).toContain("tI18n('nav.appointments')");
+    expect(breadcrumb).toContain("tI18n('nav.patients')");
+  });
+
+  it('wires breadcrumb quick links to the shared clinical routes (REG-NS-1)', () => {
+    const source = readRegistrarPanelSource();
+
+    expect(source).toContain("onNavigateToAppointments={() => navigate('/clinical/appointments')}");
+    expect(source).toContain("onNavigateToPatients={() => navigate('/clinical/search')}");
+  });
 });
 
