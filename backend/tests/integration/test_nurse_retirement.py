@@ -44,6 +44,22 @@ def test_roles_enum_has_no_nurse() -> None:
     ]
 
 
+def test_roles_catalog_retires_nurse_spelling() -> None:
+    """Codex review P2 (#3054): the DB-backed role catalog boundary
+    (RoleCreate + /roles/options) must treat Nurse as retired, same as
+    Manager/Receptionist - a hand-created catalog row must not resurrect
+    the spelling into the user-management dropdown mirror."""
+    from app.core.roles import (
+        is_retired_role_spelling,
+        normalize_role_value,
+    )
+
+    assert is_retired_role_spelling("Nurse")
+    assert is_retired_role_spelling("nurse")
+    assert normalize_role_value("Nurse") == "nurse"
+    assert not is_retired_role_spelling("Registrar")
+
+
 def test_staff_roles_and_hierarchy_drop_nurse() -> None:
     from app.core.roles import STAFF_ROLES, get_role_hierarchy
 

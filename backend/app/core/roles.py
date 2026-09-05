@@ -74,13 +74,15 @@ ADMIN_ROLES = {
 # M-2b (Codex review follow-up on #3049): spellings decommissioned from the
 # RBAC vocabulary that must ALSO stay out of the DB-backed role catalog
 # (public.roles / /api/v1/roles). Manager was closed by M-2 (2026-09-05,
-# ops-deactivated tombstone row); Receptionist was closed by E-4
+# ops-deactivated tombstone row); Receptionist was closed by E-4;
+# Nurse was closed by N-3 (2026-09-05, production census found 0 stored
+# rows - the role never shipped as a product surface).
 # (§4.1.27, canonical successor Registrar). The roles-catalog boundary
 # (RoleCreate validation + /roles/options filtering) checks this set so a
 # hand-created catalog row cannot resurrect a retired spelling into the
 # user-management dropdown mirror. Case-insensitive by design (catalog
 # names are free-form strings; 'manager'/'Manager' both match).
-RETIRED_ROLE_SPELLINGS: frozenset[str] = frozenset({"manager", "receptionist"})
+RETIRED_ROLE_SPELLINGS: frozenset[str] = frozenset({"manager", "receptionist", "nurse"})
 
 def is_retired_role_spelling(value: object) -> bool:
     """Case-insensitive check against the retired RBAC vocabulary."""
