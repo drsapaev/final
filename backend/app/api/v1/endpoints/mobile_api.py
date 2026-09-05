@@ -30,6 +30,7 @@ crud_user = importlib.import_module("app.crud.user")
 # functions like get_patient_by_user_id live on the module itself.
 # Use the instance for method calls, import the module functions directly.
 from app.core.config import settings  # PR-29: needed for real expires_in
+from app.core.roles import is_login_blocked_role
 from app.crud import patient as crud_patient  # CRUDPatient instance (for methods)
 from app.crud.patient import get_patient_by_user_id
 from app.db.session import get_db
@@ -130,6 +131,13 @@ def mobile_login(credentials: MobileLoginRequest, db: Session = Depends(get_db))
             )
 
         if not user:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        # QD-1.1 (queue resource role cleanup, Codex round-1): the phone-based
+        # mobile login must reject internal-only sentinel roles exactly like
+        # the web funnels — synthetic queue-resource accounts are structural
+        # non-logins on every credential surface.
+        if is_login_blocked_role(getattr(user, "role", None)):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
         if not credentials.password or not user.hashed_password:
@@ -820,11 +828,13 @@ def list_mobile_doctors(
         # the requested limit allowed more rows.
         if specialty:
             doctors = crud_clinic.get_doctors_by_specialty(
-                db, specialty=specialty, eligible_only=True
+                db, specialty=specialty, eligible_only=True,
+                exclude_internal_only=True,
             )
         else:
             doctors = crud_clinic.get_doctors(
-                db, active_only=True, eligible_only=True
+                db, active_only=True, eligible_only=True,
+                exclude_internal_only=True,
             )
         # Limit
         doctors = doctors[:limit]

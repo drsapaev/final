@@ -255,6 +255,18 @@ class OperationsMixin(UserManagementServiceMixinBase):
                         )
                         continue
 
+                    # QD-1.1 (queue resource role cleanup, Codex round-2):
+                    # sentinel rows are queue machinery, not manageable
+                    # accounts — record the failure and keep the batch going.
+                    from app.core.roles import is_login_blocked_role
+
+                    if is_login_blocked_role(user.role):
+                        failed_count += 1
+                        failed_users.append(
+                            {"user_id": user_id, "error": "Пользователь не найден"}
+                        )
+                        continue
+
                     if action_data.action == "activate":
                         # Codex #3031 round-4 P1: capture the pre-mutation
                         # state — if the shared-mirror catalog guard rejects

@@ -7,6 +7,7 @@ from app.api.v1.endpoints.admin_departments._helpers import (
     _ensure_department_integrations,
     router,
 )  # noqa: F401
+from app.api.v1.endpoints.admin_doctors import _reject_sentinel_linked_doctor  # QD-1.1
 
 
 @router.get("", response_model=dict)
@@ -841,6 +842,11 @@ def assign_doctor_to_department(
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
 
+    # QD-1.1 (queue resource role cleanup, Codex round-4 P2): sentinel-
+    # linked resource rows are read-only — assignment would expose them
+    # through the department doctor list and mutate queue machinery.
+    _reject_sentinel_linked_doctor(db, doctor)
+
     # Назначение
     doctor.department_id = department_id
     db.commit()
@@ -870,6 +876,10 @@ def remove_doctor_from_department(
         raise HTTPException(
             status_code=404, detail="Doctor not found in this department"
         )
+
+    # QD-1.1 (queue resource role cleanup, Codex round-4 P2): sentinel-
+    # linked resource rows are read-only — see the assign handler.
+    _reject_sentinel_linked_doctor(db, doctor)
 
     # Убираем привязку
     doctor.department_id = None

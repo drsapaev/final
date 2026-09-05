@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.core.roles import is_retired_role_spelling
+from app.core.roles import is_internal_only_role_spelling, is_retired_role_spelling
 from app.models.user import User
 from app.schemas.role import (
     RoleCreate,
@@ -94,6 +94,12 @@ async def get_role_options(
         # boundary). Case-insensitive, per the core/roles.py SSOT set.
         for role in roles:
             if is_retired_role_spelling(role.name):
+                continue
+            # QD-1.1 (queue resource role cleanup): internal-only sentinel
+            # spellings are never selectable options — the 'Resource' rows
+            # provisioned by 0055/0056 for doctorless queues are structural
+            # non-logins, not user-management vocabulary.
+            if is_internal_only_role_spelling(role.name):
                 continue
             options.append(RoleOptionResponse(
                 value=role.name,

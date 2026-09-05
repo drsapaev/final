@@ -88,6 +88,30 @@ def is_retired_role_spelling(value: object) -> bool:
     """Case-insensitive check against the retired RBAC vocabulary."""
     return normalize_role_value(value) in RETIRED_ROLE_SPELLINGS
 
+# QD-1.1 (queue resource role cleanup, 2026-09-06): internal-only sentinel
+# spelling for the synthetic queue-resource accounts provisioned by
+# 0055_queue_resource_provisioning (ecg_resource/general_resource seeded
+# with role='Nurse', resurrecting the spelling N-3 had just retired under
+# the verified "0 stored rows" premise; migration 0056 moves the two rows
+# to 'Resource' and restores the Nurse stored-count invariant).
+# 'Resource' is NOT a human/product role: it never joins the Roles enum,
+# the user-management write vocabulary, the roles catalog/options, or any
+# grant list; the auth layer rejects logins for it (structural non-login).
+# Queue machinery is deliberately role-agnostic: QD-0 resolves resource
+# staff by username + is_active, never by role.
+INTERNAL_ONLY_ROLE_SPELLINGS: frozenset[str] = frozenset({"resource"})
+
+
+def is_internal_only_role_spelling(value: object) -> bool:
+    """Case-insensitive check against the internal-only sentinel vocabulary."""
+    return normalize_role_value(value) in INTERNAL_ONLY_ROLE_SPELLINGS
+
+
+def is_login_blocked_role(value: object) -> bool:
+    """Internal-only sentinel roles are structural non-logins (QD-1.1)."""
+    return is_internal_only_role_spelling(value)
+
+
 # Роли врачей
 DOCTOR_ROLES = {
     Roles.DOCTOR,

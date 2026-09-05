@@ -348,6 +348,15 @@ class CoreMixin(UserManagementServiceMixinBase):
             if not user:
                 return False, "Пользователь не найден"
 
+            # QD-1.1 (queue resource role cleanup, Codex round-2): sentinel
+            # rows are queue machinery, not manageable accounts — an admin
+            # who knows the ID must not rename/re-role/deactivate the
+            # synthetic users the doctorless queues resolve by.
+            from app.core.roles import is_login_blocked_role
+
+            if is_login_blocked_role(user.role):
+                return False, "Пользователь не найден"
+
             # Обновляем основные поля
             update_data = user_data.model_dump(exclude_unset=True)
             old_is_active = user.is_active
@@ -493,6 +502,15 @@ class CoreMixin(UserManagementServiceMixinBase):
         try:
             user = db.query(User).filter(User.id == user_id).first()
             if not user:
+                return False, "Пользователь не найден"
+
+            # QD-1.1 (queue resource role cleanup, Codex round-2): sentinel
+            # rows are queue machinery, not manageable accounts — deleting
+            # the synthetic resource users would break the doctorless queue
+            # resolution (username + is_active lookups).
+            from app.core.roles import is_login_blocked_role
+
+            if is_login_blocked_role(user.role):
                 return False, "Пользователь не найден"
 
             if deleted_by == user_id:
@@ -698,6 +716,19 @@ class CoreMixin(UserManagementServiceMixinBase):
         """Поиск пользователей с фильтрацией"""
         try:
             query = db.query(User)
+
+            # QD-1.1 (queue resource role cleanup, Codex round-1): the
+            # user-management listing deliberately hides internal-only
+            # sentinel rows — synthetic queue-resource accounts are queue
+            # machinery, not manageable staff accounts (UserModal would
+            # otherwise offer their unknown role and 422 on every edit).
+            from sqlalchemy import func
+
+            from app.core.roles import INTERNAL_ONLY_ROLE_SPELLINGS
+
+            query = query.filter(
+                func.lower(User.role).notin_(INTERNAL_ONLY_ROLE_SPELLINGS)
+            )
 
             # Фильтр по тексту
             if search_params.query:

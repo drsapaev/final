@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.api.deps import create_access_token
+from app.core.roles import is_login_blocked_role
 from app.core.security import verify_password
 from app.repositories.auth_api_repository import AuthApiRepository
 
@@ -29,6 +30,16 @@ class AuthApiService:
                 detail="Incorrect username or password",
             )
 
+        # QD-1.1 (queue resource role cleanup): internal-only sentinel roles
+        # are structural non-logins — synthetic queue-resource accounts stay
+        # tokenless on this legacy surface too (it has no is_active check
+        # either; the generic 401 keeps the same response shape).
+        if is_login_blocked_role(getattr(user, "role", None)):
+            raise AuthApiDomainError(
+                status_code=401,
+                detail="Incorrect username or password",
+            )
+
         access_token = create_access_token({"sub": user.username})
         return {"access_token": access_token, "token_type": "bearer"}
 
@@ -47,6 +58,14 @@ class AuthApiService:
             raise AuthApiDomainError(
                 status_code=401,
                 detail="Пользователь деактивирован",
+            )
+        # QD-1.1 (queue resource role cleanup): internal-only sentinel roles
+        # are structural non-logins — the role, not the password hash, is
+        # the defense for synthetic queue-resource accounts.
+        if is_login_blocked_role(user.role):
+            raise AuthApiDomainError(
+                status_code=401,
+                detail="Аккаунт технический, вход запрещён",
             )
         if not verify_password(password, user.hashed_password):
             raise AuthApiDomainError(status_code=401, detail="Неверные учетные данные")

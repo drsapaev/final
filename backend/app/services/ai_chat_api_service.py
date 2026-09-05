@@ -10,6 +10,7 @@ import jwt
 from jwt import PyJWTError as JWTError
 from sqlalchemy.orm import Session
 
+from app.core.roles import is_login_blocked_role
 from app.models.user import User
 from app.repositories.ai_chat_api_repository import AIChatApiRepository
 from app.services.ai.chat_service import AIChatService, get_chat_service
@@ -150,4 +151,10 @@ class AIChatApiService:
         except (TypeError, ValueError):
             return None
 
-        return self.repository.get_user(parsed_user_id)
+        user = self.repository.get_user(parsed_user_id)
+        # QD-1.1 (queue resource role cleanup, Codex round-2): internal-only
+        # sentinel roles are structural non-logins — the AI chat WebSocket
+        # must reject their tokens like every HTTP surface.
+        if user is not None and is_login_blocked_role(getattr(user, "role", None)):
+            return None
+        return user

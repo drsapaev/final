@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 # try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
 from app.core.config import settings  # type: ignore
+from app.core.roles import is_login_blocked_role  # QD-1.1 sentinel guard
 
 # import authentication service
 from app.services.authentication_service import get_authentication_service
@@ -348,6 +349,23 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # QD-1.1 (queue resource role cleanup, Codex round-1): internal-only
+    # sentinel roles are structural non-logins — even a hand-minted or
+    # legacy token must not authenticate a synthetic queue-resource
+    # account. This also closes any token that could ever be minted via
+    # the 2FA-exchange surface: a pending 2FA token cannot be issued for
+    # a login-blocked account, and any pre-existing token fails here.
+    if is_login_blocked_role(getattr(user, "role", None)):
+        logger.warning(
+            "[deps.get_current_user] internal-only role rejected (user_id=%s)",
+            user.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

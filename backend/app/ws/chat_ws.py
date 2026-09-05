@@ -27,6 +27,7 @@ from app.core.messaging_contract import (
     build_ws_event_payload,
     is_supported_contract_version,
 )
+from app.core.roles import is_login_blocked_role
 from app.db.session import SessionLocal
 from app.middleware.websocket_rate_limit import websocket_rate_limiter
 from app.models.message import Message
@@ -257,11 +258,20 @@ async def _authenticate_by_token(token: str, db: Session) -> User | None:
         user_id = payload.get("sub")
         if not user_id:
             return None
-        if isinstance(user_id, str) and user_id.isdigit():
-            user_id = int(user_id)
-        elif isinstance(user_id, str):
-            return db.query(User).filter(User.username == user_id).first()
-        return db.query(User).filter(User.id == int(user_id)).first()
+        if isinstance(user_id, str) and not user_id.isdigit():
+            user = db.query(User).filter(User.username == user_id).first()
+        else:
+            user = db.query(User).filter(User.id == int(user_id)).first()
+        # QD-1.1 (queue resource role cleanup, Codex round-2): internal-only
+        # sentinel roles are structural non-logins — the chat WebSocket must
+        # reject their tokens like every HTTP surface.
+        if user is not None and is_login_blocked_role(getattr(user, "role", None)):
+            logger.warning(
+                "Chat WebSocket auth rejected: internal-only role user_id=%s",
+                user.id,
+            )
+            return None
+        return user
     except JWTError as e:
         logger.warning("Chat WebSocket JWT error: %s", e)
         return None

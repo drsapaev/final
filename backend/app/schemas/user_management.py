@@ -545,6 +545,12 @@ class UserAuditLogResponse(UserAuditLogBase):
 # (is_active=false, tombstone preserved for audit — NOT deleted); an admin
 # edit that re-submits role='Manager' 422s by design — the freeze is the
 # permanent enforcement.
+# QD-1.1 (queue resource role cleanup, 2026-09-06): the internal-only
+# 'Resource' sentinel (migration 0056 — synthetic queue-resource rows
+# provisioned by 0055 for doctorless queues) is equally ABSENT: those rows
+# are migration-provisioned only, so create/update/bulk/search all reject
+# the spelling by construction; the freeze is the mechanism, exactly as
+# for Manager.
 _USER_MANAGEMENT_ROLE_PATTERN = (
     "^(Admin|Registrar|Doctor|Cashier|Lab|Patient|"
     "SuperAdmin|"
