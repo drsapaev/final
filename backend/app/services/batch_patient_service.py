@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date as date_type
+from datetime import UTC, date as date_type, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -119,6 +119,9 @@ class BatchPatientService:
 
     def __init__(self, db: Session):
         self.db = db
+        # QF-1: operator attribution thread — set by batch_update from the
+        # endpoint's authenticated user (was a latent always-None getattr).
+        self._actor_user_id: int | None = None
 
     def get_patient_entries_for_date(
         self,
@@ -174,14 +177,22 @@ class BatchPatientService:
         self,
         patient_id: int,
         target_date: date_type,
-        request: BatchUpdateRequest
+        request: BatchUpdateRequest,
+        *,
+        actor_user_id: int | None = None,
     ) -> BatchUpdateResponse:
         """
         Выполняет batch-обновление записей пациента.
 
         Атомарная операция: если хотя бы одно действие не удалось,
         все изменения откатываются.
+
+        QF-1 (operator attribution): the endpoint threads the authenticated
+        user; _update_entry attributes called/served transitions and the
+        visit branches (_BatchActor) finally get a real actor instead of
+        the latent always-None _actor_user_id.
         """
+        self._actor_user_id = actor_user_id
         results: list[EntryResult] = []
 
         try:
@@ -399,6 +410,19 @@ class BatchPatientService:
                 entry.service_code = action.service_code
             if action.status:
                 entry.status = action.status
+                # QF-1 (operator attribution, Codex round-2 P1): a batch
+                # update can set status="called" (documented example) —
+                # the operator who made that call must be attributed, or
+                # real registrar actions would leave durable NULLs.
+                # "served" gets the same treatment for symmetry. None
+                # (unknown actor) keeps NULL — never fabricated.
+                changed_at = datetime.now(UTC)
+                if action.status == "called":
+                    entry.called_at = changed_at
+                    entry.called_by_user_id = self._actor_user_id
+                elif action.status == "served":
+                    entry.served_at = changed_at
+                    entry.served_by_user_id = self._actor_user_id
             return EntryResult(id=action.id, status="updated")
 
         if entry_type == "visit":

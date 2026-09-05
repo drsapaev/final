@@ -54,5 +54,9 @@ class QueueApiService:
     def get_queue_entry(self, entry_id: int):
         return self.repository.get_queue_entry(entry_id)
 
-    def mark_entry_called(self, entry) -> None:
-        self.repository.mark_entry_called(entry)
+    def mark_entry_called(
+        self, entry, *, called_by_user_id: int | None = None
+    ) -> None:
+        self.repository.mark_entry_called(
+            entry, called_by_user_id=called_by_user_id
+        )

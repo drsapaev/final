@@ -182,7 +182,12 @@ async def batch_update_patient_entries(
         )
 
     service = get_batch_patient_service(db)
-    result = service.batch_update(patient_id, target_date, request)
+    # QF-1 (operator attribution, Codex round-2 P1): thread the operator so
+    # batch status updates (e.g. the documented {"action":"update",
+    # "status":"called"} example) attribute the caller.
+    result = service.batch_update(
+        patient_id, target_date, request, actor_user_id=current_user.id
+    )
 
     if not result.success:
         error_detail = result.error or "Batch update failed"

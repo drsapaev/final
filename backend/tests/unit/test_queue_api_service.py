@@ -28,10 +28,12 @@ class TestQueueApiService:
         entry = SimpleNamespace(id=1)
 
         class Repository:
-            def mark_entry_called(self, entry_obj):
+            def mark_entry_called(self, entry_obj, *, called_by_user_id=None):
                 state["called"] = True
                 assert entry_obj is entry
+                # QF-1: the caller id must be threaded through verbatim.
+                assert called_by_user_id == 31
 
         service = QueueApiService(db=None, repository=Repository())
-        service.mark_entry_called(entry)
+        service.mark_entry_called(entry, called_by_user_id=31)
         assert state["called"] is True

@@ -65,7 +65,12 @@ class QueueApiRepository:
             .first()
         )
 
-    def mark_entry_called(self, entry: OnlineQueueEntry) -> None:
+    def mark_entry_called(
+        self, entry: OnlineQueueEntry, *, called_by_user_id: int | None = None
+    ) -> None:
         entry.status = "called"
         entry.called_at = datetime.now()
+        # QF-1 (operator attribution): caller identity threaded from the
+        # endpoint (legacy POST /queue/call/{entry_id}); None keeps NULL.
+        entry.called_by_user_id = called_by_user_id
         self.db.commit()

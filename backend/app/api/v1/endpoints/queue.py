@@ -565,7 +565,8 @@ def call_patient(
         raise HTTPException(status_code=400, detail="Пациент уже вызван или обслужен")
 
     # Обновление статуса
-    queue_api_service.mark_entry_called(entry)
+    # QF-1 (operator attribution): legacy call route threads the caller.
+    queue_api_service.mark_entry_called(entry, called_by_user_id=current_user.id)
 
     # Отправка WebSocket события для табло
     try:
