@@ -32,6 +32,20 @@ class LegacyUserRow:
     created_at: datetime | None
     updated_at: datetime | None
 
+    def __post_init__(self) -> None:
+        """M-2b (Codex review P1 follow-up on #3049): tombstone discipline at
+        the migration boundary. A legacy row carrying the retired 'Manager'
+        spelling is preserved VERBATIM in role (no-alias rule — see
+        _normalize_legacy_role), but its account flags are forced to the
+        tombstone shape: is_active=False (login rejected at the auth layer)
+        and is_superuser=False (a superuser row would bypass every role
+        check, so it must never survive a re-run of this migration).
+        Case-insensitive: any 'manager' spelling matches zero grant lists
+        after M-1D/M-2, so none of them may stay active or privileged."""
+        if self.role.strip().lower() == "manager":
+            object.__setattr__(self, "is_active", False)
+            object.__setattr__(self, "is_superuser", False)
+
 
 @dataclass(frozen=True)
 class MigrationSummary:
@@ -62,7 +76,10 @@ def _normalize_legacy_role(value: Any) -> str:
     data preservation, not a new grant (all Manager privileges were
     removed from the RBAC layer in M-1D, so a migrated row carries zero
     authorization). New 'Manager' writes through the canonical API
-    schemas remain frozen (422).
+    schemas remain frozen (422). M-2b additionally forces the tombstone
+    shape on such rows (is_active=False, is_superuser=False — see
+    LegacyUserRow.__post_init__): the role spelling is preserved for audit,
+    but the account can neither log in nor bypass role checks.
     """
     role = str(value or "").strip()
     if role.lower() == "receptionist":
