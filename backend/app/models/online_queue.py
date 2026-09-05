@@ -196,8 +196,11 @@ class OnlineQueueEntry(Base):
     # - called_by_user_id: who called the patient next. Until QF-1 this was
     #   a TRANSIENT attribute set by QRQueueService.call_next_patient (only
     #   the GraphQL critical-audit path persisted it — Codex round-7 P1);
-    #   as a real column every surface (REST/GQL/Telegram staff path) keeps
-    #   the caller identity.
+    #   as a real column EVERY live call surface keeps the caller identity:
+    #   canonical call-next (REST + GraphQL + Telegram staff_call), the
+    #   doctor-panel /doctor/queue/{id}/call route, the display-board
+    #   call-patient / quick/call-next service, and the legacy
+    #   /queue/call/{id} route (Codex QF-1 round-1 P1 closure).
     # - served_by_user_id / served_at: who completed the entry and when
     #   (complete_patient_visit; timestamp precedent: diagnostics_started_at).
     # Nullable FKs ON DELETE SET NULL: deleting the operator user preserves

@@ -331,6 +331,9 @@ def call_patient(
         changed_at = datetime.now(UTC)
         queue_entry.status = "called"
         queue_entry.called_at = changed_at
+        # QF-1 (operator attribution): the doctor-panel call surface keeps
+        # the caller identity, same as the canonical call-next service.
+        queue_entry.called_by_user_id = current_user.id
         queue_entry.updated_at = changed_at
 
         db.commit()

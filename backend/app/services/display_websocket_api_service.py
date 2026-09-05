@@ -99,6 +99,12 @@ class DisplayWebSocketApiService:
 
         queue_entry.status = "called"
         queue_entry.called_at = datetime.now(UTC)
+        # QF-1 (operator attribution): display-board call surface (covers
+        # POST /display/call-patient and /display/quick/call-next — the
+        # latter delegates here). getattr: current_user is loosely typed
+        # (object) in this service; unknown caller keeps NULL, never
+        # fabricates an attribution.
+        queue_entry.called_by_user_id = getattr(current_user, "id", None)
         self.repository.save()
 
         doctor = queue_entry.queue.specialist

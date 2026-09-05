@@ -348,6 +348,75 @@ def test_rest_call_next_writes_critical_audit_row(client, db_session, test_docto
 
 
 # ---------------------------------------------------------------------------
+# Codex QF-1 round-1 P1 closure: the REMAINING call surfaces
+# (doctor-panel call route, display-board call service, legacy queue call)
+# must persist the caller too — otherwise real operator actions produce
+# durable NULLs despite the column existing.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.queue
+@pytest.mark.integration
+def test_doctor_panel_call_persists_called_by(
+    client, db_session, test_doctor, cardio_auth_headers
+):
+    queue = _make_queue(db_session, test_doctor.id)
+    entry = _make_entry(db_session, queue.id, number=1)
+
+    resp = client.post(
+        f"/api/v1/doctor/queue/{entry.id}/call",
+        headers=cardio_auth_headers,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+    cardio_user_id = (
+        db_session.query(User).filter(User.username == "test_cardio").first().id
+    )
+    called_by, _, _ = _raw_attribution(db_session, entry.id)
+    assert called_by == cardio_user_id
+
+
+@pytest.mark.queue
+@pytest.mark.integration
+def test_display_call_patient_persists_called_by(client, db_session, test_doctor):
+    operator = _create_staff_user(db_session, "qf1_operator_f", "operator-f-pass")
+    headers = _login_headers(client, "qf1_operator_f", "operator-f-pass")
+    queue = _make_queue(db_session, test_doctor.id)
+    entry = _make_entry(db_session, queue.id, number=1)
+
+    resp = client.post(
+        "/api/v1/display/call-patient",
+        json={"entry_id": entry.id, "board_ids": []},
+        headers=headers,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+    called_by, _, _ = _raw_attribution(db_session, entry.id)
+    assert called_by == operator.id
+
+
+@pytest.mark.queue
+@pytest.mark.integration
+def test_legacy_queue_call_persists_called_by(client, db_session, test_doctor):
+    operator = _create_staff_user(db_session, "qf1_operator_g", "operator-g-pass")
+    headers = _login_headers(client, "qf1_operator_g", "operator-g-pass")
+    queue = _make_queue(db_session, test_doctor.id)
+    entry = _make_entry(db_session, queue.id, number=1)
+
+    resp = client.post(
+        f"/api/v1/queue/legacy/call/{entry.id}",
+        headers=headers,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+    called_by, _, _ = _raw_attribution(db_session, entry.id)
+    assert called_by == operator.id
+
+
+# ---------------------------------------------------------------------------
 # RBAC vocabulary untouched (tripwire)
 # ---------------------------------------------------------------------------
 
