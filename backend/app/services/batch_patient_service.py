@@ -53,10 +53,8 @@ _BATCH_CREATE_RESOURCE_MAPPING = {
 # SCHEMAS
 # ============================================================================
 
-
 class EntryAction(BaseModel):
     """Действие над одной записью в batch-операции"""
-
     id: int | None = None  # None для создания новой
     entry_type: EntryActionType | None = None
     action: Literal["update", "cancel", "create"]
@@ -74,7 +72,6 @@ class EntryAction(BaseModel):
 
 class CommonUpdates(BaseModel):
     """Общие обновления для всех записей пациента"""
-
     payment_type: str | None = None
     discount_mode: str | None = None
     approval_status: str | None = None
@@ -83,14 +80,12 @@ class CommonUpdates(BaseModel):
 
 class BatchUpdateRequest(BaseModel):
     """Запрос на batch-обновление записей пациента"""
-
     entries: list[EntryAction] = Field(default_factory=list)
     common_updates: CommonUpdates | None = None
 
 
 class EntryResult(BaseModel):
     """Результат операции над одной записью"""
-
     id: int
     status: Literal["updated", "cancelled", "created", "error"]
     error: str | None = None
@@ -99,7 +94,6 @@ class EntryResult(BaseModel):
 
 class BatchUpdateResponse(BaseModel):
     """Ответ на batch-обновление"""
-
     success: bool
     patient_id: int
     date: str
@@ -112,7 +106,6 @@ class BatchUpdateResponse(BaseModel):
 # ============================================================================
 # SERVICE
 # ============================================================================
-
 
 class BatchPatientService:
     """
@@ -131,7 +124,9 @@ class BatchPatientService:
         self._actor_user_id: int | None = None
 
     def get_patient_entries_for_date(
-        self, patient_id: int, target_date: date_type
+        self,
+        patient_id: int,
+        target_date: date_type
     ) -> dict[str, Any]:
         """
         Получает все записи пациента на указанную дату.
@@ -147,33 +142,27 @@ class BatchPatientService:
             "date": str(target_date),
             "online_queue_entries": [],
             "visits": [],
-            "aggregated": {},
+            "aggregated": {}
         }
 
         # Получаем OnlineQueueEntry
-        online_entries = (
-            self.db.query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.patient_id == patient_id,
-                OnlineQueueEntry.status.notin_(["cancelled", "completed"]),
-            )
-            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-            .filter(DailyQueue.day == target_date)
-            .all()
-        )
+        online_entries = self.db.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.patient_id == patient_id,
+            OnlineQueueEntry.status.notin_(["cancelled", "completed"])
+        ).join(
+            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
+        ).filter(
+            DailyQueue.day == target_date
+        ).all()
 
         result["online_queue_entries"] = online_entries
 
         # Получаем Visit записи
-        visits = (
-            self.db.query(Visit)
-            .filter(
-                Visit.patient_id == patient_id,
-                Visit.visit_date == target_date,
-                Visit.status.notin_(["cancelled"]),
-            )
-            .all()
-        )
+        visits = self.db.query(Visit).filter(
+            Visit.patient_id == patient_id,
+            Visit.visit_date == target_date,
+            Visit.status.notin_(["cancelled"])
+        ).all()
 
         result["visits"] = visits
 
@@ -228,16 +217,16 @@ class BatchPatientService:
                         result = EntryResult(
                             id=entry_action.id or 0,
                             status="error",
-                            error=f"Unknown action: {entry_action.action}",
+                            error=f"Unknown action: {entry_action.action}"
                         )
                     results.append(result)
                 except Exception as e:
                     logger.error(f"Error processing entry {entry_action.id}: {e}")
-                    results.append(
-                        EntryResult(
-                            id=entry_action.id or 0, status="error", error=str(e)
-                        )
-                    )
+                    results.append(EntryResult(
+                        id=entry_action.id or 0,
+                        status="error",
+                        error=str(e)
+                    ))
 
             # Применяем общие обновления ко всем оставшимся записям
             if request.common_updates:
@@ -261,7 +250,7 @@ class BatchPatientService:
                     date=str(target_date),
                     updated_entries=results,
                     error="One or more operations failed",
-                    error_code=first_error_code,
+                    error_code=first_error_code
                 )
 
             # Коммитим транзакцию
@@ -275,7 +264,7 @@ class BatchPatientService:
                 patient_id=patient_id,
                 date=str(target_date),
                 updated_entries=results,
-                aggregated_row=updated_data.get("aggregated"),
+                aggregated_row=updated_data.get("aggregated")
             )
 
         except Exception as e:
@@ -286,7 +275,7 @@ class BatchPatientService:
                 patient_id=patient_id,
                 date=str(target_date),
                 updated_entries=results,
-                error=str(e),
+                error=str(e)
             )
 
     def _cancel_entry(
@@ -308,10 +297,8 @@ class BatchPatientService:
         if error:
             if isinstance(error, dict):
                 return EntryResult(
-                    id=action.id,
-                    status="error",
-                    error=error["message"],
-                    error_code=error.get("code"),
+                    id=action.id, status="error",
+                    error=error["message"], error_code=error.get("code")
                 )
             return EntryResult(id=action.id, status="error", error=error)
 
@@ -363,7 +350,11 @@ class BatchPatientService:
             )
             return EntryResult(id=action.id, status="cancelled")
 
-        return EntryResult(id=action.id, status="error", error="Entry not found")
+        return EntryResult(
+            id=action.id,
+            status="error",
+            error="Entry not found"
+        )
 
     def _update_entry(
         self,
@@ -384,10 +375,8 @@ class BatchPatientService:
         if error:
             if isinstance(error, dict):
                 return EntryResult(
-                    id=action.id,
-                    status="error",
-                    error=error["message"],
-                    error_code=error.get("code"),
+                    id=action.id, status="error",
+                    error=error["message"], error_code=error.get("code")
                 )
             return EntryResult(id=action.id, status="error", error=error)
 
@@ -473,7 +462,11 @@ class BatchPatientService:
                     )
             return EntryResult(id=action.id, status="updated")
 
-        return EntryResult(id=action.id, status="error", error="Entry not found")
+        return EntryResult(
+            id=action.id,
+            status="error",
+            error="Entry not found"
+        )
 
     def _resolve_existing_entry_target(
         self,
@@ -503,14 +496,7 @@ class BatchPatientService:
             return None, None, "Entry not found"
 
         if entry and visit:
-            return (
-                None,
-                None,
-                {
-                    "code": "ambiguous_entry_id",
-                    "message": "Ambiguous entry id; include entry_type",
-                },
-            )
+            return None, None, {"code": "ambiguous_entry_id", "message": "Ambiguous entry id; include entry_type"}
         if entry:
             return "online_queue", entry, None
         if visit:
@@ -523,18 +509,14 @@ class BatchPatientService:
         target_date: date_type,
         action: EntryAction,
     ) -> OnlineQueueEntry | None:
-        return (
-            self.db.query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.id == action.id,
-                OnlineQueueEntry.patient_id == patient_id,
-            )
-            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-            .filter(
-                DailyQueue.day == target_date,
-            )
-            .first()
-        )
+        return self.db.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.id == action.id,
+            OnlineQueueEntry.patient_id == patient_id,
+        ).join(
+            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
+        ).filter(
+            DailyQueue.day == target_date,
+        ).first()
 
     def _find_visit_for_action(
         self,
@@ -542,18 +524,17 @@ class BatchPatientService:
         target_date: date_type,
         action: EntryAction,
     ) -> Visit | None:
-        return (
-            self.db.query(Visit)
-            .filter(
-                Visit.id == action.id,
-                Visit.patient_id == patient_id,
-                Visit.visit_date == target_date,
-            )
-            .first()
-        )
+        return self.db.query(Visit).filter(
+            Visit.id == action.id,
+            Visit.patient_id == patient_id,
+            Visit.visit_date == target_date,
+        ).first()
 
     def _create_entry(
-        self, patient_id: int, target_date: date_type, action: EntryAction
+        self,
+        patient_id: int,
+        target_date: date_type,
+        action: EntryAction
     ) -> EntryResult:
         """Создаёт новую запись"""
         try:
@@ -592,10 +573,17 @@ class BatchPatientService:
                 commit=False,
             )
 
-            return EntryResult(id=created_entry.id, status="created")
+            return EntryResult(
+                id=created_entry.id,
+                status="created"
+            )
         except Exception as e:
             logger.error(f"Failed to create entry: {e}")
-            return EntryResult(id=0, status="error", error=str(e))
+            return EntryResult(
+                id=0,
+                status="error",
+                error=str(e)
+            )
 
     def _get_patient_or_raise(self, patient_id: int) -> Patient:
         patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
@@ -608,13 +596,17 @@ class BatchPatientService:
 
         if action.service_id:
             service = (
-                self.db.query(Service).filter(Service.id == action.service_id).first()
+                self.db.query(Service)
+                .filter(Service.id == action.service_id)
+                .first()
             )
 
         if service is None and action.service_code:
             normalized_code = normalize_service_code(action.service_code)
             candidate_codes = {
-                code for code in {action.service_code, normalized_code} if code
+                code
+                for code in {action.service_code, normalized_code}
+                if code
             }
             service = (
                 self.db.query(Service)
@@ -628,9 +620,7 @@ class BatchPatientService:
             )
 
         if service is None and action.specialty:
-            default_service = get_default_service_by_specialty(
-                self.db, action.specialty
-            )
+            default_service = get_default_service_by_specialty(self.db, action.specialty)
             if default_service:
                 service = (
                     self.db.query(Service)
@@ -732,7 +722,8 @@ class BatchPatientService:
             return int(service_doctor_ids[0])
         if len(service_doctor_ids) > 1:
             raise ValueError(
-                "Неоднозначный владелец очереди по услугам " f"(queue_tag={queue_tag})"
+                "Неоднозначный владелец очереди по услугам "
+                f"(queue_tag={queue_tag})"
             )
 
         resource_username = _BATCH_CREATE_RESOURCE_MAPPING.get(queue_tag)
@@ -764,8 +755,7 @@ class BatchPatientService:
             doctor
             for doctor in self.db.query(Doctor).filter(Doctor.active == True).all()
             if (doctor.specialty or "").strip().lower() in specialty_candidates
-            or normalize_specialty((doctor.specialty or "").strip())
-            in specialty_candidates
+            or normalize_specialty((doctor.specialty or "").strip()) in specialty_candidates
         ]
 
         if len(matching_doctors) == 1:
@@ -824,35 +814,32 @@ class BatchPatientService:
         ]
 
     def _apply_common_updates(
-        self, patient_id: int, target_date: date_type, updates: CommonUpdates
+        self,
+        patient_id: int,
+        target_date: date_type,
+        updates: CommonUpdates
     ) -> None:
         """Применяет общие обновления ко всем записям пациента за день"""
         # Обновляем OnlineQueueEntry
-        entries = (
-            self.db.query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.patient_id == patient_id,
-                OnlineQueueEntry.status.notin_(["cancelled", "completed"]),
-            )
-            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-            .filter(DailyQueue.day == target_date)
-            .all()
-        )
+        entries = self.db.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.patient_id == patient_id,
+            OnlineQueueEntry.status.notin_(["cancelled", "completed"])
+        ).join(
+            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
+        ).filter(
+            DailyQueue.day == target_date
+        ).all()
 
         for entry in entries:
             if updates.notes:
                 entry.notes = updates.notes
 
         # Обновляем Visit записи
-        visits = (
-            self.db.query(Visit)
-            .filter(
-                Visit.patient_id == patient_id,
-                Visit.visit_date == target_date,
-                Visit.status.notin_(["cancelled"]),
-            )
-            .all()
-        )
+        visits = self.db.query(Visit).filter(
+            Visit.patient_id == patient_id,
+            Visit.visit_date == target_date,
+            Visit.status.notin_(["cancelled"])
+        ).all()
 
         for visit in visits:
             if updates.payment_type:
@@ -866,11 +853,13 @@ class BatchPatientService:
         self,
         online_entries: list[OnlineQueueEntry],
         visits: list[Visit],
-        patient_id: int,
+        patient_id: int
     ) -> dict[str, Any]:
         """Агрегирует данные из разных источников в единую структуру"""
         # Получаем данные пациента
-        patient = self.db.query(Patient).filter(Patient.id == patient_id).first()
+        patient = self.db.query(Patient).filter(
+            Patient.id == patient_id
+        ).first()
 
         services = []
         queue_numbers = []
@@ -887,37 +876,33 @@ class BatchPatientService:
             queue_tag = getattr(entry, "queue_tag", None)
             if queue_tag is None and getattr(entry, "queue", None):
                 queue_tag = entry.queue.queue_tag
-            queue_numbers.append(
-                {
-                    "id": entry.id,
-                    "number": entry.number,
-                    "queue_tag": queue_tag,
-                    "status": entry.status,
-                    "queue_time": (
-                        entry.queue_time.isoformat() if entry.queue_time else None
-                    ),  # ⭐ FIX 13
-                }
-            )
+            queue_numbers.append({
+                "id": entry.id,
+                "number": entry.number,
+                "queue_tag": queue_tag,
+                "status": entry.status,
+                "queue_time": entry.queue_time.isoformat() if entry.queue_time else None  # ⭐ FIX 13
+            })
 
         # Собираем данные из Visit
         for visit in visits:
             if hasattr(visit, 'service') and visit.service:
-                services.append(
-                    visit.service.code
-                    if hasattr(visit.service, 'code')
-                    else str(visit.service_id)
-                )
+                services.append(visit.service.code if hasattr(visit.service, 'code') else str(visit.service_id))
             if hasattr(visit, 'cost') and visit.cost:
                 total_cost += visit.cost
 
         return {
             "patient_id": patient_id,
-            "patient_fio": (patient.short_name() if patient else ""),
+            "patient_fio": (
+                patient.short_name()
+                if patient
+                else ""
+            ),
             "patient_phone": patient.phone if patient else "",
             "services": list(set(services)),  # Unique
             "queue_numbers": queue_numbers,
             "total_cost": total_cost,
-            "entry_count": len(online_entries) + len(visits),
+            "entry_count": len(online_entries) + len(visits)
         }
 
 
