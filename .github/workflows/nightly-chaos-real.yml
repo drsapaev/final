@@ -312,6 +312,9 @@ jobs:
           )
           echo "S3_ADMIN_USERS=$USERS" >> "$GITHUB_ENV"
           [ "$USERS" -le 1 ] || { echo "❌ seed duplicated admin users: $USERS"; exit 1; }
+          # Contract: seed idempotent — re-run on the fresh container so the
+          # seeded user exists for the k6 smoke stage.
+          python -m app.scripts.dev_seed --confirm-dev-seed
           cd tests/load
           k6 run k6-queue-load.js --stage 30s:10 --env BASE_URL=http://127.0.0.1:18000 --env TEST_JWT="${TEST_JWT}" --env SPECIALIST_ID="${SPECIALIST_ID}" --out json=/tmp/s3-k6.json > /tmp/s3-k6.log 2>&1
           ERRORS=$(grep -oE '"value":[0-9.]+' /tmp/s3-k6.json | tail -1)
