@@ -4,9 +4,12 @@
  * (grid template, column gap, padding, height, overflow, radius) lives ONLY
  * there — this file keeps the non-conflicting shell (sticky positioning)
  * plus the responsive visibility utilities that inline styles cannot express.
- * P2-5: the dead .hdr-btn*/.hdr-select/.hdr-title/.hdr-logo layer (zero TSX
- * usage since the ui/macos Button migration) was removed together with the
- * media-block remnants that inline styles had already been overriding. */
+ * P2-5: the dead hdr-btn family, hdr-select, hdr-title and hdr-logo layers
+ * (zero TSX usage since the ui/macos Button migration) were removed together
+ * with the media-block remnants that inline styles had already overridden.
+ * Comment-safety note (Codex round 1): never write a slash directly before
+ * the asterisk chain in prose — a stray terminator silently kills the next
+ * CSS rule (the .app-header sticky rule was being discarded that way). */
 
 .app-header {
   position: sticky;
