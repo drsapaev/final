@@ -169,6 +169,7 @@ jobs:
 
       - name: S1 — evaluate contract assertions
         id: s1_eval
+        working-directory: backend
         continue-on-error: true
         run: |
           python tests/load/chaos_eval.py \
@@ -260,8 +261,14 @@ jobs:
         run: |
           kill -9 $(cat /tmp/uvicorn.pid) 2>/dev/null || true
           docker stop "$(docker ps -aqf name=postgres)" && docker rm "$(docker ps -aqf name=postgres)"
-          # cold start: same bring-up, volume-preserved database
+          # Cold start = FRESH postgres container (contract: no volume
+          # carry-over) + the same credentials/port the job was given.
+          docker run -d --name postgres-cold             -e POSTGRES_DB=clinicdb -e POSTGRES_USER=clinic             -e POSTGRES_PASSWORD=clinic_ci_only_password             -p 5432:5432 postgres:16
           cd backend
+          for i in $(seq 1 30); do
+            docker exec postgres-cold pg_isready -U clinic -d clinicdb >/dev/null 2>&1 && break
+            sleep 2
+          done
           python - <<'PY'
           import os, time
           from sqlalchemy import create_engine, text
