@@ -1,26 +1,34 @@
-"""M-1 (Manager deprecation) — security regression suite.
+"""M-1/M-2 (Manager deprecation → vocabulary closure) — security regression suite.
 
 Verdict driving this suite (production inventory 2026-09-03): Manager is a
-deprecated legacy/synthetic role. Production carries exactly ONE 'Manager'
-row — the automated nightly-smoke account (smoke_manager, id=20, active,
-known automated password). Zero real human Manager users exist.
+deprecated legacy/synthetic role. Production carried exactly ONE 'Manager'
+row — the automated nightly-smoke account (smoke_manager, id=20). Zero
+real human Manager users exist.
 
-Security invariant under test (M-1 goal): after deploy and BEFORE the ops
-cleanup, even someone holding the smoke_manager credentials authenticates
-but receives ZERO Manager privileges — authorization is denied everywhere
-the role used to be granted.
+Lifecycle: M-1 froze writes and collapsed every grant (privilege-zero);
+the ops step DEACTIVATED the row on 2026-09-04 (is_active=false, login
+rejected at the auth layer, tombstone preserved — DEACTIVATE, not DELETE);
+M-2 (2026-09-05) closed the vocabulary: the Roles.MANAGER enum member and
+the read/filter compatibility entry are GONE.
+
+Security invariant under test (M-2 goal): the deprecated spelling is now
+absent from every code surface, while the stored tombstone row stays
+readable (raw String column, str serialization) and harmless — even a
+stored 'Manager' row authorizes nothing.
 
 Covers:
-- M-1D deny matrix: webhooks (CUD + activate/deactivate/test/bulk/trigger),
-  refund-requests (incl. process = money movement), advanced/financial
-  analytics family, system monitoring + backup metadata reads, historical
-  reports, equipment/cloud-printing statistics.
+- M-1D deny matrix (still pinned): webhooks (CUD + activate/deactivate/
+  test/bulk/trigger), refund-requests (incl. process = money movement),
+  advanced/financial analytics family, system monitoring + backup metadata
+  reads, historical reports, equipment/cloud-printing statistics.
 - Grant preservation: Admin / Cashier / Registrar / Doctor keep their live
   product contracts unchanged (no compensation widening happened).
-- M-1C write-freeze: create/update/bulk role='Manager' 422 at the schema
-  boundary; read/filter surfaces still accept the legacy spelling.
-- M-1E enum compat: Roles.MANAGER still exists (read compat until M-2),
-  but is no longer an ADMIN_ROLES member.
+- M-1C write-freeze (still pinned): create/update/bulk role='Manager' 422
+  at the schema boundary.
+- M-2 vocabulary closure: the filter surface rejects 'Manager' too (422),
+  the enum has no MANAGER member, the hierarchy scores the raw string 0.
+- M-2 tombstone compat: a stored 'Manager' row serializes as plain str
+  (readable by id — the audit row survives the enum removal).
 - M-1A/M-1B source contracts: nightly smoke repointed; ensure_smoke_users
   does not provision/pin smoke_manager and never touches a legacy row.
 - Migration decision: legacy 'Manager' rows are preserved verbatim (no
@@ -51,8 +59,11 @@ def _auth(token: str) -> dict:
 
 @pytest.fixture
 def manager_user(db_session: Session) -> User:
-    """A stored 'Manager' row — same shape as the legacy production
-    smoke_manager account (auth still works, authorization must not)."""
+    """A stored 'Manager' tombstone row — same shape as the legacy production
+    smoke_manager account AFTER the ops deactivation (2026-09-04): role
+    string preserved, account inactive, is_superuser=False. Tokens minted
+    directly still probe authorization (login itself is dead in production,
+    the deny matrix must hold regardless)."""
     user = db_session.query(User).filter(User.username == "m1_manager_probe").first()
     if user:
         return user
@@ -62,7 +73,7 @@ def manager_user(db_session: Session) -> User:
         full_name="M-1 Manager Probe",
         hashed_password=get_password_hash("managerprobe123"),
         role="Manager",
-        is_active=True,
+        is_active=False,
         is_superuser=False,
     )
     db_session.add(user)
@@ -507,31 +518,79 @@ def test_canonical_roles_unaffected_by_freeze(
     assert response.status_code in (200, 201), response.text[:300]
 
 
-def test_users_role_filter_still_accepts_manager(
+def test_users_role_filter_rejects_manager(
     client: TestClient, admin_headers_fixture: dict
 ) -> None:
-    """Read compatibility: ?role=Manager stays a valid QUERY (legacy rows
-    remain visible/queryable until the ops deactivation). 200, not 422."""
+    """M-2 vocabulary closure on the READ surface: ?role=Manager now 422s.
+    The ops deactivation (2026-09-04) closed the E-4-style compatibility
+    window — no live caller needs to query by the deprecated spelling."""
     response = client.get(
         "/api/v1/users/users", headers=admin_headers_fixture, params={"role": "Manager"}
     )
+    assert response.status_code == 422, response.text[:300]
+
+
+def test_tombstone_manager_row_still_serializes(
+    client: TestClient, admin_headers_fixture: dict, manager_user: User
+) -> None:
+    """M-2 read compat at the DATA level: the stored tombstone row (raw
+    'Manager' string in a String(20) column, is_active=false) survives the
+    enum removal — UserResponse.role is a plain str, so an Admin search by
+    username still returns the row with its historical role spelling and
+    the audit history stays visible. Authorization is unaffected: the row
+    is deactivated and its role string matches no grant list.
+    (GET /users/{id}/profile is NOT a usable probe here: that route uses
+    the request-state auth family, a pre-existing surface with no
+    middleware feeding request.state.user_id — unrelated to M-2.)"""
+    response = client.get(
+        "/api/v1/users/users",
+        headers=admin_headers_fixture,
+        params={"query": "m1_manager_probe"},
+    )
     assert response.status_code == 200, response.text[:300]
+    body = response.json()
+    rows = [u for u in body.get("users", []) if u.get("id") == manager_user.id]
+    assert rows, body[:300]
+    row = rows[0]
+    assert row["role"] == "Manager"
+    assert row["is_active"] is False
+    assert row["is_superuser"] is False
 
 
-# ===================== M-1E: ENUM COMPAT + ADMIN_ROLES =====================
+# ===================== M-2: ENUM CLOSURE + ADMIN_ROLES =====================
 
 
-def test_roles_enum_still_defines_manager_but_not_admin_role() -> None:
-    """Roles.MANAGER survives (read compatibility until M-2 + ops cleanup),
-    but is no longer a member of ADMIN_ROLES / is_admin_role()."""
-    from app.core.roles import ADMIN_ROLES, Roles, is_admin_role
+def test_roles_enum_has_no_manager_member() -> None:
+    """M-2 closure: the Roles enum no longer admits the deprecated spelling.
+    Lookup by value raises, the vocabulary is exactly the canonical set, and
+    the hierarchy scores a raw 'Manager' string 0 (canonical-only table —
+    the same treatment E-4 gave Receptionist's level 3)."""
+    import pytest as _pytest
 
-    assert Roles.MANAGER.value == "Manager"  # enum kept (M-1E)
-    assert Roles.MANAGER not in ADMIN_ROLES
-    assert not is_admin_role(Roles.MANAGER)
+    from app.core.roles import ADMIN_ROLES, Roles, get_role_hierarchy, is_admin_role
+
+    assert not hasattr(Roles, "MANAGER")
+    with _pytest.raises(ValueError):
+        Roles("Manager")
+    assert [r.value for r in Roles] == [
+        "Admin",
+        "Registrar",
+        "Doctor",
+        "Lab",
+        "Cashier",
+        "cardio",
+        "derma",
+        "dentist",
+        "Nurse",
+        "Patient",
+        "SuperAdmin",
+    ]
+    assert get_role_hierarchy("Manager") == 0
     # live admin-family roles unchanged
     assert Roles.ADMIN in ADMIN_ROLES
     assert Roles.SUPER_ADMIN in ADMIN_ROLES
+    assert len(ADMIN_ROLES) == 2
+    assert not is_admin_role("Manager")
 
 
 # ===================== M-1A / M-1B: SOURCE CONTRACTS =====================
@@ -685,17 +744,15 @@ def test_legacy_migration_preserves_manager_verbatim() -> None:
 # ===================== ROLE PATTERN CONTRACT =====================
 
 
-def test_role_vocabulary_write_vs_read_split() -> None:
-    """The write vocabulary rejects 'Manager'; the read/filter vocabulary
-    still accepts it (legacy reads temporarily accepted, canonical writes
-    only)."""
-    from app.schemas.user_management import (
-        _USER_MANAGEMENT_ROLE_FILTER_PATTERN,
-        _USER_MANAGEMENT_ROLE_PATTERN,
-    )
+def test_role_vocabulary_write_and_read_unified() -> None:
+    """M-2 closure: there is no separate read/filter vocabulary anymore —
+    'Manager' is rejected by the ONE shared pattern on both the write and
+    the query surfaces (the compatibility window closed with the ops
+    deactivation, E-4 precedent)."""
+    from app.schemas import user_management as um
 
-    assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "Manager")
-    assert re.match(_USER_MANAGEMENT_ROLE_FILTER_PATTERN, "Manager")
+    assert not hasattr(um, "_USER_MANAGEMENT_ROLE_FILTER_PATTERN")
+    assert not re.match(um._USER_MANAGEMENT_ROLE_PATTERN, "Manager")
     # canonical vocabulary unaffected
     for role in ("Admin", "Registrar", "Doctor", "Cashier", "SuperAdmin"):
-        assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, role), role
+        assert re.match(um._USER_MANAGEMENT_ROLE_PATTERN, role), role

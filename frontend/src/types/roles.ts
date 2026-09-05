@@ -12,7 +12,12 @@ export type BackendRole =
   | 'Doctor'
   | 'Lab'
   | 'Cashier'
-  | 'Manager'
+  // M-2 (Manager vocabulary closure, 2026-09-05): 'Manager' removed —
+  // mirrors backend core/roles.py. The single stored row (smoke_manager,
+  // id=20) was deactivated by ops (is_active=false); the tombstone keeps
+  // role='Manager' as a raw string, which no longer matches this union —
+  // acceptable because the account cannot log in and the frontend has
+  // zero 'manager' role-key surfaces (registry/sidebar/homeForRoles).
   | 'cardio'
   | 'derma'
   | 'dentist'
@@ -72,7 +77,8 @@ export const ROLE_LEVEL: Readonly<Record<BackendRole, number>> = {
   cardio: 7,
   derma: 7,
   dentist: 7,
-  Manager: 8,
+  // M-2: Manager: 8 retired with the spelling (mirrors backend
+  // get_role_hierarchy, which now scores a raw 'Manager' string 0).
   Admin: 9,
   SuperAdmin: 10,
 } as const;
@@ -100,7 +106,9 @@ export function isBackendRole(value: unknown): value is BackendRole {
     typeof value === 'string' &&
     (
       value === 'Admin' || value === 'Registrar' || value === 'Doctor' ||
-      value === 'Lab' || value === 'Cashier' || value === 'Manager' ||
+      value === 'Lab' || value === 'Cashier' ||
+      // M-2: 'Manager' removed from the guard — the deprecated spelling
+      // fails the type guard (mirrors the backend enum closure).
       value === 'cardio' || value === 'derma' || value === 'dentist' ||
       value === 'Nurse' || value === 'Patient' ||
       value === 'SuperAdmin'
