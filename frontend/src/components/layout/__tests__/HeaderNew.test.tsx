@@ -239,10 +239,14 @@ describe('HeaderNew chrome (HDR-FX-1)', () => {
     expect(screen.getByText('99+')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('unread badge renders nothing when the count is zero (P2-2)', () => {
+  it('unread badge renders nothing when the count is zero, but the live region stays mounted (P2-2, Codex round 3)', () => {
     unreadState.count = 0;
     renderHeader({ role: 'Admin', path: '/admin' });
+    // The badge is gone...
     expect(screen.queryByText('99+')).not.toBeInTheDocument();
+    // ...while the live region remains mounted and reports the zero count,
+    // so 1 -> 0 transitions are announced (region insertion would not be).
+    expect(screen.getByRole('status')).toHaveTextContent('Непрочитанных: 0');
   });
 
   it('registrar CTA renders on every registrar surface and dispatches the wizard event in place (P2-4)', () => {

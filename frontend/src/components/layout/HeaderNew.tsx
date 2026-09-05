@@ -437,13 +437,13 @@ export default function HeaderNew() {
       {/* 2.6) Уведомления — global notification bell, opens inbox via context */}
       {user &&
         <div style={{ flex: '0 0 auto' }}>
-          {/* HDR-FX-1 (P2-2): the real count is announced through this polite
-              live region; it stays OUTSIDE the button (see bellCount note). */}
-          {bellCount > 0 &&
-            <span role="status" className="sr-only">
-              {t('legacy.hn_notifications_unread', { count: bellCount })}
-            </span>
-          }
+          {/* HDR-FX-1 (P2-2 + Codex round 3): the live region stays MOUNTED
+              for every count including zero — assistive tech announces text
+              mutations inside an existing region, not region insertion, so
+              conditional mounting would silence both boundary transitions. */}
+          <span role="status" className="sr-only">
+            {t('legacy.hn_notifications_unread', { count: bellCount })}
+          </span>
           <Button
             variant="ghost"
             size="small"
