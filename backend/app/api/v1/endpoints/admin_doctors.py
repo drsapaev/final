@@ -5,12 +5,16 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.core.roles import DOCTOR_ROLES
+from app.core.roles import (
+    DOCTOR_ROLES,
+    INTERNAL_ONLY_ROLE_SPELLINGS,
+    is_login_blocked_role,
+)
 from app.core.security import require_roles
 from app.core.specialties import specialty_variants
 from app.crud import clinic as crud_clinic
@@ -167,6 +171,12 @@ def get_doctors(
         doctors = crud_clinic.get_doctors(
             db, skip=skip, limit=limit, active_only=active_only
         )
+        # QD-1.1 (queue resource role cleanup, Codex round-3 P1): synthetic
+        # queue-resource Doctor rows (sentinel owners) are hidden — they
+        # are queue machinery, not manageable staff profiles.
+        sentinel_owner_ids = _sentinel_linked_doctor_ids(db)
+        if sentinel_owner_ids:
+            doctors = [d for d in doctors if d.user_id not in sentinel_owner_ids]
         if specialty:
             # D-1 canonical vocabulary: any dental-family spelling finds
             # every family row (Codex round-5 P2 — the exact comparison
@@ -407,7 +417,41 @@ def get_doctor(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Врач с ID {doctor_id} не найден",
         )
+    # QD-1.1 (queue resource role cleanup, Codex round-3 P1): sentinel-linked
+    # resource rows answer 404 on the single-record surface too (hidden from
+    # the list, read-only by mutation guards).
+    _reject_sentinel_linked_doctor(db, doctor)
     return _serialize_doctor(db, doctor)
+
+
+def _sentinel_linked_doctor_ids(db: Session) -> set[int]:
+    """QD-1.1 (queue resource role cleanup, Codex round-3 P1): user ids
+    carrying internal-only sentinel roles — the owners of the synthetic
+    queue-resource Doctor profiles provisioned by 0055."""
+    return {
+        row[0]
+        for row in db.query(User.id)
+        .filter(func.lower(User.role).in_(INTERNAL_ONLY_ROLE_SPELLINGS))
+        .all()
+    }
+
+
+def _reject_sentinel_linked_doctor(db: Session, doctor) -> None:
+    """QD-1.1 (queue resource role cleanup, Codex round-3 P1): Doctor rows
+    linked to internal-only sentinel users are queue machinery, not
+    manageable staff profiles — an ordinary admin-panel mutation
+    (deactivate/reassign/delete) would break the username+is_active queue
+    resolution, and the ghost-state guard would then BLOCK reactivation
+    ('Resource' is not a doctor-family role). They are read-only at this
+    boundary and answer 404, like the hidden user-management rows."""
+    if doctor is None or doctor.user_id is None:
+        return
+    user = db.query(User).filter(User.id == doctor.user_id).first()
+    if user is not None and is_login_blocked_role(getattr(user, "role", None)):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Врач с ID {doctor.id} не найден",
+        )
 
 
 def _validate_linked_owner_allows_active(
@@ -604,6 +648,11 @@ def update_doctor(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Врач с ID {doctor_id} не найден",
             )
+        # QD-1.1 (queue resource role cleanup, Codex round-3 P1): sentinel-
+        # linked resource rows are read-only — deactivation would break the
+        # doctorless queue resolution and the ghost-state guard would then
+        # block reactivation ('Resource' is not a doctor-family role).
+        _reject_sentinel_linked_doctor(db, existing_doctor)
 
         if (
             doctor.user_id
@@ -770,6 +819,11 @@ def delete_doctor(
 ):
     """Удалить врача (мягкое удаление)."""
     try:
+        # QD-1.1 (queue resource role cleanup, Codex round-3 P1): sentinel-
+        # linked resource rows are read-only (soft-deleting/deactivating them
+        # would break the doctorless queue resolution).
+        existing_doctor = crud_clinic.get_doctor_by_id(db, doctor_id)
+        _reject_sentinel_linked_doctor(db, existing_doctor)
         success = crud_clinic.delete_doctor(db, doctor_id)
         if not success:
             raise HTTPException(

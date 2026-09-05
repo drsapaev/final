@@ -788,3 +788,97 @@ def test_user_management_mutations_reject_sentinel(
     db_session.expire_all()
     assert db_session.get(User, sentinel.id).is_active is True
     assert db_session.get(User, control.id).is_active is False
+
+
+# ============ Codex round-3: admin Doctor surface + standalone queue WS ============
+
+
+def test_admin_doctor_surface_readonly_for_sentinel(
+    client: TestClient, admin_auth_headers: dict, db_session: Session
+) -> None:
+    """Codex round-3 P1: the synthetic queue-resource Doctor rows are hidden
+    from the admin list and read-only by ID (404 on GET/PUT/DELETE) — an
+    ordinary admin action must not break the doctorless queue resolution,
+    and the ghost-state guard must not trap the row in a dead state
+    ('Resource' is not a doctor-family role, so deactivation could never
+    be reactivated)."""
+    from app.models.clinic import Doctor
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="qd11_doc_resource", role="Resource", password=probe_password
+    )
+    control_user = _make_user(
+        db_session, username="qd11_doc_doctor", role="Doctor", password=probe_password
+    )
+    sentinel_doctor = Doctor(user_id=sentinel.id, specialty="ecg", active=True)
+    control_doctor = Doctor(user_id=control_user.id, specialty="cardio", active=True)
+    db_session.add_all([sentinel_doctor, control_doctor])
+    db_session.commit()
+    db_session.refresh(sentinel_doctor)
+    db_session.refresh(control_doctor)
+
+    response = client.get("/api/v1/admin/doctors", headers=admin_auth_headers)
+    assert response.status_code == 200, (response.status_code, response.text[:300])
+    listed_ids = {d["id"] for d in response.json()}
+    assert sentinel_doctor.id not in listed_ids
+    assert control_doctor.id in listed_ids
+
+    response = client.get(
+        f"/api/v1/admin/doctors/{sentinel_doctor.id}", headers=admin_auth_headers
+    )
+    assert response.status_code == 404
+
+    response = client.put(
+        f"/api/v1/admin/doctors/{sentinel_doctor.id}",
+        headers=admin_auth_headers,
+        json={"active": False},
+    )
+    assert response.status_code == 404, (response.status_code, response.text[:300])
+
+    response = client.delete(
+        f"/api/v1/admin/doctors/{sentinel_doctor.id}", headers=admin_auth_headers
+    )
+    assert response.status_code == 404, (response.status_code, response.text[:300])
+
+    db_session.expire_all()
+    survivor = db_session.get(Doctor, sentinel_doctor.id)
+    assert survivor is not None and survivor.active is True
+
+
+def test_queue_ws_auth_ok_rejects_sentinel(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Codex round-3 P2: the standalone /ws/queue stream routes through the
+    shared sentinel-rejecting resolver (previously _auth_ok validated only
+    the JWT signature + blacklist without resolving the user)."""
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services.authentication_service import authentication_service
+    from app.ws.queue_ws import _auth_ok
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="qd11_qws_resource", role="Resource", password=probe_password
+    )
+    control = _make_user(
+        db_session, username="qd11_qws_registrar", role="Registrar", password=probe_password
+    )
+
+    monkeypatch.delenv("TESTING", raising=False)
+    # bind the resolver's ad-hoc sessions to the SAME connection so they see
+    # this test's savepoint-nested rows
+    monkeypatch.setattr(
+        "app.db.session.SessionLocal",
+        sessionmaker(bind=db_session.get_bind()),
+    )
+
+    sentinel_token = authentication_service.create_access_token(
+        {"sub": str(sentinel.id), "role": sentinel.role}
+    )
+    control_token = authentication_service.create_access_token(
+        {"sub": str(control.id), "role": control.role}
+    )
+
+    assert _auth_ok({"authorization": f"Bearer {sentinel_token}"}, None) is False
+    assert _auth_ok({"authorization": f"Bearer {control_token}"}, None) is True
