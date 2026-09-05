@@ -14,11 +14,15 @@
     processes, restarting, or mutating git state.
 
     Modes (mutually exclusive, Deploy is the default):
-      -Deploy          sync main with origin/main (ff-only) + restart runtime.
+      -Deploy          sync main with origin/main (ff-only), apply pending
+                       database migrations (alembic upgrade head), restart
+                       runtime. -SkipMigrations skips the alembic step for
+                       a deliberate code-only deploy.
       -RestartRuntime  restart the CURRENTLY DEPLOYED runtime only — no git
-                       fetch/pull/mutation. This is the only mode a watchdog
-                       may call (it must never deploy).
-      -CheckOnly       run the guards only; nothing is fetched or restarted.
+                       fetch/pull/mutation, no migrations. This is the only
+                       mode a watchdog may call (it must never deploy).
+      -CheckOnly       run the guards only; nothing is fetched, migrated,
+                       or restarted.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\deploy_restart.ps1 -CheckOnly
@@ -29,7 +33,8 @@
 param(
     [switch]$CheckOnly,
     [switch]$RestartRuntime,
-    [switch]$Deploy
+    [switch]$Deploy,
+    [switch]$SkipMigrations
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,7 +96,7 @@ try {
     Set-Location -LiteralPath $MainTree
 
     # --- Guard 1: main tree is on main (ENFORCED FOR EVERY MODE) -------------
-    # The runtime is launched from C:inalackend, so a watchdog restart
+    # The runtime is launched from C:\final\backend, so a watchdog restart
     # while the tree sits on a feature branch would deploy unreviewed code.
     # Only the clean-tree and sync checks are relaxed for -RestartRuntime.
     $branch = (& git branch --show-current)
@@ -124,7 +129,12 @@ try {
         $local = (& git rev-parse HEAD)
         $remote = (& git rev-parse origin/main)
         if ($local -ne $remote) {
+            # EAP=Continue around native 2>&1: with EAP='Stop' the first
+            # stderr line of git becomes a terminating NativeCommandError.
+            $prevEap = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
             & git merge --ff-only origin/main 2>&1 | Out-Null
+            $ErrorActionPreference = $prevEap
             if ($LASTEXITCODE -ne 0) { Fail "fast-forward to origin/main failed - resolve (untracked collisions, divergence) manually. This script never loops." }
             $local = (& git rev-parse HEAD)
             $remote = (& git rev-parse origin/main)
@@ -142,6 +152,40 @@ try {
         }
         Write-Host 'deploy_restart: prechecks passed (CheckOnly - no restart performed).'
         exit 0
+    }
+
+    $backendDir = Join-Path $MainTree 'backend'
+    $python = Join-Path $backendDir '.venv\Scripts\python.exe'
+    if (-not (Test-Path $python)) { Fail "backend venv python not found at $python." }
+
+    # --- Database migrations: Deploy only --------------------------------------
+    # Applied while the OLD runtime is stopped and the NEW one has not
+    # started: production code and schema never disagree in service. A
+    # failed migration rolls back (transactional DDL) and the Fail path
+    # leaves prod down-but-consistent for manual resolution - never
+    # half-deployed. Missed on 2026-09-05: code shipped referencing
+    # queue_entries.called_by_user_id before 0054 ran, and
+    # /registrar/queues/today 500-ed for every registrar until the
+    # migration was applied by hand.
+    if (-not $SkipMigrations) {
+        Write-Host 'deploy_restart: applying database migrations (alembic upgrade head)...'
+        $alembic = Join-Path (Join-Path $backendDir '.venv\Scripts') 'alembic.exe'
+        Push-Location $backendDir
+        try {
+            # EAP=Continue around native 2>&1: alembic writes its INFO logs to
+            # stderr, and with EAP='Stop' the first one would be a terminating
+            # NativeCommandError before any migration output is visible.
+            $prevEap = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            & $alembic upgrade head 2>&1 | ForEach-Object { Write-Host "alembic: $_" }
+            $alembicExit = $LASTEXITCODE
+            $ErrorActionPreference = $prevEap
+            if ($alembicExit -ne 0) {
+                Fail 'alembic upgrade head failed - resolve manually, then re-run deploy. The runtime was not restarted.'
+            }
+        } finally {
+            Pop-Location
+        }
     }
 
     # --- Stop current uvicorn -------------------------------------------------
