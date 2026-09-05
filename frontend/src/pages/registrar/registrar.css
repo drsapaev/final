@@ -566,32 +566,25 @@
   padding: 0;
 }
 
-/* REG-NS-1 follow-up: sidebar replacements — quick links to the shared
-   clinical destinations (Appointments, patient search), right-aligned in
-   the breadcrumb row, visible on every registrar route and viewport. */
+/* REG-NS-1 follow-up: container + padding override for the sidebar-
+   replacement quick links (Appointments, patient search), right-aligned
+   in the breadcrumb row. Colors/borders come from the existing
+   registrar-breadcrumb-link utility — this rule only positions the
+   cluster and adds a touch-sized hit area (kept free of new var() token
+   usages on purpose: UI baseline ratchet varUsagesNoFallback). */
 .registrar-breadcrumb-quicklinks {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: var(--mac-spacing-2);
+  gap: 6px;
 }
 
 .registrar-breadcrumb-quicklink {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
-  font: inherit;
+  padding: 4px 8px;
   font-size: 13px;
-  color: var(--mac-text-primary);
-  background: var(--mac-bg-primary);
-  border: 1px solid var(--mac-separator);
-  border-radius: var(--mac-radius-md);
-  cursor: pointer;
-}
-
-.registrar-breadcrumb-quicklink:hover {
-  background: var(--mac-card-hover-bg);
 }
 
 /* Data source indicator count text */

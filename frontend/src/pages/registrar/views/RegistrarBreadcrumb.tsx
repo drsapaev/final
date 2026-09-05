@@ -69,7 +69,7 @@ const RegistrarBreadcrumb = ({
     <span className="registrar-breadcrumb-quicklinks">
       <button
         type="button"
-        className="registrar-breadcrumb-quicklink"
+        className="registrar-breadcrumb-link registrar-breadcrumb-quicklink"
         onClick={onNavigateToAppointments}
       >
         <Calendar size={14} aria-hidden="true" />
@@ -77,7 +77,7 @@ const RegistrarBreadcrumb = ({
       </button>
       <button
         type="button"
-        className="registrar-breadcrumb-quicklink"
+        className="registrar-breadcrumb-link registrar-breadcrumb-quicklink"
         onClick={onNavigateToPatients}
       >
         <Search size={14} aria-hidden="true" />
