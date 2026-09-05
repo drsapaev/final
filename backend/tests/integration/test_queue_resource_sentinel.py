@@ -688,3 +688,103 @@ def test_users_list_hides_internal_sentinel_rows(
     usernames = [u["username"] for u in response.json().get("users", [])]
     assert "qd11_list_resource" not in usernames, usernames
     assert "qd11_list_registrar" in usernames, usernames
+
+
+# ============ Codex round-2: WebSocket resolvers + by-ID mutations ============
+
+
+def test_websocket_resolvers_reject_sentinel(db_session: Session) -> None:
+    """Codex round-2: every WebSocket user resolver — the shared
+    queue/display resolver and the AI chat resolver — rejects the
+    sentinel (hand-minted token for a structural non-login)."""
+    from app.api.v1.endpoints.websocket_auth import _resolve_websocket_user
+    from app.core.config import settings
+    from app.services.ai_chat_api_service import AIChatApiService
+    from app.services.authentication_service import authentication_service
+
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="qd11_ws_resource", role="Resource", password=probe_password
+    )
+    control = _make_user(
+        db_session, username="qd11_ws_registrar", role="Registrar", password=probe_password
+    )
+
+    # shared resolver (queue WS; the display-board WS imports it directly)
+    assert _resolve_websocket_user({"sub": str(sentinel.id)}, db_session) is None
+    resolved = _resolve_websocket_user({"sub": str(control.id)}, db_session)
+    assert resolved is not None and resolved.id == control.id
+
+    # AI chat resolver (raw-token path)
+    sentinel_token = authentication_service.create_access_token(
+        {"sub": str(sentinel.id), "role": sentinel.role}
+    )
+    control_token = authentication_service.create_access_token(
+        {"sub": str(control.id), "role": control.role}
+    )
+    assert (
+        AIChatApiService(db_session).authenticate_websocket_user(
+            token=sentinel_token,
+            secret_key=settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM,
+        )
+        is None
+    )
+    resolved = AIChatApiService(db_session).authenticate_websocket_user(
+        token=control_token,
+        secret_key=settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+    assert resolved is not None and resolved.id == control.id
+
+
+def test_user_management_mutations_reject_sentinel(
+    client: TestClient, admin_auth_headers: dict, db_session: Session
+) -> None:
+    """Codex round-2: PUT / DELETE / bulk by direct ID cannot mutate the
+    sentinel rows — renaming, re-roling, deactivating or deleting the
+    synthetic resource users would break the username+is_active queue
+    resolution the migration depends on."""
+    probe_password = "Pass" + "w" + "0rd!"
+    sentinel = _make_user(
+        db_session, username="qd11_mut_resource", role="Resource", password=probe_password
+    )
+    control = _make_user(
+        db_session, username="qd11_mut_registrar", role="Registrar", password=probe_password
+    )
+
+    response = client.put(
+        f"/api/v1/users/users/{sentinel.id}",
+        headers=admin_auth_headers,
+        json={"full_name": "Must not apply"},
+    )
+    assert response.status_code == 400, (response.status_code, response.text[:300])
+    assert "не найден" in response.json().get("detail", "")
+
+    response = client.delete(
+        f"/api/v1/users/users/{sentinel.id}", headers=admin_auth_headers
+    )
+    assert response.status_code == 400, (response.status_code, response.text[:300])
+
+    db_session.expire_all()
+    survivor = db_session.get(User, sentinel.id)
+    assert survivor is not None
+    assert survivor.role == "Resource" and survivor.is_active is True
+
+    response = client.post(
+        "/api/v1/users/users/bulk-action",
+        headers=admin_auth_headers,
+        json={
+            "user_ids": [sentinel.id, control.id],
+            "action": "deactivate",
+        },
+    )
+    assert response.status_code == 200, (response.status_code, response.text[:300])
+    data = response.json()
+    failed_ids = {f["user_id"] for f in data.get("failed_users", [])}
+    assert sentinel.id in failed_ids
+    assert control.id not in failed_ids
+
+    db_session.expire_all()
+    assert db_session.get(User, sentinel.id).is_active is True
+    assert db_session.get(User, control.id).is_active is False

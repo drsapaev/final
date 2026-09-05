@@ -13,6 +13,7 @@ from jwt import PyJWTError as JWTError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.roles import is_login_blocked_role
 from app.crud import user as crud_user
 from app.db.session import SessionLocal
 from app.middleware.websocket_rate_limit import websocket_rate_limiter
@@ -47,6 +48,17 @@ def _resolve_websocket_user(payload: dict, db: Session) -> User | None:
 
     if user is None:
         logger.warning("WebSocket auth rejected: no user matched token subject %r", subject)
+        return None
+
+    # QD-1.1 (queue resource role cleanup, Codex round-2): internal-only
+    # sentinel roles are structural non-logins — both the queue WebSocket
+    # (this module) and the display-board WebSocket (which imports this
+    # resolver) must reject their tokens like every HTTP surface.
+    if is_login_blocked_role(getattr(user, "role", None)):
+        logger.warning(
+            "WebSocket auth rejected: internal-only role user_id=%s", user.id
+        )
+        return None
 
     return user
 
