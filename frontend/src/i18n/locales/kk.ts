@@ -241,6 +241,7 @@ const kk = {
     no_entries: 'На сегодня не найдено лабораторных записей.',
     no_matches: 'Ничего не найдено. Измените поисковый запрос или фильтр.',
     filter_all: 'Все',
+    all_departments: 'Барлық бөлімдер',
     filter_active: 'В работе',
     filter_completed: 'Завершены',
     sort_default: 'По умолчанию',

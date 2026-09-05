@@ -322,6 +322,12 @@ const RegistrarPanel = () => {
           const qs = p.toString();
           navigate(qs ? `/registrar/welcome?${qs}` : '/registrar/welcome', { replace: true });
         }}
+        // REG-NS-1 follow-up (Codex P2): the sidebar no longer renders on
+        // registrar routes, so the shared-clinical destinations from
+        // SIDEBAR_PRESETS.registrar keep visible in-panel entry points.
+        onNavigateToAppointments={() => navigate('/clinical/appointments')}
+        onNavigateToQueue={() => navigate('/registrar/queue')}
+        onNavigateToPatients={() => navigate('/clinical/search')}
         tI18n={tI18n}
       />
 
