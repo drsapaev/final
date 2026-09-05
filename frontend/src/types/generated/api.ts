@@ -9895,6 +9895,57 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/doctors-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin List Medical Specialties
+         * @description Полный каталог специальностей (включая неактивные) — Admin UI.
+         */
+        get: operations["admin_list_medical_specialties_api_v1_admin_doctors_catalog_get"];
+        put?: never;
+        /**
+         * Admin Create Medical Specialty
+         * @description Создать специальность в каталоге (canonical code + titles).
+         */
+        post: operations["admin_create_medical_specialty_api_v1_admin_doctors_catalog_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/doctors-catalog/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Admin Update Medical Specialty
+         * @description Обновить titles/active/sort_order специальности каталога.
+         *
+         *     ``code`` — неизменяемый идентификатор: переименование запрещено,
+         *     потому что значение хранится в ``Doctor.specialty`` существующих врачей.
+         */
+        put: operations["admin_update_medical_specialty_api_v1_admin_doctors_catalog__code__put"];
+        post?: never;
+        /**
+         * Admin Delete Medical Specialty
+         * @description Удалить специальность каталога (только если её не использует врач).
+         */
+        delete: operations["admin_delete_medical_specialty_api_v1_admin_doctors_catalog__code__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/doctors/{doctor_id}": {
         parameters: {
             query?: never;
@@ -35100,6 +35151,27 @@ export type components = {
             /** Initialized */
             initialized: boolean;
         };
+        /** SpecialtyCatalogCreateIn */
+        SpecialtyCatalogCreateIn: {
+            /** Code */
+            code: string;
+            /** Title Ru */
+            title_ru: string;
+            /** Title Uz */
+            title_uz?: string | null;
+            /** Title En */
+            title_en?: string | null;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+        };
         /**
          * SpecialtyVocabularyItem
          * @description One selectable specialty from the Medical Specialty Catalog (0051).
@@ -55825,6 +55897,127 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceUnavailableDetail"];
+                };
+            };
+        };
+    };
+    admin_list_medical_specialties_api_v1_admin_doctors_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialtyVocabularyItem"][];
+                };
+            };
+        };
+    };
+    admin_create_medical_specialty_api_v1_admin_doctors_catalog_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecialtyCatalogCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialtyVocabularyItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_update_medical_specialty_api_v1_admin_doctors_catalog__code__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecialtyVocabularyItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_delete_medical_specialty_api_v1_admin_doctors_catalog__code__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
