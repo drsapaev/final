@@ -22,7 +22,8 @@ class UserRole(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration ne
     DOCTOR = "doctor"
     REGISTRAR = "registrar"
     LAB = "lab"
-    NURSE = "nurse"
+    # N-3 (Nurse retirement): NURSE removed — production census
+    # 2026-09-05 found 0 stored rows; no shipped UI/product surface.
     CASHIER = "cashier"
 
     # Специализации (алиасы для doctor с дополнительными permissions)
@@ -88,9 +89,7 @@ class UserRole(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration ne
             "Lab": cls.LAB,
             "laborant": cls.LAB,
 
-            # Nurse aliases
-            "nurse": cls.NURSE,
-            "Nurse": cls.NURSE,
+            # N-3 (Nurse retirement): nurse aliases removed (0 stored rows).
 
             # Cashier aliases
             "cashier": cls.CASHIER,
@@ -115,7 +114,6 @@ class UserRole(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration ne
             UserRole.CARDIOLOGIST,
             UserRole.DERMATOLOGIST,
             UserRole.DENTIST,
-            UserRole.NURSE,
             UserRole.LAB,
         }
 
@@ -202,11 +200,6 @@ ROLE_PERMISSIONS: dict[UserRole, set[AIPermission]] = {
     UserRole.LAB: {
         AIPermission.ANALYZE_LAB,  # Ключевое для лаборанта
         AIPermission.CHAT,
-    },
-
-    UserRole.NURSE: {
-        AIPermission.CHAT,
-        AIPermission.SYMPTOM_CHECK,
     },
 
     UserRole.CASHIER: {

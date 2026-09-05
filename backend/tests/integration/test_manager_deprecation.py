@@ -581,7 +581,6 @@ def test_roles_enum_has_no_manager_member() -> None:
         "cardio",
         "derma",
         "dentist",
-        "Nurse",
         "Patient",
         "SuperAdmin",
     ]
@@ -753,7 +752,7 @@ def test_roles_catalog_rejects_retired_spelling(
     spelling the user-management write schema then 422s. RoleCreate rejects
     it at the schema boundary (case-insensitive), same freeze discipline as
     the user-management write vocabulary."""
-    for retired_name in ("Manager", "manager", "Receptionist"):
+    for retired_name in ("Manager", "manager", "Receptionist", "Nurse", "nurse"):
         response = client.post(
             "/api/v1/roles/",
             headers=admin_headers_fixture,

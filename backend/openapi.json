@@ -19663,7 +19663,7 @@
           "ai-gateway"
         ],
         "summary": "Symptom Check",
-        "description": "Проверка симптомов для триажа.\n\nRequires: SYMPTOM_CHECK permission (Registrar, Nurse)\n\nThis is a LIMITED analysis for triage purposes only.\nDoes NOT provide diagnosis or treatment.\n\nRequest body:\n{\n    \"symptoms\": [\"боль в груди\", \"одышка\"],\n    \"duration\": \"2 часа\",\n    \"severity\": \"сильная\"\n}",
+        "description": "Проверка симптомов для триажа.\n\nRequires: SYMPTOM_CHECK permission (Registrar)\n\nThis is a LIMITED analysis for triage purposes only.\nDoes NOT provide diagnosis or treatment.\n\nRequest body:\n{\n    \"symptoms\": [\"боль в груди\", \"одышка\"],\n    \"duration\": \"2 часа\",\n    \"severity\": \"сильная\"\n}",
         "operationId": "symptom_check_api_v1_ai_v2_symptom_check_post",
         "requestBody": {
           "content": {
@@ -53616,7 +53616,6 @@
                     "Doctor": "#/components/schemas/DoctorUserCreateRequest",
                     "Admin": "#/components/schemas/NonDoctorUserCreateRequest",
                     "Registrar": "#/components/schemas/NonDoctorUserCreateRequest",
-                    "Nurse": "#/components/schemas/NonDoctorUserCreateRequest",
                     "Cashier": "#/components/schemas/NonDoctorUserCreateRequest",
                     "Lab": "#/components/schemas/NonDoctorUserCreateRequest",
                     "Patient": "#/components/schemas/NonDoctorUserCreateRequest",
@@ -53714,7 +53713,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
+                  "pattern": "^(Admin|Registrar|Doctor|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
                 },
                 {
                   "type": "null"
@@ -87038,7 +87037,6 @@
             "enum": [
               "Admin",
               "Registrar",
-              "Nurse",
               "Cashier",
               "Lab",
               "Patient",
@@ -102700,7 +102698,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
+                "pattern": "^(Admin|Registrar|Doctor|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"
@@ -104748,7 +104746,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
+                "pattern": "^(Admin|Registrar|Doctor|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"
@@ -105057,7 +105055,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
+                "pattern": "^(Admin|Registrar|Doctor|Cashier|Lab|Patient|SuperAdmin|cardio|cardiologist|cardiology|dentist|dentistry|derma|dermatologist|dermatology|doctor)$"
               },
               {
                 "type": "null"

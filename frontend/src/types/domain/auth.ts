@@ -19,7 +19,7 @@ import type { UserId } from './branded';
  * and may be adopted in Wave 4 when the auth UI is refactored.
  */
 
-export type UserRole = 'admin' | 'doctor' | 'nurse' | 'registrar' | 'cashier' | 'lab' | 'patient';
+export type UserRole = 'admin' | 'doctor' | 'registrar' | 'cashier' | 'lab' | 'patient';
 export type AuthStatus = 'authenticated' | 'unauthenticated' | 'loading' | 'error';
 
 // === Store-level auth snapshot (CANONICAL) ==================================

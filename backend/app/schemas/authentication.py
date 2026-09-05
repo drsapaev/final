@@ -365,7 +365,7 @@ class UserCreateRequest(BaseModel):
     # write vocabulary (0 production rows, SQL evidence 2026-09-02); backend
     # read alias stays during the compatibility window. Note: this schema
     # currently has no endpoint importers (declared vocabulary only).
-    role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Cashier|Lab|Patient)$")
+    role: str = Field(..., pattern="^(Admin|Doctor|Cashier|Lab|Patient)$")
     is_active: bool = True
     is_superuser: bool = False
 
@@ -393,7 +393,7 @@ class UserUpdateRequest(BaseModel):
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     # REC-1 (Receptionist deprecation): write freeze, see UserCreateRequest.
     role: str | None = Field(
-        None, pattern="^(Admin|Doctor|Nurse|Cashier|Lab|Patient)$"
+        None, pattern="^(Admin|Doctor|Cashier|Lab|Patient)$"
     )
     is_active: bool | None = None
     is_superuser: bool | None = None

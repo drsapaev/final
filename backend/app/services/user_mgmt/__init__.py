@@ -32,12 +32,6 @@ class UserManagementService(
                 "schedules:read",
                 "schedules:write",
             ],
-            "Nurse": [
-                "patients:read",
-                "appointments:read",
-                "emr:read",
-                "schedules:read",
-            ],
             # E-4 (Receptionist alias removal): legacy entry removed —
             # canonical Registrar is the front-desk role (§4.1.27).
             "Cashier": [

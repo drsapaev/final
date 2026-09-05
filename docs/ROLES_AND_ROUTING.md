@@ -142,8 +142,10 @@ Role normalization:
   spelling on both layers; canonical `Registrar` is the front-desk role
   and a legacy 'Receptionist' profile is denied (REC-3 route parity +
   backend E-4 deny-contracts)
-- `Nurse` is treated as `doctor` (frontend-only alias; separate policy
-  decision — still in force)
+- `Nurse` is NO LONGER treated as `doctor` — N-3 (Nurse retirement,
+  2026-09-05) removed the frontend alias; the role had 0 stored rows
+  (production census) and never shipped as a product surface, so the
+  spelling is denied on every layer (route parity + backend closure)
 
 ## Error Routes
 

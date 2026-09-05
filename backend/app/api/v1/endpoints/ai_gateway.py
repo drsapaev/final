@@ -260,7 +260,7 @@ async def symptom_check(
     """
     Проверка симптомов для триажа.
 
-    Requires: SYMPTOM_CHECK permission (Registrar, Nurse)
+    Requires: SYMPTOM_CHECK permission (Registrar)
 
     This is a LIMITED analysis for triage purposes only.
     Does NOT provide diagnosis or treatment.

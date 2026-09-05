@@ -15,7 +15,7 @@ from app.services.analytics import AnalyticsService
 
 router = APIRouter()
 
-CLINICAL_ADVANCED_ANALYTICS_ROLES = ["admin", "doctor", "nurse"]
+CLINICAL_ADVANCED_ANALYTICS_ROLES = ["admin", "doctor"]
 # M-1 (Manager deprecation): 'manager' removed from this role set —
 # the deprecated role loses all financial/KPI/predictive/revenue/export and
 # specialized-panel privileges. Admin keeps the surface unchanged; no role

@@ -26,7 +26,6 @@ const apiGet = vi.fn().mockImplementation((url: string) => {
           { value: 'Admin', label: 'Администратор' },
           { value: 'Doctor', label: 'Врач' },
           { value: 'doctor', label: 'doctor' },
-          { value: 'Nurse', label: 'Медсестра' },
         ],
       },
     });

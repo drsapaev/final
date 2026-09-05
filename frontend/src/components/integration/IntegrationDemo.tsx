@@ -43,8 +43,7 @@ const IntegrationDemo = () => {
     // Симулируем задержку API
     setTimeout(() => {
       actions.setUsers([
-        { id: 1, name: t('misc.id_doktor_ivanov'), role: 'Doctor' },
-        { id: 2, name: t('misc.id_medsestra_petrova'), role: 'Nurse' }
+        { id: 1, name: t('misc.id_doktor_ivanov'), role: 'Doctor' }
       ]);
     }, 1000);
   }, [actions]);

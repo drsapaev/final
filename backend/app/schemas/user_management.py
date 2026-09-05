@@ -546,7 +546,7 @@ class UserAuditLogResponse(UserAuditLogBase):
 # edit that re-submits role='Manager' 422s by design — the freeze is the
 # permanent enforcement.
 _USER_MANAGEMENT_ROLE_PATTERN = (
-    "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|"
+    "^(Admin|Registrar|Doctor|Cashier|Lab|Patient|"
     "SuperAdmin|"
     + "|".join(sorted(DOCTOR_ROLE_SPELLINGS))
     + ")$"
@@ -570,7 +570,6 @@ _USER_MANAGEMENT_ROLE_PATTERN = (
 _NON_DOCTOR_ROLE_VALUES: tuple[str, ...] = (
     "Admin",
     "Registrar",
-    "Nurse",
     "Cashier",
     "Lab",
     "Patient",

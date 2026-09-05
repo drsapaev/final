@@ -33,7 +33,11 @@ class Roles(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs
     DENTIST = "dentist"
 
     # Дополнительные роли
-    NURSE = "Nurse"
+    # N-3 (Nurse retirement): NURSE removed — production census 2026-09-05
+    # found 0 stored rows (normalized census clean); every grant list
+    # (analytics/files/notifications/patients/require_staff) dropped the
+    # spelling in this change. No canonical successor: the role never
+    # shipped as a product surface.
     # E-4 (Receptionist alias removal): RECEPTIONIST decommissioned — the
     # legacy spelling had a canonical successor (Registrar, REC track), the
     # production table held 0 rows (SQL evidence 2026-09-02), and the last
@@ -70,13 +74,15 @@ ADMIN_ROLES = {
 # M-2b (Codex review follow-up on #3049): spellings decommissioned from the
 # RBAC vocabulary that must ALSO stay out of the DB-backed role catalog
 # (public.roles / /api/v1/roles). Manager was closed by M-2 (2026-09-05,
-# ops-deactivated tombstone row); Receptionist was closed by E-4
+# ops-deactivated tombstone row); Receptionist was closed by E-4;
+# Nurse was closed by N-3 (2026-09-05, production census found 0 stored
+# rows - the role never shipped as a product surface).
 # (§4.1.27, canonical successor Registrar). The roles-catalog boundary
 # (RoleCreate validation + /roles/options filtering) checks this set so a
 # hand-created catalog row cannot resurrect a retired spelling into the
 # user-management dropdown mirror. Case-insensitive by design (catalog
 # names are free-form strings; 'manager'/'Manager' both match).
-RETIRED_ROLE_SPELLINGS: frozenset[str] = frozenset({"manager", "receptionist"})
+RETIRED_ROLE_SPELLINGS: frozenset[str] = frozenset({"manager", "receptionist", "nurse"})
 
 def is_retired_role_spelling(value: object) -> bool:
     """Case-insensitive check against the retired RBAC vocabulary."""
@@ -150,7 +156,6 @@ STAFF_ROLES = {
     Roles.REGISTRAR,
     Roles.LAB,
     Roles.CASHIER,
-    Roles.NURSE,
 }
 
 # NOTE (M-2): the hierarchy map covers the canonical vocabulary only — the
@@ -186,7 +191,8 @@ def get_role_hierarchy(role: str) -> int:
     """Возвращает уровень иерархии роли (чем выше число, тем больше прав)"""
     hierarchy = {
         Roles.PATIENT: 1,
-        Roles.NURSE: 2,
+        # N-3: Roles.NURSE: 2 retired with the spelling (the level table
+        # covers the canonical vocabulary only).
         # E-4: Roles.RECEPTIONIST: 3 removed — the level table covers the
         # canonical vocabulary only (level 3 retired with the spelling).
         Roles.CASHIER: 4,

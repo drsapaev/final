@@ -885,7 +885,7 @@ async def user_management_health_check():
         # 'Receptionist' replaced by the canonical 'Registrar' — the module
         # vocabulary now matches the write contract (create/update accept
         # Registrar; deprecated spelling frozen out of writes).
-        "supported_roles": ["Admin", "Doctor", "Nurse", "Registrar", "Patient"],
+        "supported_roles": ["Admin", "Doctor", "Registrar", "Patient"],
         "supported_statuses": ["active", "inactive", "suspended", "pending", "locked"],
         "export_formats": ["csv", "excel", "json", "pdf"],
     }

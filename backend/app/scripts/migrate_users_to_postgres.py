@@ -41,8 +41,11 @@ class LegacyUserRow:
         and is_superuser=False (a superuser row would bypass every role
         check, so it must never survive a re-run of this migration).
         Case-insensitive: any 'manager' spelling matches zero grant lists
-        after M-1D/M-2, so none of them may stay active or privileged."""
-        if self.role.strip().lower() == "manager":
+        after M-1D/M-2, so none of them may stay active or privileged.
+        N-3 (Nurse retirement, Codex review P1 on #3054): 'nurse' joins the
+        tombstone set — same no-successor verbatim rule, same census
+        evidence (0 stored rows, 2026-09-05)."""
+        if self.role.strip().lower() in {"manager", "nurse"}:
             object.__setattr__(self, "is_active", False)
             object.__setattr__(self, "is_superuser", False)
 
@@ -75,7 +78,10 @@ def _normalize_legacy_role(value: Any) -> str:
     legacy 'Manager' row is therefore PRESERVED VERBATIM: this is legacy
     data preservation, not a new grant (all Manager privileges were
     removed from the RBAC layer in M-1D, so a migrated row carries zero
-    authorization). New 'Manager' writes through the canonical API
+    authorization). N-3 (Nurse retirement) follows the same rule: 'Nurse'
+    has no canonical successor and is preserved verbatim, tombstoned by
+    LegacyUserRow.__post_init__ (is_active=False, is_superuser=False).
+    New 'Manager' writes through the canonical API
     schemas remain frozen (422). M-2b additionally forces the tombstone
     shape on such rows (is_active=False, is_superuser=False — see
     LegacyUserRow.__post_init__): the role spelling is preserved for audit,

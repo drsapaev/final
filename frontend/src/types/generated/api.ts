@@ -6931,7 +6931,7 @@ export type paths = {
          * Symptom Check
          * @description Проверка симптомов для триажа.
          *
-         *     Requires: SYMPTOM_CHECK permission (Registrar, Nurse)
+         *     Requires: SYMPTOM_CHECK permission (Registrar)
          *
          *     This is a LIMITED analysis for triage purposes only.
          *     Does NOT provide diagnosis or treatment.
@@ -30262,7 +30262,7 @@ export type components = {
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            role: "Admin" | "Registrar" | "Nurse" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
+            role: "Admin" | "Registrar" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
             /** Doctor Profile */
             doctor_profile?: null;
         };

@@ -197,7 +197,6 @@ const UserModal = ({
   const baseRoleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
     { value: 'Admin', label: t('admin2.umdl_role_admin') },
     { value: 'Doctor', label: t('admin2.umdl_role_doctor_general') },
-    { value: 'Nurse', label: t('admin2.umdl_role_nurse') },
     { value: 'Registrar', label: t('admin2.umdl_role_registrar') },
     { value: 'Cashier', label: t('admin2.umdl_role_cashier') },
     { value: 'Lab', label: t('admin2.umdl_role_lab') },

@@ -145,7 +145,7 @@ async def get_doctor_performance_visualization(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: str | None = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(["admin", "doctor"])),
 ):
     """Получить визуализацию эффективности врачей"""
     try:
@@ -195,7 +195,7 @@ async def get_patient_analytics_visualization(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(["admin", "doctor"])),
 ):
     """Получить визуализацию аналитики пациентов"""
     try:
@@ -360,7 +360,7 @@ async def get_comprehensive_visualization(
 @router.get("/chart-types", response_model=dict[str, Any])
 async def get_supported_chart_types(
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user=Depends(require_roles(["admin", "doctor"])),
 ):
     """Получить список поддерживаемых типов графиков"""
     return {

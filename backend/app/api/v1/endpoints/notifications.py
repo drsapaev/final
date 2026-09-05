@@ -274,7 +274,7 @@ async def send_appointment_reminder(
     appointment_date: datetime,
     doctor_name: str,
     department: str,
-    current_user: User = Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user: User = Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
 ):
     """Отправка напоминания о записи"""
@@ -307,7 +307,7 @@ async def send_visit_confirmation(
     background_tasks: BackgroundTasks,
     visit_id: int,
     queue_number: int | None = None,
-    current_user: User = Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user: User = Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
 ):
     """Отправка подтверждения визита"""
@@ -347,7 +347,7 @@ async def send_payment_notification(
     visit_id: int,
     amount: float,
     currency: str,
-    current_user: User = Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user: User = Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
 ):
     """Отправка уведомления об оплате"""
@@ -387,7 +387,7 @@ async def send_queue_update(
     department: str,
     current_number: int,
     estimated_wait: str,
-    current_user: User = Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user: User = Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
 ):
     """Отправка обновления очереди"""
@@ -884,7 +884,7 @@ async def update_user_notification_policy(
 async def send_notification(
     background_tasks: BackgroundTasks,
     request: SendNotificationRequest,
-    current_user: User = Depends(require_roles(["admin", "doctor", "nurse"])),
+    current_user: User = Depends(require_roles(["admin", "doctor"])),
     db: Session = Depends(get_db),
 ):
     """Отправка уведомления с использованием шаблона"""
