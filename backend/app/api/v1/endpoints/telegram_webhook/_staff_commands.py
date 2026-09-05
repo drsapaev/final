@@ -1,11 +1,12 @@
 """
 Split from telegram_webhook.py (5647 LOC → modular).
 """
+
 from __future__ import annotations
 
 import html
 import logging
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -269,7 +270,9 @@ async def _handle_staff_read_only_menu(
     return True
 
 
-async def _handle_ticket_qr_start(update: dict[str, Any], db: Session, bot_service) -> bool:
+async def _handle_ticket_qr_start(
+    update: dict[str, Any], db: Session, bot_service
+) -> bool:
     extracted = _extract_ticket_qr_start_payload(update)
     if not extracted:
         return False
@@ -423,6 +426,7 @@ async def _handle_staff_link_start(
         )
         return True
 
+
 def _message_from_update(update: dict[str, Any]) -> dict[str, Any]:
     return update.get("message") or {}
 
@@ -479,9 +483,7 @@ def _recent_visit_summary(
     )
 
 
-def _patient_recent_visits(
-    db: Session, patient_id: int, limit: int = 3
-) -> list[Visit]:
+def _patient_recent_visits(db: Session, patient_id: int, limit: int = 3) -> list[Visit]:
     return (
         db.query(Visit)
         .filter(Visit.patient_id == patient_id)
@@ -525,13 +527,15 @@ def _patient_for_telegram_chat(
     return telegram_user, patient
 
 
-def _patient_today_queue_entries(db: Session, patient_id: int) -> list[OnlineQueueEntry]:
+def _patient_today_queue_entries(
+    db: Session, patient_id: int
+) -> list[OnlineQueueEntry]:
     return (
         db.query(OnlineQueueEntry)
         .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
         .filter(
             OnlineQueueEntry.patient_id == patient_id,
-            DailyQueue.day == date.today(),
+            DailyQueue.day == clinic_today(db),
             ~OnlineQueueEntry.status.in_(QUEUE_TERMINAL_STATUSES),
         )
         .order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc())
@@ -710,7 +714,7 @@ def _patient_relevant_visits(
 
     visits = (
         db.query(Visit)
-        .filter(Visit.patient_id == patient_id, Visit.visit_date == date.today())
+        .filter(Visit.patient_id == patient_id, Visit.visit_date == clinic_today(db))
         .order_by(Visit.created_at.desc(), Visit.id.desc())
         .limit(3)
         .all()
@@ -782,7 +786,9 @@ def _billing_totals(
     expected_total = unlinked_entry_total
     for visit in visits:
         queue_total = entry_total_by_visit.get(visit.id, Decimal("0"))
-        expected_total += queue_total if queue_total > 0 else _visit_services_total(visit)
+        expected_total += (
+            queue_total if queue_total > 0 else _visit_services_total(visit)
+        )
 
     visit_ids = sorted(visits_by_id)
     paid_total = _payment_total_for_visits(db, visit_ids, PAYMENT_PAID_STATUSES)
@@ -798,8 +804,8 @@ def _clinic_payments_message(db: Session, chat_id: int) -> str:
 
     language = _telegram_chat_language(db, chat_id)
     patient_name = _html_text(_patient_display_name(patient))
-    entries, visits, expected_total, paid_total, pending_total, debt_total = _billing_totals(
-        db, telegram_user.patient_id
+    entries, visits, expected_total, paid_total, pending_total, debt_total = (
+        _billing_totals(db, telegram_user.patient_id)
     )
     if not entries and not visits and expected_total <= 0 and paid_total <= 0:
         return _localized_text("payments_empty", language).format(patient=patient_name)
@@ -864,7 +870,9 @@ def _lab_report_document_caption(
     return caption
 
 
-def _build_lab_report_pdf(db: Session, instance: LabReportInstance) -> tuple[str, bytes, str]:
+def _build_lab_report_pdf(
+    db: Session, instance: LabReportInstance
+) -> tuple[str, bytes, str]:
     service = LabReportingService(db)
     materialized_sections = service.materialize_instance(instance)
     critical_findings = service.summarize_critical_findings(materialized_sections)
@@ -884,9 +892,7 @@ def _build_lab_report_pdf(db: Session, instance: LabReportInstance) -> tuple[str
         }
     )
     filename = f"kosmed-lab-report-{instance.id}.pdf"
-    caption = _lab_report_document_caption(
-        instance, report_date, TELEGRAM_LANGUAGE_RU
-    )
+    caption = _lab_report_document_caption(instance, report_date, TELEGRAM_LANGUAGE_RU)
     return filename, pdf_bytes, caption
 
 
@@ -940,7 +946,8 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
             bot_service,
             chat_id,
             _telegram_chat_text(db, chat_id, "unlinked_protected_action"),
-            _telegram_onboarding_entry_markup(db, chat_id) or _telegram_chat_menu(db, chat_id),
+            _telegram_onboarding_entry_markup(db, chat_id)
+            or _telegram_chat_menu(db, chat_id),
             "telegram_patient_results_needs_link",
         )
         return
@@ -988,7 +995,11 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
                 )
             else:
                 logger.error("Telegram bot service does not support document send")
-                ok, message_id, error_message = False, None, "send_document_not_supported"
+                ok, message_id, error_message = (
+                    False,
+                    None,
+                    "send_document_not_supported",
+                )
             _log_lab_report_document_send(
                 db,
                 chat_id,
@@ -1010,9 +1021,9 @@ async def _send_clinic_lab_results(db: Session, bot_service, chat_id: int) -> No
                 db,
                 chat_id,
                 instance.id,
-                _localized_text(
-                    "lab_result_document_failed_caption", language
-                ).format(report_id=instance.id),
+                _localized_text("lab_result_document_failed_caption", language).format(
+                    report_id=instance.id
+                ),
                 "failed",
                 error_message=type(exc).__name__,
             )
@@ -1112,7 +1123,9 @@ async def _set_notification_consent(
     db: Session, bot_service, chat_id: int, enabled: bool
 ) -> None:
     telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
-    language = _normalize_patient_language(getattr(telegram_user, "language_code", None))
+    language = _normalize_patient_language(
+        getattr(telegram_user, "language_code", None)
+    )
     previous_template_key = _latest_patient_bot_template_key(db, chat_id)
     if telegram_user:
         telegram_user.notifications_enabled = enabled
@@ -1180,7 +1193,8 @@ async def _handle_contact_link(
             bot_service,
             chat_id,
             _telegram_chat_text(db, chat_id, "patient_not_found"),
-            _telegram_onboarding_entry_markup(db, chat_id) or _telegram_chat_menu(db, chat_id),
+            _telegram_onboarding_entry_markup(db, chat_id)
+            or _telegram_chat_menu(db, chat_id),
             "telegram_patient_not_found",
         )
         return True
@@ -1230,3 +1244,6 @@ async def _handle_contact_link(
     )
     return True
 
+
+# SSOT: календарный день КЛИНИКИ (не host-UTC дата)
+from app.crud.clinic import clinic_today  # noqa: E402

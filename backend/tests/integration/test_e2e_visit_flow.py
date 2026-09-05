@@ -15,6 +15,20 @@ from app.models.visit import Visit, VisitService
 from app.services.morning_assignment import MorningAssignmentService
 
 
+def _clinic_today(db_session):
+    """SSOT: день КЛИНИКИ (Asia/Tashkent), а не host-UTC дата.
+
+    На UTC-хосте между 19:00 и полуночью HOST-дата уже «вчера»
+    для клиники; подтверждение активирует confirmed → open только для
+    визитов, датированных днём клиники (см.
+    registrar_wizard._visits._clinic_today). Сеим фикстуры той же датой,
+    иначе тесты становятся зависимыми от окна UTC-хоста.
+    """
+    from app.api.v1.endpoints.registrar_wizard._visits import _clinic_today
+
+    return _clinic_today(db_session)
+
+
 @pytest.mark.integration
 @pytest.mark.confirmation
 @pytest.mark.queue
@@ -45,7 +59,7 @@ class TestE2EVisitFlow:
             json={
                 "patient_id": foreign_patient.id,
                 "service_ids": [test_service.id],
-                "visit_date": (date.today() + timedelta(days=1)).isoformat(),
+                "visit_date": (_clinic_today(db_session) + timedelta(days=1)).isoformat(),
                 "visit_time": "10:00",
                 "discount_mode": "none",
                 "all_free": False,
@@ -74,7 +88,7 @@ class TestE2EVisitFlow:
         existing_visit = Visit(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="09:00",
             status="open",
             discount_mode="none",
@@ -88,7 +102,7 @@ class TestE2EVisitFlow:
             json={
                 "patient_id": test_patient.id,
                 "service_ids": [test_service.id],
-                "visit_date": (date.today() + timedelta(days=1)).isoformat(),
+                "visit_date": (_clinic_today(db_session) + timedelta(days=1)).isoformat(),
                 "visit_time": "10:00",
                 "discount_mode": "none",
                 "all_free": False,
@@ -114,7 +128,7 @@ class TestE2EVisitFlow:
             json={
                 "patient_id": test_patient.id,
                 "service_ids": [test_service.id],
-                "visit_date": date.today().isoformat(),
+                "visit_date": _clinic_today(db_session).isoformat(),
                 "visit_time": "10:00",
                 "discount_mode": "none",
                 "all_free": False,
@@ -138,11 +152,11 @@ class TestE2EVisitFlow:
         assert visit is not None
         assert visit.status == "pending_confirmation"
         assert visit.confirmation_token == confirmation_token
-        assert visit.visit_date == date.today()
+        assert visit.visit_date == _clinic_today(db_session)
 
         # ШАГ 2: Создаем дневную очередь для сегодня
         daily_queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=visit.doctor_id,
             queue_tag="cardiology_common",
             active=True
@@ -214,7 +228,7 @@ class TestE2EVisitFlow:
         db_session.add(future_service)
         db_session.commit()
 
-        tomorrow = date.today() + timedelta(days=1)
+        tomorrow = _clinic_today(db_session) + timedelta(days=1)
 
         # ШАГ 1: Врач назначает визит на завтра
         schedule_response = client.post(
@@ -289,7 +303,7 @@ class TestE2EVisitFlow:
         visit = Visit(
             patient_id=test_patient.id,
             doctor_id=admin_user.id,  # Используем админа как врача
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="09:00",
             status="confirmed",
             discount_mode="benefit",
@@ -314,7 +328,7 @@ class TestE2EVisitFlow:
 
         # ШАГ 2: Создаем дневную очередь
         daily_queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=visit.doctor_id,
             queue_tag="cardiology_common",
             active=True
@@ -361,10 +375,12 @@ class TestE2EVisitFlow:
         E2E тест подтверждения регистратором: визит создан → регистратор подтвердил → номер выдан
         """
         # ШАГ 1: Создаем визит ожидающий подтверждения
+        # (дата клиники, не host-UTC: активация confirmed → open
+        # сравнивает visit_date с днём клиники — SSOT)
         visit = Visit(
             patient_id=test_patient.id,
             doctor_id=admin_user.id,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="11:00",
             status="pending_confirmation",
             discount_mode="none",
@@ -378,7 +394,7 @@ class TestE2EVisitFlow:
 
         # ШАГ 2: Создаем дневную очередь
         daily_queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=visit.doctor_id,
             queue_tag="cardiology_common",
             active=True
@@ -448,7 +464,7 @@ class TestE2EVisitFlow:
             json={
                 "patient_id": test_patient.id,
                 "service_ids": [ecg_service.id, lab_service.id],
-                "visit_date": date.today().isoformat(),
+                "visit_date": _clinic_today(db_session).isoformat(),
                 "visit_time": "12:00",
                 "discount_mode": "none",
                 "all_free": False,
@@ -465,13 +481,13 @@ class TestE2EVisitFlow:
 
         # ШАГ 3: Создаем очереди для разных услуг
         ecg_queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=2,  # Ресурсный врач для ЭКГ
             queue_tag="ecg",
             active=True
         )
         lab_queue = DailyQueue(
-            day=date.today(),
+            day=_clinic_today(db_session),
             specialist_id=3,  # Ресурсный врач для лаборатории
             queue_tag="lab",
             active=True
@@ -536,7 +552,7 @@ class TestE2EVisitFlow:
         expired_visit = Visit(
             patient_id=test_patient.id,
             doctor_id=1,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="13:00",
             status="pending_confirmation",
             confirmation_token="expired-token-123",
@@ -562,7 +578,7 @@ class TestE2EVisitFlow:
         valid_visit = Visit(
             patient_id=test_patient.id,
             doctor_id=1,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="14:00",
             status="pending_confirmation",
             confirmation_token="valid-token-123",
@@ -606,7 +622,7 @@ class TestE2EVisitFlow:
             json={
                 "patient_id": test_patient.id,
                 "service_ids": [notification_service.id],
-                "visit_date": (date.today() + timedelta(days=1)).isoformat(),
+                "visit_date": (_clinic_today(db_session) + timedelta(days=1)).isoformat(),
                 "visit_time": "15:00",
                 "discount_mode": "none",
                 "all_free": False,
@@ -655,7 +671,7 @@ class TestScheduleNextInvitationDispatch:
         existing_visit = Visit(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="09:00",
             status="open",
             discount_mode="none",
@@ -679,7 +695,7 @@ class TestScheduleNextInvitationDispatch:
             json={
                 "patient_id": test_patient.id,
                 "service_ids": [test_service.id],
-                "visit_date": (date.today() + timedelta(days=1)).isoformat(),
+                "visit_date": (_clinic_today(db_session) + timedelta(days=1)).isoformat(),
                 "visit_time": "10:00",
                 "discount_mode": "none",
                 "all_free": False,
@@ -719,7 +735,7 @@ class TestScheduleNextInvitationLogHygiene:
         existing_visit = Visit(
             patient_id=test_patient.id,
             doctor_id=test_doctor.id,
-            visit_date=date.today(),
+            visit_date=_clinic_today(db_session),
             visit_time="09:00",
             status="open",
             discount_mode="none",
@@ -747,7 +763,7 @@ class TestScheduleNextInvitationLogHygiene:
                 json={
                     "patient_id": test_patient.id,
                     "service_ids": [test_service.id],
-                    "visit_date": (date.today() + timedelta(days=1)).isoformat(),
+                    "visit_date": (_clinic_today(db_session) + timedelta(days=1)).isoformat(),
                     "visit_time": "10:00",
                     "discount_mode": "none",
                     "all_free": False,

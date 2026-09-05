@@ -228,7 +228,7 @@ const Modal = ({
         onKeyDown={handleBackdropKeyDown}
         role="button"
         tabIndex={0}
-        aria-label="Закрыть модальное окно" />
+        aria-label={t('common.close')} />
 
 
       {/* Modal Content */}
@@ -285,6 +285,8 @@ const Modal = ({
           variant="ghost"
           size="small"
           onClick={onClose}
+          aria-label={t('common.close', { defaultValue: 'Close' })}
+          title={t('common.close', { defaultValue: 'Close' })}
           style={{
             position: 'absolute',
             top: '12px',

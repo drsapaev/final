@@ -1,10 +1,11 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
 
 import pytest
 
+from app.api.v1.endpoints.registrar_wizard._visits import _clinic_today
 from app.models.online_queue import OnlineQueueEntry
 from app.models.visit import VisitService
 
@@ -43,6 +44,14 @@ def test_confirmation_split_flow_assigns_next_number_and_links_visit(
     test_service,
 ):
     _attach_visit_service(db_session, test_visit, test_service)
+
+    # SSOT: приводим дату визита и очереди к дню КЛИНИКИ (не host-UTC),
+    # иначе при confirm в окне 19:00-24:00 UTC активация не сработает
+    clinic_day = _clinic_today(db_session)
+    test_visit.visit_date = clinic_day
+    test_daily_queue.day = clinic_day
+    db_session.add_all([test_visit, test_daily_queue])
+    db_session.commit()
 
     baseline_entry = OnlineQueueEntry(
         queue_id=test_daily_queue.id,
@@ -99,6 +108,14 @@ def test_confirmation_split_flow_replay_returns_error_and_keeps_single_queue_row
 ):
     _attach_visit_service(db_session, test_visit, test_service)
 
+    # SSOT: приводим дату визита и очереди к дню КЛИНИКИ (не host-UTC),
+    # иначе при confirm в окне 19:00-24:00 UTC активация не сработает
+    clinic_day = _clinic_today(db_session)
+    test_visit.visit_date = clinic_day
+    test_daily_queue.day = clinic_day
+    db_session.add_all([test_visit, test_daily_queue])
+    db_session.commit()
+
     first_response = client.post(
         "/api/v1/telegram/visits/confirm",
         json={
@@ -138,6 +155,15 @@ def test_confirmation_split_flow_with_existing_active_entry_reuses_active_row(
     test_patient,
 ):
     _attach_visit_service(db_session, test_visit, test_service)
+
+    # SSOT: приводим дату визита и очереди к дню КЛИНИКИ (не host-UTC),
+    # иначе при confirm в окне 19:00-24:00 UTC активация не сработает
+    clinic_day = _clinic_today(db_session)
+    test_visit.visit_date = clinic_day
+    test_daily_queue.day = clinic_day
+    db_session.add_all([test_visit, test_daily_queue])
+    db_session.commit()
+
     original_queue_time = datetime.utcnow().replace(microsecond=0)
 
     existing_active_entry = OnlineQueueEntry(
@@ -196,6 +222,14 @@ def test_confirmation_split_flow_registrar_bridge_creates_confirmation_source_en
     registrar_auth_headers,
 ):
     _attach_visit_service(db_session, test_visit, test_service)
+
+    # SSOT: приводим дату визита и очереди к дню КЛИНИКИ (не host-UTC),
+    # иначе при confirm в окне 19:00-24:00 UTC активация не сработает
+    clinic_day = _clinic_today(db_session)
+    test_visit.visit_date = clinic_day
+    test_daily_queue.day = clinic_day
+    db_session.add_all([test_visit, test_daily_queue])
+    db_session.commit()
 
     response = client.post(
         f"/api/v1/registrar/visits/{test_visit.id}/confirm",

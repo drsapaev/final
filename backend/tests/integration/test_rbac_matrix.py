@@ -599,8 +599,9 @@ def test_role_pattern_covers_full_doctor_family_ssot() -> None:
         assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, spelling), spelling
 
     # canonical non-doctor roles still accepted
-    # M-1 (Manager deprecation): 'Manager' moved from the WRITE vocabulary to
-    # the read/filter compatibility vocabulary — write surfaces 422 it now.
+    # M-1 (Manager deprecation): 'Manager' left the WRITE vocabulary; M-2
+    # (vocabulary closure) removed the read/filter compatibility entry too —
+    # every surface 422s the deprecated spelling now.
     for role in ("Admin", "Doctor", "Registrar", "SuperAdmin", "Nurse"):
         assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, role), role
     assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "Manager")
@@ -628,7 +629,10 @@ def test_get_users_role_filter_accepts_family_spellings(
 ) -> None:
     """Codex round-1 P2: the GET /users route's preceding Query pattern must
     reuse the shared vocabulary — ?role=cardio used to 422 BEFORE
-    UserSearchRequest was even constructed."""
+    UserSearchRequest was even constructed. M-2 (vocabulary closure): the
+    deprecated 'Manager' spelling left the shared vocabulary too — it now
+    422s at the same boundary as junk (the read/filter compatibility window
+    closed with the ops deactivation of smoke_manager, 2026-09-04)."""
     headers = {"Authorization": f"Bearer {admin_token}"}
     for role in (
         "cardio",
@@ -641,14 +645,14 @@ def test_get_users_role_filter_accepts_family_spellings(
         "dentistry",
         "Registrar",
         "SuperAdmin",
-        "Manager",
     ):
         resp = client.get(f"/api/v1/users/users?role={role}", headers=headers)
         assert resp.status_code == 200, (role, resp.status_code, resp.text[:200])
 
-    # junk still rejected at the boundary
-    resp = client.get("/api/v1/users/users?role=wizard", headers=headers)
-    assert resp.status_code == 422
+    # junk AND the deprecated spelling both rejected at the boundary
+    for role in ("wizard", "Manager"):
+        resp = client.get(f"/api/v1/users/users?role={role}", headers=headers)
+        assert resp.status_code == 422, (role, resp.status_code, resp.text[:200])
 
 
 def test_ensure_roles_reactivates_inactive_doctor_profile(

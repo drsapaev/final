@@ -8,7 +8,6 @@ from app.api.v1.endpoints.user_management._helpers import (
     _safe_user_export_filename,
     _user_export_mime_type,
     _USER_MANAGEMENT_ROLE_PATTERN,
-    _USER_MANAGEMENT_ROLE_FILTER_PATTERN,
     router,
 )  # noqa: F401
 from app.schemas.clinic import ServiceUnavailableDetail
@@ -119,15 +118,16 @@ async def get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     role: str | None = Query(
-        None, pattern=_USER_MANAGEMENT_ROLE_FILTER_PATTERN
+        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
         # Codex round-1 P2: reuse the shared vocabulary — the previous
         # hardcoded list rejected cardio/derma/dentist/Registrar/SuperAdmin/
         # Manager BEFORE UserSearchRequest was constructed, so ?role=cardio
         # answered 422 while the schema advertised it as valid.
-        # Codex re-review P2 (PR #3025): READ surface — compatibility filter
-        # vocabulary. E-4 (§4.1.27): the 'Receptionist' filter entry was
-        # decommissioned with the alias (window closed: stored rows = 0);
-        # 'Manager' stays until the ops deactivation (M-1).
+        # READ surface — the filter vocabulary now equals the canonical
+        # write vocabulary: E-4 (§4.1.27) dropped 'Receptionist' (window
+        # closed) and M-2 (2026-09-05) dropped 'Manager' the same way,
+        # after the ops deactivation of the single stored row
+        # (smoke_manager, id=20). ?role=Manager now answers 422.
         # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
     ),
     status_filter: str | None = Query(

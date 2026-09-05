@@ -77,7 +77,7 @@ const Dialog = ({ open, onClose, maxWidth = 'md', fullWidth = true, children, st
         style={backdropStyle}
         onClick={(e) => onClose?.(e)}
         tabIndex={-1}
-        aria-label="Закрыть диалог"
+        aria-label={t('misc.fm_aria_close')}
       />
       <div
         role="dialog"

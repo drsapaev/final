@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import clinic_today as _clinic_today
 from app.db.session import SessionLocal
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -23,6 +24,7 @@ from app.services.service_mapping import get_service_code
 
 logger = logging.getLogger(__name__)
 
+
 WIZARD_DUPLICATE_ACTIVE_STATUSES = (
     "waiting",
     "called",
@@ -34,6 +36,7 @@ WIZARD_DUPLICATE_ACTIVE_STATUSES = (
 class MorningAssignmentClaimError(ValueError):
     """Raised when a wizard-family queue claim cannot be resolved safely."""
 
+
 WIZARD_DUPLICATE_ACTIVE_STATUSES = (
     "waiting",
     "called",
@@ -42,7 +45,9 @@ WIZARD_DUPLICATE_ACTIVE_STATUSES = (
 )
 
 
-class MorningAssignmentClaimError(ValueError):  # noqa: F811  # manual-review: intentional redefinition for compatibility
+class MorningAssignmentClaimError(
+    ValueError
+):  # noqa: F811  # manual-review: intentional redefinition for compatibility
     """Raised when a wizard-family queue claim cannot be resolved safely."""
 
 
@@ -128,7 +133,7 @@ class MorningAssignmentService:
                     .filter(
                         DailyQueue.day == target_date,
                         DailyQueue.queue_tag == queue_tag,
-                        DailyQueue.active == True
+                        DailyQueue.active == True,
                     )
                     .first()
                 )
@@ -149,19 +154,19 @@ class MorningAssignmentService:
 
         if created_count > 0:
             self.db.flush()
-            logger.info(f"🏗️ Pre-created {created_count} DailyQueues for {len(unique_tags)} unique queue_tags")
+            logger.info(
+                f"🏗️ Pre-created {created_count} DailyQueues for {len(unique_tags)} unique queue_tags"
+            )
 
         return created_count
 
-    def run_morning_assignment(
-        self, target_date: date | None = None
-    ) -> dict[str, any]:
+    def run_morning_assignment(self, target_date: date | None = None) -> dict[str, any]:
         """
         Основная функция утренней сборки
         Присваивает номера всем подтвержденным визитам на указанную дату
         """
         if not target_date:
-            target_date = date.today()
+            target_date = _clinic_today(self.db)
 
         logger.info(f"🌅 Запуск утренней сборки для {target_date}")
 
@@ -222,7 +227,9 @@ class MorningAssignmentService:
                         # partial state (some visits 'open' with queue
                         # entries, others 'confirmed' without).
                         # See tests/regression/test_p2_1_morning_assignment_txn.py.
-                        from app.services.visit_lifecycle_service import VisitLifecycleService
+                        from app.services.visit_lifecycle_service import (
+                            VisitLifecycleService,
+                        )
 
                         VisitLifecycleService(self.db).activate_confirmed_visit(
                             visit_id=visit.id,
@@ -408,7 +415,7 @@ class MorningAssignmentService:
             except Exception as e:
                 logger.error(
                     f"Ошибка присвоения очереди {queue_tag} для визита {visit.id}: {e}",
-                    exc_info=True
+                    exc_info=True,
                 )
                 # P2-1b: rollback to restore the session after flush failure.
                 # No try/except — if rollback fails, the error should propagate.
@@ -456,7 +463,9 @@ class MorningAssignmentService:
             **create_handoff.create_entry_kwargs,
         )
 
-        service_codes_for_entry = create_handoff.create_entry_kwargs.get("service_codes", [])
+        service_codes_for_entry = create_handoff.create_entry_kwargs.get(
+            "service_codes", []
+        )
         logger.info(
             "Assigned number %s in queue %s through SSOT, services: %s",
             queue_entry.number,
@@ -636,27 +645,33 @@ class MorningAssignmentService:
                 code = service.service_code or get_service_code(service.id, self.db)
                 if code:
                     service_codes_for_entry.append(code.upper() if code else None)
-                    services_for_entry.append({
-                        "id": service.id,
-                        "code": code.upper() if code else None,
-                        "name": service.name,
-                        "price": float(vs.price) if vs.price else 0,
-                    })
-
-        # Если не нашли услуги с matching queue_tag, добавляем все услуги визита
-        if not services_for_entry:
-            for vs in visit_services:
-                service = self.db.query(Service).filter(Service.id == vs.service_id).first()
-                if service:
-                    code = service.service_code or get_service_code(service.id, self.db)
-                    if code:
-                        service_codes_for_entry.append(code.upper() if code else None)
-                        services_for_entry.append({
+                    services_for_entry.append(
+                        {
                             "id": service.id,
                             "code": code.upper() if code else None,
                             "name": service.name,
                             "price": float(vs.price) if vs.price else 0,
-                        })
+                        }
+                    )
+
+        # Если не нашли услуги с matching queue_tag, добавляем все услуги визита
+        if not services_for_entry:
+            for vs in visit_services:
+                service = (
+                    self.db.query(Service).filter(Service.id == vs.service_id).first()
+                )
+                if service:
+                    code = service.service_code or get_service_code(service.id, self.db)
+                    if code:
+                        service_codes_for_entry.append(code.upper() if code else None)
+                        services_for_entry.append(
+                            {
+                                "id": service.id,
+                                "code": code.upper() if code else None,
+                                "name": service.name,
+                                "price": float(vs.price) if vs.price else 0,
+                            }
+                        )
 
         # ✅ ИСПРАВЛЕНО: Используем SSOT метод для создания записи С услугами
         return MorningAssignmentPreparedQueueAssignment(
@@ -714,8 +729,7 @@ class MorningAssignmentService:
 
         if len(active_entries) > 1:
             raise MorningAssignmentClaimError(
-                "Ambiguous active queue entry for "
-                f"queue_tag={queue_tag}"
+                "Ambiguous active queue entry for " f"queue_tag={queue_tag}"
             )
 
         if len(active_entries) == 1:
@@ -730,17 +744,17 @@ class MorningAssignmentService:
 
         if len(active_queues) > 1:
             raise MorningAssignmentClaimError(
-                "Ambiguous active queue for "
-                f"queue_tag={queue_tag}"
+                "Ambiguous active queue for " f"queue_tag={queue_tag}"
             )
 
         return active_queues[0], None
+
     def get_morning_assignment_stats(
         self, target_date: date | None = None
     ) -> dict[str, any]:
         """Получает статистику утренней сборки"""
         if not target_date:
-            target_date = date.today()
+            target_date = _clinic_today(self.db)
 
         # Подтвержденные визиты на дату
         confirmed_visits = (

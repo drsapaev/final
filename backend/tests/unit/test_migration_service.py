@@ -129,13 +129,14 @@ class TestMigrationService:
 
     def test_backup_queue_data_with_data(self, db_session, test_daily_queue, test_queue_entry):
         """Тест создания резервной копии с данными"""
+        # SSOT: бэкапим очередь дня КЛИНИКИ (фикстуры сеются clinic-today)
         service = MigrationService(db_session)
 
         with patch('os.makedirs'), patch('builtins.open', create=True) as mock_open:
             mock_file = MagicMock()
             mock_open.return_value.__enter__.return_value = mock_file
 
-            result = service.backup_queue_data(date.today())
+            result = service.backup_queue_data(test_daily_queue.day)
 
             assert result["success"] is True
             assert result["queues_count"] == 1

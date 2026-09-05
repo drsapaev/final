@@ -10,17 +10,22 @@ from app.services.morning_assignment_api_service import MorningAssignmentApiServ
 
 @pytest.mark.unit
 class TestMorningAssignmentApiService:
-    def test_parse_target_date_handles_none_and_iso(self):
-        assert MorningAssignmentApiService.parse_target_date(None) == date.today()
-        assert MorningAssignmentApiService.parse_target_date("2026-02-14") == date(
+    def test_parse_target_date_handles_none_and_iso(self, db_session):
+        # SSOT: дефолт без явной даты — день КЛИНИКИ (не host-UTC дата)
+        from app.services.visit_confirmation_service import _clinic_today
+
+        service = MorningAssignmentApiService(db_session)
+        assert service.parse_target_date(None) == _clinic_today(db_session)
+        assert service.parse_target_date("2026-02-14") == date(
             2026,
             2,
             14,
         )
 
-    def test_parse_target_date_raises_for_invalid_date(self):
+    def test_parse_target_date_raises_for_invalid_date(self, db_session):
+        service = MorningAssignmentApiService(db_session)
         with pytest.raises(ValueError):
-            MorningAssignmentApiService.parse_target_date("bad-date")
+            service.parse_target_date("bad-date")
 
     def test_manual_assignment_for_visits_returns_not_found_result(self, monkeypatch):
         class FakeMorningService:

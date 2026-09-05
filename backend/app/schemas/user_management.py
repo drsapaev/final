@@ -530,15 +530,10 @@ class UserAuditLogResponse(UserAuditLogBase):
 # re-submission safety: 0 stored users carry the spelling, so no edit flow
 # can re-submit it.
 # E-4 (Receptionist alias removal, §4.1.27): the READ alias in
-# core/security.require_roles and the 'Receptionist' entry in the
-# READ/FILTER vocabulary below were decommissioned — the compatibility
+# core/security.require_roles and the 'Receptionist' entry in the former
+# READ/FILTER vocabulary were decommissioned — the compatibility
 # window closed with all four removal-gate conditions verified (stored = 0,
 # writes frozen, frontend callers = 0, external callers = 0).
-# Codex re-review P2 (PR #3025): the WRITE vocabulary is deliberately
-# separate from the READ/FILTER vocabulary below — the search/filter
-# surfaces must keep accepting the deprecated spelling so a compatible
-# deployment holding legacy rows can still query them (legacy reads
-# temporarily accepted; canonical writes only).
 # M-1 (Manager deprecation): 'Manager' removed from the canonical write
 # vocabulary — Manager is a deprecated legacy/synthetic role (production
 # inventory 2026-09-03: exactly 1 row, the automated smoke_manager account;
@@ -546,9 +541,10 @@ class UserAuditLogResponse(UserAuditLogBase):
 # bulk-assigned or role-changed. Unlike Receptionist there is NO canonical
 # successor role and NO backend alias (privileged grants were removed in
 # M-1D instead). Update-re-submission safety: the single legacy row
-# (smoke_manager) is owned by the post-deploy ops step (DEACTIVATE, not
-# DELETE); an admin edit that re-submits role='Manager' for it now 422s by
-# design — the freeze is the enforcement, ops deactivation is the cleanup.
+# (smoke_manager) was deactivated by the post-deploy ops step on 2026-09-04
+# (is_active=false, tombstone preserved for audit — NOT deleted); an admin
+# edit that re-submits role='Manager' 422s by design — the freeze is the
+# permanent enforcement.
 _USER_MANAGEMENT_ROLE_PATTERN = (
     "^(Admin|Registrar|Doctor|Nurse|Cashier|Lab|Patient|"
     "SuperAdmin|"
@@ -561,13 +557,16 @@ _USER_MANAGEMENT_ROLE_PATTERN = (
 # every legacy lowercase spelling (including the bare "doctor"), which all
 # keep the compatibility auto-map and are NOT canonical onboarding.
 # REC-1 (Receptionist deprecation): 'Receptionist' is deliberately ABSENT
-# here — the write freeze is absolute; it remains queryable via the filter
-# pattern below only.
+# here — the write freeze is absolute.
 # M-1 (Manager deprecation, post-#3032 main): 'Manager' is equally ABSENT
-# from the write vocabulary — a deprecated legacy/synthetic role with no
-# canonical successor (privilege-zero landed in M-1D). The merged tree
-# keeps the READ/FILTER vocabulary accepting both deprecated spellings;
-# create/update/bulk-change-role reject them (write freeze stays absolute).
+# — a deprecated legacy/synthetic role with no canonical successor
+# (privilege-zero landed in M-1D). Create/update/bulk-change-role reject it.
+# M-2 (vocabulary closure, 2026-09-05): the separate READ/FILTER vocabulary
+# was REMOVED — the search/filter surfaces now validate against the same
+# canonical pattern. Removal gate (E-4-style): stored legacy rows are
+# tombstoned (smoke_manager deactivated 2026-09-04, login rejected at the
+# auth layer), writes frozen since M-1, frontend 'Manager' callers = 0,
+# external callers = 0 — the window has closed.
 _NON_DOCTOR_ROLE_VALUES: tuple[str, ...] = (
     "Admin",
     "Registrar",
@@ -578,19 +577,17 @@ _NON_DOCTOR_ROLE_VALUES: tuple[str, ...] = (
     "SuperAdmin",
 ) + tuple(sorted(DOCTOR_ROLE_SPELLINGS))
 
-# Read/filter vocabulary: canonical write vocabulary PLUS the deprecated
-# 'Manager' spelling — used ONLY by query/filter surfaces
-# (UserSearchRequest.role, GET /users role parameter) so legacy rows in
-# compatible deployments remain queryable during the compatibility window
-# (M-1: production carries 1 stored 'Manager' row — smoke_manager — that
-# must stay visible/queryable until the ops deactivation).
-# E-4 (§4.1.27): the 'Receptionist' filter entry was REMOVED — its window
-# closed (0 stored rows, canonical successor exists, alias decommissioned
-# everywhere); Manager's window stays open until the ops deactivation.
-# NOT used by create/update/bulk-change-role (write freeze stays absolute).
-_USER_MANAGEMENT_ROLE_FILTER_PATTERN = (
-    _USER_MANAGEMENT_ROLE_PATTERN[:-2] + "|Manager)$"
-)
+# M-2 (Manager vocabulary closure, 2026-09-05): the former
+# _USER_MANAGEMENT_ROLE_FILTER_PATTERN (write vocabulary PLUS the
+# deprecated 'Manager' spelling, used by UserSearchRequest.role and the
+# GET /users role parameter) was REMOVED — the compatibility window closed
+# the same way E-4 closed Receptionist's: the single stored row
+# (smoke_manager, id=20) was deactivated by ops on 2026-09-04, so no live
+# caller needs to query by the deprecated spelling anymore. Filter
+# surfaces now share the canonical write pattern; ?role=Manager answers
+# 422. The tombstone row itself stays readable by id/username — users.role
+# is a raw String(20) column and response schemas use plain str, so
+# deactivation changed nothing about row serialization.
 
 
 NonDoctorRoleLiteral = Literal.__getitem__(_NON_DOCTOR_ROLE_VALUES)
@@ -839,11 +836,12 @@ class UserSearchRequest(BaseModel):
 
     query: str | None = Field(None, min_length=1, max_length=100)
     # TODO(DB_ROLES): Replace regex with DB-driven validation in Phase 0.5
-    # Codex re-review P2 (PR #3025): READ surface — compatibility filter
-    # vocabulary. E-4 (§4.1.27): 'Receptionist' dropped from the filter set
-    # (window closed); 'Manager' kept until the ops deactivation (M-1).
+    # READ surface — the filter vocabulary now EQUALS the canonical write
+    # vocabulary: E-4 (§4.1.27) dropped 'Receptionist' (window closed) and
+    # M-2 (2026-09-05) dropped 'Manager' the same way after the ops
+    # deactivation of the single stored row (smoke_manager, id=20).
     role: str | None = Field(
-        None, pattern=_USER_MANAGEMENT_ROLE_FILTER_PATTERN
+        None, pattern=_USER_MANAGEMENT_ROLE_PATTERN
     )
     status: UserStatus | None = None
     is_active: bool | None = None
