@@ -65,14 +65,18 @@ export const SIDEBAR_PRESETS = {
     ],
   },
   // PR-UI-04b: restored cashier preset (completes AppShell migration).
-  // Cashier sidebar: Касса (home) + Записи (shared clinical route).
+  // P-014 TIGHTEN: the appointments nav item (clinical-appointments) was
+  // removed from the Cashier sidebar — that route is canonical trio
+  // (Admin/Doctor/Registrar) again, and non-admin presets are not
+  // access-filtered, so a stale entry here would render a dead link that
+  // lands Cashier on /forbidden. Payment workflows for Cashier live on
+  // /cashier (pending-payments feed), not on the shared appointments screen.
   // admin-finance excluded — role-scoped to Admin only.
   cashier: {
     navigation: 'path',
     defaultItem: 'cashier-home',
     items: [
       { id: 'cashier-home', labelKey: 'nav.cashier', icon: CreditCard, to: '/cashier' },
-      { id: 'clinical-appointments', labelKey: 'nav.appointments', icon: Calendar, to: '/clinical/appointments' },
     ],
   },
   doctor: {
@@ -1241,11 +1245,16 @@ export const ROUTE_REGISTRY = [
     lifecycle: stable,
     shell: 'app-shell',
     auth: 'role-scoped',
-    // P-014 fix: previously roles:[Admin, Registrar] excluded Doctor, Cashier, Lab.
-    // Cashier needs to look up appointments to take payments; Lab needs to find
-    // patients for sample collection; Doctor needs to see schedules of peers.
-    // All clinical roles now have read access to the appointments list.
-    roles: ['Admin', 'Doctor', 'Registrar', 'Cashier', 'Lab', 'cardio', 'derma', 'dentist'],
+    // P-014 TIGHTEN: canonical access for Appointments/Scheduler is the
+    // Admin/Doctor/Registrar trio (matches clinical-scheduler above, the page
+    // RoleGate on Appointments.tsx, and backend require_roles). The historical
+    // widening to Cashier/Lab/cardio/derma/dentist was route-level only and
+    // decorative: those roles were 403-rejected by the backend list endpoint
+    // (doctor-family scoping; page never sends doctor_id), so the extra entry
+    // points exposed dead UI reachability and /forbidden landings, not access.
+    // The Cashier payment-facing surface (/appointments/pending-payments and
+    // /cashier) is preserved separately — see APPOINTMENT_PENDING_PAYMENT_ROLES.
+    roles: ['Admin', 'Doctor', 'Registrar'],
     entry: 'menu',
     nav: nav({ labelKey: 'nav.appointments', icon: Calendar, sectionKey: 'nav.section_clinical', order: 90, menu: true }),
     title: 'Clinical Appointments',
