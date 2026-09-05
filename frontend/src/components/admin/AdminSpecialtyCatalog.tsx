@@ -30,6 +30,9 @@ const AdminSpecialtyCatalog = () => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const [rows, setRows] = useState<CatalogRow[]>([]);
+  const [createForm, setCreateForm] = useState({ code: '', title_ru: '', title_en: '' });
+  const [createFormError, setCreateFormError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingCode, setSavingCode] = useState<string | null>(null);
@@ -43,7 +46,7 @@ const AdminSpecialtyCatalog = () => {
       setRows(response.data);
     } catch (loadError) {
       logger.error('Failed to load specialty catalog:', loadError);
-      setError(String(loadError));
+      setError(t('admin2.spec_load_failed'));
     } finally {
       setLoading(false);
     }
@@ -55,6 +58,32 @@ const AdminSpecialtyCatalog = () => {
 
   const setDraft = (code: string, patch: Partial<CatalogRow>) =>
     setDrafts((prev) => ({ ...prev, [code]: { ...prev[code], ...patch } }));
+
+  const createSpecialty = async () => {
+    const code = createForm.code.trim();
+    const title_ru = createForm.title_ru.trim();
+    if (!code || !title_ru) {
+      setCreateFormError(t('admin2.spec_create_validation'));
+      return;
+    }
+    setCreating(true);
+    setCreateFormError(null);
+    try {
+      const response = await api.post('/admin/doctors-catalog', {
+        code,
+        title_ru,
+        title_en: createForm.title_en.trim() || null,
+      });
+      setRows((prev) => [...prev, response.data].sort((a, b) => a.code.localeCompare(b.code)));
+      setCreateForm({ code: '', title_ru: '', title_en: '' });
+      notify.success(t('admin2.spec_created'));
+    } catch (createError) {
+      logger.error('Failed to create specialty:', createError);
+      notify.error(t('admin2.spec_save_failed'));
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const saveRow = async (row: CatalogRow) => {
     const patch = drafts[row.code];
@@ -127,6 +156,47 @@ const AdminSpecialtyCatalog = () => {
         </div>
       </Card>
 
+      {/* Create form — new specialties appear in onboarding immediately */}
+      <Card variant="default" shadow="none" className="admin-patients-header-card">
+        <div className="admin-doctors-filters-grid">
+          <Input
+            placeholder={t('admin2.spec_create_code')}
+            value={createForm.code}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setCreateForm((prev) => ({ ...prev, code: e.target.value }))
+            }
+            aria-label={t('admin2.spec_create_code')}
+          />
+          <Input
+            placeholder={t('admin2.spec_create_title_ru')}
+            value={createForm.title_ru}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setCreateForm((prev) => ({ ...prev, title_ru: e.target.value }))
+            }
+            aria-label={t('admin2.spec_create_title_ru')}
+          />
+          <Input
+            placeholder={t('admin2.spec_create_title_en')}
+            value={createForm.title_en}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setCreateForm((prev) => ({ ...prev, title_en: e.target.value }))
+            }
+            aria-label={t('admin2.spec_create_title_en')}
+          />
+          <Button
+            variant="primary"
+            startIcon={<Plus size={16} />}
+            onClick={createSpecialty}
+            disabled={creating || !createForm.code.trim() || !createForm.title_ru.trim()}
+          >
+            {t('admin2.spec_create_button')}
+          </Button>
+        </div>
+        {createFormError && (
+          <div className="admin-field-error" role="alert">{createFormError}</div>
+        )}
+      </Card>
+
       {loading ? (
         <div className="admin-p-24" aria-busy="true">{t('admin2.spec_loading')}</div>
       ) : error ? (
@@ -149,7 +219,9 @@ const AdminSpecialtyCatalog = () => {
               <tbody>
                 {rows.map((row) => {
                   const draft = drafts[row.code] ?? {};
-                  const dirty = Boolean(draft.title_ru || draft.title_en);
+                  // Codex P2: dirtiness = any changed draft key present
+                  // (clearing a title to '' is also a persisted edit).
+                  const dirty = Object.keys(draft).length > 0;
                   return (
                     <tr key={row.code} className="admin-patients-tbody-row">
                       <td className="admin-p-12-16">
