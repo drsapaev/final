@@ -274,6 +274,90 @@ export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
 };
 
 // =====================================================================
+// PATIENT PROFILE UPDATE (Fix B: explicit profile save + verification)
+// =====================================================================
+
+const digitsOnly = (value: unknown): string =>
+  String(value ?? '').replace(/\D/g, '');
+
+export interface PatientProfileSnapshot {
+  full_name: string;
+  phone_digits: string;
+  address: string;
+  birth_date: string;
+  sex: string;
+}
+
+// API-ориентированный снимок профиля карточки на момент выбора/инициализации.
+// Используется для diff'а «форма vs карточка», чтобы отправлять update только
+// по реально изменённым полям.
+export const buildPatientProfileSnapshot = (
+  patient: Record<string, unknown> | null | undefined
+): PatientProfileSnapshot => ({
+  full_name: String(patient?.fio ?? patient?.full_name ?? '')
+    .replace(/\s+/g, ' ')
+    .trim(),
+  phone_digits: digitsOnly(patient?.phone),
+  address: String(patient?.address ?? '').trim(),
+  birth_date: String(patient?.birth_date ?? '').trim(),
+  sex: String(
+    genderToPatientSexForApi(
+      resolvePatientGenderValue(patient as PatientGenderRecordLike)
+    ) ?? ''
+  ),
+});
+
+// Возвращает payload для updatePatient по изменившимся полям либо null,
+// если профиль не менялся (без лишних PUT-запросов).
+export const buildPatientProfileUpdate = (
+  snapshot: PatientProfileSnapshot | null | undefined,
+  form: Record<string, unknown>,
+  options: { normalizedPhone?: string | null } = {}
+): Record<string, unknown> | null => {
+  if (!snapshot) return null;
+
+  const current = buildPatientProfileSnapshot(form);
+  if (options.normalizedPhone !== undefined) {
+    current.phone_digits = digitsOnly(options.normalizedPhone);
+  }
+
+  const update: Record<string, unknown> = {};
+  if (current.full_name !== snapshot.full_name && current.full_name) {
+    update.full_name = current.full_name;
+  }
+  if (current.phone_digits !== snapshot.phone_digits && current.phone_digits) {
+    update.phone = options.normalizedPhone
+      ? String(options.normalizedPhone).trim()
+      : String(form.phone ?? '').trim();
+  }
+  if (current.address !== snapshot.address) {
+    update.address = current.address;
+  }
+  if (current.birth_date !== snapshot.birth_date) {
+    update.birth_date = current.birth_date;
+  }
+  if (current.sex !== snapshot.sex && current.sex) {
+    update.sex = current.sex;
+  }
+
+  return Object.keys(update).length > 0 ? update : null;
+};
+
+// Сверка сохранённого имени с отправленным (после PUT ответ содержит
+// перечитанную с сервера карточку). Регистронезависимо, без лишних пробелов.
+export const isSavedNameMatching = (
+  savedName: unknown,
+  requestedName: unknown
+): boolean => {
+  const normalize = (value: unknown): string =>
+    String(value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const saved = normalize(savedName);
+  const requested = normalize(requestedName);
+  if (!saved || !requested) return true; // нечего сверять — не считаем ошибкой
+  return saved === requested;
+};
+
+// =====================================================================
 // PATIENT ID RESOLUTION
 // =====================================================================
 
@@ -457,6 +541,9 @@ export default {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  buildPatientProfileSnapshot,
+  buildPatientProfileUpdate,
+  isSavedNameMatching,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,

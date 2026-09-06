@@ -78,6 +78,12 @@ class PatientCreate(PatientBase):
 
 
 class PatientUpdate(ORMModel):
+    # Fix B (wizard profile save): мастер регистрации отправляет правки профиля
+    # единым full_name. Раньше поле молча отбрасывалось Pydantic (extra=ignore) и
+    # ФИО не сохранялось при ответе 200. Теперь поле принимается, а сервис
+    # нормализует его в last_name/first_name/middle_name через
+    # normalize_patient_name (см. PatientService.update_patient).
+    full_name: str | None = Field(None, max_length=255)
     last_name: str | None = Field(None, max_length=128)
     first_name: str | None = Field(None, max_length=128)
     middle_name: str | None = Field(None, max_length=128)

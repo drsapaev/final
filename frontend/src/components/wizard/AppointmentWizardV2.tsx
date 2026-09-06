@@ -209,6 +209,10 @@ import {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  // Fix B (profile save): снимок карточки + diff профиля + верификация ответа.
+  buildPatientProfileSnapshot,
+  buildPatientProfileUpdate,
+  isSavedNameMatching,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
@@ -217,6 +221,7 @@ import {
   resolveInitialServiceCategory,
   categories,
 } from './wizardUtils';
+import type { PatientProfileSnapshot } from './wizardUtils';
 
 const AppointmentWizardV2 = ({
   isOpen,
@@ -388,6 +393,20 @@ const AppointmentWizardV2 = ({
           }
         });
 
+        // Fix B: снимок профиля для diff'а правок при сабмите (editMode)
+        editProfileSnapshotRef.current = buildPatientProfileSnapshot({
+          fio: String(initialData.patient_fio || initialData.patient_name || initialDataPatient.fio || ''),
+          phone: formatUzbekPhoneDisplay(
+            String(initialData.phone || initialData.patient_phone || initialDataPatient.phone || '')
+          ),
+          address: String(initialData.address || initialDataPatient.address || ''),
+          gender: (() => {
+            const genderValue = resolvePatientGenderValue(initialData);
+            return normalizeGenderForForm(genderValue);
+          })(),
+          birth_date: birthDate
+        });
+
         // ✅ ИСПРАВЛЕНО: Синхронизация formattedBirthDate
         if (birthDate) {
           setFormattedBirthDate(convertDateFromISO(birthDate));
@@ -465,6 +484,9 @@ const AppointmentWizardV2 = ({
       setActiveServiceCategory('specialists');
       setServiceSearchQuery('');
       setShowAllServices(false);
+      // Fix B: снимки профилей больше не актуальны
+      selectedCardProfileRef.current = null;
+      editProfileSnapshotRef.current = null;
     }
   }, [isOpen]);
 
@@ -497,6 +519,11 @@ const AppointmentWizardV2 = ({
   const phoneRef = useRef<HTMLInputElement>(null);
   const nextStepRef = useRef<() => void>(() => {});
   const handleCompleteRef = useRef<() => Promise<void>>(async () => {});
+  // Fix B: снимок профиля карточки на момент выбора (selectPatient) или
+  // инициализации editMode. Нужен для diff'а «форма vs карточка» перед сабмитом,
+  // чтобы правки профиля существующего пациента не терялись молча.
+  const selectedCardProfileRef = useRef<PatientProfileSnapshot | null>(null);
+  const editProfileSnapshotRef = useRef<PatientProfileSnapshot | null>(null);
 
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
@@ -574,6 +601,8 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(STEP_PATIENT);
+    // Fix B: выбранная карточка сброшена — снимок больше не актуален
+    selectedCardProfileRef.current = null;
     toast.success(t('misc.aw_form_cleared'));
   };
 
@@ -729,6 +758,13 @@ const AppointmentWizardV2 = ({
         middleName: patient.middle_name || ''
       }
     }));
+
+    // Fix B: снимок профиля выбранной карточки для diff'а при сабмите —
+    // правки адреса/телефона/даты рождения/пола у существующего пациента
+    // должны явно сохраняться, а не теряться молча
+    selectedCardProfileRef.current = buildPatientProfileSnapshot(
+      patient as unknown as Record<string, unknown>
+    );
 
     // Обновляем отформатированную дату
     setFormattedBirthDate(convertDateFromISO(patient.birth_date || ''));
@@ -1667,7 +1703,13 @@ const AppointmentWizardV2 = ({
               await updatePatient(foundPatient.id as string | number, updateData);
               logger.log('✅ Patient data updated');
             } catch (e: unknown) {
-              logger.warn('⚠️ Failed to update patient:', e);
+              // Fix B: ошибка сохранения профиля не может пройти молча —
+              // финальный тост «успешно» без сохранённых данных = ложный успех.
+              // Явно останавливаем отправку и показываем ошибку.
+              const updateErr = e as Error & { status?: number; message?: string };
+              logger.error('[AppointmentWizardV2] Failed to update patient before attach:', updateErr.status, updateErr.message);
+              toast.error(t('misc.aw_patient_profile_save_failed', { message: updateErr.message || t('misc.aw_unknown_error') }));
+              return;
             }
           }
         } else {
@@ -1794,6 +1836,41 @@ const AppointmentWizardV2 = ({
         });
         toast.error(t('misc.aw_patient_not_determined'));
         return;
+      }
+
+      // === Fix B: явное сохранение правок профиля выбранной карточки (обычный режим) ===
+      // Раньше обычная новая регистрация существующего пациента передавала
+      // patient_id как есть, а правки ФИО/адреса/телефона/даты рождения/пола
+      // в форме молча терялись. Теперь diff'им форму со снимком карточки и
+      // сохраняем только реально изменённые поля.
+      if (!editMode && patientId && selectedCardProfileRef.current) {
+        const profileUpdate = buildPatientProfileUpdate(
+          selectedCardProfileRef.current,
+          wizardData.patient as Record<string, unknown>,
+          { normalizedPhone }
+        );
+        if (profileUpdate) {
+          logger.log('[AppointmentWizardV2] Saving patient profile changes before submit:', Object.keys(profileUpdate));
+          try {
+            const updatedPatient = await updatePatient(patientId, profileUpdate);
+            // Fix B: 200 недостаточно — сверяем перечитанный с сервера ответ
+            if (
+              typeof profileUpdate.full_name === 'string' &&
+              !isSavedNameMatching(
+                (updatedPatient as unknown as Record<string, unknown>).full_name ?? (updatedPatient as unknown as Record<string, unknown>).name,
+                profileUpdate.full_name
+              )
+            ) {
+              throw new Error(t('misc.aw_patient_profile_verify_failed'));
+            }
+            logger.log('[AppointmentWizardV2] Patient profile changes saved');
+          } catch (profileError: unknown) {
+            const profileErr = profileError as Error & { status?: number; message?: string };
+            logger.error('[AppointmentWizardV2] Failed to save patient profile changes:', profileErr.status, profileErr.message);
+            toast.error(t('misc.aw_patient_profile_save_failed', { message: profileErr.message || t('misc.aw_unknown_error') }));
+            return;
+          }
+        }
       }
 
       const initialPatientSex = genderToPatientSexForApi(resolvePatientGenderValue(initialData));
@@ -2450,8 +2527,20 @@ const AppointmentWizardV2 = ({
           // UX Audit Stage 3 (Wizard issue 5.1):
           // Заменён raw fetch() PUT на updatePatient() из api/patients.
           // updatePatient() бросает Error с .message и .status при неудаче.
-          await updatePatient(patientId, patientUpdateData);
+          const updatedPatient = await updatePatient(patientId, patientUpdateData);
           logger.log('✅ Данные пациента успешно обновлены');
+
+          // Fix B: 200 недостаточно — серверный ответ содержит перечитанную
+          // карточку. Если ФИО не совпало с отправленным — сохранения не было.
+          if (
+            typeof patientUpdateData.full_name === 'string' &&
+            !isSavedNameMatching(
+              (updatedPatient as unknown as Record<string, unknown>).full_name ?? (updatedPatient as unknown as Record<string, unknown>).name,
+              patientUpdateData.full_name
+            )
+          ) {
+            throw new Error(t('misc.aw_patient_profile_verify_failed'));
+          }
           toast.success(t('misc.aw_patient_data_updated'));
 
           // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
@@ -2475,7 +2564,9 @@ const AppointmentWizardV2 = ({
           const patientErr = patientError as Error & { message?: string };
           logger.error('❌ Ошибка обновления данных пациента:', patientError);
           toast.error(t('misc.aw_patient_data_update_error', { message: patientErr.message || t('misc.aw_unknown_error') }));
-          // Продолжаем с обычным flow (хотя visits пустой, это не должно произойти)
+          // Fix B: ошибка сохранения профиля — это НЕ успех. Явно останавливаем
+          // отправку, не продолжаем flow с ложным «успешно обновлено».
+          return;
         }
       }
 

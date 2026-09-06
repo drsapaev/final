@@ -377,7 +377,21 @@ class PatientService:
         # extract_model_changes -> кортеж, маскируем после распаковки).
         old_data, _ = extract_model_changes(patient, None)
         old_data = mask_pii(old_data)
-        patient = patient_crud.update(db=self.db, db_obj=patient, obj_in=patient_in)
+
+        # Fix B (wizard profile save): PatientUpdate теперь принимает full_name.
+        # Нормализуем его в last_name/first_name/middle_name той же функцией,
+        # что и при создании (SSOT: normalize_patient_name), и НЕ передаём
+        # schema-only поле в CRUD — у ORM-модели full_name это read-only
+        # hybrid property, setattr затирал бы её в экземпляре.
+        update_payload = patient_in.model_dump(exclude_unset=True)
+        raw_full_name = update_payload.pop("full_name", None)
+        if raw_full_name is not None and str(raw_full_name).strip():
+            name_parts = normalize_patient_name(full_name=str(raw_full_name).strip())
+            update_payload["last_name"] = name_parts.get("last_name") or None
+            update_payload["first_name"] = name_parts.get("first_name") or None
+            update_payload["middle_name"] = name_parts.get("middle_name") or None
+
+        patient = patient_crud.update(db=self.db, db_obj=patient, obj_in=update_payload)
         self.db.refresh(patient)
 
         _, new_data = extract_model_changes(None, patient)

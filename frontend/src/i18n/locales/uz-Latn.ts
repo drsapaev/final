@@ -6334,6 +6334,8 @@ const uzLatn = {
     aw_services_unprocessable_reload: 'Baʼzi xizmatlarni qayta ishlab boʻlmadi. Iltimos, sahifani qayta yuklang va qayta urinib koʻring.',
     aw_fio_required: 'Bemorning FIOsi toʻldirilishi shart',
     aw_patient_phone_exists_not_found: '{phone} telefon raqamli bemor allaqachon mavjud, lekin bazada topilmadi.',
+    aw_patient_profile_save_failed: 'Bemor profilidagi oʻzgartirishlarni saqlab boʻlmadi: {message}. Yozuv yaratilmadi — maʼlumotlarni tekshirib qayta urinib koʻring.',
+    aw_patient_profile_verify_failed: 'Saqlangan bemor maʼlumotlari yuborilganlarga mos kelmadi. Yozuv yaratilmadi — kartani qayta oʻqib urinib koʻring.',
     aw_patient_validation_error: 'Bemor maʼlumotlarini tasdiqlash xatosi: {message}',
     aw_patient_creation_error: 'Bemorni yaratish xatosi: {status} {message}',
     aw_patient_not_determined: 'Bemorni aniqlab boʻlmadi. Iltimos, sahifani qayta yuklang va qayta urinib koʻring.',
