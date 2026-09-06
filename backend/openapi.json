@@ -15717,6 +15717,53 @@
         ]
       }
     },
+    "/api/v1/registrar/cart/quote": {
+      "post": {
+        "tags": [
+          "registrar-wizard"
+        ],
+        "summary": "Quote Cart Prices",
+        "description": "Fix D: read-only предварительный расчёт цены корзины БЕЗ сохранения.\n\nПереиспользует те же настройки и тот же хелпер скидок, что и путь\nсохранения /registrar/cart (_load_registration_discount_settings +\n_apply_service_discount) — frontend больше не дублирует бизнес-правила\nскидок, и подтверждённая сумма совпадает с суммой invoice.\n\nОтсутствие цены у услуги — это НЕ 0: endpoint отвечает 409 с указанием\nуслуги, чтобы регистратор увидел проблему до сохранения.",
+        "operationId": "quote_cart_prices_api_v1_registrar_cart_quote_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CartQuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartQuoteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/registrar/cart/edit-delta": {
       "post": {
         "tags": [
@@ -70865,6 +70912,115 @@
           "ecg_date"
         ],
         "title": "CardioECGRecordOut"
+      },
+      "CartQuoteItemRequest": {
+        "properties": {
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Quantity",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "service_id"
+        ],
+        "title": "CartQuoteItemRequest"
+      },
+      "CartQuoteItemResponse": {
+        "properties": {
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "service_name": {
+            "type": "string",
+            "title": "Service Name"
+          },
+          "unit_price": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Unit Price"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "discount_percent": {
+            "type": "integer",
+            "title": "Discount Percent"
+          },
+          "final_price": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Final Price"
+          }
+        },
+        "type": "object",
+        "required": [
+          "service_id",
+          "service_name",
+          "unit_price",
+          "quantity",
+          "discount_percent",
+          "final_price"
+        ],
+        "title": "CartQuoteItemResponse"
+      },
+      "CartQuoteRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CartQuoteItemRequest"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "discount_mode": {
+            "type": "string",
+            "title": "Discount Mode",
+            "default": "none"
+          },
+          "all_free": {
+            "type": "boolean",
+            "title": "All Free",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "CartQuoteRequest"
+      },
+      "CartQuoteResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CartQuoteItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Amount"
+          },
+          "approval_status": {
+            "type": "string",
+            "title": "Approval Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total_amount",
+          "approval_status"
+        ],
+        "title": "CartQuoteResponse"
       },
       "CartRequest": {
         "properties": {

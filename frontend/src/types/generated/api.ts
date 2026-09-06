@@ -5468,6 +5468,34 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/registrar/cart/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quote Cart Prices
+         * @description Fix D: read-only предварительный расчёт цены корзины БЕЗ сохранения.
+         *
+         *     Переиспользует те же настройки и тот же хелпер скидок, что и путь
+         *     сохранения /registrar/cart (_load_registration_discount_settings +
+         *     _apply_service_discount) — frontend больше не дублирует бизнес-правила
+         *     скидок, и подтверждённая сумма совпадает с суммой invoice.
+         *
+         *     Отсутствие цены у услуги — это НЕ 0: endpoint отвечает 409 с указанием
+         *     услуги, чтобы регистратор увидел проблему до сохранения.
+         */
+        post: operations["quote_cart_prices_api_v1_registrar_cart_quote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/registrar/cart/edit-delta": {
         parameters: {
             query?: never;
@@ -24205,6 +24233,55 @@ export type components = {
             created_at?: string | null;
             /** Updated At */
             updated_at?: string | null;
+        };
+        /** CartQuoteItemRequest */
+        CartQuoteItemRequest: {
+            /** Service Id */
+            service_id: number;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number;
+        };
+        /** CartQuoteItemResponse */
+        CartQuoteItemResponse: {
+            /** Service Id */
+            service_id: number;
+            /** Service Name */
+            service_name: string;
+            /** Unit Price */
+            unit_price: string;
+            /** Quantity */
+            quantity: number;
+            /** Discount Percent */
+            discount_percent: number;
+            /** Final Price */
+            final_price: string;
+        };
+        /** CartQuoteRequest */
+        CartQuoteRequest: {
+            /** Items */
+            items?: components["schemas"]["CartQuoteItemRequest"][];
+            /**
+             * Discount Mode
+             * @default none
+             */
+            discount_mode: string;
+            /**
+             * All Free
+             * @default false
+             */
+            all_free: boolean;
+        };
+        /** CartQuoteResponse */
+        CartQuoteResponse: {
+            /** Items */
+            items: components["schemas"]["CartQuoteItemResponse"][];
+            /** Total Amount */
+            total_amount: string;
+            /** Approval Status */
+            approval_status: string;
         };
         /** CartRequest */
         CartRequest: {
@@ -47882,6 +47959,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quote_cart_prices_api_v1_registrar_cart_quote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CartQuoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartQuoteResponse"];
                 };
             };
             /** @description Validation Error */
