@@ -552,6 +552,10 @@ def test_adr_001_documents_dual_owner_axis() -> None:
     assert "0058_queue_resource_expand" in text
     # the doctor-ownership decision itself is explicitly unchanged
     assert "decision itself is UNCHANGED" in text
+    # Codex round-2 P2: the general resource's conditional fate is explicit —
+    # stage E cannot retire general_resource before its destination decision
+    # lands, so general queues are never left ownerless
+    assert "deliberately conditional, not forgotten" in text
 
 
 # ===================== E. migration 0058 (offline PG dialect) =====================

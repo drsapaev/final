@@ -200,6 +200,15 @@ The rollout is staged, one PR per stage:
 | D | CONTRACT: XOR CHECK + partial active uniqueness (`UNIQUE(day, queue_resource_id) WHERE active AND queue_resource_id IS NOT NULL`). |
 | E | Retire the synthetic User+Doctor pairs (paired deletion), remove the bridge vocabulary. |
 
+**The `general` resource is deliberately conditional, not forgotten.** Stage B
+seeds `lab` and `ecg` only — the `general` tag becomes a registry row ONLY if
+the QD-2B inventory proves it is a real standalone routing tag rather than a
+mixed bucket. Its destination is an explicit operator decision (registry row
+in a stage-B follow-up, or retirement of general-queue routing with the load
+moved to explicit tags) that must land BEFORE stage E can retire
+`general_resource` — stage E is gated on zero live references for all three
+synthetic pairs, so general queues can never be left without an owner.
+
 ### Guidance for readers of this ADR
 
 Anything that routes, authorizes, or reports on queues must treat ownership
