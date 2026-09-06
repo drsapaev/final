@@ -15,6 +15,7 @@ import logger from '../../utils/logger';
 import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import { HEADER_PORTAL_Z } from '../../theme/zLayers';
 
 const patientSearchRouteByRole = {
   registrar: getRoleHomeRoute('registrar'),
@@ -358,7 +359,9 @@ export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps
       border: '1px solid var(--mac-border, #e2e8f0)',
       borderRadius: 'var(--mac-radius-lg)',
       boxShadow: '0 10px 40px rgba(0,0,0,0.25)',
-      zIndex: 2147483647,
+      // HDR-FX-1 (P2-3): shared header-portal layer instead of INT32_MAX
+      // (which painted this dropdown above the session-expiry modal).
+      zIndex: HEADER_PORTAL_Z,
       maxHeight: '400px',
       overflowY: 'auto'
     },
