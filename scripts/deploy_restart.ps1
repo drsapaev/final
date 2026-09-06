@@ -189,12 +189,24 @@ try {
     }
 
     # --- Stop current uvicorn -------------------------------------------------
+    # Remember the OLD listener pid: if the kill fails (e.g. an elevated
+    # process vs a non-elevated shell) and the same pid still answers the
+    # health poll afterwards, the deploy DID NOT take effect — fail loudly
+    # instead of reporting "healthy" against the previous process
+    # (observed 2026-09-06: access-denied taskkill, health passed on the
+    # old process, deploy silently skipped).
     $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
         Select-Object -First 1
+    $oldPid = $null
     if ($conn) {
-        Write-Host "deploy_restart: stopping uvicorn pid=$($conn.OwningProcess)."
-        taskkill /PID $conn.OwningProcess /T /F | Out-Null
+        $oldPid = $conn.OwningProcess
+        Write-Host "deploy_restart: stopping uvicorn pid=$oldPid."
+        taskkill /PID $oldPid /T /F | Out-Null
         Start-Sleep -Seconds 3
+        $stillListening = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+        if ($stillListening) {
+            Fail "old uvicorn pid=$oldPid could not be stopped (access denied?) - run this script from an elevated shell or stop the process manually; aborting instead of reporting a false deploy."
+        }
     }
     else {
         Write-Host 'deploy_restart: no listener on port; starting fresh.'
@@ -218,7 +230,12 @@ try {
         try {
             $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/v1/health" -TimeoutSec 5
             if ($health.ok) {
-                Write-Host "deploy_restart: healthy (db=$($health.db)) on port $Port."
+                $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
+                    Select-Object -First 1
+                if ($oldPid -and $listener -and $listener.OwningProcess -eq $oldPid) {
+                    Fail "old process pid=$oldPid is still answering after the restart attempt - the new backend did not take over."
+                }
+                Write-Host "deploy_restart: healthy (db=$($health.db)) on port $Port (listener pid=$($listener.OwningProcess))."
                 exit 0
             }
         }
