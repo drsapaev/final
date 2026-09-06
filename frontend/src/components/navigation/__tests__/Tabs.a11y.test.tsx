@@ -74,11 +74,15 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
   // payment, today count) must ride the accessible DESCRIPTION instead —
   // aria-describedby -> the in-button .status-indicators container, which
   // stays visible (referenceable) at every viewport width.
-  it('populated departmentStats: status text is reachable as the button accessible description', async () => {
+  // Codex P2 round 2 (thread 3944985044): the target must carry REAL
+  // localized text (titles do not concatenate; boolean-only states would be
+  // empty) — the .sr-only sentence is asserted via toHaveAccessibleDescription.
+  it('populated departmentStats: status text is the button accessible description', async () => {
     render(
       <Tabs
         departmentStats={{
           cardiology: { todayCount: 4, hasActiveQueue: true, hasPendingPayments: true },
+          ecg: { todayCount: 0, hasActiveQueue: true, hasPendingPayments: false },
         }}
       />
     );
@@ -88,23 +92,31 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
     const describedBy = cardiology.getAttribute('aria-describedby');
     expect(describedBy).toBeTruthy();
 
-    // The reference resolves INSIDE the same button (no dangling id).
-    const statusContainer = document.getElementById(describedBy as string);
-    expect(statusContainer).not.toBeNull();
-    expect(cardiology.contains(statusContainer as Node)).toBe(true);
-    expect(statusContainer).toHaveClass('status-indicators');
+    // The reference resolves INSIDE the same button (no dangling id) and
+    // targets the DEDICATED sr-only sentence node (round 2: the visible
+    // indicator container would concatenate bare count digits into the
+    // description).
+    const statusTarget = document.getElementById(describedBy as string);
+    expect(statusTarget).not.toBeNull();
+    expect(cardiology.contains(statusTarget as Node)).toBe(true);
+    expect(statusTarget).toHaveClass('sr-only');
+    expect(statusTarget?.textContent).toBe('queue.queue: 4, queue.pending, queue.today: 4');
 
-    // All three populated indicators render; the today-count digits are
-    // real text inside the description target (titles ride along as
-    // attribute-level text on the icon-only indicators).
+    // Visible indicators render as before (pure visual layer).
+    const statusContainer = cardiology.querySelector('.status-indicators');
     expect(statusContainer!.querySelectorAll('.status-indicator').length).toBe(3);
     expect(statusContainer!.querySelector('.status-indicator.queue')).not.toBeNull();
     expect(statusContainer!.querySelector('.status-indicator.pending')).not.toBeNull();
     expect(statusContainer!.querySelector('.status-indicator.count')?.textContent).toContain('4');
-    expect(statusContainer!.querySelector('.status-indicator.queue')).toHaveAttribute(
-      'title',
-      'queue.queue: 4',
-    );
+
+    // THE assertion Codex demanded: the computed accessible description
+    // carries the full localized status text.
+    expect(cardiology).toHaveAccessibleDescription('queue.queue: 4, queue.pending, queue.today: 4');
+
+    // Boolean-only state (active queue, zero count): previously this would
+    // compute an EMPTY description (icon SVG only) — now it announces text.
+    const ecg = screen.getByRole('button', { name: 'misc.mt_ekg' });
+    expect(ecg).toHaveAccessibleDescription('queue.queue: 0');
   });
 
   it('empty departmentStats: no aria-describedby dangles on department buttons', async () => {

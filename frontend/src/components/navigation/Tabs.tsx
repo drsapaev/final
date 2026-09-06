@@ -300,6 +300,22 @@ const Tabs = ({
     const s = getStats(tabKey);
     return s.hasActiveQueue || s.hasPendingPayments || s.todayCount > 0;
   };
+  // AXE-MOB-1 (Codex P2 round 2, thread 3944985044): the description target
+  // must carry REAL text. Icon-only indicators store their meaning in
+  // `title` attributes, which are not reliably concatenated into the
+  // accessible description, and boolean-only states would compute an EMPTY
+  // description (or an unexplained bare count). statusTextFor composes the
+  // localized status sentence from the same stats the visible indicators
+  // render; it is placed inside the target as .sr-only text (canonical
+  // clip pattern in tokens.css) — visually invisible, announced by AT.
+  const statusTextFor = (tabKey: string): string => {
+    const s = getStats(tabKey);
+    const parts: string[] = [];
+    if (s.hasActiveQueue) parts.push(`${t('queue.queue')}: ${s.todayCount}`);
+    if (s.hasPendingPayments) parts.push(t('queue.pending'));
+    if (s.todayCount > 0) parts.push(`${t('queue.today')}: ${s.todayCount}`);
+    return parts.join(', ');
+  };
 
   // Показываем заглушку пока загружаются вкладки
   if (loading) {
@@ -416,9 +432,19 @@ const Tabs = ({
                   <span className="tab-label">{tab.label}</span>
 
                   {/* Индикаторы статуса */}
-                  <div className="status-indicators" id={statusIdFor(tab.key)}>
+                  <div className="status-indicators">
                     {renderStatusIndicators(tab.key)}
                   </div>
+                  {/* AXE-MOB-1 round 2 (thread 3944985044): dedicated sr-only
+                      description TARGET — the visible container would
+                      concatenate the bare count digits into the description
+                      ("4 queue.queue: 4 …"); this node carries ONLY the
+                      localized sentence, so the description is exact. */}
+                  {hasStatusFor(tab.key) && (
+                    <span id={statusIdFor(tab.key)} className="sr-only">
+                      {statusTextFor(tab.key)}
+                    </span>
+                  )}
                 </div>
 
                 {/* Эффект ripple */}
