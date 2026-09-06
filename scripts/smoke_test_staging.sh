@@ -17,6 +17,10 @@
 #   prerequisite such as SENTRY_DSN / DATABASE_URL / optional dependency).
 #   Skipped checks are counted and listed in the summary so incomplete
 #   coverage cannot be mistaken for a full pass.
+#   Coverage honesty: some checks are wiring-only or reduced subsets of the
+#   corresponding runbook items. Each such check prints a NOTE stating
+#   exactly what it does NOT prove; the uncovered part stays manual or in
+#   nightly CI (see docs/runbooks/STAGING_VALIDATION.md).
 #
 # This script is safe to run multiple times. It does NOT modify data.
 # It only reads, sends test events to Sentry, and creates a throwaway
@@ -92,6 +96,8 @@ except RuntimeError as e:
     capture_exception(e)
 print('    Backend event sent to Sentry.')
 " 2>&1
+        echo "    NOTE: proves event submission only — delivery is not verified here."
+        echo "    Frontend event smoke is manual (browser console, runbook Check 1)."
     )
 }
 
@@ -143,6 +149,8 @@ from app.services.ai_feature_gating import RequireAiFeature
 dep = RequireAiFeature('ai_smart_template')
 print('    RequireAiFeature dependency instantiated correctly.')
 " 2>&1
+        echo "    NOTE: proves wiring only (flag row + dependency class)."
+        echo "    Behavioral toggle->503 is manual (runbook Check 3)."
     )
 }
 
@@ -160,10 +168,14 @@ ai_safety_check() {
     (
         cd backend || exit 1
         python -m pytest tests/unit/test_pii_masker.py -v --tb=short 2>&1 | tail -20
+        echo "    NOTE: PII masker subset only."
+        echo "    requires_doctor_confirmation Playwright contract runs in nightly"
+        echo "    CI (ai-safety-guardrails.yml), not here; full proof is manual"
+        echo "    (runbook Check 4)."
     )
 }
 
-run_check 4 "AI safety + PII masker unit tests" ai_safety_check
+run_check 4 "PII masker unit tests (AI-safety subset)" ai_safety_check
 
 # ---------------------------------------------------------------------------
 # Check 5: arq worker setup
@@ -181,10 +193,12 @@ from app.tasks.worker import WorkerSettings, send_visit_reminder, run_data_reten
 print(f'    Worker functions: {len(WorkerSettings.functions)} defined')
 print(f'    Cron jobs: {len(WorkerSettings.cron_jobs)} defined')
 " 2>&1
+        echo "    NOTE: proves module wiring only."
+        echo "    enqueue+process needs live Redis+worker — manual (runbook Check 5)."
     )
 }
 
-run_check 5 "arq worker setup" arq_check
+run_check 5 "arq worker module wiring" arq_check
 
 # ---------------------------------------------------------------------------
 # Check 6: PII scrubbing
@@ -275,7 +289,7 @@ bandit_check() {
 run_check 9 "Bandit security scan (MEDIUM+)" bandit_check
 
 # ---------------------------------------------------------------------------
-# Check 10: Frontend build (if node available)
+# Check 10: Frontend build + unit tests (if node available)
 # ---------------------------------------------------------------------------
 frontend_check() {
     if [ ! -d frontend/node_modules ]; then
@@ -284,11 +298,13 @@ frontend_check() {
     fi
     (
         cd frontend || exit 1
-        npm run build 2>&1 | tail -5 | sed 's/^/    /'
+        npm run build 2>&1 | tail -5 | sed 's/^/    /' || exit 1
+        echo "    Build OK — running frontend unit tests (vitest)..."
+        npm run test:run 2>&1 | tail -15
     )
 }
 
-run_check 10 "Frontend build" frontend_check
+run_check 10 "Frontend build + unit tests" frontend_check
 
 # ---------------------------------------------------------------------------
 # Summary

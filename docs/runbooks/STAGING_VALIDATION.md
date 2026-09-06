@@ -571,18 +571,21 @@ npm run test:run      # 467+ tests pass
 
 ## Automated smoke test script
 
-Run all checks 1, 2, 3, 5, 7, 8, 9 in one command:
+Runs all 10 checks in one command (some as wiring-only or reduced subsets —
+each such check prints a NOTE stating exactly what it does **not** prove):
 
 ```bash
 bash scripts/smoke_test_staging.sh
 ```
 
 This script:
-- Sets up env vars from `.env`
-- Runs each check
-- Prints ✓ / ✗ next to each
-- Exits 0 if all pass, 1 if any fail
-- Outputs a summary at the end
+- Reads prerequisites from the shell environment (export `SENTRY_DSN` and
+  `DATABASE_URL` first; it does **not** load `backend/.env` itself)
+- Runs each check; missing prerequisites are counted as **skipped**, not failed
+- Prints ✓ / ✗ / ⊘ next to each check
+- Exits 0 if all runnable checks pass, 1 if any check fails
+- Outputs a summary listing failed and skipped checks (incomplete coverage
+  is reported explicitly)
 
 See `scripts/smoke_test_staging.sh` for the implementation.
 
@@ -643,7 +646,7 @@ depends on honest reporting.
 
 | File | Purpose |
 |---|---|
-| `scripts/smoke_test_staging.sh` | Automated version of this runbook |
+| `scripts/smoke_test_staging.sh` | Automated subset of this runbook (per-check coverage notes in its output) |
 | `docs/runbooks/SENTRY_SETUP.md` | Sentry setup + troubleshooting |
 | `docs/runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md` | DR drill details |
 | `backend/app/scripts/dr_drill.py` | DR drill implementation |
