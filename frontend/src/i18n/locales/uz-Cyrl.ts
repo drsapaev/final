@@ -9748,7 +9748,7 @@ const uzCyrl = {
     tgs_paid: 'Оплачено',
     tgs_pending: 'Ожидает подтверждения',
     tgs_linked_visits: 'Связанные визиты',
-    tgs_active_queue: 'Активная очередь',
+    tgs_active_queue: 'Фаол навбат',
     tgs_queue_title: 'Моя очередь',
     tgs_queue_number: 'Номер очереди',
     tgs_queue_status: 'Статус очереди',

@@ -156,26 +156,36 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
   // Codex P2 round 4 (thread 3945043230): "test against real locale
   // resources" — the three status keys must be DEFINED in every locale
   // file, in the exact namespaces the component references.
+  // Codex P2 round 5 (thread 3945071007): the active-queue phrase must be
+  // LOCALIZED — en/kk/uz-Cyrl previously carried the Russian text.
   it('status keys resolve in real locale resources for all five locales', () => {
     const fs = require('node:fs') as typeof import('node:fs');
     const path = require('node:path') as typeof import('node:path');
 
     const localesDir = path.resolve(__dirname, '../../../i18n/locales');
 
-    const nsMember = (src: string, ns: string, member: string): boolean => {
+    const nsMemberValue = (src: string, ns: string, member: string): string | null => {
       const block = new RegExp(`^  ${ns}: \\{([\\s\\S]*?)^  \\},`, 'm').exec(src);
-      if (!block) return false;
-      return new RegExp(`^    ${member}: '`, 'm').test(block[1]);
+      if (!block) return null;
+      const m = new RegExp(`^    ${member}: '(.*)',?$`, 'm').exec(block[1]);
+      return m ? m[1] : null;
     };
 
     for (const locale of ['ru', 'en', 'kk', 'uz-Cyrl', 'uz-Latn']) {
       const src = fs.readFileSync(path.join(localesDir, `${locale}.ts`), 'utf8');
-      expect(nsMember(src, 'final', 'tgs_active_queue'), `${locale}: final.tgs_active_queue`).toBe(true);
+      expect(nsMemberValue(src, 'final', 'tgs_active_queue'), `${locale}: final.tgs_active_queue`).toBeTruthy();
       expect(
-        nsMember(src, 'registrarPanel', 'pending_payments'),
+        nsMemberValue(src, 'registrarPanel', 'pending_payments'),
         `${locale}: registrarPanel.pending_payments`,
-      ).toBe(true);
-      expect(nsMember(src, 'registrarPanel', 'today'), `${locale}: registrarPanel.today`).toBe(true);
+      ).toBeTruthy();
+      expect(nsMemberValue(src, 'registrarPanel', 'today'), `${locale}: registrarPanel.today`).toBeTruthy();
     }
+
+    // Localized (round-5): no more Russian "Активная очередь" outside ru.
+    expect(nsMemberValue(fs.readFileSync(path.join(localesDir, 'ru.ts'), 'utf8'), 'final', 'tgs_active_queue')).toBe('Активная очередь');
+    expect(nsMemberValue(fs.readFileSync(path.join(localesDir, 'en.ts'), 'utf8'), 'final', 'tgs_active_queue')).toBe('Active queue');
+    expect(nsMemberValue(fs.readFileSync(path.join(localesDir, 'kk.ts'), 'utf8'), 'final', 'tgs_active_queue')).toBe('Белсенді кезек');
+    expect(nsMemberValue(fs.readFileSync(path.join(localesDir, 'uz-Cyrl.ts'), 'utf8'), 'final', 'tgs_active_queue')).toBe('Фаол навбат');
+    expect(nsMemberValue(fs.readFileSync(path.join(localesDir, 'uz-Latn.ts'), 'utf8'), 'final', 'tgs_active_queue')).toBe('Faol navbat');
   });
 });
