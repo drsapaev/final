@@ -237,6 +237,35 @@ class RepeatEligibilityPreviewResponse(BaseModel):
     items: list[RepeatEligibilityPreviewItem]
 
 
+# ===================== FIX D: КВОТА ЦЕН КОРЗИНЫ (read-only preview) =====================
+
+
+class CartQuoteItemRequest(BaseModel):
+    service_id: int
+    quantity: int = Field(default=1, ge=1)
+
+
+class CartQuoteRequest(BaseModel):
+    items: list[CartQuoteItemRequest] = Field(default_factory=list)
+    discount_mode: str = Field(default="none")  # none|repeat|benefit
+    all_free: bool = Field(default=False)
+
+
+class CartQuoteItemResponse(BaseModel):
+    service_id: int
+    service_name: str
+    unit_price: Decimal  # базовая цена услуги (до скидки)
+    quantity: int
+    discount_percent: int  # применённая скидка (для отображения)
+    final_price: Decimal  # unit_price × quantity со скидкой
+
+
+class CartQuoteResponse(BaseModel):
+    items: list[CartQuoteItemResponse]
+    total_amount: Decimal
+    approval_status: str  # "approved" | "pending" (all_free без автоодобрения)
+
+
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 

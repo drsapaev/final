@@ -209,6 +209,10 @@ import {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  // Fix D (trusted pricing): типы квоты + построение запроса
+  type CartQuote,
+  type CartQuoteStatus,
+  buildCartQuoteRequest,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
@@ -484,6 +488,13 @@ const AppointmentWizardV2 = ({
       }));
     }
   }, [wizardData]);
+
+  // Fix D (trusted pricing): серверная квота цен корзины — единственный
+  // достоверный источник суммы (backend — SSOT расчёта скидок).
+  const [cartQuote, setCartQuote] = useState<CartQuote | null>(null);
+  const [cartQuoteStatus, setCartQuoteStatus] = useState<CartQuoteStatus>('idle');
+  const [cartQuoteError, setCartQuoteError] = useState('');
+  const cartQuoteRequestIdRef = useRef(0);
 
   // Состояние онлайн оплаты убрано
 
@@ -1131,6 +1142,51 @@ const AppointmentWizardV2 = ({
     };
   }, [isOpen, wizardData.patient.id, consultationCartItems]);
 
+  // ===================== FIX D: КВОТА ЦЕН КОРЗИНЫ =====================
+
+  // Любое изменение корзины/скидки инвалидирует предыдущую квоту и
+  // перезапрашивает расчёт. Только ПОСЛЕДНИЙ ответ применяется
+  // (cartQuoteRequestIdRef) — устаревший ответ не затирает новый.
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const quoteRequest = buildCartQuoteRequest(wizardData.cart);
+    if (!quoteRequest) {
+      cartQuoteRequestIdRef.current += 1; // инвалидируем незавершённые запросы
+      setCartQuote(null);
+      setCartQuoteStatus('idle');
+      setCartQuoteError('');
+      return;
+    }
+
+    const requestId = ++cartQuoteRequestIdRef.current;
+    setCartQuoteStatus('loading');
+
+    const timeout = setTimeout(async () => {
+      try {
+        const response = await api.post('/registrar/cart/quote', quoteRequest) as import('axios').AxiosResponse<Record<string, unknown>>;
+        if (requestId !== cartQuoteRequestIdRef.current) {
+          return; // устаревший ответ: корзина уже изменилась
+        }
+        setCartQuote(response.data as unknown as CartQuote);
+        setCartQuoteStatus('ready');
+        setCartQuoteError('');
+      } catch (error: unknown) {
+        if (requestId !== cartQuoteRequestIdRef.current) {
+          return;
+        }
+        logger.warn('[AppointmentWizardV2] cart quote failed', error);
+        setCartQuote(null);
+        setCartQuoteStatus('error');
+        setCartQuoteError(getErrorMessage(error) || '');
+      }
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [isOpen, wizardData.cart]);
+
   const repeatSuggestionSummary = useMemo(() => {
     if (!consultationCartItems.length) {
       return {
@@ -1510,18 +1566,37 @@ const AppointmentWizardV2 = ({
     // Показываем что именно будет создано — услуги, количество визитов, сумма.
     // Раньше кнопка «Завершить» сразу создавала запись без preview.
     const cartItems = wizardData.cart.items || [];
-    const totalAmount = cartItems.reduce((sum, item) => sum + (Number((item as { price?: number | string }).price) || 0), 0);
-    const serviceCount = cartItems.length;
     const doctorCount = new Set(cartItems.map((item) => (item as { doctor_id?: string | number }).doctor_id).filter(Boolean)).size;
 
-    // PR-25: itemized breakdown — show each service + doctor + price
-    const itemizedLines = cartItems.map((item) => {
-      const svcName = (item as { service_name?: string }).service_name || item.name || t('misc.aw_service_hash', { id: (item as { service_id?: string | number }).service_id });
-      const qty = Number((item as { quantity?: number }).quantity ?? 1);
-      const price = Number((item as { price?: number | string }).price) || 0;
-      const docName = (item as { doctor_name?: string }).doctor_name || ((item as { doctor_id?: string | number }).doctor_id ? t('misc.aw_doctor_hash', { id: (item as { doctor_id?: string | number }).doctor_id }) : '');
-      const priceStr = price > 0 ? `${new Intl.NumberFormat('ru-RU').format(price * qty)} ${t('misc.aw_currency_sum')}` : t('misc.aw_free');
-      return `• ${svcName}${qty > 1 ? ` ×${qty}` : ''}${docName ? ` — ${docName}` : ''} — ${priceStr}`;
+    // Fix D (trusted pricing): подтверждение показывает ТОЛЬКО серверный
+    // расчёт (квота). Раньше сумма считалась из item.price (несуществующее
+    // поле) и показывала 0 для платных услуг. Если квота не готова —
+    // завершение блокируется: недостоверную сумму показывать нельзя.
+    if (cartQuoteStatus !== 'ready' || !cartQuote) {
+      const quoteError =
+        cartQuoteStatus === 'loading'
+          ? t('misc.aw_quote_calculating')
+          : t('misc.aw_quote_error');
+      setErrors((prev) => ({ ...prev, quote: quoteError }));
+      setCurrentStep(STEP_CART);
+      return;
+    }
+    setErrors((prev) => {
+      if (!prev.quote) return prev;
+      const next = { ...prev };
+      delete next.quote;
+      return next;
+    });
+
+    const totalAmount = Number(cartQuote.total_amount) || 0;
+
+    // Itemized breakdown из квоты: услуга × количество, скидка, итог строки
+    const itemizedLines = cartQuote.items.map((item) => {
+      const qty = Number(item.quantity ?? 1);
+      const finalPrice = Number(item.final_price) || 0;
+      const discountSuffix = item.discount_percent > 0 ? ` (−${item.discount_percent}%)` : '';
+      const priceStr = finalPrice > 0 ? `${new Intl.NumberFormat('ru-RU').format(finalPrice)} ${t('misc.aw_currency_sum')}` : t('misc.aw_free');
+      return `• ${item.service_name}${qty > 1 ? ` ×${qty}` : ''}${discountSuffix} — ${priceStr}`;
     });
 
     const summaryLines = [
@@ -1531,6 +1606,7 @@ const AppointmentWizardV2 = ({
       '',
       doctorCount > 1 ? t('misc.aw_summary_doctors_count', { count: doctorCount }) : null,
       totalAmount > 0 ? t('misc.aw_summary_total', { amount: new Intl.NumberFormat('ru-RU').format(totalAmount) }) : t('misc.aw_summary_free'),
+      cartQuote.approval_status === 'pending' ? t('misc.aw_quote_pending_approval') : null,
     ].filter(Boolean);
 
     // UX Audit Registrar #2: window.confirm() → useConfirm hook.
@@ -3129,7 +3205,10 @@ const AppointmentWizardV2 = ({
               repeatEligibilityByItemId={repeatEligibilityByItemId}
               isRepeatEligibilityLoading={isRepeatEligibilityLoading}
               onApplyRepeatSuggestion={applyRepeatSuggestion}
-              repeatSuggestionSummary={repeatSuggestionSummary} />
+              repeatSuggestionSummary={repeatSuggestionSummary}
+              cartQuoteStatus={cartQuoteStatus}
+              cartQuoteTotal={cartQuote ? Number(cartQuote.total_amount) : null}
+              cartQuoteMessage={cartQuoteError} />
 
             }
 

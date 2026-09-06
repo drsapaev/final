@@ -274,6 +274,53 @@ export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
 };
 
 // =====================================================================
+// CART QUOTE (Fix D: server-side pricing preview)
+// =====================================================================
+
+export interface CartQuoteItem {
+  service_id: number;
+  service_name: string;
+  unit_price: number;
+  quantity: number;
+  discount_percent: number;
+  final_price: number;
+}
+
+export interface CartQuote {
+  items: CartQuoteItem[];
+  total_amount: number;
+  approval_status: string; // "approved" | "pending"
+}
+
+export type CartQuoteStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+interface QuoteCartSource {
+  items?: Array<{ service_id?: unknown; quantity?: unknown }>;
+  discount_mode?: unknown;
+  all_free?: unknown;
+}
+
+// Строит запрос квоты из корзины. null — когда нет ни одной позиции
+// с разрешённым service_id (квотировать нечего).
+export const buildCartQuoteRequest = (
+  cart: QuoteCartSource | null | undefined
+): { items: Array<{ service_id: number; quantity: number }>; discount_mode: string; all_free: boolean } | null => {
+  const rawItems = Array.isArray(cart?.items) ? cart.items : [];
+  const items = rawItems
+    .filter((item) => item && item.service_id != null)
+    .map((item) => ({
+      service_id: Number(item.service_id),
+      quantity: Math.max(1, Number(item.quantity || 1)),
+    }));
+  if (items.length === 0) return null;
+  return {
+    items,
+    discount_mode: String(cart?.discount_mode || 'none'),
+    all_free: Boolean(cart?.all_free),
+  };
+};
+
+// =====================================================================
 // PATIENT ID RESOLUTION
 // =====================================================================
 
@@ -457,6 +504,7 @@ export default {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  buildCartQuoteRequest,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,

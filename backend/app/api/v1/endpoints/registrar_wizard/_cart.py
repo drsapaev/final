@@ -336,6 +336,102 @@ def create_cart_appointments(
 # ===================== УПРАВЛЕНИЕ ИЗМЕНЕНИЯМИ ЦЕН =====================
 
 
+@router.post("/registrar/cart/quote", response_model=CartQuoteResponse)
+def quote_cart_prices(
+    quote_req: CartQuoteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+):
+    """
+    Fix D: read-only предварительный расчёт цены корзины БЕЗ сохранения.
+
+    Переиспользует те же настройки и тот же хелпер скидок, что и путь
+    сохранения /registrar/cart (_load_registration_discount_settings +
+    _apply_service_discount) — frontend больше не дублирует бизнес-правила
+    скидок, и подтверждённая сумма совпадает с суммой invoice.
+
+    Отсутствие цены у услуги — это НЕ 0: endpoint отвечает 409 с указанием
+    услуги, чтобы регистратор увидел проблему до сохранения.
+    """
+    _ = current_user
+
+    effective_discount_mode = _resolve_effective_discount_mode(quote_req)
+    registration_settings = _load_registration_discount_settings(db)
+
+    if effective_discount_mode == "all_free":
+        approval_status = (
+            "pending"
+            if not registration_settings["all_free_auto_approve"]
+            else "approved"
+        )
+    else:
+        approval_status = "approved"
+
+    items: list[CartQuoteItemResponse] = []
+    total_amount = Decimal("0")
+
+    for item_req in quote_req.items:
+        service = (
+            db.query(Service).filter(Service.id == item_req.service_id).first()
+        )
+        if not service:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Услуга с ID {item_req.service_id} не найдена",
+            )
+
+        if service.price is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Для услуги «{service.name}» не указана цена",
+            )
+
+        base_price = Decimal(str(service.price))
+        unit_final = _apply_service_discount(
+            base_price,
+            effective_discount_mode,
+            registration_settings,
+            service.is_consultation,
+        )
+
+        # Процент скидки для отображения (зеркало _apply_service_discount)
+        if effective_discount_mode == "all_free":
+            discount_percent = 100
+        elif effective_discount_mode == "repeat" and service.is_consultation:
+            raw = Decimal(
+                str(registration_settings.get("repeat_visit_discount", 0) or 0)
+            )
+            discount_percent = int(max(Decimal("0"), min(raw, Decimal("100"))))
+        elif effective_discount_mode == "benefit" and service.is_consultation:
+            discount_percent = (
+                100 if registration_settings.get("benefit_consultation_free", True) else 0
+            )
+        else:
+            discount_percent = 0
+
+        final_price = (unit_final * Decimal(item_req.quantity)).quantize(
+            Decimal("0.01")
+        )
+        total_amount += final_price
+
+        items.append(
+            CartQuoteItemResponse(
+                service_id=service.id,
+                service_name=service.name,
+                unit_price=base_price,
+                quantity=item_req.quantity,
+                discount_percent=discount_percent,
+                final_price=final_price,
+            )
+        )
+
+    return CartQuoteResponse(
+        items=items,
+        total_amount=total_amount,
+        approval_status=approval_status,
+    )
+
+
 @router.post("/registrar/cart/edit-delta", response_model=EditDeltaResponse)
 def apply_registrar_cart_edit_delta(
     request: EditDeltaRequest,
