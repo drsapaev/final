@@ -294,6 +294,7 @@ def test_upgrade_fk_naming_contract() -> None:
         ]
         assert len(fks) == 1
         # QD-2D partial-unique/XOR follow-ups + drop_constraint reference these
+        assert fks[0]["name"] == "fk_daily_queues_queue_resource_id"
         assert fks[0]["constrained_columns"] == ["queue_resource_id"]
         assert fks[0]["referred_columns"] == ["id"]
 
@@ -434,6 +435,143 @@ def test_downgrade_aborts_when_doctorless_rows_exist() -> None:
         # abort happened BEFORE any mutation: the expanded shape is intact
         assert _columns(conn, "daily_queues")["queue_resource_id"] is not None
         assert _columns(conn, "daily_queues")["specialist_id"]["nullable"] is True
+
+
+# ===================== Codex round-1: adoption + FK drift pins =====================
+
+
+def _scratch_with_precreated_queue_resources(*, drift: str) -> sa.engine.Connection:
+    """Scratch world where queue_resources ALREADY exists (manual or
+    interrupted rollout). ``drift`` selects the contract violation:
+    'missing_column' | 'nullable_drift' | 'missing_unique' | 'clean'.
+    """
+    engine = sa.create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=sa.pool.StaticPool,
+    )
+    metadata = sa.MetaData()
+    sa.Table(
+        "doctors",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("specialty", sa.String(100), nullable=False),
+    )
+    sa.Table(
+        "daily_queues",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("day", sa.Date, nullable=False),
+        sa.Column(
+            "specialist_id", sa.Integer, sa.ForeignKey("doctors.id"), nullable=False
+        ),
+        sa.Column("queue_tag", sa.String(32), nullable=True),
+        sa.Column("active", sa.Boolean, nullable=False, default=True),
+    )
+    columns = [
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("code", sa.String(50), nullable=False),
+        sa.Column("queue_tag", sa.String(32), nullable=False),
+        sa.Column("display_name", sa.String(100), nullable=(drift == "nullable_drift")),
+        sa.Column("active", sa.Boolean, nullable=False, default=True),
+        sa.Column("start_number_online", sa.Integer, nullable=False, default=1),
+        sa.Column("max_online_per_day", sa.Integer, nullable=False, default=15),
+        sa.Column("created_at", sa.DateTime, nullable=True),
+        sa.Column("updated_at", sa.DateTime, nullable=True),
+    ]
+    if drift != "missing_column":
+        columns.append(sa.Column("default_cabinet", sa.String(20), nullable=True))
+    table_args = []
+    if drift != "missing_unique":
+        table_args = [
+            sa.UniqueConstraint("code", name="uq_queue_resources_code"),
+            sa.UniqueConstraint("queue_tag", name="uq_queue_resources_queue_tag"),
+        ]
+    sa.Table("queue_resources", metadata, *columns, *table_args)
+    metadata.create_all(engine)
+    return engine.connect()
+
+
+def test_upgrade_aborts_on_drifted_precreated_queue_resources() -> None:
+    """Codex round-1 P1: a pre-existing queue_resources table is adopted
+    ONLY on a full contract match — any drift aborts BEFORE any DDL, so
+    daily_queues stays untouched and the chain is never stamped against
+    an incompatible registry."""
+    module = _load_migration_0058()
+    for drift, needle in (
+        ("missing_column", "missing=\\['default_cabinet'\\]"),
+        ("nullable_drift", "nullable=True"),
+        ("missing_unique", "UNIQUE contract"),
+    ):
+        with _scratch_with_precreated_queue_resources(drift=drift) as conn:
+            with pytest.raises(RuntimeError, match=needle):
+                _run_upgrade_steps(module, conn)
+
+            # abort BEFORE any DDL: daily_queues never expanded
+            assert "queue_resource_id" not in _columns(conn, "daily_queues")
+            assert _columns(conn, "daily_queues")["specialist_id"]["nullable"] is False
+
+
+def test_upgrade_adopts_clean_precreated_queue_resources() -> None:
+    """Codex round-1 P1 (positive side): a shape-identical pre-existing
+    table IS adopted — the idempotent already-migrated pass, and the
+    missing id index is ensured even on the adoption path."""
+    module = _load_migration_0058()
+    with _scratch_with_precreated_queue_resources(drift="clean") as conn:
+        _run_upgrade_steps(module, conn)
+
+        # adoption: table kept, index ensured, daily_queues expanded
+        assert "ix_queue_resources_id" in {
+            idx["name"] for idx in sa.inspect(conn).get_indexes("queue_resources")
+        }
+        assert _columns(conn, "daily_queues")["queue_resource_id"]["nullable"] is True
+        assert _columns(conn, "daily_queues")["specialist_id"]["nullable"] is True
+        assert module._canonical_resource_fk_present(conn)
+
+
+def test_upgrade_aborts_on_unexpected_resource_fk() -> None:
+    """Codex round-1 P2: a foreign key to queue_resources that is NOT the
+    canonical constraint (different name here) is drift — abort instead of
+    skipping the canonical create (a wrong FK would leave the owner
+    unenforced or break the name-based downgrade)."""
+    module = _load_migration_0058()
+    engine = sa.create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=sa.pool.StaticPool,
+    )
+    metadata = sa.MetaData()
+    sa.Table(
+        "doctors",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+    )
+    sa.Table(
+        "queue_resources",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("code", sa.String(50), nullable=False),
+    )
+    sa.Table(
+        "daily_queues",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("day", sa.Date, nullable=False),
+        sa.Column("specialist_id", sa.Integer, nullable=False),
+        sa.Column(
+            "queue_resource_id",
+            sa.Integer,
+            sa.ForeignKey("queue_resources.id", name="fk_daily_queues_resource_drift"),
+            nullable=True,
+        ),
+    )
+    metadata.create_all(engine)
+    with engine.connect() as conn:
+        with pytest.raises(RuntimeError, match="unexpected foreign key"):
+            module._expand_daily_queues(_ops(conn), conn)
+
+        # abort BEFORE any mutation: specialist_id never relaxed
+        assert _columns(conn, "daily_queues")["specialist_id"]["nullable"] is False
 
 
 # ===================== model world (create_all) =====================
