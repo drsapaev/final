@@ -323,6 +323,7 @@ export default function HeaderNew() {
         alignItems: 'center',
         gap: 'var(--mac-spacing-1)',
         padding: '8px 10px',
+        height: '36px',
         flexShrink: 0
       }}>
       <ChevronLeft size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />
@@ -342,7 +343,8 @@ export default function HeaderNew() {
       display: 'flex',
       alignItems: 'center',
       gap: 'var(--mac-spacing-2)',
-      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)'
+      height: '36px',
+      padding: 'var(--mac-spacing-1) var(--mac-spacing-3)'
     }}>
 
       <Stethoscope size={20} aria-hidden="true" style={{ color: 'var(--mac-accent-blue)' }} />
@@ -370,6 +372,7 @@ export default function HeaderNew() {
             display: 'flex',
             alignItems: 'center',
             gap: 'var(--mac-spacing-2)',
+            height: '36px',
             flexShrink: 0,
             color: active ?
             'white' :
@@ -404,7 +407,7 @@ export default function HeaderNew() {
             navigate(`${registrarHomeRoute}?action=new`);
           }
         }}
-        style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0 }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', height: '36px', flexShrink: 0 }}>
 
             <Plus size={16} aria-hidden="true" style={{ color: 'white' }} />
             {/* HDR-FX-1 (P1-1): label collapses to icon-only below 1200px
@@ -434,7 +437,7 @@ export default function HeaderNew() {
       <LanguageSwitcher compact />
 
       {/* 2) Сеть */}
-      <div style={{ flex: '0 0 auto' }}>
+      <div style={{ flex: '0 0 auto', height: '36px', display: 'flex', alignItems: 'center' }}>
         <CompactConnectionStatus className="mr-2" />
       </div>
 
@@ -636,6 +639,7 @@ export default function HeaderNew() {
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--mac-spacing-2)',
+              height: '36px',
               flex: '0 0 auto'
             }}>
             <User size={16} aria-hidden="true" style={{ color: 'var(--mac-text-primary)' }} />
@@ -732,6 +736,7 @@ export default function HeaderNew() {
             display: 'flex',
             alignItems: 'center',
             gap: 'var(--mac-spacing-2)',
+            height: '36px',
             flex: '0 0 auto'
           }}>
           <User size={16} aria-hidden="true" style={{ color: 'white' }} />
@@ -771,7 +776,11 @@ export default function HeaderNew() {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            padding: '4px 8px',
+            justifyContent: 'center',
+            width: '36px',
+            minWidth: '36px',
+            height: '36px',
+            padding: 0,
             fontSize: 'var(--mac-font-size-xs)',
             fontWeight: 'var(--mac-font-weight-medium)',
             // AXE-EXP-2: the previous background var(--mac-surface-secondary,

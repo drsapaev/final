@@ -152,6 +152,9 @@ const LanguageSwitcher = ({ compact = false }: { compact?: boolean }) => {
                     alignItems: 'center',
                     gap: 'var(--mac-spacing-2)',
                     padding: compact ? '4px 8px' : '6px 12px',
+                    // HDR-POLISH: compact trigger (header-only) matches the
+                    // uniform 36px header control height.
+                    minHeight: compact ? '36px' : undefined,
                     flex: '0 0 auto',
                 }}
             >
