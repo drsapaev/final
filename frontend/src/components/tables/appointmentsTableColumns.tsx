@@ -27,7 +27,7 @@ import {
   CreditCard,
   XCircle,
   AlertCircle } from 'lucide-react';
-import { Checkbox } from '../ui/macos';
+import { Checkbox, Tooltip } from '../ui/macos';
 import type { DataTableColumn } from '../ui/DataTable';
 import { QueueActionButtons } from '../queue/QueueManagementCard';
 import logger from '../../utils/logger';
@@ -1299,21 +1299,22 @@ export const buildAppointmentsTableColumns = ({
           ) : null}
 
           {canPrint ? (
-            <button
-              className="action-button"
-              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                e.preventDefault();
-                e?.stopPropagation();
-              }}
-              onClick={(e: React.MouseEvent<HTMLElement>) => {
-                e.preventDefault();
-                e?.stopPropagation();
-                onActionClick?.('print', row as unknown as AppointmentRow, e);
-              }}
-              title={t('misc.eat_print')}
-              aria-label={t('misc.eat_print')}>
-              <FileText size={14} />
-            </button>
+            <Tooltip content={t('misc.eat_print')}>
+              <button
+                className="action-button"
+                onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                  e.preventDefault();
+                  e?.stopPropagation();
+                }}
+                onClick={(e: React.MouseEvent<HTMLElement>) => {
+                  e.preventDefault();
+                  e?.stopPropagation();
+                  onActionClick?.('print', row as unknown as AppointmentRow, e);
+                }}
+                aria-label={t('misc.eat_print')}>
+                <FileText size={14} />
+              </button>
+            </Tooltip>
           ) : null}
 
           {canComplete ? (
@@ -1356,80 +1357,103 @@ export const buildAppointmentsTableColumns = ({
               compact={true} />
           ) : null}
 
-          <button
-            className="action-button"
-            onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-              e.preventDefault();
-              e?.stopPropagation();
-              logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
-            }}
-            onClick={(e: React.MouseEvent<HTMLElement>) => {
-              e.preventDefault();
-              e?.stopPropagation();
-              onActionClick?.('view', row as unknown as AppointmentRow, e);
-            }}
-            title={t('misc.eat_view')}
-            aria-label={t('misc.eat_view')}>
-            <Eye size={14} />
-          </button>
-
-          <button
-            className="action-button"
-            onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-              e.preventDefault();
-              e?.stopPropagation();
-              logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
-            }}
-            onClick={(e: React.MouseEvent<HTMLElement>) => {
-              e.preventDefault();
-              e?.stopPropagation();
-              onActionClick?.('edit', row as unknown as AppointmentRow, e);
-            }}
-            title={t('misc.eat_edit')}
-            aria-label={t('misc.eat_edit')}>
-            <Edit size={14} />
-          </button>
-
-          {/* EMR (doctor view) */}
-          {canViewEmr ? (
+          <Tooltip content={t('misc.eat_view')}>
             <button
-              className="action-button action-button--primary"
+              className="action-button"
               onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                 e.preventDefault();
                 e?.stopPropagation();
+                logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
               }}
               onClick={(e: React.MouseEvent<HTMLElement>) => {
                 e.preventDefault();
                 e?.stopPropagation();
-                onActionClick?.('view_emr', row as unknown as AppointmentRow, e);
+                onActionClick?.('view', row as unknown as AppointmentRow, e);
               }}
-              title={t('misc.eat_view_emr')}
-              aria-label={t('misc.eat_view_emr')}>
-              <FileText size={14} />
+              aria-label={t('misc.eat_view')}>
+              <Eye size={14} />
             </button>
+          </Tooltip>
+
+          <Tooltip content={t('misc.eat_edit')}>
+            <button
+              className="action-button"
+              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+                logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
+              }}
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
+                e.preventDefault();
+                e?.stopPropagation();
+                onActionClick?.('edit', row as unknown as AppointmentRow, e);
+              }}
+              aria-label={t('misc.eat_edit')}>
+              <Edit size={14} />
+            </button>
+          </Tooltip>
+
+          {/* EMR (doctor view) */}
+          {canViewEmr ? (
+            <Tooltip content={t('misc.eat_view_emr')}>
+              <button
+                className="action-button action-button--primary"
+                onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                  e.preventDefault();
+                  e?.stopPropagation();
+                }}
+                onClick={(e: React.MouseEvent<HTMLElement>) => {
+                  e.preventDefault();
+                  e?.stopPropagation();
+                  onActionClick?.('view_emr', row as unknown as AppointmentRow, e);
+                }}
+                aria-label={t('misc.eat_view_emr')}>
+                <FileText size={14} />
+              </button>
+            </Tooltip>
           ) : null}
 
           {/* UX Audit Registrar #4: inline кнопки Cancel и Reschedule.
               Раньше только через context menu — недоступно на touch-устройствах. */}
           {canReschedule ? (
-            <button
-              className="action-button"
-              onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-                e.preventDefault();
-                e?.stopPropagation();
-              }}
-              onClick={(e: React.MouseEvent<HTMLElement>) => {
-                e.preventDefault();
-                e?.stopPropagation();
-                onActionClick?.('reschedule', row as unknown as AppointmentRow, e);
-              }}
-              title={t('misc.eat_reschedule')}
-              aria-label={t('misc.eat_reschedule_aria')}>
-              <CalendarClock size={14} />
-            </button>
+            <Tooltip content={t('misc.eat_reschedule')}>
+              <button
+                className="action-button"
+                onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                  e.preventDefault();
+                  e?.stopPropagation();
+                }}
+                onClick={(e: React.MouseEvent<HTMLElement>) => {
+                  e.preventDefault();
+                  e?.stopPropagation();
+                  onActionClick?.('reschedule', row as unknown as AppointmentRow, e);
+                }}
+                aria-label={t('misc.eat_reschedule_aria')}>
+                <CalendarClock size={14} />
+              </button>
+            </Tooltip>
           ) : null}
 
           {canCancel ? (
+            <Tooltip content={t('misc.eat_cancel')}>
+              <button
+                className="action-button"
+                onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
+                  e.preventDefault();
+                  e?.stopPropagation();
+                }}
+                onClick={(e: React.MouseEvent<HTMLElement>) => {
+                  e.preventDefault();
+                  e?.stopPropagation();
+                  onActionClick?.('cancel', row as unknown as AppointmentRow, e);
+                }}
+                aria-label={t('misc.eat_cancel_aria')}>
+                <X size={14} />
+              </button>
+            </Tooltip>
+          ) : null}
+
+          <Tooltip content={t('misc.eat_more')}>
             <button
               className="action-button"
               onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -1439,29 +1463,12 @@ export const buildAppointmentsTableColumns = ({
               onClick={(e: React.MouseEvent<HTMLElement>) => {
                 e.preventDefault();
                 e?.stopPropagation();
-                onActionClick?.('cancel', row as unknown as AppointmentRow, e);
+                onActionClick?.('more', row as unknown as AppointmentRow, e);
               }}
-              title={t('misc.eat_cancel')}
-              aria-label={t('misc.eat_cancel_aria')}>
-              <X size={14} />
+              aria-label={t('misc.eat_more')}>
+              <MoreHorizontal size={14} />
             </button>
-          ) : null}
-
-          <button
-            className="action-button"
-            onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
-              e.preventDefault();
-              e?.stopPropagation();
-            }}
-            onClick={(e: React.MouseEvent<HTMLElement>) => {
-              e.preventDefault();
-              e?.stopPropagation();
-              onActionClick?.('more', row as unknown as AppointmentRow, e);
-            }}
-            title={t('misc.eat_more')}
-            aria-label={t('misc.eat_more')}>
-            <MoreHorizontal size={14} />
-          </button>
+          </Tooltip>
 
           {canScheduleNext ? (
             <button
