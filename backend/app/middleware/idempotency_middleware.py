@@ -11,9 +11,15 @@ timeout could create duplicate appointments / payments / patients.
 Implementation: in-memory LRU cache keyed by (user_id, idempotency_key).
 For production with multiple workers, this should be backed by Redis;
 for now in-memory is sufficient to satisfy the contract and tests.
+
+Fix C (registrar cart atomicity): in-flight single-flight map. Two
+concurrent requests with the same key in the same worker now share ONE
+execution — the second awaits the first and returns the same response,
+instead of both missing the (empty) cache and creating duplicate carts.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections import OrderedDict
@@ -72,6 +78,11 @@ class IdempotencyResponseCache:
 # Global singleton cache
 _idempotency_cache = IdempotencyResponseCache()
 
+# Fix C: in-flight executions keyed like the cache. Single-flight within a
+# worker: concurrent duplicate keys share one execution instead of racing.
+# Note: cross-worker dedupe still requires a Redis-backed implementation.
+_inflight: dict[tuple[int, str], asyncio.Future[Response]] = {}
+
 
 def get_idempotency_cache() -> IdempotencyResponseCache:
     return _idempotency_cache
@@ -111,40 +122,72 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
             return cached
 
-        # Execute handler
-        response = await call_next(request)
+        cache_key = (user_id, idempotency_key)
 
-        # Cache only successful responses (2xx) — don't cache errors,
-        # client should be able to retry with the same key after fixing
-        # the issue.
-        if 200 <= response.status_code < 300:
-            # Materialize the body so we can replay it on cache hit.
-            # Starlette StreamingResponse consumes the body on first read,
-            # so we need to capture it and build a new Response.
-            body_bytes = b""
-            async for chunk in response.body_iterator:
-                body_bytes += chunk
-            # Rebuild response with materialized body
-            cached_response = Response(
-                content=body_bytes,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=response.media_type,
-            )
-            _idempotency_cache.set(user_id, idempotency_key, cached_response)
+        # Fix C: single-flight — if the same key is already being executed
+        # (lost-response retry racing the original), await the in-flight
+        # execution and return its response instead of duplicating the work.
+        inflight = _inflight.get(cache_key)
+        if inflight is not None and not inflight.done():
             logger.info(
-                "Idempotency cached: user=%s key=%s method=%s path=%s status=%s",
-                user_id, idempotency_key, request.method, request.url.path, response.status_code,
+                "Idempotency single-flight: user=%s key=%s — awaiting in-flight execution",
+                user_id, idempotency_key,
             )
-            # Return a fresh Response with the same body (so client can read it)
-            return Response(
-                content=body_bytes,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-                media_type=response.media_type,
-            )
+            return await asyncio.shield(inflight)
 
-        return response
+        loop = asyncio.get_running_loop()
+        inflight_future: asyncio.Future[Response] = loop.create_future()
+        _inflight[cache_key] = inflight_future
+
+        try:
+            # Execute handler
+            response = await call_next(request)
+        except Exception:
+            # Do not leave a broken future behind for waiting duplicates.
+            if not inflight_future.done():
+                inflight_future.set_exception(asyncio.CancelledError())
+            _inflight.pop(cache_key, None)
+            raise
+
+        try:
+            # Cache only successful responses (2xx) — don't cache errors,
+            # client should be able to retry with the same key after fixing
+            # the issue.
+            if 200 <= response.status_code < 300:
+                # Materialize the body so we can replay it on cache hit.
+                # Starlette StreamingResponse consumes the body on first read,
+                # so we need to capture it and build a new Response.
+                body_bytes = b""
+                async for chunk in response.body_iterator:
+                    body_bytes += chunk
+                # Rebuild response with materialized body
+                cached_response = Response(
+                    content=body_bytes,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type,
+                )
+                _idempotency_cache.set(user_id, idempotency_key, cached_response)
+                logger.info(
+                    "Idempotency cached: user=%s key=%s method=%s path=%s status=%s",
+                    user_id, idempotency_key, request.method, request.url.path, response.status_code,
+                )
+                replay_response = Response(
+                    content=body_bytes,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type,
+                )
+            else:
+                replay_response = response
+
+            # Fix C: release waiters with the same response, then drop the
+            # in-flight entry (the response is now in the cache).
+            if not inflight_future.done():
+                inflight_future.set_result(replay_response)
+            return replay_response
+        finally:
+            _inflight.pop(cache_key, None)
 
     def _resolve_user_id(self, request: Request) -> int:
         """Best-effort user_id resolution from request state.

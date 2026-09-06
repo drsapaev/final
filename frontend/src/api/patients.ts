@@ -149,9 +149,14 @@ export async function checkAuthProbe(): Promise<boolean> {
  * @param cartData - { patient_id, visits, discount_mode, payment_method, all_free, notes }
  * @returns {Promise<Record<string, unknown>>} Created cart result
  */
-export async function createRegistrarCart(cartData: Record<string, unknown>): Promise<Record<string, unknown>> {
+export async function createRegistrarCart(
+  cartData: Record<string, unknown>,
+  idempotencyKey?: string,
+): Promise<Record<string, unknown>> {
   try {
-    const response = await api.post('/registrar/cart', cartData);
+    // Fix C: повтор запроса с тем же Idempotency-Key после потери ответа
+    // не создаёт вторую корзину (серверный идемпотентный middleware).
+    const response = await api.post('/registrar/cart', cartData, idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined);
     return response.data;
   } catch (error) {
     const status = (error as HttpApiError)?.response?.status;
