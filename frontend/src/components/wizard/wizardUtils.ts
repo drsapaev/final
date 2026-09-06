@@ -274,6 +274,20 @@ export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
 };
 
 // =====================================================================
+// IDEMPOTENCY KEY (Fix C: duplicate submit / lost-response retry)
+// =====================================================================
+
+// Один логический сабмит корзины = один Idempotency-Key. При потере ответа
+// и повторной отправке с тем же ключом backend вернёт кэшированный ответ
+// (IdempotencyMiddleware), а не создаст вторую корзину.
+export const createIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `cart-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+// =====================================================================
 // PATIENT ID RESOLUTION
 // =====================================================================
 
@@ -457,6 +471,7 @@ export default {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  createIdempotencyKey,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,

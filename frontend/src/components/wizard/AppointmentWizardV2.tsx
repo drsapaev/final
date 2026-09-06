@@ -209,6 +209,8 @@ import {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  // Fix C (cart atomicity): ключ идемпотентности для финального сабмита корзины.
+  createIdempotencyKey,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
@@ -465,6 +467,8 @@ const AppointmentWizardV2 = ({
       setActiveServiceCategory('specialists');
       setServiceSearchQuery('');
       setShowAllServices(false);
+      // Fix C: незавершённая попытка сабмита отменена закрытием — ключ сбрасываем
+      cartIdempotencyKeyRef.current = null;
     }
   }, [isOpen]);
 
@@ -497,6 +501,12 @@ const AppointmentWizardV2 = ({
   const phoneRef = useRef<HTMLInputElement>(null);
   const nextStepRef = useRef<() => void>(() => {});
   const handleCompleteRef = useRef<() => Promise<void>>(async () => {});
+  // Fix C: защита от повторной отправки (двойной Enter / Ctrl+Enter / клик).
+  const submitLockRef = useRef(false);
+  // Fix C: один логический сабмит = один Idempotency-Key. При потере ответа
+  // повторная отправка с тем же ключом вернёт кэшированный ответ, а не
+  // создаст вторую корзину. Ключ живёт до успеха/закрытия/очистки формы.
+  const cartIdempotencyKeyRef = useRef<string | null>(null);
 
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
@@ -574,6 +584,8 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(STEP_PATIENT);
+    // Fix C: очистка формы отменяет текущую попытку сабмита — ключ сбрасываем
+    cartIdempotencyKeyRef.current = null;
     toast.success(t('misc.aw_form_cleared'));
   };
 
@@ -1430,6 +1442,10 @@ const AppointmentWizardV2 = ({
       if (!isOpen) return;
       const target = e.target as HTMLElement | null;
 
+      // Fix C: во время обработки повторный Enter/Ctrl+Enter игнорируется —
+      // раньше двойное нажатие дважды запускало handleComplete (две корзины).
+      if (isProcessing) return;
+
       // Enter - следующий шаг (кроме textarea)
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && target?.tagName !== 'TEXTAREA') {
         e.preventDefault();
@@ -1451,11 +1467,27 @@ const AppointmentWizardV2 = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentStep, totalSteps]);
+  }, [isOpen, currentStep, totalSteps, isProcessing]);
 
   // ===================== ЗАВЕРШЕНИЕ =====================
 
   const handleComplete = async () => {
+    // Fix C: реентерабельный лок — повторный вызов во время обработки
+    // (двойной Enter, Enter + Ctrl+Enter, клик + Enter) игнорируется.
+    if (submitLockRef.current) {
+      logger.warn('[AppointmentWizardV2] handleComplete re-entered while processing; ignored');
+      return;
+    }
+    submitLockRef.current = true;
+    try {
+      await runHandleComplete();
+    } finally {
+      submitLockRef.current = false;
+    }
+  };
+  handleCompleteRef.current = handleComplete;
+
+  const runHandleComplete = async () => {
     if (!validateStep(currentStep)) return;
 
     // P-022 fix: previously used toast.warning/toast.info as blocking validation
@@ -2508,7 +2540,15 @@ const AppointmentWizardV2 = ({
       // createRegistrarCart бросает Error с .status, .message, .response при неудаче.
       let result;
       try {
-        result = await createRegistrarCart(cartData);
+        // Fix C: один логический сабмит = один Idempotency-Key. Ключ создаётся
+        // при первой попытке и переиспользуется при повторной отправке после
+        // сбоя/потери ответа — backend вернёт кэшированный ответ вместо новой корзины.
+        if (!cartIdempotencyKeyRef.current) {
+          cartIdempotencyKeyRef.current = createIdempotencyKey();
+        }
+        result = await createRegistrarCart(cartData, { idempotencyKey: cartIdempotencyKeyRef.current });
+        // Успех — ключ отработал, следующая корзина получит новый
+        cartIdempotencyKeyRef.current = null;
       } catch (cartError: unknown) {
         // Обработка ошибок создания корзины
         const cartErr = cartError as Error & { status?: number; message?: string };
@@ -2566,7 +2606,7 @@ const AppointmentWizardV2 = ({
       setIsProcessing(false);
     }
   };
-  handleCompleteRef.current = handleComplete;
+  // (handleCompleteRef.current назначается после обёртки Fix C выше)
 
   // Группировка элементов корзины по визитам
   const groupCartItemsByVisit = (): unknown[] => {
