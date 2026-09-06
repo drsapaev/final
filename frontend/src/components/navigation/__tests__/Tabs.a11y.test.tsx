@@ -100,23 +100,36 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
     expect(statusTarget).not.toBeNull();
     expect(cardiology.contains(statusTarget as Node)).toBe(true);
     expect(statusTarget).toHaveClass('sr-only');
-    expect(statusTarget?.textContent).toBe('queue.queue: 4, queue.pending, queue.today: 4');
+    expect(statusTarget?.textContent).toBe('terms.queue: 4, queue_status.pending, registrarPanel.today: 4');
 
-    // Visible indicators render as before (pure visual layer).
+    // Visible indicators render as before (pure visual layer); their
+    // tooltips now use DEFINED i18n keys (round-3 i18n fix).
     const statusContainer = cardiology.querySelector('.status-indicators');
     expect(statusContainer!.querySelectorAll('.status-indicator').length).toBe(3);
     expect(statusContainer!.querySelector('.status-indicator.queue')).not.toBeNull();
     expect(statusContainer!.querySelector('.status-indicator.pending')).not.toBeNull();
     expect(statusContainer!.querySelector('.status-indicator.count')?.textContent).toContain('4');
+    expect(statusContainer!.querySelector('.status-indicator.queue')).toHaveAttribute(
+      'title',
+      'terms.queue: 4',
+    );
+    expect(statusContainer!.querySelector('.status-indicator.pending')).toHaveAttribute(
+      'title',
+      'queue_status.pending',
+    );
+    expect(statusContainer!.querySelector('.status-indicator.count')).toHaveAttribute(
+      'title',
+      'registrarPanel.today: 4',
+    );
 
     // THE assertion Codex demanded: the computed accessible description
     // carries the full localized status text.
-    expect(cardiology).toHaveAccessibleDescription('queue.queue: 4, queue.pending, queue.today: 4');
+    expect(cardiology).toHaveAccessibleDescription('terms.queue: 4, queue_status.pending, registrarPanel.today: 4');
 
     // Boolean-only state (active queue, zero count): previously this would
     // compute an EMPTY description (icon SVG only) — now it announces text.
     const ecg = screen.getByRole('button', { name: 'misc.mt_ekg' });
-    expect(ecg).toHaveAccessibleDescription('queue.queue: 0');
+    expect(ecg).toHaveAccessibleDescription('terms.queue: 0');
   });
 
   it('empty departmentStats: no aria-describedby dangles on department buttons', async () => {

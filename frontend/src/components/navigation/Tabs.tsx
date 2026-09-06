@@ -251,7 +251,12 @@ const Tabs = ({
         <div
           key="queue"
           className="status-indicator queue"
-          title={`${t('queue.queue')}: ${String(stats.todayCount ?? '')}`}>
+          // AXE-MOB-1 (Codex P2 round 3, thread 3945016484): use keys that
+          // are actually DEFINED in all five locales — queue.queue /
+          // queue.pending / queue.today do not exist in the queue namespace,
+          // so t() returned the raw key (latent bug, visible in these
+          // tooltips since before AXE-MOB-1).
+          title={`${t('terms.queue')}: ${String(stats.todayCount ?? '')}`}>
 
           <Clock size={10} />
         </div>
@@ -263,7 +268,7 @@ const Tabs = ({
         <div
           key="pending"
           className="status-indicator pending"
-          title={t('queue.pending')}>
+          title={t('queue_status.pending')}>
 
           <AlertCircle size={10} />
         </div>
@@ -275,7 +280,7 @@ const Tabs = ({
         <div
           key="count"
           className="status-indicator count"
-          title={`${t('queue.today')}: ${String(stats.todayCount ?? '')}`}>
+          title={`${t('registrarPanel.today')}: ${String(stats.todayCount ?? '')}`}>
 
           {String(stats.todayCount ?? '')}
         </div>
@@ -306,14 +311,18 @@ const Tabs = ({
   // accessible description, and boolean-only states would compute an EMPTY
   // description (or an unexplained bare count). statusTextFor composes the
   // localized status sentence from the same stats the visible indicators
-  // render; it is placed inside the target as .sr-only text (canonical
-  // clip pattern in tokens.css) — visually invisible, announced by AT.
+  // render; it is rendered as a dedicated .sr-only description target —
+  // visually invisible, announced by AT.
+  // AXE-MOB-1 (Codex P2 round 3, thread 3945016484): the keys must be
+  // DEFINED — terms.queue / queue_status.pending / registrarPanel.today all
+  // exist in every locale, while queue.queue / queue.pending / queue.today
+  // do not (t() returned the raw key).
   const statusTextFor = (tabKey: string): string => {
     const s = getStats(tabKey);
     const parts: string[] = [];
-    if (s.hasActiveQueue) parts.push(`${t('queue.queue')}: ${s.todayCount}`);
-    if (s.hasPendingPayments) parts.push(t('queue.pending'));
-    if (s.todayCount > 0) parts.push(`${t('queue.today')}: ${s.todayCount}`);
+    if (s.hasActiveQueue) parts.push(`${t('terms.queue')}: ${s.todayCount}`);
+    if (s.hasPendingPayments) parts.push(t('queue_status.pending'));
+    if (s.todayCount > 0) parts.push(`${t('registrarPanel.today')}: ${s.todayCount}`);
     return parts.join(', ');
   };
 
