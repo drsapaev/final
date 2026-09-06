@@ -274,6 +274,43 @@ export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
 };
 
 // =====================================================================
+// PATIENT SELECTION SAFETY (Fix A: data mixing / duplicate-phone stop)
+// =====================================================================
+
+// Marker set by the wizard when ALL patient fields were populated from an
+// explicitly selected card (selectPatient). Editing ФИО afterwards switches
+// the form to new-patient mode and must clear every inherited field,
+// otherwise a new patient is created with another person's address/phone.
+export const PATIENT_SELECTED_FROM_CARD_FLAG = '_selectedFromCard';
+
+export const isPatientSelectedFromCard = (
+  patient: Record<string, unknown> | null | undefined
+): boolean => Boolean(patient && patient[PATIENT_SELECTED_FROM_CARD_FLAG]);
+
+// Identity fields that must never leak from one patient card into a
+// different patient's registration. Returned as a patch for spread.
+export const buildInheritedPatientClearPatch = (): Record<string, unknown> => ({
+  birth_date: '',
+  phone: '',
+  address: '',
+  gender: '',
+  lastName: '',
+  firstName: '',
+  middleName: '',
+  [PATIENT_SELECTED_FROM_CARD_FLAG]: false,
+});
+
+// Backend currently signals "duplicate phone" with HTTP 400 + a text detail.
+// The same 400 is also used for unrelated validation problems (e.g. duplicate
+// doc_number), so only an explicit phone-duplicate message may trigger the
+// duplicate-phone UX path. Until the backend exposes a dedicated error code,
+// this is the narrowest safe discriminator.
+export const isPhoneDuplicateErrorMessage = (message: unknown): boolean => {
+  const normalized = String(message || '').toLowerCase();
+  return normalized.includes('уже существует') && normalized.includes('телефон');
+};
+
+// =====================================================================
 // PATIENT ID RESOLUTION
 // =====================================================================
 
@@ -457,6 +494,10 @@ export default {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  PATIENT_SELECTED_FROM_CARD_FLAG,
+  isPatientSelectedFromCard,
+  buildInheritedPatientClearPatch,
+  isPhoneDuplicateErrorMessage,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
