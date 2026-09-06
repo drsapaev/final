@@ -176,7 +176,10 @@ const PatientStepV2 = ({
               type="button"
               role="radio"
               aria-checked={selectedGender === gender}
-              tabIndex={selectedGender === gender ? 0 : -1}
+              // Fix E: roving tabindex — при невыбранном поле первый вариант
+              // доступен по Tab. Раньше оба варианта были tabIndex=-1 и
+              // группа была недостижима с клавиатуры.
+              tabIndex={selectedGender === gender || (!selectedGender && gender === 'male') ? 0 : -1}
               onClick={() => onUpdate('gender', gender)}
               className={`patient-step-v2__gender-radio ${selectedGender === gender ? 'patient-step-v2__gender-radio--selected' : 'patient-step-v2__gender-radio--unselected'}`}>
 

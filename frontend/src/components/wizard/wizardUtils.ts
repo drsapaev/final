@@ -274,6 +274,58 @@ export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
 };
 
 // =====================================================================
+// BIRTH DATE CALENDAR VALIDATION (Fix E)
+// =====================================================================
+
+export type BirthDateValidation = 'empty' | 'incomplete' | 'invalid' | 'future' | 'ok';
+
+// Календарная валидация даты рождения в формате ДД.ММ.ГГГГ.
+// Раньше проверялись только диапазоны 1..31 / 1..12 / год 1900..текущий —
+// несуществующие даты (31.02.2020) и будущие даты в текущем году проходили.
+// Неполный ввод ('31.02', '3102') не считается валидным — он не должен
+// молча превращаться в пустую дату.
+export const getBirthDateValidationError = (
+  value: string,
+  now: Date = new Date()
+): BirthDateValidation => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed || trimmed === '00.00.0000') return 'empty';
+
+  const parts = trimmed.split('.');
+  if (parts.length !== 3 || parts.some((part) => part.length === 0)) {
+    return 'incomplete';
+  }
+  const day = Number(parts[0]);
+  const month = Number(parts[1]);
+  const year = Number(parts[2]);
+  if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) {
+    return 'incomplete';
+  }
+  if (parts[2].length !== 4) return 'incomplete';
+
+  if (month < 1 || month > 12) return 'invalid';
+  if (day < 1 || day > 31) return 'invalid';
+  if (year < 1900) return 'invalid';
+
+  // Календарная существованность: Date нормализует переполнения
+  // (31.02 → 3 марта), поэтому сверяем компоненты обратно.
+  const probe = new Date(year, month - 1, day);
+  if (
+    probe.getFullYear() !== year ||
+    probe.getMonth() !== month - 1 ||
+    probe.getDate() !== day
+  ) {
+    return 'invalid';
+  }
+
+  // Будущая дата (полная дата, а не только год)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (probe > today) return 'future';
+
+  return 'ok';
+};
+
+// =====================================================================
 // PATIENT ID RESOLUTION
 // =====================================================================
 
@@ -457,6 +509,7 @@ export default {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  getBirthDateValidationError,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
