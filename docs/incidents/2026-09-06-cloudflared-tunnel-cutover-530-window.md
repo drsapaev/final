@@ -6,7 +6,8 @@ During the planned cutover of the `api.finalclinic.fyi` Cloudflare Tunnel from a
 login-session user-process to a Windows Service, production API availability was
 lost externally for approximately 10 minutes (HTTP 530, Cloudflare error 1033 —
 edge could not reach any tunnel connector). Patient-facing impact window:
-2026-09-06 ~06:25–06:35 +0500. No data was lost; backend (uvicorn :18000) was
+2026-09-06 ~06:25–06:35 +0500. No database corruption was observed (see the qualified
+loss-scope statement in Impact); backend (uvicorn :18000) was
 healthy locally throughout — this was purely an ingress (tunnel connector)
 outage.
 

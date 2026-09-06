@@ -82,8 +82,8 @@ ENCRYPTION_KEY → encrypts .dump.enc artifacts (external Task Scheduler backup)
 | 3.2 | DNS CNAME: `<subdomain>` → `<tunnel-id>.cfargotunnel.com` | DNS resolves |
 | 3.3 | `config.yml`: ingress → `http://localhost:18000` | Config valid |
 | 3.4 | Set `protocol: http2` in config.yml. Prefer HTTP/2 for this deployment unless QUIC has been explicitly validated on target ISP | Tunnel connects via HTTP/2 |
-| 3.5 | `cloudflared tunnel run <clinic-name>` | `curl https://api.<domain>/api/v1/health` → 200 |
-| 3.6 | Autostart script in Startup folder | Survives reboot |
+| 3.5 | Install the tunnel as a Windows Service: `cloudflared service install`, then set registry `ImagePath` to `"…cloudflared.exe" tunnel run <clinic-name>` (bare agent = remote-managed mode, never serves the named tunnel), copy config+credentials to `C:\Windows\System32\config\systemprofile\.cloudflared`, set SCM recovery `sc failure cloudflared reset= 0 actions= restart/5000/restart/50000/restart/300000`, start service | `curl https://api.<domain>/api/v1/health` → 200 AND service `Running` with fresh `Registered tunnel connection` log lines |
+| 3.6 | Reboot survival via SYSTEM scheduled tasks (AtStartup): backend autostart (`scripts/run_uvicorn_prod.ps1`) + tunnel boot-check; do NOT use Startup-folder `cloudflared` (login-session ownership dies at logout and dual-runs with the service) | After reboot WITHOUT login: external health 200; boot-check log written |
 | 3.7 | Attribution check (requires step 2.12): from an EXTERNAL device, authenticate and read a patient record in the Mini App | Row in `patient_access_audit_logs` records the external client IP — NOT `127.0.0.1` and not the tunnel peer |
 
 **Failure handling**: if tunnel won't connect, check cloudflared logfile. Common: DNS not propagated (wait 5 min), wrong tunnel ID. If the attribution check (3.7) records `127.0.0.1`, `TRUSTED_PROXIES` is missing from `.env` (step 2.12) — fix it and restart uvicorn.
