@@ -147,6 +147,7 @@ from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
 from .print_config import PrinterConfig, PrintJob, PrintTemplate
 from .queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
+from .queue_resource import QueueResource
 from .refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
@@ -301,6 +302,7 @@ __all__ = [
     "QueueToken",
     "QueueProfile",
     "INITIAL_QUEUE_PROFILES",
+    "QueueResource",
     "TelegramConfig",
     "TelegramTemplate",
     "TelegramUser",

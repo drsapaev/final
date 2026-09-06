@@ -114,7 +114,12 @@ class DailyQueueOut(BaseModel):
 
     id: int
     day: date
-    specialist_id: int
+    # QD-2A (migration 0058): dual ownership — doctor queues keep
+    # specialist_id, doctorless routing queues carry queue_resource_id.
+    # All pre-QD-2 rows are doctor-owned: existing clients keep seeing
+    # an int exactly as before (nullable is additive on the wire).
+    specialist_id: int | None = None
+    queue_resource_id: int | None = None
     active: bool
     opened_at: datetime | None = None
     created_at: datetime
@@ -127,6 +132,25 @@ class DailyQueueOut(BaseModel):
     total_entries: int = 0
     waiting_count: int = 0
     served_count: int = 0
+
+
+class QueueResourceOut(BaseModel):
+    """Владелец-ресурс doctorless-очереди (QD-2: лаборатория, ЭКГ, ...).
+
+    Read-контракт сущности; эндпоинты появляются на стадии QD-2C
+    (runtime switch), пока контракт закреплён тестами.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    queue_tag: str
+    display_name: str
+    active: bool
+    start_number_online: int
+    max_online_per_day: int
+    default_cabinet: str | None = None
 
 
 # ===================== НАСТРОЙКИ ОЧЕРЕДИ =====================

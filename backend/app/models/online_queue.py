@@ -45,6 +45,7 @@ from app.db.base_class import Base
 if TYPE_CHECKING:
     from app.models.clinic import Doctor
     from app.models.patient import Patient
+    from app.models.queue_resource import QueueResource
     from app.models.user import User
     from app.models.visit import Visit
 
@@ -56,9 +57,18 @@ class DailyQueue(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     day: Mapped[date] = mapped_column(Date, nullable=False, index=True)  # YYYY-MM-DD
-    specialist_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("doctors.id"), nullable=False, index=True
+    specialist_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("doctors.id"), nullable=True, index=True
     )  # ИСПРАВЛЕНО: FK к doctors.id
+    # QD-2A EXPAND (migration 0058): dual ownership — a DailyQueue is owned
+    # by a Doctor (doctor queues, FK above) XOR a QueueResource (doctorless
+    # routing queues, FK below). The XOR CHECK itself is deliberately NOT
+    # here yet: it lands in QD-2D after the QD-2B backfill and the QD-2C
+    # runtime switch prove the ownership shape. All pre-QD-2 rows are
+    # doctor-owned, so relaxing NOT NULL is a no-op for existing data.
+    queue_resource_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("queue_resources.id"), nullable=True, index=True
+    )
     queue_tag: Mapped[str | None] = mapped_column(
         String(32), nullable=True, index=True
     )  # ecg, lab, cardiology_common, etc.
@@ -86,7 +96,10 @@ class DailyQueue(Base):
     )
 
     # Relationships
-    specialist: Mapped[Doctor] = relationship("Doctor", foreign_keys=[specialist_id])
+    specialist: Mapped[Doctor | None] = relationship("Doctor", foreign_keys=[specialist_id])
+    queue_resource: Mapped[QueueResource | None] = relationship(
+        "QueueResource", foreign_keys=[queue_resource_id]
+    )
     entries: Mapped[list[OnlineQueueEntry]] = relationship(
         "OnlineQueueEntry", back_populates="queue", cascade="all, delete-orphan"
     )
