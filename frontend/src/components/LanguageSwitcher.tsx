@@ -13,6 +13,7 @@ import ReactDOM from 'react-dom';
 import { useTranslation } from '../i18n/useTranslation';
 import { Button } from './ui/macos';
 import { AVAILABLE_LANGUAGES } from '../i18n/useTranslation';
+import { HEADER_PORTAL_Z } from '../theme/zLayers';
 import { ChevronDown } from 'lucide-react';
 
 const LanguageSwitcher = ({ compact = false }: { compact?: boolean }) => {
@@ -174,7 +175,9 @@ const LanguageSwitcher = ({ compact = false }: { compact?: boolean }) => {
                         boxShadow: 'var(--mac-shadow-lg)',
                         border: '1px solid var(--mac-border)',
                         overflow: 'hidden',
-                        zIndex: 2147483647,
+                        // HDR-FX-1 (P2-3): shared header-portal layer instead
+                        // of INT32_MAX (session modal must paint above).
+                        zIndex: HEADER_PORTAL_Z,
                         minWidth: '150px',
                         padding: '4px',
                     }}

@@ -9978,6 +9978,7 @@ const uzCyrl = {
     hn_profile_menu_item: 'Профиль',
     hn_logout: 'Выйти',
     hn_login: 'Войти',
+    hn_notifications_unread: 'Ўқилмаган: {count}',
     hn_command_palette_title: 'Открыть командную палитру (Cmd+K / Ctrl+K)',
     hn_command_palette_aria: 'Открыть командную палитру',
   },
