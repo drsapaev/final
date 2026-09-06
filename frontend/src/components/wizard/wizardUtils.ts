@@ -11,6 +11,7 @@
  */
 
 import { toast } from 'react-toastify';
+import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { ClipboardList, FlaskConical, Stethoscope, Syringe } from 'lucide-react';
@@ -358,6 +359,105 @@ export const isSavedNameMatching = (
 };
 
 // =====================================================================
+// BIRTH DATE INPUT MASK (extracted from AppointmentWizardV2)
+// =====================================================================
+
+// Маска ввода: только цифры, максимум 8, формат ДД.ММ.ГГГГ
+export const formatBirthDateInput = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  const limitedDigits = digits.slice(0, 8);
+  if (limitedDigits.length === 0) return '';
+  if (limitedDigits.length <= 2) return limitedDigits;
+  if (limitedDigits.length <= 4) return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2)}`;
+  return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2, 4)}.${limitedDigits.slice(4)}`;
+};
+
+// Конвертация ДД.ММ.ГГГГ → ГГГГ-ММ-ДД
+export const convertDateToISO = (dateStr: string): string => {
+  if (!dateStr || dateStr.length !== 10) return '';
+  const [day, month, year] = dateStr.split('.');
+  if (!day || !month || !year || year.length !== 4) return '';
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+};
+
+// Конвертация ГГГГ-ММ-ДД → ДД.ММ.ГГГГ
+export const convertDateFromISO = (isoStr: string): string => {
+  if (!isoStr) return '';
+  const [year, month, day] = isoStr.split('-');
+  if (!year || !month || !day) return '';
+  return `${day}.${month}.${year}`;
+};
+
+// =====================================================================
+// DEPARTMENT RESOLUTION (extracted from AppointmentWizardV2)
+// =====================================================================
+
+interface DeptServiceLike {
+  id?: unknown;
+  queue_tag?: unknown;
+  category_code?: string;
+  service_code?: unknown;
+  name?: unknown;
+  [key: string]: unknown;
+}
+
+const DEPARTMENT_CODE_MAPPING: Record<string, string> = {
+  'K': 'cardiology', // Кардиология → вкладка cardio (БЕЗ ЭКГ!)
+  'D': 'dermatology', // Дерматология → вкладка derma (только консультации)
+  'S': 'dentistry', // Стоматология → вкладка dental
+  'L': 'laboratory', // Лаборатория → вкладка lab
+  'P': 'procedures', // Физиотерапия → вкладка procedures
+  'C': 'procedures', // Косметология → вкладка procedures
+  'D_PROC': 'procedures', // Дерматологические процедуры → вкладка procedures
+  'O': 'procedures' // Прочие процедуры → вкладка procedures
+};
+
+const DEPARTMENT_NORMALIZED_MAPPING: Record<string, string> = {
+  'specialists': 'cardiology', // Консультации специалистов (только если не 'D' или 'S') -> cardiology
+  'laboratory': 'lab', // ✅ Лаборатория -> lab (для соответствия вкладке)
+  'procedures': 'procedures', // Процедуры -> procedures
+  'other': 'general' // Прочее -> general
+};
+
+// Определяет отделение визита для услуги (ECG — отдельный кабинет).
+// Чистая функция: извлечена из AppointmentWizardV2 (PR-45 LOC ceiling).
+export const getWizardDepartmentForService = (
+  serviceId: string | number,
+  servicesData: DeptServiceLike[]
+): string => {
+  if (!serviceId || serviceId === null || serviceId === undefined) {
+    return 'general';
+  }
+
+  const service = servicesData.find((s) => s.id === serviceId);
+
+  if (!service) {
+    return 'general';
+  }
+
+  // 🎯 СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЭКГ: отдельный кабинет!
+  if (service.queue_tag === 'ecg') {
+    return 'echokg';
+  }
+
+  // Сначала точный маппинг оригинального category_code (Bug 2 fix),
+  // затем нормализованный fallback.
+  if (service.category_code && DEPARTMENT_CODE_MAPPING[service.category_code]) {
+    return DEPARTMENT_CODE_MAPPING[service.category_code];
+  }
+
+  const normalizedCategoryCode = service.category_code
+    ? normalizeCategoryCode(service.category_code)
+    : '';
+
+  return (
+    DEPARTMENT_NORMALIZED_MAPPING[normalizedCategoryCode] ||
+    DEPARTMENT_CODE_MAPPING[service.category_code as string] ||
+    'general'
+  );
+};
+
+// =====================================================================
 // PATIENT ID RESOLUTION
 // =====================================================================
 
@@ -544,6 +644,10 @@ export default {
   buildPatientProfileSnapshot,
   buildPatientProfileUpdate,
   isSavedNameMatching,
+  formatBirthDateInput,
+  convertDateToISO,
+  convertDateFromISO,
+  getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
