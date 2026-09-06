@@ -18,7 +18,7 @@ import { normalizeGenderForForm } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './PatientStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React, { useRef } from "react";
 
 interface PatientStepV2Props {
   data?: Record<string, unknown>;
@@ -36,6 +36,9 @@ interface PatientStepV2Props {
   formattedBirthDate: string;
   fioRef: React.Ref<HTMLInputElement> | null;
   phoneRef: React.Ref<HTMLInputElement> | null;
+  // Fix E: refs для перевода фокуса на первое проблемное поле после ошибки
+  birthDateRef?: React.Ref<HTMLInputElement> | null;
+  genderGroupRef?: React.Ref<HTMLDivElement> | null;
   cart: Record<string, any> | null;
   // TECH-DEBT(patient-step-cart-any): value is `any` — cart field types vary
   onUpdateCart: (field: string, value: any) => void;
@@ -57,6 +60,8 @@ const PatientStepV2 = ({
   formattedBirthDate,
   fioRef,
   phoneRef,
+  birthDateRef = null,
+  genderGroupRef = null,
   cart,
   onUpdateCart,
   phoneError
@@ -65,18 +70,44 @@ const PatientStepV2 = ({
   const safeData = (data || {}) as Record<string, any>;
   const selectedGender = normalizeGenderForForm(safeData.gender);
 
+  // Fix E: roving tabindex для radio-группы пола.
+  // Раньше при невыбранном поле ОБЕ кнопки имели tabIndex={-1} — группа
+  // была недостижима с клавиатуры. Теперь:
+  //   - выбранная кнопка — единственная tab-точка группы;
+  //   - если ничего не выбрано, tab-точкой становится первая кнопка (male);
+  //   - стрелки меняют выбор и перемещают фокус (стандартный ARIA-паттерн).
+  const genderOrder = ['male', 'female'] as const;
+  const genderButtonRefs = useRef<Array<HTMLButtonElement | null>>([null, null]);
+
+  const handleGenderKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    const currentIndex = genderOrder.indexOf((selectedGender || '') as typeof genderOrder[number]);
+    let nextIndex: number;
+    if (currentIndex === -1) {
+      nextIndex = 0; // ничего не выбрано — выбираем первую опцию
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      nextIndex = (currentIndex + genderOrder.length - 1) % genderOrder.length;
+    } else {
+      nextIndex = (currentIndex + 1) % genderOrder.length;
+    }
+    onUpdate('gender', genderOrder[nextIndex]);
+    genderButtonRefs.current[nextIndex]?.focus();
+  };
+
   return (
     // UX Audit R-3.3: main container inline style → .patient-step-v2 class
     <div className="patient-step-v2">
       <div className="patient-step-v2__form-grid">
         {/* ФИО с поиском */}
         <div className="patient-step-v2__field">
-          <label className="patient-step-v2__label">
+          <label className="patient-step-v2__label" htmlFor="psv-fio-input">
             ФИО пациента *
           </label>
           <div className="patient-step-v2__field-relative">
             <Input
               ref={fioRef}
+              id="psv-fio-input"
               type="text"
               value={safeData.fio || ''}
               onChange={(e) => onSearch(e.target.value)}
@@ -107,7 +138,7 @@ const PatientStepV2 = ({
           </div>
 
           {errors.fio &&
-          <span className="patient-step-v2__error-inline">
+          <span className="patient-step-v2__error-inline" role="alert">
               <AlertCircle size={14} />
               {errors.fio}
             </span>
@@ -157,26 +188,24 @@ const PatientStepV2 = ({
             Пол *
           </label>
           <div
+            ref={genderGroupRef}
             role="radiogroup"
             aria-label={t('misc.psv_pol_patsienta')}
             aria-required="true"
             tabIndex={-1}
-            onKeyDown={(e) => {
-              // UX Audit R-2.4: ARIA radiogroup keyboard navigation.
-              // Arrow keys move between options, Tab moves out.
-              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-              e.preventDefault();
-              const next = selectedGender === 'male' ? 'female' : 'male';
-              onUpdate('gender', next);
-            }}
+            onKeyDown={handleGenderKeyDown}
             className="patient-step-v2__gender-radiogroup">
-            {['male', 'female'].map((gender) =>
+            {genderOrder.map((gender, genderIndex) =>
             <button
               key={gender}
+              ref={(el) => { genderButtonRefs.current[genderIndex] = el; }}
               type="button"
               role="radio"
               aria-checked={selectedGender === gender}
-              tabIndex={selectedGender === gender ? 0 : -1}
+              // Fix E (roving tabindex): выбранная кнопка — tab-точка группы;
+              // при невыбранном поле tab-точкой становится первая кнопка,
+              // иначе группа недостижима с клавиатуры.
+              tabIndex={selectedGender === gender || (!selectedGender && genderIndex === 0) ? 0 : -1}
               onClick={() => onUpdate('gender', gender)}
               className={`patient-step-v2__gender-radio ${selectedGender === gender ? 'patient-step-v2__gender-radio--selected' : 'patient-step-v2__gender-radio--unselected'}`}>
 
@@ -185,7 +214,7 @@ const PatientStepV2 = ({
             )}
           </div>
           {errors.gender &&
-          <span className="patient-step-v2__error-inline">
+          <span className="patient-step-v2__error-inline" role="alert">
               <AlertCircle size={14} />
               {errors.gender}
             </span>
@@ -194,11 +223,12 @@ const PatientStepV2 = ({
 
         {/* Телефон */}
         <div className="patient-step-v2__field-group">
-          <label className="patient-step-v2__field-label">
+          <label className="patient-step-v2__field-label" htmlFor="psv-phone-input">
             Телефон <span className="patient-step-v2__field-hint">(необязательно)</span>
           </label>
           <Input
             ref={phoneRef}
+            id="psv-phone-input"
             type="tel"
             value={safeData.phone}
             onChange={(e) => onPhoneChange(e.target.value)}
@@ -214,13 +244,13 @@ const PatientStepV2 = ({
             </span>
           }
           {errors.phone &&
-          <span className="patient-step-v2__error-inline">
+          <span className="patient-step-v2__error-inline" role="alert">
               <AlertCircle size={14} />
               {errors.phone}
             </span>
           }
           {phoneError &&
-          <div className="patient-step-v2__phone-error-block">
+          <div className="patient-step-v2__phone-error-block" role="alert">
               <span className="patient-step-v2__phone-error-text">
                 <AlertCircle size={14} />
                 {phoneError.message}
@@ -238,10 +268,12 @@ const PatientStepV2 = ({
 
         {/* Дата рождения */}
         <div className="patient-step-v2__field-group">
-          <label className="patient-step-v2__field-label">
+          <label className="patient-step-v2__field-label" htmlFor="psv-birth-date-input">
             Дата рождения <span className="patient-step-v2__field-hint">(необязательно)</span>
           </label>
           <Input
+            ref={birthDateRef}
+            id="psv-birth-date-input"
             type="text"
             value={formattedBirthDate}
             onChange={(e) => onBirthDateChange(e.target.value)}
@@ -254,7 +286,7 @@ const PatientStepV2 = ({
             aria-label={t('misc.psv_data_rozhdeniya')} />
 
           {errors.birth_date &&
-          <span className="patient-step-v2__error-inline">
+          <span className="patient-step-v2__error-inline" role="alert">
               <AlertCircle size={14} />
               {errors.birth_date}
             </span>
@@ -263,10 +295,11 @@ const PatientStepV2 = ({
 
         {/* Адрес */}
         <div className="patient-step-v2__field-group--full">
-          <label className="patient-step-v2__field-label">
+          <label className="patient-step-v2__field-label" htmlFor="psv-address-input">
             Адрес
           </label>
           <Input
+            id="psv-address-input"
             type="text"
             value={safeData.address}
             onChange={(e) => onUpdate('address', e.target.value)}

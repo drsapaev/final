@@ -216,6 +216,11 @@ import {
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
   categories,
+  validateBirthDateDisplay,
+  BIRTH_DATE_ERROR_KEYS,
+  isNestedModalOpen,
+  targetOwnsEnter,
+  focusFirstWizardErrorField,
 } from './wizardUtils';
 
 const AppointmentWizardV2 = ({
@@ -316,6 +321,12 @@ const AppointmentWizardV2 = ({
   const [isSearchingPatients, setIsSearchingPatients] = useState(false); // UX Audit Registrar #11
   const [phoneCheckTimeout, setPhoneCheckTimeout] = useState<ReturnType<typeof setTimeout> | null>(null); // ✅ Timeout для проверки телефона
   const [phoneError, setPhoneError] = useState<{ message?: string; patient?: unknown } | null>(null); // ✅ Ошибка уникальности телефона
+  // Fix E: refs для фокуса на первое проблемное поле после ошибки валидации.
+  const birthDateRef = useRef<HTMLInputElement | null>(null);
+  const genderGroupRef = useRef<HTMLDivElement | null>(null);
+  // Fix E: зеркало isProcessing в ref — клавиатура видит актуальное значение.
+  const isProcessingRef = useRef(false);
+  isProcessingRef.current = isProcessing;
   const [servicesData, setServicesData] = useState<ServiceData[]>([]);
   const [doctorsData, setDoctorsData] = useState<DoctorData[]>([]);
   const [filteredServices, setFilteredServices] = useState<ServiceData[]>([]);
@@ -1357,7 +1368,9 @@ const AppointmentWizardV2 = ({
 
   // ===================== НАВИГАЦИЯ =====================
 
-  const validateStep = (step: number) => {
+  // Fix E: сбор ошибок шага отдельно — финальная отправка валидирует
+  // ВСЕ шаги, сохраняя ошибки в одном объекте.
+  const collectStepErrors = (step: number): Record<string, string> => {
     const newErrors: Record<string, string> = {};
 
     if (step === 1) {
@@ -1373,18 +1386,12 @@ const AppointmentWizardV2 = ({
       if (!wizardData.patient.gender) {// ✅ Валидация пола
         newErrors.gender = t('misc.aw_gender_required');
       }
-      // Валидация даты рождения
-      if (formattedBirthDate && formattedBirthDate !== '00.00.0000') {
-        const [day, month, year] = formattedBirthDate.split('.');
-        const dayNum = parseInt(day);
-        const monthNum = parseInt(month);
-        const yearNum = parseInt(year);
-
-        if (!day || !month || !year ||
-        dayNum < 1 || dayNum > 31 ||
-        monthNum < 1 || monthNum > 12 ||
-        yearNum < 1900 || yearNum > new Date().getFullYear()) {
-          newErrors.birth_date = t('misc.aw_birth_date_invalid');
+      // Fix E: полная проверка даты рождения (несуществующие даты типа
+      // 31.02.2020, високосные годы, будущие даты, неполный ввод).
+      if (formattedBirthDate) {
+        const birthDateValidation = validateBirthDateDisplay(formattedBirthDate);
+        if (!birthDateValidation.valid) {
+          newErrors.birth_date = t(BIRTH_DATE_ERROR_KEYS[birthDateValidation.reason]);
         }
       }
     } else if (step === 2) {
@@ -1400,15 +1407,26 @@ const AppointmentWizardV2 = ({
         newErrors.doctors = t('misc.aw_doctors_required');
       }
     }
-    // Убрана валидация для шагов 3 и 4
 
+    return newErrors;
+  };
+
+  const validateStep = (step: number) => {
+    const newErrors = collectStepErrors(step);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // Fix E: после ошибки валидации фокус переводится к первому проблемному полю.
+  const focusFirstErrorField = (errs: Record<string, unknown>) =>
+    focusFirstWizardErrorField(errs, { fio: fioRef, phone: phoneRef, genderGroup: genderGroupRef, birthDate: birthDateRef });
+
   const nextStep = () => {
     if (validateStep(currentStep)) {
       setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
+    } else if (currentStep === STEP_PATIENT) {
+      // Fix E: при неудачной валидации шага 1 фокус идёт к первому проблемному полю.
+      focusFirstErrorField(collectStepErrors(STEP_PATIENT));
     }
   };
   nextStepRef.current = nextStep;
@@ -1428,11 +1446,20 @@ const AppointmentWizardV2 = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
+
+      // Fix E: вложенный диалог (confirm) владеет клавиатурой.
+      if (isNestedModalOpen()) return;
+
       const target = e.target as HTMLElement | null;
 
-      // Enter - следующий шаг (кроме textarea)
+      // Fix E: Enter/Ctrl+Enter на BUTTON/SELECT выполняют действие элемента.
+      if (targetOwnsEnter(target)) return;
+
+      // Enter - следующий шаг (кроме textarea, где Enter — перенос строки)
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && target?.tagName !== 'TEXTAREA') {
         e.preventDefault();
+        // Fix E: повторный Enter во время отправки не запускает второе сохранение.
+        if (isProcessingRef.current) return;
         if (currentStep < totalSteps) {
           nextStepRef.current();
         } else {
@@ -1443,6 +1470,7 @@ const AppointmentWizardV2 = ({
       // Ctrl+Enter - завершить
       if (e.key === 'Enter' && e.ctrlKey) {
         e.preventDefault();
+        if (isProcessingRef.current) return;
         handleCompleteRef.current();
       }
 
@@ -1456,7 +1484,20 @@ const AppointmentWizardV2 = ({
   // ===================== ЗАВЕРШЕНИЕ =====================
 
   const handleComplete = async () => {
-    if (!validateStep(currentStep)) return;
+    // Fix E: защита от повторного входа + валидация ВСЕХ шагов мастера,
+    // а не только текущего.
+    if (isProcessingRef.current) return;
+    const patientErrors = collectStepErrors(STEP_PATIENT);
+    const allErrors: Record<string, string> = { ...patientErrors, ...collectStepErrors(STEP_CART) };
+    if (Object.keys(allErrors).length > 0) {
+      setErrors(allErrors);
+      // Возвращаем пользователя на шаг с ошибкой; фокус — первое проблемное поле.
+      const backToPatient = Object.keys(patientErrors).length > 0;
+      setCurrentStep(backToPatient ? STEP_PATIENT : STEP_CART);
+      if (backToPatient) focusFirstErrorField(patientErrors);
+      return;
+    }
+    setErrors({});
 
     // P-022 fix: previously used toast.warning/toast.info as blocking validation
     // (early return after toast). Toasts are non-modal and easy to miss — the
@@ -3089,6 +3130,8 @@ const AppointmentWizardV2 = ({
               formattedBirthDate={formattedBirthDate}
               fioRef={fioRef}
               phoneRef={phoneRef}
+              birthDateRef={birthDateRef}
+              genderGroupRef={genderGroupRef}
               cart={wizardData.cart}
               onUpdateCart={(field: string, value: unknown) =>
               setWizardData((prev) => ({
