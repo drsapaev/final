@@ -1346,3 +1346,55 @@ describe('DataTable — PR-UI-12-4 sticky-header bounded viewport (DT-45..47)', 
     }
   });
 });
+
+describe('DataTable — scroll-wrapper keyboard reachability (AXE-MOB-2, DT-48..52)', () => {
+  const columns: DataTableColumn[] = [
+    { key: 'name', title: 'Name', sortable: false },
+    { key: 'age', title: 'Age', sortable: false }
+  ];
+  const data = [{ name: 'John', age: 30 }];
+
+  // axe scrollable-region-focusable (WCAG 2.1 AA): .mac-table-scroll-wrapper
+  // is the horizontal scroll viewport (tokens.css: overflow-x auto) and MAY
+  // overflow at narrow viewports / wide column sets. Whether it actually
+  // scrolls is content+viewport dependent at runtime, so focusability is
+  // pinned UNCONDITIONALLY on every render path.
+
+  it('DT-48: main data path — wrapper carries tabIndex 0 and is focusable', () => {
+    const { container } = render(<DataTable columns={columns} data={data} />);
+
+    const wrapper = container.querySelector('.mac-table-scroll-wrapper') as HTMLElement;
+    expect(wrapper).toHaveAttribute('tabIndex', '0');
+    wrapper.focus();
+    expect(wrapper).toHaveFocus();
+  });
+
+  it('DT-49: empty state — wrapper stays keyboard-reachable', () => {
+    const { container } = render(<DataTable columns={columns} data={[]} />);
+    expect(container.querySelector('.mac-table-scroll-wrapper')).toHaveAttribute('tabIndex', '0');
+  });
+
+  it('DT-50: loading state — wrapper stays keyboard-reachable', () => {
+    const { container } = render(<DataTable columns={columns} data={[]} loading />);
+    expect(container.querySelector('.mac-table-scroll-wrapper')).toHaveAttribute('tabIndex', '0');
+  });
+
+  it('DT-51: error state — wrapper stays keyboard-reachable', () => {
+    const { container } = render(<DataTable columns={columns} data={[]} error="Boom" />);
+    expect(container.querySelector('.mac-table-scroll-wrapper')).toHaveAttribute('tabIndex', '0');
+  });
+
+  it('DT-52: children composition path — wrapper stays keyboard-reachable', () => {
+    const { container } = render(
+      <DataTable columns={columns} data={[]}>
+        <thead>
+          <tr><th>H</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>x</td></tr>
+        </tbody>
+      </DataTable>
+    );
+    expect(container.querySelector('.mac-table-scroll-wrapper')).toHaveAttribute('tabIndex', '0');
+  });
+});
