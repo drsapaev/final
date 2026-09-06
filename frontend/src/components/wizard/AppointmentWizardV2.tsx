@@ -209,9 +209,10 @@ import {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
-  // Fix A (safe patient selection): наследованные поля выбранной карточки
-  // не должны протекать в нового пациента; произвольный HTTP 400 при
-  // создании не является доказательством «пациент уже существует».
+  formatBirthDateInput,
+  convertDateToISO,
+  convertDateFromISO,
+  // Fix A: наследованные поля выбранной карточки не протекают в нового пациента
   isPatientSelectedFromCard,
   buildInheritedPatientClearPatch,
   isPhoneDuplicateErrorMessage,
@@ -583,37 +584,7 @@ const AppointmentWizardV2 = ({
     toast.success(t('misc.aw_form_cleared'));
   };
 
-  // ===================== МАСКИ ВВОДА =====================
-
-  const formatBirthDate = (value: string) => {
-    // Убираем все символы кроме цифр
-    const digits = value.replace(/\D/g, '');
-
-    // Ограничиваем до 8 цифр (ДДММГГГГ)
-    const limitedDigits = digits.slice(0, 8);
-
-    // Форматируем как ДД.ММ.ГГГГ
-    if (limitedDigits.length === 0) return '';
-    if (limitedDigits.length <= 2) return limitedDigits;
-    if (limitedDigits.length <= 4) return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2)}`;
-    return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2, 4)}.${limitedDigits.slice(4)}`;
-  };
-
-  const convertDateToISO = (dateStr: string) => {
-    // Конвертируем ДД.ММ.ГГГГ в ГГГГ-ММ-ДД
-    if (!dateStr || dateStr.length !== 10) return '';
-    const [day, month, year] = dateStr.split('.');
-    if (!day || !month || !year || year.length !== 4) return '';
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  };
-
-  const convertDateFromISO = (isoStr: string) => {
-    // Конвертируем ГГГГ-ММ-ДД в ДД.ММ.ГГГГ
-    if (!isoStr) return '';
-    const [year, month, day] = isoStr.split('-');
-    if (!year || !month || !day) return '';
-    return `${day}.${month}.${year}`;
-  };
+  // ===================== МАСКИ ВВОДА (маска даты — в wizardUtils) =====================
 
   // ===================== ПОИСК ПАЦИЕНТОВ =====================
 
@@ -766,7 +737,7 @@ const AppointmentWizardV2 = ({
 
 
   const handleBirthDateChange = (value: string) => {
-    const formatted = formatBirthDate(value);
+    const formatted = formatBirthDateInput(value);
     setFormattedBirthDate(formatted);
 
     // Конвертируем в ISO формат для сохранения

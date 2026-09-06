@@ -274,6 +274,36 @@ export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
 };
 
 // =====================================================================
+// BIRTH DATE INPUT MASK (extracted from AppointmentWizardV2)
+// =====================================================================
+
+// Маска ввода: только цифры, максимум 8, формат ДД.ММ.ГГГГ
+export const formatBirthDateInput = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  const limitedDigits = digits.slice(0, 8);
+  if (limitedDigits.length === 0) return '';
+  if (limitedDigits.length <= 2) return limitedDigits;
+  if (limitedDigits.length <= 4) return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2)}`;
+  return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2, 4)}.${limitedDigits.slice(4)}`;
+};
+
+// Конвертация ДД.ММ.ГГГГ → ГГГГ-ММ-ДД
+export const convertDateToISO = (dateStr: string): string => {
+  if (!dateStr || dateStr.length !== 10) return '';
+  const [day, month, year] = dateStr.split('.');
+  if (!day || !month || !year || year.length !== 4) return '';
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+};
+
+// Конвертация ГГГГ-ММ-ДД → ДД.ММ.ГГГГ
+export const convertDateFromISO = (isoStr: string): string => {
+  if (!isoStr) return '';
+  const [year, month, day] = isoStr.split('-');
+  if (!year || !month || !day) return '';
+  return `${day}.${month}.${year}`;
+};
+
+// =====================================================================
 // PATIENT SELECTION SAFETY (Fix A: data mixing / duplicate-phone stop)
 // =====================================================================
 
@@ -494,6 +524,9 @@ export default {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  formatBirthDateInput,
+  convertDateToISO,
+  convertDateFromISO,
   PATIENT_SELECTED_FROM_CARD_FLAG,
   isPatientSelectedFromCard,
   buildInheritedPatientClearPatch,
