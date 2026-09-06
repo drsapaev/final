@@ -12,19 +12,19 @@
 - Red-check handling: Ran frontend vitest check logic.
 
 ## Contract Impact
-Not applicable because this is a pure UI change using an existing tooltip component. There are no backend or API changes involved.
+Not applicable - pure UI change using an existing tooltip component. There are no backend or API changes involved.
 
 ## RBAC / Permissions
-Not applicable because no role, permission, or authorization scopes were modified.
+Not applicable - no role, permission, or authorization scopes were modified.
 
 ## Notification / Realtime
-Not applicable because no webhooks, websockets, or event payloads were modified.
+Not applicable - no webhooks, websockets, or event payloads were modified.
 
 ## Frontend Resilience
-Not applicable because this is a purely visual tooltip rendering change and does not affect data loading, missing states, or error handling.
+Not applicable - this is a purely visual tooltip rendering change and does not affect data loading, missing states, or error handling.
 
 ## Scope Gate
-Not applicable because no routing, module migrations, or major logical flows were changed. The tooltip applies locally to button elements.
+Not applicable - no routing, module migrations, or major logical flows were changed. The tooltip applies locally to button elements.
 
 ## Validation
 - Targeted tests or smoke run: Checked visually and ran tests
