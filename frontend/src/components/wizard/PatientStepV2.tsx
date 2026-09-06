@@ -26,6 +26,9 @@ interface PatientStepV2Props {
   suggestions: Array<Record<string, any>>;
   showSuggestions: boolean;
   isSearching?: boolean;
+  // Fix F: явная ошибка поиска (не маскируется под «не найдено») + повтор
+  searchError?: string | null;
+  onRetrySearch?: () => void;
   onSearch: (value: string) => void;
   // TECH-DEBT(patient-step-patient-any): patient is `any` — raw API response shape
   onSelectPatient: (patient: any) => void;
@@ -49,6 +52,8 @@ const PatientStepV2 = ({
   suggestions,
   showSuggestions,
   isSearching = false, // UX Audit Registrar #11
+  searchError = null,
+  onRetrySearch,
   onSearch,
   onSelectPatient,
   onUpdate,
@@ -121,8 +126,23 @@ const PatientStepV2 = ({
           </div>
           }
 
-          {/* UX Audit #9: Empty state — patients not found. */}
-          {showSuggestions && !isSearching && suggestions.length === 0 && safeData.fio && safeData.fio.trim().length >= 2 &&
+          {/* Fix F: ошибка поиска — показывается ЯВНО, с возможностью повтора.
+              Раньше сетевой сбой выглядел как «пациенты не найдены — будет
+              создан новый пациент», что подталкивало к созданию дубликата. */}
+          {searchError && !isSearching &&
+          <div className="patient-step-v2__search-empty" role="alert">
+              {searchError}
+              <button
+              type="button"
+              onClick={onRetrySearch}
+              className="patient-step-v2__phone-error-btn">
+                {t('misc.aw_search_retry')}
+              </button>
+            </div>
+          }
+
+          {/* UX Audit #9: Empty state — patients not found (только когда поиск УСПЕШЕН и пуст). */}
+          {showSuggestions && !isSearching && !searchError && suggestions.length === 0 && safeData.fio && safeData.fio.trim().length >= 2 &&
           <div className="patient-step-v2__search-empty">
             Пациенты не найдены. Будет создан новый пациент.
           </div>
