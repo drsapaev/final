@@ -64,6 +64,10 @@ outage.
 ## Impact
 
 External API unavailable ~10 min (530). Frontend (Vercel) stayed up; backend
-locally healthy; no writes lost (writes cannot arrive without ingress).
-Uptime Monitor CI caught the earlier (unrelated) window of the same day — the
-monitoring layer worked as designed.
+locally healthy. Scope of the loss claim: no database corruption was observed
+and no write could REACH the backend without ingress — but requests already
+in flight when the serving connector disappeared, and any user submissions
+attempted during the window, could have failed client-side; no client-error
+reconciliation was performed, so "no data loss" is NOT claimed beyond the
+database layer. Uptime Monitor CI caught the earlier (unrelated) window of
+the same day — the monitoring layer worked as designed.
