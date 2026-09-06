@@ -138,6 +138,43 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
     expect(ecg).toHaveAccessibleDescription('final.tgs_active_queue');
   });
 
+  // Codex P2 round 6 (thread 3945096766): the tab key is backend-defined
+  // and may contain whitespace ("general medicine") — aria-describedby is
+  // an IDREF list, so the generated id must be whitespace-free and must
+  // still resolve in-button. The whitespace key arrives through the API
+  // path (mockResolvedValueOnce overrides the rejection default), since
+  // the offline fallback set only contains clean keys.
+  it('department key with whitespace: describedby id stays a valid single IDREF', async () => {
+    const { api } = await import('../../../api/client');
+    vi.mocked(api.get).mockResolvedValueOnce({
+      data: {
+        source: 'database',
+        profiles: [
+          { key: 'general medicine', title_ru: 'Общая медицина', icon: 'Heart', color: '#cc0000', queue_tags: [] },
+        ],
+      },
+    });
+
+    render(
+      <Tabs
+        departmentStats={{
+          'general medicine': { todayCount: 2, hasActiveQueue: false, hasPendingPayments: false },
+        }}
+      />
+    );
+
+    const button = await screen.findByRole('button', { name: 'Общая медицина' });
+
+    const describedBy = button.getAttribute('aria-describedby');
+    expect(describedBy).toBeTruthy();
+    expect(describedBy).not.toMatch(/\s/);
+
+    const target = document.getElementById(describedBy as string);
+    expect(target).not.toBeNull();
+    expect(button.contains(target as Node)).toBe(true);
+    expect(button).toHaveAccessibleDescription('registrarPanel.today: 2');
+  });
+
   it('empty departmentStats: no aria-describedby dangles on department buttons', async () => {
     render(<Tabs />);
 
@@ -187,5 +224,14 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
     expect(nsMemberValue(fs.readFileSync(path.join(localesDir, 'kk.ts'), 'utf8'), 'final', 'tgs_active_queue')).toBe('Белсенді кезек');
     expect(nsMemberValue(fs.readFileSync(path.join(localesDir, 'uz-Cyrl.ts'), 'utf8'), 'final', 'tgs_active_queue')).toBe('Фаол навбат');
     expect(nsMemberValue(fs.readFileSync(path.join(localesDir, 'uz-Latn.ts'), 'utf8'), 'final', 'tgs_active_queue')).toBe('Faol navbat');
+
+    // Localized (round-6): pending_payments / today no longer Russian in
+    // kk and uz-Cyrl (registrar users hear one language per locale).
+    const kk = fs.readFileSync(path.join(localesDir, 'kk.ts'), 'utf8');
+    const uzc = fs.readFileSync(path.join(localesDir, 'uz-Cyrl.ts'), 'utf8');
+    expect(nsMemberValue(kk, 'registrarPanel', 'pending_payments')).toBe('Төлемдер күтуде');
+    expect(nsMemberValue(kk, 'registrarPanel', 'today')).toBe('Бүгін');
+    expect(nsMemberValue(uzc, 'registrarPanel', 'pending_payments')).toBe('Тўловни кутмоқда');
+    expect(nsMemberValue(uzc, 'registrarPanel', 'today')).toBe('Бугун');
   });
 });

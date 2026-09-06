@@ -307,7 +307,13 @@ const Tabs = ({
   // .tab-label collapses at <=768px), so the reference stays resolvable on
   // mobile too; the name keeps the stable department label (WCAG 2.5.3
   // Label-in-Name) and the description announces the operational status.
-  const statusIdFor = (tabKey: string) => `${uid}-status-${tabKey}`;
+  // AXE-MOB-1 (Codex P2 round 6, thread 3945096766): the tab key is
+  // backend-defined (queue profile key) and may contain whitespace or other
+  // characters illegal in an HTML id (e.g. "general medicine").
+  // aria-describedby is an ID-reference list — the id MUST be
+  // whitespace-free, so the key is percent-encoded (injective +
+  // deterministic, no cross-key collisions).
+  const statusIdFor = (tabKey: string) => `${uid}-status-${encodeURIComponent(tabKey)}`;
   const hasStatusFor = (tabKey: string) => {
     const s = getStats(tabKey);
     return s.hasActiveQueue || s.hasPendingPayments || s.todayCount > 0;
