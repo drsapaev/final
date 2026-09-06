@@ -230,10 +230,14 @@ async function cacheFirst(request, cacheName) {
 
 // Network First стратегия
 async function networkFirst(request, cacheName, offlineFallbackUrl) {
+  // Чувствительные маршруты (payments, ai, telegram, print, auth) никогда
+  // не попадают в Cache Storage — иначе на общем компьютере клиники
+  // офлайн-фолбэк может отдать ответ одного пользователя другому.
+  const noCache = isNoCachePath(new URL(request.url).pathname);
   try {
     const networkResponse = await fetch(request);
 
-    if (networkResponse.ok) {
+    if (networkResponse.ok && !noCache) {
       const cache = await caches.open(cacheName);
       cache.put(request, networkResponse.clone());
     }
@@ -267,6 +271,11 @@ function isStaticFile(pathname) {
 // Проверка API запросов
 function isApiRequest(pathname) {
   return pathname.startsWith('/api/') || API_CACHE_PATTERNS.some(pattern => pattern.test(pathname));
+}
+
+// Проверка запрета кэширования (payments, ai, telegram, print, auth)
+function isNoCachePath(pathname) {
+  return NO_CACHE_PATTERNS.some(pattern => pattern.test(pathname));
 }
 
 // Проверка HTML запросов
