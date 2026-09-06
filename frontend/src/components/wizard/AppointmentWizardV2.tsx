@@ -209,6 +209,10 @@ import {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  formatBirthDateInput,
+  convertDateToISO,
+  convertDateFromISO,
+  getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
@@ -602,36 +606,7 @@ const AppointmentWizardV2 = ({
   };
 
   // ===================== МАСКИ ВВОДА =====================
-
-  const formatBirthDate = (value: string) => {
-    // Убираем все символы кроме цифр
-    const digits = value.replace(/\D/g, '');
-
-    // Ограничиваем до 8 цифр (ДДММГГГГ)
-    const limitedDigits = digits.slice(0, 8);
-
-    // Форматируем как ДД.ММ.ГГГГ
-    if (limitedDigits.length === 0) return '';
-    if (limitedDigits.length <= 2) return limitedDigits;
-    if (limitedDigits.length <= 4) return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2)}`;
-    return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2, 4)}.${limitedDigits.slice(4)}`;
-  };
-
-  const convertDateToISO = (dateStr: string) => {
-    // Конвертируем ДД.ММ.ГГГГ в ГГГГ-ММ-ДД
-    if (!dateStr || dateStr.length !== 10) return '';
-    const [day, month, year] = dateStr.split('.');
-    if (!day || !month || !year || year.length !== 4) return '';
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  };
-
-  const convertDateFromISO = (isoStr: string) => {
-    // Конвертируем ГГГГ-ММ-ДД в ДД.ММ.ГГГГ
-    if (!isoStr) return '';
-    const [year, month, day] = isoStr.split('-');
-    if (!year || !month || !day) return '';
-    return `${day}.${month}.${year}`;
-  };
+  // Fix-refactor: маска/конвертация даты рождения вынесены в wizardUtils (чистые функции).
 
   // ===================== ПОИСК ПАЦИЕНТОВ =====================
 
@@ -791,7 +766,7 @@ const AppointmentWizardV2 = ({
 
 
   const handleBirthDateChange = (value: string) => {
-    const formatted = formatBirthDate(value);
+    const formatted = formatBirthDateInput(value);
     setFormattedBirthDate(formatted);
 
     // Конвертируем в ISO формат для сохранения
@@ -2749,62 +2724,10 @@ const AppointmentWizardV2 = ({
     return Object.values(visits);
   };
 
+  // Fix-refactor: маппинг отделения вынесен в wizardUtils (чистая функция);
+  // обёртка сохраняет существующие вызовы.
   const getDepartmentByService = (serviceId: string | number) => {
-    // ✅ ИСПРАВЛЕНО: Проверка на null/undefined перед поиском
-    if (!serviceId || serviceId === null || serviceId === undefined) {
-      logger.warn('⚠️ getDepartmentByService: serviceId is null/undefined');
-      return 'general';
-    }
-
-    const service = servicesData.find((s) => s.id === serviceId);
-
-    if (!service) {
-      logger.warn(`⚠️ Услуга ${serviceId} не найдена в servicesData`);
-      return 'general';
-    }
-
-    logger.log(`🔍 getDepartmentByService: serviceId=${serviceId}, queue_tag=${service.queue_tag}, category_code=${service.category_code}`);
-
-    // 🎯 СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЭКГ: отдельный кабинет!
-    if (service.queue_tag === 'ecg') {
-      logger.log('✅ ЭКГ обнаружено! Возвращаем department=\'echokg\'');
-      return 'echokg'; // ЭКГ в отдельном кабинете (соответствует вкладке 'echokg')
-    }
-
-    // ✅ ИСПРАВЛЕННЫЙ МАППИНГ - соответствует вкладкам RegistrarPanel
-    const mapping: Record<string, string> = {
-      'K': 'cardiology', // Кардиология → вкладка cardio (БЕЗ ЭКГ!)
-      'D': 'dermatology', // Дерматология → вкладка derma (только консультации)
-      'S': 'dentistry', // Стоматология → вкладка dental
-      'L': 'laboratory', // Лаборатория → вкладка lab
-      'P': 'procedures', // Физиотерапия → вкладка procedures
-      'C': 'procedures', // Косметология → вкладка procedures
-      'D_PROC': 'procedures', // Дерматологические процедуры → вкладка procedures
-      'O': 'procedures' // Прочие процедуры → вкладка procedures
-    };
-
-    // ✅ ИСПРАВЛЕНО Bug 2: Сначала проверяем оригинальный category_code для точного маппинга
-    // Это предотвращает неправильный маппинг дерматологии и стоматологии в кардиологию
-    if (service.category_code && mapping[service.category_code]) {
-      const result = mapping[service.category_code];
-      logger.log(`🎯 getDepartmentByService результат: serviceId=${serviceId}, category_code=${service.category_code}, department=${result} (прямой маппинг)`);
-      return result;
-    }
-
-    // ✅ Нормализация category_code как fallback
-    const normalizedCategoryCode = service.category_code ? normalizeCategoryCode(service.category_code) : '';
-
-    // ✅ ИСПРАВЛЕНИЕ: Маппинг для нормализованных кодов (только для случаев, когда нет прямого маппинга)
-    const normalizedMapping: Record<string, string> = {
-      'specialists': 'cardiology', // Консультации специалистов (только если не 'D' или 'S') -> cardiology
-      'laboratory': 'lab', // ✅ ИСПРАВЛЕНИЕ: Лаборатория -> lab (для соответствия вкладке)
-      'procedures': 'procedures', // Процедуры -> procedures
-      'other': 'general' // Прочее -> general
-    };
-
-    const result = normalizedMapping[normalizedCategoryCode] || mapping[service.category_code as string] || 'general';
-    logger.log(`🎯 getDepartmentByService результат: serviceId=${serviceId}, category_code=${normalizedCategoryCode}, department=${result}`);
-    return result;
+    return getWizardDepartmentForService(serviceId, servicesData);
   };
 
   // ===================== ДЕЙСТВИЯ ДИАЛОГА =====================
