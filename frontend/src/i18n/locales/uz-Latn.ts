@@ -6288,6 +6288,9 @@ const uzLatn = {
 
     // ─── AppointmentWizardV2.jsx (aw_) ─────────────────────────────────────
     aw_phone_already_exists: 'Bunday telefon raqamli bemor allaqachon mavjud',
+    psv_card_edit_hint: 'Tanlangan bemor kartasi tahrirlanmoqda. Telefon, manzil va tugʻilgan sana oʻzgarishlari saqlanadi.',
+    aw_card_save_failed: 'Karta oʻzgarishlarini saqlash amalga oshmadi: {message}. Yozuv yaratilmadi.',
+    aw_card_save_not_persisted: 'Karta oʻzgarishlari saqlanmadi. Yozuv yaratilmadi. Qayta urinib koʻring.',
     aw_form_cleared: 'Shakl tozalandi',
     aw_no_name: 'Ism yoʻq',
     aw_unknown_service: 'Nomaʼlum xizmat',

@@ -465,3 +465,126 @@ export default {
   resolveInitialServiceCategory,
   categories,
 };
+
+/**
+ * Fix B: split a display FIO into the separate name fields accepted by the
+ * backend PatientUpdate contract (PatientUpdate has NO full_name field —
+ * sending one is silently dropped with a 200 response).
+ */
+export const splitFioForUpdate = (
+  fio: string,
+): { last_name?: string; first_name?: string; middle_name?: string } => {
+  const parts = (fio || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return {};
+  const result: { last_name?: string; first_name?: string; middle_name?: string } = {
+    last_name: parts[0],
+    first_name: parts[1] || parts[0],
+  };
+  if (parts.length > 2) {
+    result.middle_name = parts.slice(2).join(' ');
+  }
+  return result;
+};
+
+export interface WizardCardSnapshot {
+  id: string | number | null;
+  phoneDigits: string;
+  address: string;
+  birthDate: string;
+  sex: string;
+}
+
+/**
+ * Fix B: diff the edited card against the snapshot taken at selection time.
+ * Only fields the user actually changed are sent to the patients API.
+ */
+export const buildCardUpdateFromSnapshot = (
+  snapshot: WizardCardSnapshot,
+  current: { phoneDigits: string; address?: string; birthDate?: string; sex?: string },
+  normalizedPhone: string | null,
+): Record<string, unknown> => {
+  const cardUpdate: Record<string, unknown> = {};
+  if (current.phoneDigits !== snapshot.phoneDigits) cardUpdate.phone = normalizedPhone;
+  if ((current.address || '') !== snapshot.address) cardUpdate.address = current.address || null;
+  if (current.birthDate && current.birthDate !== snapshot.birthDate) cardUpdate.birth_date = current.birthDate;
+  if (current.sex && current.sex !== snapshot.sex) cardUpdate.sex = current.sex;
+  return cardUpdate;
+};
+
+/**
+ * Fix B: a 200 response alone does not prove persistence — verify each sent
+ * field against the freshly re-read card and report mismatched field names.
+ */
+export const findCardPersistMismatches = (
+  refreshed: Record<string, unknown>,
+  cardUpdate: Record<string, unknown>,
+  currentPhoneDigits: string,
+): string[] => {
+  const mismatches: string[] = [];
+  if (cardUpdate.phone !== undefined) {
+    const refreshedDigits = String(refreshed.phone || '').replace(/\D/g, '');
+    if (refreshedDigits !== currentPhoneDigits) mismatches.push('phone');
+  }
+  if (cardUpdate.address !== undefined && String(refreshed.address || '') !== String(cardUpdate.address)) {
+    mismatches.push('address');
+  }
+  if (cardUpdate.birth_date !== undefined && String(refreshed.birth_date || '') !== String(cardUpdate.birth_date)) {
+    mismatches.push('birth_date');
+  }
+  if (cardUpdate.sex !== undefined && String(refreshed.sex || '') !== String(cardUpdate.sex)) {
+    mismatches.push('sex');
+  }
+  return mismatches;
+};
+
+interface CardPersistLogger {
+  error: (...args: unknown[]) => void;
+  log: (...args: unknown[]) => void;
+}
+
+/**
+ * Fix B: persist edited patient-card fields through the canonical patients
+ * API BEFORE the cart is created, then verify with a read-back that every
+ * sent field actually persisted (a 200 alone proves nothing). Unchanged
+ * cards trigger no update request.
+ *
+ * Returns true when the flow may proceed; false means the submission was
+ * stopped (error shown, no success toast, no cart created).
+ */
+export const persistCardChangesIfEdited = async (args: {
+  patientId: string | number;
+  snapshot: WizardCardSnapshot | null;
+  current: { phoneDigits: string; address?: string; birthDate?: string; sex?: string };
+  normalizedPhone: string | null;
+  updatePatient: (id: string | number, payload: Record<string, unknown>) => Promise<unknown>;
+  getPatient: (id: string | number) => Promise<unknown>;
+  logger: CardPersistLogger;
+  toast: { error: (message: string) => unknown };
+  t: (key: string, options?: Record<string, unknown>) => string;
+}): Promise<boolean> => {
+  const { patientId, snapshot, current, normalizedPhone, updatePatient, getPatient, logger, toast, t } = args;
+  if (!snapshot || String(snapshot.id) !== String(patientId)) return true;
+
+  const cardUpdate = buildCardUpdateFromSnapshot(snapshot, current, normalizedPhone);
+  if (Object.keys(cardUpdate).length === 0) return true;
+
+  try {
+    await updatePatient(patientId, cardUpdate);
+    // 200 OK does not prove persistence — verify with an actual read-back.
+    const refreshed = (await getPatient(patientId)) as unknown as Record<string, unknown>;
+    const mismatches = findCardPersistMismatches(refreshed, cardUpdate, current.phoneDigits);
+    if (mismatches.length > 0) {
+      logger.error('Card update not persisted for fields:', mismatches);
+      toast.error(t('misc.aw_card_save_not_persisted'));
+      return false;
+    }
+    logger.log('Card changes persisted and verified by read-back');
+    return true;
+  } catch (cardUpdateError: unknown) {
+    const cardErr = cardUpdateError as Error & { status?: number; message?: string };
+    // On a save error the cart must NOT be created with stale card data.
+    logger.error('Card save failed:', cardErr.status, cardErr.message);
+    toast.error(t('misc.aw_card_save_failed', { message: cardErr.message || t('misc.aw_unknown_error') }));
+    return false;
+  }
+};
