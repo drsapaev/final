@@ -291,3 +291,33 @@ describe('HeaderNew chrome (HDR-FX-1)', () => {
     expect(screen.queryByTitle('Новая запись')).not.toBeInTheDocument();
   });
 });
+
+describe('HeaderNew brand navigation (HDR-POLISH-2, audit P3-3)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    unreadState.count = 0;
+  });
+
+  it('authed user: brand navigates to the role home, not the public landing', () => {
+    renderHeader({ role: 'Admin', path: '/admin/settings' });
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/admin/settings');
+    fireEvent.click(screen.getByTitle('На главную'));
+    // role home for Admin (routeRegistry homeForRoles), same target the
+    // Back-fallback uses — the brand no longer exits to the landing.
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/admin');
+  });
+
+  it('anonymous user: brand keeps navigating to the public landing', () => {
+    authState.profile = null as unknown as Record<string, unknown>;
+    renderWithProviders(
+      <>
+        <HeaderNew />
+        <LocationProbe />
+      </>,
+      { routerProps: { initialEntries: ['/login'] } },
+    );
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/login');
+    fireEvent.click(screen.getByTitle('На главную'));
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/');
+  });
+});

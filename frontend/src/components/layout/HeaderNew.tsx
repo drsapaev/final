@@ -256,7 +256,10 @@ export default function HeaderNew() {
     borderRadius: 'var(--mac-radius-md)',
     padding: '0 16px',
     height: '54px',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+    // HDR-POLISH-2 (P3-2): the canonical typography token (--ui-font,
+    // theme.css) instead of a private -apple-system stack — the header now
+    // renders with the same face as the rest of the app on every platform.
+    fontFamily: 'var(--ui-font)',
     backgroundImage: isGlassTheme ?
     'none' :
     isGradientTheme || isVibrantTheme ?
@@ -295,7 +298,12 @@ export default function HeaderNew() {
     const p = location.pathname;
     if (p === '/' || p === landingRoute || p === loginRoute) return false;
     if (p === roleHomePath) return false;
-    // No history beyond the current entry (new tab / deep link)
+    // No history beyond the current entry (new tab / deep link).
+    // P3 (audit, documented): history.length grows monotonically within a
+    // session, so after a long session this heuristic can enable Back even
+    // when the previous entry lies outside the app (external referrer).
+    // navigate(-1) then leaves the SPA — accepted, low-risk behaviour; the
+    // fallback branch below already targets roleHomePath.
     if (!window.history || window.history.length <= 1) return false;
     return true;
     // landingRoute/loginRoute are module-level constants, not React state.
@@ -334,7 +342,10 @@ export default function HeaderNew() {
   <Button
     variant="ghost"
     size="small"
-    onClick={() => navigate(landingRoute)}
+    // HDR-POLISH-2 (P3-3): for an authenticated user the brand is a home
+    // button to their role panel (same target the Back-fallback uses),
+    // not an exit to the public landing. Anonymous users keep landing.
+    onClick={() => navigate(user ? roleHomePath || landingRoute : landingRoute)}
     title={t('legacy.hn_brand_title')}
     style={{
       color: 'var(--mac-text-primary)',
@@ -367,8 +378,9 @@ export default function HeaderNew() {
           size="small"
           onClick={() => navigate(item.to)}
           title={item.label}
-          className="hdr-hide-xs"
           style={{
+            // HDR-POLISH-2: hdr-hide-xs removed — inline display:flex always
+            // out-ranked the media rule, so the class never fired.
             display: 'flex',
             alignItems: 'center',
             gap: 'var(--mac-spacing-2)',
@@ -462,8 +474,10 @@ export default function HeaderNew() {
             variant="ghost"
             size="small"
             onClick={() => setInboxOpen(!inboxOpen)}
-            title={t('legacy.hn_notifications_title') || 'Уведомления'}
-            aria-label={t('legacy.hn_notifications_title') || 'Уведомления'}
+            // HDR-POLISH-2 (P3-1): the literal fallback removed — the key
+            // exists in ru/en/kk/uz, so the fallback string was dead code.
+            title={t('legacy.hn_notifications_title')}
+            aria-label={t('legacy.hn_notifications_title')}
             aria-expanded={inboxOpen}
             style={{
               width: '36px',
@@ -634,8 +648,10 @@ export default function HeaderNew() {
             aria-label={t('legacy.hn_profile_title')}
             aria-haspopup="menu"
             aria-expanded={showProfileMenu}
-            className="hdr-hide-sm"
             style={{
+              // HDR-POLISH-2: hdr-hide-sm removed — inline display:flex always
+              // out-ranked the media rule; the trigger stays visible <=768px
+              // (that is the behaviour baselines already capture).
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--mac-spacing-2)',
@@ -731,8 +747,8 @@ export default function HeaderNew() {
           variant="primary"
           size="small"
           onClick={() => navigate(loginRoute)}
-          className="hdr-hide-sm"
           style={{
+            // HDR-POLISH-2: hdr-hide-sm removed — dead class, see above.
             display: 'flex',
             alignItems: 'center',
             gap: 'var(--mac-spacing-2)',

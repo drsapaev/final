@@ -98,15 +98,12 @@ html {
 }
 
 /* Улучшенная адаптивность: visibility utilities (inline styles cannot
-   express media queries, so these remain the single CSS-owned behavior). */
-@media (max-width: 1024px) {
-  .hdr-hide-md { display: none; }
-}
-
-@media (max-width: 768px) {
-  .hdr-hide-sm { display: none; }
-}
-
+   express media queries, so these remain the single CSS-owned behavior).
+   HDR-POLISH-2: dead utilities removed — .hdr-hide-md had zero usages and
+   .hdr-hide-sm sat only on buttons whose inline display:flex always
+   out-ranked the rule (the rendered behaviour — controls visible — is what
+   the baselines already capture). The brand-text span is the only live
+   .hdr-hide-xs consumer. */
 @media (max-width: 480px) {
   .hdr-hide-xs { display: none; }
 }
