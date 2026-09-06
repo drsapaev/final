@@ -1,6 +1,6 @@
 import React, { type CSSProperties } from 'react';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import {
   Heart,
   Activity,
@@ -85,6 +85,10 @@ const Tabs = ({
   const [tabs, setTabs] = useState<TabItem[]>([]);
   const [loading, setLoading] = useState(true);
   const tabsRef = useRef<HTMLDivElement | null>(null);
+  // AXE-MOB-1 (Codex P2 round 1, thread 3944915764): instance-scoped id
+  // prefix for the aria-describedby targets — document-unique even with
+  // multiple Tabs mounts (e.g. CSSTestPage).
+  const uid = useId();
 
   // ⭐ SSOT: Загрузка профилей очередей (вкладок) из БД через API
   // Tabs определяются в backend, frontend только отображает
@@ -242,7 +246,6 @@ const Tabs = ({
   const renderStatusIndicators = (tabKey: string) => {
     const stats = getStats(tabKey);
     const indicators: React.ReactNode[] = [];
-
     if (stats.hasActiveQueue) {
       indicators.push(
         <div
@@ -280,6 +283,22 @@ const Tabs = ({
     }
 
     return indicators;
+  };
+
+  // AXE-MOB-1 (Codex P2 round 1, thread 3944915764): the department
+  // buttons carry aria-label={tab.label}, which overrides name-from-content
+  // — without the wiring below the status indicators (active queue, pending
+  // payment, today count) would stay visible but DISAPPEAR from screen-
+  // reader output. The status text is associated as the button accessible
+  // DESCRIPTION via aria-describedby -> the in-button .status-indicators
+  // container. The container is rendered visible at EVERY width (only
+  // .tab-label collapses at <=768px), so the reference stays resolvable on
+  // mobile too; the name keeps the stable department label (WCAG 2.5.3
+  // Label-in-Name) and the description announces the operational status.
+  const statusIdFor = (tabKey: string) => `${uid}-status-${tabKey}`;
+  const hasStatusFor = (tabKey: string) => {
+    const s = getStats(tabKey);
+    return s.hasActiveQueue || s.hasPendingPayments || s.todayCount > 0;
   };
 
   // Показываем заглушку пока загружаются вкладки
@@ -377,8 +396,12 @@ const Tabs = ({
                 // AXE-MOB-1: same button-name contract as the
                 // all-departments control above — the visible .tab-label is
                 // display:none at <=768px (Tabs.css), so the name must come
-                // from an attribute.
+                // from an attribute. Status text is NOT folded into the
+                // label: it rides the accessible description instead (see
+                // statusIdFor above) so SR users still hear the operational
+                // status this button renders visually.
                 aria-label={tab.label}
+                aria-describedby={hasStatusFor(tab.key) ? statusIdFor(tab.key) : undefined}
                 style={{
                   color: isActive ? 'var(--mac-text-primary)' : colors.text,
                   backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active), transparent 70%)' : 'transparent',
@@ -393,7 +416,7 @@ const Tabs = ({
                   <span className="tab-label">{tab.label}</span>
 
                   {/* Индикаторы статуса */}
-                  <div className="status-indicators">
+                  <div className="status-indicators" id={statusIdFor(tab.key)}>
                     {renderStatusIndicators(tab.key)}
                   </div>
                 </div>
