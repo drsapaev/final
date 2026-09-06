@@ -192,13 +192,19 @@ arq_check() {
 from app.tasks.worker import WorkerSettings, send_visit_reminder, run_data_retention
 print(f'    Worker functions: {len(WorkerSettings.functions)} defined')
 print(f'    Cron jobs: {len(WorkerSettings.cron_jobs)} defined')
-" 2>&1
-        echo "    NOTE: proves module wiring only."
-        echo "    enqueue+process needs live Redis+worker — manual (runbook Check 5)."
+" 2>&1 || exit 1
+        if [ -n "${ARQ_TEST_REDIS_URL:-}${REDIS_URL:-}" ]; then
+            echo "    Live enqueue+process proof on scratch queue..."
+            python -m app.scripts.arq_enqueue_process_check 2>&1
+        else
+            echo "    NOTE: proves module wiring only."
+            echo "    Set ARQ_TEST_REDIS_URL (or REDIS_URL) to run the live"
+            echo "    enqueue+process proof; otherwise it stays manual (runbook Check 5)."
+        fi
     )
 }
 
-run_check 5 "arq worker module wiring" arq_check
+run_check 5 "arq worker wiring (+ live enqueue/process when Redis URL set)" arq_check
 
 # ---------------------------------------------------------------------------
 # Check 6: PII scrubbing
