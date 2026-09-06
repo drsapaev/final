@@ -100,10 +100,12 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
     expect(statusTarget).not.toBeNull();
     expect(cardiology.contains(statusTarget as Node)).toBe(true);
     expect(statusTarget).toHaveClass('sr-only');
-    expect(statusTarget?.textContent).toBe('terms.queue: 4, queue_status.pending, registrarPanel.today: 4');
+    expect(statusTarget?.textContent).toBe(
+      'final.tgs_active_queue, registrarPanel.pending_payments, registrarPanel.today: 4',
+    );
 
-    // Visible indicators render as before (pure visual layer); their
-    // tooltips now use DEFINED i18n keys (round-3 i18n fix).
+    // Visible indicators render as before (pure visual layer); tooltips
+    // agree with the description (round-4 semantics + i18n).
     const statusContainer = cardiology.querySelector('.status-indicators');
     expect(statusContainer!.querySelectorAll('.status-indicator').length).toBe(3);
     expect(statusContainer!.querySelector('.status-indicator.queue')).not.toBeNull();
@@ -111,11 +113,11 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
     expect(statusContainer!.querySelector('.status-indicator.count')?.textContent).toContain('4');
     expect(statusContainer!.querySelector('.status-indicator.queue')).toHaveAttribute(
       'title',
-      'terms.queue: 4',
+      'final.tgs_active_queue',
     );
     expect(statusContainer!.querySelector('.status-indicator.pending')).toHaveAttribute(
       'title',
-      'queue_status.pending',
+      'registrarPanel.pending_payments',
     );
     expect(statusContainer!.querySelector('.status-indicator.count')).toHaveAttribute(
       'title',
@@ -123,13 +125,17 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
     );
 
     // THE assertion Codex demanded: the computed accessible description
-    // carries the full localized status text.
-    expect(cardiology).toHaveAccessibleDescription('terms.queue: 4, queue_status.pending, registrarPanel.today: 4');
+    // carries the full localized status text (active queue is a boolean
+    // phrase WITHOUT the unrelated today-count).
+    expect(cardiology).toHaveAccessibleDescription(
+      'final.tgs_active_queue, registrarPanel.pending_payments, registrarPanel.today: 4',
+    );
 
     // Boolean-only state (active queue, zero count): previously this would
-    // compute an EMPTY description (icon SVG only) — now it announces text.
+    // compute an EMPTY description (icon SVG only) — now it announces text,
+    // with NO misleading "queue size" number.
     const ecg = screen.getByRole('button', { name: 'misc.mt_ekg' });
-    expect(ecg).toHaveAccessibleDescription('terms.queue: 0');
+    expect(ecg).toHaveAccessibleDescription('final.tgs_active_queue');
   });
 
   it('empty departmentStats: no aria-describedby dangles on department buttons', async () => {
@@ -144,6 +150,32 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
     );
     for (const button of departmentButtons) {
       expect(button.getAttribute('aria-describedby')).toBeNull();
+    }
+  });
+
+  // Codex P2 round 4 (thread 3945043230): "test against real locale
+  // resources" — the three status keys must be DEFINED in every locale
+  // file, in the exact namespaces the component references.
+  it('status keys resolve in real locale resources for all five locales', () => {
+    const fs = require('node:fs') as typeof import('node:fs');
+    const path = require('node:path') as typeof import('node:path');
+
+    const localesDir = path.resolve(__dirname, '../../../i18n/locales');
+
+    const nsMember = (src: string, ns: string, member: string): boolean => {
+      const block = new RegExp(`^  ${ns}: \\{([\\s\\S]*?)^  \\},`, 'm').exec(src);
+      if (!block) return false;
+      return new RegExp(`^    ${member}: '`, 'm').test(block[1]);
+    };
+
+    for (const locale of ['ru', 'en', 'kk', 'uz-Cyrl', 'uz-Latn']) {
+      const src = fs.readFileSync(path.join(localesDir, `${locale}.ts`), 'utf8');
+      expect(nsMember(src, 'final', 'tgs_active_queue'), `${locale}: final.tgs_active_queue`).toBe(true);
+      expect(
+        nsMember(src, 'registrarPanel', 'pending_payments'),
+        `${locale}: registrarPanel.pending_payments`,
+      ).toBe(true);
+      expect(nsMember(src, 'registrarPanel', 'today'), `${locale}: registrarPanel.today`).toBe(true);
     }
   });
 });

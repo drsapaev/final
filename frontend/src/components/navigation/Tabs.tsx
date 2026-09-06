@@ -251,12 +251,15 @@ const Tabs = ({
         <div
           key="queue"
           className="status-indicator queue"
-          // AXE-MOB-1 (Codex P2 round 3, thread 3945016484): use keys that
-          // are actually DEFINED in all five locales — queue.queue /
-          // queue.pending / queue.today do not exist in the queue namespace,
-          // so t() returned the raw key (latent bug, visible in these
-          // tooltips since before AXE-MOB-1).
-          title={`${t('terms.queue')}: ${String(stats.todayCount ?? '')}`}>
+          // AXE-MOB-1 (Codex P2 round 4, thread 3945043227): an active-queue
+          // phrase WITHOUT the unrelated count — todayCount is every
+          // appointment dated today (computeDepartmentStats) while
+          // hasActiveQueue is derived independently from active
+          // queue_numbers entries, so "Queue: {todayCount}" misannounced
+          // both directions ("Queue: 5" for 5 appointments + 1 queued;
+          // "Queue: 0" for an other-day active queue). The tooltip agrees
+          // with the description below.
+          title={t('final.tgs_active_queue')}>
 
           <Clock size={10} />
         </div>
@@ -268,7 +271,11 @@ const Tabs = ({
         <div
           key="pending"
           className="status-indicator pending"
-          title={t('queue_status.pending')}>
+          // AXE-MOB-1 (Codex P2 round 4, thread 3945043230): the
+          // payment-specific label — queue_status.pending is a generic
+          // queue-state word (and untranslated in en). registrarPanel
+          // .pending_payments resolves to "Pending payments" in en.
+          title={t('registrarPanel.pending_payments')}>
 
           <AlertCircle size={10} />
         </div>
@@ -313,15 +320,21 @@ const Tabs = ({
   // localized status sentence from the same stats the visible indicators
   // render; it is rendered as a dedicated .sr-only description target —
   // visually invisible, announced by AT.
-  // AXE-MOB-1 (Codex P2 round 3, thread 3945016484): the keys must be
-  // DEFINED — terms.queue / queue_status.pending / registrarPanel.today all
-  // exist in every locale, while queue.queue / queue.pending / queue.today
-  // do not (t() returned the raw key).
+  // AXE-MOB-1 (Codex P2 rounds 3-4, threads 3945016484 / 3945043227 /
+  // 3945043230): every key must be DEFINED in all five locales AND carry
+  // the right semantics:
+  //   - active queue: final.tgs_active_queue ("Активная очередь") — a
+  //     boolean phrase; todayCount is ALL appointments dated today, NOT the
+  //     queue size, so it must never ride the queue announcement;
+  //   - pending payments: registrarPanel.pending_payments ("Pending
+  //     payments") — payment-specific, not the generic queue state word;
+  //   - today count: registrarPanel.today + the count — this pairing IS
+  //     semantically correct ("Сегодня: N" = appointments dated today).
   const statusTextFor = (tabKey: string): string => {
     const s = getStats(tabKey);
     const parts: string[] = [];
-    if (s.hasActiveQueue) parts.push(`${t('terms.queue')}: ${s.todayCount}`);
-    if (s.hasPendingPayments) parts.push(t('queue_status.pending'));
+    if (s.hasActiveQueue) parts.push(t('final.tgs_active_queue'));
+    if (s.hasPendingPayments) parts.push(t('registrarPanel.pending_payments'));
     if (s.todayCount > 0) parts.push(`${t('registrarPanel.today')}: ${s.todayCount}`);
     return parts.join(', ');
   };
