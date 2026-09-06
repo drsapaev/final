@@ -216,7 +216,11 @@ import {
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
   categories,
+  normalizeAndSortPatientSuggestions,
+  hasWizardFormContent,
+  type WizardPatientSuggestion,
 } from './wizardUtils';
+import { useWizardSafeClose } from './useWizardSafeClose';
 
 const AppointmentWizardV2 = ({
   isOpen,
@@ -316,6 +320,11 @@ const AppointmentWizardV2 = ({
   const [isSearchingPatients, setIsSearchingPatients] = useState(false); // UX Audit Registrar #11
   const [phoneCheckTimeout, setPhoneCheckTimeout] = useState<ReturnType<typeof setTimeout> | null>(null); // ✅ Timeout для проверки телефона
   const [phoneError, setPhoneError] = useState<{ message?: string; patient?: unknown } | null>(null); // ✅ Ошибка уникальности телефона
+  // Fix F: ошибка поиска + счётчики актуальности — устаревший ответ
+  // (после нового запроса, очистки поля, закрытия) не применяется.
+  const [searchError, setSearchError] = useState(false);
+  const searchSequenceRef = useRef(0);
+  const phoneCheckSequenceRef = useRef(0);
   const [servicesData, setServicesData] = useState<ServiceData[]>([]);
   const [doctorsData, setDoctorsData] = useState<DoctorData[]>([]);
   const [filteredServices, setFilteredServices] = useState<ServiceData[]>([]);
@@ -465,8 +474,25 @@ const AppointmentWizardV2 = ({
       setActiveServiceCategory('specialists');
       setServiceSearchQuery('');
       setShowAllServices(false);
+      // Fix F: таймеры снимаются, in-flight запросы инвалидируются,
+      // подсказки/ошибки не переносятся в следующее открытие мастера.
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        setSearchTimeout(null);
+      }
+      if (phoneCheckTimeout) {
+        clearTimeout(phoneCheckTimeout);
+        setPhoneCheckTimeout(null);
+      }
+      searchSequenceRef.current += 1;
+      phoneCheckSequenceRef.current += 1;
+      setPatientSuggestions([]);
+      setShowSuggestions(false);
+      setIsSearchingPatients(false);
+      setSearchError(false);
+      setPhoneError(null);
     }
-  }, [isOpen]);
+  }, [isOpen, searchTimeout, phoneCheckTimeout]);
 
   // Safeguard: Ensure wizardData structure is valid
   useEffect(() => {
@@ -513,10 +539,16 @@ const AppointmentWizardV2 = ({
       return;
     }
 
+    // Fix F: ответ старой проверки не перезаписывает новое состояние.
+    const requestId = ++phoneCheckSequenceRef.current;
+
     try {
       // UX Audit Stage 3 (Wizard issue 5.1):
       // Заменён raw fetch() на searchPatientsByPhone() из api/patients.
       const data = await searchPatientsByPhone(normalizedPhone) as unknown as PatientRecord[];
+
+      if (requestId !== phoneCheckSequenceRef.current) return; // устаревший ответ
+
       // Если найден пациент и это не тот же самый пациент (если мы редактируем, но тут мы создаем/ищем)
       // В мастере мы всегда предполагаем, что если ID не выбран, то это новый.
       // Если ID выбран, то мы не проверяем (или проверяем, не занят ли другим).
@@ -536,6 +568,9 @@ const AppointmentWizardV2 = ({
         setPhoneError(null);
       }
     } catch (error: unknown) {
+      // Fix F: ошибка проверки телефона не блокирует форму и не подменяет
+      // актуальное состояние устаревшего запроса.
+      if (requestId !== phoneCheckSequenceRef.current) return;
       logger.error('Ошибка проверки телефона:', error);
     }
   };
@@ -612,67 +647,49 @@ const AppointmentWizardV2 = ({
   // ===================== ПОИСК ПАЦИЕНТОВ =====================
 
   const searchPatients = useCallback(async (query: string) => {
-    if (!query || query.length < 2) {
+    // Fix F: учитывается только последний актуальный запрос — каждый вызов
+    // инвалидирует все предыдущие (гонка ответов, очистка поля, закрытие).
+    const requestId = ++searchSequenceRef.current;
+
+    if (!query || query.trim().length < 2) {
       setPatientSuggestions([]);
       setShowSuggestions(false);
+      setSearchError(false);
+      setIsSearchingPatients(false);
       return;
     }
 
     // UX Audit Registrar #11: loading indicator во время поиска.
     setIsSearchingPatients(true);
+    setSearchError(false);
 
     try {
       // UX Audit Stage 3 (Wizard issue 5.1):
       // Заменён raw fetch() на searchPatientsApi() из api/patients.
       const data = await searchPatientsApi(query) as unknown as PatientRecord[];
 
-      // ✅ Формируем fio из отдельных полей, если его нет
-      const patientsWithFio = data.map((patient) => {
-          if (!patient.fio && (patient.last_name || patient.first_name)) {
-            const parts = [
-            patient.last_name || '',
-            patient.first_name || '',
-            patient.middle_name || ''].
-            filter((p) => p);
-            patient.fio = parts.join(' ').trim() || t('misc.aw_no_name');
-          } else if (!patient.fio) {
-            patient.fio = t('misc.aw_no_name');
-          }
-          return patient;
-        });
-
-        // Сортировка по приоритету: телефон > точное ФИО > частичное ФИО
-        const sorted = patientsWithFio.sort((a, b) => {
-          const queryLower = (query || '').toLowerCase();
-          const aPhone = a?.phone || '';
-          const bPhone = b?.phone || '';
-          const aFio = (a?.fio || '').toLowerCase();
-          const bFio = (b?.fio || '').toLowerCase();
-
-          // Приоритет 1: точное совпадение телефона
-          if (aPhone === query) return -1;
-          if (bPhone === query) return 1;
-
-          // Приоритет 2: точное совпадение ФИО
-          if (aFio === queryLower) return -1;
-          if (bFio === queryLower) return 1;
-
-          // Приоритет 3: частичное совпадение ФИО
-          const aMatch = aFio.includes(queryLower);
-          const bMatch = bFio.includes(queryLower);
-
-          if (aMatch && !bMatch) return -1;
-          if (!aMatch && bMatch) return 1;
-
-          return 0;
-        });
+      // Fix F: устаревший ответ (пришёл после нового запроса) игнорируется.
+      if (requestId !== searchSequenceRef.current) return;
+      const sorted = normalizeAndSortPatientSuggestions(
+        data as WizardPatientSuggestion[],
+        query,
+        t('misc.aw_no_name'),
+      );
 
       setPatientSuggestions(sorted.slice(0, 10)); // Максимум 10 результатов
       setShowSuggestions(true);
     } catch (error: unknown) {
+      // Fix F: сетевой сбой — состояние «Ошибка поиска» с повтором; фраза
+      // «Будет создан новый пациент» при ошибке не показывается.
+      if (requestId !== searchSequenceRef.current) return;
       logger.error('Ошибка поиска пациентов:', error);
+      setPatientSuggestions([]);
+      setSearchError(true);
+      setShowSuggestions(true);
     } finally {
-      setIsSearchingPatients(false);
+      if (requestId === searchSequenceRef.current) {
+        setIsSearchingPatients(false);
+      }
     }
   }, []);
 
@@ -692,6 +709,11 @@ const AppointmentWizardV2 = ({
     if (searchTimeout) clearTimeout(searchTimeout);
     const timeout = setTimeout(() => searchPatients(value), 300);
     setSearchTimeout(timeout);
+  };
+
+  // Fix F: повтор поиска после ошибки — тот же актуальный запрос, что и при вводе.
+  const retryPatientSearch = () => {
+    void searchPatients(wizardData.patient.fio);
   };
 
   const selectPatient = (patient: PatientRecord) => {
@@ -732,7 +754,12 @@ const AppointmentWizardV2 = ({
 
     // Обновляем отформатированную дату
     setFormattedBirthDate(convertDateFromISO(patient.birth_date || ''));
+    // Fix F: подсказки поиска не переживают выбор карточки — иначе старый
+    // (или поздний) ответ поиска снова покажет список под выбранным пациентом.
+    setPatientSuggestions([]);
     setShowSuggestions(false);
+    setSearchError(false);
+    setPhoneError(null);
     setErrors((prev) => ({ ...prev, fio: null }));
   };
 
@@ -1428,6 +1455,17 @@ const AppointmentWizardV2 = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
+
+      // Fix F: вложенный диалог (confirm) владеет клавиатурой.
+      if (typeof document !== 'undefined' && document.querySelector('.mac-modal-backdrop')) return;
+
+      // Fix F: Escape — через dirty-aware запрос, без уничтожения ввода.
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        requestCloseRef.current();
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
 
       // Enter - следующий шаг (кроме textarea)
@@ -1454,6 +1492,11 @@ const AppointmentWizardV2 = ({
   }, [isOpen, currentStep, totalSteps]);
 
   // ===================== ЗАВЕРШЕНИЕ =====================
+
+  // Fix F: dirty-aware закрытие через useWizardSafeClose.
+  const hasWizardContent = hasWizardFormContent(wizardData.patient, formattedBirthDate, wizardData.cart.items.length);
+  const requestCloseRef = useWizardSafeClose({ isProcessing, hasContent: hasWizardContent, confirm, t, onClose });
+
 
   const handleComplete = async () => {
     if (!validateStep(currentStep)) return;
@@ -2836,7 +2879,7 @@ const AppointmentWizardV2 = ({
 
       <button
       type="button"
-      onClick={onClose}
+      onClick={() => requestCloseRef.current()}
       title={t('misc.aw_close')}
       aria-label={t('misc.aw_close')}
       style={wizardHeaderCloseStyle}
@@ -2966,7 +3009,7 @@ const AppointmentWizardV2 = ({
         {/* Кнопка закрытия */}
         <button
         type="button"
-        onClick={onClose}
+        onClick={() => requestCloseRef.current()}
         title={t('misc.aw_close')}
         aria-label="Close appointment wizard"
         style={{
@@ -3076,6 +3119,8 @@ const AppointmentWizardV2 = ({
               suggestions={patientSuggestions}
               showSuggestions={showSuggestions}
               isSearching={isSearchingPatients}
+              searchError={searchError}
+              onSearchRetry={retryPatientSearch}
               onSearch={handlePatientSearch}
               onSelectPatient={selectPatient}
               onUpdate={(field: string, value: unknown) =>

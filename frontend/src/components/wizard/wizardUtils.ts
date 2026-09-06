@@ -465,3 +465,69 @@ export default {
   resolveInitialServiceCategory,
   categories,
 };
+
+// ---------------------------------------------------------------------
+// Fix F: patient-search normalization helpers (pure, unit-testable).
+// Extracted from AppointmentWizardV2 to keep the component under its
+// PR-45 LOC ceiling and to make the suggestion pipeline directly testable.
+// ---------------------------------------------------------------------
+
+export interface WizardPatientSuggestion {
+  id?: string | number;
+  fio?: string;
+  last_name?: string;
+  first_name?: string;
+  middle_name?: string;
+  phone?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Build display FIO from separate name fields when missing, then sort by
+ * priority: exact phone match > exact FIO match > partial FIO match.
+ */
+export const normalizeAndSortPatientSuggestions = (
+  data: WizardPatientSuggestion[],
+  query: string,
+  noNameLabel: string,
+): WizardPatientSuggestion[] =>
+  data.map((patient) => {
+    if (!patient.fio && (patient.last_name || patient.first_name)) {
+      const parts = [patient.last_name || '', patient.first_name || '', patient.middle_name || ''].filter((p) => p);
+      patient.fio = parts.join(' ').trim() || noNameLabel;
+    } else if (!patient.fio) {
+      patient.fio = noNameLabel;
+    }
+    return patient;
+  }).sort((a, b) => {
+    const queryLower = (query || '').toLowerCase();
+    const aPhone = a?.phone || '';
+    const bPhone = b?.phone || '';
+    const aFio = (a?.fio || '').toLowerCase();
+    const bFio = (b?.fio || '').toLowerCase();
+    if (aPhone === query) return -1;
+    if (bPhone === query) return 1;
+    if (aFio === queryLower) return -1;
+    if (bFio === queryLower) return 1;
+    const aMatch = aFio.includes(queryLower);
+    const bMatch = bFio.includes(queryLower);
+    if (aMatch && !bMatch) return -1;
+    if (!aMatch && bMatch) return 1;
+    return 0;
+  });
+
+/**
+ * True when the wizard form holds any user-entered data (dirty close guard).
+ */
+export const hasWizardFormContent = (
+  patient: { fio?: string; phone?: string; address?: string },
+  formattedBirthDate: string,
+  cartItemCount: number,
+): boolean =>
+  Boolean(
+    (patient.fio || '').trim() ||
+    (patient.phone || '').trim() ||
+    formattedBirthDate ||
+    (patient.address || '').trim() ||
+    cartItemCount > 0
+  );

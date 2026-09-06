@@ -86,7 +86,10 @@ export const useRegistrarHotkeys = ({
         // QW-01 fix: removed Alt+1/Alt+2/Alt+3 bulk-action hotkeys.
         // No bulk-action UI exists anymore; these were dead shortcuts.
       } else if (e.key === 'Escape') {
-        if (showWizard) setShowWizard(false);
+        // Fix F: Escape больше НЕ закрывает мастер напрямую — раньше это
+        // обходило защиту мастера от потери введённых данных. Мастер сам
+        // обрабатывает Escape через dirty-aware подтверждение закрытия
+        // (AppointmentWizardV2). Слоты-модал закрывается как раньше.
         if (showSlotsModal) setShowSlotsModal(false);
       }
     };

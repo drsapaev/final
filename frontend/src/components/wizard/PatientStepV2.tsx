@@ -26,6 +26,9 @@ interface PatientStepV2Props {
   suggestions: Array<Record<string, any>>;
   showSuggestions: boolean;
   isSearching?: boolean;
+  // Fix F: различимые состояния поиска + повтор после сетевого сбоя.
+  searchError?: boolean;
+  onSearchRetry?: () => void;
   onSearch: (value: string) => void;
   // TECH-DEBT(patient-step-patient-any): patient is `any` — raw API response shape
   onSelectPatient: (patient: any) => void;
@@ -49,6 +52,8 @@ const PatientStepV2 = ({
   suggestions,
   showSuggestions,
   isSearching = false, // UX Audit Registrar #11
+  searchError = false,
+  onSearchRetry,
   onSearch,
   onSelectPatient,
   onUpdate,
@@ -117,14 +122,32 @@ const PatientStepV2 = ({
           {isSearching &&
           <div className="patient-step-v2__search-loading">
             <RefreshCw size={14} className="patient-step-v2__search-spinner" />
-            Поиск пациентов...
+            {t('misc.psv_search_patients')}
           </div>
           }
 
-          {/* UX Audit #9: Empty state — patients not found. */}
-          {showSuggestions && !isSearching && suggestions.length === 0 && safeData.fio && safeData.fio.trim().length >= 2 &&
+          {/* UX Audit #9: Empty state — поиск завершился, пациентов нет. */}
+          {showSuggestions && !isSearching && !searchError && suggestions.length === 0 && safeData.fio && safeData.fio.trim().length >= 2 &&
           <div className="patient-step-v2__search-empty">
-            Пациенты не найдены. Будет создан новый пациент.
+            {t('misc.psv_not_found_new_patient')}
+          </div>
+          }
+
+          {/* Fix F: сетевой сбой поиска — различимое состояние с повтором.
+              «Будет создан новый пациент» здесь НЕ показывается: поиск не
+              завершился, утверждать это нельзя. */}
+          {showSuggestions && !isSearching && searchError &&
+          <div className="patient-step-v2__search-empty" role="alert">
+            {t('misc.psv_search_error')}
+            {onSearchRetry &&
+            <button
+              type="button"
+              onClick={onSearchRetry}
+              className="patient-step-v2__phone-error-btn">
+
+                {t('misc.psv_search_retry')}
+              </button>
+            }
           </div>
           }
 
