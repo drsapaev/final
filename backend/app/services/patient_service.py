@@ -118,9 +118,15 @@ class PatientService:
                 self.db, phone=patient_in.phone
             )
             if existing_patient:
+                # Fix A: machine-readable code so clients (registrar wizard)
+                # can distinguish "phone already exists" from any other 400
+                # without parsing the human-readable text.
                 raise HTTPException(
                     status_code=400,
-                    detail="Пациент с таким номером телефона уже существует",
+                    detail={
+                        "code": "patient_phone_exists",
+                        "message": "Пациент с таким номером телефона уже существует",
+                    },
                 )
 
         if patient_in.doc_number:
@@ -132,7 +138,10 @@ class PatientService:
             if existing_by_doc:
                 raise HTTPException(
                     status_code=400,
-                    detail="Пациент с таким номером документа уже зарегистрирован",
+                    detail={
+                        "code": "patient_doc_exists",
+                        "message": "Пациент с таким номером документа уже зарегистрирован",
+                    },
                 )
 
         has_full_name = patient_in.full_name and patient_in.full_name.strip()
@@ -352,9 +361,13 @@ class PatientService:
                 self.db, phone=patient_in.phone
             )
             if existing_patient and existing_patient.id != patient_id:
+                # Fix A: same machine-readable code as the create path.
                 raise HTTPException(
                     status_code=400,
-                    detail="Пациент с таким номером телефона уже существует",
+                    detail={
+                        "code": "patient_phone_exists",
+                        "message": "Пациент с таким номером телефона уже существует",
+                    },
                 )
 
         # Codex round-15 P1: дубликат doc_number при обновлении -- тот же
@@ -370,7 +383,10 @@ class PatientService:
             if existing_by_doc and existing_by_doc.id != patient_id:
                 raise HTTPException(
                     status_code=400,
-                    detail="Пациент с таким номером документа уже зарегистрирован",
+                    detail={
+                    "code": "patient_doc_exists",
+                    "message": "Пациент с таким номером документа уже зарегистрирован",
+                },
                 )
 
         # Codex round-10 P1: маскируем PHI в old-снапшоте (см. create;

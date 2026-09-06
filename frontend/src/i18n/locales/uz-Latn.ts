@@ -6288,6 +6288,7 @@ const uzLatn = {
 
     // ─── AppointmentWizardV2.jsx (aw_) ─────────────────────────────────────
     aw_phone_already_exists: 'Bunday telefon raqamli bemor allaqachon mavjud',
+    aw_phone_exists_choose: 'Bu raqam bilan bemor mavjud: {fio}. Uning kartasini tanlang yoki yangi bemor yaratish uchun telefonni tozalang.',
     aw_form_cleared: 'Shakl tozalandi',
     aw_no_name: 'Ism yoʻq',
     aw_unknown_service: 'Nomaʼlum xizmat',

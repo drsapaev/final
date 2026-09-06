@@ -1,12 +1,31 @@
 // ADR-0016: WrappedApiError replaced by canonical HttpApiError from types/errors.ts.
 import type { HttpApiError } from '../types/errors';
 
-function createWrappedError(message: string, extras: { status?: number; detail?: string; response?: unknown }): HttpApiError & Error {
+function createWrappedError(message: string, extras: { status?: number; detail?: string; code?: string; response?: unknown }): HttpApiError & Error {
   const err = new Error(message) as HttpApiError & Error;
   err.status = extras.status;
   err.detail = extras.detail;
+  if (extras.code) err.code = extras.code;
   err.response = extras.response as HttpApiError['response'];
   return err;
+}
+
+/**
+ * Fix A: backend returns structured details for domain errors, e.g.
+ *   { code: 'patient_phone_exists', message: '...' }
+ * Extract a machine-readable code + human message without guessing from
+ * the status code or the text.
+ */
+function parseApiDetail(detail: unknown): { code?: string; message: string } {
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    const d = detail as { code?: string; message?: string; error?: string };
+    return {
+      code: typeof d.code === 'string' ? d.code : undefined,
+      message: d.message || d.error || 'Ошибка запроса',
+    };
+  }
+  if (typeof detail === 'string' && detail) return { message: detail };
+  return { message: 'Ошибка запроса' };
 }
 
 /**
@@ -58,14 +77,14 @@ export async function createPatient(patientData: Record<string, unknown>): Promi
     const response = await api.post<PatientDto>('/patients/', patientData);
     return mapPatientDto(response.data);
   } catch (error) {
-    // 400 — типичная ошибка «пациент уже существует»
-    if ((error as HttpApiError)?.response?.status === 400) {
-      const detail = (error as HttpApiError)?.response?.data?.detail || 'Пациент с таким номером телефона уже существует';
-      throw createWrappedError(String(detail), { status: 400, detail: String(detail), response: (error as HttpApiError)?.response });
+    // Fix A: machine-readable code from the structured detail (if present);
+    // no invented "patient exists" message for arbitrary 400s.
+    const status = (error as HttpApiError)?.response?.status;
+    const { code, message } = parseApiDetail((error as HttpApiError)?.response?.data?.detail);
+    if (status === 400) {
+      throw createWrappedError(message, { status: 400, detail: message, code, response: (error as HttpApiError)?.response });
     }
-    // Другие ошибки — пробрасываем с нормализованным сообщением
-    const message = (error as HttpApiError)?.response?.data?.detail || (error as { message?: string })?.message || 'Ошибка создания пациента';
-    throw createWrappedError(String(message), { status: (error as HttpApiError)?.response?.status as number | undefined, response: (error as HttpApiError)?.response });
+    throw createWrappedError(message || 'Ошибка создания пациента', { status: status as number | undefined, code, response: (error as HttpApiError)?.response });
   }
 }
 
@@ -79,9 +98,9 @@ export async function updatePatient(patientId: string | number, updateData: Reco
     return mapPatientDto(response.data);
   } catch (error) {
     const status = (error as HttpApiError)?.response?.status;
-    const detail = (error as HttpApiError)?.response?.data?.detail;
-    logger.error('[patients API] updatePatient failed', { patientId, status, detail });
-    throw createWrappedError(String(detail || `Ошибка обновления пациента (${status || 'network'})`), { status: status as number | undefined, response: (error as HttpApiError)?.response });
+    const { code, message } = parseApiDetail((error as HttpApiError)?.response?.data?.detail);
+    logger.error('[patients API] updatePatient failed', { patientId, status, code, detail: message });
+    throw createWrappedError(message || `Ошибка обновления пациента (${status || 'network'})`, { status: status as number | undefined, code, response: (error as HttpApiError)?.response });
   }
 }
 

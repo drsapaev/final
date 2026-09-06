@@ -6298,6 +6298,7 @@ const uzCyrl = {
 
     // ─── AppointmentWizardV2.jsx (aw_) ─────────────────────────────────────
     aw_phone_already_exists: 'Пациент с таким номером уже существует',
+    aw_phone_exists_choose: 'Бундай рақамли бемор мавжуд: {fio}. Унинг картасини танланг ёки янги бемор яратиш учун телефонни тозаланг.',
     aw_form_cleared: 'Форма очищена',
     aw_no_name: 'Без имени',
     aw_unknown_service: 'Неизвестная услуга',

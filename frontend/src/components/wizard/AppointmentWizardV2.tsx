@@ -677,16 +677,28 @@ const AppointmentWizardV2 = ({
   }, []);
 
   const handlePatientSearch = (value: string) => {
-    // 🚨 FIX: Сбрасываем ID при изменении текста, чтобы не было "призраков"
-    // Если пользователь меняет имя, это уже не тот пациент, которого выбрали ранее
+    // Fix A (безопасная идентичность): ввод ФИО — это ПОИСК/создание нового.
+    // Раньше сбрасывался только id, а телефон/адрес/дата/пол и отдельные
+    // поля имени оставались от ранее выбранной карточки — данные двух людей
+    // смешивались в одной записи. Теперь при изменении текста поиска вся
+    // унаследованная карточка очищается синхронно.
     setWizardData((prev) => ({
       ...prev,
       patient: {
         ...prev.patient,
         fio: value,
-        id: null // ✅ Сброс ID
+        id: null,
+        birth_date: '',
+        phone: '',
+        address: '',
+        gender: '',
+        lastName: '',
+        firstName: '',
+        middleName: ''
       }
     }));
+    // Fix A: выбранная карточка больше не действует — ошибка телефона тоже.
+    setPhoneError(null);
 
     // Дебаунс поиска
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -1754,36 +1766,45 @@ const AppointmentWizardV2 = ({
           }));
           logger.log('✅ Пациент создан успешно:', patient.id);
         } catch (createError: unknown) {
-          // createPatient бросает Error с .status === 400 если «пациент уже существует»
-          const createErr = createError as Error & { status?: number; message: string };
-          if (createErr.status === 400 && wizardData.patient.phone) {
-            // Пациент уже существует — ищем по телефону
-            const cleanPhone = normalizedPhoneDigits;
-            logger.log(`⚠️ Ищем существующего пациента по номеру телефона: ${wizardData.patient.phone} (clean: ${cleanPhone})`);
+          const createErr = createError as Error & { status?: number; message: string; code?: string };
 
-            // UX Audit Stage 3 (issue 5.3): используем findPatientByPhoneVariants
-            const foundPatient = await findPatientByPhoneVariants(normalizedPhone as string);
+          // Fix A: только машиночитаемый код отличает «телефон уже существует»
+          // от любой другой 400-ошибки. Автоматическая подмена пациента на
+          // найденного по телефону ЗАПРЕЩЕНА: подтверждённое ФИО и фактический
+          // владелец визита должны совпадать. Вместо авто-выбора — явная
+          // остановка с предложением выбрать существующую карточку.
+          if (createErr.code === 'patient_phone_exists') {
+            logger.warn('⚠️ Duplicate phone on patient create (code=patient_phone_exists)');
+            const foundPatient = wizardData.patient.phone
+              ? await findPatientByPhoneVariants(normalizedPhone as string)
+              : null;
 
-            if (foundPatient) {
-              patientId = foundPatient.id as string | number;
-              setWizardData((prev) => ({
-                ...prev,
-                patient: { ...prev.patient, id: foundPatient.id as string | number }
-              }));
-              logger.log('✅ Найден существующий пациент (по телефону):', foundPatient.id);
-            } else {
-              // 🚨 НЕ используем fallback - требуем точное совпадение
-              logger.error('❌ Exact phone match not found after 400');
-              throw new Error(t('misc.aw_patient_phone_exists_not_found', { phone: wizardData.patient.phone }));
-            }
-          } else if (createErr.status === 400) {
-            // Нет телефона и ошибка создания - это проблема валидации
-            throw new Error(t('misc.aw_patient_validation_error', { message: createErr.message }));
-          } else {
-            // Другие ошибки (5xx, network)
-            logger.error('❌ Ошибка создания пациента:', createErr.status, createErr.message);
-            throw new Error(t('misc.aw_patient_creation_error', { status: createErr.status || '', message: createErr.message }));
+            // Fix A: отображаемое имя найденной карточки — fio может
+            // отсутствовать в доменной модели, собираем из полей имени.
+            const foundPatientFio = (foundPatient as { fio?: string } | null)?.fio
+              || foundPatient?.full_name
+              || [foundPatient?.last_name, foundPatient?.first_name].filter(Boolean).join(' ')
+              || '';
+            setPhoneError({
+              message: foundPatient
+                ? t('misc.aw_phone_exists_choose', { fio: foundPatientFio })
+                : t('misc.aw_phone_already_exists'),
+              patient: foundPatient ?? undefined,
+            });
+            setErrors({});
+            setCurrentStep(STEP_PATIENT);
+            throw new Error(t('misc.aw_phone_already_exists'));
           }
+
+          if (createErr.status === 400) {
+            // Любая другая 400 — проблема валидации; поиск по телефону не выполняется.
+            logger.error('❌ Patient create 400 (code:', createErr.code || 'none', ')');
+            throw new Error(t('misc.aw_patient_validation_error', { message: createErr.message }));
+          }
+
+          // Другие ошибки (5xx, network)
+          logger.error('❌ Ошибка создания пациента:', createErr.status, createErr.message);
+          throw new Error(t('misc.aw_patient_creation_error', { status: createErr.status || '', message: createErr.message }));
         }
       }
 
