@@ -326,6 +326,12 @@ const Tabs = ({
         <button
           className={`tab-button all-departments ${!activeTab ? 'active' : ''}`}
           onClick={() => onTabChange?.(null)}
+          // AXE-MOB-1 (Mobile Chrome registrar:light/dark, axe button-name):
+          // Tabs.css hides .tab-label at <=768px, collapsing this control to
+          // an icon-only button with NO accessible name. Pin the name to the
+          // same source as the visible label (identical text at desktop
+          // widths keeps WCAG 2.5.3 Label-in-Name satisfied).
+          aria-label={t('queue.all_departments')}
           style={{
             color: !activeTab ? 'var(--mac-accent)' : colors.text
           }}>
@@ -368,6 +374,11 @@ const Tabs = ({
                 data-tab={tab.key}
                 className={`tab-button department ${isActive ? 'active' : ''}`}
                 onClick={() => onTabChange?.(isActive ? null : tab.key)}
+                // AXE-MOB-1: same button-name contract as the
+                // all-departments control above — the visible .tab-label is
+                // display:none at <=768px (Tabs.css), so the name must come
+                // from an attribute.
+                aria-label={tab.label}
                 style={{
                   color: isActive ? 'var(--mac-text-primary)' : colors.text,
                   backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active), transparent 70%)' : 'transparent',
