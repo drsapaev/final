@@ -295,7 +295,7 @@ export QA_REGISTRAR_PASSWORD=<registrar password>
 export BACKEND_URL=http://localhost:18000
 
 # Run the spec
-npx playwright test e2e/ai-safety-guardrails.spec.js --project=chromium
+npx playwright test e2e/ai-safety-guardrails.spec.ts --project=chromium
 ```
 
 ### Expected
@@ -651,7 +651,7 @@ depends on honest reporting.
 | `docs/runbooks/CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md` | DR drill details |
 | `backend/app/scripts/dr_drill.py` | DR drill implementation |
 | `backend/app/scripts/seed_ai_feature_flags.py` | AI flag seeder |
-| `frontend/e2e/ai-safety-guardrails.spec.js` | AI safety contract tests |
+| `frontend/e2e/ai-safety-guardrails.spec.ts` | AI safety contract tests |
 | `.github/workflows/dr-drill.yml` | Weekly DR drill CI |
 | `.github/workflows/ai-safety-guardrails.yml` | Nightly AI safety CI |
 | `AGENTS.md` | AI agent rules (references this runbook) |
