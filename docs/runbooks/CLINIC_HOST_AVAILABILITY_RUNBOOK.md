@@ -31,14 +31,30 @@ powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE   → AC index 0x00000000
 powercfg /query SCHEME_CURRENT SUB_SLEEP UNATTENDSLEEP → AC index 0x00000000
 ```
 
-## 2. Autostart chain (survives reboot, proven 2026-08-27)
+## 2. Autostart chain (survives reboot; tunnel via Windows Service since 2026-09-06)
 
-- Startup folder: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\clinic-api-autostart.cmd`
-  (source: `tools/start_backend_tunnel_boot.cmd`) — starts uvicorn :18000 if
-  not listening, then cloudflared.
-- Tunnel config: `%USERPROFILE%\.cloudflared\config.yml` — **`protocol: http2`**
-  is mandatory (QUIC streams died under UDP loss, 2026-08-27; keep http2).
-- `--logfile` is a TOP-LEVEL cloudflared flag and must precede `tunnel run`.
+- **Tunnel ownership (2026-09-06 cutover, incident
+  2026-09-06-cloudflared-tunnel-cutover-530-window): the `cloudflared`
+  Windows Service owns the tunnel — binPath
+  `"C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel run`,
+  StartType=Automatic, SCM recovery restart/5000/50000/300000, config from
+  `C:\Windows\System32\config\systemprofile\.cloudflared\config.yml`.
+  DO NOT start a login-session `cloudflared tunnel run` alongside it — a
+  second connector under the SAME tunnel id is the dual-ownership this
+  cutover removed. Boot evidence (pre-login): `tools/boot_tunnel_check.log`
+  (SYSTEM task `CloudflaredBootTunnelCheck`, AtStartup).
+  **`protocol: http2`** stays mandatory (QUIC died under UDP loss,
+  2026-08-27). `--logfile` is a TOP-LEVEL flag and must precede
+  `tunnel run` in any manual invocation.
+- Backend headless start: SYSTEM task `ClinicBackendBootAutostart` runs
+  `scripts/run_uvicorn_prod.ps1` at boot (persistent log
+  `tools/uvicorn_backend.log`). The Startup-folder `.cmd` keeps only the
+  netstat-guarded backend fallback for interactive logons.
+- Runbook rule for any future tunnel cutover: keep the serving connector up
+  until the replacement PROVES registration (fresh `Registered tunnel
+  connection` lines attributable to the new process), then retire the old
+  one, then verify external health. Never trust `Status=Running` alone —
+  a remote-managed agent runs "Running" without serving the named tunnel.
 
 ## 3. Nightly backup chain (armed 2026-08-28)
 
