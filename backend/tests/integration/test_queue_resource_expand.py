@@ -27,12 +27,24 @@ data (lab/ecg seeds, dedup) is QD-2B, the XOR/partial-unique
 contract is QD-2D. The offline-SQL generation runs the real
 migration functions through the PG dialect (the QF-1 0054 validation
 pattern; the sqlite chain cannot host 0054+ DDL).
+
+Codex round-1 pins (both findings fixed in this PR):
+
+- P1 backup round-trip: MigrationService.backup_queue_data /
+  restore_queue_data must carry queue_resource_id, or a future
+  resource-owned queue (specialist_id NULL) restored from backup
+  would come back with BOTH owners NULL — an unroutable queue with
+  orphaned entries. Backward compatibility: pre-QD-2 backup files
+  (no queue_resource_id key) still restore.
+- P2 ADR honesty: ADR-001 documents the dual-owner staged contract
+  (the doctor-ownership decision is unchanged for doctor queues).
 """
 
 from __future__ import annotations
 
 import importlib.util
 import io
+import json
 import re
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -51,6 +63,9 @@ from app.schemas.online_queue import DailyQueueOut
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / "backend"
 MIGRATION_0058 = BACKEND_ROOT / "alembic" / "versions" / "0058_queue_resource_expand.py"
+ADR_001 = (
+    REPO_ROOT / "docs" / "adr" / "ADR-001-queue-ownership-and-specialty-architecture.md"
+)
 
 # non-secret placeholder mirroring the 0055 seed marker — this suite
 # performs no password verification
@@ -395,6 +410,148 @@ def test_doctor_mutation_guard_still_rejects_foreign_specialist(
     with pytest.raises(HTTPException) as exc_info:
         _mutation_guard(db_session, owner_doctor.id, stranger)
     assert exc_info.value.status_code == 403
+
+
+# ===================== F. Codex round-1 P1: backup round-trip =====================
+
+
+def test_backup_queue_data_includes_resource_owner(
+    db_session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Codex round-1 P1: the backup format must serialize the resource
+    owner — otherwise a resource-owned queue (specialist_id NULL)
+    restored from backup comes back with BOTH owners NULL, an
+    unroutable queue with orphaned entries."""
+    from app.services.migration_service import MigrationService
+
+    user = _make_user(db_session, username="dr_backup", role="doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="cardio")
+    resource = _make_resource(db_session, code="lab", queue_tag="lab")
+    day = date(2026, 9, 7)
+    _make_queue(db_session, day=day, specialist_id=doctor.id, queue_tag="cardio")
+    _make_queue(
+        db_session,
+        day=day,
+        specialist_id=None,
+        queue_resource_id=resource.id,
+        queue_tag="lab",
+    )
+
+    # backup writes to a CWD-relative backups/ dir — isolate it
+    monkeypatch.chdir(tmp_path)
+    result = MigrationService(db_session).backup_queue_data(day)
+    assert result["success"] is True, result
+    assert result["queues_count"] == 2
+
+    backup = json.loads((tmp_path / result["backup_file"]).read_text(encoding="utf-8"))
+    by_tag = {q["queue_tag"]: q for q in backup["queues"]}
+    assert by_tag["cardio"]["specialist_id"] == doctor.id
+    assert by_tag["cardio"]["queue_resource_id"] is None
+    assert by_tag["lab"]["specialist_id"] is None
+    assert by_tag["lab"]["queue_resource_id"] == resource.id
+
+
+def test_restore_queue_data_round_trips_resource_owner(
+    db_session: Session, tmp_path: Path
+) -> None:
+    """The other half of the P1 fix: restore recreates the resource
+    owner (raw-SQL pin — identity-map-proof)."""
+    from app.services.migration_service import MigrationService
+
+    resource = _make_resource(db_session, code="lab", queue_tag="lab")
+    backup_file = tmp_path / "resource_owner_backup.json"
+    backup_file.write_text(
+        json.dumps(
+            {
+                "backup_date": "2026-09-07",
+                "created_at": "2026-09-07T00:00:00+00:00",
+                "queues": [
+                    {
+                        "id": 910001,
+                        "day": "2026-09-07",
+                        "specialist_id": None,
+                        "queue_resource_id": resource.id,
+                        "queue_tag": "lab",
+                        "active": True,
+                        "opened_at": None,
+                        "entries": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = MigrationService(db_session).restore_queue_data(str(backup_file))
+    assert result["success"] is True, result
+    assert result["restored_queues"] == 1
+
+    row = db_session.execute(
+        sa.text(
+            "SELECT specialist_id, queue_resource_id FROM daily_queues WHERE id = 910001"
+        )
+    ).fetchone()
+    assert row == (None, resource.id)
+
+
+def test_restore_queue_data_accepts_pre_qd2_backup_format(
+    db_session: Session, tmp_path: Path
+) -> None:
+    """Backward compatibility: a pre-QD-2 backup file (no
+    queue_resource_id key) still restores, with the resource axis
+    simply NULL — exactly the pre-QD-2 behavior."""
+    from app.services.migration_service import MigrationService
+
+    backup_file = tmp_path / "pre_qd2_backup.json"
+    backup_file.write_text(
+        json.dumps(
+            {
+                "backup_date": "2026-09-07",
+                "created_at": "2026-09-07T00:00:00+00:00",
+                "queues": [
+                    {
+                        "id": 910002,
+                        "day": "2026-09-07",
+                        "specialist_id": 42,
+                        "queue_tag": "cardio",
+                        "active": True,
+                        "opened_at": None,
+                        "entries": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = MigrationService(db_session).restore_queue_data(str(backup_file))
+    assert result["success"] is True, result
+
+    row = db_session.execute(
+        sa.text(
+            "SELECT specialist_id, queue_resource_id FROM daily_queues WHERE id = 910002"
+        )
+    ).fetchone()
+    assert row == (42, None)
+
+
+# ===================== G. Codex round-1 P2: ADR honesty =====================
+
+
+def test_adr_001_documents_dual_owner_axis() -> None:
+    """Codex round-1 P2: the canonical ownership ADR must carry the
+    dual-owner staged contract — engineers following a stale 'every
+    DailyQueue belongs to a doctor' ADR would omit resource-owned
+    queues from routing/authorization/reporting work."""
+    text = ADR_001.read_text(encoding="utf-8")
+    assert "Dual-Owner Axis for Doctorless Queues" in text
+    assert "queue_resource_id" in text
+    assert "queue_resources" in text
+    # the staged contract is spelled out
+    assert "XOR" in text
+    assert "0058_queue_resource_expand" in text
+    # the doctor-ownership decision itself is explicitly unchanged
+    assert "decision itself is UNCHANGED" in text
 
 
 # ===================== E. migration 0058 (offline PG dialect) =====================
