@@ -6,7 +6,7 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 
 - Backend business rules are the source of truth for payment, queue, RBAC, EMR, lab, Telegram security, and persistence behavior.
 - Frontend is presentation and interaction orchestration unless a route-specific adapter is explicitly documented as a read model.
-- Route registry ownership starts from `frontend/src/routing/routeRegistry.js`.
+- Route registry ownership starts from `frontend/src/routing/routeRegistry.ts`.
 - Database shape ownership starts from SQLAlchemy models plus Alembic revisions, not endpoint text or UI assumptions.
 - CI and PR gates are repository safety infrastructure and must not be bypassed to save time.
 - AI Factory, dossiers, evidence logs, and skills are advisory memory layers; executable source and tests still win when they conflict.
@@ -19,7 +19,7 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 - Queue identity/fairness: `profile/specialist/doctor mapping -> queue service ordering -> API contract -> frontend presentation`.
 - Notifications: `event catalog -> producer service -> user preference/anti-noise policy -> delivery adapter -> frontend consumer`.
 - Telegram token/security: `token model/storage -> Alembic revision -> service expiry/single-use checks -> webhook/command UX`.
-- Routing: `routeRegistry.js -> route guards/layouts -> role panels -> links/navigation`.
+- Routing: `routeRegistry.ts -> route guards/layouts -> role panels -> links/navigation`.
 
 ## Known Failure Patterns
 
@@ -89,7 +89,7 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 
 ## Route Registry SSOT
 
-- Start route work from `frontend/src/routing/routeRegistry.js`.
+- Start route work from `frontend/src/routing/routeRegistry.ts`.
 - Preserve canonical routes, aliases, guards, and role ownership.
 - Do not create duplicate navigation truth in page components, tests, or docs.
 - Stop when a route change implies RBAC, backend contract, or legacy redirect behavior not covered by the current scope.
@@ -100,7 +100,7 @@ Large multi-PR cleanup sprint executed via Z.ai (Claude Sonnet 4.5 + GitHub
 PAT). All PRs merged to main. Facts below are durable and supersede any
 older assumption that conflicts with them.
 
-### Security posture (current state)
+### Security posture (as of 2026-07-04 sprint — historical snapshot, verify before relying)
 
 - **Bandit**: 0 HIGH, 0 MEDIUM findings (CI blocks on MEDIUM+ via `bandit -ll`)
 - **pip-audit**: 0 CVEs in `backend/requirements.txt` (CI blocks via `pip-audit --strict -r requirements.txt`)
@@ -128,7 +128,7 @@ older assumption that conflicts with them.
   ai_complaint_analysis, ai_icd10_suggestion, ai_smart_template, ai_smart_suggestions,
   ai_chat_assistant, ai_phrase_suggest, telegram_mini_app_enabled, online_queue_enabled
 - `ai_safety_meta()` returns `requires_doctor_confirmation: True` on every AI response
-- Playwright spec `frontend/e2e/ai-safety-guardrails.spec.js` — 6 contract tests, nightly CI
+- Playwright spec `frontend/e2e/ai-safety-guardrails.spec.ts` — 6 contract tests, nightly CI
 
 ### Background jobs (arq + Redis)
 
@@ -178,7 +178,7 @@ older assumption that conflicts with them.
 - `backend/app/scripts/seed_ai_feature_flags.py` — 8 default flags
 - `backend/app/tasks/` — arq package (scheduler.py, worker.py)
 - `frontend/src/services/sentry.js` — frontend Sentry init + PII scrubbing
-- `frontend/e2e/ai-safety-guardrails.spec.js` — 6 contract tests
+- `frontend/e2e/ai-safety-guardrails.spec.ts` — 6 contract tests
 - `mcp-servers/synthetic_data_server.py` — stdlib MCP server for IDE test data gen
 
 ### Known issues / debt
