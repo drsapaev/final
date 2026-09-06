@@ -556,6 +556,11 @@ def test_adr_001_documents_dual_owner_axis() -> None:
     # stage E cannot retire general_resource before its destination decision
     # lands, so general queues are never left ownerless
     assert "deliberately conditional, not forgotten" in text
+    # Codex round-3 P2: pin the SUBSTANTIVE clauses, not just the heading —
+    # the destination decision must land before stage E, and the stage-E
+    # gate covers all three synthetic pairs (zero live references)
+    assert "must land BEFORE stage E can retire" in text
+    assert "zero live references for all three" in text
 
 
 # ===================== E. migration 0058 (offline PG dialect) =====================
