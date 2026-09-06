@@ -84,8 +84,16 @@ ok(`offline auth/me NOT served (${authmeOffline})`, authmeOffline === 503);
 await context.setOffline(false);
 
 // Frontend Sentry smoke: uncaught page error -> ingest returns 200
+const isSentryIngest = (rawUrl) => {
+  try {
+    const { hostname } = new URL(rawUrl);
+    return hostname === 'ingest.us.sentry.io' || hostname.endsWith('.ingest.us.sentry.io');
+  } catch {
+    return false;
+  }
+};
 const sentryPromise = page
-  .waitForResponse((r) => r.url().includes('ingest.us.sentry.io') && r.request().method() === 'POST', { timeout: 20000 })
+  .waitForResponse((r) => isSentryIngest(r.url()) && r.request().method() === 'POST', { timeout: 20000 })
   .then((r) => `sentry ingest ${r.status()}`)
   .catch(() => 'sentry ingest NOT seen');
 await page.evaluate(() => {
