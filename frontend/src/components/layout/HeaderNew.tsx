@@ -294,6 +294,21 @@ export default function HeaderNew() {
     }
   }, [roleNormalized]);
 
+  // HDR-POLISH-2 (Codex round 1, P2): the brand home resolves from the
+  // COMPLETE profile object — getRoleHomeRoute preserves Doctor specialty
+  // routing (cardiology -> /doctor/cardiology) and multi-role priority
+  // only when it receives the profile, not a flattened role string.
+  // The Back gate above intentionally keeps the flattened roleHomePath:
+  // its fallback branch fires only when history is exhausted, and the
+  // hide-at-home heuristic must not churn with profile identity.
+  const brandHomePath = useMemo(() => {
+    try {
+      return getRoleHomeRoute(user) || '/';
+    } catch {
+      return '/';
+    }
+  }, [user]);
+
   const canGoBack = useMemo(() => {
     const p = location.pathname;
     if (p === '/' || p === landingRoute || p === loginRoute) return false;
@@ -343,9 +358,10 @@ export default function HeaderNew() {
     variant="ghost"
     size="small"
     // HDR-POLISH-2 (P3-3): for an authenticated user the brand is a home
-    // button to their role panel (same target the Back-fallback uses),
-    // not an exit to the public landing. Anonymous users keep landing.
-    onClick={() => navigate(user ? roleHomePath || landingRoute : landingRoute)}
+    // button to their role panel (profile-aware: specialty doctors land on
+    // their dedicated panel), not an exit to the public landing. Anonymous
+    // users keep landing.
+    onClick={() => navigate(user ? brandHomePath || landingRoute : landingRoute)}
     title={t('legacy.hn_brand_title')}
     style={{
       color: 'var(--mac-text-primary)',
