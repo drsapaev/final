@@ -21,7 +21,7 @@ const authState = {
     username: 'admin',
     full_name: 'Admin User',
     role: 'Admin',
-  } as Record<string, unknown>,
+  } as Record<string, unknown> | null,
 };
 
 // Controllable unread count for the notification bell (P2-2 live region).
@@ -77,13 +77,15 @@ function LocationProbe() {
   return <div data-testid="location-probe">{location.pathname}</div>;
 }
 
-function renderHeader(options: { role?: string; path?: string } = {}) {
-  authState.profile = {
-    id: 1,
-    username: 'qa',
-    full_name: 'QA User',
-    role: options.role ?? 'Admin',
-  };
+function renderHeader(options: { role?: string; path?: string; profile?: Record<string, unknown> | null } = {}) {
+  authState.profile = options.profile !== undefined
+    ? options.profile
+    : {
+        id: 1,
+        username: 'qa',
+        full_name: 'QA User',
+        role: options.role ?? 'Admin',
+      };
   return renderWithProviders(
     <>
       <HeaderNew />
@@ -289,5 +291,52 @@ describe('HeaderNew chrome (HDR-FX-1)', () => {
 
     renderHeader({ role: 'Admin', path: '/registrar' });
     expect(screen.queryByTitle('Новая запись')).not.toBeInTheDocument();
+  });
+});
+
+describe('HeaderNew brand navigation (HDR-POLISH-2, audit P3-3)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    unreadState.count = 0;
+  });
+
+  it('authed user: brand navigates to the role home, not the public landing', () => {
+    renderHeader({ role: 'Admin', path: '/admin/settings' });
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/admin/settings');
+    fireEvent.click(screen.getByTitle('На главную'));
+    // role home for Admin (routeRegistry homeForRoles) — the brand no longer
+    // exits to the landing.
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/admin');
+  });
+
+  it('anonymous user: brand keeps navigating to the public landing', () => {
+    renderHeader({ profile: null, path: '/login' });
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/login');
+    fireEvent.click(screen.getByTitle('На главную'));
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/');
+  });
+
+  it('specialist doctor: brand resolves the home from the complete profile (Codex round 1 P2)', () => {
+    renderHeader({
+      path: '/clinical/patients',
+      profile: {
+        id: 7,
+        username: 'doc',
+        full_name: 'Doc Cardio',
+        role: 'Doctor',
+        specialty: 'cardiology',
+      },
+    });
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/clinical/patients');
+    fireEvent.click(screen.getByTitle('На главную'));
+    // getRoleHomeRoute(profile) honors Doctor.specialty — a cardiology
+    // doctor must land on the dedicated panel, not the generic /doctor.
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/doctor/cardiology');
+  });
+
+  it('plain doctor without specialty: brand falls back to the generic doctor panel', () => {
+    renderHeader({ role: 'Doctor', path: '/clinical/patients' });
+    fireEvent.click(screen.getByTitle('На главную'));
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/doctor');
   });
 });
