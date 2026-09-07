@@ -14,6 +14,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { ClipboardList, FlaskConical, Stethoscope, Syringe } from 'lucide-react';
+import type { Ref } from 'react';
 
 // =====================================================================
 // CONSTANTS
@@ -38,6 +39,162 @@ export const getLocalISODate = () => {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+// ---------------------------------------------------------------------
+// Birth date validation (Fix E — wizard date-of-birth correctness).
+//
+// The wizard mask produces DD.MM.YYYY display strings. The previous
+// inline validation in AppointmentWizardV2 checked only numeric ranges,
+// so impossible calendar dates like 31.02.2020 passed validateStep(1)
+// and were converted to a bogus ISO string for the API.
+//
+// This pure helper performs the full correctness check:
+//   1. complete DD.MM.YYYY shape (partial input is an error, never a
+//      silently saved empty date),
+//   2. numeric ranges (day/month/year bounds, incl. 1900 lower bound),
+//   3. calendar existence via a Date round-trip (rejects 31.02,
+//      29.02 of non-leap years, accepts 29.02.2024),
+//   4. not in the future (a birth date cannot be today or later).
+//
+// An empty string and the mask sentinel '00.00.0000' are valid because
+// the birth date field is optional.
+// ---------------------------------------------------------------------
+
+export type BirthDateValidationReason =
+  | 'incomplete'
+  | 'out_of_range'
+  | 'impossible'
+  | 'future';
+
+export type BirthDateValidationResult =
+  | { valid: true }
+  | { valid: false; reason: BirthDateValidationReason };
+
+export const BIRTH_DATE_MASK_SENTINEL = '00.00.0000';
+export const BIRTH_DATE_MIN_YEAR = 1900;
+
+export const validateBirthDateDisplay = (
+  formatted: string,
+  now: Date = new Date(),
+): BirthDateValidationResult => {
+  // Optional field: empty input is allowed.
+  if (!formatted || formatted === BIRTH_DATE_MASK_SENTINEL) {
+    return { valid: true };
+  }
+
+  // Partial input (e.g. "31.02" or "31.02.20") must not silently become a
+  // saved empty date — require the complete mask shape.
+  if (!/^\d{2}\.\d{2}\.\d{4}$/.test(formatted)) {
+    return { valid: false, reason: 'incomplete' };
+  }
+
+  const [dayPart, monthPart, yearPart] = formatted.split('.');
+  const day = parseInt(dayPart, 10);
+  const month = parseInt(monthPart, 10);
+  const year = parseInt(yearPart, 10);
+
+  if (
+    !Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year) ||
+    day < 1 || day > 31 ||
+    month < 1 || month > 12 ||
+    year < BIRTH_DATE_MIN_YEAR || year > now.getFullYear()
+  ) {
+    return { valid: false, reason: 'out_of_range' };
+  }
+
+  // Calendar existence: construct the date from the same components and
+  // read them back. JS Date silently rolls overflow values (31.02 → 02.03),
+  // so a component mismatch proves the date does not exist.
+  const constructed = new Date(year, month - 1, day);
+  if (
+    constructed.getFullYear() !== year ||
+    constructed.getMonth() !== month - 1 ||
+    constructed.getDate() !== day
+  ) {
+    return { valid: false, reason: 'impossible' };
+  }
+
+  // Future birth dates (including later in the current year) are invalid.
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (constructed.getTime() >= todayStart.getTime()) {
+    return { valid: false, reason: 'future' };
+  }
+
+  return { valid: true };
+};
+
+// ---------------------------------------------------------------------
+// Fix E: wizard-level keyboard/validation helpers.
+//
+// Kept in wizardUtils so AppointmentWizardV2 stays under its LOC ceiling
+// (src/__tests__/pr45WizardSplit.test.ts) and the logic stays unit-testable.
+// ---------------------------------------------------------------------
+
+/**
+ * True when a nested modal (e.g. the useConfirm dialog rendered through
+ * ui/macos Modal with .mac-modal-backdrop) is currently open. While it is,
+ * the wizard must not intercept Enter/Ctrl+Enter: the nested dialog owns
+ * the keyboard, and intercepting Enter on its confirm button would cancel
+ * and restart the pending confirm forever.
+ */
+export const isNestedModalOpen = (doc: Document | null = typeof document !== 'undefined' ? document : null): boolean =>
+  Boolean(doc && doc.querySelector('.mac-modal-backdrop'));
+
+/**
+ * True when the keydown target is an element that owns Enter (buttons,
+ * selects, radios, suggestion items): the wizard must let the native
+ * activation happen instead of advancing to the next step.
+ */
+export const targetOwnsEnter = (target: HTMLElement | null): boolean =>
+  Boolean(
+    target &&
+    (target.tagName === 'BUTTON' ||
+      target.tagName === 'SELECT' ||
+      target.closest('button, [role="radio"]'))
+  );
+
+export interface WizardFieldRefs {
+  fio?: Ref<HTMLInputElement> | null;
+  phone?: Ref<HTMLInputElement> | null;
+  genderGroup?: Ref<HTMLDivElement> | null;
+  birthDate?: Ref<HTMLInputElement> | null;
+}
+
+/**
+ * Move keyboard focus to the first problem field after a validation error.
+ * Order matches the visual order of the patient step: FIO, phone, gender, birth date.
+ */
+export const focusFirstWizardErrorField = (
+  errors: Record<string, unknown>,
+  refs: WizardFieldRefs,
+): void => {
+  const focusInput = (ref: Ref<HTMLInputElement> | null | undefined) => {
+    if (ref && 'current' in ref && ref.current) {
+      ref.current.focus();
+      return true;
+    }
+    return false;
+  };
+
+  if (errors.fio && focusInput(refs.fio)) return;
+  if (errors.phone && focusInput(refs.phone)) return;
+  if (errors.gender && refs.genderGroup && 'current' in refs.genderGroup && refs.genderGroup.current) {
+    refs.genderGroup.current.focus();
+    return;
+  }
+  if (errors.birth_date && focusInput(refs.birthDate)) return;
+};
+
+/**
+ * Fix E: i18n keys per birth-date validation reason, shared by the wizard's
+ * step-1 validation so the map lives next to validateBirthDateDisplay.
+ */
+export const BIRTH_DATE_ERROR_KEYS: Record<BirthDateValidationReason, string> = {
+  incomplete: 'misc.aw_birth_date_incomplete',
+  impossible: 'misc.aw_birth_date_impossible',
+  future: 'misc.aw_birth_date_future',
+  out_of_range: 'misc.aw_birth_date_invalid',
 };
 
 // =====================================================================

@@ -56,6 +56,20 @@ export const useRegistrarHotkeys = ({
         return;
       }
 
+      // Fix E: пока активен вложенный модальный диалог (например, диалог
+      // подтверждения мастера, рендеримый через ui/macos Modal), глобальные
+      // горячие клавиши не действуют — клавиатурой владеет диалог.
+      if (typeof document !== 'undefined' && document.querySelector('.mac-modal-backdrop')) {
+        return;
+      }
+
+      // Fix E: пока открыт мастер или слоты (модальные окна над панелью),
+      // горячие клавиши не переключают вкладки/маршруты за модальным окном.
+      const panelModalOpen = showWizard || showSlotsModal;
+      if (panelModalOpen && e.ctrlKey && e.key !== 'Escape') {
+        return;
+      }
+
       if (e.key === 'Enter') {
         // Enter в мастере обрабатывается отдельно в полях ввода
         // Здесь не обрабатываем, чтобы избежать конфликтов
