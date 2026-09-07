@@ -142,14 +142,17 @@ class RegistrarWizardQueueAssignmentService:
         P2-1c fix: queue_assignments is CLEARED on failure and the visit is
         NOT activated (queue_assignments is empty).
 
-        Codex R1 #3092 (P1, savepoint successor of _rollback_session): a full
-        db.rollback() is incompatible with the atomic cart
-        (/registrar/cart + create_visit(commit=False)) — it destroyed the
-        flushed-but-uncommitted cart rows, after which the endpoint committed
-        an empty transaction and returned 200 with phantom visit IDs.
-        Queue assignment for the visit now runs inside a SAVEPOINT: a failure
-        rolls back only THIS visit's queue entries (P2-1c partial-assignment
-        contract preserved), while the cart transaction stays intact.
+        Codex R1 #3092 (P1): a full db.rollback() is incompatible with the
+        atomic cart (/registrar/cart + create_visit(commit=False)) — it
+        destroyed the flushed-but-uncommitted cart rows, after which the
+        endpoint committed an empty transaction and returned 200 with
+        phantom visit IDs.
+
+        Codex R1 follow-up (CI repair): a SAVEPOINT protected the cart but
+        conflicted with the savepoint-based db_session test fixture
+        (P2-1b warned about exactly this), so the mechanism is now a
+        COMPENSATING DELETE of this visit's queue entries in the same
+        transaction: the cart is never touched, no rollback, no savepoint.
 
         Contract (consistent with P2-1b):
             Partial queue assignment is intentionally unsupported. On any
@@ -168,14 +171,22 @@ class RegistrarWizardQueueAssignmentService:
         # как flush-нутые, но не закоммиченные строки — полный rollback стирал
         # корзину, после чего endpoint делал db.commit() и возвращал 200 с ID
         # несуществующих визитов.
-        # Теперь присвоение номеров ОДНОГО визита изолируется SAVEPOINT-ом:
-        # сбой откатывает только записи ЭТОГО визита, корзина не затрагивается.
-        # Один savepoint на визит (а не на тег) сохраняет контракт P2-1c
-        # «частичное присвоение не поддерживается»: после сбоя в БД не остаётся
-        # ни одной записи очереди текущего визита.
-        nested = self.db.begin_nested()
-        try:
-            for queue_tag in unique_queue_tags:
+        # ИСПРАВЛЕНИЕ (CI, пост-Codex-R2): промежуточный вариант с SAVEPOINT
+        # (db.begin_nested()) защищал корзину, но несовместим с тестовой
+        # инфраструктурой — db_session-фикстура conftest сама строит
+        # savepoint-изоляцию (P2-1b прямо предупреждал: «avoids conflicts
+        # with test infrastructure that uses begin_nested()»): вложенный
+        # session-level savepoint ломал учёт savepoint-ов фикстуры, teardown
+        # падал «no such savepoint» и утекал connection — каскад ложных
+        # падений всей integration-секции в CI.
+        # Итоговый механизм — КОМПЕНСИРУЮЩАЯ зачистка без rollback и без
+        # savepoint: при сбое присвоения записи очереди ЭТОГО визита
+        # удаляются явным DELETE в той же транзакции. Корзина не затрагивается
+        # (её строки даже не перечитываются), контракт P2-1c «после сбоя в БД
+        # не остаётся ни одной записи очереди визита» выполняется, частичное
+        # присвоение по-прежнему невозможно (queue_assignments.clear() + break).
+        for queue_tag in unique_queue_tags:
+            try:
                 prepared_assignment = assignment_service.prepare_wizard_queue_assignment(
                     visit,
                     queue_tag,
@@ -185,38 +196,53 @@ class RegistrarWizardQueueAssignmentService:
                 assignment = self._materialize_prepared_assignment(prepared_assignment)
                 if assignment:
                     queue_assignments.append(assignment)
-        except Exception as exc:
-            # Откат ТОЛЬКО до savepoint — частичные записи этого визита
-            # уничтожаются, внешняя транзакция корзины жива.
-            try:
-                nested.rollback()
-            except Exception as rollback_error:
+            except Exception as exc:
                 logger.error(
-                    "Ошибка rollback savepoint очередей визита %d: %s",
+                    "Ошибка присвоения очередей для визита %d: %s",
                     visit.id,
-                    str(rollback_error),
+                    str(exc),
                     exc_info=True,
                 )
-            logger.error(
-                "Ошибка присвоения очередей для визита %d: %s",
-                visit.id,
-                str(exc),
-                exc_info=True,
-            )
-            # P2-1c: CLEAR stale data — откаченные savepoint-ом записи больше
-            # не существуют в БД, поэтому словари в queue_assignments ссылаются
-            # на несуществующие строки. Без очистки вызывающий увидел бы
-            # непустой список и активировал визит без реальных записей.
-            queue_assignments.clear()
-            # P2-1c: обработка останавливается на этом визите — состояние
-            # попытки откачено; продолжение могло бы создать частичное
-            # состояние. Цикл по тегам прерван исключением естественным
-            # образом.
-        else:
-            # Успех — фиксируем savepoint (RELEASE SAVEPOINT)
-            nested.commit()
+                # Компенсирующая зачистка: DELETE записей очереди этого визита
+                # в той же транзакции (почему не rollback и не savepoint — см.
+                # комментарий выше). Ошибка зачистки НЕ глотается: она уйдёт в
+                # top-level assign_same_day_queue_numbers, визит не будет
+                # активирован, а endpoint атомарной корзины не закоммитит
+                # частичное состояние (P2-1c).
+                self._cleanup_visit_queue_entries(visit)
+                # P2-1c: CLEAR stale data — компенсированные записи больше не
+                # существуют в транзакции, поэтому словари в queue_assignments
+                # ссылались бы на несуществующие строки.
+                queue_assignments.clear()
+                # P2-1c: обработка останавливается на этом визите — частичное
+                # присвоение не поддерживается.
+                break
 
         return queue_assignments
+
+    def _cleanup_visit_queue_entries(self, visit: Visit) -> None:
+        """Удалить записи очереди ЭТОГО визита в текущей транзакции.
+
+        Компенсирующее действие вместо rollback/savepoint: rollback стёр бы
+        flush-нутые строки атомарной корзины (Codex R1 #3092), savepoint
+        несовместим с savepoint-изоляцией db_session-фикстуры в тестах
+        (P2-1b). DELETE по visit_id затрагивает только записи очереди
+        визита — корзина (визиты/invoice) не перечитывается и не меняется.
+        """
+        from app.models.online_queue import OnlineQueueEntry
+
+        entries = self.db.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.visit_id == visit.id
+        ).all()
+        for entry in entries:
+            self.db.delete(entry)
+        if entries:
+            self.db.flush()
+            logger.info(
+                "REGISTRATION: компенсирующая зачистка очереди визита %d — удалено записей: %d",
+                visit.id,
+                len(entries),
+            )
 
     def _materialize_prepared_assignment(
         self,
