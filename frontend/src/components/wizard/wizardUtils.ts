@@ -326,16 +326,28 @@ export const buildPatientProfileUpdate = (
   if (current.full_name !== snapshot.full_name && current.full_name) {
     update.full_name = current.full_name;
   }
-  if (current.phone_digits !== snapshot.phone_digits && current.phone_digits) {
-    update.phone = options.normalizedPhone
-      ? String(options.normalizedPhone).trim()
-      : String(form.phone ?? '').trim();
+  if (current.phone_digits !== snapshot.phone_digits) {
+    if (current.phone_digits) {
+      update.phone = options.normalizedPhone
+        ? String(options.normalizedPhone).trim()
+        : String(form.phone ?? '').trim();
+    } else {
+      // Codex R1 #3090 (P1): очистка номера в форме должна ЯВНО занулять
+      // поле. Прежний truthiness-фильтр просто выбрасывал phone из payload,
+      // и старый номер молча оставался в карточке. PatientUpdate принимает
+      // phone: null (схема str | None, exclude_unset сохраняет null), а
+      // CRUD применяет None как очистку колонки.
+      update.phone = null;
+    }
   }
   if (current.address !== snapshot.address) {
     update.address = current.address;
   }
   if (current.birth_date !== snapshot.birth_date) {
-    update.birth_date = current.birth_date;
+    // Codex R1 #3090 (P2): контракт бэкенда — date | None. Пустая строка
+    // ('') отвергается Pydantic (422) и блокировала отправку визита.
+    // Очищенная дата отправляется как null; непустое значение — как строка.
+    update.birth_date = current.birth_date ? current.birth_date : null;
   }
   if (current.sex !== snapshot.sex && current.sex) {
     update.sex = current.sex;

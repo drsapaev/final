@@ -39,8 +39,8 @@ const readWizardSource = () => fs.readFileSync(wizardPath, 'utf8');
 
 describe('Fix B: buildPatientProfileSnapshot / buildPatientProfileUpdate', () => {
   const card = {
-    fio: 'Иванов Иван Иванович',
-    phone: '+998 90 123 45 67',
+    fio: 'SYNTHETIC-Тестов Тест Тестович',
+    phone: '+998 00 000 00 01',
     address: 'ул. Навои, 1',
     birth_date: '1990-05-01',
     sex: 'M',
@@ -55,7 +55,7 @@ describe('Fix B: buildPatientProfileSnapshot / buildPatientProfileUpdate', () =>
   it('builds update only from actually changed fields', () => {
     const snapshot = buildPatientProfileSnapshot(card);
     const form = {
-      fio: 'Иванов Иван Иванович',
+      fio: 'SYNTHETIC-Тестов Тест Тестович',
       phone: card.phone,
       address: 'новый адрес 42',
       birth_date: '1990-05-01',
@@ -70,8 +70,8 @@ describe('Fix B: buildPatientProfileSnapshot / buildPatientProfileUpdate', () =>
     // Тот же номер в другом форматировании → НЕ изменение
     const samePhone = buildPatientProfileUpdate(
       snapshot,
-      { ...card, phone: '+998901234567' },
-      { normalizedPhone: '+998901234567' }
+      { ...card, phone: '+998000000001' },
+      { normalizedPhone: '+998000000001' }
     );
     expect(samePhone).toBeNull();
     // Другой номер → изменение с нормализованным значением
@@ -87,11 +87,40 @@ describe('Fix B: buildPatientProfileSnapshot / buildPatientProfileUpdate', () =>
     const snapshot = buildPatientProfileSnapshot(card);
     const update = buildPatientProfileUpdate(
       snapshot,
-      { ...card, fio: 'Иванов Иван' }
+      { ...card, fio: 'SYNTHETIC-Тестов Тест' }
     ) as Record<string, unknown>;
-    expect(update.full_name).toBe('Иванов Иван');
+    expect(update.full_name).toBe('SYNTHETIC-Тестов Тест');
     expect(update.last_name).toBeUndefined();
     expect(update.first_name).toBeUndefined();
+  });
+
+  it('clearing the phone emits phone: null (Codex R1 P1 regression)', () => {
+    // Прежний баг: truthiness-фильтр выбрасывал phone из payload при очистке,
+    // и старый номер молча оставался в карточке после успешного PUT.
+    const snapshot = buildPatientProfileSnapshot(card);
+    const cleared = buildPatientProfileUpdate(
+      snapshot,
+      { ...card, phone: '' },
+      { normalizedPhone: '' }
+    ) as Record<string, unknown>;
+    expect(cleared.phone).toBeNull();
+  });
+
+  it('clearing an optional birth date emits birth_date: null, not empty string (Codex R1 P2 regression)', () => {
+    // Прежний баг: birth_date: '' отвергается Pydantic (date | None) с 422
+    // и блокирует отправку визита с прочими правками профиля.
+    const snapshot = buildPatientProfileSnapshot(card);
+    const cleared = buildPatientProfileUpdate(
+      snapshot,
+      { ...card, birth_date: '' }
+    ) as Record<string, unknown>;
+    expect(cleared.birth_date).toBeNull();
+    // Непустая дата по-прежнему уходит строкой
+    const changed = buildPatientProfileUpdate(
+      snapshot,
+      { ...card, birth_date: '1991-06-02' }
+    ) as Record<string, unknown>;
+    expect(changed.birth_date).toBe('1991-06-02');
   });
 
   it('returns null without a snapshot (no card selected → no update)', () => {
@@ -101,12 +130,12 @@ describe('Fix B: buildPatientProfileSnapshot / buildPatientProfileUpdate', () =>
   });
 
   it('isSavedNameMatching verifies the re-read server card', () => {
-    expect(isSavedNameMatching('Иванов Иван Иванович', 'иванов иван иванович')).toBe(true);
-    expect(isSavedNameMatching('Иванов  Иван', 'Иванов Иван')).toBe(true);
-    expect(isSavedNameMatching('Петров Пётр', 'Иванов Иван')).toBe(false);
+    expect(isSavedNameMatching('SYNTHETIC-Тестов Тест', 'synthetic-тестов тест')).toBe(true);
+    expect(isSavedNameMatching('SYNTHETIC-Тестов  Тест', 'SYNTHETIC-Тестов Тест')).toBe(true);
+    expect(isSavedNameMatching('SYNTHETIC-Чужой', 'SYNTHETIC-Тестов Тест')).toBe(false);
     // Пустые стороны — сверять нечего, ошибкой не считаем
-    expect(isSavedNameMatching('', 'Иванов Иван')).toBe(true);
-    expect(isSavedNameMatching('Иванов Иван', undefined)).toBe(true);
+    expect(isSavedNameMatching('', 'SYNTHETIC-Тестов Тест')).toBe(true);
+    expect(isSavedNameMatching('SYNTHETIC-Тестов Тест', undefined)).toBe(true);
   });
 });
 
