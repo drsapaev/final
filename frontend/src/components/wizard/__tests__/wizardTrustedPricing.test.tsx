@@ -127,7 +127,7 @@ describe('Fix D: trusted pricing contract', () => {
     // Codex R1 PR 3095: в edit-режиме квота дополнительно зависит от identity
     // (edit-дельта) и справочника услуг; Codex R2 PR 3095: ещё и от маршрута
     // команды (fullUpdateQuoteRoute — QR-записи квотируются по full-update)
-    expect(source).toContain('}, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute]);');
+    expect(source).toContain('}, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute, quoteRefreshNonce]);');
   });
 
   it('CartStepV2 no longer zeroes repeat consultations (backend owns discounts)', () => {

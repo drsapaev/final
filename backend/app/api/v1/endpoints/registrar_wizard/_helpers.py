@@ -158,7 +158,11 @@ class EditDeltaRequest(BaseModel):
     # Frontend передаёт updated_at каждой existing entry при последнем чтении.
     # Если какая-либо entry была изменена другим пользователем — 409 Conflict.
     expected_entry_updated_at: dict[int, str] = Field(default_factory=dict)
-
+    # Codex R4 #3095 (P1): привязка подтверждённой edit-квоты к команде.
+    # apply_registrar_cart_edit_delta пересчитывает цены на текущем каталоге
+    # (правила edit_delta) и отклоняет устаревший токен с 409 — подтверждённая
+    # сумма не может «тихо» разойтись с фактическим начислением.
+    quote_token: str | None = None
 
 class EditDeltaResponse(BaseModel):
     success: bool
@@ -338,8 +342,14 @@ def _resolve_effective_discount_mode(cart_data: CartRequest) -> str:
     return cart_data.discount_mode or "none"
 
 
-def _load_registration_discount_settings(db: Session) -> dict[str, Any]:
-    """Load repeat/benefit settings with safe defaults."""
+def _load_registration_discount_settings(db: Session, lock_rows: bool = False) -> dict[str, Any]:
+    """Load repeat/benefit settings with safe defaults.
+
+    Codex R4 #3095 (P1): lock_rows=True (save-time revalidation) takes row
+    locks on the settings so a concurrent admin change cannot land between
+    the quote revalidation and the invoice calculation under READ COMMITTED.
+    (FOR UPDATE is a no-op on SQLite — test harness unaffected.)
+    """
     defaults = {
         "repeat_visit_days": 21,
         "repeat_visit_discount": 0,
@@ -348,20 +358,19 @@ def _load_registration_discount_settings(db: Session) -> dict[str, Any]:
     }
     settings = defaults.copy()
 
-    rows = (
-        db.query(ClinicSettings)
-        .filter(
-            ClinicSettings.key.in_(
-                [
-                    "repeat_visit_days",
-                    "repeat_visit_discount",
-                    "benefit_consultation_free",
-                    "all_free_auto_approve",
-                ]
-            )
+    settings_query = db.query(ClinicSettings).filter(
+        ClinicSettings.key.in_(
+            [
+                "repeat_visit_days",
+                "repeat_visit_discount",
+                "benefit_consultation_free",
+                "all_free_auto_approve",
+            ]
         )
-        .all()
     )
+    if lock_rows:
+        settings_query = settings_query.with_for_update()
+    rows = settings_query.all()
 
     for row in rows:
         if row.key in {"repeat_visit_days", "repeat_visit_discount"}:

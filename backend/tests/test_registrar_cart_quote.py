@@ -553,3 +553,94 @@ def test_cart_without_quote_token_still_saves_backward_compatible(
         "/api/v1/registrar/cart", headers=_auth_headers(admin_user), json=payload
     )
     assert saved.status_code == 200, saved.text
+
+
+def test_edit_delta_quote_token_rejects_stale_pricing_409(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """Codex R4 #3095 (P1): the edit-delta command revalidates the confirmed
+    edit quote BEFORE any mutation — an admin price change after confirmation
+    yields 409, never a silently different invoice."""
+    service = _service(db_session, code="FIXD-EDT-1", price=50000.00)
+
+    quoted = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [{"service_id": service.id, "quantity": 1}],
+            "discount_mode": "none",
+            "all_free": False,
+            "pricing_mode": "edit_delta",
+        },
+    )
+    assert quoted.status_code == 200
+    stale_token = quoted.json()["quote_token"]
+
+    service.price = 90000.00
+    db_session.commit()
+
+    payload = {
+        "patient_id": test_patient.id,
+        "target_date": date.today().isoformat(),
+        "payment_method": "cash",
+        "discount_mode": "none",
+        "all_free": False,
+        "services": [{"service_id": service.id, "quantity": 1, "specialist_id": None}],
+        "quote_token": stale_token,
+    }
+    stale = client.post(
+        "/api/v1/registrar/cart/edit-delta", headers=_auth_headers(admin_user), json=payload
+    )
+    assert stale.status_code == 409, stale.text
+    assert "изменились" in stale.json()["detail"]
+    assert "90000" in stale.json()["detail"]
+
+
+def test_edit_delta_fresh_quote_token_passes_revalidation(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """Fresh token for the same payload (re-quoted after the price change)
+    passes revalidation — the command proceeds past the pricing gate."""
+    from tests.conftest import mint_access_token
+
+    service = _service(db_session, code="FIXD-EDT-2", price=50000.00)
+
+    token_headers = {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
+    quoted = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=token_headers,
+        json={
+            "items": [{"service_id": service.id, "quantity": 1}],
+            "discount_mode": "none",
+            "all_free": False,
+            "pricing_mode": "edit_delta",
+        },
+    )
+    stale_token = quoted.json()["quote_token"]
+
+    service.price = 90000.00
+    db_session.commit()
+
+    fresh = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=token_headers,
+        json={
+            "items": [{"service_id": service.id, "quantity": 1}],
+            "discount_mode": "none",
+            "all_free": False,
+            "pricing_mode": "edit_delta",
+        },
+    )
+    payload = {
+        "patient_id": test_patient.id,
+        "target_date": date.today().isoformat(),
+        "payment_method": "cash",
+        "discount_mode": "none",
+        "all_free": False,
+        "services": [{"service_id": service.id, "quantity": 1, "specialist_id": None}],
+        "quote_token": fresh.json()["quote_token"],
+    }
+    ok = client.post(
+        "/api/v1/registrar/cart/edit-delta", headers=token_headers, json=payload
+    )
+    assert ok.status_code != 409, ok.text

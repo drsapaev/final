@@ -26875,6 +26875,8 @@ export type components = {
             expected_entry_updated_at?: {
                 [key: string]: string;
             };
+            /** Quote Token */
+            quote_token?: string | null;
         };
         /** EditDeltaResponse */
         EditDeltaResponse: {
@@ -28025,6 +28027,8 @@ export type components = {
             all_free: boolean;
             /** Aggregated Ids */
             aggregated_ids?: number[] | null;
+            /** Quote Token */
+            quote_token?: string | null;
         };
         /**
          * Gender

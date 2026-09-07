@@ -41,30 +41,14 @@ def create_cart_appointments(
             for visit_req in cart_data.visits
             for s in visit_req.services
         ]
-        fresh_quote = _quote_core(
+        _assert_quote_token_matches(
             db,
-            CartQuoteRequest(
-                items=flat_items,
-                discount_mode=cart_data.discount_mode,
-                all_free=cart_data.all_free,
-                pricing_mode="cart",
-            ),
+            items=flat_items,
+            discount_mode=cart_data.discount_mode,
+            all_free=cart_data.all_free,
+            pricing_mode="cart",
+            quote_token=cart_data.quote_token,
         )
-        if fresh_quote.quote_token != cart_data.quote_token:
-            # Codex R3 #3095 (P1): patient_id is PHI — never logged; the
-            # request id / audit context already identifies the caller.
-            logger.warning(
-                "REGISTRATION: stale quote token — pricing changed since confirmation; "
-                "current cart total: %s",
-                fresh_quote.total_amount,
-            )
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "Цены или скидки изменились после подтверждения — подтвердите новую сумму. "
-                    f"Текущая сумма корзины: {fresh_quote.total_amount} сум"
-                ),
-            )
 
     logger.info(
         "REGISTRATION: Получен запрос на создание корзины. Patient ID: %s, Визитов: %d, Discount mode: %s, Effective discount mode: %s, All free: %s, Payment method: %s",
@@ -414,7 +398,7 @@ def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, appr
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _quote_core(db: Session, quote_req: CartQuoteRequest) -> CartQuoteResponse:
+def _quote_core(db: Session, quote_req: CartQuoteRequest, lock_pricing_rows: bool = False) -> CartQuoteResponse:
     """Shared pricing core for /registrar/cart/quote AND the save-time
     revalidation of the confirmed quote (Codex R3 #3095 P1). Raises the same
     HTTP errors either way; returns the quote with its binding token.
@@ -430,7 +414,7 @@ def _quote_core(db: Session, quote_req: CartQuoteRequest) -> CartQuoteResponse:
     услуги, чтобы регистратор увидел проблему до сохранения.
     """
     effective_discount_mode = _resolve_effective_discount_mode(quote_req)
-    registration_settings = _load_registration_discount_settings(db)
+    registration_settings = _load_registration_discount_settings(db, lock_rows=lock_pricing_rows)
 
     # Codex R2 #3095 (P2): approval_status обязан отражать контракт
     # ВЫБРАННОЙ команды сохранения. RegistrarEditDeltaService._create_visit
@@ -460,9 +444,13 @@ def _quote_core(db: Session, quote_req: CartQuoteRequest) -> CartQuoteResponse:
     items: list[CartQuoteItemResponse] = []
 
     for item_req in quote_req.items:
-        service = (
-            db.query(Service).filter(Service.id == item_req.service_id).first()
-        )
+        service_query = db.query(Service).filter(Service.id == item_req.service_id)
+        if lock_pricing_rows:
+            # Codex R4 #3095 (P1): the save path holds the row locks to the end
+            # of its transaction, so a concurrent price change cannot slip in
+            # between token revalidation and invoice calculation.
+            service_query = service_query.with_for_update()
+        service = service_query.first()
         if not service:
             raise HTTPException(
                 status_code=404,
@@ -584,12 +572,67 @@ def quote_cart_prices(
     return _quote_core(db, quote_req)
 
 
+def _assert_quote_token_matches(
+    db: Session,
+    *,
+    items: list[CartQuoteItemRequest],
+    discount_mode: str,
+    all_free: bool,
+    pricing_mode: str,
+    quote_token: str | None,
+) -> None:
+    """Save-command revalidation shared by /registrar/cart, edit-delta and
+    full-update (Codex R4 #3095 P1). Recomputes the quote on the CURRENT
+    catalog/settings with row locks held to the end of the caller's
+    transaction and rejects a stale token with 409."""
+    if not quote_token:
+        return
+    fresh_quote = _quote_core(
+        db,
+        CartQuoteRequest(
+            items=items,
+            discount_mode=discount_mode,
+            all_free=all_free,
+            pricing_mode=pricing_mode,
+        ),
+        lock_pricing_rows=True,
+    )
+    if fresh_quote.quote_token != quote_token:
+        logger.warning(
+            "REGISTRATION: stale quote token — pricing changed since confirmation; "
+            "current total: %s",
+            fresh_quote.total_amount,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Цены или скидки изменились после подтверждения — подтвердите новую сумму. "
+                f"Текущая сумма корзины: {fresh_quote.total_amount} сум"
+            ),
+        )
+
+
 @router.post("/registrar/cart/edit-delta", response_model=EditDeltaResponse)
 def apply_registrar_cart_edit_delta(
     request: EditDeltaRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
+    # Codex R4 #3095 (P1): bind the confirmed edit quote to the command —
+    # revalidate BEFORE any mutation (the edit-delta pricing rules are
+    # mirrored by the quote's edit_delta mode; custom_price is not part of
+    # the edit-delta contract).
+    _assert_quote_token_matches(
+        db,
+        items=[
+            CartQuoteItemRequest(service_id=s.service_id, quantity=s.quantity)
+            for s in request.services
+        ],
+        discount_mode=request.discount_mode,
+        all_free=request.all_free,
+        pricing_mode="edit_delta",
+        quote_token=request.quote_token,
+    )
     try:
         result = RegistrarEditDeltaService(db).apply(
             patient_id=request.patient_id,

@@ -77889,6 +77889,17 @@
             },
             "type": "object",
             "title": "Expected Entry Updated At"
+          },
+          "quote_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Token"
           }
         },
         "type": "object",
@@ -81140,6 +81151,17 @@
               }
             ],
             "title": "Aggregated Ids"
+          },
+          "quote_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Token"
           }
         },
         "type": "object",

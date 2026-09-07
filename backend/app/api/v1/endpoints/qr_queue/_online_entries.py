@@ -126,6 +126,9 @@ class FullUpdateOnlineEntryRequest(BaseModel):
     services: list[dict]  # [{service_id, quantity}]
     all_free: bool = False
     aggregated_ids: list[int] | None = None  # ⭐ FIX: IDs of all merged entries for dedup check
+    # Codex R4 #3095 (P1): привязка подтверждённой full-update квоты к команде —
+    # пересчёт цен на текущем каталоге (правила full_update) ДО мутаций.
+    quote_token: str | None = None
 
 
 def _full_update_find_and_validate_entry(
@@ -1726,7 +1729,13 @@ def _full_update_update_current_entry_services(
                 logger.info("[full_update_online_entry] Применена скидка all_free")
                 item_price = 0  # Всё бесплатно
 
-            total_amount += item_price
+            # Codex R3/R4 #3095 (P2): per-line int() — the SAME conversion the
+            # independent-entry path uses for new services and the
+            # /registrar/cart/quote full_update mode mirrors. The former
+            # raw accumulation + single int(total) disagreed with the
+            # confirmed per-line quote for fractional catalog prices
+            # (2 × 10.99 → confirmed 20, stored 21).
+            total_amount += int(item_price)
 
             # ⭐ FIX PHASE 2: Для существующих услуг используем оригинальное queue_time
             if service_id in existing_service_queue_times:
@@ -1977,6 +1986,34 @@ def full_update_online_entry(
         entry, original_entry_discount_mode = _full_update_find_and_validate_entry(
             db, entry_id, current_user
         )
+
+        # Codex R4 #3095 (P1): bind the confirmed quote to the command —
+        # revalidate prices BEFORE any mutation. Item-level conversion mirrors
+        # the per-line int() the command stores (see total_amount accumulation).
+        if request.quote_token:
+            from app.api.v1.endpoints.registrar_wizard._cart import (
+                _assert_quote_token_matches,
+            )
+            from app.api.v1.endpoints.registrar_wizard._helpers import (
+                CartQuoteItemRequest,
+            )
+
+            _assert_quote_token_matches(
+                db,
+                items=[
+                    CartQuoteItemRequest(
+                        service_id=int(s["service_id"]),
+                        quantity=int(s.get("quantity", 1) or 1),
+                    )
+                    for s in request.services
+                    if s.get("service_id") is not None
+                ],
+                discount_mode=request.discount_mode,
+                all_free=request.all_free,
+                pricing_mode="full_update",
+                quote_token=request.quote_token,
+            )
+
         _full_update_patient_data(entry, request.patient_data)
         _full_update_visit_type(entry, request)
 

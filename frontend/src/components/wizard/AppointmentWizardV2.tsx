@@ -498,6 +498,10 @@ const AppointmentWizardV2 = ({
   // Fix D (trusted pricing): серверная квота цен корзины — единственный
   // достоверный источник суммы (backend — SSOT расчёта скидок).
   const [cartQuote, setCartQuote] = useState<CartQuote | null>(null);
+  // Codex R4 PR 3095 (P2): bump → quote effect re-runs (stale-token 409
+  // invalidates the quote and immediately requests the current pricing so
+  // the registrar can reconfirm instead of resubmitting the stale amount).
+  const [quoteRefreshNonce, setQuoteRefreshNonce] = useState(0);
   const [cartQuoteStatus, setCartQuoteStatus] = useState<CartQuoteStatus>('idle');
   const [cartQuoteError, setCartQuoteError] = useState('');
   const cartQuoteRequestIdRef = useRef(0);
@@ -1207,11 +1211,11 @@ const AppointmentWizardV2 = ({
         if (requestId !== cartQuoteRequestIdRef.current) {
           return; // устаревший ответ: корзина уже изменилась
         }
-        const storedQuote = response.data as unknown as CartQuote;
-        // Codex R3 PR 3095 (P1): токен привязки сохраняется ТОЛЬКО для
-        // cart-режима — edit_delta/full_update квоты обслуживают другие
-        // маршруты сохранения, их токен в /registrar/cart отправлять нельзя.
-        setCartQuote(quotePricingMode === 'cart' ? storedQuote : { ...storedQuote, quote_token: undefined });
+        // Codex R4 PR 3095 (P1): токен привязки сохраняется для ВСЕХ режимов —
+        // каждая команда сохранения (cart / edit-delta / full-update)
+        // переиспользует свой подтверждённый квота-токен и пере-проверяет
+        // цены на момент подтверждения.
+        setCartQuote(response.data as unknown as CartQuote);
         setCartQuoteStatus('ready');
         setCartQuoteError('');
       } catch (error: unknown) {
@@ -1226,7 +1230,7 @@ const AppointmentWizardV2 = ({
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute]);
+  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute, quoteRefreshNonce]);
 
   const repeatSuggestionSummary = useMemo(() => {
     if (!consultationCartItems.length) {
@@ -2020,7 +2024,9 @@ const AppointmentWizardV2 = ({
               discountMode,
               services: cartServices,
               allFree,
-              aggregatedIds // ⭐ FIX: Передаём все ID для проверки дубликатов
+              aggregatedIds, // ⭐ FIX: Передаём все ID для проверки дубликатов
+              // Codex R4 PR 3095 (P1): привязка подтверждённой full-update квоты
+              quoteToken: cartQuote?.quote_token
             });
 
             logger.log('✅ QR-запись успешно обновлена:', updateResult);
@@ -2164,6 +2170,8 @@ const AppointmentWizardV2 = ({
               // PR-14: pass optimistic-locking map so backend can detect
               // concurrent edits (last-write-wins → 409 Conflict).
               expectedEntryUpdatedAt: Object.keys(entryUpdatedAtMap).length > 0 ? entryUpdatedAtMap : null,
+              // Codex R4 PR 3095 (P1): привязка подтверждённой edit-квоты
+              quoteToken: cartQuote?.quote_token,
             });
 
             if (!editDeltaResult?.success) {
@@ -2434,6 +2442,16 @@ const AppointmentWizardV2 = ({
         const isPermissionError = cartErr.status === 403;
 
         logger.error('❌ Ошибка создания корзины:', cartErr.status, errorMessage);
+
+        // Codex R4 PR 3095 (P2): stale-quote 409 — invalidate the quote and
+        // immediately request the current itemized pricing, so pressing
+        // Complete reconfirms the NEW amount instead of resubmitting the
+        // stale one indefinitely.
+        if (cartErr.status === 409) {
+          setCartQuote(null);
+          setCartQuoteStatus('idle');
+          setQuoteRefreshNonce((n) => n + 1);
+        }
 
         if (isPermissionError) {
           if (errorMessage.includes('Not enough permissions')) {
