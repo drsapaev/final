@@ -2585,6 +2585,25 @@ const AppointmentWizardV2 = ({
 
         logger.error('❌ Ошибка создания корзины:', cartErr.status, errorMessage);
 
+        // Codex R3 PR 3092 (P2): definitive 4xx (кроме 409) доказывает, что
+        // операция НЕ закоммичена — backend откатил транзакцию и освободил
+        // distributed-claim. Удерживать привязку ключа дальше значило бы
+        // навсегда заблокировать исправленную повторную отправку через
+        // cartIdempotencyGuard (регистратору пришлось бы закрыть мастер и
+        // потерять корзину). Привязка сохраняется только для неоднозначных
+        // исходов: сеть/таймаут/5xx (неизвестно, закоммичено ли) и 409
+        // (запрос может быть ещё в полёте на другом воркере).
+        const definitiveNonCommit =
+          typeof cartErr.status === 'number' &&
+          cartErr.status >= 400 &&
+          cartErr.status < 500 &&
+          cartErr.status !== 409;
+        if (definitiveNonCommit) {
+          logger.log('Fix C (Codex R3): definitive non-commit response — releasing the bound idempotency key for a corrected retry');
+          cartIdempotencyKeyRef.current = null;
+          cartIdempotencyPayloadRef.current = null;
+        }
+
         if (isPermissionError) {
           if (errorMessage.includes('Not enough permissions')) {
             errorMessage = t('misc.aw_no_permissions');

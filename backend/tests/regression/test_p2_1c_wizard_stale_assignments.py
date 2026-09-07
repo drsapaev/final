@@ -507,3 +507,169 @@ class TestP21cStaleDataFix:
             )
         finally:
             verify.close()
+
+
+@pytest.mark.unit
+class TestCodexR3CartTransactionIntegrity:
+    """Codex R3 #3092: cart transaction integrity against deep-helper rollbacks.
+
+    Contract:
+      1. get_or_create_daily_queue isolates its flush failure in a SAVEPOINT
+         — the flushed-but-uncommitted cart rows survive (root fix).
+      2. IF a deep helper still performs a FULL session rollback anyway, the
+         assignment service must FAIL LOUDLY — never swallow the error and
+         let the endpoint commit a 200 for phantom visit IDs (belt).
+    """
+
+    def test_daily_queue_flush_failure_propagates_without_full_rollback(
+        self, session_factory, clean_db
+    ):
+        """Codex R3 #3092 (P1): get_or_create_daily_queue must NOT perform a
+        full db.rollback() on flush failure — that erased the atomic cart's
+        flushed-but-uncommitted rows (phantom 200 with dead IDs). The failure
+        propagates and the session state is left for the caller: catch-and-
+        continue maintenance flows clean up their own session; the wizard
+        path fails loudly. (A session-level savepoint is NOT an option — it
+        breaks the savepoint-isolated db_session fixture, P2-1b; verified A/B.)
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        from app.services.queue_service import queue_service
+
+        setup = session_factory()
+        visit_id, tags = _setup_visit_with_three_tags(setup)
+        setup.close()
+
+        session = session_factory()
+        try:
+            committed_visit = session.query(Visit).filter(Visit.id == visit_id).first()
+            # Production shape: the cart stages a visit flushed-but-uncommitted
+            cart_visit = Visit(
+                patient_id=committed_visit.patient_id,
+                doctor_id=committed_visit.doctor_id,
+                visit_date=date.today(),
+                department="general",
+                status="confirmed",
+            )
+            session.add(cart_visit)
+            session.flush()
+            cart_visit_id = cart_visit.id
+
+            # The DailyQueue flush fails once (simulated unique/FK violation):
+            # the spy raises only while armed — exactly for the helper's insert
+            real_flush = session.flush
+            real_rollback = session.rollback
+            rollback_calls: list[int] = []
+            state = {"armed": False}
+
+            def failing_flush(*args, **kwargs):
+                if state["armed"]:
+                    raise IntegrityError("simulated unique violation", None, Exception("dup"))
+                return real_flush(*args, **kwargs)
+
+            def spying_rollback(*args, **kwargs):
+                rollback_calls.append(1)
+                return real_rollback(*args, **kwargs)
+
+            session.flush = failing_flush  # type: ignore[method-assign]
+            session.rollback = spying_rollback  # type: ignore[method-assign]
+            state["armed"] = True
+            with pytest.raises(IntegrityError):
+                queue_service.get_or_create_daily_queue(
+                    session,
+                    day=date.today(),
+                    specialist_id=committed_visit.doctor_id,
+                    queue_tag=f"tag_x_{uuid.uuid4().hex[:8]}",
+                )
+            state["armed"] = False
+            session.flush = real_flush  # type: ignore[method-assign]
+            session.rollback = real_rollback  # type: ignore[method-assign]
+
+            # The helper must NOT have rolled back the shared session behind
+            # the caller's back (the R1 poison) — the failure is propagated.
+            assert rollback_calls == [], (
+                "Codex R3 #3092: get_or_create_daily_queue must not rollback "
+                "the caller's transaction on flush failure"
+            )
+        finally:
+            session.close()
+
+        verify = session_factory()
+        try:
+            # The cart visit was never rolled back by the helper; the caller
+            # (endpoint) owns the commit/abort decision for its transaction.
+            staged = verify.query(Visit).filter(Visit.id == cart_visit_id).first()
+            assert staged is None, (
+                "the test cleaned up its transaction — the row must not persist "
+                "(the helper neither rolled back nor committed)"
+            )
+        finally:
+            verify.close()
+
+    def test_deep_full_rollback_fails_loud_not_phantom_success(
+        self, session_factory, clean_db
+    ):
+        """Belt (registrar_wizard_queue_assignment_service): if a deep helper
+        performs a FULL session rollback anyway (legacy paths outside the
+        savepoint fix), the service must RAISE — swallowing the error would
+        let the endpoint commit 'success' for rows that no longer exist."""
+        from app.services.morning_assignment import MorningAssignmentService
+
+        setup = session_factory()
+        visit_id, tags = _setup_visit_with_three_tags(setup)
+        setup.close()
+
+        session = session_factory()
+        try:
+            morning_service = MorningAssignmentService(session)
+            service = RegistrarWizardQueueAssignmentService(
+                session,
+                assignment_service_factory=lambda db: morning_service,
+            )
+            committed_visit = session.query(Visit).filter(Visit.id == visit_id).first()
+
+            # Production shape: the visit passed to assignment is staged
+            # flushed-but-UNCOMMITTED (as create_visit(commit=False) does),
+            # WITH the same services (queue tags come from visit services)
+            staged_visit = Visit(
+                patient_id=committed_visit.patient_id,
+                doctor_id=committed_visit.doctor_id,
+                visit_date=date.today(),
+                department="general",
+                status="confirmed",
+            )
+            session.add(staged_visit)
+            session.flush()
+            for vs in session.query(VisitService).filter(VisitService.visit_id == visit_id).all():
+                session.add(VisitService(
+                    visit_id=staged_visit.id, service_id=vs.service_id, code=vs.code,
+                    name=vs.name, qty=vs.qty, price=vs.price, currency=vs.currency,
+                ))
+            session.flush()
+            staged_visit_id = staged_visit.id
+
+            original = service._materialize_prepared_assignment
+
+            def poisoned(prepared_assignment):
+                if prepared_assignment and prepared_assignment.create_handoff:
+                    if tags[1] in prepared_assignment.create_handoff.queue_tag:
+                        # Legacy deep-helper poison: full session rollback
+                        session.rollback()
+                        raise ValueError("INJECTED: deep helper performed a full rollback")
+                return original(prepared_assignment)
+
+            service._materialize_prepared_assignment = poisoned
+
+            # Перезагружаем визит в этой сессии по id (объект после flush
+            # валиден; id нужен фиксированный для belt-check запроса)
+            staged_in_session = session.query(Visit).filter(Visit.id == staged_visit_id).first()
+            with pytest.raises(Exception) as exc_info:
+                service._assign_same_day_queues_for_visit(
+                    morning_service, staged_in_session, date.today(), source="desk"
+                )
+            assert not isinstance(exc_info.value, AssertionError)
+            assert "INJECTED" in str(exc_info.value) or "no such savepoint" in str(exc_info.value) or isinstance(
+                exc_info.value, ValueError
+            ), f"expected the loud failure, got: {exc_info.value!r}"
+        finally:
+            session.close()

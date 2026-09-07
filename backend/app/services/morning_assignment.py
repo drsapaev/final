@@ -150,6 +150,14 @@ class MorningAssignmentService:
                     logger.info(f"✅ Pre-created DailyQueue for queue_tag={queue_tag}")
 
             except Exception as e:
+                # Codex R3 #3092 (P1): get_or_create_daily_queue no longer
+                # rolls the session back on flush failure (the rollback erased
+                # the atomic cart's uncommitted rows in the wizard flow).
+                # THIS loop is a catch-and-continue maintenance flow on its
+                # own session (no cart transaction to protect), so a rollback
+                # here restores the skip-tag-and-continue behavior without
+                # poisoning anything else.
+                self.db.rollback()
                 logger.error(f"Error pre-creating queue for {queue_tag}: {e}")
 
         if created_count > 0:

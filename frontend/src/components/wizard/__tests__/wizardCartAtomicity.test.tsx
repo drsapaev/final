@@ -133,3 +133,28 @@ describe('Fix C: wizard duplicate-submit contract', () => {
     expect(apiSource).toContain("'Idempotency-Key': options.idempotencyKey");
   });
 });
+
+describe('Fix C (Codex R3 #3092): key binding release on definitive failures', () => {
+  const readWizardSource = () => fs.readFileSync(
+    path.resolve(__dirname, '../AppointmentWizardV2.tsx'),
+    'utf8'
+  );
+
+  it('releases the bound key after definitive 4xx (non-commit), keeps it for ambiguous outcomes', () => {
+    // Codex R3 PR 3092 (P2): определённый 4xx (кроме 409) доказывает, что
+    // операция НЕ закоммичена — backend откатил транзакцию и освободил
+    // distributed-claim. Удержание привязки навсегда блокировало бы
+    // исправленную повторную отправку (потеря корзины). Привязка остаётся
+    // только для неоднозначных исходов: сеть/таймаут/5xx и 409.
+    const source = readWizardSource();
+    const start = source.indexOf('} catch (cartError: unknown) {');
+    const end = source.indexOf('if (isPermissionError) {', start);
+    const catchBlock = source.slice(start, end);
+    expect(catchBlock).toContain('definitiveNonCommit');
+    expect(catchBlock).toContain('cartErr.status >= 400');
+    expect(catchBlock).toContain('cartErr.status < 500');
+    expect(catchBlock).toContain('cartErr.status !== 409');
+    expect(catchBlock).toContain('cartIdempotencyKeyRef.current = null;');
+    expect(catchBlock).toContain('cartIdempotencyPayloadRef.current = null;');
+  });
+});

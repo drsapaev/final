@@ -165,6 +165,11 @@ class RegistrarWizardQueueAssignmentService:
             return []
 
         queue_assignments: list[dict[str, Any]] = []
+        # Codex R3 #3092 (P1): capture the PK while the instance is alive —
+        # after a deep full rollback the ORM instance is expired, and every
+        # attribute access below must not depend on a refresh that would
+        # raise ObjectDeletedError instead of the loud, explicit failure.
+        visit_id = visit.id
         # Codex R1 #3092 (P1): предыдущий _rollback_session() делал ПОЛНЫЙ
         # db.rollback() сессии. В атомарной корзине (/registrar/cart с
         # create_visit(commit=False)) визиты/invoice лежат в той же транзакции
@@ -199,10 +204,24 @@ class RegistrarWizardQueueAssignmentService:
             except Exception as exc:
                 logger.error(
                     "Ошибка присвоения очередей для визита %d: %s",
-                    visit.id,
+                    visit_id,
                     str(exc),
                     exc_info=True,
                 )
+                # Codex R3 #3092 (P1): belt-and-suspenders. A deep helper that
+                # still performs a FULL session rollback (e.g. legacy
+                # get_or_create_daily_queue paths outside the savepoint fix)
+                # would erase the flushed cart rows from this transaction.
+                # The compensating cleanup below is meaningless then, and
+                # swallowing the error would let the endpoint commit a 200
+                # for phantom visit/invoice IDs. Verify the visit row still
+                # exists IN THE TRANSACTION; if not — fail loudly.
+                visit_still_in_tx = (
+                    self.db.query(Visit.id).filter(Visit.id == visit_id).first()
+                    is not None
+                )
+                if not visit_still_in_tx:
+                    raise
                 # Компенсирующая зачистка: DELETE записей очереди этого визита
                 # в той же транзакции (почему не rollback и не savepoint — см.
                 # комментарий выше). Ошибка зачистки НЕ глотается: она уйдёт в

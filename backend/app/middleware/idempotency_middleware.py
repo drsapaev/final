@@ -55,6 +55,7 @@ from collections import OrderedDict
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+import jwt
 import redis as redis_lib
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -84,6 +85,22 @@ _IN_FLIGHT_LEASE_SECONDS = 90
 # the backend process is restarted.
 _RECONNECT_COOLDOWN_SECONDS = 5.0
 
+# Codex R3 #3092 (P1): the in-flight claim is OWNED by the worker that acquired
+# it. A worker whose lease lapsed during a Redis outage/long pause must not be
+# able to renew or release the replacement claim acquired by another worker:
+# renew is compare-and-expire, release is compare-and-delete — both verify the
+# stored ownership token, so a stale owner can no longer overwrite or delete
+# a live claim (which had allowed a third request to execute and duplicate
+# visits/invoices/queue positions).
+_LEASE_RENEW_LUA = (
+    "if redis.call('get', KEYS[1]) == ARGV[1] then "
+    "return redis.call('expire', KEYS[1], ARGV[2]) else return 0 end"
+)
+_LEASE_RELEASE_LUA = (
+    "if redis.call('get', KEYS[1]) == ARGV[1] then "
+    "return redis.call('del', KEYS[1]) else return 0 end"
+)
+
 
 def redact_redis_url(url: str) -> str:
     """Strip URI userinfo credentials from a Redis URL before logging.
@@ -109,6 +126,102 @@ def payload_hash(body: bytes | None) -> str:
     return hashlib.sha256(body or b"").hexdigest()
 
 
+def _user_authorized_in_db(db: Any, user_id: int | None, username: str | None, jti: Any) -> bool:
+    """Pure DB-backed authorization query — fails CLOSED (Codex R3 #3092).
+
+    Same semantics as app.api.deps._get_user_with_blacklist: the user must
+    exist, be active, and the token must not be blacklisted (jti match or
+    the all_user_tokens sentinel). One SQL roundtrip.
+    """
+    if db is None or (user_id is None and not username):
+        return False
+    try:
+        from datetime import UTC, datetime
+
+        from sqlalchemy import select
+
+        from app.models.authentication import TokenBlacklist
+        from app.models.user import User
+
+        if user_id is not None:
+            subject_filter = User.id == user_id
+        else:
+            subject_filter = User.username == username
+
+        jti_bl = select(TokenBlacklist.id).where(TokenBlacklist.jti == jti).exists()
+        sentinel_bl = (
+            select(TokenBlacklist.id)
+            .where(
+                TokenBlacklist.user_id == User.id,
+                TokenBlacklist.reason.like("all_user_tokens:%"),
+                TokenBlacklist.expires_at > datetime.now(UTC),
+            )
+            .exists()
+        )
+        stmt = select(User.id, User.is_active, jti_bl.label("jti_bl"), sentinel_bl.label("sentinel_bl")).where(
+            subject_filter
+        )
+        row = db.execute(stmt).first()
+        if row is None:
+            return False
+        _, is_active, jti_hit, sentinel_hit = row
+        return bool(is_active) and not (jti_hit or sentinel_hit)
+    except Exception:
+        logger.warning(
+            "Idempotency principal authorization query failed; refusing replay",
+            exc_info=True,
+        )
+        return False
+
+
+def _resolve_request_db(request: Any):
+    """Open the SAME session source the request's endpoint will use.
+
+    Production: app.api.deps.get_db → SessionLocal (the canonical DB).
+    Test world: the app's dependency override (savepoint-isolated fixture
+    session) — the middleware must authorize against the same users the
+    endpoint authenticates against, not against a second connection that
+    sees a different database.
+    """
+    from app.api.deps import get_db as canonical_get_db
+
+    override = None
+    try:
+        override = request.app.dependency_overrides.get(canonical_get_db)
+    except Exception:  # pragma: no cover - app object without overrides
+        override = None
+    return (override or canonical_get_db)()
+
+
+def _check_principal_authorized_sync(
+    request: Any, user_id: int | None, username: str | None, jti: Any
+) -> bool:
+    """DB-backed principal authorization for the replay path (Codex R3 #3092).
+
+    Resolves the DB through the same session source the endpoint uses, runs
+    the authorization query off the event loop, and fails CLOSED: a broken
+    DB check never results in a replay.
+    """
+    try:
+        generator = _resolve_request_db(request)
+        try:
+            db = next(generator)
+            return _user_authorized_in_db(db, user_id, username, jti)
+        finally:
+            try:
+                next(generator)
+            except StopIteration:
+                pass
+            except Exception:  # pragma: no cover - generator teardown
+                pass
+    except Exception:
+        logger.warning(
+            "Idempotency principal authorization check failed; refusing replay",
+            exc_info=True,
+        )
+        return False
+
+
 class IdempotencyResponseCache:
     """In-memory LRU cache for idempotent responses.
 
@@ -118,10 +231,10 @@ class IdempotencyResponseCache:
     """
 
     def __init__(self, max_entries: int = _MAX_CACHE_ENTRIES) -> None:
-        self._cache: OrderedDict[tuple[int, str], tuple[float, Response, str]] = OrderedDict()
+        self._cache: OrderedDict[tuple[str, str], tuple[float, Response, str]] = OrderedDict()
         self._max_entries = max_entries
 
-    def get(self, user_id: int, key: str, body_hash: str | None = None) -> tuple[Response | None, bool]:
+    def get(self, user_id: str, key: str, body_hash: str | None = None) -> tuple[Response | None, bool]:
         """Return (cached_response, payload_mismatch)."""
         cache_key = (user_id, key)
         entry = self._cache.get(cache_key)
@@ -137,7 +250,7 @@ class IdempotencyResponseCache:
         mismatch = bool(body_hash and stored_hash and body_hash != stored_hash)
         return response, mismatch
 
-    def set(self, user_id: int, key: str, response: Response, body_hash: str = "", ttl: int = _CACHE_TTL_SECONDS) -> None:
+    def set(self, user_id: str, key: str, response: Response, body_hash: str = "", ttl: int = _CACHE_TTL_SECONDS) -> None:
         cache_key = (user_id, key)
         expires_at = time.time() + ttl
         self._cache[cache_key] = (expires_at, response, body_hash)
@@ -232,11 +345,11 @@ class DistributedIdempotencyClaim:
         return self._lease_seconds
 
     @staticmethod
-    def _claim_key(user_id: int, key: str) -> str:
+    def _claim_key(user_id: int | str, key: str) -> str:
         return f"idem:{user_id}:{key}:claim"
 
     @staticmethod
-    def _resp_key(user_id: int, key: str) -> str:
+    def _resp_key(user_id: int | str, key: str) -> str:
         return f"idem:{user_id}:{key}:resp"
 
     def _ensure_available(self) -> bool:
@@ -278,36 +391,62 @@ class DistributedIdempotencyClaim:
             self._failed_at = time.time()
             return None
 
-    def acquire(self, user_id: int, key: str) -> bool:
+    def acquire(self, user_id: int | str, key: str) -> str | None:
+        """Acquire the in-flight claim; return the OWNERSHIP TOKEN.
+
+        Codex R3 #3092 (P1): the token binds renew/release to the acquirer —
+        a stale worker cannot renew or delete a replacement claim.
+        Returns:
+          - a non-empty token string: the caller owns the claim and may execute;
+          - None: the claim is held elsewhere (409 to the client) or the Redis
+            op failed (conservative: refuse execution, same as before R3).
+          Degraded mode (Redis unavailable before the claim attempt) returns a
+          synthetic token so the request proceeds on the in-memory path.
+        """
         if not self._ensure_available() or self._client is None:
-            return True  # degrade: caller proceeds (in-memory path)
+            return f"local-{uuid.uuid4().hex}"  # degrade: caller proceeds (in-memory path)
+        token = uuid.uuid4().hex
         ok = self._run(
             self._client.set,
             self._claim_key(user_id, key),
-            uuid.uuid4().hex,
+            token,
             nx=True,
             ex=self._lease_seconds,  # Codex R2 #3092 (P2): short renewable lease
         )
-        return bool(ok)
+        return token if ok else None
 
-    def renew(self, user_id: int, key: str) -> bool:
-        """Extend the in-flight lease while this worker is still executing.
+    def renew(self, user_id: int | str, key: str, token: str) -> bool:
+        """Extend the in-flight lease — only for the CURRENT owner (Codex R3).
 
-        XX=True: only an existing claim is extended — a claim that already
-        lapsed (crashed worker) is never resurrected by renewal.
+        Compare-and-expire: the stored ownership token must match. A claim
+        that lapsed and was re-acquired by another worker is never renewed
+        by the stale owner (SET XX alone only checked existence).
         """
         if not self._ensure_available() or self._client is None:
             return False
         ok = self._run(
-            self._client.set,
+            self._client.eval,
+            _LEASE_RENEW_LUA,
+            1,
             self._claim_key(user_id, key),
-            "in-flight",
-            xx=True,
-            ex=self._lease_seconds,
+            token,
+            str(self._lease_seconds),
         )
         return bool(ok)
 
-    def load_response(self, user_id: int, key: str) -> tuple[Response | None, str | None]:
+    def release(self, user_id: int | str, key: str, token: str) -> None:
+        """Drop the in-flight claim — only if THIS caller still owns it (Codex R3)."""
+        if not self._ensure_available() or self._client is None:
+            return
+        self._run(
+            self._client.eval,
+            _LEASE_RELEASE_LUA,
+            1,
+            self._claim_key(user_id, key),
+            token,
+        )
+
+    def load_response(self, user_id: int | str, key: str) -> tuple[Response | None, str | None]:
         """Return (replay_response, stored_payload_hash)."""
         if not self._ensure_available() or self._client is None:
             return None, None
@@ -327,7 +466,7 @@ class DistributedIdempotencyClaim:
             logger.warning("Idempotency snapshot decode failed: %s", exc)
             return None, None
 
-    def store_response(self, user_id: int, key: str, response: Response, ttl: int | None = None, payload_hash: str = "") -> None:
+    def store_response(self, user_id: int | str, key: str, response: Response, ttl: int | None = None, payload_hash: str = "") -> None:
         if not self._ensure_available() or self._client is None:
             return
         body = getattr(response, "body", b"") or b""
@@ -347,12 +486,7 @@ class DistributedIdempotencyClaim:
             ex=ttl or self._ttl,
         )
 
-    def release(self, user_id: int, key: str) -> None:
-        if not self._ensure_available() or self._client is None:
-            return
-        self._run(self._client.delete, self._claim_key(user_id, key))
-
-    def has_in_flight(self, user_id: int, key: str) -> bool:
+    def has_in_flight(self, user_id: int | str, key: str) -> bool:
         """Claim marker present = some worker is executing this key."""
         if not self._ensure_available() or self._client is None:
             return False
@@ -362,19 +496,21 @@ class DistributedIdempotencyClaim:
 _distributed_claim: DistributedIdempotencyClaim | None = None
 
 
-async def _renew_lease_loop(claim: DistributedIdempotencyClaim, user_id: int, key: str) -> None:
+async def _renew_lease_loop(claim: DistributedIdempotencyClaim, user_id: int | str, key: str, token: str) -> None:
     """Renew the in-flight claim lease while the handler is running.
 
     Codex R2 #3092 (P2): interval is half the lease, so a renewal burst of
     failures (Redis briefly down) still leaves the claim alive; if the task
     is cancelled (handler finished / worker died), the lease simply lapses
     after lease_seconds and same-key retries stop receiving 409.
+    Codex R3 #3092 (P1): renewals carry the owner token — a stale loop can
+    no longer extend a claim that now belongs to another worker.
     """
     interval = max(1.0, claim.lease_seconds / 2.0)
     try:
         while True:
             await asyncio.sleep(interval)
-            claim.renew(user_id, key)
+            claim.renew(user_id, key, token)
     except asyncio.CancelledError:
         return
 
@@ -436,9 +572,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             request_body = b""
         incoming_hash = payload_hash(request_body)
 
-        # Resolve user_id from auth state (set by upstream middleware)
-        # Default to 0 if unauthenticated (rare for POST, but defensive)
-        user_id = self._resolve_user_id(request)
+        # Codex R3 #3092 (P1): the cache namespace comes from a VERIFIED
+        # principal. Authentication lives in endpoint dependencies — no
+        # upstream middleware populates request.state.user_id, so the old
+        # _resolve_user_id resolved EVERY request to user 0 and the Redis
+        # lookup could replay a cached cart response to an unauthenticated
+        # caller or across auth boundaries (same key + body, different
+        # client). Now: the JWT in the Authorization header is verified
+        # (signature + exp) and the namespace is derived from its sub claim;
+        # requests without a verifiable identity bypass idempotency entirely
+        # (the endpoint will 401 them — nothing is stored or replayed).
+        principal_payload = self._verified_principal(request)
+        if principal_payload is None:
+            return await call_next(request)
+        user_id = self._namespace(principal_payload)
 
         # Check local (per-process) cache first — fastest path
         cached, local_mismatch = _idempotency_cache.get(user_id, idempotency_key, incoming_hash)
@@ -450,6 +597,14 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
             return self._payload_mismatch_response()
         if cached is not None:
+            # Codex R3 #3092 (P1): replay only after authorization — the
+            # principal must still resolve to an active, non-blacklisted user.
+            if not await self._principal_authorized(request, principal_payload):
+                logger.warning(
+                    "Idempotency replay refused (principal not authorized): user=%s key=%s path=%s",
+                    user_id, idempotency_key, request.url.path,
+                )
+                return await call_next(request)
             logger.info(
                 "Idempotency hit: user=%s key=%s method=%s path=%s — returning cached response",
                 user_id, idempotency_key, request.method, request.url.path,
@@ -461,6 +616,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # request; the per-process cache alone cannot deduplicate either case.
         claim = get_distributed_claim()
         claim_acquired = True
+        claim_token: str | None = None
         if claim is not None and claim.try_available():
             replayed, stored_hash = claim.load_response(user_id, idempotency_key)
             if replayed is not None:
@@ -470,12 +626,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         user_id, idempotency_key, request.url.path,
                     )
                     return self._payload_mismatch_response()
+                # Codex R3 #3092 (P1): authorization before cross-worker replay.
+                if not await self._principal_authorized(request, principal_payload):
+                    logger.warning(
+                        "Idempotency distributed replay refused (principal not authorized): user=%s key=%s path=%s",
+                        user_id, idempotency_key, request.url.path,
+                    )
+                    return await call_next(request)
                 logger.info(
                     "Idempotency distributed replay: user=%s key=%s path=%s",
                     user_id, idempotency_key, request.url.path,
                 )
                 return replayed
-            claim_acquired = claim.acquire(user_id, idempotency_key)
+            claim_token = claim.acquire(user_id, idempotency_key)
+            claim_acquired = claim_token is not None
             if not claim_acquired:
                 # Another worker holds the claim. Its response may have
                 # completed between our acquire attempt and now — re-check
@@ -507,11 +671,13 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # while this worker is still executing, the in-flight claim is
         # periodically extended so a slow-but-alive request never lapses;
         # if the worker dies, the loop dies with it and the short lease
-        # expires on its own (no 24h 409 lockout).
+        # expires on its own (no 24h 409 lockout). Codex R3 #3092 (P1):
+        # renewals and release carry the OWNER TOKEN, so a stale worker can
+        # neither extend nor delete a claim that now belongs to another.
         lease_task: asyncio.Task | None = None
-        if claim is not None and claim.try_available() and claim_acquired:
+        if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
             lease_task = asyncio.create_task(
-                _renew_lease_loop(claim, user_id, idempotency_key)
+                _renew_lease_loop(claim, user_id, idempotency_key, claim_token)
             )
         try:
             response = await call_next(request)
@@ -519,8 +685,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             # Handler crashed — release the claim so the client can retry.
             if lease_task is not None:
                 lease_task.cancel()
-            if claim is not None and claim.try_available() and claim_acquired:
-                claim.release(user_id, idempotency_key)
+            if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
+                claim.release(user_id, idempotency_key, claim_token)
             raise
         finally:
             if lease_task is not None:
@@ -544,14 +710,14 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 media_type=response.media_type,
             )
             _idempotency_cache.set(user_id, idempotency_key, cached_response, incoming_hash)
-            if claim is not None and claim.try_available() and claim_acquired:
+            if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                 # Codex R1 #3092 (P1): snapshot for CROSS-WORKER replay, then
                 # drop the in-flight claim so later retries replay instead
                 # of conflicting. Codex R2 #3092 (P1): the snapshot carries
                 # the payload hash — changed data is never replayed as the
                 # original success.
                 claim.store_response(user_id, idempotency_key, cached_response, payload_hash=incoming_hash)
-                claim.release(user_id, idempotency_key)
+                claim.release(user_id, idempotency_key, claim_token)
             logger.info(
                 "Idempotency cached: user=%s key=%s method=%s path=%s status=%s",
                 user_id, idempotency_key, request.method, request.url.path, response.status_code,
@@ -566,8 +732,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
         # Non-2xx is not cached — release the claim so the client can retry
         # with the same key after fixing the issue.
-        if claim is not None and claim.try_available() and claim_acquired:
-            claim.release(user_id, idempotency_key)
+        if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
+            claim.release(user_id, idempotency_key, claim_token)
         return response
 
     @staticmethod
@@ -585,19 +751,62 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             media_type="application/json",
         )
 
-    def _resolve_user_id(self, request: Request) -> int:
-        """Best-effort user_id resolution from request state.
+    _JWT_LEEWAY_SECONDS = 15
 
-        Look for user_id in request.state (set by auth middleware) or
-        in the Authorization header (decode JWT). Returns 0 if not found.
+    def _verified_principal(self, request: Request) -> dict[str, Any] | None:
+        """Verify the bearer JWT and return its payload (Codex R3 #3092 P1).
+
+        The payload's `sub` becomes the idempotency namespace. Returns None
+        when the request carries no verifiable identity — such requests
+        bypass idempotency entirely (nothing stored, nothing replayed).
         """
-        # Fast path: auth middleware already set state.user_id
-        user_id = getattr(request.state, "user_id", None)
-        if user_id is not None:
-            return int(user_id)
-        user = getattr(request.state, "user", None)
-        if user is not None:
-            uid = getattr(user, "id", None)
-            if uid is not None:
-                return int(uid)
-        return 0
+        auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
+        if not auth_header:
+            return None
+        scheme, _, token = auth_header.partition(" ")
+        if scheme.lower() != "bearer" or not token.strip():
+            return None
+        try:
+            from app.core.config import settings
+
+            return jwt.decode(
+                token.strip(),
+                settings.SECRET_KEY,
+                algorithms=[getattr(settings, "ALGORITHM", "HS256")],
+                leeway=self._JWT_LEEWAY_SECONDS,
+            )
+        except Exception as exc:
+            logger.debug("Idempotency: no verifiable principal (%s)", type(exc).__name__)
+            return None
+
+    @staticmethod
+    def _namespace(principal_payload: dict[str, Any]) -> str:
+        """Stable per-principal cache namespace from the verified sub claim.
+
+        Hashed: no usernames/ids in Redis keys, no collision between a text
+        sub (username) and a colon-bearing value.
+        """
+        sub = str(principal_payload.get("sub") or "")
+        return hashlib.sha256(sub.encode("utf-8")).hexdigest()[:32]
+
+    async def _principal_authorized(self, request: Request, principal_payload: dict[str, Any]) -> bool:
+        """DB-backed authorization before any replay (Codex R3 #3092 P1).
+
+        Mirrors get_current_user's semantics: the user must exist, be active,
+        and the token must not be blacklisted (jti or all-user sentinel).
+        Runs the sync query in a worker thread; fails CLOSED — a broken DB
+        check never results in a replay (the request falls through to the
+        endpoint, which re-authenticates anyway).
+        """
+        sub = principal_payload.get("sub")
+        sub_text = str(sub) if sub is not None else ""
+        user_id = int(sub_text) if sub_text.isdigit() else None
+        username = None if user_id is not None else (sub_text or None)
+        jti = principal_payload.get("jti")
+        try:
+            return await asyncio.to_thread(
+                _check_principal_authorized_sync, request, user_id, username, jti
+            )
+        except Exception:  # pragma: no cover - to_thread failure is fail-closed
+            logger.warning("Idempotency principal check crashed; refusing replay", exc_info=True)
+            return False

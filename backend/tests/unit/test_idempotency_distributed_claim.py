@@ -22,6 +22,17 @@ Codex R2 #3092 additions:
   7. A transient Redis failure degrades, then RECOVERS (re-probe) instead
      of permanently disabling coordination on the worker.
   8. The Redis URL is redacted before logging (credentials never reach logs).
+
+Codex R3 #3092 additions:
+  9. The cache namespace comes from a VERIFIED bearer JWT; requests without
+     a verifiable identity bypass idempotency entirely (nothing stored,
+     nothing replayed) — no more user-0 shared namespace.
+ 10. Cross-principal replay is impossible: two verified principals sharing
+     one key never see each other's cached response; a principal that fails
+     the DB authorization check (revoked/deactivated) gets no replay.
+ 11. Lease renewal/release are bound to the owner token (compare-and-expire
+     / compare-and-delete) — a stale worker can neither extend nor delete a
+     replacement claim acquired by another worker.
 """
 from __future__ import annotations
 
@@ -87,6 +98,37 @@ class FakeRedis:
             raise ConnectionError("simulated transient redis failure")
         return 1 if self.store.pop(key, None) is not None else 0
 
+    def eval(self, script: str, numkeys: int, key: str, *args: str) -> int:
+        """Emulate the two Lua compare-and-* scripts used by the claim."""
+        if self.fail_next_ops > 0:
+            self.fail_next_ops -= 1
+            raise ConnectionError("simulated transient redis failure")
+        if "del" in script:
+            if self.store.get(key) == args[0]:
+                self.store.pop(key)
+                self.ttls.pop(key, None)
+                return 1
+            return 0
+        if "expire" in script:
+            if self.store.get(key) == args[0]:
+                self.ttls[key] = int(args[1])
+                return 1
+            return 0
+        raise AssertionError(f"unexpected Lua script: {script}")
+
+
+def auth_headers(sub: str = "1") -> dict[str, str]:
+    """Bearer token for a verified principal (Codex R3 #3092 P1)."""
+    from app.core.security import create_access_token
+
+    return {"Authorization": f"Bearer {create_access_token(sub)}"}
+
+
+def nkey(sub: str, key: str, kind: str) -> str:
+    """Redis key under the hashed namespace of the given principal."""
+    ns = IdempotencyMiddleware._namespace({"sub": sub})
+    return f"idem:{ns}:{key}:{kind}"
+
 
 def _make_claim(fake: FakeRedis) -> DistributedIdempotencyClaim:
     """Build a claim instance without a real Redis (bypass from_url/ping)."""
@@ -122,10 +164,14 @@ def fake_redis() -> FakeRedis:
 @pytest.fixture
 def two_workers(fake_redis: FakeRedis):
     """Two TestClients (simulated workers) sharing one Redis; both middlewares
-    see the same distributed claim, while per-process caches stay separate."""
+    see the same distributed claim, while per-process caches stay separate.
+    Codex R3: the DB authorization check is stubbed AUTHORIZED by default —
+    dedicated tests below flip it to pin the fail-closed behavior."""
     # Reset the module-level distributed singleton and wire the fake
     saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
     idem_module._distributed_claim = _make_claim(fake_redis)
+    idem_module._check_principal_authorized_sync = lambda *a, **k: True
 
     counters = {"w1": {"calls": 0}, "w2": {"calls": 0}}
     client1 = TestClient(_make_app(counters["w1"]), raise_server_exceptions=False)
@@ -133,12 +179,13 @@ def two_workers(fake_redis: FakeRedis):
     yield client1, client2, counters, fake_redis
 
     idem_module._distributed_claim = saved
+    idem_module._check_principal_authorized_sync = saved_auth
 
 
 def test_retry_on_other_worker_replays_response_executes_once(two_workers):
     """Lost response → retry hits ANOTHER worker → replay, handler ran once."""
     client1, client2, counters, _ = two_workers
-    headers = {"Idempotency-Key": "codex-r1-lost-response"}
+    headers = {**auth_headers("1"), "Idempotency-Key": "codex-r1-lost-response"}
 
     first = client1.post("/echo", headers=headers)
     assert first.status_code == 200
@@ -159,10 +206,10 @@ def test_in_flight_overlap_returns_409_not_second_execution(two_workers):
     client1, client2, counters, fake_redis = two_workers
 
     # Simulate worker 1 holding an in-flight claim (handler not finished yet)
-    claim_key = "idem:0:overlap-key:claim"
+    claim_key = nkey("1", "overlap-key", "claim")
     fake_redis.store[claim_key] = uuid.uuid4().hex
 
-    response = client2.post("/echo", headers={"Idempotency-Key": "overlap-key"})
+    response = client2.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "overlap-key"})
     assert response.status_code == 409
     assert response.headers.get("Retry-After") == "1"
     assert counters["w2"]["calls"] == 0, (
@@ -175,17 +222,18 @@ def test_in_flight_claim_replays_if_response_landed_between_attempts(two_workers
     client1, client2, counters, fake_redis = two_workers
 
     key = "race-key"
+    h1 = auth_headers("1")
     # Worker 1 completes: snapshot stored, claim released
-    first = client1.post("/echo", headers={"Idempotency-Key": key})
+    first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
     assert first.status_code == 200
     # (worker 2's per-process cache is cold; only Redis knows the response)
-    resp_snapshot_key = "idem:0:race-key:resp"
+    resp_snapshot_key = nkey("1", key, "resp")
     assert resp_snapshot_key in fake_redis.store
 
     # A claim is (re)acquired concurrently — then worker 2 retries:
     # acquire fails on the stale claim, but the re-check finds the snapshot.
-    fake_redis.store["idem:0:race-key:claim"] = uuid.uuid4().hex
-    second = client2.post("/echo", headers={"Idempotency-Key": key})
+    fake_redis.store[nkey("1", key, "claim")] = uuid.uuid4().hex
+    second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
     assert second.status_code == 200
     assert counters["w2"]["calls"] == 0
 
@@ -194,13 +242,13 @@ def test_handler_crash_releases_claim_so_retry_reruns(two_workers):
     """Non-2xx/crash releases the claim — client can retry with the same key."""
     client1, client2, counters, fake_redis = two_workers
 
-    first = client1.post("/boom", headers={"Idempotency-Key": "crash-key"})
+    first = client1.post("/boom", headers={**auth_headers("1"), "Idempotency-Key": "crash-key"})
     assert first.status_code == 500
-    assert "idem:0:crash-key:claim" not in fake_redis.store, (
+    assert nkey("1", "crash-key", "claim") not in fake_redis.store, (
         "crashed handler must release the in-flight claim"
     )
 
-    second = client2.post("/boom", headers={"Idempotency-Key": "crash-key"})
+    second = client2.post("/boom", headers={**auth_headers("1"), "Idempotency-Key": "crash-key"})
     assert second.status_code == 500
     assert counters["w1"]["calls"] == 1
     assert counters["w2"]["calls"] == 1, (
@@ -211,24 +259,28 @@ def test_handler_crash_releases_claim_so_retry_reruns(two_workers):
 def test_redis_unavailable_falls_back_to_in_memory(monkeypatch):
     """Redis down → per-process behavior (original PR-6 contract), no crash."""
     saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
     claim = object.__new__(DistributedIdempotencyClaim)
     claim._ttl = 24 * 60 * 60
     claim._client = None
     claim._available = False
     idem_module._distributed_claim = claim
+    idem_module._check_principal_authorized_sync = lambda *a, **k: True
 
     try:
         counter = {"calls": 0}
         app = _make_app(counter)
         client = TestClient(app, raise_server_exceptions=False)
 
-        r1 = client.post("/echo", headers={"Idempotency-Key": "mem-key"})
+        h1 = auth_headers("1")
+        r1 = client.post("/echo", headers={**h1, "Idempotency-Key": "mem-key"})
         assert r1.status_code == 200
-        r2 = client.post("/echo", headers={"Idempotency-Key": "mem-key"})
+        r2 = client.post("/echo", headers={**h1, "Idempotency-Key": "mem-key"})
         assert r2.status_code == 200
         assert counter["calls"] == 1, "in-memory dedup still works in fallback"
     finally:
         idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
 
 
 def test_store_response_snapshot_round_trip(fake_redis):
@@ -263,13 +315,14 @@ def test_changed_payload_with_reused_key_gets_409_not_original_success(two_worke
     replays."""
     client1, client2, counters, _ = two_workers
     key = "codex-r2-payload-binding"
+    h1 = auth_headers("1")
 
-    first = client1.post("/echo", json={"doctor": 1}, headers={"Idempotency-Key": key})
+    first = client1.post("/echo", json={"doctor": 1}, headers={**h1, "Idempotency-Key": key})
     assert first.status_code == 200
     assert counters["w1"]["calls"] == 1
 
     # Registrar changed the cart before retrying — same key, different body
-    changed = client2.post("/echo", json={"doctor": 2}, headers={"Idempotency-Key": key})
+    changed = client2.post("/echo", json={"doctor": 2}, headers={**h1, "Idempotency-Key": key})
     assert changed.status_code == 409
     assert "different request payload" in changed.text
     # The changed retry must NOT execute the handler either
@@ -277,7 +330,7 @@ def test_changed_payload_with_reused_key_gets_409_not_original_success(two_worke
 
     # Unchanged retry (lost-response replay scenario) still replays the
     # original 200 with the original body.
-    same = client2.post("/echo", json={"doctor": 1}, headers={"Idempotency-Key": key})
+    same = client2.post("/echo", json={"doctor": 1}, headers={**h1, "Idempotency-Key": key})
     assert same.status_code == 200
     assert same.json()["ok"] is True
     assert counters["w2"]["calls"] == 0
@@ -287,10 +340,11 @@ def test_changed_payload_local_cache_mismatch_returns_409(two_workers):
     """Local (same-worker) path: cached response + different body → 409."""
     client1, client2, counters, _ = two_workers
     key = "codex-r2-local-mismatch"
+    h1 = auth_headers("1")
 
-    first = client1.post("/echo", json={"v": 1}, headers={"Idempotency-Key": key})
+    first = client1.post("/echo", json={"v": 1}, headers={**h1, "Idempotency-Key": key})
     assert first.status_code == 200
-    second = client1.post("/echo", json={"v": 999}, headers={"Idempotency-Key": key})
+    second = client1.post("/echo", json={"v": 999}, headers={**h1, "Idempotency-Key": key})
     assert second.status_code == 409
     assert counters["w1"]["calls"] == 1, "changed payload must not execute the handler"
 
@@ -299,7 +353,8 @@ def test_in_flight_lease_is_short_not_24h(fake_redis):
     """Codex R2 #3092 (P2): the claim lives lease_seconds (90s), not the
     response TTL — a dead worker 409-locks its key for seconds, not a day."""
     claim = _make_claim(fake_redis)
-    assert claim.acquire(1, "lease-key") is True
+    token = claim.acquire(1, "lease-key")
+    assert token, "acquire returns the ownership token (Codex R3)"
     claim_ttl = fake_redis.ttls["idem:1:lease-key:claim"]
     assert claim_ttl == claim.lease_seconds
     assert claim_ttl < 24 * 60 * 60
@@ -307,16 +362,18 @@ def test_in_flight_lease_is_short_not_24h(fake_redis):
 
 
 def test_lease_renewal_extends_only_existing_claim(fake_redis):
-    """renew() extends a live claim (XX) and never resurrects a lapsed one."""
+    """renew() extends a live claim (owner-token CAS) and never resurrects
+    a lapsed one."""
     claim = _make_claim(fake_redis)
-    assert claim.acquire(1, "renew-key") is True
-    assert fake_redis.store["idem:1:renew-key:claim"]
-    assert claim.renew(1, "renew-key") is True
+    token = claim.acquire(1, "renew-key")
+    assert token
+    assert fake_redis.store["idem:1:renew-key:claim"] == token
+    assert claim.renew(1, "renew-key", token) is True
     assert fake_redis.ttls["idem:1:renew-key:claim"] == 90
 
     # Lapsed claim (worker died, TTL elapsed) — renewal must NOT resurrect it
     fake_redis.store.pop("idem:1:renew-key:claim")
-    assert claim.renew(1, "renew-key") is False
+    assert claim.renew(1, "renew-key", token) is False
     assert "idem:1:renew-key:claim" not in fake_redis.store
 
 
@@ -329,13 +386,14 @@ def test_transient_redis_failure_recovers(monkeypatch, fake_redis):
 
     # Simulate a transient failure: the next op raises
     fake_redis.fail_next_ops = 1
-    assert claim.acquire(1, "recover-key") is False  # op failed → degrade
+    assert claim.acquire(1, "recover-key") is None  # op failed → refuse execution
     assert claim.available is False
 
     # Cooldown elapsed (0s): the next acquire re-probes and succeeds
-    assert claim.acquire(1, "recover-key") is True
+    token = claim.acquire(1, "recover-key")
+    assert token, "recovered acquire returns a fresh owner token"
     assert claim.available is True
-    assert "idem:1:recover-key:claim" in fake_redis.store
+    assert fake_redis.store["idem:1:recover-key:claim"] == token
 
 
 def test_redis_url_redacted_in_logs(monkeypatch, caplog):
@@ -364,3 +422,194 @@ def test_redis_url_redacted_in_logs(monkeypatch, caplog):
     redacted = idem_module.redact_redis_url("redis://user:pw@host:6380/2")
     assert "pw" not in redacted and "user" not in redacted
     assert redacted.startswith("redis://host:6380/2")
+
+
+# =====================================================================
+# Codex R3 #3092
+# =====================================================================
+
+
+def test_stale_owner_cannot_renew_or_release_replacement_claim(fake_redis):
+    """Codex R3 #3092 (P1): a worker whose lease lapsed cannot renew or delete
+    the claim re-acquired by another owner. renew = compare-and-expire,
+    release = compare-and-delete over the ownership token. Previously SET XX
+    only checked existence, so the stale worker overwrote the replacement and
+    its unconditional release deleted a live claim — a third request could
+    then execute and duplicate visits/invoices/queue positions."""
+    claim = _make_claim(fake_redis)
+
+    stale_token = claim.acquire(1, "owner-key")
+    assert stale_token
+
+    # Lease lapsed (Redis outage / long pause); another worker acquired the key
+    fake_redis.store.pop("idem:1:owner-key:claim")
+    fresh_token = claim.acquire(1, "owner-key")
+    assert fresh_token and fresh_token != stale_token
+
+    # Stale owner's renewal must NOT overwrite the replacement claim
+    assert claim.renew(1, "owner-key", stale_token) is False
+    assert fake_redis.store["idem:1:owner-key:claim"] == fresh_token
+
+    # Stale owner's release must NOT delete the live claim
+    claim.release(1, "owner-key", stale_token)
+    assert fake_redis.store["idem:1:owner-key:claim"] == fresh_token
+
+    # The CURRENT owner can still renew and release
+    assert claim.renew(1, "owner-key", fresh_token) is True
+    claim.release(1, "owner-key", fresh_token)
+    assert "idem:1:owner-key:claim" not in fake_redis.store
+
+
+def test_unverified_principal_bypasses_idempotency_entirely(two_workers):
+    """Codex R3 #3092 (P1): no/garbage bearer token → the middleware must not
+    store or replay anything (the shared user-0 namespace is gone). Both
+    requests execute; nothing lands in Redis under that key."""
+    client1, client2, counters, fake_redis = two_workers
+
+    r1 = client1.post("/echo", headers={"Idempotency-Key": "anon-key"})
+    assert r1.status_code == 200
+    r2 = client2.post("/echo", headers={"Idempotency-Key": "anon-key"})
+    assert r2.status_code == 200
+    assert counters["w1"]["calls"] == 1
+    assert counters["w2"]["calls"] == 1, (
+        "unauthenticated requests bypass idempotency — no cross-user replay"
+    )
+    assert not any("anon-key" in k for k in fake_redis.store), (
+        "nothing may be stored without a verified principal"
+    )
+
+    # A garbage token is equally untrusted
+    bad = client2.post(
+        "/echo",
+        headers={"Authorization": "Bearer not-a-jwt", "Idempotency-Key": "anon-key"},
+    )
+    assert bad.status_code == 200
+    assert counters["w2"]["calls"] == 2
+
+
+def test_verified_principal_replays_across_workers(two_workers):
+    """Codex R3 #3092 (P1): with a verified principal the R1 cross-worker
+    replay guarantee still holds — the namespace is derived from the token."""
+    client1, client2, counters, _ = two_workers
+    key = "verified-replay"
+    h1 = auth_headers("1")
+
+    first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 200
+    assert counters["w2"]["calls"] == 0, "same verified principal → replay, not re-execution"
+
+
+def test_cross_principal_replay_is_blocked(two_workers):
+    """Codex R3 #3092 (P1): two verified principals sharing one key + body
+    never see each other's cached response — the namespaces differ because
+    they are derived from each verified sub claim."""
+    client1, client2, counters, _ = two_workers
+    key = "shared-key"
+    h1 = auth_headers("1")
+    h2 = auth_headers("2")
+
+    first = client1.post("/echo", json={"v": 1}, headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    second = client2.post("/echo", json={"v": 1}, headers={**h2, "Idempotency-Key": key})
+    assert second.status_code == 200
+    assert counters["w2"]["calls"] == 1, (
+        "principal 2 must execute its own handler, never replay principal 1's response"
+    )
+
+
+def test_replay_refused_when_principal_no_longer_authorized(two_workers, monkeypatch):
+    """Codex R3 #3092 (P1): replay happens only AFTER authorization. A cached
+    2xx must not be served to a principal that no longer passes the DB check
+    (revoked token / deactivated user) — the request falls through to the
+    endpoint instead."""
+    client1, client2, counters, _ = two_workers
+    key = "revoked-key"
+    h1 = auth_headers("1")
+
+    first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    # The DB authorization check now fails for this principal
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: False
+    )
+    second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 200  # fell through to the endpoint handler
+    assert counters["w2"]["calls"] == 1, (
+        "unauthorized principal must not receive the cached response"
+    )
+
+
+def test_principal_authorization_check_fails_closed(fake_redis, monkeypatch):
+    """The DB-backed check must fail CLOSED: a broken DB session refuses
+    authorization instead of allowing a replay. The check runs against the
+    SAME session source the endpoint uses (get_db, or its dependency
+    override in the test world)."""
+    from types import SimpleNamespace
+
+    from app.api.deps import get_db
+    from app.middleware.idempotency_middleware import _check_principal_authorized_sync
+
+    class BrokenSession:
+        def execute(self, *a, **k):
+            raise RuntimeError("simulated DB outage")
+
+    def broken_override():
+        yield BrokenSession()
+
+    request = SimpleNamespace(
+        app=SimpleNamespace(dependency_overrides={get_db: broken_override})
+    )
+    assert _check_principal_authorized_sync(request, 1, None, None) is False
+    assert _check_principal_authorized_sync(request, None, None, None) is False
+
+
+def test_authorization_resolves_through_dependency_override():
+    """The check must query the SAME DB the endpoint authenticates against:
+    when the app overrides get_db (test world), the middleware follows the
+    override instead of opening a second connection to another database."""
+    from types import SimpleNamespace
+
+    from app.api.deps import get_db
+    from app.middleware.idempotency_middleware import _check_principal_authorized_sync
+
+    class SessionSpy:
+        def __init__(self) -> None:
+            self.used = False
+
+        def execute(self, stmt):
+            self.used = True
+            # user found, active, not blacklisted
+            return SimpleNamespace(first=lambda: (7, True, False, False))
+
+    class Override:
+        def __init__(self) -> None:
+            self.session = SessionSpy()
+
+        def __call__(self):
+            yield self.session
+
+    override = Override()
+    request = SimpleNamespace(app=SimpleNamespace(dependency_overrides={get_db: override}))
+    assert _check_principal_authorized_sync(request, 7, None, None) is True
+    assert override.session.used, "the override session (endpoint's DB) must be queried"
+
+
+def test_namespace_is_stable_per_sub_and_hashed():
+    """The namespace is a deterministic hash of the verified sub — no raw
+    usernames/ids in cache keys, no collisions between principals."""
+    from hashlib import sha256
+
+    ns1 = IdempotencyMiddleware._namespace({"sub": "1"})
+    ns1_again = IdempotencyMiddleware._namespace({"sub": "1"})
+    ns2 = IdempotencyMiddleware._namespace({"sub": "2"})
+    assert ns1 == ns1_again
+    assert ns1 != ns2
+    assert ns1 == sha256(b"1").hexdigest()[:32]
