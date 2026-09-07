@@ -763,6 +763,16 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 )
                 .first()
             )
+            # QD-2C (Codex round-2 P1): очередь тега реестра может быть
+            # resource-owned (specialist NULL) — токен по-прежнему
+            # именует тег через specialty синтетика: резолвим (day, tag)-
+            # поверхность, иначе валидация токена отвергала живую очередь.
+            if not daily_queue:
+                daily_queue = (
+                    queue_resource_routing.resolve_registry_tag_queue_for_specialist(
+                        db, queue_token.day, queue_token.specialist_id, None
+                    )
+                )
             if not daily_queue:
                 raise QueueNotFoundError(
                     "Очередь ещё не создана для выбранного специалиста"

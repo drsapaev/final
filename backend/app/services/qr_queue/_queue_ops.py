@@ -39,6 +39,15 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             .first()
         )
 
+        # QD-2C (Codex round-2 P2): очередь тега реестра может быть
+        # resource-owned (specialist NULL) — тот же fallback, что и
+        # call_next_patient, иначе статус «не активна» при живой очереди
+        # (и вызываемом тем же specialist_id пациенте).
+        if not daily_queue:
+            daily_queue = resolve_registry_tag_queue_for_specialist(
+                self.db, target_date, specialist_id, None
+            )
+
         if not daily_queue:
             return {
                 "active": False,
@@ -464,6 +473,12 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 )
                 .first()
             )
+            # QD-2C (Codex round-2 P1): resource-owned очередь тега
+            # реестра — тот же fallback, что и call_next_patient
+            if not daily_queue:
+                daily_queue = resolve_registry_tag_queue_for_specialist(
+                    self.db, target_date, qr_token.specialist_id, None
+                )
 
             logger.debug(f"  daily_queue найдена: {daily_queue is not None}")
             if daily_queue:

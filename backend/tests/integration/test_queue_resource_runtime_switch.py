@@ -988,3 +988,113 @@ def test_resource_start_number_helper(db_session: Session) -> None:
         db_session, day=_DAY, specialist_id=None, queue_tag="ecg"
     )
     assert qrr.resource_start_number(db_session, resource_queue) == 31
+
+
+# ===================== L. Codex round-2 P1/P2 pins =====================
+
+
+def test_validate_queue_token_resolves_resource_queue(db_session: Session) -> None:
+    """Codex round-2 P1: a token issued for a registry tag (the
+    synthetic specialist) must validate against the resource-owned
+    queue — the doctor-keyed lookup alone reported 'queue not
+    created' for a live queue."""
+    from app.models.online_queue import QueueToken
+
+    user = _make_user(db_session, username="lab_resource3", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    assert queue.specialist_id is None
+    token = QueueToken(
+        token="tok-round2-lab",
+        day=_DAY,
+        specialist_id=synthetic.id,
+        department="lab",
+        is_clinic_wide=False,
+        expires_at=datetime(2026, 9, 8, 12, 0, 0),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.commit()
+
+    queue_token, meta = queue_service.validate_queue_token(db_session, "tok-round2-lab")
+    assert meta["daily_queue"] is not None
+    assert meta["daily_queue"].id == queue.id
+
+
+def test_validate_queue_token_doctor_token_unchanged(db_session: Session) -> None:
+    """Non-registry tokens keep the canonical error when the doctor's
+    queue does not exist (no cross-doctor resolution)."""
+    from app.models.online_queue import QueueToken
+
+    user = _make_user(db_session, username="dr_tok", role="doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="cardiology")
+    token = QueueToken(
+        token="tok-round2-doctor",
+        day=_DAY,
+        specialist_id=doctor.id,
+        department="cardiology",
+        is_clinic_wide=False,
+        expires_at=datetime(2026, 9, 8, 12, 0, 0),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.commit()
+
+    from app.services.queue_svc._base import QueueNotFoundError
+
+    with pytest.raises(QueueNotFoundError):
+        queue_service.validate_queue_token(db_session, "tok-round2-doctor")
+
+
+def test_get_queue_status_resolves_resource_queue(db_session: Session) -> None:
+    """Codex round-2 P2: GET /api/v1/queue/status/{specialist_id} —
+    the status lookup resolves the resource-owned queue through the
+    same registry-tag fallback as call_next_patient (previously
+    active=False + no entries for a live queue)."""
+    from app.services.qr_queue import QRQueueService
+
+    user = _make_user(db_session, username="ecg_resource2", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="ecg")
+    _make_resource(db_session, code="ecg", queue_tag="ecg")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="ecg"
+    )
+    _make_waiting_entry(db_session, queue, number=3)
+
+    status = QRQueueService(db_session).get_queue_status(synthetic.id, target_date=_DAY)
+    assert status["active"] is True
+    assert status["queue_length"] == 1
+    assert status["entries"][0]["number"] == 3
+
+
+def test_get_qr_token_info_resolves_resource_queue(db_session: Session) -> None:
+    """Codex round-2 P1 (info surface): get_qr_token_info reports the
+    resource-owned queue for a registry-tag token."""
+    from app.models.online_queue import QueueToken
+    from app.services.qr_queue import QRQueueService
+
+    user = _make_user(db_session, username="lab_resource4", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    _make_waiting_entry(db_session, queue, number=1)
+    token = QueueToken(
+        token="tok-round2-info",
+        day=_DAY,
+        specialist_id=synthetic.id,
+        department="lab",
+        is_clinic_wide=False,
+        expires_at=datetime(2026, 9, 8, 12, 0, 0),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.commit()
+
+    info = QRQueueService(db_session).get_qr_token_info("tok-round2-info")
+    assert info is not None
+    assert info.get("daily_queue") is not None or info.get("queue_length") == 1
