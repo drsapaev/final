@@ -421,13 +421,15 @@ def _edit_delta_billable_quantity(
 ) -> int:
     """Codex R6 #3095 (P2): mirror the edit-delta command's billing quantity.
 
-    RegistrarEditDeltaService routes an added service to the patient's
-    active same-day entry with the same queue_tag; when that entry ALREADY
-    contains the service, _append_to_existing_entry bills only
-    max(requested − existing, 0) — never the full requested quantity. The
-    quote must validate the SAME billable amount, otherwise the confirmed
-    total exceeds the actual invoice delta. Read-only: reuses the service's
-    own routing/payload predicates instead of duplicating them (no drift).
+    W2-PR1: the command bills the SIGNED target-state delta
+    (requested − existing): increases bill the remainder, decreases bill a
+    negative remainder, equal quantities bill zero. The quote must validate
+    the SAME net amount, otherwise the confirmed total diverges from the
+    actual invoice delta. Routing must also mirror the command's
+    doctor-aware entry preference (ADR-001): an explicit specialist_id
+    never merges into another doctor's same-tag queue. Read-only: reuses
+    the service's own routing/payload predicates instead of duplicating
+    them (no drift).
     """
     edit_service = RegistrarEditDeltaService(db)
     queue_tag = service.queue_tag or service.department_key
@@ -445,6 +447,7 @@ def _edit_delta_billable_quantity(
         queue_tag=queue_tag,
         target_date=target_date,
         preferred_entry_ids=preferred_entry_ids,
+        specialist_id=specialist_id,
     )
     if entry is None:
         # Codex R11 #3095 (P2): the command routes a no-entry edit to
@@ -483,7 +486,7 @@ def _edit_delta_billable_quantity(
     if not existing_payload:
         return requested_qty
     existing_qty = edit_service._payload_quantity(existing_payload)
-    return max(requested_qty - existing_qty, 0)
+    return requested_qty - existing_qty
 
 
 def _quote_core(
@@ -647,9 +650,10 @@ def _quote_core(
                     detail=f"Service {service.id} has no queue tag",
                 )
             # Codex R6 #3095 (P2): with edit context the billable quantity is
-            # the DELTA the command will actually bill (active same-day entry
-            # already holding the service → max(requested − existing, 0)),
-            # not the full requested quantity.
+            # the DELTA the command will actually bill. W2-PR1: the delta is
+            # SIGNED (requested − existing): increases bill the remainder,
+            # decreases bill negative, equal quantities bill zero — the quote
+            # mirrors the command's target-state semantics exactly.
             if quote_req.patient_id is not None and quote_req.target_date is not None:
                 billable_qty = _edit_delta_billable_quantity(
                     db,

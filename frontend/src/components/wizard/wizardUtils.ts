@@ -341,15 +341,19 @@ export const buildCartQuoteRequest = (
       if (customPrice != null && Number.isFinite(Number(customPrice))) {
         quoteItem.custom_price = Number(customPrice);
       }
-      // Codex R12 #3095 (P2): specialist_id зеркалится из выбранного врача
-      // корзины (doctor_id) — ТО ЖЕ, что шлёт команда сохранения
+      // Codex R12 #3095 (P2): specialist_id зеркалится в квоту — маршрутизация
+      // дельты в квоте обязана совпадать с маршрутизацией команды (ADR-001).
+      // Источники: item.specialist_id у edit-delta target-item'ов (для
+      // существующих позиций — null: перенос врача запрещён), иначе
+      // doctor_id сырой корзины — ТО ЖЕ, что шлёт команда сохранения
       // (newServices: specialist_id: item.doctor_id). Иначе edit добавляет
       // услугу без default-врача каталога и без активной очереди дня: квота
       // отвечает 400 "specialist_id is required", хотя команда создала бы
       // очередь выбранного врача — завершение заблокировано навсегда.
       // Save-ревалидация токена пере-считывает квоту по ЭТИМ ЖЕ item'ам —
       // зеркалирование в маппере покрывает оба пути одним местом.
-      const specialistId = (item as { doctor_id?: unknown }).doctor_id;
+      const itemRecord = item as Record<string, unknown>;
+      const specialistId = 'specialist_id' in itemRecord ? itemRecord.specialist_id : itemRecord.doctor_id;
       if (specialistId != null && Number.isFinite(Number(specialistId)) && Number(specialistId) > 0) {
         quoteItem.specialist_id = Number(specialistId);
       }
@@ -662,6 +666,10 @@ export interface EditOriginalServiceIdentity {
   serviceNames: Set<string>;
   queueIds: Set<string | number>;
   entryUpdatedAtMap: Record<string, string>;
+  // W2-PR1: исходное количество позиции по service_id (из service_details —
+  // read-модель отдаёт quantity с W2-PR1). Отсутствие ключа = исходное
+  // количество неизвестно — такая позиция не включается в edit-дельту.
+  originalQuantities: Map<string, number>;
 }
 
 // Собирает множества «исходных» услуг edit-записи (service_details →
@@ -681,6 +689,7 @@ export const buildEditOriginalServiceIdentity = (
     serviceNames: new Set<string>(),
     queueIds: new Set<string | number>(),
     entryUpdatedAtMap: {},
+    originalQuantities: new Map<string, number>(),
   };
   if (!editMode || !initialData) return identity;
 
@@ -699,6 +708,7 @@ export const buildEditOriginalServiceIdentity = (
   const originalServiceIds = identity.serviceIds;
   const originalQueueIds = identity.queueIds; // PR-14: optimistic locking map lives here too
   const entryUpdatedAtMap = identity.entryUpdatedAtMap;
+  const originalQuantities = identity.originalQuantities;
   const originalServiceCodes = identity.serviceCodes;
   const originalServiceNames = identity.serviceNames;
 
@@ -716,6 +726,11 @@ export const buildEditOriginalServiceIdentity = (
 
         if (serviceId) originalServiceIds.add(serviceId);
         if (queueId) originalQueueIds.add(queueId);
+        // W2-PR1: исходное количество позиции (read-модель service_details)
+        const originalQty = Number(serviceDetail.quantity ?? serviceDetail.qty);
+        if (serviceId && Number.isFinite(originalQty) && originalQty > 0) {
+          originalQuantities.set(String(serviceId), originalQty);
+        }
         // PR-14: collect updated_at for optimistic locking
         if (queueId) {
           const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || initialData.updated_at || initialData.last_changed_at;
@@ -930,6 +945,64 @@ export const isEditDeltaNewItem = (
   return !hasExistingQueueIdentity && !inIds && !inCodes && !inNames;
 };
 
+// =====================================================================
+// W2-PR1: ЦЕЛЕВОЕ СОСТОЯНИЕ edit-дельты (полная корзина, а не только новые)
+// =====================================================================
+
+export interface EditDeltaTargetItem {
+  service_id: string | number;
+  quantity: number;
+  specialist_id: string | number | null;
+}
+
+export interface EditDeltaTargetBuild {
+  items: EditDeltaTargetItem[];
+  hasNew: boolean;
+  hasQuantityChange: boolean;
+}
+
+// Собирает edit-delta payload из ВСЕЙ корзины (целевое состояние позиции),
+// а не только из новых услуг. Новые услуги — как раньше (specialist_id из
+// корзины). Существующая позиция включается ТОЛЬКО когда исходное количество
+// известно (service_details после W2-PR1) и пользователь его изменил:
+// неизвестное исходное количество нельзя молча превращать в снижение —
+// backend применил бы его как negative delta (записал бы целевое количество
+// поверх реального). Позиция без изменения количества не отправляется —
+// настоящий no-op. Смена врача существующей позиции в payload не передаётся
+// (specialist_id=null): контракт переноса — отдельная операция (wave2 PR2).
+export const buildEditDeltaTargetItems = (
+  cartItems: Array<Record<string, unknown>>,
+  servicesData: WizardServiceRecord[],
+  identity: EditOriginalServiceIdentity,
+): EditDeltaTargetBuild => {
+  const build: EditDeltaTargetBuild = { items: [], hasNew: false, hasQuantityChange: false };
+  (cartItems || []).forEach((item) => {
+    if (!item || item.service_id == null) return;
+    const service = servicesData.find((s) => String(s.id) === String(item.service_id));
+    if (!service) return; // зеркало сабмита: услуга вне справочника не сабмитится
+    const quantity = Math.max(1, Number(item.quantity || 1));
+    if (isEditDeltaNewItem(item, service, identity)) {
+      build.hasNew = true;
+      build.items.push({
+        service_id: item.service_id as string | number,
+        quantity,
+        specialist_id: (item.doctor_id as string | number | undefined) ?? null,
+      });
+      return;
+    }
+    const originalQty = identity.originalQuantities.get(String(item.service_id));
+    if (originalQty === undefined) return;
+    if (quantity === originalQty) return; // без изменений — no-op
+    build.hasQuantityChange = true;
+    build.items.push({
+      service_id: item.service_id as string | number,
+      quantity,
+      specialist_id: null,
+    });
+  });
+  return build;
+};
+
 export default {
   PATIENT_NAME_PATTERN,
   MIXED_REPEAT_WARNING,
@@ -953,6 +1026,7 @@ export default {
   resolvePatientGenderValue,
   genderToPatientSexForApi,
   buildCartQuoteRequest,
+  buildEditDeltaTargetItems,
   formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
