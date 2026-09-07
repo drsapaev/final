@@ -420,6 +420,10 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 queue_resource_routing.lock_registry_tag_creation(
                     db, queue_tag, day
                 )
+                # Codex round-4 P2: перепроверка ПОСЛЕ лока — деактивация
+                # строки между resolve и lock не должна создавать очередь
+                resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
+            if resource is not None:
                 existing = queue_resource_routing.find_active_tag_queue(
                     db, day, queue_tag
                 )

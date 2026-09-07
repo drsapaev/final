@@ -79,6 +79,9 @@ class VisitConfirmationRepository:
             resource = resolve_tag_resource(self.db, queue_tag)
             if resource is not None:
                 lock_registry_tag_creation(self.db, queue_tag, day)
+                # Codex round-4 P2: перепроверка ПОСЛЕ лока
+                resource = resolve_tag_resource(self.db, queue_tag)
+            if resource is not None:
                 existing_by_tag = (
                     self.db.query(DailyQueue)
                     .filter(

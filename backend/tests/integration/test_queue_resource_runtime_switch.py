@@ -1215,3 +1215,108 @@ def test_online_queue_status_and_availability_resolve_resource(
     # cap reached (2/2) — resolved THROUGH the resource queue, not a ghost
     assert availability["available"] is False
     assert availability.get("reason") in ("QUEUE_FULL", "QUEUE_LIMIT_REACHED")
+
+
+# ===================== N. Codex round-4 P1/P2 pins =====================
+
+
+def test_aggregate_statistics_include_resource_owned_queue(
+    db_session: Session,
+) -> None:
+    """Codex round-4 P1: GET /online-queue/today without specialist_id
+    aggregates ALL queues — a resource-owned row (specialist NULL)
+    previously crashed the response builder on q.specialist.user
+    (AttributeError → 500). Now the owner label comes from the
+    registry row and the resource axis is reported."""
+    from app.crud.online_queue import get_queue_statistics
+
+    user = _make_user(db_session, username="dr_agg", role="doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="cardio")
+    queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=doctor.id, queue_tag="cardio"
+    )
+    resource = _make_resource(
+        db_session, code="lab", queue_tag="lab", display_name="Лаборатория"
+    )
+    lab_queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    _make_waiting_entry(db_session, lab_queue)
+
+    stats = get_queue_statistics(db_session, _DAY)  # no specialist filter
+    assert stats["total_queues"] >= 2
+    by_resource = next(
+        q for q in stats["queues"] if q["queue_resource_id"] == resource.id
+    )
+    assert by_resource["specialist_id"] is None
+    assert by_resource["specialist_name"] == "Лаборатория"
+    assert by_resource["entries_count"] == 1
+    doctor_row = next(q for q in stats["queues"] if q["specialist_id"] == doctor.id)
+    # doctor label unchanged (user full_name or the doctor fallback)
+    assert doctor_row["specialist_name"] in ("dr_agg", f"Врач #{doctor.id}")
+
+
+def test_staff_call_explicit_tag_survives_deactivation(
+    db_session: Session,
+) -> None:
+    """Codex round-4 P1: the explicit-tag staff call form
+    (specialist_id=synthetic, queue_tag='lab') keeps resolving the
+    resource queue AFTER a mid-day registry deactivation — the same
+    surface rule as the specialist-only form."""
+    from datetime import UTC
+    from datetime import datetime as dt
+
+    user = _make_user(db_session, username="lab_res8", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    resource = _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    entry = _make_waiting_entry(db_session, queue)
+    entry.queue_time = dt(2026, 9, 7, 8, 0, tzinfo=UTC)
+    db_session.commit()
+
+    resource.active = False
+    db_session.commit()
+
+    result = queue_service.staff_call_next_patient(
+        db_session,
+        specialist_id=synthetic.id,
+        queue_tag="lab",
+        target_date=_DAY,
+        actor_user_id=None,
+        commit=False,
+    )
+    assert result["success"] is True
+    assert result["queue_id"] == queue.id
+
+
+def test_registry_recheck_after_lock_is_sourced(db_session: Session) -> None:
+    """Codex round-4 P2 (source pin): every get_or_create registry
+    branch re-resolves the registry row AFTER acquiring the creation
+    lock — a deactivation committed between the first resolve and the
+    lock must not produce a resource-owned queue for a deactivated
+    tag. The TOCTOU window itself needs the PG advisory lock, so the
+    recheck is source-pinned (the sqlite test path takes the no-op
+    branch)."""
+    import inspect
+
+    from app.crud import online_queue as crud_online_queue
+    from app.repositories import visit_confirmation_repository as vcr
+    from app.services.queue_svc import _operations as queue_ops
+
+    crud_src = inspect.getsource(crud_online_queue.get_or_create_daily_queue)
+    ops_src = inspect.getsource(queue_ops.OperationsMixin.get_or_create_daily_queue)
+    repo_src = inspect.getsource(
+        vcr.VisitConfirmationRepository.get_or_create_daily_queue
+    )
+    for name, src in (
+        ("crud", crud_src),
+        ("queue_svc", ops_src),
+        ("repository", repo_src),
+    ):
+        assert "lock_registry_tag_creation" in src, name
+        # the recheck: resolve_tag_resource appears again AFTER the lock
+        lock_pos = src.find("lock_registry_tag_creation")
+        recheck = src.find("resolve_tag_resource", lock_pos)
+        assert recheck > lock_pos, name

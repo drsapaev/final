@@ -871,7 +871,9 @@ def get_or_create_daily_queue(
     # QD-2C: тег реестра → ресурсная ось (унификация тег-первый;
     # Codex round-3 P1: поверхность деактивационно-устойчива —
     # существующая resource-owned очередь остаётся поверхностью,
-    # новые ресурсные очереди — только при АКТИВНОЙ строке)
+    # новые ресурсные очереди — только при АКТИВНОЙ строке;
+    # Codex round-4 P2: активность строки перепроверяется ПОСЛЕ лока —
+    # деактивация между resolve и lock не должна приводить к созданию)
     if queue_tag:
         surface = queue_resource_routing.tag_routes_to_resource(db, queue_tag, day)
         if surface is not None:
@@ -879,6 +881,8 @@ def get_or_create_daily_queue(
         resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
         if resource is not None:
             queue_resource_routing.lock_registry_tag_creation(db, queue_tag, day)
+            resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
+        if resource is not None:
             existing_by_tag = (
                 db.query(DailyQueue)
                 .filter(
@@ -1014,11 +1018,23 @@ def get_queue_statistics(
         "queues": [
             {
                 "specialist_id": q.specialist_id,
+                # QD-2C (Codex round-4 P1): resource-owned очередь
+                # (specialist NULL) в агрегате — владелец из реестра,
+                # иначе AttributeError на q.specialist.user → 500
                 "specialist_name": (
-                    q.specialist.user.full_name
-                    if q.specialist.user
-                    else f"Врач #{q.specialist_id}"
+                    (
+                        q.specialist.user.full_name
+                        if q.specialist and q.specialist.user
+                        else f"Врач #{q.specialist_id}"
+                    )
+                    if q.specialist_id is not None
+                    else (
+                        q.queue_resource.display_name
+                        if q.queue_resource
+                        else "Ресурс очереди"
+                    )
                 ),
+                "queue_resource_id": q.queue_resource_id,
                 "opened_at": q.opened_at,
                 "entries_count": db.query(OnlineQueueEntry)
                 .filter(OnlineQueueEntry.queue_id == q.id)
