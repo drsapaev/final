@@ -465,6 +465,9 @@ const AppointmentWizardV2 = ({
       setActiveServiceCategory('specialists');
       setServiceSearchQuery('');
       setShowAllServices(false);
+      // Fix C: новая запись после закрытия получает новый ключ
+      // идемпотентности (успешно использованный ключ больше не валиден).
+      cartIdempotencyKeyRef.current = null;
     }
   }, [isOpen]);
 
@@ -1455,7 +1458,27 @@ const AppointmentWizardV2 = ({
 
   // ===================== ЗАВЕРШЕНИЕ =====================
 
+  // Fix C: защита повторной отправки (мышь/клавиатура) + идемпотентность.
+  // Ключ генерируется на попытку отправки; при СЕТЕВОМ сбое (ответ потерян,
+  // сервер мог обработать запрос) ключ СОХРАНЯЕТСЯ для повторной попытки —
+  // повтор с тем же Idempotency-Key не создаст вторую корзину. При
+  // определённой ошибке сервера (4xx/5xx) ключ обновляется — новая запись
+  // остаётся возможной.
+  const submitInFlightRef = useRef(false);
+  const cartIdempotencyKeyRef = useRef<string | null>(null);
+
   const handleComplete = async () => {
+    if (submitInFlightRef.current) return; // Fix C: одна отправка за раз
+    submitInFlightRef.current = true;
+    try {
+      await handleCompleteInner();
+    } finally {
+      submitInFlightRef.current = false;
+    }
+  };
+  handleCompleteRef.current = handleComplete;
+
+  const handleCompleteInner = async () => {
     if (!validateStep(currentStep)) return;
 
     // P-022 fix: previously used toast.warning/toast.info as blocking validation
@@ -2508,12 +2531,26 @@ const AppointmentWizardV2 = ({
       // createRegistrarCart бросает Error с .status, .message, .response при неудаче.
       let result;
       try {
-        result = await createRegistrarCart(cartData);
+        // Fix C: ключ идемпотентности на попытку отправки корзины.
+        if (!cartIdempotencyKeyRef.current) {
+          cartIdempotencyKeyRef.current =
+            typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? crypto.randomUUID()
+              : `cart-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+        result = await createRegistrarCart(cartData, cartIdempotencyKeyRef.current);
       } catch (cartError: unknown) {
         // Обработка ошибок создания корзины
         const cartErr = cartError as Error & { status?: number; message?: string };
         let errorMessage = cartErr.message || t('misc.aw_record_creation_error_status', { status: cartErr.status || 'network' });
         const isPermissionError = cartErr.status === 403;
+
+        // Fix C: при определённой ошибке сервера ключ обновляется (новая
+        // запись остаётся возможной); при сетевом сбое ключ сохраняется —
+        // повтор не создаст вторую корзину.
+        if (cartErr.status !== undefined) {
+          cartIdempotencyKeyRef.current = null;
+        }
 
         logger.error('❌ Ошибка создания корзины:', cartErr.status, errorMessage);
 

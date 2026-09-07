@@ -147,6 +147,10 @@ def create_cart_appointments(
                 auto_status=False,  # Статус уже установлен выше
                 notify=False,  # Уведомления отправляются отдельно
                 log=True,
+                # Fix C: одна корзина = одна транзакция. Все визиты, invoice,
+                # связи invoice/visit и записи очереди фиксируются одним
+                # db.commit() ниже; ошибка любого этапа откатывает ВСЁ.
+                commit=False,
             )
             logger.info("REGISTRATION: Визит %d создан через create_visit()", visit.id)
 

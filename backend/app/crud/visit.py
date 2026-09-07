@@ -80,6 +80,12 @@ def create_visit(
     confirmed_at: datetime | None = None,
     confirmed_by: str | None = None,
     source: str = "desk",
+    # Fix C: transactional ownership — the registrar cart endpoint creates
+    # several visits plus an invoice plus queue rows in ONE transaction, so
+    # it passes commit=False and commits once at the end. Default True keeps
+    # every other caller (visits API, GraphQL, find_or_create_today_visit)
+    # on the previous behavior.
+    commit: bool = True,
 ) -> Visit:
     """
     Создать новый визит - единая функция для всего проекта.
@@ -192,8 +198,12 @@ def create_visit(
         # Здесь можно добавить отправку уведомлений
         pass
 
-    db.commit()
-    db.refresh(visit)
+    if commit:
+        db.commit()
+        db.refresh(visit)
+    else:
+        # Fix C: the transaction owner commits; flush keeps IDs available.
+        db.flush()
     return visit
 
 
