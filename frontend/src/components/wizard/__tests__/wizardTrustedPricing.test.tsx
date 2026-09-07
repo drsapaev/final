@@ -125,8 +125,9 @@ describe('Fix D: trusted pricing contract', () => {
 
   it('quote request is rebuilt on any cart/discount change (old preview invalidated)', () => {
     // Codex R1 #3095: в edit-режиме квота дополнительно зависит от identity
-    // (edit-дельта) и справочника услуг
-    expect(source).toContain('}, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity]);');
+    // (edit-дельта) и справочника услуг; Codex R2 #3095: ещё и от маршрута
+    // команды (fullUpdateQuoteRoute — QR-записи квотируются по full-update)
+    expect(source).toContain('}, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute]);');
   });
 
   it('CartStepV2 no longer zeroes repeat consultations (backend owns discounts)', () => {
@@ -180,5 +181,49 @@ describe('Fix D: quote shape', () => {
     };
     expect(quote.items[0].final_price).toBe(quote.items[0].unit_price); // 50% от 100000 × 2
     expect(quote.total_amount).toBe(100000);
+  });
+});
+
+// =====================================================================
+// 4. Codex R2 #3095
+// =====================================================================
+
+describe('Fix D Codex R2: quote contract follows the actual command route', () => {
+  let source = '';
+
+  beforeEach(() => {
+    source = readWizardSource();
+  });
+
+  it('full_update route is detected by the same predicate as the submit (Codex R2 P1)', () => {
+    // QR-записи (online_queue + source=online + queueEntryId) сабмятся через
+    // /queue/online-entry/{id}/full-update — квота обязана использовать
+    // pricing_mode='full_update' и ПОЛНУЮ корзину, а не edit_delta.
+    expect(source).toContain('const fullUpdateQuoteRoute = useMemo(() => {');
+    expect(source).toContain("recordKind === 'online_queue' && effectiveSource === 'online'");
+    expect(source).toContain('resolveOnlineQueueEntryId(initialData, recordKind, effectiveSource)');
+    // выбор контракта: edit_delta только НЕ для full-update маршрута
+    expect(source).toContain("if (isEditModeQuote && !fullUpdateQuoteRoute) {");
+    expect(source).toContain("quotePricingMode = 'full_update';");
+  });
+
+  it('empty edit delta is a valid zero-cost quote, not a blocked idle state (Codex R2 P1)', () => {
+    // Изменили только данные пациента / удалили услуги → квотировать нечего,
+    // но сабмит обязан проходить: в edit-режиме ставится нулевая ready-квота.
+    expect(source).toContain("setCartQuote({ items: [], total_amount: 0, approval_status: 'approved' });");
+    expect(source).toContain('Codex R2 #3095 (P1): пустая дельта');
+    // вне edit-режима поведение прежнее (idle)
+    expect(source).toContain("setCartQuoteStatus('idle');");
+  });
+
+  it('backend quote endpoint accepts full_update and mirrors the full-update route', () => {
+    const backend = readBackendCartSource();
+    // Ветка зеркалит _full_update_create_single_independent_entry
+    expect(backend).toContain('elif quote_req.pricing_mode == "full_update":');
+    expect(backend).toContain('service.is_consultation and effective_discount_mode in ("repeat", "benefit")');
+    // edit_delta/full_update всегда approved (команда пишет approved)
+    expect(backend).toContain('if quote_req.pricing_mode in ("edit_delta", "full_update"):');
+    // cart-режим: custom_price спасает от 409 при пустом каталог-прайсе
+    expect(backend).toContain('if service.price is None and item_req.custom_price is None:');
   });
 });

@@ -1126,6 +1126,22 @@ const AppointmentWizardV2 = ({
     [editMode, initialData, servicesData]
   );
 
+  // Codex R2 #3095 (P1): маршрут команды edit-записи. QR-записи
+  // (online_queue + source=online) сабмитятся через /queue/online-entry/
+  // {id}/full-update (ПОЛНАЯ корзина, свои правила цен) — квота обязана
+  // использовать контракт этого маршрута, а не edit_delta. Предикат
+  // синхронизирован с сабмитом (handleComplete, блок hasQueueEntries).
+  const fullUpdateQuoteRoute = useMemo(() => {
+    if (!editMode || !initialData) return false;
+    const recordKind = getWizardRecordKind(initialData);
+    const sourceKind = getWizardSourceKind(initialData);
+    const effectiveSource = sourceKind || (recordKind === 'visit' || recordKind === 'appointment' ? 'desk' : 'online');
+    const isOnlineQueueEntry = recordKind === 'online_queue' && effectiveSource === 'online';
+    if (!isOnlineQueueEntry) return false;
+    const queueEntryId = resolveOnlineQueueEntryId(initialData, recordKind, effectiveSource);
+    return Boolean(queueEntryId);
+  }, [editMode, initialData]);
+
   // ===================== FIX D: КВОТА ЦЕН КОРЗИНЫ =====================
 
   // Любое изменение корзины/скидки инвалидирует предыдущую квоту и
@@ -1140,17 +1156,24 @@ const AppointmentWizardV2 = ({
     // выставляет ТОЛЬКО новые услуги и по СВОИМ правилам (без repeat/benefit
     // скидок, только all_free→0). Квота обязана показывать ровно то, что
     // будет в invoice: считаем дельту тем же предикатом, что и сабмит.
+    // Codex R2 #3095 (P1): для QR-записей (online_queue) сабмит идёт через
+    // /queue/online-entry/{id}/full-update ПОЛНОЙ корзины — квотируем всю
+    // корзину по контракту этого маршрута (pricing_mode='full_update'),
+    // иначе repeat/benefit-консультации квотировались по полной каталоговой
+    // цене, а сохранялись бесплатно.
     const isEditModeQuote = editMode === true;
     const rawCartItems = (wizardData.cart.items ?? []) as Array<Record<string, unknown>>;
     let quoteSourceItems: Array<Record<string, unknown>> = rawCartItems;
-    let quotePricingMode: 'cart' | 'edit_delta' = 'cart';
-    if (isEditModeQuote) {
+    let quotePricingMode: 'cart' | 'edit_delta' | 'full_update' = 'cart';
+    if (isEditModeQuote && !fullUpdateQuoteRoute) {
       quotePricingMode = 'edit_delta';
       quoteSourceItems = rawCartItems.filter((item) => {
         const service = servicesData.find((s) => String(s.id) === String(item.service_id));
         if (!service) return false; // зеркало сабмита: услуга вне справочника не сабмитится
         return isEditDeltaNewItem(item, service, editOriginalServiceIdentity);
       });
+    } else if (isEditModeQuote && fullUpdateQuoteRoute) {
+      quotePricingMode = 'full_update';
     }
 
     const quoteRequest = buildCartQuoteRequest(wizardData.cart, {
@@ -1159,9 +1182,19 @@ const AppointmentWizardV2 = ({
     });
     if (!quoteRequest) {
       cartQuoteRequestIdRef.current += 1; // инвалидируем незавершённые запросы
-      setCartQuote(null);
-      setCartQuoteStatus('idle');
-      setCartQuoteError('');
+      if (isEditModeQuote) {
+        // Codex R2 #3095 (P1): пустая дельта — ВАЛИДНЫЙ edit-флоу (изменили
+        // только данные пациента или удалили услуги). Раньше квота оставалась
+        // в 'idle' и handleComplete блокировал сабмит требованием 'ready'.
+        // Нулевая готовая квота подтверждение не блокирует.
+        setCartQuote({ items: [], total_amount: 0, approval_status: 'approved' });
+        setCartQuoteStatus('ready');
+        setCartQuoteError('');
+      } else {
+        setCartQuote(null);
+        setCartQuoteStatus('idle');
+        setCartQuoteError('');
+      }
       return;
     }
 
@@ -1189,7 +1222,7 @@ const AppointmentWizardV2 = ({
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity]);
+  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute]);
 
   const repeatSuggestionSummary = useMemo(() => {
     if (!consultationCartItems.length) {

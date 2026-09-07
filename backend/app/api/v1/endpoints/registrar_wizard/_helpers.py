@@ -257,7 +257,13 @@ class CartQuoteRequest(BaseModel):
     # (_apply_service_discount), 'edit_delta' — точные правила
     # /registrar/cart/edit-delta (RegistrarEditDeltaService: только
     # all_free→0, repeat/benefit скидки НЕ применяются).
-    pricing_mode: str = Field(default="cart", pattern="^(cart|edit_delta)$")
+    # Codex R2 #3095 (P1): 'full_update' — правила
+    # /queue/online-entry/{id}/full-update
+    # (_full_update_create_single_independent_entry: консультация при
+    # repeat/benefit → 0, all_free → 0, остальное — каталог-цена;
+    # custom_price в контракте маршрута не участвует). Квота обязана
+    # выбирать контракт по фактическому маршруту команды, а не по editMode.
+    pricing_mode: str = Field(default="cart", pattern="^(cart|edit_delta|full_update)$")
 
 
 class CartQuoteItemResponse(BaseModel):
@@ -354,7 +360,12 @@ def _load_registration_discount_settings(db: Session) -> dict[str, Any]:
             except (TypeError, ValueError):
                 pass
         elif row.key in {"benefit_consultation_free", "all_free_auto_approve"}:
-            settings[row.key] = bool(row.value)
+            # Codex R2 #3095 (P2): значения настроек приходят строками, а
+            # bool("False")/bool("0") в Python — True: любая непустая строка
+            # молча включала настройку (например, all_free_auto_approve),
+            # и квота/invoice расходились в approval-статусе. Детерминированный
+            # список truthy-значений.
+            settings[row.key] = str(row.value).strip().lower() in {"1", "true", "yes", "on"}
 
     return settings
 

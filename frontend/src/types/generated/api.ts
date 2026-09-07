@@ -24243,10 +24243,8 @@ export type components = {
              * @default 1
              */
             quantity: number;
-            /**
-             * Custom Price
-             */
-            custom_price?: number | null;
+            /** Custom Price */
+            custom_price?: number | string | null;
         };
         /** CartQuoteItemResponse */
         CartQuoteItemResponse: {

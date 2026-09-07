@@ -358,7 +358,15 @@ def quote_cart_prices(
     effective_discount_mode = _resolve_effective_discount_mode(quote_req)
     registration_settings = _load_registration_discount_settings(db)
 
-    if effective_discount_mode == "all_free":
+    # Codex R2 #3095 (P2): approval_status обязан отражать контракт
+    # ВЫБРАННОЙ команды сохранения. RegistrarEditDeltaService._create_visit
+    # всегда пишет approval_status="approved" и никогда не читает
+    # all_free_auto_approve — предупреждение «требуется согласование» в
+    # edit_delta-квоте вводило в заблуждение. /queue/online-entry full-update
+    # тоже не имеет согласования. Проверка остаётся только для cart-пути.
+    if quote_req.pricing_mode in ("edit_delta", "full_update"):
+        approval_status = "approved"
+    elif effective_discount_mode == "all_free":
         approval_status = (
             "pending"
             if not registration_settings["all_free_auto_approve"]
@@ -380,7 +388,20 @@ def quote_cart_prices(
                 detail=f"Услуга с ID {item_req.service_id} не найдена",
             )
 
-        if service.price is None:
+        # Codex R2 #3095 (P2): отклоняем отсутствие цены только когда НЕТ
+        # ни одной эффективной цены. custom_price (врачебная переопределённая
+        # цена) входит в контракт cart-пути сохранения — create_cart_
+        # appointments использует её ПЕРЕД каталог-ценой, поэтому квота не
+        # имеет права блокировать этот вызов. Для edit_delta/full_update
+        # custom_price в контракте маршрута не участвует — там отсутствие
+        # каталог-цены остаётся проблемой (это НЕ 0).
+        if quote_req.pricing_mode == "cart":
+            if service.price is None and item_req.custom_price is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Для услуги «{service.name}» не указана цена",
+                )
+        elif service.price is None:
             raise HTTPException(
                 status_code=409,
                 detail=f"Для услуги «{service.name}» не указана цена",
@@ -395,6 +416,20 @@ def quote_cart_prices(
             base_price = Decimal(str(service.price))
             unit_final = Decimal("0") if effective_discount_mode == "all_free" else base_price
             discount_percent = 0
+        elif quote_req.pricing_mode == "full_update":
+            # Codex R2 #3095 (P1): зеркало _full_update_create_single_
+            # independent_entry: консультация при repeat/benefit → 0,
+            # all_free → 0, остальное — каталог-цена × количество.
+            base_price = Decimal(str(service.price))
+            if effective_discount_mode == "all_free":
+                unit_final = Decimal("0")
+                discount_percent = 100
+            elif service.is_consultation and effective_discount_mode in ("repeat", "benefit"):
+                unit_final = Decimal("0")
+                discount_percent = 100
+            else:
+                unit_final = base_price
+                discount_percent = 0
         else:
             # Mode 'cart' — зеркало пути сохранения /registrar/cart:
             # врачебная переопределённая цена (Codex R1 #3095 P2), затем

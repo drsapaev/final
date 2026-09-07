@@ -70931,6 +70931,10 @@
                 "type": "number"
               },
               {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -71004,9 +71008,9 @@
           },
           "pricing_mode": {
             "type": "string",
+            "pattern": "^(cart|edit_delta|full_update)$",
             "title": "Pricing Mode",
-            "default": "cart",
-            "pattern": "^(cart|edit_delta)$"
+            "default": "cart"
           }
         },
         "type": "object",

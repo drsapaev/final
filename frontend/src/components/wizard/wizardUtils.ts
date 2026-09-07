@@ -306,7 +306,10 @@ interface QuoteCartSource {
 export interface CartQuoteRequestOptions {
   // Fix D (Codex R1 #3095): edit-режим квотирует РОВНО edit-delta payload
   // (pricing_mode='edit_delta' зеркалирует правила /registrar/cart/edit-delta).
-  pricingMode?: 'cart' | 'edit_delta';
+  // Codex R2 #3095 (P1): 'full_update' — правила /queue/online-entry/{id}/
+  // full-update (консультация при repeat/benefit → 0, all_free → 0, остальное
+  // — каталог-цена); выбирается по фактическому маршруту команды.
+  pricingMode?: 'cart' | 'edit_delta' | 'full_update';
   itemsOverride?: QuoteCartSource['items'];
 }
 
