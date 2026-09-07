@@ -212,6 +212,7 @@ import {
   resolveCartServiceReferences,
   refreshBaselineAfterGenderHydration,
   refreshBaselineAfterServiceResolution,
+  useWizardSearchUnmountCleanup,
   wizardContentSignature,
   formatBirthDateInput,
   convertDateToISO,
@@ -528,6 +529,10 @@ const AppointmentWizardV2 = ({
     }
   }, [isOpen]);
 
+  // Codex R5 PR 3097 (P2): условное размонтирование (EditPatientModal)
+  // минует isOpen-эффект — гасим дебаунсы на unmount.
+  useWizardSearchUnmountCleanup(() => [searchTimeout, phoneCheckTimeout]);
+
   // Safeguard: Ensure wizardData structure is valid
   useEffect(() => {
     if (!wizardData.patient) {
@@ -788,6 +793,10 @@ const AppointmentWizardV2 = ({
   };
 
   const selectPatient = (patient: PatientRecord) => {
+    // Codex R5 PR 3097 (P2): выбор инвалидирует активный поиск (его finally
+    // больше не сбросит спиннер) — сбрасываем здесь.
+    patientSearchSeqRef.current += 1;
+    setIsSearchingPatients(false);
     // ✅ УПРОЩЕНО: Формируем fio из отдельных полей для отображения (Single Source of Truth)
     // Backend уже нормализует ФИО, здесь только форматируем для UI
     let patientFio = patient.fio;
@@ -1444,10 +1453,8 @@ const AppointmentWizardV2 = ({
         fio: p.fio || '',
         phone: p.phone || '',
         address: p.address || '',
-        // Codex R4 PR 3097 (P2): частично введённая дата («01.0») живёт только
-        // в formattedBirthDate, ISO остаётся пустым — сравнение с пустым
-        // baseline молча теряло видимый ввод при закрытии. Пока маска
-        // неполная, ISO пуст, а в подпись уходит сам видимый ввод.
+        // Codex R4 PR 3097 (P2): частичная маска («01.0») живёт только в
+        // formattedBirthDate (ISO пуст) — иначе закрытие молча теряло ввод.
         birth_date: p.birth_date || convertDateToISO(formattedBirthDate) || formattedBirthDate || '',
         gender: p.gender || ''
       },
@@ -1495,12 +1502,9 @@ const AppointmentWizardV2 = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
-      // Codex R3 PR 3097 (P2): пока открыт модальный диалог подтверждения
-      // (discard / другие), шорткаты мастера принадлежат ДИАЛОГУ. Раньше
-      // Enter на его кнопках preventDefault'ился и продвигал/отправлял
-      // мастер под диалогом; на последнем шаге второй confirm() даже
-      // ЗАМЕНЯЛ ожидающий диалог (useConfirm резолвит старый промис как
-      // false) — пользователь терял контроль над отменой.
+      // Codex R3 PR 3097 (P2): при открытом диалоге подтверждения шорткаты
+      // принадлежат ему (иначе Enter продвигал мастер под диалогом, а второй
+      // confirm() заменял ожидающий).
       if (confirmDialogOpenRef.current) return;
       const target = e.target as HTMLElement | null;
 
