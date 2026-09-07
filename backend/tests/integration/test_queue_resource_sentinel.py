@@ -531,7 +531,7 @@ def _revision_graph() -> dict[str, tuple[str, ...]]:
     return graph
 
 
-def test_alembic_chain_single_head_0057() -> None:
+def test_alembic_chain_single_head_0058() -> None:
     graph = _revision_graph()
     assert "0056_queue_resource_role_cleanup" in graph
     assert graph["0056_queue_resource_role_cleanup"] == (
@@ -543,9 +543,15 @@ def test_alembic_chain_single_head_0057() -> None:
     assert graph["0057_lab_resource_internal_role"] == (
         "0056_queue_resource_role_cleanup",
     )
+    # QD-2A: the chain head moved to 0058 (queue_resources registry +
+    # daily_queues dual-owner EXPAND — additive DDL only).
+    assert "0058_queue_resource_expand" in graph
+    assert graph["0058_queue_resource_expand"] == (
+        "0057_lab_resource_internal_role",
+    )
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0057_lab_resource_internal_role"]
+    assert heads == ["0058_queue_resource_expand"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============
