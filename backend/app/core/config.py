@@ -140,6 +140,10 @@ class Settings(BaseSettings):
     # Replaces previous Celery stub. arq is asyncio-native and matches the
     # FastAPI stack. See app/tasks/worker.py for the worker entry point.
     ARQ_REDIS_URL: str = Field(default="redis://localhost:6379/0")
+    # PR-1 reminder pipeline: failed enqueues must not masquerade as success.
+    # true (default): scheduler raises TaskEnqueueError when Redis/arq fails.
+    # false (dev only): log + return a job_id even when nothing was queued.
+    ARQ_ENQUEUE_FAIL_LOUD: bool = Field(default=True)
 
     # --- Payment providers ---
     CLICK_ENABLED: bool = Field(default=False, description="Enable Click payments")

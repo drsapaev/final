@@ -83,6 +83,14 @@ class Visit(Base):
         String(64), nullable=True
     )  # user_id, telegram_id, или phone
 
+    # PR-1 reminder pipeline: idempotency marker — set by the arq worker
+    # (app/tasks/worker.py) after a reminder was actually sent; duplicate
+    # jobs / arq retries check this before dispatching. Nullable: most
+    # historical visits never had a reminder.
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # ✅ SSOT: Источник визита (единственный источник истины)
     # 'online' = QR/Telegram регистрация
     # 'desk' = Регистратура

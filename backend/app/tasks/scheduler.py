@@ -1,7 +1,9 @@
 """Task scheduler — thin shim that enqueues jobs onto arq's Redis pool.
 
-P2.3: now uses real arq when available. Falls back to synchronous execution
-(no worker required) when arq is not installed or redis is unreachable.
+P2.3: uses real arq when available. When arq is missing the enqueue
+degrades to a logged warning; when Redis is unreachable the behavior is
+governed by settings.ARQ_ENQUEUE_FAIL_LOUD (default: raise TaskEnqueueError
+instead of returning a fake job_id).
 
 Pattern:
     from app.tasks import enqueue_reminder, run_data_retention
@@ -23,26 +25,45 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+class TaskEnqueueError(RuntimeError):
+    """Raised when a task cannot be enqueued while ARQ_ENQUEUE_FAIL_LOUD is on.
+
+    PR-1: replaces the historical fail-open behavior (log + return a job_id
+    that pointed at nothing), which made Redis outages look like successful
+    scheduling.
+    """
+
+
 async def _enqueue(func_name: str, **kwargs: Any) -> str:
     """Enqueue a job on arq's Redis pool. Returns job ID.
 
-    Falls back to logging if arq is not installed or redis is unreachable.
-    This is acceptable for dev environments where the worker isn't running.
-    In prod, redis unavailability is a P1 incident — the call should fail
-    loud, not silently.
+    Targets ARQ_QUEUE_NAME (app/tasks/worker.py) — the exact queue the worker
+    consumes. The historical default-queue enqueue stranded every business
+    job on `arq:queue` while the worker listened on "clinic".
+
+    Redis failure behavior (settings.ARQ_ENQUEUE_FAIL_LOUD):
+      - true (default, production-safe): raise TaskEnqueueError — callers and
+        logs see the failure instead of a fake success.
+      - false (dev only): log loudly and return the job_id anyway.
     """
     job_id = kwargs.pop("_job_id", None) or f"{func_name}:{uuid4()}"
 
     try:
         from arq import create_pool
-        from arq.connections import RedisSettings  # noqa: F401
 
-        from app.tasks.worker import _parse_redis_settings
+        from app.tasks.worker import ARQ_QUEUE_NAME, _parse_redis_settings
 
         redis_settings = _parse_redis_settings(settings.ARQ_REDIS_URL)
         pool = await create_pool(redis_settings)
-        job = await pool.enqueue_job(func_name, **kwargs, _job_id=job_id)
-        await pool.close()
+        try:
+            job = await pool.enqueue_job(
+                func_name,
+                **kwargs,
+                _job_id=job_id,
+                _queue_name=ARQ_QUEUE_NAME,
+            )
+        finally:
+            await pool.close()
 
         if job is None:
             # Job with this ID already enqueued — idempotent skip
@@ -58,13 +79,14 @@ async def _enqueue(func_name: str, **kwargs: Any) -> str:
         )
         return job_id
     except Exception as e:
-        # Redis unreachable — log loudly but don't crash the caller.
-        # The caller (e.g. an HTTP endpoint) should still succeed; the
-        # background job failing is a separate incident.
         logger.error(
             "task.enqueue.failed job_id=%s func=%s error=%s",
             job_id, func_name, e,
         )
+        if settings.ARQ_ENQUEUE_FAIL_LOUD:
+            # Production: fail loud — the caller must not see a fake success.
+            raise TaskEnqueueError(f"enqueue {func_name} failed: {e}") from e
+        # Dev only: no redis expected; keep the caller working.
         return job_id
 
 
