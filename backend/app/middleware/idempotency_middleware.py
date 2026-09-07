@@ -126,17 +126,21 @@ def payload_hash(body: bytes | None) -> str:
     return hashlib.sha256(body or b"").hexdigest()
 
 
-def _user_authorized_in_db(db: Any, user_id: int | None, username: str | None, jti: Any) -> tuple[bool, str | None]:
+def _user_authorized_in_db(
+    db: Any, user_id: int | None, username: str | None, jti: Any
+) -> tuple[bool, str | None, bool]:
     """Pure DB-backed authorization query — fails CLOSED (Codex R3/R4 #3092).
 
     Same semantics as app.api.deps._get_user_with_blacklist, plus the role:
     the user must exist, be active, and the token must not be blacklisted
     (jti match or the all_user_tokens sentinel). One SQL roundtrip.
-    Returns (authorized, role) — the role binds stored responses to the
-    RBAC policy they were produced under (Codex R4 #3092 P1).
+    Returns (authorized, role, is_superuser) — the role binds stored
+    responses to the RBAC policy they were produced under (Codex R4 #3092
+    P1); is_superuser lets the replay evaluate require_roles' superuser
+    bypass exactly as the endpoint would (Codex R6 #3092 P1).
     """
     if db is None or (user_id is None and not username):
-        return False, None
+        return False, None, False
     try:
         from datetime import UTC, datetime
 
@@ -160,21 +164,26 @@ def _user_authorized_in_db(db: Any, user_id: int | None, username: str | None, j
             )
             .exists()
         )
-        stmt = select(User.id, User.is_active, User.role, jti_bl.label("jti_bl"), sentinel_bl.label("sentinel_bl")).where(
-            subject_filter
-        )
+        stmt = select(
+            User.id,
+            User.is_active,
+            User.role,
+            User.is_superuser,
+            jti_bl.label("jti_bl"),
+            sentinel_bl.label("sentinel_bl"),
+        ).where(subject_filter)
         row = db.execute(stmt).first()
         if row is None:
-            return False, None
-        _, is_active, role, jti_hit, sentinel_hit = row
+            return False, None, False
+        _, is_active, role, is_superuser, jti_hit, sentinel_hit = row
         role_label = str(role) if role is not None else None
-        return (bool(is_active) and not (jti_hit or sentinel_hit)), role_label
+        return (bool(is_active) and not (jti_hit or sentinel_hit)), role_label, bool(is_superuser)
     except Exception:
         logger.warning(
             "Idempotency principal authorization query failed; refusing replay",
             exc_info=True,
         )
-        return False, None
+        return False, None, False
 
 
 def _resolve_request_db(request: Any):
@@ -198,12 +207,13 @@ def _resolve_request_db(request: Any):
 
 def _check_principal_authorized_sync(
     request: Any, user_id: int | None, username: str | None, jti: Any
-) -> tuple[bool, str | None]:
+) -> tuple[bool, str | None, bool]:
     """DB-backed principal authorization for the replay path (Codex R3/R4 #3092).
 
     Resolves the DB through the same session source the endpoint uses, runs
     the authorization query off the event loop, and fails CLOSED: a broken
-    DB check never results in a replay. Returns (authorized, current_role).
+    DB check never results in a replay.
+    Returns (authorized, current_role, is_superuser).
     """
     try:
         generator = _resolve_request_db(request)
@@ -222,7 +232,7 @@ def _check_principal_authorized_sync(
             "Idempotency principal authorization check failed; refusing replay",
             exc_info=True,
         )
-        return False, None
+        return False, None, False
 
 
 class IdempotencyResponseCache:
@@ -624,36 +634,51 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             # Codex R3 #3092 (P1): replay only after authorization — the
             # principal must still resolve to an active, non-blacklisted user.
             # Codex R4 #3092 (P1): the response is additionally bound to the
-            # authorized ROLE at execution time — a demoted user (role change
-            # does not revoke tokens) cannot replay a cached response that
-            # required the old role; the request falls through to the
-            # endpoint's require_roles, which re-authorizes.
-            authorized, current_role = await self._principal_authorized(request, principal_payload)
+            # authorized ROLE at execution time.
+            # Codex R6 #3092 (P1): a changed role is no longer refused by
+            # label comparison alone — the ENDPOINT policy decides. Admin↔
+            # Registrar both pass /registrar/cart, so a role change between
+            # two authorized roles must REPLAY the committed snapshot, not
+            # evict it and re-execute the write (duplicate visits/invoices).
+            authorized, current_role, current_superuser = await self._principal_authorized(request, principal_payload)
             if not authorized:
                 logger.warning(
                     "Idempotency replay refused (principal not authorized): user=%s key=%s path=%s",
                     user_id, idempotency_key, request.url.path,
                 )
                 return await call_next(request)
-            if cached_role is not None and current_role != cached_role:
-                logger.warning(
-                    "Idempotency replay refused (role changed since execution): user=%s key=%s path=%s (%s -> %s) — re-executing",
-                    user_id, idempotency_key, request.url.path, cached_role, current_role,
-                )
-                # Codex R4 #3092 (P1): the binding is stale forever for this
-                # principal — evict it so the re-execution re-stores with the
-                # fresh role instead of refusing every retry endlessly.
-                _idempotency_cache.invalidate(user_id, idempotency_key)
-                if claim is not None and claim.try_available():
-                    claim.forget_response(user_id, idempotency_key)
-                cached = None
-                cached_role = None
-            else:
+            permitted = self._role_permitted_for_replay(request, cached_role, current_role, current_superuser)
+            if permitted is True or (
+                permitted is None and (cached_role is None or current_role == cached_role)
+            ):
                 logger.info(
                     "Idempotency hit: user=%s key=%s method=%s path=%s — returning cached response",
                     user_id, idempotency_key, request.method, request.url.path,
                 )
                 return cached
+            if permitted is False:
+                # Endpoint policy refuses the current role — the endpoint's
+                # require_roles 403s + audits it exactly as for a fresh
+                # request. The snapshot is KEPT: when the principal regains
+                # an allowed role, the same-key retry replays again instead
+                # of re-executing the write.
+                logger.warning(
+                    "Idempotency replay refused (endpoint policy): user=%s key=%s path=%s (stored=%s current=%s) — falling through",
+                    user_id, idempotency_key, request.url.path, cached_role, current_role,
+                )
+                return await call_next(request)
+            # permitted is None (policy unknown) AND the role label changed:
+            # conservative R4 fallback — evict the stale binding so the
+            # re-execution re-stores with the fresh role.
+            logger.warning(
+                "Idempotency replay refused (role changed since execution, policy unknown): user=%s key=%s path=%s (%s -> %s) — re-executing",
+                user_id, idempotency_key, request.url.path, cached_role, current_role,
+            )
+            _idempotency_cache.invalidate(user_id, idempotency_key)
+            if claim is not None and claim.try_available():
+                claim.forget_response(user_id, idempotency_key)
+            cached = None
+            cached_role = None
 
         # Codex R1 #3092 (P1): distributed claim across workers. A retry may
         # land on a different worker (staging runs two) or overlap the first
@@ -667,30 +692,44 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         user_id, idempotency_key, request.url.path,
                     )
                     return self._payload_mismatch_response()
-                # Codex R3 #3092 (P1): authorization before cross-worker replay.
-                authorized, current_role = await self._principal_authorized(request, principal_payload)
+                # Codex R3/R4 #3092: authorization + role binding before
+                # cross-worker replay. Codex R6: the endpoint policy decides
+                # on role change (same as the local-cache branch above).
+                authorized, current_role, current_superuser = await self._principal_authorized(request, principal_payload)
                 if not authorized:
                     logger.warning(
                         "Idempotency distributed replay refused (principal not authorized): user=%s key=%s path=%s",
                         user_id, idempotency_key, request.url.path,
                     )
                     return await call_next(request)
-                if stored_role is not None and current_role != stored_role:
-                    logger.warning(
-                        "Idempotency distributed replay refused (role changed since execution): user=%s key=%s path=%s (%s -> %s) — re-executing",
-                        user_id, idempotency_key, request.url.path, stored_role, current_role,
-                    )
-                    # Codex R4 #3092 (P1): stale binding — drop the snapshot so
-                    # this request re-executes and re-stores with the fresh role.
-                    claim.forget_response(user_id, idempotency_key)
-                    _idempotency_cache.invalidate(user_id, idempotency_key)
-                    replayed = None
-                else:
+                permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
+                if permitted is True or (
+                    permitted is None and (stored_role is None or current_role == stored_role)
+                ):
                     logger.info(
                         "Idempotency distributed replay: user=%s key=%s path=%s",
                         user_id, idempotency_key, request.url.path,
                     )
                     return replayed
+                if permitted is False:
+                    # Endpoint policy refuses the current role — fall through
+                    # to require_roles (403 + audit); snapshot KEPT (see the
+                    # local-cache branch).
+                    logger.warning(
+                        "Idempotency distributed replay refused (endpoint policy): user=%s key=%s path=%s (stored=%s current=%s) — falling through",
+                        user_id, idempotency_key, request.url.path, stored_role, current_role,
+                    )
+                    return await call_next(request)
+                # permitted is None (policy unknown) AND role changed:
+                # conservative R4 — drop the snapshot so this request
+                # re-executes and re-stores with the fresh role.
+                logger.warning(
+                    "Idempotency distributed replay refused (role changed since execution, policy unknown): user=%s key=%s path=%s (%s -> %s) — re-executing",
+                    user_id, idempotency_key, request.url.path, stored_role, current_role,
+                )
+                claim.forget_response(user_id, idempotency_key)
+                _idempotency_cache.invalidate(user_id, idempotency_key)
+                replayed = None
             claim_token = claim.acquire(user_id, idempotency_key)
             claim_acquired = claim_token is not None
             if not claim_acquired:
@@ -703,12 +742,19 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         return self._payload_mismatch_response()
                     # Codex R4 #3092 (P1): the post-claim replay path runs the
                     # SAME authorization + role binding as the earlier branches —
-                    # a revoked/deactivated/demoted principal must not receive
-                    # the cached response here either.
-                    authorized, current_role = await self._principal_authorized(request, principal_payload)
-                    if not authorized or (stored_role is not None and current_role != stored_role):
+                    # a revoked/deactivated principal must not receive
+                    # the cached response here either. Codex R6: the endpoint
+                    # policy decides on role change (snapshot KEPT on refusal).
+                    authorized, current_role, current_superuser = await self._principal_authorized(request, principal_payload)
+                    permitted = (
+                        self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
+                        if authorized else False
+                    )
+                    if not authorized or permitted is False or (
+                        permitted is None and stored_role is not None and current_role != stored_role
+                    ):
                         logger.warning(
-                            "Idempotency post-inflight replay refused (principal not authorized or role changed): user=%s key=%s path=%s",
+                            "Idempotency post-inflight replay refused (principal not authorized or role not permitted): user=%s key=%s path=%s",
                             user_id, idempotency_key, request.url.path,
                         )
                         return await call_next(request)
@@ -730,6 +776,27 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     ),
                     media_type="application/json",
                 )
+
+        # Codex R6 #3092 (P1): establish the authorized role BEFORE execution —
+        # the single DB authorization query of the execute path. Post-commit
+        # the outcome is then retained UNCONDITIONALLY: the previous post-
+        # commit re-check meant a transient DB failure after /registrar/cart
+        # had already committed returned the 2xx WITHOUT any snapshot; the
+        # claim expired after 90s and the lost-response retry re-executed the
+        # cart, duplicating its billing and queue records.
+        exec_authorized, exec_role, _exec_superuser = await self._principal_authorized(
+            request, principal_payload
+        )
+        if not exec_authorized:
+            # Fail-closed: nothing is stored or bound for an unauthorized
+            # principal — the endpoint re-authenticates (401/403 + audit).
+            logger.warning(
+                "Idempotency execute path refused pre-execution (principal not authorized): user=%s key=%s path=%s",
+                user_id, idempotency_key, request.url.path,
+            )
+            if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
+                claim.release(user_id, idempotency_key, claim_token)
+            return await call_next(request)
 
         # Execute handler with a lease-renewal loop (Codex R2 #3092 P2):
         # while this worker is still executing, the in-flight claim is
@@ -774,25 +841,18 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 media_type=response.media_type,
             )
             # Codex R4 #3092 (P1): bind the stored response to the authorized
-            # ROLE at execution time. Role changes do not revoke tokens, so a
-            # demoted user must not be able to replay a cached response that
-            # required the old role — the replay re-checks it (see above).
-            store_authorized, store_role = await self._principal_authorized(request, principal_payload)
-            if store_authorized:
-                _idempotency_cache.set(user_id, idempotency_key, cached_response, incoming_hash, principal_role=store_role)
-                if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
-                    # Codex R1 #3092 (P1): snapshot for CROSS-WORKER replay, then
-                    # drop the in-flight claim so later retries replay instead
-                    # of conflicting. Codex R2 #3092 (P1): the snapshot carries
-                    # the payload hash — changed data is never replayed as the
-                    # original success.
-                    claim.store_response(user_id, idempotency_key, cached_response, payload_hash=incoming_hash, principal_role=store_role)
-                    claim.release(user_id, idempotency_key, claim_token)
-            else:
-                logger.warning(
-                    "Idempotency response not cached (principal not authorized at store time): user=%s key=%s path=%s",
-                    user_id, idempotency_key, request.url.path,
-                )
+            # ROLE. Codex R6 #3092 (P1): the role was established BEFORE
+            # execution — retain the committed outcome unconditionally (no
+            # post-commit DB re-query to lose), the replay re-checks it.
+            _idempotency_cache.set(user_id, idempotency_key, cached_response, incoming_hash, principal_role=exec_role)
+            if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
+                # Codex R1 #3092 (P1): snapshot for CROSS-WORKER replay, then
+                # drop the in-flight claim so later retries replay instead
+                # of conflicting. Codex R2 #3092 (P1): the snapshot carries
+                # the payload hash — changed data is never replayed as the
+                # original success.
+                claim.store_response(user_id, idempotency_key, cached_response, payload_hash=incoming_hash, principal_role=exec_role)
+                claim.release(user_id, idempotency_key, claim_token)
             logger.info(
                 "Idempotency cached: user=%s key=%s method=%s path=%s status=%s",
                 user_id, idempotency_key, request.method, request.url.path, response.status_code,
@@ -826,14 +886,16 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             media_type="application/json",
         )
 
-    _JWT_LEEWAY_SECONDS = 15
-
     def _verified_principal(self, request: Request) -> dict[str, Any] | None:
         """Verify the bearer JWT and return its payload (Codex R3 #3092 P1).
 
         The payload's `sub` becomes the idempotency namespace. Returns None
         when the request carries no verifiable identity — such requests
         bypass idempotency entirely (nothing stored, nothing replayed).
+        Codex R6 #3092 (P2): decoded with the SAME zero-leeway expiry policy
+        as the canonical get_current_user dependency (deps.py) — the old 15s
+        leeway let an already-expired bearer retrieve the PHI-bearing cached
+        response before the endpoint dependency could reject it.
         """
         auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
         if not auth_header:
@@ -844,11 +906,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         try:
             from app.core.config import settings
 
+            # No leeway — identical semantics to get_current_user's decode
+            # (Codex R6 #3092 P2): an expired token is never a principal.
             return jwt.decode(
                 token.strip(),
                 settings.SECRET_KEY,
                 algorithms=[getattr(settings, "ALGORITHM", "HS256")],
-                leeway=self._JWT_LEEWAY_SECONDS,
             )
         except Exception as exc:
             logger.debug("Idempotency: no verifiable principal (%s)", type(exc).__name__)
@@ -864,14 +927,16 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         sub = str(principal_payload.get("sub") or "")
         return hashlib.sha256(sub.encode("utf-8")).hexdigest()[:32]
 
-    async def _principal_authorized(self, request: Request, principal_payload: dict[str, Any]) -> tuple[bool, str | None]:
-        """DB-backed authorization before any replay (Codex R3/R4 #3092).
+    async def _principal_authorized(self, request: Request, principal_payload: dict[str, Any]) -> tuple[bool, str | None, bool]:
+        """DB-backed authorization before any replay (Codex R3/R4/R6 #3092).
 
         Mirrors get_current_user's semantics: the user must exist, be active,
         and the token must not be blacklisted (jti or all-user sentinel).
-        Returns (authorized, current_role) — the role lets the caller bind a
-        stored response to the role it was authorized under (Codex R4: role
-        changes do not revoke tokens, so the replay must re-check it).
+        Returns (authorized, current_role, is_superuser) — the role lets the
+        caller bind a stored response to the role it was authorized under,
+        and both feed the endpoint-policy evaluation at replay (Codex R6:
+        role changes do not revoke tokens; a role change between two roles
+        the endpoint still authorizes must REPLAY, not re-execute).
         Runs the sync query in a worker thread; fails CLOSED — a broken DB
         check never results in a replay (the request falls through to the
         endpoint, which re-authenticates anyway).
@@ -887,4 +952,89 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
         except Exception:  # pragma: no cover - to_thread failure is fail-closed
             logger.warning("Idempotency principal check crashed; refusing replay", exc_info=True)
-            return False, None
+            return False, None, False
+
+    @staticmethod
+    def _endpoint_allowed_roles(request: Any) -> frozenset[str] | None:
+        """Resolve the endpoint's require_roles policy (Codex R6 #3092 P1).
+
+        Returns the lowercase role labels the matched route accepts:
+        - empty frozenset: the route carries no require_roles dependency —
+          any authenticated principal is authorized (require_roles itself
+          authorizes exactly these roles, superusers, and is silent for
+          routes that never called it);
+        - None: the policy could NOT be determined (no app in scope, no
+          matching route) — callers fall back to the conservative R4
+          role-label comparison.
+
+        The roles come from the `required_roles` attribute that the SSOT
+        require_roles factory publishes on its dependency callable — the
+        middleware reads the policy, it never re-implements it.
+        """
+        try:
+            scope = getattr(request, "scope", None) or {}
+            app = scope.get("app")
+            if app is None:
+                return None
+            from starlette.routing import Match
+
+            for route in getattr(getattr(app, "router", None), "routes", None) or []:
+                try:
+                    result = route.matches(scope)
+                    match = result[0] if isinstance(result, tuple) else result
+                except Exception:  # pragma: no cover - exotic route objects
+                    continue
+                if match != Match.FULL:
+                    continue
+                dependant = getattr(route, "dependant", None)
+                if dependant is None:
+                    return None
+                allowed: set[str] = set()
+                for dep in getattr(dependant, "dependencies", []) or []:
+                    roles = getattr(getattr(dep, "call", None), "required_roles", None)
+                    if roles:
+                        allowed.update(str(r).strip().lower() for r in roles)
+                return frozenset(allowed)
+        except Exception:  # pragma: no cover - never let policy lookup replay
+            logger.warning("Idempotency endpoint policy lookup failed", exc_info=True)
+            return None
+        return None
+
+    def _role_permitted_for_replay(
+        self,
+        request: Request,
+        stored_role: str | None,
+        current_role: str | None,
+        is_superuser: bool,
+    ) -> bool | None:
+        """Codex R6 #3092 (P1): evaluate the ENDPOINT policy on role change.
+
+        R4 refused every replay whose role label differed from the stored
+        one. That over-blocks /registrar/cart, which accepts BOTH Admin and
+        Registrar: an Admin→Registrar (or Registrar→Admin) change after a
+        committed request whose response was lost evicted the snapshot and
+        the authorized retry re-executed the cart — duplicate visits,
+        invoices and queue entries.
+
+        True  — the endpoint policy still authorizes the principal
+                (superuser bypass, no require_roles dependency, or the
+                current role in the endpoint's allowed set): keep the
+                committed snapshot and replay.
+        False — the policy refuses the current role: do NOT replay (the
+                endpoint's require_roles will 403 + audit exactly as it
+                would for a fresh request). The snapshot is KEPT — when the
+                principal regains an allowed role, the retry replays again
+                instead of re-executing the write.
+        None  — policy unknown: fall back to the conservative R4 exact
+                role-label comparison (caller decides).
+        """
+        if is_superuser:
+            return True
+        allowed = self._endpoint_allowed_roles(request)
+        if allowed is None:
+            return None
+        if not allowed:
+            return True
+        if not current_role:
+            return False
+        return current_role.strip().lower() in allowed

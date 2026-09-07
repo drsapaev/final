@@ -42,7 +42,7 @@ import uuid
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
 from app.middleware import idempotency_middleware as idem_module
@@ -139,12 +139,29 @@ def _make_claim(fake: FakeRedis) -> DistributedIdempotencyClaim:
     claim._available = True
     return claim
 
+
+def _policy_dep() -> None:
+    """Stand-in for require_roles(...) — a dependency that carries the
+    published RBAC policy the idempotency middleware reads at replay time
+    (the SSOT require_roles attaches `required_roles` to its _dep)."""
+    return None
+
+
+_policy_dep.required_roles = ("Admin", "Registrar")
+
+
 def _make_app(counter: dict, call_next_error: Exception | None = None) -> FastAPI:
     app = FastAPI()
     app.add_middleware(IdempotencyMiddleware)
 
     @app.post("/echo")
     async def _echo() -> dict[str, Any]:
+        counter["calls"] += 1
+        return {"ok": True, "calls": counter["calls"]}
+
+    @app.post("/cart-like")
+    async def _cart_like(_policy: None = Depends(_policy_dep)) -> dict[str, Any]:
+        # /registrar/cart accepts BOTH Admin and Registrar (_cart.py:14-18)
         counter["calls"] += 1
         return {"ok": True, "calls": counter["calls"]}
 
@@ -171,7 +188,7 @@ def two_workers(fake_redis: FakeRedis):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     idem_module._distributed_claim = _make_claim(fake_redis)
-    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar")
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
 
     counters = {"w1": {"calls": 0}, "w2": {"calls": 0}}
     client1 = TestClient(_make_app(counters["w1"]), raise_server_exceptions=False)
@@ -265,7 +282,7 @@ def test_redis_unavailable_falls_back_to_in_memory(monkeypatch):
     claim._client = None
     claim._available = False
     idem_module._distributed_claim = claim
-    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar")
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
 
     try:
         counter = {"calls": 0}
@@ -539,7 +556,7 @@ def test_replay_refused_when_principal_no_longer_authorized(two_workers, monkeyp
 
     # The DB authorization check now fails for this principal
     monkeypatch.setattr(
-        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None)
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None, False)
     )
     second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
     assert second.status_code == 200  # fell through to the endpoint handler
@@ -587,8 +604,8 @@ def test_authorization_resolves_through_dependency_override():
 
         def execute(self, stmt):
             self.used = True
-            # user found, active, not blacklisted, role Registrar
-            return SimpleNamespace(first=lambda: (7, True, "Registrar", False, False))
+            # user found, active, not blacklisted, role Registrar, not superuser
+            return SimpleNamespace(first=lambda: (7, True, "Registrar", False, False, False))
 
     class Override:
         def __init__(self) -> None:
@@ -599,9 +616,10 @@ def test_authorization_resolves_through_dependency_override():
 
     override = Override()
     request = SimpleNamespace(app=SimpleNamespace(dependency_overrides={get_db: override}))
-    authorized, role = _check_principal_authorized_sync(request, 7, None, None)
+    authorized, role, is_superuser = _check_principal_authorized_sync(request, 7, None, None)
     assert authorized is True
     assert role == "Registrar"
+    assert is_superuser is False
     assert override.session.used, "the override session (endpoint's DB) must be queried"
 
 
@@ -619,48 +637,8 @@ def test_namespace_is_stable_per_sub_and_hashed():
 
 
 # =====================================================================
-# Codex R4 #3092
+# Codex R4 → R6 #3092: role binding at replay
 # =====================================================================
-
-
-def test_role_change_after_execution_blocks_replay(two_workers, monkeypatch):
-    """Codex R4 #3092 (P1): a role change (e.g. registrar demoted to Doctor)
-    does not revoke tokens, so the replay must re-check the authorized role.
-    A stored response bound to 'Registrar' must not be served when the
-    principal's current role differs — the request re-executes under the
-    endpoint's require_roles and re-stores with the fresh binding."""
-    client1, client2, counters, fake_redis = two_workers
-    key = "role-binding-key"
-    h1 = auth_headers("1")
-
-    first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
-    assert first.status_code == 200
-    assert counters["w1"]["calls"] == 1
-    assert counters["w2"]["calls"] == 0
-
-    # The same principal's role changed since execution
-    monkeypatch.setattr(
-        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Doctor")
-    )
-    second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
-    assert second.status_code == 200  # re-executed under the new role
-    assert counters["w2"]["calls"] == 1, (
-        "changed-role principal must not receive the cached response"
-    )
-
-    # Each further same-role retry replays the response stored under the
-    # CURRENT role binding (no endless refusals, no duplicate executions)
-    third = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
-    assert third.status_code == 200
-    assert counters["w2"]["calls"] == 1
-
-    # Role changes again → the Doctor-bound response is refused too
-    monkeypatch.setattr(
-        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Admin")
-    )
-    fourth = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
-    assert fourth.status_code == 200
-    assert counters["w2"]["calls"] == 2
 
 
 def test_post_inflight_replay_is_authorized_too(two_workers, monkeypatch):
@@ -680,10 +658,266 @@ def test_post_inflight_replay_is_authorized_too(two_workers, monkeypatch):
     # then finds the snapshot — and must authorize BEFORE replaying.
     fake_redis.store[nkey("1", key, "claim")] = uuid.uuid4().hex
     monkeypatch.setattr(
-        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None)
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None, False)
     )
     second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
     assert second.status_code == 200  # fell through to the endpoint
     assert counters["w2"]["calls"] == 1, (
         "post-inflight replay must not bypass authorization"
+    )
+
+
+def test_require_roles_publishes_policy_for_introspection():
+    """Codex R6 #3092 (P1): the SSOT require_roles factory publishes the
+    normalized roles on its dependency callable — the idempotency middleware
+    reads this attribute to evaluate the endpoint policy at replay time.
+    No policy duplication, no drift."""
+    from app.core.security import require_roles
+
+    dep = require_roles("Admin", "Registrar")
+    assert getattr(dep, "required_roles", None) == ("Admin", "Registrar")
+
+
+def test_role_change_between_authorized_roles_replays_snapshot(two_workers, monkeypatch):
+    """Codex R6 #3092 (P1): /registrar/cart accepts BOTH Admin and Registrar.
+    A role change between two roles the endpoint still authorizes must
+    REPLAY the committed snapshot — the R4 label-comparison evicted it and
+    the authorized retry re-executed the write (duplicate visits, invoices
+    and queue entries after a lost response)."""
+    client1, client2, counters, _ = two_workers
+    key = "role-policy-replay"
+    h1 = auth_headers("1")
+
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Admin", False)
+    )
+    first = client1.post("/cart-like", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    # The same principal is now a Registrar — still authorized by the policy.
+    # Cross-worker retry: the distributed snapshot must be replayed.
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Registrar", False)
+    )
+    second = client2.post("/cart-like", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 200
+    assert counters["w2"]["calls"] == 0, (
+        "role change between two allowed roles → replay the committed outcome, not re-execution"
+    )
+
+    # Same-worker retry (w1 holds the local cache entry from the first
+    # request) exercises the LOCAL cache branch with the same policy
+    third = client1.post("/cart-like", headers={**h1, "Idempotency-Key": key})
+    assert third.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+
+def test_role_change_to_unauthorized_role_refuses_but_keeps_snapshot(two_workers, monkeypatch):
+    """Codex R6 #3092 (P1): when the endpoint policy refuses the new role the
+    replay falls through (require_roles 403s + audits exactly as for a fresh
+    request), but the committed snapshot is KEPT — when the principal regains
+    an allowed role, the same-key retry replays again instead of re-executing
+    the write."""
+    client1, client2, counters, _ = two_workers
+    key = "role-policy-refuse"
+    h1 = auth_headers("1")
+
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Admin", False)
+    )
+    first = client1.post("/cart-like", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    # Demoted to a role the endpoint does not accept → no replay.
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Doctor", False)
+    )
+    second = client2.post("/cart-like", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 200  # fell through (the endpoint 403s in production)
+    assert counters["w2"]["calls"] == 1, "policy-refused role must not receive the cached response"
+
+    # Re-promoted → the SAME snapshot replays (retention, not eviction).
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Admin", False)
+    )
+    third = client2.post("/cart-like", headers={**h1, "Idempotency-Key": key})
+    assert third.status_code == 200
+    assert counters["w2"]["calls"] == 1, "re-promoted principal replays the retained snapshot"
+
+
+def test_superuser_replays_across_role_change(two_workers, monkeypatch):
+    """Codex R6 #3092 (P1): require_roles lets superusers through regardless
+    of the role label — the replay policy must honor the same bypass, so a
+    superuser whose role label changed still replays the committed snapshot."""
+    client1, client2, counters, _ = two_workers
+    key = "superuser-replay"
+    h1 = auth_headers("1")
+
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Admin", False)
+    )
+    first = client1.post("/cart-like", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Doctor", True)
+    )
+    second = client2.post("/cart-like", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 200
+    assert counters["w2"]["calls"] == 0, "superuser bypass → replay, not re-execution"
+
+
+def test_role_change_with_unknown_policy_blocks_replay(two_workers, monkeypatch):
+    """Codex R4 fallback preserved: when the endpoint policy CANNOT be
+    determined (no app in scope / no matching route), a changed role label
+    still refuses the replay and evicts the stale binding so the
+    re-execution re-stores with the fresh role."""
+    client1, client2, counters, _ = two_workers
+    key = "unknown-policy"
+    h1 = auth_headers("1")
+
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Registrar", False)
+    )
+    monkeypatch.setattr(
+        IdempotencyMiddleware, "_endpoint_allowed_roles", lambda self, request: None
+    )
+    first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Doctor", False)
+    )
+    second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 200  # re-executed under the new role
+    assert counters["w2"]["calls"] == 1, (
+        "unknown policy + changed role → conservative re-execution, no replay"
+    )
+
+    # Each further same-role retry replays the response stored under the
+    # CURRENT role binding (no endless refusals, no duplicate executions)
+    third = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert third.status_code == 200
+    assert counters["w2"]["calls"] == 1
+
+
+def test_endpoint_allowed_roles_resolves_matched_route():
+    """Codex R6 #3092 (P1): the policy resolver walks the app router, matches
+    the request scope against the routes and unions the published
+    required_roles of the matched route's dependencies; an unrestricted
+    route resolves to an empty frozenset (any authenticated principal)."""
+    from types import SimpleNamespace
+
+    middleware = IdempotencyMiddleware(app=None)
+
+    class _Route:
+        def __init__(self, path: str, roles) -> None:
+            self.path = path
+            self._roles = roles
+
+        def matches(self, scope):
+            from starlette.routing import Match
+
+            if scope.get("path") == self.path and scope.get("method") == "POST":
+                return Match.FULL, {}
+            return Match.NONE, {}
+
+        @property
+        def dependant(self):
+            dep = SimpleNamespace(call=_policy_dep)
+            return SimpleNamespace(dependencies=[dep])
+
+    class _App:
+        def __init__(self, routes) -> None:
+            self.router = SimpleNamespace(routes=routes)
+
+    request = SimpleNamespace(scope={"path": "/cart-like", "method": "POST"})
+    app = _App([
+        _Route("/cart-like", _policy_dep.required_roles),
+    ])
+    request.scope["app"] = app
+    assert middleware._endpoint_allowed_roles(request) == frozenset({"admin", "registrar"})
+
+
+def test_execute_path_authorizes_once_and_retains_outcome(two_workers, monkeypatch):
+    """Codex R6 #3092 (P1): the authorized role is established BEFORE
+    execution (single DB query per keyed request) and the committed outcome
+    is retained UNCONDITIONALLY — the old post-commit re-check lost the
+    snapshot on a transient DB failure after /registrar/cart had already
+    committed, and the claim expiry then duplicated the write on the
+    lost-response retry."""
+    calls = {"n": 0}
+
+    def spy(*a, **k):
+        calls["n"] += 1
+        return (True, "Registrar", False)
+
+    monkeypatch.setattr(idem_module, "_check_principal_authorized_sync", spy)
+    client1, client2, counters, _ = two_workers
+    key = "pre-exec-authz"
+    h1 = auth_headers("1")
+
+    first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+    assert calls["n"] == 1, (
+        "exactly ONE DB authorization query (pre-execution); the post-commit re-check is gone"
+    )
+
+    # The committed outcome is retained: a lost-response retry on another
+    # worker replays it (the replay path's own authorization query is the
+    # only further DB call).
+    second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 200
+    assert counters["w2"]["calls"] == 0, "retained snapshot must replay, not re-execute"
+
+
+def test_pre_execution_authorization_failure_stores_nothing(two_workers, monkeypatch):
+    """Codex R6 #3092 (P1): fail-closed — when the pre-execution authorization
+    cannot establish the role (transient DB failure), nothing is stored or
+    bound; the endpoint re-authenticates and a retry re-executes from
+    scratch (no snapshot for an unverified role)."""
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None, False)
+    )
+    client1, client2, counters, _ = two_workers
+    key = "pre-exec-fail"
+    h1 = auth_headers("1")
+
+    first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200  # fell through to the endpoint
+    assert counters["w1"]["calls"] == 1
+
+    second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 200
+    assert counters["w2"]["calls"] == 1, (
+        "nothing was stored for the unauthorized principal — the retry re-executes"
+    )
+
+
+def test_expired_token_bypasses_replay_zero_leeway(two_workers):
+    """Codex R6 #3092 (P2): the middleware decodes the bearer JWT with the
+    SAME zero-leeway expiry policy as get_current_user — an already-expired
+    token is not a principal, bypasses idempotency entirely and can no
+    longer retrieve the PHI-bearing cached response during the old 15s
+    leeway window."""
+    from app.core.security import create_access_token
+
+    client1, client2, counters, _ = two_workers
+    key = "expired-token"
+    h1 = auth_headers("1")
+
+    first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    expired = {"Authorization": f"Bearer {create_access_token('1', expires_minutes=-1)}"}
+    second = client2.post("/echo", headers={**expired, "Idempotency-Key": key})
+    assert second.status_code == 200
+    assert counters["w2"]["calls"] == 1, (
+        "expired token bypasses idempotency — the endpoint re-authenticates (401 in production)"
     )
