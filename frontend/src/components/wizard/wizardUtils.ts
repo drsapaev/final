@@ -582,6 +582,113 @@ export const wizardContentSignature = (content: WizardContentShape): string => {
   return JSON.stringify({ patient, cart });
 };
 
+// =====================================================================
+// CART SERVICE RESOLUTION (SSOT)
+// =====================================================================
+
+export interface CartServiceResolution {
+  items: Array<Record<string, unknown>>;
+  changed: boolean;
+}
+
+// Codex R2 #3097: резолвинг ссылок на услуги корзины по справочнику (SSOT).
+// Чистая функция, вынесенная из AppointmentWizardV2 (эффект гидрации
+// edit-записи): основной файл удержан в пределах потолка LOC PR-45,
+// логика резолвинга покрыта unit-тестами напрямую.
+//
+// Возвращает null, когда делать нечего: нет элементов без service_id,
+// нет расхождений имён с SSOT, либо маппинг ничего не изменил.
+export const resolveCartServiceReferences = (
+  items: Array<Record<string, unknown>>,
+  services: Array<Record<string, unknown>>
+): CartServiceResolution | null => {
+  type _SvcView = { id?: string | number; name?: string | null; service_code?: string | null; price?: number | null };
+  type _ItemView = {
+    service_id?: string | number;
+    service_name?: string;
+    service_price?: number;
+    doctor_id?: string | number | null;
+    _temp_name?: string;
+    [k: string]: unknown;
+  };
+
+  if (!Array.isArray(items) || items.length === 0 || !Array.isArray(services) || services.length === 0) return null;
+  const svcList = services as _SvcView[];
+
+  const unresolvedCount = items.filter((i) => !(i as _ItemView).service_id).length;
+  const hasNameMismatches = items.some((item) => {
+    if (!(item as _ItemView).service_id) return false;
+    const service = svcList.find((s) => s.id === (item as _ItemView).service_id);
+    return Boolean(service && service.name && service.name !== (item as _ItemView).service_name);
+  });
+
+  // Если нет ни нерешённых услуг, ни несоответствий имён — делать нечего
+  if (unresolvedCount === 0 && !hasNameMismatches) return null;
+
+  const updatedItems = items.map((rawItem) => {
+    const item = rawItem as _ItemView;
+
+    // Сначала синхронизируем элементы, у которых уже есть service_id, с SSOT
+    if (item.service_id) {
+      const service = svcList.find((s) => s.id === item.service_id);
+      if (service) {
+        const nextName = service.name || item.service_name;
+        const nextPrice = service.price != null ? service.price : item.service_price || 0;
+        if (nextName !== item.service_name || nextPrice !== item.service_price) {
+          return { ...rawItem, service_name: nextName, service_price: nextPrice, doctor_id: item.doctor_id || null };
+        }
+      }
+      // service_id есть и изменений нет (или услуга не найдена) — без изменений
+      return { ...rawItem, doctor_id: item.doctor_id || null };
+    }
+
+    // Ищем услугу по коду (приоритет) или имени
+    const searchName = item._temp_name || item.service_name;
+    if (!searchName) {
+      logger.warn('[resolveCartServiceReferences] item has no searchable name', { item });
+      return rawItem;
+    }
+
+    // Приводим к верхнему регистру и убираем ведущие нули для сравнения (p09 = p9)
+    const searchNameUpper = String(searchName).toUpperCase().trim();
+    const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+
+    const foundService = svcList.find((s) => {
+      // Паритет с прежней логикой: услуги без service_code не участвуют в поиске
+      if (!s.service_code) return false;
+      const codeUpper = String(s.service_code).toUpperCase().trim();
+      const codeNoZero = codeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+      if (codeUpper === searchNameUpper) return true;
+      if (codeNoZero === searchNameNoZero) return true;
+      return s.name === searchName || s.name === searchNameUpper;
+    });
+
+    if (foundService) {
+      return {
+        ...rawItem,
+        service_id: foundService.id,
+        service_name: foundService.name, // SSOT: полное название из справочника
+        service_price: foundService.price || 0,
+        _temp_name: searchName, // исходный код для отладки
+        doctor_id: item.doctor_id || null
+      };
+    }
+
+    logger.warn('[resolveCartServiceReferences] service not found in catalog', { searchName });
+    return rawItem;
+  });
+
+  const changed = updatedItems.some((rawItem, index) => {
+    const item = rawItem as _ItemView;
+    const prev = items[index] as _ItemView;
+    return item.service_id !== prev.service_id ||
+      item.service_price !== prev.service_price ||
+      item.service_name !== prev.service_name;
+  });
+
+  return changed ? { items: updatedItems, changed } : null;
+};
+
 export default {
   PATIENT_NAME_PATTERN,
   MIXED_REPEAT_WARNING,
@@ -616,4 +723,5 @@ export default {
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
   categories,
+  resolveCartServiceReferences,
 };

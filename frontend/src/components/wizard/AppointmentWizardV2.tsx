@@ -209,6 +209,7 @@ import {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  resolveCartServiceReferences,
   wizardContentSignature,
   formatBirthDateInput,
   convertDateToISO,
@@ -356,14 +357,9 @@ const AppointmentWizardV2 = ({
         const birthDate = String(birthDateRaw ?? '');
         const initialDataPatient = (initialData.patient as { fio?: string; phone?: string; address?: string } | null | undefined) ?? {};
         const initialCartItems = (() => {
-          logger.log('📦 AppointmentWizardV2: Using SSOT normalizeServicesFromInitialData');
           const items = normalizeServicesFromInitialData(initialData, []);
-          logger.log('📦 Initialized cart with items:', items);
-          logger.log('📦 InitialData full structure:', initialData);
-
-          if (items.length > 0) {
-            logger.log(`✅ SSOT: Услуги извлечены из источника: ${items[0]._source}`);
-          }
+          // ⭐ SSOT: унифицированная функция вместо 5 разных источников
+          logger.log('📦 SSOT initialized cart:', { count: items.length, source: items[0]?._source, items });
           return items;
         })();
         setActiveServiceCategory(resolveInitialServiceCategory(initialCartItems, activeTab));
@@ -471,6 +467,25 @@ const AppointmentWizardV2 = ({
               gender: normalizedGender
             }
           };
+        });
+
+        // Codex R2 #3097: авто-гидрация пола — НЕ правка пользователя;
+        // обновляем снимок, чтобы закрытие нетронутой записи не давало
+        // ложного предупреждения о несохранённых данных.
+        initialContentRef.current = wizardContentSignature({
+          patient: {
+            id: wizardData.patient.id ?? patientId ?? null,
+            fio: wizardData.patient.fio || '',
+            phone: wizardData.patient.phone || '',
+            address: wizardData.patient.address || '',
+            birth_date: wizardData.patient.birth_date || '',
+            gender: normalizedGender
+          },
+          cart: {
+            items: (wizardData.cart.items ?? []) as unknown as Array<Record<string, unknown>>,
+            discount_mode: wizardData.cart.discount_mode || 'none',
+            all_free: Boolean(wizardData.cart.all_free)
+          }
         });
       } catch (error: unknown) {
         logger.warn('[AppointmentWizardV2] Failed to hydrate edit-mode patient gender', {
@@ -953,126 +968,42 @@ const AppointmentWizardV2 = ({
   useEffect(() => {
     // ✅ ИСПРАВЛЕНО: Разрешаем услуги не только в editMode, но и когда servicesData загружены
     if (servicesData.length > 0 && wizardData.cart.items.length > 0) {
-      const unresolvedCount = wizardData.cart.items.filter((i) => !i.service_id).length;
+      // Codex R2 #3097: резолвинг вынесен в resolveCartServiceReferences (потолок LOC PR-45)
+      const resolution = resolveCartServiceReferences(
+        wizardData.cart.items as unknown as Array<Record<string, unknown>>,
+        servicesData as unknown as Array<Record<string, unknown>>
+      );
+      if (!resolution) return;
 
-      // ✅ НОВОЕ: Проверяем также элементы с service_id, у которых имя не совпадает с SSOT
-      const hasNameMismatches = wizardData.cart.items.some((item) => {
-        if (!(item as { service_id?: string | number }).service_id) return false;
-        const service = servicesData.find((s) => s.id === (item as { service_id?: string | number }).service_id);
-        return service && service.name && service.name !== (item as { service_name?: string }).service_name;
-      });
+      logger.log('✅ Updating cart with resolved services:', resolution.items.length);
 
-      // Если нет ни нерешённых услуг, ни несоответствий имён — выходим
-      if (unresolvedCount === 0 && !hasNameMismatches) return;
-
-      logger.log('🔍 Attempting to resolve services...', {
-        servicesDataCount: servicesData.length,
-        cartItemsCount: wizardData.cart.items.length,
-        unresolvedItems: unresolvedCount
-      });
-
-      const updatedItems = wizardData.cart.items.map((item) => {
-        // ✅ Сначала синхронизируем элементы, у которых уже есть service_id, с SSOT (servicesData)
-        if ((item as { service_id?: string | number }).service_id) {
-          const service = servicesData.find((s) => s.id === (item as { service_id?: string | number }).service_id);
-
-          if (service) {
-            const nextName = service.name || (item as { service_name?: string }).service_name;
-            const nextPrice = service.price != null ? service.price : item.service_price || 0;
-
-            // Если название или цена отличаются от SSOT — обновляем элемент
-            if (nextName !== (item as { service_name?: string }).service_name || nextPrice !== item.service_price) {
-              return {
-                ...item,
-                service_name: nextName,
-                service_price: nextPrice,
-                // ✅ ВАЖНО: Сохраняем doctor_id при обновлении
-                doctor_id: (item as { doctor_id?: string | number }).doctor_id || null
-              };
-            }
-          }
-
-          // Если service_id есть и изменений нет — возвращаем элемент без изменений
-          // ✅ ВАЖНО: Убеждаемся, что doctor_id сохранен
-          return {
-            ...item,
-            doctor_id: (item as { doctor_id?: string | number }).doctor_id || null
-          };
+      setWizardData((prev) => ({
+        ...prev,
+        cart: {
+          ...prev.cart,
+          items: resolution.items as unknown as CartItem[]
         }
+      }));
 
-        // Ищем услугу по имени или коду (которое мы сохранили в service_name или _temp_name)
-        const searchName = item._temp_name || (item as { service_name?: string }).service_name;
-        if (!searchName) {
-          logger.warn('⚠️ Item has no searchable name:', item);
-          return item;
+      // Codex R2 #3097: гидрация service_id по справочнику — НЕ правка
+      // пользователя. Обновляем исходный снимок корзины, иначе закрытие
+      // нетронутой записи давало ложное предупреждение о потере данных
+      // (снимок содержал service_id: null, состояние — уже разрешённый ID).
+      initialContentRef.current = wizardContentSignature({
+        patient: {
+          id: wizardData.patient.id ?? null,
+          fio: wizardData.patient.fio || '',
+          phone: wizardData.patient.phone || '',
+          address: wizardData.patient.address || '',
+          birth_date: wizardData.patient.birth_date || '',
+          gender: String(wizardData.patient.gender || '')
+        },
+        cart: {
+          items: resolution.items,
+          discount_mode: wizardData.cart.discount_mode || 'none',
+          all_free: Boolean(wizardData.cart.all_free)
         }
-
-        // ✅ ИСПРАВЛЕНО: Поиск по service_code (приоритет) и по name
-        // Приводим к верхнему регистру для сравнения кодов
-        const searchNameUpper = String(searchName).toUpperCase().trim();
-        // Убираем ведущие нули для сравнения (p09 = p9)
-        const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-
-        const foundService = servicesData.find((s) => {
-          if (!s.service_code) return false;
-          const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
-          const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-
-          // Прямое сравнение
-          if (serviceCodeUpper === searchNameUpper) return true;
-          // Сравнение без ведущих нулей (p09 = p9)
-          if (serviceCodeNoZero === searchNameNoZero) return true;
-          // Поиск по названию
-          if (s.name === searchName || s.name === searchNameUpper) return true;
-          return false;
-        });
-
-        if (foundService) {
-          logger.log(`✅ Service resolved: "${searchName}" -> ID ${foundService.id} (${foundService.name})`);
-          return {
-            ...item,
-            service_id: foundService.id,
-            service_name: foundService.name, // ✅ SSOT: Сохраняем полное название из servicesData
-            service_price: foundService.price || 0,
-            _temp_name: searchName, // Сохраняем исходный код для отладки
-            // ✅ ВАЖНО: Сохраняем doctor_id при резолвинге
-            doctor_id: (item as { doctor_id?: string | number }).doctor_id || null
-          };
-        }
-
-        logger.warn(`⚠️ Service not found in servicesData: "${searchName}". Available codes:`,
-        servicesData.slice(0, 20).map((s) => `${s.service_code || 'N/A'}: ${s.name || 'N/A'}`).filter((s) => s !== 'N/A: N/A'));
-
-        return item;
       });
-
-      // ✅ ИСПРАВЛЕНО: Проверяем изменения, включая service_name
-      const hasChanges = updatedItems.some((item, index) => {
-        const prevItem = wizardData.cart.items[index];
-        return (item as { service_id?: string | number }).service_id !== prevItem.service_id ||
-        item.service_price !== prevItem.service_price ||
-        (item as { service_name?: string }).service_name !== prevItem.service_name; // ✅ Проверяем также изменение названия
-      });
-
-      if (hasChanges) {
-        logger.log('✅ Updating cart with resolved services:', updatedItems.length);
-        // ✅ УЛУЧШЕНО: Логируем какие услуги были разрешены
-        const resolved = updatedItems.filter((item, index) => {
-          const prevItem = wizardData.cart.items[index];
-          return (item as { service_id?: string | number }).service_id !== prevItem.service_id;
-        });
-        if (resolved.length > 0) {
-          logger.log('📋 Resolved services:', resolved.map((item) => `${item._temp_name || (item as { service_name?: string }).service_name} -> ${(item as { service_name?: string }).service_name} (ID: ${(item as { service_id?: string | number }).service_id})`));
-        }
-
-        setWizardData((prev) => ({
-          ...prev,
-          cart: {
-            ...prev.cart,
-            items: updatedItems
-          }
-        }));
-      }
     }
   }, [servicesData, wizardData.cart.items]); // ✅ ИСПРАВЛЕНО: Триггерим при изменении servicesData или корзины
 

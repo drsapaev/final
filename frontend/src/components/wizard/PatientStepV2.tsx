@@ -135,6 +135,14 @@ const PatientStepV2 = ({
               <button
               type="button"
               onClick={onRetrySearch}
+              // Codex R2 #3097: Enter на этой кнопке должен НАЖИМАТЬ её, а не
+              // проваливаться в глобальный обработчик мастера (preventDefault
+              // + переход к следующему шагу гасил родную активацию кнопки).
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation();
+                }
+              }}
               className="patient-step-v2__phone-error-btn">
                 {t('misc.aw_search_retry')}
               </button>

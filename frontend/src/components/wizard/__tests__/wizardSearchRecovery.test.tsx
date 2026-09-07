@@ -27,6 +27,7 @@ const hotkeysPath = path.resolve(__dirname, '../../../pages/registrar/useRegistr
 const readWizardSource = () => fs.readFileSync(wizardPath, 'utf8');
 const readPatientStepSource = () => fs.readFileSync(patientStepPath, 'utf8');
 const readHotkeysSource = () => fs.readFileSync(hotkeysPath, 'utf8');
+const readWizardUtilsSource = () => fs.readFileSync(path.resolve(__dirname, '../wizardUtils.ts'), 'utf8');
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
@@ -192,6 +193,45 @@ describe('Fix F Codex R1 regressions', () => {
     expect(hasContent).toContain('return current !== initialContentRef.current;');
     // Прежний контракт удалён: p.id сам по себе больше не «контент»
     expect(hasContent).not.toContain('p.id\n    );');
+  });
+
+  it('auto-hydration (service_id / gender) refreshes the dirty baseline (Codex R2 P2)', () => {
+    // Codex R2 #3097: резолвинг вынесен в чистую функцию (потолок LOC PR-45),
+    // эффект гидрации обязан перезаписывать снимок после разрешённого service_id.
+    const hydration = extractSourceBlock(
+      source,
+      'const resolution = resolveCartServiceReferences(',
+      '}, [servicesData, wizardData.cart.items]);'
+    );
+    expect(hydration).toContain('initialContentRef.current = wizardContentSignature(');
+    expect(hydration).toContain('Codex R2 #3097');
+
+    // Сама чистая функция резолвит service_id по коду (p09 = p9) и имени
+    const utilsSource = readWizardUtilsSource();
+    const resolver = extractSourceBlock(
+      utilsSource,
+      'export const resolveCartServiceReferences = (',
+      'return changed ? { items: updatedItems, changed } : null;'
+    );
+    expect(resolver).toContain('service_id: foundService.id');
+    expect(resolver).toContain("replace(/^([A-Z])0+(\\d+)$/, '$1$2')");
+
+    const genderBlock = extractSourceBlock(
+      source,
+      'const hydrateMissingEditGender = async () => {',
+      'hydrateMissingEditGender();'
+    );
+    expect(genderBlock).toContain('initialContentRef.current = wizardContentSignature(');
+  });
+
+  it('Enter on the retry button activates the button, not the wizard shortcut (Codex R2 P2)', () => {
+    const retryBlock = extractSourceBlock(
+      readPatientStepSource(),
+      'onClick={onRetrySearch}',
+      "{t('misc.aw_search_retry')}"
+    );
+    expect(retryBlock).toContain("if (e.key === 'Enter' || e.key === ' ')");
+    expect(retryBlock).toContain('e.stopPropagation()');
   });
 
   it('wizardContentSignature: unchanged edit data is stable, real edits change the signature (real behavior)', () => {
