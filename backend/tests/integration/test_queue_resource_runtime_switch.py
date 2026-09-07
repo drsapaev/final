@@ -831,6 +831,44 @@ def test_empty_registry_full_legacy_behavior(db_session: Session) -> None:
 # ===================== K. Codex round-1 P1/P2 pins =====================
 
 
+def _durable_cleanup(db_session: Session, *usernames: str) -> None:
+    """open_daily_queue (and other crud writers) COMMIT the session —
+    the per-test savepoint is broken and the rows become DURABLE in
+    the shared file DB. Remove exactly the rows this test created
+    (tracked usernames → their doctors → registry/queues/entries) so
+    later files (e.g. the lab_reporting catalog tests) see a clean
+    world."""
+    for username in usernames:
+        user = db_session.query(User).filter(User.username == username).first()
+        if user is None:
+            continue
+        for doctor in db_session.query(Doctor).filter(Doctor.user_id == user.id).all():
+            for queue in (
+                db_session.query(DailyQueue)
+                .filter(DailyQueue.specialist_id == doctor.id)
+                .all()
+            ):
+                db_session.query(OnlineQueueEntry).filter(
+                    OnlineQueueEntry.queue_id == queue.id
+                ).delete(synchronize_session=False)
+                db_session.delete(queue)
+            db_session.delete(doctor)
+        db_session.delete(user)
+    # resource-owned queues + registry rows created in THIS test world
+    for queue in (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.specialist_id.is_(None), DailyQueue.active.is_(True))
+        .all()
+    ):
+        db_session.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.queue_id == queue.id
+        ).delete(synchronize_session=False)
+        db_session.delete(queue)
+    for resource in db_session.query(QueueResource).all():
+        db_session.delete(resource)
+    db_session.commit()
+
+
 def _make_waiting_entry(
     db_session: Session, queue: DailyQueue, number: int = 1
 ) -> OnlineQueueEntry:
@@ -1169,7 +1207,19 @@ def test_open_daily_queue_opens_the_resource_queue(db_session: Session) -> None:
     """Codex round-3 P1 (/online-queue/open): opening reception with the
     synthetic identity must open THE resource queue — previously it
     created and opened a parallel doctor-owned queue while the
-    resource queue stayed open for online joins."""
+    resource queue stayed open for online joins. NOTE: open_daily_queue
+    COMMITs — durable rows are cleaned in the finally (see
+    _durable_cleanup)."""
+
+    try:
+        _test_open_daily_queue_opens_the_resource_queue_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "lab_res6")
+
+
+def _test_open_daily_queue_opens_the_resource_queue_body(
+    db_session: Session,
+) -> None:
     from app.crud.online_queue import open_daily_queue
 
     user = _make_user(db_session, username="lab_res6", role="Resource")
@@ -1320,3 +1370,138 @@ def test_registry_recheck_after_lock_is_sourced(db_session: Session) -> None:
         lock_pos = src.find("lock_registry_tag_creation")
         recheck = src.find("resolve_tag_resource", lock_pos)
         assert recheck > lock_pos, name
+
+
+# ===================== O. Codex round-5 P1 pins =====================
+
+
+def _legacy_then_resource_world(db_session: Session) -> tuple:
+    """The round-5 P1 scenario world: a DEACTIVATED legacy
+    synthetic-owned queue (operator cleanup after the switch) + the
+    live resource-owned queue for the same day/tag."""
+    user = _make_user(db_session, username="lab_res9", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    legacy = _make_queue(
+        db_session, specialist_id=synthetic.id, queue_tag="lab", active=False
+    )
+    live = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    return synthetic, legacy, live
+
+
+def test_token_validation_prefers_active_surface(db_session: Session) -> None:
+    """Codex round-5 P1: the doctor-keyed lookup (no active filter)
+    returned the DEACTIVATED legacy row and the join accepted the
+    disabled queue while staff worked the live resource queue. The
+    token validation now prefers the active registry surface."""
+    from app.models.online_queue import QueueToken
+
+    synthetic, legacy, live = _legacy_then_resource_world(db_session)
+    _make_waiting_entry(db_session, live)
+    token = QueueToken(
+        token="tok-round5",
+        day=_DAY,
+        specialist_id=synthetic.id,
+        department="lab",
+        is_clinic_wide=False,
+        expires_at=datetime(2026, 9, 8, 12, 0, 0),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.commit()
+
+    queue_token, meta = queue_service.validate_queue_token(db_session, "tok-round5")
+    assert meta["daily_queue"].id == live.id  # NOT the inactive legacy
+
+
+def test_status_prefers_active_surface_over_inactive_legacy(
+    db_session: Session,
+) -> None:
+    """The status surfaces (qr + crud) prefer the active resource
+    queue over the inactive legacy row."""
+    from app.crud.online_queue import get_queue_status as crud_status
+    from app.services.qr_queue import QRQueueService
+
+    synthetic, legacy, live = _legacy_then_resource_world(db_session)
+    _make_waiting_entry(db_session, live)
+
+    status = QRQueueService(db_session).get_queue_status(synthetic.id, target_date=_DAY)
+    assert status["active"] is True
+    assert status["queue_length"] == 1
+
+    crud = crud_status(db_session, _DAY, synthetic.id)
+    assert crud["queue_exists"] is True
+    assert crud["queue_id"] == live.id
+
+
+def test_open_daily_queue_prefers_active_surface(db_session: Session) -> None:
+    """Opening reception opens the LIVE resource queue when an
+    inactive legacy row shadows it in the no-filter lookup.
+    open_daily_queue COMMITs — durable rows cleaned in the finally."""
+    try:
+        _test_open_daily_queue_prefers_active_surface_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "lab_res9")
+
+
+def _test_open_daily_queue_prefers_active_surface_body(
+    db_session: Session,
+) -> None:
+    from app.crud.online_queue import open_daily_queue
+
+    synthetic, legacy, live = _legacy_then_resource_world(db_session)
+
+    result = open_daily_queue(db_session, _DAY, synthetic.id)
+    assert result["success"] is True
+    db_session.refresh(live)
+    db_session.refresh(legacy)
+    assert live.opened_at is not None
+    assert legacy.opened_at is None  # the disabled row stays untouched
+
+
+def test_doctor_complete_rejects_resource_entry_for_non_admin(
+    db_session: Session,
+) -> None:
+    """Codex round-5 P1: POST /doctor/queue/{entry_id}/complete — the
+    ownership guard skipped when specialist was NULL, admitting any
+    routed role (Cashier/Registrar/foreign Doctor). The resource entry
+    is completable ONLY by Admin through this doctor command — the
+    same effective policy the pre-C synthetic owner enforced (the
+    synthetic's user_id matched no human caller)."""
+    from fastapi import HTTPException
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        complete_patient_visit,
+    )
+
+    user = _make_user(db_session, username="dr_res10", role="doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    entry = _make_waiting_entry(db_session, queue)
+    entry.status = "called"
+    db_session.commit()
+
+    def _attempt(role: str) -> HTTPException | None:
+        caller = _make_user(db_session, username=f"usr_{role}", role=role)
+        try:
+            complete_patient_visit(
+                entry.id,
+                visit_data=None,
+                db=db_session,
+                current_user=caller,
+            )
+            return None
+        except HTTPException as exc:
+            return exc
+
+    # a doctor (not admin, not the owner — the queue HAS no owner):
+    exc = _attempt("Doctor")
+    assert exc is not None and exc.status_code == 403
+    # the doctor-family role spellings equally rejected
+    exc = _attempt("Registrar")
+    assert exc is not None and exc.status_code == 403

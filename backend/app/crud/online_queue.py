@@ -602,10 +602,11 @@ def open_daily_queue(db: Session, day: date, specialist_id: int) -> dict[str, An
     # resource-owned — /online-queue/qrcode создаёт её с specialist
     # NULL; без fallback открытие приёма создавало бы ПАРАЛЛЕЛЬНУЮ
     # врачебную очередь, оставив ресурсную открытой для онлайна.
-    if not daily_queue:
-        daily_queue = queue_resource_routing.resolve_registry_tag_queue_for_specialist(
-            db, day, specialist_id, None
-        )
+    # Codex round-5 P1: неактивная легаси-строка не затеняет живую
+    # поверхность — открытие открывает РЕСУРСНУЮ очередь.
+    daily_queue = queue_resource_routing.prefer_registry_surface(
+        db, daily_queue, day, specialist_id
+    )
 
     if not daily_queue:
         # Создаем очередь если не существует
@@ -654,11 +655,11 @@ def get_queue_status(db: Session, day: date, specialist_id: int) -> dict[str, An
     )
 
     # QD-2C (Codex round-3 P1): resource-owned очередь тега реестра —
-    # тот же fallback, иначе статус reports queue_exists=False
-    if not daily_queue:
-        daily_queue = queue_resource_routing.resolve_registry_tag_queue_for_specialist(
-            db, day, specialist_id, None
-        )
+    # тот же fallback, иначе статус reports queue_exists=False;
+    # round-5 P1: предпочтение активной поверхности
+    daily_queue = queue_resource_routing.prefer_registry_surface(
+        db, daily_queue, day, specialist_id
+    )
 
     if not daily_queue:
         return {"queue_exists": False, "queue_open": False, "entries_count": 0}
@@ -734,11 +735,11 @@ def check_queue_availability(
         .first()
     )
 
-    # QD-2C (Codex round-3 P1): resource-owned очередь тега реестра
-    if not daily_queue:
-        daily_queue = queue_resource_routing.resolve_registry_tag_queue_for_specialist(
-            db, day, specialist_id, None
-        )
+    # QD-2C (Codex round-3 P1): resource-owned очередь тега реестра;
+    # round-5 P1: предпочтение активной поверхности
+    daily_queue = queue_resource_routing.prefer_registry_surface(
+        db, daily_queue, day, specialist_id
+    )
 
     if daily_queue and daily_queue.opened_at:
         return {

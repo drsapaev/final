@@ -5,7 +5,7 @@ Split from qr_queue_service.py.
 from __future__ import annotations
 
 from app.crud.queue_resource_routing import (
-    resolve_registry_tag_queue_for_specialist,
+    prefer_registry_surface,
 )
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import QRQueueServiceMixinBase
@@ -219,11 +219,12 @@ class TokensMixin(QRQueueServiceMixinBase):
                     .first()
                 )
                 # QD-2C (Codex round-2 P1): resource-owned очередь тега
-                # реестра — fallback через specialty синтетика
-                if not daily_queue:
-                    daily_queue = resolve_registry_tag_queue_for_specialist(
-                        self.db, target_date, qr_token.specialist_id, None
-                    )
+                # реестра — fallback через specialty синтетика;
+                # round-5 P1: неактивная легаси-строка не затеняет
+                # живую ресурсную поверхность
+                daily_queue = prefer_registry_surface(
+                    self.db, daily_queue, target_date, qr_token.specialist_id
+                )
 
             logger.debug(
                 f"[QRQueueService.get_qr_token_info] DailyQueue найдена: {daily_queue is not None}"
@@ -344,11 +345,11 @@ class TokensMixin(QRQueueServiceMixinBase):
                         .first()
                     )
                     # QD-2C (Codex round-2 P1): resource-owned очередь
-                    # тега реестра — fallback (счётчик длины очереди)
-                    if not daily_queue:
-                        daily_queue = resolve_registry_tag_queue_for_specialist(
-                            self.db, target_date, specialist.id, None
-                        )
+                    # тега реестра — fallback (счётчик длины очереди);
+                    # round-5 P1: предпочтение активной поверхности
+                    daily_queue = prefer_registry_surface(
+                        self.db, daily_queue, target_date, specialist.id
+                    )
 
                     if daily_queue:
                         # Считаем OnlineQueueEntry записи в этой очереди (waiting/called)

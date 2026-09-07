@@ -195,3 +195,32 @@ def tag_routes_to_resource(db: Session, queue_tag: str, day: date) -> DailyQueue
     if resolve_tag_resource(db, queue_tag) is None:
         return None
     return queue
+
+
+def prefer_registry_surface(
+    db: Session,
+    daily_queue: DailyQueue | None,
+    day: date,
+    specialist_id: int | None,
+) -> DailyQueue | None:
+    """Prefer the ACTIVE registry surface over an inactive legacy row
+    (QD-2C, Codex round-5 P1).
+
+    A doctor-keyed lookup without an ``active`` predicate can return
+    a DEACTIVATED legacy synthetic-owned row for the same day — while
+    the live routing surface is the active resource-owned queue (e.g.
+    an operator deactivated the legacy queue after the switch). Every
+    such lookup must prefer the active registry surface before
+    accepting the inactive row: patients would otherwise join a
+    disabled queue while the staff surfaces operate the live one.
+
+    Doctor queues keep the legacy behavior: an inactive doctor queue
+    without a registry surface is returned unchanged (None stays
+    None).
+    """
+    if daily_queue is not None and daily_queue.active:
+        return daily_queue
+    surface = resolve_registry_tag_queue_for_specialist(db, day, specialist_id, None)
+    if surface is not None:
+        return surface
+    return daily_queue

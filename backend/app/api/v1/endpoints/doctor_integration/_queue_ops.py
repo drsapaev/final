@@ -644,10 +644,13 @@ def complete_patient_visit(
             # Проверяем права врача на эту очередь
             daily_queue = queue_entry.queue
             doctor = daily_queue.specialist if daily_queue else None
-            if (
-                doctor
-                and current_user.role != "Admin"
-                and doctor.user_id != current_user.id
+            # QD-2C (Codex round-5 P1): resource-owned очередь (specialist
+            # NULL) — явная политика той же формы, что до свитча у
+            # synthetic-владельца (владелец-врач не совпадал ни с одним
+            # человеком → проходил только Admin): этот доктор-командой
+            # ресурсную запись завершает ТОЛЬКО Admin.
+            if current_user.role != "Admin" and (
+                doctor is None or doctor.user_id != current_user.id
             ):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,

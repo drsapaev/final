@@ -779,12 +779,12 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             # resource-owned (specialist NULL) — токен по-прежнему
             # именует тег через specialty синтетика: резолвим (day, tag)-
             # поверхность, иначе валидация токена отвергала живую очередь.
-            if not daily_queue:
-                daily_queue = (
-                    queue_resource_routing.resolve_registry_tag_queue_for_specialist(
-                        db, queue_token.day, queue_token.specialist_id, None
-                    )
-                )
+            # Codex round-5 P1: НЕАКТИВНАЯ легаси-строка не должна
+            # затенять живую ресурсную поверхность — lookup без active-
+            # предиката возвращал выключенную очередь.
+            daily_queue = queue_resource_routing.prefer_registry_surface(
+                db, daily_queue, queue_token.day, queue_token.specialist_id
+            )
             if not daily_queue:
                 raise QueueNotFoundError(
                     "Очередь ещё не создана для выбранного специалиста"

@@ -6,6 +6,7 @@ Split from qr_queue_service.py.
 from __future__ import annotations
 
 from app.crud.queue_resource_routing import (
+    prefer_registry_surface,
     resolve_registry_tag_queue_for_specialist,
 )
 from app.services.qr_queue._base import *  # noqa: F401, F403
@@ -43,10 +44,11 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         # resource-owned (specialist NULL) — тот же fallback, что и
         # call_next_patient, иначе статус «не активна» при живой очереди
         # (и вызываемом тем же specialist_id пациенте).
-        if not daily_queue:
-            daily_queue = resolve_registry_tag_queue_for_specialist(
-                self.db, target_date, specialist_id, None
-            )
+        # Codex round-5 P1: НЕАКТИВНАЯ легаси-строка не затеняет живую
+        # ресурсную поверхность (lookup без active-предиката).
+        daily_queue = prefer_registry_surface(
+            self.db, daily_queue, target_date, specialist_id
+        )
 
         if not daily_queue:
             return {
