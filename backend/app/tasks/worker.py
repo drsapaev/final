@@ -6,8 +6,9 @@ Run with:
 
 Or via docker-compose (ops/docker-compose.yml worker service).
 
-The worker consumes jobs from the 'notifications' and 'reports' queues on
-the Redis instance configured by settings.ARQ_REDIS_URL.
+The worker consumes the single 'clinic' queue (QUEUE_NAME — the same queue
+name app/tasks/scheduler.py enqueues onto; the queue must never diverge)
+on the Redis instance configured by settings.ARQ_REDIS_URL.
 
 Jobs are defined as async functions in this file. The scheduler in
 app/tasks/scheduler.py enqueues them by name.
@@ -18,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from arq import cron
@@ -39,16 +41,18 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
     """Send a reminder to a patient about an upcoming visit.
 
     Enqueued by app.tasks.scheduler.enqueue_reminder().
-    Idempotent: checks if a reminder was already sent for this visit before sending.
+    Idempotent at the DB level: ``visits.reminder_sent_at`` (ORM column,
+    migration 0060) is stamped on success, so arq retries and duplicate
+    enqueues never send a second notification.
 
-    Uses the existing NotificationService.send_confirmation_reminder() which
-    handles Telegram/SMS/email dispatch based on patient preferences. The
-    `channel` argument is a hint — the service may override it via
-    _determine_best_channel() based on patient contact info.
-
-    Marks `visits.reminder_sent_at` on success so retries are idempotent.
+    Calls the real notification service by its actual contract:
+    ``NotificationSenderService.send_confirmation_reminder(db, visit_id,
+    hours_before=...)`` — the service re-resolves the visit and dispatches
+    to Telegram/PWA/phone via _determine_best_channel(). The ``channel``
+    argument of this job is a hint for logging only (the service owns the
+    channel decision).
     """
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
 
     from app.models.visit import Visit
@@ -59,28 +63,23 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
     engine = create_engine(str(settings.DATABASE_URL))
     db = Session(engine)
     try:
-        # Idempotency: skip if already sent
-        already_sent = db.execute(
-            text("SELECT reminder_sent_at FROM visits WHERE id = :vid"),
-            {"vid": visit_id},
-        ).scalar()
-        if already_sent:
-            logger.info(
-                "job.send_visit_reminder: visit %s already reminded at %s, skipping",
-                visit_id, already_sent,
-            )
-            return
-
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             logger.warning("job.send_visit_reminder: visit %s not found", visit_id)
             return
 
-        # Send via the real notification service.
-        # This dispatches to Telegram bot / SMS gateway / email based on
-        # patient preferences and the channel hint.
+        # Idempotency: skip if a reminder was already stamped for this visit
+        if visit.reminder_sent_at is not None:
+            logger.info(
+                "job.send_visit_reminder: visit %s already reminded at %s, skipping",
+                visit_id, visit.reminder_sent_at,
+            )
+            return
+
+        # Send via the real notification service — real contract:
+        # send_confirmation_reminder(self, db, visit_id, hours_before=24).
         service = NotificationService(db)
-        result = await service.send_confirmation_reminder(visit, hours_before=24)
+        result = await service.send_confirmation_reminder(db, visit_id, hours_before=24)
 
         if not result.get("success"):
             logger.warning(
@@ -90,11 +89,8 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
             # Don't mark as sent — let arq retry
             raise RuntimeError(f"Notification send failed: {result.get('error')}")
 
-        # Mark as sent
-        db.execute(
-            text("UPDATE visits SET reminder_sent_at = NOW() WHERE id = :vid"),
-            {"vid": visit_id},
-        )
+        # Mark as sent (ORM attribute — same column the idempotency guard read)
+        visit.reminder_sent_at = datetime.now(UTC)
         db.commit()
         logger.info(
             "job.send_visit_reminder: visit %s reminded via %s",
@@ -214,6 +210,14 @@ def _parse_redis_settings(url: str) -> RedisSettings:
     )
 
 
+# The single application queue. SSOT for both sides of the pipeline:
+# the worker consumes this queue (WorkerSettings.queue_name) and the
+# scheduler enqueues onto it (_queue_name=QUEUE_NAME) — previously the
+# scheduler silently fell back to arq's default 'arq:queue' while the
+# worker listened here, so every reminder was stranded.
+QUEUE_NAME = "clinic"
+
+
 class WorkerSettings:
     """arq worker configuration. Run with:
         arq app.tasks.worker.WorkerSettings
@@ -230,7 +234,7 @@ class WorkerSettings:
     max_jobs = 10
     job_timeout = 300  # 5 min per job
     health_check_interval = 30
-    queue_name = "clinic"
+    queue_name = QUEUE_NAME
 
     # Cron jobs — run on the schedule, regardless of enqueues
     cron_jobs = [
@@ -240,4 +244,10 @@ class WorkerSettings:
 
 
 # Make functions importable from app.tasks (for scheduler.py)
-__all__ = ["send_visit_reminder", "run_data_retention", "generate_scheduled_report", "run_lab_follow_up_reminders"]
+__all__ = [
+    "QUEUE_NAME",
+    "send_visit_reminder",
+    "run_data_retention",
+    "generate_scheduled_report",
+    "run_lab_follow_up_reminders",
+]

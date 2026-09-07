@@ -83,6 +83,15 @@ class Visit(Base):
         String(64), nullable=True
     )  # user_id, telegram_id, или phone
 
+    # ✅ Идемпотентность reminder-пайплайна (arq job send_visit_reminder):
+    # штампуется воркером после успешной отправки напоминания; повторные
+    # запуски job'а (arq retry / повторный enqueue) видят NOT NULL и
+    # пропускают отправку. Канонический путь записи — только воркер
+    # (app/tasks/worker.py), схема — миграция 0059.
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # ✅ SSOT: Источник визита (единственный источник истины)
     # 'online' = QR/Telegram регистрация
     # 'desk' = Регистратура
