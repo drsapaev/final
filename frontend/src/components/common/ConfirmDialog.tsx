@@ -258,7 +258,11 @@ export function ConfirmDialog({
  *   }
  */
 export type ConfirmFn = (options: Record<string, unknown>) => Promise<boolean>;
-export type UseConfirmReturn = [ConfirmFn, React.ReactNode];
+// Codex R3 PR 3097 (P2): третий элемент — isOpen. Существующие потребители,
+// деструктурирующие [confirm, dialog], продолжают работать (лишний элемент
+// массива игнорируется); мастер использует флаг, чтобы НЕ перехватывать
+// шорткаты, пока модальный диалог подтверждения открыт.
+export type UseConfirmReturn = [ConfirmFn, React.ReactNode, boolean];
 
 export function useConfirm(): UseConfirmReturn {
   const [state, setState] = useState({
@@ -317,9 +321,10 @@ export function useConfirm(): UseConfirmReturn {
     document.body
   ) : null;
 
-  return [confirm, dialog] as [
+  return [confirm, dialog, state.isOpen] as [
     (options: Record<string, unknown>) => Promise<boolean>,
-    React.ReactNode
+    React.ReactNode,
+    boolean
   ];
 }
 

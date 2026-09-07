@@ -582,6 +582,69 @@ export const wizardContentSignature = (content: WizardContentShape): string => {
   return JSON.stringify({ patient, cart });
 };
 
+// Codex R3 PR 3097 (P2): парсинг JSON-снимка исходного содержимого мастера.
+// null — снимок повреждён/пуст (вызывающий код обязан оставить снимок как был).
+export const parseWizardBaseline = (baseline: string): WizardContentShape | null => {
+  try {
+    const parsed = JSON.parse(baseline) as WizardContentShape | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!parsed.patient || !parsed.cart || !Array.isArray(parsed.cart.items)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+// Codex R3 PR 3097 (P2): вносит в ИСХОДНЫЙ снимок ТОЛЬКО автогидрированные
+// service_id. Полный переснимок живого состояния копировал бы в снимок правки
+// пользователя (ФИО/телефон/врач/количество), сделанные, пока шёл запрос
+// /registrar/services, — и wizardHasUserContent() возвращал бы false, а
+// закрытие молча теряло бы эти правки. Расхождение длины (пользователь
+// добавил/удалил позицию, пока шёл запрос) оставляет снимок нетронутым —
+// закрытие в этом случае честно предупредит о несохранённых данных.
+export const patchBaselineWithResolvedServiceIds = (
+  baselineItems: Array<Record<string, unknown>>,
+  resolvedItems: Array<Record<string, unknown>>
+): Array<Record<string, unknown>> => {
+  if (!Array.isArray(baselineItems) || !Array.isArray(resolvedItems)) return baselineItems;
+  if (baselineItems.length !== resolvedItems.length) return baselineItems;
+  return baselineItems.map((item, index) => {
+    const resolvedId = (resolvedItems[index] as { service_id?: unknown } | null | undefined)?.service_id;
+    if (resolvedId == null) return item;
+    const baselineId = (item as { service_id?: unknown }).service_id;
+    if (baselineId != null) return item; // позиция уже была идентифицирована в снимке
+    return { ...item, service_id: resolvedId };
+  });
+};
+
+// Готовые обновления снимка (потолок LOC PR-45): вызываются из эффектов
+// гидрации. Возвращают НОВУЮ подпись снимка или null (снимок повреждён —
+// вызывающий код обязан оставить его как был).
+export const refreshBaselineAfterServiceResolution = (
+  baseline: string,
+  resolvedItems: Array<Record<string, unknown>>
+): string | null => {
+  const parsed = parseWizardBaseline(baseline);
+  if (!parsed) return null;
+  return wizardContentSignature({
+    patient: parsed.patient,
+    cart: {
+      items: patchBaselineWithResolvedServiceIds(parsed.cart.items, resolvedItems),
+      discount_mode: parsed.cart.discount_mode,
+      all_free: parsed.cart.all_free,
+    },
+  });
+};
+
+export const refreshBaselineAfterGenderHydration = (baseline: string, gender: string): string | null => {
+  const parsed = parseWizardBaseline(baseline);
+  if (!parsed) return null;
+  return wizardContentSignature({
+    patient: { ...parsed.patient, gender },
+    cart: parsed.cart,
+  });
+};
+
 // =====================================================================
 // CART SERVICE RESOLUTION (SSOT)
 // =====================================================================

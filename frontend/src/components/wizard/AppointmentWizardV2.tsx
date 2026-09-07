@@ -210,6 +210,8 @@ import {
   resolvePatientGenderValue,
   genderToPatientSexForApi,
   resolveCartServiceReferences,
+  refreshBaselineAfterGenderHydration,
+  refreshBaselineAfterServiceResolution,
   wizardContentSignature,
   formatBirthDateInput,
   convertDateToISO,
@@ -246,7 +248,11 @@ const AppointmentWizardV2 = ({
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
-  const [confirmRaw, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog, confirmDialogOpen] = useConfirm();
+  // Codex R3 PR 3097 (P2): флаг для document-keydown обработчика (он
+  // регистрируется с фиксированными зависимостями — читаем через ref).
+  const confirmDialogOpenRef = useRef(false);
+  confirmDialogOpenRef.current = confirmDialogOpen;
   const confirm = confirmRaw;
 
   // ADR-0015: queue + patients APIs accessed via hooks.
@@ -469,24 +475,12 @@ const AppointmentWizardV2 = ({
           };
         });
 
-        // Codex R2 PR 3097: авто-гидрация пола — НЕ правка пользователя;
-        // обновляем снимок, чтобы закрытие нетронутой записи не давало
-        // ложного предупреждения о несохранённых данных.
-        initialContentRef.current = wizardContentSignature({
-          patient: {
-            id: wizardData.patient.id ?? patientId ?? null,
-            fio: wizardData.patient.fio || '',
-            phone: wizardData.patient.phone || '',
-            address: wizardData.patient.address || '',
-            birth_date: wizardData.patient.birth_date || '',
-            gender: normalizedGender
-          },
-          cart: {
-            items: (wizardData.cart.items ?? []) as unknown as Array<Record<string, unknown>>,
-            discount_mode: wizardData.cart.discount_mode || 'none',
-            all_free: Boolean(wizardData.cart.all_free)
-          }
-        });
+        // Codex R2 PR 3097: авто-гидрация пола — НЕ правка пользователя.
+        // Codex R3 PR 3097 (P2): в снимке патчится ТОЛЬКО поле gender —
+        // гидрация service_id в нём сохраняется, правки пользователя не
+        // попадают.
+        const genderBaseline = refreshBaselineAfterGenderHydration(initialContentRef.current, normalizedGender);
+        if (genderBaseline) initialContentRef.current = genderBaseline;
       } catch (error: unknown) {
         logger.warn('[AppointmentWizardV2] Failed to hydrate edit-mode patient gender', {
           patientId,
@@ -985,25 +979,13 @@ const AppointmentWizardV2 = ({
         }
       }));
 
-      // Codex R2 PR 3097: гидрация service_id по справочнику — НЕ правка
-      // пользователя. Обновляем исходный снимок корзины, иначе закрытие
-      // нетронутой записи давало ложное предупреждение о потере данных
-      // (снимок содержал service_id: null, состояние — уже разрешённый ID).
-      initialContentRef.current = wizardContentSignature({
-        patient: {
-          id: wizardData.patient.id ?? null,
-          fio: wizardData.patient.fio || '',
-          phone: wizardData.patient.phone || '',
-          address: wizardData.patient.address || '',
-          birth_date: wizardData.patient.birth_date || '',
-          gender: String(wizardData.patient.gender || '')
-        },
-        cart: {
-          items: resolution.items,
-          discount_mode: wizardData.cart.discount_mode || 'none',
-          all_free: Boolean(wizardData.cart.all_free)
-        }
-      });
+      // Codex R2 PR 3097: гидрация service_id — НЕ правка пользователя.
+      // Codex R3 PR 3097 (P2): в снимок вносится ТОЛЬКО гидрированный
+      // service_id; правки пользователя (ФИО/телефон/врач/количество),
+      // сделанные, пока шёл запрос /registrar/services, в снимок не
+      // попадают — закрытие не теряет их молча.
+      const refreshedBaseline = refreshBaselineAfterServiceResolution(initialContentRef.current, resolution.items);
+      if (refreshedBaseline) initialContentRef.current = refreshedBaseline;
     }
   }, [servicesData, wizardData.cart.items]); // ✅ ИСПРАВЛЕНО: Триггерим при изменении servicesData или корзины
 
@@ -1509,6 +1491,13 @@ const AppointmentWizardV2 = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
+      // Codex R3 PR 3097 (P2): пока открыт модальный диалог подтверждения
+      // (discard / другие), шорткаты мастера принадлежат ДИАЛОГУ. Раньше
+      // Enter на его кнопках preventDefault'ился и продвигал/отправлял
+      // мастер под диалогом; на последнем шаге второй confirm() даже
+      // ЗАМЕНЯЛ ожидающий диалог (useConfirm резолвит старый промис как
+      // false) — пользователь терял контроль над отменой.
+      if (confirmDialogOpenRef.current) return;
       const target = e.target as HTMLElement | null;
 
       // Fix F: Escape закрывает мастер через СОБСТВЕННУЮ защиту

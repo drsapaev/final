@@ -18,12 +18,19 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { wizardContentSignature } from '../wizardUtils';
+import {
+  parseWizardBaseline,
+  patchBaselineWithResolvedServiceIds,
+  refreshBaselineAfterGenderHydration,
+  refreshBaselineAfterServiceResolution,
+  wizardContentSignature,
+} from '../wizardUtils';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const wizardPath = path.resolve(__dirname, '../AppointmentWizardV2.tsx');
 const patientStepPath = path.resolve(__dirname, '../PatientStepV2.tsx');
 const hotkeysPath = path.resolve(__dirname, '../../../pages/registrar/useRegistrarHotkeys.ts');
+const confirmDialogPath = path.resolve(__dirname, '../../common/ConfirmDialog.tsx');
 const readWizardSource = () => fs.readFileSync(wizardPath, 'utf8');
 const readPatientStepSource = () => fs.readFileSync(patientStepPath, 'utf8');
 const readHotkeysSource = () => fs.readFileSync(hotkeysPath, 'utf8');
@@ -203,8 +210,9 @@ describe('Fix F Codex R1 regressions', () => {
       'const resolution = resolveCartServiceReferences(',
       '}, [servicesData, wizardData.cart.items]);'
     );
-    expect(hydration).toContain('initialContentRef.current = wizardContentSignature(');
-    expect(hydration).toContain('Codex R2 PR 3097');
+    // Codex R3 PR 3097: подпись снимка обновляется через refresh-хелпер
+    // (только гидрированный service_id, без переснимка живого состояния)
+    expect(hydration).toContain('if (refreshedBaseline) initialContentRef.current = refreshedBaseline;');
 
     // Сама чистая функция резолвит service_id по коду (p09 = p9) и имени
     const utilsSource = readWizardUtilsSource();
@@ -221,7 +229,56 @@ describe('Fix F Codex R1 regressions', () => {
       'const hydrateMissingEditGender = async () => {',
       'hydrateMissingEditGender();'
     );
-    expect(genderBlock).toContain('initialContentRef.current = wizardContentSignature(');
+    expect(genderBlock).toContain('if (genderBaseline) initialContentRef.current = genderBaseline;');
+  });
+
+  it('baseline refresh patches ONLY auto-hydrated fields, never live user edits (Codex R3 #3097 P2 regression)', () => {
+    // Прежний баг: переснимок живого wizardData копировал в снимок правки
+    // пользователя (ФИО/телефон/врач/количество), сделанные, пока шёл запрос
+    // /registrar/services, — и закрытие молча теряло их.
+    const hydration = extractSourceBlock(
+      source,
+      'const resolution = resolveCartServiceReferences(',
+      '}, [servicesData, wizardData.cart.items]);'
+    );
+    // снимок патчится из ИСХОДНОГО снимка, а не из живого состояния
+    expect(hydration).toContain('refreshBaselineAfterServiceResolution(initialContentRef.current');
+    expect(hydration).not.toContain('fio: wizardData.patient.fio');
+    expect(hydration).not.toContain('phone: wizardData.patient.phone');
+
+    const genderBlock = extractSourceBlock(
+      source,
+      'const hydrateMissingEditGender = async () => {',
+      'hydrateMissingEditGender();'
+    );
+    expect(genderBlock).toContain('refreshBaselineAfterGenderHydration(initialContentRef.current');
+    expect(genderBlock).not.toContain('fio: wizardData.patient.fio');
+
+    // чистые хелперы: патч только service_id, снятие при расхождении длины
+    const utilsSource = readWizardUtilsSource();
+    const patcher = extractSourceBlock(
+      utilsSource,
+      'export const patchBaselineWithResolvedServiceIds = (',
+      'return baselineItems.map((item, index) => {'
+    );
+    expect(patcher).toContain('baselineItems.length !== resolvedItems.length');
+  });
+
+  it('wizard shortcuts are suppressed while the confirm dialog is open (Codex R3 #3097 P2 regression)', () => {
+    // Прежний баг: Enter на кнопках модального диалога подтверждения
+    // preventDefault'ился и продвигал/отправлял мастер под диалогом; на
+    // последнем шаге второй confirm() заменял ожидающий диалог.
+    const handler = extractSourceBlock(
+      source,
+      'const handleKeyDown = (e: KeyboardEvent) => {',
+      "document.addEventListener('keydown', handleKeyDown);"
+    );
+    expect(handler).toContain('if (confirmDialogOpenRef.current) return;');
+    // флаг обновляется синхронно на каждом рендере
+    expect(source).toContain('confirmDialogOpenRef.current = confirmDialogOpen;');
+    // useConfirm отдаёт флаг открытости третьим элементом
+    const dialogSource = fs.readFileSync(confirmDialogPath, 'utf8');
+    expect(dialogSource).toContain('return [confirm, dialog, state.isOpen] as [');
   });
 
   it('Enter on the retry button activates the button, not the wizard shortcut (Codex R2 P2)', () => {
@@ -283,5 +340,83 @@ describe('Fix F Codex R1 regressions', () => {
         cart: initialCart,
       })
     ).toBe(initialSignature);
+  });
+});
+
+describe('Fix F (Codex R3 #3097): baseline patch helpers', () => {
+  const baseline = wizardContentSignature({
+    patient: { id: 7, fio: 'SYNTHETIC-Тестов Тест', phone: '+998000000001', address: '', birth_date: '1990-01-01', gender: '' },
+    cart: { items: [{ service_id: null, doctor_id: 3, quantity: 1 }, { service_id: 9, doctor_id: null, quantity: 2 }], discount_mode: 'none', all_free: false },
+  });
+
+  it('parseWizardBaseline round-trips the signature and rejects malformed input', () => {
+    const parsed = parseWizardBaseline(baseline);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.patient.fio).toBe('SYNTHETIC-Тестов Тест');
+    expect(parsed?.cart.items).toHaveLength(2);
+
+    expect(parseWizardBaseline('')).toBeNull();
+    expect(parseWizardBaseline('not json {')).toBeNull();
+    expect(parseWizardBaseline('{"patient": {}}')).toBeNull();
+  });
+
+  it('patch fills ONLY missing service_ids and keeps user-editable baseline fields', () => {
+    const parsed = parseWizardBaseline(baseline);
+    const resolved = [
+      { service_id: 12, service_name: 'X', service_price: 100, doctor_id: 3, quantity: 1 },
+      { service_id: 9, service_name: 'Y', service_price: 200, doctor_id: null, quantity: 2 },
+    ];
+    const patched = patchBaselineWithResolvedServiceIds(parsed!.cart.items, resolved as unknown as Array<Record<string, unknown>>);
+
+    expect((patched[0] as { service_id: number }).service_id).toBe(12);
+    // уже идентифицированная позиция не меняется
+    expect((patched[1] as { service_id: number }).service_id).toBe(9);
+    // quantity/doctor_id снимка не перезаписываются живым состоянием
+    expect((patched[0] as { quantity: number }).quantity).toBe(1);
+    expect((patched[1] as { doctor_id: number | null }).doctor_id).toBeNull();
+
+    // подпись со снятым снимком отличается ТОЛЬКО гидрацией service_id
+    const reSigned = wizardContentSignature({ patient: parsed!.patient, cart: { ...parsed!.cart, items: patched } });
+    expect(reSigned).not.toBe(baseline);
+    expect(JSON.parse(reSigned).cart.items[0].service_id).toBe(12);
+    expect(JSON.parse(reSigned).patient.fio).toBe('SYNTHETIC-Тестов Тест');
+  });
+
+  it('length mismatch (user added/removed items mid-flight) leaves the baseline untouched', () => {
+    const parsed = parseWizardBaseline(baseline);
+    const shorter = [{ service_id: 12 }];
+    const patched = patchBaselineWithResolvedServiceIds(parsed!.cart.items, shorter as unknown as Array<Record<string, unknown>>);
+    expect(patched).toBe(parsed!.cart.items); // тот же массив — снимок не тронут
+  });
+});
+
+describe('Fix F (Codex R3 #3097): refresh helpers keep user edits out of the baseline', () => {
+  const base = wizardContentSignature({
+    patient: { id: 7, fio: 'SYNTHETIC-Тестов Тест', phone: '+998000000001', address: 'ул. А', birth_date: '1990-01-01', gender: '' },
+    cart: { items: [{ service_id: null, doctor_id: 3, quantity: 1 }], discount_mode: 'none', all_free: false },
+  });
+  const resolved = [{ service_id: 12, service_name: 'X', service_price: 100, doctor_id: 3, quantity: 1 }] as unknown as Array<Record<string, unknown>>;
+
+  it('service resolution refresh: only service_id changes, user fields untouched', () => {
+    const refreshed = refreshBaselineAfterServiceResolution(base, resolved);
+    expect(refreshed).not.toBeNull();
+    const obj = JSON.parse(refreshed as string);
+    expect(obj.cart.items[0].service_id).toBe(12);
+    // правки пользователя НЕ попали в снимок: fio/address остаются исходными
+    expect(obj.patient.fio).toBe('SYNTHETIC-Тестов Тест');
+    expect(obj.patient.address).toBe('ул. А');
+  });
+
+  it('gender hydration refresh: only gender changes, service hydration preserved', () => {
+    const afterService = refreshBaselineAfterServiceResolution(base, resolved) as string;
+    const afterGender = refreshBaselineAfterGenderHydration(afterService, 'male') as string;
+    const obj = JSON.parse(afterGender);
+    expect(obj.patient.gender).toBe('male');
+    expect(obj.patient.fio).toBe('SYNTHETIC-Тестов Тест');
+    expect(obj.cart.items[0].service_id).toBe(12);
+
+    // повреждённый снимок → null (снимок остаётся как был)
+    expect(refreshBaselineAfterGenderHydration('broken {', 'male')).toBeNull();
+    expect(refreshBaselineAfterServiceResolution('broken {', resolved)).toBeNull();
   });
 });
