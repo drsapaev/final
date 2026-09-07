@@ -25,6 +25,14 @@ const patientStepPath = path.resolve(__dirname, '../PatientStepV2.tsx');
 const readWizardSource = () => fs.readFileSync(wizardPath, 'utf8');
 const readPatientStepSource = () => fs.readFileSync(patientStepPath, 'utf8');
 
+const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
+  const start = source.indexOf(startMarker);
+  expect(start).toBeGreaterThanOrEqual(0);
+  const end = source.indexOf(endMarker, start);
+  expect(end).toBeGreaterThan(start);
+  return source.slice(start, end);
+};
+
 // =====================================================================
 // 1. Birth date calendar validation (real behavior)
 // =====================================================================
@@ -91,6 +99,23 @@ describe('Fix E: keyboard & validation contract', () => {
   it('Enter is not hijacked from interactive controls (buttons, links, selects)', () => {
     expect(source).toContain("const interactiveTags = ['BUTTON', 'A', 'SELECT'];");
     expect(source).toContain('if (isInteractiveTarget) return;');
+  });
+
+  it('Ctrl+Enter completion is handled BEFORE the interactive-target guard (Codex R1)', () => {
+    // Регрессия R1: guard `if (isInteractiveTarget) return;` стоял раньше
+    // блока Ctrl+Enter, поэтому фокус на BUTTON/A/SELECT/contenteditable
+    // гасил задокументированный глобальный шорткат «Завершить».
+    const hotkeys = extractSourceBlock(
+      source,
+      '===================== ГОРЯЧИЕ КЛАВИШИ =====================',
+      'document.addEventListener(\'keydown\', handleKeyDown);'
+    );
+    const ctrlEnterIdx = hotkeys.indexOf("if (e.key === 'Enter' && e.ctrlKey)");
+    const guardIdx = hotkeys.indexOf('if (isInteractiveTarget) return;');
+    expect(ctrlEnterIdx).toBeGreaterThanOrEqual(0);
+    expect(guardIdx).toBeGreaterThan(ctrlEnterIdx);
+    // Ctrl+Enter-ветка завершает обработку: следующая не «проваливается» в guard
+    expect(hotkeys.slice(ctrlEnterIdx, guardIdx)).toContain('return;');
   });
 
   it('gender radio group is reachable by keyboard when nothing is selected', () => {
