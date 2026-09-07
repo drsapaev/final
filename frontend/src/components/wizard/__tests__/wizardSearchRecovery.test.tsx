@@ -16,13 +16,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
+import { useEffect, useState } from 'react';
 
 import {
   parseWizardBaseline,
   patchBaselineWithResolvedServiceIds,
   refreshBaselineAfterGenderHydration,
   refreshBaselineAfterServiceResolution,
+  useWizardSearchUnmountCleanup,
   wizardContentSignature,
 } from '../wizardUtils';
 
@@ -434,5 +437,58 @@ describe('Fix F (Codex R4 #3097): partial birth-date input tracked in dirty stat
     expect(hasContent).toContain(
       "birth_date: p.birth_date || convertDateToISO(formattedBirthDate) || formattedBirthDate || ''"
     );
+  });
+});
+
+describe('Fix F (Codex R7 #3097): unmount-only debounce cleanup', () => {
+  // Поведенческий стенд: таймер хранится в state, как в мастере
+  // (setSearchTimeout/setPhoneCheckTimeout), хук — единственный,
+  // кто гасит его вне обработчиков.
+  const useDebounceHarness = (fire: () => void) => {
+    const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+    useWizardSearchUnmountCleanup(() => [timer]);
+    useEffect(() => {
+      const t = setTimeout(fire, 300);
+      setTimer(t);
+    }, []);
+    return timer;
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('pending debounce survives an unrelated re-render inside the window (R7 P2)', () => {
+    const onFire = vi.fn();
+    const { rerender } = renderHook(({ fire }: { fire: () => void }) => useDebounceHarness(fire), {
+      initialProps: { fire: onFire },
+    });
+    // Посторонний ререндер в окне дебаунса (услуги/врачи догрузились):
+    // прежний cleanup-на-каждом-рендере гасил валидный таймер — поиск/проверка
+    // телефона молча не выполнялись.
+    rerender({ fire: onFire });
+    act(() => {
+      vi.advanceTimersByTime(350);
+    });
+    expect(onFire).toHaveBeenCalledTimes(1);
+  });
+
+  it('real unmount still cancels the pending debounce (R5 invariant)', () => {
+    const onFire = vi.fn();
+    const { unmount } = renderHook(({ fire }: { fire: () => void }) => useDebounceHarness(fire), {
+      initialProps: { fire: onFire },
+    });
+    act(() => {
+      unmount();
+    });
+    act(() => {
+      vi.advanceTimersByTime(350);
+    });
+    expect(onFire).not.toHaveBeenCalled();
   });
 });

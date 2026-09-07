@@ -10,7 +10,7 @@
  *   - Упрощает code review (утилиты отделены от UI-логики)
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { api } from '../../api/client';
@@ -793,10 +793,18 @@ export default {
 // Codex R5 PR 3097 (P2): при условном размонтировании мастера (EditPatientModal
 // снимает его с дерева сразу при закрытии) isOpen-эффект не срабатывает, и
 // активные дебаунсы уходили в сеть после исчезновения диалога. Хук гасит
-// переданные таймеры на unmount (без deps — cleanup на каждом рендере держит
-// актуальные значения, повторный clearTimeout безвреден).
+// переданные таймеры на unmount. Codex R7 (P2): clearTimeout только на unmount
+// — замыкание обновляется через ref на каждом рендере, чтобы любой ререндер
+// (загрузка услуг/врачей) не погасил валидный отложенный поиск/проверку телефона.
 export const useWizardSearchUnmountCleanup = (
   getTimers: () => Array<ReturnType<typeof setTimeout> | null>
 ): void => {
-  useEffect(() => () => { getTimers().forEach((t) => { if (t) clearTimeout(t); }); });
+  const getTimersRef = useRef(getTimers);
+  useEffect(() => {
+    getTimersRef.current = getTimers;
+  });
+  useEffect(
+    () => () => { getTimersRef.current().forEach((t) => { if (t) clearTimeout(t); }); },
+    [],
+  );
 };
