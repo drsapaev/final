@@ -126,15 +126,17 @@ def payload_hash(body: bytes | None) -> str:
     return hashlib.sha256(body or b"").hexdigest()
 
 
-def _user_authorized_in_db(db: Any, user_id: int | None, username: str | None, jti: Any) -> bool:
-    """Pure DB-backed authorization query — fails CLOSED (Codex R3 #3092).
+def _user_authorized_in_db(db: Any, user_id: int | None, username: str | None, jti: Any) -> tuple[bool, str | None]:
+    """Pure DB-backed authorization query — fails CLOSED (Codex R3/R4 #3092).
 
-    Same semantics as app.api.deps._get_user_with_blacklist: the user must
-    exist, be active, and the token must not be blacklisted (jti match or
-    the all_user_tokens sentinel). One SQL roundtrip.
+    Same semantics as app.api.deps._get_user_with_blacklist, plus the role:
+    the user must exist, be active, and the token must not be blacklisted
+    (jti match or the all_user_tokens sentinel). One SQL roundtrip.
+    Returns (authorized, role) — the role binds stored responses to the
+    RBAC policy they were produced under (Codex R4 #3092 P1).
     """
     if db is None or (user_id is None and not username):
-        return False
+        return False, None
     try:
         from datetime import UTC, datetime
 
@@ -158,20 +160,21 @@ def _user_authorized_in_db(db: Any, user_id: int | None, username: str | None, j
             )
             .exists()
         )
-        stmt = select(User.id, User.is_active, jti_bl.label("jti_bl"), sentinel_bl.label("sentinel_bl")).where(
+        stmt = select(User.id, User.is_active, User.role, jti_bl.label("jti_bl"), sentinel_bl.label("sentinel_bl")).where(
             subject_filter
         )
         row = db.execute(stmt).first()
         if row is None:
-            return False
-        _, is_active, jti_hit, sentinel_hit = row
-        return bool(is_active) and not (jti_hit or sentinel_hit)
+            return False, None
+        _, is_active, role, jti_hit, sentinel_hit = row
+        role_label = str(role) if role is not None else None
+        return (bool(is_active) and not (jti_hit or sentinel_hit)), role_label
     except Exception:
         logger.warning(
             "Idempotency principal authorization query failed; refusing replay",
             exc_info=True,
         )
-        return False
+        return False, None
 
 
 def _resolve_request_db(request: Any):
@@ -195,12 +198,12 @@ def _resolve_request_db(request: Any):
 
 def _check_principal_authorized_sync(
     request: Any, user_id: int | None, username: str | None, jti: Any
-) -> bool:
-    """DB-backed principal authorization for the replay path (Codex R3 #3092).
+) -> tuple[bool, str | None]:
+    """DB-backed principal authorization for the replay path (Codex R3/R4 #3092).
 
     Resolves the DB through the same session source the endpoint uses, runs
     the authorization query off the event loop, and fails CLOSED: a broken
-    DB check never results in a replay.
+    DB check never results in a replay. Returns (authorized, current_role).
     """
     try:
         generator = _resolve_request_db(request)
@@ -219,7 +222,7 @@ def _check_principal_authorized_sync(
             "Idempotency principal authorization check failed; refusing replay",
             exc_info=True,
         )
-        return False
+        return False, None
 
 
 class IdempotencyResponseCache:
@@ -231,29 +234,34 @@ class IdempotencyResponseCache:
     """
 
     def __init__(self, max_entries: int = _MAX_CACHE_ENTRIES) -> None:
-        self._cache: OrderedDict[tuple[str, str], tuple[float, Response, str]] = OrderedDict()
+        self._cache: OrderedDict[tuple[str, str], tuple[float, Response, str, str | None]] = OrderedDict()
         self._max_entries = max_entries
 
-    def get(self, user_id: str, key: str, body_hash: str | None = None) -> tuple[Response | None, bool]:
-        """Return (cached_response, payload_mismatch)."""
+    def get(self, user_id: str, key: str, body_hash: str | None = None) -> tuple[Response | None, bool, str | None]:
+        """Return (cached_response, payload_mismatch, bound_role)."""
         cache_key = (user_id, key)
         entry = self._cache.get(cache_key)
         if entry is None:
-            return None, False
-        expires_at, response, stored_hash = entry
+            return None, False, None
+        expires_at, response, stored_hash, stored_role = entry
         if time.time() > expires_at:
             # Expired — evict
             self._cache.pop(cache_key, None)
-            return None, False
+            return None, False, None
         # Move to end (most recently used)
         self._cache.move_to_end(cache_key)
         mismatch = bool(body_hash and stored_hash and body_hash != stored_hash)
-        return response, mismatch
+        return response, mismatch, stored_role
 
-    def set(self, user_id: str, key: str, response: Response, body_hash: str = "", ttl: int = _CACHE_TTL_SECONDS) -> None:
+    def invalidate(self, user_id: str, key: str) -> None:
+        """Drop a stored response whose role binding can never match again
+        (Codex R4 #3092: role changed since execution)."""
+        self._cache.pop((user_id, key), None)
+
+    def set(self, user_id: str, key: str, response: Response, body_hash: str = "", ttl: int = _CACHE_TTL_SECONDS, principal_role: str | None = None) -> None:
         cache_key = (user_id, key)
         expires_at = time.time() + ttl
-        self._cache[cache_key] = (expires_at, response, body_hash)
+        self._cache[cache_key] = (expires_at, response, body_hash, principal_role)
         self._cache.move_to_end(cache_key)
         # Evict oldest if over capacity
         while len(self._cache) > self._max_entries:
@@ -446,13 +454,13 @@ class DistributedIdempotencyClaim:
             token,
         )
 
-    def load_response(self, user_id: int | str, key: str) -> tuple[Response | None, str | None]:
-        """Return (replay_response, stored_payload_hash)."""
+    def load_response(self, user_id: int | str, key: str) -> tuple[Response | None, str | None, str | None]:
+        """Return (replay_response, stored_payload_hash, bound_principal_role)."""
         if not self._ensure_available() or self._client is None:
-            return None, None
+            return None, None, None
         raw = self._run(self._client.get, self._resp_key(user_id, key))
         if not raw:
-            return None, None
+            return None, None, None
         try:
             snapshot = json.loads(raw)
             body = base64.b64decode(snapshot["body_b64"])
@@ -461,12 +469,12 @@ class DistributedIdempotencyClaim:
                 status_code=int(snapshot["status"]),
                 headers=dict(snapshot["headers"]),
                 media_type=snapshot.get("media_type"),
-            ), snapshot.get("payload_hash")
+            ), snapshot.get("payload_hash"), snapshot.get("principal_role")
         except Exception as exc:
             logger.warning("Idempotency snapshot decode failed: %s", exc)
-            return None, None
+            return None, None, None
 
-    def store_response(self, user_id: int | str, key: str, response: Response, ttl: int | None = None, payload_hash: str = "") -> None:
+    def store_response(self, user_id: int | str, key: str, response: Response, ttl: int | None = None, payload_hash: str = "", principal_role: str | None = None) -> None:
         if not self._ensure_available() or self._client is None:
             return
         body = getattr(response, "body", b"") or b""
@@ -477,6 +485,7 @@ class DistributedIdempotencyClaim:
                 "media_type": response.media_type,
                 "body_b64": base64.b64encode(body).decode("ascii"),
                 "payload_hash": payload_hash,
+                "principal_role": principal_role,
             }
         )
         self._run(
@@ -485,6 +494,14 @@ class DistributedIdempotencyClaim:
             snapshot,
             ex=ttl or self._ttl,
         )
+
+    def forget_response(self, user_id: int | str, key: str) -> None:
+        """Drop the stored response snapshot (stale role binding — Codex R4
+        #3092): the next request re-executes and re-stores with the fresh
+        binding instead of being refused forever."""
+        if not self._ensure_available() or self._client is None:
+            return
+        self._run(self._client.delete, self._resp_key(user_id, key))
 
     def has_in_flight(self, user_id: int | str, key: str) -> bool:
         """Claim marker present = some worker is executing this key."""
@@ -587,8 +604,15 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         user_id = self._namespace(principal_payload)
 
+        # Codex R4 #3092 (P1): resolve the distributed claim BEFORE the local
+        # cache check — the role-mismatch fall-through needs it to drop a
+        # stale snapshot and re-execute.
+        claim = get_distributed_claim()
+        claim_acquired = True
+        claim_token: str | None = None
+
         # Check local (per-process) cache first — fastest path
-        cached, local_mismatch = _idempotency_cache.get(user_id, idempotency_key, incoming_hash)
+        cached, local_mismatch, cached_role = _idempotency_cache.get(user_id, idempotency_key, incoming_hash)
         if local_mismatch:
             logger.warning(
                 "Idempotency payload mismatch (local): user=%s key=%s path=%s — refusing to replay "
@@ -599,26 +623,43 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         if cached is not None:
             # Codex R3 #3092 (P1): replay only after authorization — the
             # principal must still resolve to an active, non-blacklisted user.
-            if not await self._principal_authorized(request, principal_payload):
+            # Codex R4 #3092 (P1): the response is additionally bound to the
+            # authorized ROLE at execution time — a demoted user (role change
+            # does not revoke tokens) cannot replay a cached response that
+            # required the old role; the request falls through to the
+            # endpoint's require_roles, which re-authorizes.
+            authorized, current_role = await self._principal_authorized(request, principal_payload)
+            if not authorized:
                 logger.warning(
                     "Idempotency replay refused (principal not authorized): user=%s key=%s path=%s",
                     user_id, idempotency_key, request.url.path,
                 )
                 return await call_next(request)
-            logger.info(
-                "Idempotency hit: user=%s key=%s method=%s path=%s — returning cached response",
-                user_id, idempotency_key, request.method, request.url.path,
-            )
-            return cached
+            if cached_role is not None and current_role != cached_role:
+                logger.warning(
+                    "Idempotency replay refused (role changed since execution): user=%s key=%s path=%s (%s -> %s) — re-executing",
+                    user_id, idempotency_key, request.url.path, cached_role, current_role,
+                )
+                # Codex R4 #3092 (P1): the binding is stale forever for this
+                # principal — evict it so the re-execution re-stores with the
+                # fresh role instead of refusing every retry endlessly.
+                _idempotency_cache.invalidate(user_id, idempotency_key)
+                if claim is not None and claim.try_available():
+                    claim.forget_response(user_id, idempotency_key)
+                cached = None
+                cached_role = None
+            else:
+                logger.info(
+                    "Idempotency hit: user=%s key=%s method=%s path=%s — returning cached response",
+                    user_id, idempotency_key, request.method, request.url.path,
+                )
+                return cached
 
         # Codex R1 #3092 (P1): distributed claim across workers. A retry may
         # land on a different worker (staging runs two) or overlap the first
         # request; the per-process cache alone cannot deduplicate either case.
-        claim = get_distributed_claim()
-        claim_acquired = True
-        claim_token: str | None = None
         if claim is not None and claim.try_available():
-            replayed, stored_hash = claim.load_response(user_id, idempotency_key)
+            replayed, stored_hash, stored_role = claim.load_response(user_id, idempotency_key)
             if replayed is not None:
                 if stored_hash and stored_hash != incoming_hash:
                     logger.warning(
@@ -627,27 +668,50 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     )
                     return self._payload_mismatch_response()
                 # Codex R3 #3092 (P1): authorization before cross-worker replay.
-                if not await self._principal_authorized(request, principal_payload):
+                authorized, current_role = await self._principal_authorized(request, principal_payload)
+                if not authorized:
                     logger.warning(
                         "Idempotency distributed replay refused (principal not authorized): user=%s key=%s path=%s",
                         user_id, idempotency_key, request.url.path,
                     )
                     return await call_next(request)
-                logger.info(
-                    "Idempotency distributed replay: user=%s key=%s path=%s",
-                    user_id, idempotency_key, request.url.path,
-                )
-                return replayed
+                if stored_role is not None and current_role != stored_role:
+                    logger.warning(
+                        "Idempotency distributed replay refused (role changed since execution): user=%s key=%s path=%s (%s -> %s) — re-executing",
+                        user_id, idempotency_key, request.url.path, stored_role, current_role,
+                    )
+                    # Codex R4 #3092 (P1): stale binding — drop the snapshot so
+                    # this request re-executes and re-stores with the fresh role.
+                    claim.forget_response(user_id, idempotency_key)
+                    _idempotency_cache.invalidate(user_id, idempotency_key)
+                    replayed = None
+                else:
+                    logger.info(
+                        "Idempotency distributed replay: user=%s key=%s path=%s",
+                        user_id, idempotency_key, request.url.path,
+                    )
+                    return replayed
             claim_token = claim.acquire(user_id, idempotency_key)
             claim_acquired = claim_token is not None
             if not claim_acquired:
                 # Another worker holds the claim. Its response may have
                 # completed between our acquire attempt and now — re-check
                 # before rejecting.
-                replayed, stored_hash = claim.load_response(user_id, idempotency_key)
+                replayed, stored_hash, stored_role = claim.load_response(user_id, idempotency_key)
                 if replayed is not None:
                     if stored_hash and stored_hash != incoming_hash:
                         return self._payload_mismatch_response()
+                    # Codex R4 #3092 (P1): the post-claim replay path runs the
+                    # SAME authorization + role binding as the earlier branches —
+                    # a revoked/deactivated/demoted principal must not receive
+                    # the cached response here either.
+                    authorized, current_role = await self._principal_authorized(request, principal_payload)
+                    if not authorized or (stored_role is not None and current_role != stored_role):
+                        logger.warning(
+                            "Idempotency post-inflight replay refused (principal not authorized or role changed): user=%s key=%s path=%s",
+                            user_id, idempotency_key, request.url.path,
+                        )
+                        return await call_next(request)
                     logger.info(
                         "Idempotency distributed replay (post-inflight): user=%s key=%s",
                         user_id, idempotency_key,
@@ -709,15 +773,26 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 headers=dict(response.headers),
                 media_type=response.media_type,
             )
-            _idempotency_cache.set(user_id, idempotency_key, cached_response, incoming_hash)
-            if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
-                # Codex R1 #3092 (P1): snapshot for CROSS-WORKER replay, then
-                # drop the in-flight claim so later retries replay instead
-                # of conflicting. Codex R2 #3092 (P1): the snapshot carries
-                # the payload hash — changed data is never replayed as the
-                # original success.
-                claim.store_response(user_id, idempotency_key, cached_response, payload_hash=incoming_hash)
-                claim.release(user_id, idempotency_key, claim_token)
+            # Codex R4 #3092 (P1): bind the stored response to the authorized
+            # ROLE at execution time. Role changes do not revoke tokens, so a
+            # demoted user must not be able to replay a cached response that
+            # required the old role — the replay re-checks it (see above).
+            store_authorized, store_role = await self._principal_authorized(request, principal_payload)
+            if store_authorized:
+                _idempotency_cache.set(user_id, idempotency_key, cached_response, incoming_hash, principal_role=store_role)
+                if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
+                    # Codex R1 #3092 (P1): snapshot for CROSS-WORKER replay, then
+                    # drop the in-flight claim so later retries replay instead
+                    # of conflicting. Codex R2 #3092 (P1): the snapshot carries
+                    # the payload hash — changed data is never replayed as the
+                    # original success.
+                    claim.store_response(user_id, idempotency_key, cached_response, payload_hash=incoming_hash, principal_role=store_role)
+                    claim.release(user_id, idempotency_key, claim_token)
+            else:
+                logger.warning(
+                    "Idempotency response not cached (principal not authorized at store time): user=%s key=%s path=%s",
+                    user_id, idempotency_key, request.url.path,
+                )
             logger.info(
                 "Idempotency cached: user=%s key=%s method=%s path=%s status=%s",
                 user_id, idempotency_key, request.method, request.url.path, response.status_code,
@@ -789,11 +864,14 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         sub = str(principal_payload.get("sub") or "")
         return hashlib.sha256(sub.encode("utf-8")).hexdigest()[:32]
 
-    async def _principal_authorized(self, request: Request, principal_payload: dict[str, Any]) -> bool:
-        """DB-backed authorization before any replay (Codex R3 #3092 P1).
+    async def _principal_authorized(self, request: Request, principal_payload: dict[str, Any]) -> tuple[bool, str | None]:
+        """DB-backed authorization before any replay (Codex R3/R4 #3092).
 
         Mirrors get_current_user's semantics: the user must exist, be active,
         and the token must not be blacklisted (jti or all-user sentinel).
+        Returns (authorized, current_role) — the role lets the caller bind a
+        stored response to the role it was authorized under (Codex R4: role
+        changes do not revoke tokens, so the replay must re-check it).
         Runs the sync query in a worker thread; fails CLOSED — a broken DB
         check never results in a replay (the request falls through to the
         endpoint, which re-authenticates anyway).
@@ -809,4 +887,4 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
         except Exception:  # pragma: no cover - to_thread failure is fail-closed
             logger.warning("Idempotency principal check crashed; refusing replay", exc_info=True)
-            return False
+            return False, None

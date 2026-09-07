@@ -171,7 +171,7 @@ def two_workers(fake_redis: FakeRedis):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     idem_module._distributed_claim = _make_claim(fake_redis)
-    idem_module._check_principal_authorized_sync = lambda *a, **k: True
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar")
 
     counters = {"w1": {"calls": 0}, "w2": {"calls": 0}}
     client1 = TestClient(_make_app(counters["w1"]), raise_server_exceptions=False)
@@ -265,7 +265,7 @@ def test_redis_unavailable_falls_back_to_in_memory(monkeypatch):
     claim._client = None
     claim._available = False
     idem_module._distributed_claim = claim
-    idem_module._check_principal_authorized_sync = lambda *a, **k: True
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar")
 
     try:
         counter = {"calls": 0}
@@ -294,13 +294,14 @@ def test_store_response_snapshot_round_trip(fake_redis):
         headers={"X-Custom": "abc"},
         media_type="application/json",
     )
-    claim.store_response(7, "k", original, payload_hash="deadbeef")
-    replayed, stored_hash = claim.load_response(7, "k")
+    claim.store_response(7, "k", original, payload_hash="deadbeef", principal_role="Registrar")
+    replayed, stored_hash, stored_role = claim.load_response(7, "k")
     assert replayed is not None
     assert replayed.status_code == 200
     assert replayed.body == b'{"invoice_id": 42}'
     assert replayed.headers.get("x-custom") == "abc"
     assert stored_hash == "deadbeef"
+    assert stored_role == "Registrar"
 
 
 # =====================================================================
@@ -538,7 +539,7 @@ def test_replay_refused_when_principal_no_longer_authorized(two_workers, monkeyp
 
     # The DB authorization check now fails for this principal
     monkeypatch.setattr(
-        idem_module, "_check_principal_authorized_sync", lambda *a, **k: False
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None)
     )
     second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
     assert second.status_code == 200  # fell through to the endpoint handler
@@ -567,8 +568,8 @@ def test_principal_authorization_check_fails_closed(fake_redis, monkeypatch):
     request = SimpleNamespace(
         app=SimpleNamespace(dependency_overrides={get_db: broken_override})
     )
-    assert _check_principal_authorized_sync(request, 1, None, None) is False
-    assert _check_principal_authorized_sync(request, None, None, None) is False
+    assert _check_principal_authorized_sync(request, 1, None, None)[0] is False
+    assert _check_principal_authorized_sync(request, None, None, None)[0] is False
 
 
 def test_authorization_resolves_through_dependency_override():
@@ -586,8 +587,8 @@ def test_authorization_resolves_through_dependency_override():
 
         def execute(self, stmt):
             self.used = True
-            # user found, active, not blacklisted
-            return SimpleNamespace(first=lambda: (7, True, False, False))
+            # user found, active, not blacklisted, role Registrar
+            return SimpleNamespace(first=lambda: (7, True, "Registrar", False, False))
 
     class Override:
         def __init__(self) -> None:
@@ -598,7 +599,9 @@ def test_authorization_resolves_through_dependency_override():
 
     override = Override()
     request = SimpleNamespace(app=SimpleNamespace(dependency_overrides={get_db: override}))
-    assert _check_principal_authorized_sync(request, 7, None, None) is True
+    authorized, role = _check_principal_authorized_sync(request, 7, None, None)
+    assert authorized is True
+    assert role == "Registrar"
     assert override.session.used, "the override session (endpoint's DB) must be queried"
 
 
@@ -613,3 +616,74 @@ def test_namespace_is_stable_per_sub_and_hashed():
     assert ns1 == ns1_again
     assert ns1 != ns2
     assert ns1 == sha256(b"1").hexdigest()[:32]
+
+
+# =====================================================================
+# Codex R4 #3092
+# =====================================================================
+
+
+def test_role_change_after_execution_blocks_replay(two_workers, monkeypatch):
+    """Codex R4 #3092 (P1): a role change (e.g. registrar demoted to Doctor)
+    does not revoke tokens, so the replay must re-check the authorized role.
+    A stored response bound to 'Registrar' must not be served when the
+    principal's current role differs — the request re-executes under the
+    endpoint's require_roles and re-stores with the fresh binding."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "role-binding-key"
+    h1 = auth_headers("1")
+
+    first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+    assert counters["w2"]["calls"] == 0
+
+    # The same principal's role changed since execution
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Doctor")
+    )
+    second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 200  # re-executed under the new role
+    assert counters["w2"]["calls"] == 1, (
+        "changed-role principal must not receive the cached response"
+    )
+
+    # Each further same-role retry replays the response stored under the
+    # CURRENT role binding (no endless refusals, no duplicate executions)
+    third = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert third.status_code == 200
+    assert counters["w2"]["calls"] == 1
+
+    # Role changes again → the Doctor-bound response is refused too
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Admin")
+    )
+    fourth = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert fourth.status_code == 200
+    assert counters["w2"]["calls"] == 2
+
+
+def test_post_inflight_replay_is_authorized_too(two_workers, monkeypatch):
+    """Codex R4 #3092 (P1): the post-in-flight re-check branch must run the
+    same authorization as the earlier replay branches — a revoked principal
+    must not receive the cached response that landed between its failed
+    acquire and the second lookup."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "post-inflight-auth"
+    h1 = auth_headers("1")
+
+    first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    # A stale claim is present, so worker 2's acquire fails; the re-check
+    # then finds the snapshot — and must authorize BEFORE replaying.
+    fake_redis.store[nkey("1", key, "claim")] = uuid.uuid4().hex
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None)
+    )
+    second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 200  # fell through to the endpoint
+    assert counters["w2"]["calls"] == 1, (
+        "post-inflight replay must not bypass authorization"
+    )
