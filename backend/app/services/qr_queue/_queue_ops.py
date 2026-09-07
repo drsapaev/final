@@ -5,6 +5,9 @@ Split from qr_queue_service.py.
 
 from __future__ import annotations
 
+from app.crud.queue_resource_routing import (
+    resolve_registry_tag_queue_for_specialist,
+)
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import QRQueueServiceMixinBase, _now
 
@@ -121,6 +124,20 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         if queue_tag:
             queue_query = queue_query.filter(DailyQueue.queue_tag == queue_tag)
         candidate_queues = queue_query.all()
+
+        # QD-2C (Codex round-1 P1): очередь тега реестра может быть
+        # resource-owned (specialist NULL — утренний пре-креат или любой
+        # пост-свитч писатель), и doctor-keyed-поиск её не видит: "очередь
+        # не активна", waiting-пациенты не продвигаются канонической
+        # командой. Legacy-идентичность (synthetic Doctor id / явный тег)
+        # по-прежнему именует тег: резолвим (day, tag)-поверхность, когда
+        # тег имеет строку реестра; doctor-теги сохраняют контракт PR-26.
+        if not candidate_queues:
+            tag_queue = resolve_registry_tag_queue_for_specialist(
+                self.db, queue_date, specialist_id, queue_tag
+            )
+            if tag_queue is not None:
+                candidate_queues = [tag_queue]
 
         # Codex P1 (round-12): без queue_tag у врача с несколькими активными
         # tagged-очередями неупорядоченный .first() выбирал произвольную —

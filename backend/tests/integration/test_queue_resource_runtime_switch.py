@@ -826,3 +826,165 @@ def test_empty_registry_full_legacy_behavior(db_session: Session) -> None:
     # crud wrapper: same contract
     queue2 = crud_queue.get_or_create_daily_queue(db_session, _DAY, doctor.id, "lab")
     assert queue2.id == queue.id
+
+
+# ===================== K. Codex round-1 P1/P2 pins =====================
+
+
+def _make_waiting_entry(
+    db_session: Session, queue: DailyQueue, number: int = 1
+) -> OnlineQueueEntry:
+    entry = OnlineQueueEntry(
+        queue_id=queue.id, number=number, status="waiting", source="desk"
+    )
+    db_session.add(entry)
+    db_session.commit()
+    db_session.refresh(entry)
+    return entry
+
+
+def test_qr_call_next_advances_resource_owned_queue(db_session: Session) -> None:
+    """Codex round-1 P1: the staff command surface (REST
+    /qr_queue/{specialist_id}/call-next, GQL callNextPatient) addresses
+    the queue by the DOCTOR id — a resource-owned registry-tag queue
+    (specialist NULL) was invisible to it. The resource-axis fallback
+    resolves the (day, tag) surface through the synthetic's
+    specialty, and the waiting patient advances through the canonical
+    command."""
+    from app.services.qr_queue import QRQueueService
+
+    user = _make_user(db_session, username="lab_resource", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    assert queue.specialist_id is None  # the invisible shape
+    entry = _make_waiting_entry(db_session, queue)
+
+    service = QRQueueService(db_session)
+    result = service.call_next_patient(
+        synthetic.id, called_by_user_id=None, target_date=_DAY
+    )
+    assert result["success"] is True
+    db_session.refresh(entry)
+    assert entry.status == "called"
+
+
+def test_qr_call_next_doctor_tag_queue_unchanged(db_session: Session) -> None:
+    """The fallback fires ONLY for registry tags: a doctor queue with no
+    waiting entries still raises the canonical 'queue not active' error
+    (no silent cross-doctor resolution)."""
+    from app.services.qr_queue import QRQueueService
+
+    user = _make_user(db_session, username="dr_call", role="doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="cardiology")
+    # NO queue for this doctor on _DAY, and a registry tag exists that
+    # is NOT the doctor's specialty: the fallback must not fire — the
+    # canonical 'queue not active' error is raised (no cross-tag
+    # resolution for non-registry specialties)
+    _make_resource(db_session, code="lab", queue_tag="lab")
+
+    service = QRQueueService(db_session)
+    with pytest.raises(ValueError, match="Очередь не активна"):
+        service.call_next_patient(doctor.id, called_by_user_id=None, target_date=_DAY)
+
+
+def test_staff_call_next_patient_with_tag_resolves_resource_queue(
+    db_session: Session,
+) -> None:
+    """staff_call_next_patient(specialist_id=synthetic, queue_tag='lab'):
+    the tag is registry-backed → the (day, tag) surface is filtered
+    instead of the specialist — the resource-owned queue's waiting
+    entry is called."""
+    from datetime import UTC
+    from datetime import datetime as dt
+
+    user = _make_user(db_session, username="ecg_resource", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="ecg")
+    _make_resource(db_session, code="ecg", queue_tag="ecg")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="ecg"
+    )
+    entry = _make_waiting_entry(db_session, queue)
+    entry.queue_time = dt(2026, 9, 7, 8, 0, tzinfo=UTC)
+    db_session.commit()
+
+    result = queue_service.staff_call_next_patient(
+        db_session,
+        specialist_id=synthetic.id,
+        queue_tag="ecg",
+        target_date=_DAY,
+        actor_user_id=None,
+        commit=False,
+    )
+    assert result["success"] is True
+    assert result["queue_id"] == queue.id
+
+
+def test_staff_call_next_patient_specialist_only_registry_tag(
+    db_session: Session,
+) -> None:
+    """Specialist-keyed call WITHOUT an explicit tag: the synthetic's
+    specialty resolves the registry tag → the tag queue's entry is
+    called (the pre-fix behavior was 'No waiting queue entry')."""
+    from datetime import UTC
+    from datetime import datetime as dt
+
+    user = _make_user(db_session, username="lab_resource2", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    entry = _make_waiting_entry(db_session, queue)
+    entry.queue_time = dt(2026, 9, 7, 8, 0, tzinfo=UTC)
+    db_session.commit()
+
+    result = queue_service.staff_call_next_patient(
+        db_session,
+        specialist_id=synthetic.id,
+        target_date=_DAY,
+        actor_user_id=None,
+        commit=False,
+    )
+    assert result["success"] is True
+    assert result["queue_id"] == queue.id
+
+
+def test_first_creation_lock_is_pg_gated_noop_on_sqlite(
+    db_session: Session,
+) -> None:
+    """The advisory lock helper (Codex round-1 P1 race fix) is a
+    no-op on SQLite (tests) and carries the pg_advisory_xact_lock
+    statement for PostgreSQL — source-pinned so the race fix cannot
+    silently disappear."""
+    import inspect
+
+    from app.crud import queue_resource_routing as qrr
+
+    # no-op: must not raise on the sqlite test session
+    qrr.lock_registry_tag_creation(db_session, "lab", _DAY)
+
+    source = inspect.getsource(qrr.lock_registry_tag_creation)
+    assert "pg_advisory_xact_lock" in source
+    assert "daily_queue:tag:{queue_tag}:{day" in source.replace(" '", "'")
+
+
+def test_resource_start_number_helper(db_session: Session) -> None:
+    """The QD-2C numbering SSOT helper: resource/bridged queues floor
+    at the registry value; doctor queues return None."""
+    from app.crud import queue_resource_routing as qrr
+
+    user = _make_user(db_session, username="dr_floor", role="doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="cardio")
+    doctor_queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=doctor.id, queue_tag="cardio"
+    )
+    assert qrr.resource_start_number(db_session, doctor_queue) is None
+
+    _make_resource(db_session, code="ecg", queue_tag="ecg", start_number_online=31)
+    resource_queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="ecg"
+    )
+    assert qrr.resource_start_number(db_session, resource_queue) == 31

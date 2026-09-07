@@ -409,6 +409,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if queue_tag:
             resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
             if resource is not None:
+                queue_resource_routing.lock_registry_tag_creation(
+                    db, queue_tag, day
+                )
                 existing = queue_resource_routing.find_active_tag_queue(
                     db, day, queue_tag
                 )

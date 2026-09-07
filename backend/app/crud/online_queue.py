@@ -850,6 +850,7 @@ def get_or_create_daily_queue(
     if queue_tag:
         resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
         if resource is not None:
+            queue_resource_routing.lock_registry_tag_creation(db, queue_tag, day)
             existing_by_tag = (
                 db.query(DailyQueue)
                 .filter(

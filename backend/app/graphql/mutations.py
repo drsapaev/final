@@ -41,6 +41,9 @@ from app.crud.patient import soft_delete_patient
 from app.crud.queue_resource_routing import (
     resolve_tag_resource as _resolve_tag_resource,
 )
+from app.crud.queue_resource_routing import (
+    resource_start_number,
+)
 from app.crud.visit import create_visit
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.services.appointment_eligibility import (
@@ -1210,6 +1213,13 @@ class Mutation:
                 # start_number_online != 1 выдавала всегда билет #1. Как в
                 # каноническом calculate_next_number (queue_svc/_operations.py):
                 # max(max_number + 1, start_number), старт — настройка врача.
+                # QD-2C (Codex round-1 P2): очередь тега реестра (ресурсная
+                # или мост) стартует со значения реестра — как REST/svc пути
+                # (calculate_next_number), иначе GQL и REST расходились бы в
+                # последовательностях при отличии от настроки врача.
+                start_floor = resource_start_number(db, daily_queue)
+                if start_floor is None:
+                    start_floor = doctor.start_number_online
                 next_number = max(
                     (
                         db.query(func.max(OnlineQueueEntry.number))
@@ -1218,7 +1228,7 @@ class Mutation:
                         or 0
                     )
                     + 1,
-                    doctor.start_number_online,
+                    start_floor,
                 )
 
                 queue_entry = OnlineQueueEntry(

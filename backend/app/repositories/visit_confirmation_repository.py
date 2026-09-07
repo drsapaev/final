@@ -8,7 +8,10 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.crud import clinic as crud_clinic
-from app.crud.queue_resource_routing import resolve_tag_resource
+from app.crud.queue_resource_routing import (
+    lock_registry_tag_creation,
+    resolve_tag_resource,
+)
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
@@ -70,6 +73,7 @@ class VisitConfirmationRepository:
         if queue_tag:
             resource = resolve_tag_resource(self.db, queue_tag)
             if resource is not None:
+                lock_registry_tag_creation(self.db, queue_tag, day)
                 existing_by_tag = (
                     self.db.query(DailyQueue)
                     .filter(

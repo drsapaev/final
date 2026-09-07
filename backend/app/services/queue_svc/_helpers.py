@@ -5,6 +5,7 @@ Split from queue_service.py.
 
 from __future__ import annotations
 
+from app.crud import queue_resource_routing
 from app.crud.clinic import clinic_today
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase  # noqa: F401
@@ -59,10 +60,31 @@ class HelpersMixin(QueueBusinessServiceMixinBase):
         )
         if queue_id is not None:
             query = query.filter(OnlineQueueEntry.queue_id == queue_id)
-        if specialist_id is not None:
-            query = query.filter(DailyQueue.specialist_id == specialist_id)
-        if queue_tag:
+        elif queue_tag and queue_resource_routing.resolve_tag_resource(
+            db, queue_tag
+        ) is not None:
+            # QD-2C (Codex round-1 P1): тег реестра — (day, tag) ЕСТЬ
+            # поверхность маршрутизации (очередь может быть
+            # resource-owned, specialist NULL): specialist-фильтр
+            # заменяется теговым. Doctor-теги — прежний контракт.
             query = query.filter(DailyQueue.queue_tag == queue_tag)
+        elif (
+            specialist_id is not None
+            and queue_tag is None
+            and queue_resource_routing.resolve_registry_tag_queue_for_specialist(
+                db, target_day, specialist_id, None
+            )
+            is not None
+        ):
+            # specialist-keyed вызов для тега реестра (синтетик):
+            # резолвим тег врача и фильтруем по нему
+            doctor = db.get(Doctor, specialist_id)
+            query = query.filter(DailyQueue.queue_tag == doctor.specialty)
+        else:
+            if specialist_id is not None:
+                query = query.filter(DailyQueue.specialist_id == specialist_id)
+            if queue_tag:
+                query = query.filter(DailyQueue.queue_tag == queue_tag)
 
         entry = query.order_by(
             OnlineQueueEntry.priority.desc(),

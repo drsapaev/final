@@ -37,6 +37,7 @@ from __future__ import annotations
 
 from datetime import date
 
+import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.models.online_queue import DailyQueue, QueueResource
@@ -95,3 +96,72 @@ def resource_queue_defaults(resource: QueueResource) -> dict:
     return {
         "max_online_entries": resource.max_online_per_day,
     }
+
+
+def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
+    """Serialize the first creation of a registry-tag queue (QD-2C).
+
+    query-then-insert with no unique constraint until QD-2D: two
+    concurrent first-arrival writers (batch create, visit
+    confirmation, GQL joinQueue) could both observe no active
+    (day, tag) queue and insert two resource queues, splitting
+    patients across the tag's routing surface. The PostgreSQL
+    advisory transaction lock (same key the GQL joinQueue mutation
+    takes: ``daily_queue:tag:{tag}:{day}``) serializes the
+    check-then-insert window; SQLite (tests) has no advisory locks
+    and skips — the sequential no-duplicate pins cover that path.
+    """
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        db.execute(
+            sa.text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
+            {"k": f"daily_queue:tag:{queue_tag}:{day.isoformat()}"},
+        )
+
+
+def resource_start_number(db: Session, daily_queue: DailyQueue) -> int | None:
+    """The registry row's start_number_online for a resource queue.
+
+    QD-2C numbering SSOT: a resource-owned (or bridged) queue floors
+    its ticket sequence at ``QueueResource.start_number_online`` (the
+    LIVE synthetic values 0059 transferred). ``None`` for doctor
+    queues — the caller keeps its doctor/settings floor.
+    """
+    if not daily_queue.queue_resource_id:
+        return None
+    resource = db.get(QueueResource, daily_queue.queue_resource_id)
+    if resource is None or not resource.start_number_online:
+        return None
+    return int(resource.start_number_online)
+
+
+def resolve_registry_tag_queue_for_specialist(
+    db: Session, day: date, specialist_id: int | None, queue_tag: str | None
+) -> DailyQueue | None:
+    """Resource-axis fallback for the STAFF queue identity (QD-2C).
+
+    The staff command surfaces (REST ``POST /qr_queue/{specialist_id}/
+    call-next``, GQL ``callNextPatient``, ``staff_call_next_patient``)
+    address a queue by the DOCTOR id. A registry tag's queue may be
+    resource-owned (specialist NULL) — created by the morning
+    pre-create or any post-switch writer — and the doctor-keyed
+    lookup finds nothing. The legacy identity still names the tag:
+    the synthetic Doctor's specialty (or the explicit queue_tag) IS
+    the routing tag, and when that tag has an active registry row the
+    (day, tag) queue is the one routing surface (ADR-001 stage C).
+
+    Returns the tag queue only when the tag is registry-backed;
+    doctor-tag lookups keep the per-doctor PR-26 contract untouched.
+    """
+    tag = queue_tag
+    if tag is None and specialist_id is not None:
+        from app.models.clinic import Doctor
+
+        doctor = db.get(Doctor, specialist_id)
+        if doctor is None:
+            return None
+        tag = doctor.specialty
+    if not tag:
+        return None
+    if resolve_tag_resource(db, tag) is None:
+        return None
+    return find_active_tag_queue(db, day, tag)
