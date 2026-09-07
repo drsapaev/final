@@ -6349,7 +6349,7 @@ const uzLatn = {
     aw_patient_data_update_error: 'Bemor maʼlumotlarini yangilash xatosi: {message}',
     aw_cart_empty_create_record: 'Savatcha boʻsh. Yozilish yaratish uchun xizmatlar qoʻshing.',
     aw_record_creation_error_status: 'Yozilish yaratish xatosi ({status})',
-    aw_cart_retry_payload_changed: 'Qayta yuborish bloklandi: muvaffaqiyatsiz urinishdan keyin ma'lumotlar o'zgartirildi. Yozuv allaqachon saqlangan bo'lishi mumkin — yozuvlar ro'yxatini tekshiring.',
+    aw_cart_retry_payload_changed: 'Qayta yuborish bloklandi: muvaffaqiyatsiz urinishdan keyin maʼlumotlar oʻzgartirildi. Yozuv allaqachon saqlangan boʻlishi mumkin — yozuvlar roʻyxatini tekshiring.',
     aw_no_permissions: 'Sizda yozilishlarni yaratish huquqi yoʻq. Registrator yoki Administrator roli kerak.',
     aw_record_creation_error: 'Yozilish yaratish xatosi: {message}',
     aw_record_updated_bang: 'Yozilish yangilandi!',
