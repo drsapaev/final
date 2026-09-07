@@ -109,6 +109,11 @@ class CartRequest(BaseModel):
     payment_method: str = Field(default="cash")  # cash|card|online|click|payme
     all_free: bool = Field(default=False)  # Чекбокс "All Free"
     notes: str | None = None
+    # Codex R3 #3095 (P1): токен подтверждённой квоты. Если передан — save
+    # перепроверяет цены/настройки на момент подтверждения; расхождение =
+    # 409 (прайс изменился после подтверждения). None = обратная
+    # совместимость для внешних API-вызовов (мастер всегда передаёт токен).
+    quote_token: str | None = None
 
 
 class CartResponse(BaseModel):
@@ -279,6 +284,11 @@ class CartQuoteResponse(BaseModel):
     items: list[CartQuoteItemResponse]
     total_amount: Decimal
     approval_status: str  # "approved" | "pending" (all_free без автоодобрения)
+    # Codex R3 #3095 (P1): привязка подтверждённой квоты к команде сохранения.
+    # /registrar/cart пересчитывает квоту на текущих ценах/настройках и
+    # отклоняет устаревший токен с 409 — подтверждённая сумма не может
+    # «тихо» разойтись с invoice после изменения цены администратором.
+    quote_token: str = ""
 
 
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================

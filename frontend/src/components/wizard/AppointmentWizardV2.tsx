@@ -1207,7 +1207,11 @@ const AppointmentWizardV2 = ({
         if (requestId !== cartQuoteRequestIdRef.current) {
           return; // устаревший ответ: корзина уже изменилась
         }
-        setCartQuote(response.data as unknown as CartQuote);
+        const storedQuote = response.data as unknown as CartQuote;
+        // Codex R3 PR 3095 (P1): токен привязки сохраняется ТОЛЬКО для
+        // cart-режима — edit_delta/full_update квоты обслуживают другие
+        // маршруты сохранения, их токен в /registrar/cart отправлять нельзя.
+        setCartQuote(quotePricingMode === 'cart' ? storedQuote : { ...storedQuote, quote_token: undefined });
         setCartQuoteStatus('ready');
         setCartQuoteError('');
       } catch (error: unknown) {
@@ -2409,7 +2413,11 @@ const AppointmentWizardV2 = ({
         discount_mode: wizardData.cart.discount_mode,
         payment_method: wizardData.payment.method,
         all_free: wizardData.cart.all_free,
-        notes: wizardData.cart.notes
+        notes: wizardData.cart.notes,
+        // Codex R3 PR 3095 (P1): привязка подтверждённой квоты. Backend
+        // перепроверяет цены/настройки; расхождение → 409 «подтвердите новую
+        // сумму» вместо тихого invoice на другую сумму.
+        quote_token: cartQuote?.quote_token
       };
 
       // Создаём корзину визитов

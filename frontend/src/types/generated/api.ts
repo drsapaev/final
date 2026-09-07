@@ -5479,15 +5479,7 @@ export type paths = {
         put?: never;
         /**
          * Quote Cart Prices
-         * @description Fix D: read-only предварительный расчёт цены корзины БЕЗ сохранения.
-         *
-         *     Переиспользует те же настройки и тот же хелпер скидок, что и путь
-         *     сохранения /registrar/cart (_load_registration_discount_settings +
-         *     _apply_service_discount) — frontend больше не дублирует бизнес-правила
-         *     скидок, и подтверждённая сумма совпадает с суммой invoice.
-         *
-         *     Отсутствие цены у услуги — это НЕ 0: endpoint отвечает 409 с указанием
-         *     услуги, чтобы регистратор увидел проблему до сохранения.
+         * @description Fix D: read-only предварительный расчёт цены корзины (endpoint).
          */
         post: operations["quote_cart_prices_api_v1_registrar_cart_quote_post"];
         delete?: never;
@@ -24289,6 +24281,11 @@ export type components = {
             total_amount: string;
             /** Approval Status */
             approval_status: string;
+            /**
+             * Quote Token
+             * @default
+             */
+            quote_token: string;
         };
         /** CartRequest */
         CartRequest: {
@@ -24313,6 +24310,8 @@ export type components = {
             all_free: boolean;
             /** Notes */
             notes?: string | null;
+            /** Quote Token */
+            quote_token?: string | null;
         };
         /** CartResponse */
         CartResponse: {

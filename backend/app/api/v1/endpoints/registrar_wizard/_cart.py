@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
@@ -22,6 +24,48 @@ def create_cart_appointments(
     Поддерживает: повторные/льготные визиты, All Free, динамические цены, очереди по queue_tag
     """
     effective_discount_mode = _resolve_effective_discount_mode(cart_data)
+
+    # Codex R3 #3095 (P1): revalidate the CONFIRMED quote before any write.
+    # An administrator may change a service price or a discount setting after
+    # the registrar confirmed the preview; without this check /registrar/cart
+    # silently created an invoice for a DIFFERENT amount. The token binds the
+    # save command to the exact pricing the registrar confirmed; a mismatch
+    # is a hard 409 — the registrar must re-confirm, not be over/undercharged.
+    if cart_data.quote_token:
+        flat_items = [
+            CartQuoteItemRequest(
+                service_id=s.service_id,
+                quantity=s.quantity,
+                custom_price=s.custom_price,
+            )
+            for visit_req in cart_data.visits
+            for s in visit_req.services
+        ]
+        fresh_quote = _quote_core(
+            db,
+            CartQuoteRequest(
+                items=flat_items,
+                discount_mode=cart_data.discount_mode,
+                all_free=cart_data.all_free,
+                pricing_mode="cart",
+            ),
+        )
+        if fresh_quote.quote_token != cart_data.quote_token:
+            # Codex R3 #3095 (P1): patient_id is PHI — never logged; the
+            # request id / audit context already identifies the caller.
+            logger.warning(
+                "REGISTRATION: stale quote token — pricing changed since confirmation; "
+                "current cart total: %s",
+                fresh_quote.total_amount,
+            )
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Цены или скидки изменились после подтверждения — подтвердите новую сумму. "
+                    f"Текущая сумма корзины: {fresh_quote.total_amount} сум"
+                ),
+            )
+
     logger.info(
         "REGISTRATION: Получен запрос на создание корзины. Patient ID: %s, Визитов: %d, Discount mode: %s, Effective discount mode: %s, All free: %s, Payment method: %s",
         cart_data.patient_id,
@@ -336,13 +380,45 @@ def create_cart_appointments(
 # ===================== УПРАВЛЕНИЕ ИЗМЕНЕНИЯМИ ЦЕН =====================
 
 
-@router.post("/registrar/cart/quote", response_model=CartQuoteResponse)
-def quote_cart_prices(
-    quote_req: CartQuoteRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
-):
+def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, approval_status: str, quote_req: CartQuoteRequest) -> str:
+    """Canonical binding token of a computed quote (Codex R3 #3095 P1).
+
+    sha256 over the ORDER-INSENSITIVE multiset of priced items (same items in
+    a different visit grouping produce the same token) plus the pricing
+    context. A later change of catalog prices or discount settings changes
+    the recomputed token, so a stale confirmed quote is detectable at save
+    time instead of silently invoicing a different amount.
     """
+    canonical_items = sorted(
+        (
+            {
+                "service_id": int(item.service_id),
+                "quantity": int(item.quantity),
+                "unit_price": str(item.unit_price),
+                "discount_percent": int(item.discount_percent),
+                "final_price": str(item.final_price),
+            }
+            for item in items
+        ),
+        key=lambda d: (d["service_id"], d["quantity"], d["unit_price"], d["final_price"]),
+    )
+    payload = {
+        "pricing_mode": quote_req.pricing_mode,
+        "discount_mode": quote_req.discount_mode,
+        "all_free": bool(quote_req.all_free),
+        "approval_status": approval_status,
+        "items": canonical_items,
+        "total_amount": str(total_amount),
+    }
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _quote_core(db: Session, quote_req: CartQuoteRequest) -> CartQuoteResponse:
+    """Shared pricing core for /registrar/cart/quote AND the save-time
+    revalidation of the confirmed quote (Codex R3 #3095 P1). Raises the same
+    HTTP errors either way; returns the quote with its binding token.
+
     Fix D: read-only предварительный расчёт цены корзины БЕЗ сохранения.
 
     Переиспользует те же настройки и тот же хелпер скидок, что и путь
@@ -353,8 +429,6 @@ def quote_cart_prices(
     Отсутствие цены у услуги — это НЕ 0: endpoint отвечает 409 с указанием
     услуги, чтобы регистратор увидел проблему до сохранения.
     """
-    _ = current_user
-
     effective_discount_mode = _resolve_effective_discount_mode(quote_req)
     registration_settings = _load_registration_discount_settings(db)
 
@@ -362,10 +436,17 @@ def quote_cart_prices(
     # ВЫБРАННОЙ команды сохранения. RegistrarEditDeltaService._create_visit
     # всегда пишет approval_status="approved" и никогда не читает
     # all_free_auto_approve — предупреждение «требуется согласование» в
-    # edit_delta-квоте вводило в заблуждение. /queue/online-entry full-update
-    # тоже не имеет согласования. Проверка остаётся только для cart-пути.
-    if quote_req.pricing_mode in ("edit_delta", "full_update"):
+    # edit_delta-квоте вводило в заблуждение.
+    # Codex R3 #3095 (P2): full-update ОБРАТНО пишет approval_status="pending"
+    # для all_free (_full_update_handle_all_free_visit: и существующий
+    # неоплаченный визит, и новый визит) — квота обязана предупреждать о
+    # согласовании в этом случае, а не рапортовать «approved».
+    if quote_req.pricing_mode == "edit_delta":
         approval_status = "approved"
+    elif quote_req.pricing_mode == "full_update":
+        approval_status = (
+            "pending" if effective_discount_mode == "all_free" else "approved"
+        )
     elif effective_discount_mode == "all_free":
         approval_status = (
             "pending"
@@ -375,8 +456,8 @@ def quote_cart_prices(
     else:
         approval_status = "approved"
 
-    items: list[CartQuoteItemResponse] = []
     total_amount = Decimal("0")
+    items: list[CartQuoteItemResponse] = []
 
     for item_req in quote_req.items:
         service = (
@@ -463,6 +544,14 @@ def quote_cart_prices(
         final_price = (unit_final * Decimal(item_req.quantity)).quantize(
             Decimal("0.01")
         )
+        if quote_req.pricing_mode == "full_update":
+            # Codex R3 #3095 (P2): the full-update command stores
+            # int(item_price) (unit × quantity) in BOTH the service payload
+            # and total_amount (_full_update_create_single_independent_entry),
+            # so a valid catalog price like 10.99 × 3 is saved as 32, while
+            # the quote showed 32.97. Mirror the command's exact conversion:
+            # the confirmed amount and the saved amount must be identical.
+            final_price = Decimal(int(unit_final * Decimal(item_req.quantity)))
         total_amount += final_price
 
         items.append(
@@ -480,7 +569,19 @@ def quote_cart_prices(
         items=items,
         total_amount=total_amount,
         approval_status=approval_status,
+        quote_token=_quote_token(items, total_amount, approval_status, quote_req),
     )
+
+
+@router.post("/registrar/cart/quote", response_model=CartQuoteResponse)
+def quote_cart_prices(
+    quote_req: CartQuoteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+):
+    """Fix D: read-only предварительный расчёт цены корзины (endpoint)."""
+    _ = current_user
+    return _quote_core(db, quote_req)
 
 
 @router.post("/registrar/cart/edit-delta", response_model=EditDeltaResponse)

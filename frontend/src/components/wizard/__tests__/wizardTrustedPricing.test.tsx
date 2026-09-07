@@ -221,8 +221,11 @@ describe('Fix D Codex R2: quote contract follows the actual command route', () =
     // Ветка зеркалит _full_update_create_single_independent_entry
     expect(backend).toContain('elif quote_req.pricing_mode == "full_update":');
     expect(backend).toContain('service.is_consultation and effective_discount_mode in ("repeat", "benefit")');
-    // edit_delta/full_update всегда approved (команда пишет approved)
-    expect(backend).toContain('if quote_req.pricing_mode in ("edit_delta", "full_update"):');
+    // edit_delta → approved (команда пишет approved); full_update + all_free
+    // → pending (Codex R3 #3095: _full_update_handle_all_free_visit пишет
+    // approval_status="pending" и для нового, и для неоплаченного визита)
+    expect(backend).toContain('if quote_req.pricing_mode == "edit_delta":');
+    expect(backend).toContain('"pending" if effective_discount_mode == "all_free" else "approved"');
     // cart-режим: custom_price спасает от 409 при пустом каталог-прайсе
     expect(backend).toContain('if service.price is None and item_req.custom_price is None:');
   });

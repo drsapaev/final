@@ -15,6 +15,8 @@ Quote endpoint переиспользует те же SSOT-хелперы, чт�
 """
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -398,4 +400,156 @@ def test_quote_full_update_mode_mirrors_the_full_update_route(
     )
     assert all_free_quote.status_code == 200
     assert float(all_free_quote.json()["total_amount"]) == 0
-    assert all_free_quote.json()["approval_status"] == "approved"
+    # Codex R3 #3095 (P2): _full_update_handle_all_free_visit writes
+    # approval_status="pending" for BOTH the unpaid existing visit and a new
+    # visit — the quote must warn about approval, not report approved.
+    assert all_free_quote.json()["approval_status"] == "pending"
+
+
+# ===================== Codex R3 #3095 =====================
+
+
+def test_quote_full_update_int_conversion_mirrors_the_command(
+    client: TestClient, db_session: Session, admin_user
+):
+    """Codex R3 #3095 (P2): _full_update_create_single_independent_entry
+    stores int(item_price) (unit × quantity) in the payload and total_amount.
+    A valid two-decimal catalog price 10.99 × 3 must therefore quote 32
+    (the exact saved amount), not 32.97."""
+    service = _service(db_session, code="FIXD-FU-DEC", price=10.99)
+
+    response = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [{"service_id": service.id, "quantity": 3}],
+            "discount_mode": "none",
+            "all_free": False,
+            "pricing_mode": "full_update",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert float(body["items"][0]["final_price"]) == 32, (
+        "the quote must mirror the command's int() conversion exactly"
+    )
+    assert float(body["total_amount"]) == 32
+
+    # The cart-mode quote keeps decimal precision (the cart path saves Decimals)
+    cart_quote = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [{"service_id": service.id, "quantity": 3}],
+            "discount_mode": "none",
+            "all_free": False,
+            "pricing_mode": "cart",
+        },
+    )
+    assert float(cart_quote.json()["items"][0]["final_price"]) == 32.97
+
+
+def test_quote_token_rejects_stale_pricing_at_save_409(
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor
+):
+    """Codex R3 #3095 (P1): the confirmed quote is bound to the save command.
+    If an administrator changes the price after confirmation, /registrar/cart
+    must reject the stale token with 409 instead of silently invoicing a
+    different amount."""
+    service = _service(db_session, code="FIXD-TOK-1", price=50000.00)
+
+    quoted = _quote(client, admin_user, [{"service_id": service.id, "quantity": 1}])
+    assert quoted.status_code == 200
+    stale_token = quoted.json()["quote_token"]
+    assert stale_token
+
+    # Administrator changes the price AFTER the registrar confirmed
+    service.price = 70000.00
+    db_session.commit()
+
+    payload = {
+        "patient_id": test_patient.id,
+        "discount_mode": "none",
+        "payment_method": "cash",
+        "quote_token": stale_token,
+        "visits": [
+            {
+                "doctor_id": test_doctor.id,
+                "visit_date": date.today().isoformat(),
+                "department": "general",
+                "services": [{"service_id": service.id, "quantity": 1}],
+            }
+        ],
+    }
+    stale_save = client.post(
+        "/api/v1/registrar/cart", headers=_auth_headers(admin_user), json=payload
+    )
+    assert stale_save.status_code == 409, stale_save.text
+    assert "изменились" in stale_save.json()["detail"]
+    # The current price is surfaced so the registrar can re-confirm knowingly
+    assert "70000" in stale_save.json()["detail"]
+
+
+def test_quote_token_fresh_pricing_passes_revalidation(
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor
+):
+    """The same payload re-quoted AFTER the price change produces a fresh
+    token that passes revalidation — the save proceeds (no false 409)."""
+    service = _service(db_session, code="FIXD-TOK-2", price=50000.00)
+
+    quoted = _quote(client, admin_user, [{"service_id": service.id, "quantity": 1}])
+    stale_token = quoted.json()["quote_token"]
+
+    service.price = 70000.00
+    db_session.commit()
+
+    payload = {
+        "patient_id": test_patient.id,
+        "discount_mode": "none",
+        "payment_method": "cash",
+        "quote_token": stale_token,
+        "visits": [
+            {
+                "doctor_id": test_doctor.id,
+                "visit_date": date.today().isoformat(),
+                "department": "general",
+                "services": [{"service_id": service.id, "quantity": 1}],
+            }
+        ],
+    }
+    # Re-confirm: fresh quote for the SAME payload on the new price
+    fresh = _quote(client, admin_user, [{"service_id": service.id, "quantity": 1}])
+    payload["quote_token"] = fresh.json()["quote_token"]
+
+    saved = client.post(
+        "/api/v1/registrar/cart", headers=_auth_headers(admin_user), json=payload
+    )
+    assert saved.status_code == 200, saved.text
+    body = saved.json()
+    assert float(body["total_amount"]) == 70000
+
+
+def test_cart_without_quote_token_still_saves_backward_compatible(
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor
+):
+    """No token → no revalidation (external API callers, backward compat).
+    The wizard always sends the token; absence is allowed but not exploited."""
+    service = _service(db_session, code="FIXD-TOK-3", price=45000.00)
+
+    payload = {
+        "patient_id": test_patient.id,
+        "discount_mode": "none",
+        "payment_method": "cash",
+        "visits": [
+            {
+                "doctor_id": test_doctor.id,
+                "visit_date": date.today().isoformat(),
+                "department": "general",
+                "services": [{"service_id": service.id, "quantity": 1}],
+            }
+        ],
+    }
+    saved = client.post(
+        "/api/v1/registrar/cart", headers=_auth_headers(admin_user), json=payload
+    )
+    assert saved.status_code == 200, saved.text

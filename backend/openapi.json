@@ -15723,7 +15723,7 @@
           "registrar-wizard"
         ],
         "summary": "Quote Cart Prices",
-        "description": "Fix D: read-only предварительный расчёт цены корзины БЕЗ сохранения.\n\nПереиспользует те же настройки и тот же хелпер скидок, что и путь\nсохранения /registrar/cart (_load_registration_discount_settings +\n_apply_service_discount) — frontend больше не дублирует бизнес-правила\nскидок, и подтверждённая сумма совпадает с суммой invoice.\n\nОтсутствие цены у услуги — это НЕ 0: endpoint отвечает 409 с указанием\nуслуги, чтобы регистратор увидел проблему до сохранения.",
+        "description": "Fix D: read-only предварительный расчёт цены корзины (endpoint).",
         "operationId": "quote_cart_prices_api_v1_registrar_cart_quote_post",
         "requestBody": {
           "content": {
@@ -71033,6 +71033,11 @@
           "approval_status": {
             "type": "string",
             "title": "Approval Status"
+          },
+          "quote_token": {
+            "type": "string",
+            "title": "Quote Token",
+            "default": ""
           }
         },
         "type": "object",
@@ -71081,6 +71086,17 @@
               }
             ],
             "title": "Notes"
+          },
+          "quote_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Token"
           }
         },
         "type": "object",

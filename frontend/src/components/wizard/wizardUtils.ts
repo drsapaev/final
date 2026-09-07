@@ -291,6 +291,11 @@ export interface CartQuote {
   items: CartQuoteItem[];
   total_amount: number;
   approval_status: string; // "approved" | "pending"
+  // Codex R3 PR 3095 (P1): привязка подтверждённой квоты к команде сохранения.
+  // Заполняется ТОЛЬКО для pricing_mode='cart' (save /registrar/cart
+  // перепроверяет цены/настройки на момент подтверждения — расхождение даёт
+  // 409 «цены изменились» вместо тихого invoice на другую сумму).
+  quote_token?: string;
 }
 
 export type CartQuoteStatus = 'idle' | 'loading' | 'ready' | 'error';
