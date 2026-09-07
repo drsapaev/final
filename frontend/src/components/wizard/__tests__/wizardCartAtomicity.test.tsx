@@ -71,6 +71,29 @@ describe('Fix C: wizard duplicate-submit contract', () => {
     expect(source).toContain('cartIdempotencyKeyRef.current = null;');
   });
 
+  it('refuses to resend a CHANGED payload under the already-bound key (Codex R2 P2)', () => {
+    // Codex R2 #3092 (P1): ключ привязан к payload первой попытки; изменив
+    // врача/услугу/дату после сбоя, нельзя повторно отправить изменённые
+    // данные со старым ключом — backend вернёт 409, а фронт откажется
+    // отправлять раньше времени, чтобы не выдавать оригинальный успех за
+    // сохранение новых данных.
+    expect(source).toContain('cartIdempotencyPayloadRef = useRef<string | null>(null);');
+    expect(source).toContain('cartIdempotencyPayloadRef.current = JSON.stringify(cartData);');
+    expect(source).toContain("JSON.stringify(cartData) !== cartIdempotencyPayloadRef.current");
+    expect(source).toContain("t('misc.aw_cart_retry_payload_changed')");
+    // Успех очищает и payload-снимок; сброс ключа при закрытии/очистке — тоже
+    expect(source).toContain('cartIdempotencyPayloadRef.current = null;');
+    // i18n-ключ существует во всех 5 локалях (правило Codex R1 #3088)
+    const locales = ['en', 'ru', 'kk', 'uz-Cyrl', 'uz-Latn'];
+    for (const loc of locales) {
+      const localeSource = fs.readFileSync(
+        path.resolve(__dirname, `../../../i18n/locales/${loc}.ts`),
+        'utf8'
+      );
+      expect(localeSource).toContain('aw_cart_retry_payload_changed:');
+    }
+  });
+
   it('api client forwards the Idempotency-Key header', () => {
     const apiSource = readPatientsApiSource();
     expect(apiSource).toContain("options: { idempotencyKey?: string } = {}");

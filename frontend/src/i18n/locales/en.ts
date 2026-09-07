@@ -6348,6 +6348,7 @@ const en = {
     aw_patient_data_update_error: 'Ошибка обновления данных пациента: {message}',
     aw_cart_empty_create_record: 'Корзина пуста. Добавьте услуги для создания записи.',
     aw_record_creation_error_status: 'Ошибка создания записи ({status})',
+    aw_cart_retry_payload_changed: 'Retry blocked: the data was changed after the failed attempt. The record may already be saved — check the records list before submitting again.',
     aw_no_permissions: 'У вас нет прав для создания записей. Необходима роль Регистратора или Администратора.',
     aw_record_creation_error: 'Ошибка создания записи: {message}',
     aw_record_updated_bang: 'Запись обновлена!',

@@ -14,6 +14,14 @@ Contract now (when Redis is reachable — simulated here with a fake client):
   3. Non-2xx responses release the claim — retry with the same key re-runs.
   4. Redis unavailable → per-process in-memory fallback (original PR-6
      behavior), traffic never breaks.
+
+Codex R2 #3092 additions:
+  5. A retry with the SAME key and a CHANGED body gets 409, never the
+     original success replayed over different data (payload-hash binding).
+  6. The in-flight claim uses a SHORT renewable lease, not the 24h TTL.
+  7. A transient Redis failure degrades, then RECOVERS (re-probe) instead
+     of permanently disabling coordination on the worker.
+  8. The Redis URL is redacted before logging (credentials never reach logs).
 """
 from __future__ import annotations
 
@@ -34,25 +42,49 @@ from app.middleware.idempotency_middleware import (
 
 
 class FakeRedis:
-    """Minimal Redis subset: SET NX EX / GET / DEL / PING — shared across
-    'workers' to emulate the staging deployment."""
+    """Minimal Redis subset: SET NX/XX EX / GET / DEL / PING — shared across
+    'workers' to emulate the staging deployment. Tracks per-key TTLs."""
 
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
+        self.ttls: dict[str, int | None] = {}
+        self.fail_next_ops = 0
 
     def ping(self) -> bool:
+        if self.fail_next_ops > 0:
+            self.fail_next_ops -= 1
+            raise ConnectionError("simulated transient redis failure")
         return True
 
-    def set(self, key: str, value: str, nx: bool = False, ex: int | None = None) -> bool | None:
+    def set(
+        self,
+        key: str,
+        value: str,
+        nx: bool = False,
+        xx: bool = False,
+        ex: int | None = None,
+    ) -> bool | None:
+        if self.fail_next_ops > 0:
+            self.fail_next_ops -= 1
+            raise ConnectionError("simulated transient redis failure")
         if nx and key in self.store:
             return None
+        if xx and key not in self.store:
+            return None
         self.store[key] = value
+        self.ttls[key] = ex
         return True
 
     def get(self, key: str) -> str | None:
+        if self.fail_next_ops > 0:
+            self.fail_next_ops -= 1
+            raise ConnectionError("simulated transient redis failure")
         return self.store.get(key)
 
     def delete(self, key: str) -> int:
+        if self.fail_next_ops > 0:
+            self.fail_next_ops -= 1
+            raise ConnectionError("simulated transient redis failure")
         return 1 if self.store.pop(key, None) is not None else 0
 
 
@@ -64,7 +96,6 @@ def _make_claim(fake: FakeRedis) -> DistributedIdempotencyClaim:
     claim._client = fake
     claim._available = True
     return claim
-
 
 def _make_app(counter: dict, call_next_error: Exception | None = None) -> FastAPI:
     app = FastAPI()
@@ -211,9 +242,125 @@ def test_store_response_snapshot_round_trip(fake_redis):
         headers={"X-Custom": "abc"},
         media_type="application/json",
     )
-    claim.store_response(7, "k", original)
-    replayed = claim.load_response(7, "k")
+    claim.store_response(7, "k", original, payload_hash="deadbeef")
+    replayed, stored_hash = claim.load_response(7, "k")
     assert replayed is not None
     assert replayed.status_code == 200
     assert replayed.body == b'{"invoice_id": 42}'
     assert replayed.headers.get("x-custom") == "abc"
+    assert stored_hash == "deadbeef"
+
+
+# =====================================================================
+# Codex R2 #3092
+# =====================================================================
+
+
+def test_changed_payload_with_reused_key_gets_409_not_original_success(two_workers):
+    """Codex R2 #3092 (P1): cart committed, response lost, registrar changed a
+    doctor/price and retried with the SAME key → 409 Conflict, never the
+    original success replayed over different data. Same-payload retry still
+    replays."""
+    client1, client2, counters, _ = two_workers
+    key = "codex-r2-payload-binding"
+
+    first = client1.post("/echo", json={"doctor": 1}, headers={"Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    # Registrar changed the cart before retrying — same key, different body
+    changed = client2.post("/echo", json={"doctor": 2}, headers={"Idempotency-Key": key})
+    assert changed.status_code == 409
+    assert "different request payload" in changed.text
+    # The changed retry must NOT execute the handler either
+    assert counters["w2"]["calls"] == 0
+
+    # Unchanged retry (lost-response replay scenario) still replays the
+    # original 200 with the original body.
+    same = client2.post("/echo", json={"doctor": 1}, headers={"Idempotency-Key": key})
+    assert same.status_code == 200
+    assert same.json()["ok"] is True
+    assert counters["w2"]["calls"] == 0
+
+
+def test_changed_payload_local_cache_mismatch_returns_409(two_workers):
+    """Local (same-worker) path: cached response + different body → 409."""
+    client1, client2, counters, _ = two_workers
+    key = "codex-r2-local-mismatch"
+
+    first = client1.post("/echo", json={"v": 1}, headers={"Idempotency-Key": key})
+    assert first.status_code == 200
+    second = client1.post("/echo", json={"v": 999}, headers={"Idempotency-Key": key})
+    assert second.status_code == 409
+    assert counters["w1"]["calls"] == 1, "changed payload must not execute the handler"
+
+
+def test_in_flight_lease_is_short_not_24h(fake_redis):
+    """Codex R2 #3092 (P2): the claim lives lease_seconds (90s), not the
+    response TTL — a dead worker 409-locks its key for seconds, not a day."""
+    claim = _make_claim(fake_redis)
+    assert claim.acquire(1, "lease-key") is True
+    claim_ttl = fake_redis.ttls["idem:1:lease-key:claim"]
+    assert claim_ttl == claim.lease_seconds
+    assert claim_ttl < 24 * 60 * 60
+    assert claim_ttl == 90
+
+
+def test_lease_renewal_extends_only_existing_claim(fake_redis):
+    """renew() extends a live claim (XX) and never resurrects a lapsed one."""
+    claim = _make_claim(fake_redis)
+    assert claim.acquire(1, "renew-key") is True
+    assert fake_redis.store["idem:1:renew-key:claim"]
+    assert claim.renew(1, "renew-key") is True
+    assert fake_redis.ttls["idem:1:renew-key:claim"] == 90
+
+    # Lapsed claim (worker died, TTL elapsed) — renewal must NOT resurrect it
+    fake_redis.store.pop("idem:1:renew-key:claim")
+    assert claim.renew(1, "renew-key") is False
+    assert "idem:1:renew-key:claim" not in fake_redis.store
+
+
+def test_transient_redis_failure_recovers(monkeypatch, fake_redis):
+    """Codex R2 #3092 (P1): a Redis timeout/restart degrades the layer, then
+    coordination RESUMES after the cooldown — the worker is not permanently
+    disabled until restart."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+    claim = _make_claim(fake_redis)
+
+    # Simulate a transient failure: the next op raises
+    fake_redis.fail_next_ops = 1
+    assert claim.acquire(1, "recover-key") is False  # op failed → degrade
+    assert claim.available is False
+
+    # Cooldown elapsed (0s): the next acquire re-probes and succeeds
+    assert claim.acquire(1, "recover-key") is True
+    assert claim.available is True
+    assert "idem:1:recover-key:claim" in fake_redis.store
+
+
+def test_redis_url_redacted_in_logs(monkeypatch, caplog):
+    """Codex R2 #3092 (P1): credentials in the Redis URI never reach logs."""
+    import logging as _logging
+
+    class _PingingFake:
+        def ping(self) -> bool:
+            return True
+
+    monkeypatch.setattr(
+        idem_module.redis_lib.Redis,
+        "from_url",
+        classmethod(lambda cls, url, **kwargs: _PingingFake()),
+    )
+
+    import app.middleware.idempotency_middleware as m
+
+    with caplog.at_level(_logging.INFO, logger=m.logger.name):
+        DistributedIdempotencyClaim("redis://:S3cretPassword@redis-host:6379/0")
+
+    assert "S3cretPassword" not in caplog.text
+    assert "redis-host:6379" in caplog.text
+
+    # The pure helper behaves identically on URL-like strings
+    redacted = idem_module.redact_redis_url("redis://user:pw@host:6380/2")
+    assert "pw" not in redacted and "user" not in redacted
+    assert redacted.startswith("redis://host:6380/2")

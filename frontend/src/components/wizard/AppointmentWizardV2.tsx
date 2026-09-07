@@ -469,6 +469,7 @@ const AppointmentWizardV2 = ({
       setShowAllServices(false);
       // Fix C: незавершённая попытка сабмита отменена закрытием — ключ сбрасываем
       cartIdempotencyKeyRef.current = null;
+      cartIdempotencyPayloadRef.current = null;
     }
   }, [isOpen]);
 
@@ -507,6 +508,12 @@ const AppointmentWizardV2 = ({
   // повторная отправка с тем же ключом вернёт кэшированный ответ, а не
   // создаст вторую корзину. Ключ живёт до успеха/закрытия/очистки формы.
   const cartIdempotencyKeyRef = useRef<string | null>(null);
+  // Codex R2 #3092 (P1): ключ привязан к payload первой попытки. Если после
+  // сбоя регистратор изменил врача/услугу/дату/цену, повторная отправка С
+  // ТЕМ ЖЕ ключом больше не «прокатит» оригинальный успех поверх новых
+  // данных — backend (hash-проверка) вернёт 409, а фронт preemptively
+  // откажется отправлять изменённый payload со старым ключом.
+  const cartIdempotencyPayloadRef = useRef<string | null>(null);
 
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
@@ -586,6 +593,7 @@ const AppointmentWizardV2 = ({
     setCurrentStep(STEP_PATIENT);
     // Fix C: очистка формы отменяет текущую попытку сабмита — ключ сбрасываем
     cartIdempotencyKeyRef.current = null;
+    cartIdempotencyPayloadRef.current = null;
     toast.success(t('misc.aw_form_cleared'));
   };
 
@@ -2543,12 +2551,29 @@ const AppointmentWizardV2 = ({
         // Fix C: один логический сабмит = один Idempotency-Key. Ключ создаётся
         // при первой попытке и переиспользуется при повторной отправке после
         // сбоя/потери ответа — backend вернёт кэшированный ответ вместо новой корзины.
+        // Codex R2 #3092 (P1): при создании ключа фиксируем снимок payload;
+        // повторная попытка с ИЗМЕНЁННЫМИ данными и старым ключом запрещена
+        // (backend вернёт 409 — оригинальный успех нельзя натянуть на новые данные).
         if (!cartIdempotencyKeyRef.current) {
           cartIdempotencyKeyRef.current = createIdempotencyKey();
+          cartIdempotencyPayloadRef.current = JSON.stringify(cartData);
+        } else if (cartIdempotencyPayloadRef.current && JSON.stringify(cartData) !== cartIdempotencyPayloadRef.current) {
+          logger.warn(
+            'Fix C (Codex R2): payload changed after the failed attempt; refusing to reuse the bound idempotency key',
+          );
+          toast.error(t('misc.aw_cart_retry_payload_changed'), {
+            style: {
+              backgroundColor: 'color-mix(in srgb, var(--mac-warning), transparent 84%)',
+              border: '1px solid color-mix(in srgb, var(--mac-warning), transparent 72%)',
+              color: 'var(--mac-text-primary)'
+            }
+          });
+          return; // ❌ НЕ отправляем и НЕ закрываем мастер: запись могла быть уже создана
         }
         result = await createRegistrarCart(cartData, { idempotencyKey: cartIdempotencyKeyRef.current });
         // Успех — ключ отработал, следующая корзина получит новый
         cartIdempotencyKeyRef.current = null;
+        cartIdempotencyPayloadRef.current = null;
       } catch (cartError: unknown) {
         // Обработка ошибок создания корзины
         const cartErr = cartError as Error & { status?: number; message?: string };
