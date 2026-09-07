@@ -391,6 +391,22 @@ class PatientService:
             update_payload["first_name"] = name_parts.get("first_name") or None
             update_payload["middle_name"] = name_parts.get("middle_name") or None
 
+            # Codex R2 #3090 (P2): full_name ограничен 255 символами в схеме,
+            # но колонки last_name/first_name/middle_name — varchar(128).
+            # Компонент длиной 129+ символов (ФИО-инпут визарда без maxLength)
+            # проходил схему и падал на уровне БД (500) вместо 422-валидации.
+            _NAME_PART_MAX = 128
+            for _part in ("last_name", "first_name", "middle_name"):
+                _value = update_payload.get(_part)
+                if _value is not None and len(str(_value)) > _NAME_PART_MAX:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=(
+                            f"Часть ФИО «{_part}» превышает {_NAME_PART_MAX} символов "
+                            f"({len(str(_value))}). Разбейте ФИО или сократите."
+                        ),
+                    )
+
         patient = patient_crud.update(db=self.db, db_obj=patient, obj_in=update_payload)
         self.db.refresh(patient)
 

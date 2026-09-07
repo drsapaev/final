@@ -21,7 +21,7 @@ def _create_patient(client: TestClient, token: str, phone: str) -> dict:
     response = client.post(
         "/api/v1/patients/",
         json={
-            "last_name": "Тестов",
+            "last_name": "SYNTHETIC-Тестов",
             "first_name": "Пациент",
             "birth_date": "1990-01-01",
             "sex": "M",
@@ -40,12 +40,12 @@ def test_update_patient_full_name_is_split_and_persisted(
     from tests.conftest import mint_access_token
 
     token = mint_access_token(admin_user)
-    created = _create_patient(client, token, "+998900000901")
+    created = _create_patient(client, token, "+998000000901")
 
     response = client.put(
         f"/api/v1/patients/{created['id']}",
         json={
-            "full_name": "Иванов Иван Иванович",
+            "full_name": "SYNTHETIC-Иванов Иван Иванович",
             "address": "ул. Навои, 1",
         },
         headers={"Authorization": f"Bearer {token}"},
@@ -54,7 +54,7 @@ def test_update_patient_full_name_is_split_and_persisted(
     body = response.json()
 
     # Ответ содержит перечитанную с сервера карточку
-    assert body["last_name"] == "Иванов"
+    assert body["last_name"] == "SYNTHETIC-Иванов"
     assert body["first_name"] == "Иван"
     assert body["middle_name"] == "Иванович"
     assert body["address"] == "ул. Навои, 1"
@@ -62,7 +62,7 @@ def test_update_patient_full_name_is_split_and_persisted(
     # Проверяем фактическое сохранение в БД (не только 200)
     db_patient = db.query(Patient).filter(Patient.id == created["id"]).first()
     assert db_patient is not None
-    assert db_patient.last_name == "Иванов"
+    assert db_patient.last_name == "SYNTHETIC-Иванов"
     assert db_patient.first_name == "Иван"
     assert db_patient.middle_name == "Иванович"
 
@@ -85,7 +85,7 @@ def test_update_patient_without_full_name_keeps_names(
 
     db_patient = db.query(Patient).filter(Patient.id == created["id"]).first()
     assert db_patient is not None
-    assert db_patient.last_name == "Тестов"
+    assert db_patient.last_name == "SYNTHETIC-Тестов"
     assert db_patient.first_name == "Пациент"
     assert db_patient.address == "новый адрес"
 
@@ -101,13 +101,33 @@ def test_update_patient_two_word_full_name_clears_middle_name(
 
     response = client.put(
         f"/api/v1/patients/{created['id']}",
-        json={"full_name": "Петров Пётр"},
+        json={"full_name": "SYNTHETIC-Петров Пётр"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200, response.text
 
     db_patient = db.query(Patient).filter(Patient.id == created["id"]).first()
     assert db_patient is not None
-    assert db_patient.last_name == "Петров"
+    assert db_patient.last_name == "SYNTHETIC-Петров"
     assert db_patient.first_name == "Пётр"
     assert not db_patient.middle_name
+
+
+def test_update_patient_overlong_name_part_returns_422_not_500(
+    client: TestClient, db: Session, admin_user: User, admin_password: str
+):
+    """Codex R2 #3090 (P2): компонент ФИО длиннее varchar(128) отвергается
+    сервисом как 422, а не доходит до БД и падает 500."""
+    from tests.conftest import mint_access_token
+
+    token = mint_access_token(admin_user)
+    created = _create_patient(client, token, "+998000000902")
+
+    long_surname = "SYNTHETIC-" + "Д" * 129  # 129+ символов (> 128)
+    response = client.put(
+        f"/api/v1/patients/{created['id']}",
+        json={"full_name": long_surname + " Иван"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422, response.text
+    assert "128" in response.json()["detail"]
