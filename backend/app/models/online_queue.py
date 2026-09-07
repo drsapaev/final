@@ -7,6 +7,7 @@
 
 These models represent the OFFICIAL and PREFERRED queue system architecture:
   - DailyQueue: Specialist-based daily queues (SSOT)
+  - QueueResource: doctorless queue routing registry (QD-2A expand)
   - OnlineQueueEntry: Queue entries with full metadata (SSOT)
   - QueueToken: QR code tokens for online registration (SSOT)
 
@@ -49,6 +50,51 @@ if TYPE_CHECKING:
     from app.models.visit import Visit
 
 
+class QueueResource(Base):
+    """Реестр безврачебных ресурсов очереди (QD-2A expand)
+
+    Физическая замена synthetic-пары User+Doctor (lab_resource и т.д.):
+    DailyQueue.queue_resource_id ссылается сюда. Это справочник — НЕ
+    аккаунт: логина/RBAC-роли у него нет и не будет (синтетические
+    идентичности выходят из оборота в QD-2E).
+
+    Поля нумерации повторяют Doctor.start_number_online /
+    max_online_per_day (queue_svc/_operations.py и GraphQL-мутации
+    читают их у ресурс-врача сегодня) — QueueResource несёт эквивалент
+    для ресурсных очередей.
+
+    Стадийный контракт (QD-2 FINAL, 2026-09-07): стадия A — только
+    схема; сиды lab/ecg и политика дублей — QD-2B; рантайм-переключение
+    резолверов — QD-2C; XOR/уникальность — QD-2D. Семантика
+    queue_tag — точное совпадение со значением DailyQueue.queue_tag
+    (exact-tag-wins), НЕ префикс и НЕ «общий владелец».
+    """
+
+    __tablename__ = "queue_resources"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    # Машинный идентификатор строки реестра (для админ-UI/QD-2B сидов)
+    code: Mapped[str] = mapped_column(
+        String(50), unique=True, nullable=False, index=True
+    )
+    # Точное значение DailyQueue.queue_tag, которым владеет ресурс
+    queue_tag: Mapped[str] = mapped_column(
+        String(32), unique=True, nullable=False, index=True
+    )
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    start_number_online: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    max_online_per_day: Mapped[int] = mapped_column(Integer, default=15, nullable=False)
+    default_cabinet: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class DailyQueue(Base):
     """Ежедневные очереди по специалистам"""
 
@@ -56,9 +102,17 @@ class DailyQueue(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     day: Mapped[date] = mapped_column(Date, nullable=False, index=True)  # YYYY-MM-DD
-    specialist_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("doctors.id"), nullable=False, index=True
-    )  # ИСПРАВЛЕНО: FK к doctors.id
+    # Двойной владелец (QD-2A expand): specialist_id (врач, FK к
+    # doctors.id) ИЛИ queue_resource_id (безврачебный ресурс, FK к
+    # queue_resources.id). Оба nullable на уровне схемы; XOR-контракт
+    # и partial unique — стадия QD-2D, до неё обе оси просто
+    # сосуществуют, старые строки не меняются.
+    specialist_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("doctors.id"), nullable=True, index=True
+    )  # FK к doctors.id (ось врача)
+    queue_resource_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("queue_resources.id"), nullable=True, index=True
+    )  # FK к queue_resources.id (ось ресурса)
     queue_tag: Mapped[str | None] = mapped_column(
         String(32), nullable=True, index=True
     )  # ecg, lab, cardiology_common, etc.
@@ -86,7 +140,12 @@ class DailyQueue(Base):
     )
 
     # Relationships
-    specialist: Mapped[Doctor] = relationship("Doctor", foreign_keys=[specialist_id])
+    specialist: Mapped[Doctor | None] = relationship(
+        "Doctor", foreign_keys=[specialist_id]
+    )
+    queue_resource: Mapped[QueueResource | None] = relationship(
+        "QueueResource", foreign_keys=[queue_resource_id]
+    )
     entries: Mapped[list[OnlineQueueEntry]] = relationship(
         "OnlineQueueEntry", back_populates="queue", cascade="all, delete-orphan"
     )
