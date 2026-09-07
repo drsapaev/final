@@ -83,7 +83,11 @@ class PatientUpdate(ORMModel):
     # ФИО не сохранялось при ответе 200. Теперь поле принимается, а сервис
     # нормализует его в last_name/first_name/middle_name через
     # normalize_patient_name (см. PatientService.update_patient).
-    full_name: str | None = Field(None, max_length=255)
+    # Codex R3 #3090: лимит совпадает с PatientCreate (3 x 128 = 384) —
+    # иначе пациент, легитимно созданный с ФИО 256-384 символа, не смог бы
+    # передать то же ФИО через PUT (422 до компонентной валидации).
+    # Покомпонентная проверка 128 остаётся в PatientService.update_patient.
+    full_name: str | None = Field(None, max_length=384)
     last_name: str | None = Field(None, max_length=128)
     first_name: str | None = Field(None, max_length=128)
     middle_name: str | None = Field(None, max_length=128)

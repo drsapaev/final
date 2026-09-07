@@ -186,7 +186,7 @@ describe('Fix B: wizard profile-save contract', () => {
     expect(attachBlock).not.toContain("logger.warn('⚠️ Failed to update patient:', e);");
   });
 
-  it('keeps profile snapshots in sync with card lifecycle', () => {
+  it('keeps profile snapshots and the retained card ID in sync with card lifecycle', () => {
     // Снимок создаётся при выборе карточки и инициализации editMode
     expect(source).toContain('selectedCardProfileRef.current = buildPatientProfileSnapshot(');
     expect(source).toContain('editProfileSnapshotRef.current = buildPatientProfileSnapshot(');
@@ -197,12 +197,59 @@ describe('Fix B: wizard profile-save contract', () => {
       'Safeguard: Ensure wizardData structure is valid'
     );
     expect(closeBlock).toContain('selectedCardProfileRef.current = null;');
+
+    // Codex R3 PR 3090 (P1): ID выбранной карточки живёт тем же жизненным циклом —
+    // устанавливается в selectPatient, сбрасывается при закрытии и «Очистить»
+    expect(source).toContain('selectedPatientCardIdRef.current = patient.id ?? null;');
+    expect(closeBlock).toContain('selectedPatientCardIdRef.current = null;');
+    const clearDraftBlock = extractSourceBlock(
+      source,
+      'const clearDraft = () => {',
+      "toast.success(t('misc.aw_form_cleared'))"
+    );
+    expect(clearDraftBlock).toContain('selectedPatientCardIdRef.current = null;');
   });
 
-  it('backend PatientUpdate schema accepts full_name and the service normalizes it', () => {
+  it('submit targets the retained selected card BEFORE any new-patient creation (Codex R3 PR 3090 P1 regression)', () => {
+    // Прежний баг: правка ФИО очищала wizardData.patient.id, сабмит уходил в
+    // ветку создания и плодил дубликат пациента, а Fix B-обновление профиля
+    // таргетило уже новую запись вместо выбранной карточки.
+    const normalBranch = extractSourceBlock(
+      source,
+      'В обычном режиме (не edit) создаем пациента если нужно',
+      'Fix B: явное сохранение правок профиля выбранной карточки (обычный режим)'
+    );
+    // retained-карточка восстанавливается как цель сабмита
+    const retainedBlock = extractSourceBlock(
+      normalBranch,
+      'Fix B (Codex R3 PR 3090, P1): карточка ЯВНО выбрана в этой сессии',
+      'audit/phase-2, BS-52'
+    );
+    expect(retainedBlock).toContain('patientId = selectedPatientCardIdRef.current;');
+    // и создание пациента выполняется ТОЛЬКО когда retained-карточки нет
+    expect(normalBranch).toContain('if (!selectedPatientCardIdRef.current) {');
+    expect(normalBranch).toContain('await createPatient(patientData)');
+    // порядок: восстановление цели стоит РАНЬШЕ блока создания
+    expect(normalBranch.indexOf('patientId = selectedPatientCardIdRef.current;')).toBeLessThan(
+      normalBranch.indexOf('await createPatient(patientData)')
+    );
+  });
+
+  it('own retained card is not reported as a foreign phone conflict (Codex R3 PR 3090)', () => {
+    const checkBlock = extractSourceBlock(
+      source,
+      'Fix B (Codex R3 PR 3090): карточка, выбранная в этой сессии, не является',
+      'setPhoneError({'
+    );
+    expect(checkBlock).toContain('existingPatient.id !== selectedPatientCardIdRef.current');
+  });
+
+  it('backend PatientUpdate schema accepts full_name with the create contract limit (Codex R3 PR 3090 P2 regression)', () => {
     const schema = fs.readFileSync(backendSchemaPath, 'utf8');
     const updateBlock = extractSourceBlock(schema, 'class PatientUpdate(ORMModel):', 'birth_date: date | None = None');
-    expect(updateBlock).toContain('full_name: str | None = Field(None, max_length=255)');
+    // Лимит совпадает с PatientCreate (3 x 128 = 384): пациент, легитимно
+    // созданный с ФИО 256-384 символа, обязан проходить и через PUT.
+    expect(updateBlock).toContain('full_name: str | None = Field(None, max_length=384)');
 
     const service = fs.readFileSync(backendServicePath, 'utf8');
     expect(service).toContain('normalize_patient_name(full_name=str(raw_full_name).strip())');

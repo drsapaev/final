@@ -89708,7 +89708,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 255
+                "maxLength": 384
               },
               {
                 "type": "null"

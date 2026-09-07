@@ -491,6 +491,7 @@ const AppointmentWizardV2 = ({
       // Fix B: снимки профилей больше не актуальны
       selectedCardProfileRef.current = null;
       editProfileSnapshotRef.current = null;
+      selectedPatientCardIdRef.current = null;
     }
   }, [isOpen]);
 
@@ -528,6 +529,11 @@ const AppointmentWizardV2 = ({
   // чтобы правки профиля существующего пациента не терялись молча.
   const selectedCardProfileRef = useRef<PatientProfileSnapshot | null>(null);
   const editProfileSnapshotRef = useRef<PatientProfileSnapshot | null>(null);
+  // Fix B (Codex R3 PR 3090): ID явно выбранной карточки — правка ФИО/телефона
+  // после выбора остаётся правкой ЭТОЙ карточки, а не созданием новой (иначе
+  // сабмит уходил в ветку создания и плодил дубликат). Сбрасывается только
+  // явными действиями: «Очистить», выбор другой карточки, закрытие мастера.
+  const selectedPatientCardIdRef = useRef<string | number | null>(null);
 
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
@@ -558,7 +564,9 @@ const AppointmentWizardV2 = ({
         return pPhone === cleanPhone;
       });
 
-      if (existingPatient && existingPatient.id !== wizardData.patient.id) {
+      // Fix B (Codex R3 PR 3090): карточка, выбранная в этой сессии, не является
+      // «другим пациентом» — предупреждение только для чужого телефона.
+      if (existingPatient && existingPatient.id !== wizardData.patient.id && existingPatient.id !== selectedPatientCardIdRef.current) {
         setPhoneError({
           message: t('misc.aw_phone_already_exists'),
           patient: existingPatient
@@ -607,6 +615,7 @@ const AppointmentWizardV2 = ({
     setCurrentStep(STEP_PATIENT);
     // Fix B: выбранная карточка сброшена — снимок больше не актуален
     selectedCardProfileRef.current = null;
+    selectedPatientCardIdRef.current = null;
     toast.success(t('misc.aw_form_cleared'));
   };
 
@@ -682,7 +691,9 @@ const AppointmentWizardV2 = ({
 
   const handlePatientSearch = (value: string) => {
     // 🚨 FIX: Сбрасываем ID при изменении текста, чтобы не было "призраков"
-    // Если пользователь меняет имя, это уже не тот пациент, которого выбрали ранее
+    // Если пользователь меняет имя, это уже не тот пациент, которого выбрали ранее.
+    // Fix B (Codex R3 PR 3090): выбор не теряется — ID карточки сохранён в
+    // selectedPatientCardIdRef, сабмит продолжает таргетить её (правка профиля).
     setWizardData((prev) => ({
       ...prev,
       patient: {
@@ -740,6 +751,9 @@ const AppointmentWizardV2 = ({
     selectedCardProfileRef.current = buildPatientProfileSnapshot(
       patient as unknown as Record<string, unknown>
     );
+    // Fix B (Codex R3 PR 3090): retained-ID — правки после выбора остаются
+    // правкой этой карточки, а не созданием новой
+    selectedPatientCardIdRef.current = patient.id ?? null;
 
     // Обновляем отформатированную дату
     setFormattedBirthDate(convertDateFromISO(patient.birth_date || ''));
@@ -1728,6 +1742,19 @@ const AppointmentWizardV2 = ({
           throw new Error(t('misc.aw_fio_required'));
         }
 
+        // Fix B (Codex R3 PR 3090, P1): карточка ЯВНО выбрана в этой сессии —
+        // правки ФИО/телефона означают правку профиля этой карточки, а не
+        // создание новой (раньше сброс patient.id уводил сабмит в ветку
+        // создания и плодил дубликаты). Восстанавливаем цель сабмита.
+        if (selectedPatientCardIdRef.current) {
+          patientId = selectedPatientCardIdRef.current;
+          setWizardData((prev) => ({
+            ...prev,
+            patient: { ...prev.patient, id: patientId }
+          }));
+          logger.log('[AppointmentWizardV2] Retained explicitly selected card as submit target:', patientId);
+        }
+
         // audit/phase-2, BS-52: removed two `logger.log` lines that printed
         // the first 20 chars of the JWT to the browser console. The logger's
         // PHI sanitizer only scrubs object arguments — primitive strings pass
@@ -1740,6 +1767,8 @@ const AppointmentWizardV2 = ({
         const _token = tokenManager.getAccessToken();
         void _token;
 
+        // Fix B (Codex R3 PR 3090, P1): с retained-карточкой создание не выполняется.
+        if (!selectedPatientCardIdRef.current) {
         // Подготовка данных пациента - отправляем полное ФИО, backend нормализует
         const patientData: Record<string, unknown> = {
           full_name: wizardData.patient.fio.trim(),
@@ -1802,6 +1831,7 @@ const AppointmentWizardV2 = ({
             throw new Error(t('misc.aw_patient_creation_error', { status: createErr.status || '', message: createErr.message }));
           }
         }
+        } // end: creation only for a truly new patient (no retained card)
       }
 
       // На этом этапе patientId должен быть определён

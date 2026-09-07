@@ -131,3 +131,60 @@ def test_update_patient_overlong_name_part_returns_422_not_500(
     )
     assert response.status_code == 422, response.text
     assert "128" in response.json()["detail"]
+
+
+def test_update_patient_full_name_accepts_create_contract_limit_384(
+    client: TestClient, db: Session, admin_user: User, admin_password: str
+):
+    """Codex R3 #3090 (P2): лимит full_name в PatientUpdate совпадает с
+    PatientCreate (3 x 128 = 384). Пациент, легитимно созданный с ФИО
+    256-384 символа (компоненты в пределах varchar(128)), обязан проходить
+    и через PUT — раньше схема возвращала 422 на 255 до компонентной
+    валидации, блокируя повторное сохранение того же имени."""
+    from tests.conftest import mint_access_token
+
+    token = mint_access_token(admin_user)
+    created = _create_patient(client, token, "+998000000904")
+
+    # 384 символа суммарно: фамилия 128 + пробел + имя 128 + пробел + отчество 126
+    long_full_name = "Д" * 128 + " " + "И" * 128 + " " + "О" * 126
+    assert len(long_full_name) == 384
+
+    response = client.put(
+        f"/api/v1/patients/{created['id']}",
+        json={"full_name": long_full_name},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    # Не 422 «less than 384» и не 500 — компоненты в пределах varchar(128)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["last_name"] == "Д" * 128
+    assert body["first_name"] == "И" * 128
+    assert body["middle_name"] == "О" * 126
+
+    db_patient = db.query(Patient).filter(Patient.id == created["id"]).first()
+    assert db_patient is not None
+    assert db_patient.last_name == "Д" * 128
+    assert db_patient.first_name == "И" * 128
+    assert db_patient.middle_name == "О" * 126
+
+
+def test_update_patient_full_name_over_384_rejected_by_schema(
+    client: TestClient, db: Session, admin_user: User, admin_password: str
+):
+    """Codex R3 #3090 (P2): 385+ символов отвергается схемой (422) так же,
+    как и в PatientCreate — контракт создания и обновления симметричен."""
+    from tests.conftest import mint_access_token
+
+    token = mint_access_token(admin_user)
+    created = _create_patient(client, token, "+998000000905")
+
+    # 385 символов суммарно: 129 + пробел + 128 + пробел + 126
+    too_long = "Д" * 129 + " " + "И" * 128 + " " + "О" * 126
+    assert len(too_long) == 385
+    response = client.put(
+        f"/api/v1/patients/{created['id']}",
+        json={"full_name": too_long},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422, response.text
