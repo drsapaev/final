@@ -549,9 +549,15 @@ def test_alembic_chain_single_head_0058() -> None:
     assert graph["0058_queue_resource_expand"] == (
         "0057_lab_resource_internal_role",
     )
+    # PR-1: the chain head moved to 0059 (visits.reminder_sent_at — the
+    # idempotency marker the reminder worker always assumed existed).
+    assert "0059_visit_reminder_sent_at" in graph
+    assert graph["0059_visit_reminder_sent_at"] == (
+        "0058_queue_resource_expand",
+    )
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0058_queue_resource_expand"]
+    assert heads == ["0059_visit_reminder_sent_at"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

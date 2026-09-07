@@ -17,12 +17,11 @@ from __future__ import annotations
 
 import os
 import random
-from datetime import UTC, datetime
+from datetime import datetime, UTC
 
 import pytest
 
 from app.core.config import settings
-
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -248,7 +247,7 @@ async def test_live_business_wiring_enqueue_worker_service_idempotency(monkeypat
     'clinic' queue of the TEST redis -> real arq Worker picks it up ->
     NotificationSenderService called with the right args -> a duplicate job
     never sends a second time (reminder_sent_at marker)."""
-    from arq.connections import RedisSettings, create_pool
+    from arq.connections import create_pool, RedisSettings
     from arq.worker import Worker
 
     import app.services.notification_service as notif_module

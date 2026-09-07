@@ -22,10 +22,13 @@ import logging
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from arq import cron
 from arq.connections import RedisSettings
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 # Ensure backend/ is on PYTHONPATH when run via `arq app.tasks.worker.WorkerSettings`
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
@@ -46,7 +49,7 @@ ARQ_QUEUE_NAME = "clinic"
 # Job implementations
 # ---------------------------------------------------------------------------
 
-def _build_db_session() -> tuple["Session", Any]:
+def _build_db_session() -> tuple[Session, Any]:
     """Build a short-lived DB session for one job run.
 
     Returns (session, engine) so the caller can dispose the engine after the

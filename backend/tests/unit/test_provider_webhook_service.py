@@ -13,6 +13,9 @@ from app.services.provider_webhook_service import ProviderWebhookService
 class TestProviderWebhookService:
     def test_click_webhook_requires_signature(self, db_session):
         service = ProviderWebhookService(db_session)
+        # lint-only anchor: `payment` must resolve for pyflakes; the mock
+        # below is never invoked in this test (kept from the #2988 copy).
+        payment = None
         try:
             def _mock_update_status(payment_id, new_status, commit=False):
                 payment.status = new_status
@@ -31,6 +34,9 @@ class TestProviderWebhookService:
 
     def test_payme_webhook_requires_auth_header(self, db_session):
         service = ProviderWebhookService(db_session)
+        # lint-only anchor: `payment` must resolve for pyflakes; the mock
+        # below is never invoked in this test (kept from the #2988 copy).
+        payment = None
         try:
             def _mock_update_status(payment_id, new_status, commit=False):
                 payment.status = new_status
@@ -383,6 +389,9 @@ class TestProviderWebhookService:
 
     def test_extract_payment_id_from_order(self, db_session):
         service = ProviderWebhookService(db_session)
+        # lint-only anchor: `payment` must resolve for pyflakes; the mock
+        # below is never invoked in this test (kept from the #2988 copy).
+        payment = None
         try:
             def _mock_update_status(payment_id, new_status, commit=False):
                 payment.status = new_status
@@ -399,6 +408,9 @@ class TestProviderWebhookService:
 
     def test_map_provider_status_to_payment_status(self, db_session):
         service = ProviderWebhookService(db_session)
+        # lint-only anchor: `payment` must resolve for pyflakes; the mock
+        # below is never invoked in this test (kept from the #2988 copy).
+        payment = None
         try:
             def _mock_update_status(payment_id, new_status, commit=False):
                 payment.status = new_status
