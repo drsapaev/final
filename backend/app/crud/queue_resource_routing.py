@@ -162,6 +162,36 @@ def resolve_registry_tag_queue_for_specialist(
         tag = doctor.specialty
     if not tag:
         return None
-    if resolve_tag_resource(db, tag) is None:
+    # Codex round-3 P1: deactivation-proof — an existing resource-owned
+    # queue stays the surface even if the registry row was deactivated
+    return tag_routes_to_resource(db, tag, day)
+
+
+def tag_routes_to_resource(db: Session, queue_tag: str, day: date) -> DailyQueue | None:
+    """The (day, tag) routing surface — deactivation-proof (QD-2C,
+    Codex round-3 P1).
+
+    An operator deactivating a registry row mid-day must not make the
+    day's routing surface vanish: patients already waiting on the
+    resource-owned queue would disappear from every specialist-keyed
+    surface while new arrivals fork a parallel legacy queue. The rule:
+
+    - an existing ACTIVE queue for (day, tag) that carries
+      ``queue_resource_id`` IS the surface regardless of the registry
+      flag (the resource axis stays routable until the queue closes);
+    - otherwise an ACTIVE registry row makes the (day, tag) queue the
+      surface whatever its owner (the stage-C switch);
+    - otherwise the tag is legacy doctor routing (None) — a
+      deactivated tag without a live resource queue creates nothing
+      on the resource axis.
+
+    Returns the queue (or None); creation of NEW resource queues is
+    the caller's decision and still requires the ACTIVE registry row
+    (``resolve_tag_resource``).
+    """
+    queue = find_active_tag_queue(db, day, queue_tag)
+    if queue is not None and queue.queue_resource_id is not None:
+        return queue
+    if resolve_tag_resource(db, queue_tag) is None:
         return None
-    return find_active_tag_queue(db, day, tag)
+    return queue

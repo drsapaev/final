@@ -405,8 +405,16 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         """
         defaults = defaults or {}
 
-        # QD-2C: тег реестра → ресурсная ось (унификация тег-первый)
+        # QD-2C: тег реестра → ресурсная ось (унификация тег-первый).
+        # Codex round-3 P1: поверхность деактивационно-устойчива —
+        # существующая resource-owned очередь тега остаётся поверхностью
+        # даже при деактивации строки реестра (пациенты не исчезают,
+        # параллельная очередь не форкается); НОВЫЕ ресурсные очереди
+        # создаются только при АКТИВНОЙ строке.
         if queue_tag:
+            surface = queue_resource_routing.tag_routes_to_resource(db, queue_tag, day)
+            if surface is not None:
+                return surface
             resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
             if resource is not None:
                 queue_resource_routing.lock_registry_tag_creation(

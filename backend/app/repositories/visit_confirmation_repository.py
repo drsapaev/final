@@ -11,6 +11,7 @@ from app.crud import clinic as crud_clinic
 from app.crud.queue_resource_routing import (
     lock_registry_tag_creation,
     resolve_tag_resource,
+    tag_routes_to_resource,
 )
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -69,8 +70,12 @@ class VisitConfirmationRepository:
         (day, tag)-очередь возвращается как есть, новой очередью
         становится resource-owned строка. Теги без строки реестра —
         прежний путь врача байт-идентично."""
-        # QD-2C: тег реестра → ресурсная ось
+        # QD-2C: тег реестра → ресурсная ось (Codex round-3 P1:
+        # поверхность деактивационно-устойчива)
         if queue_tag:
+            surface = tag_routes_to_resource(self.db, queue_tag, day)
+            if surface is not None:
+                return surface
             resource = resolve_tag_resource(self.db, queue_tag)
             if resource is not None:
                 lock_registry_tag_creation(self.db, queue_tag, day)

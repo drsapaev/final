@@ -1098,3 +1098,120 @@ def test_get_qr_token_info_resolves_resource_queue(db_session: Session) -> None:
     info = QRQueueService(db_session).get_qr_token_info("tok-round2-info")
     assert info is not None
     assert info.get("daily_queue") is not None or info.get("queue_length") == 1
+
+
+# ===================== M. Codex round-3 P1 pins =====================
+
+
+def test_deactivated_registry_keeps_resource_queue_routable(
+    db_session: Session,
+) -> None:
+    """Codex round-3 P1: an operator deactivating a registry row
+    mid-day must not make the day's routing surface vanish — the
+    existing resource-owned queue stays THE surface (no parallel
+    legacy fork, waiting patients stay visible to the
+    specialist-keyed surfaces)."""
+    from app.crud import queue_resource_routing as qrr
+
+    user = _make_user(db_session, username="lab_res5", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    resource = _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    _make_waiting_entry(db_session, queue)
+
+    # mid-day deactivation
+    resource.active = False
+    db_session.commit()
+
+    # 1. the writers do NOT fork a parallel legacy queue — the same
+    #    queue is returned whatever caller identity is used
+    again = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=synthetic.id, queue_tag="lab"
+    )
+    assert again.id == queue.id
+    assert len(_tag_queues(db_session, _DAY, "lab")) == 1
+
+    # 2. the staff surfaces still resolve it
+    assert (
+        qrr.resolve_registry_tag_queue_for_specialist(
+            db_session, _DAY, synthetic.id, None
+        ).id
+        == queue.id
+    )
+
+    # 3. the routing helper reports the resource surface
+    assert qrr.tag_routes_to_resource(db_session, "lab", _DAY).id == queue.id
+
+
+def test_deactivated_registry_without_queue_takes_legacy_path(
+    db_session: Session,
+) -> None:
+    """Deactivated registry row and NO live resource queue: the tag is
+    no longer proven doctorless — new queues go to the legacy doctor
+    axis (no resource creation)."""
+    from app.crud import queue_resource_routing as qrr
+
+    _make_resource(db_session, code="lab", queue_tag="lab", active=False)
+    assert qrr.tag_routes_to_resource(db_session, "lab", _DAY) is None
+
+    user = _make_user(db_session, username="dr_deact", role="doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=doctor.id, queue_tag="lab"
+    )
+    assert queue.specialist_id == doctor.id
+    assert queue.queue_resource_id is None
+
+
+def test_open_daily_queue_opens_the_resource_queue(db_session: Session) -> None:
+    """Codex round-3 P1 (/online-queue/open): opening reception with the
+    synthetic identity must open THE resource queue — previously it
+    created and opened a parallel doctor-owned queue while the
+    resource queue stayed open for online joins."""
+    from app.crud.online_queue import open_daily_queue
+
+    user = _make_user(db_session, username="lab_res6", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+
+    result = open_daily_queue(db_session, _DAY, synthetic.id)
+    assert result["success"] is True
+    db_session.refresh(queue)
+    assert queue.opened_at is not None  # THE queue was opened
+    assert len(_tag_queues(db_session, _DAY, "lab")) == 1  # no parallel fork
+
+
+def test_online_queue_status_and_availability_resolve_resource(
+    db_session: Session,
+) -> None:
+    """Codex round-3 P1 (/online-queue/status, availability): the
+    specialist-keyed lookups resolve the resource queue instead of
+    reporting queue_exists=False / creating ghosts."""
+    from app.crud.online_queue import check_queue_availability, get_queue_status
+
+    user = _make_user(db_session, username="lab_res7", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab", max_online_per_day=2)
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    _make_waiting_entry(db_session, queue, number=1)
+    _make_waiting_entry(db_session, queue, number=2)
+
+    status = get_queue_status(db_session, _DAY, synthetic.id)
+    assert status["queue_exists"] is True
+    assert status["queue_id"] == queue.id
+    assert status["total_entries"] == 2
+    assert status["waiting_entries"] == 2
+
+    availability = check_queue_availability(
+        db_session, _DAY, specialist_id=synthetic.id
+    )
+    # cap reached (2/2) — resolved THROUGH the resource queue, not a ghost
+    assert availability["available"] is False
+    assert availability.get("reason") in ("QUEUE_FULL", "QUEUE_LIMIT_REACHED")

@@ -598,6 +598,15 @@ def open_daily_queue(db: Session, day: date, specialist_id: int) -> dict[str, An
         .first()
     )
 
+    # QD-2C (Codex round-3 P1): очередь тега реестра может быть
+    # resource-owned — /online-queue/qrcode создаёт её с specialist
+    # NULL; без fallback открытие приёма создавало бы ПАРАЛЛЕЛЬНУЮ
+    # врачебную очередь, оставив ресурсную открытой для онлайна.
+    if not daily_queue:
+        daily_queue = queue_resource_routing.resolve_registry_tag_queue_for_specialist(
+            db, day, specialist_id, None
+        )
+
     if not daily_queue:
         # Создаем очередь если не существует
         daily_queue = DailyQueue(day=day, specialist_id=specialist_id, active=True)
@@ -643,6 +652,13 @@ def get_queue_status(db: Session, day: date, specialist_id: int) -> dict[str, An
         .filter(and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id))
         .first()
     )
+
+    # QD-2C (Codex round-3 P1): resource-owned очередь тега реестра —
+    # тот же fallback, иначе статус reports queue_exists=False
+    if not daily_queue:
+        daily_queue = queue_resource_routing.resolve_registry_tag_queue_for_specialist(
+            db, day, specialist_id, None
+        )
 
     if not daily_queue:
         return {"queue_exists": False, "queue_open": False, "entries_count": 0}
@@ -717,6 +733,12 @@ def check_queue_availability(
         .filter(and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id))
         .first()
     )
+
+    # QD-2C (Codex round-3 P1): resource-owned очередь тега реестра
+    if not daily_queue:
+        daily_queue = queue_resource_routing.resolve_registry_tag_queue_for_specialist(
+            db, day, specialist_id, None
+        )
 
     if daily_queue and daily_queue.opened_at:
         return {
@@ -846,8 +868,14 @@ def get_or_create_daily_queue(
     реестра); specialist_id игнорируется и может быть None. Теги без
     строки реестра — прежний путь врача байт-идентично.
     """
-    # QD-2C: тег реестра → ресурсная ось (унификация тег-первый)
+    # QD-2C: тег реестра → ресурсная ось (унификация тег-первый;
+    # Codex round-3 P1: поверхность деактивационно-устойчива —
+    # существующая resource-owned очередь остаётся поверхностью,
+    # новые ресурсные очереди — только при АКТИВНОЙ строке)
     if queue_tag:
+        surface = queue_resource_routing.tag_routes_to_resource(db, queue_tag, day)
+        if surface is not None:
+            return surface
         resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
         if resource is not None:
             queue_resource_routing.lock_registry_tag_creation(db, queue_tag, day)
