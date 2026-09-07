@@ -535,12 +535,60 @@ if (typeof document !== 'undefined' && !document.getElementById('wizard-keyframe
   document.head.appendChild(style);
 }
 
+// =====================================================================
+// FIX F: СНИМОК СОДЕРЖИМОГО МАСТЕРА (diff «есть ли несохранённые правки»)
+// =====================================================================
+
+interface WizardContentShape {
+  patient: {
+    id: string | number | null;
+    fio: string;
+    phone: string;
+    address: string;
+    birth_date: string;
+    gender: string;
+  };
+  cart: {
+    items: Array<Record<string, unknown>>;
+    discount_mode: string;
+    all_free: boolean;
+  };
+}
+
+// Детерминированная строка-подпись содержимого мастера. Используется для
+// сравнения текущего состояния с исходным снимком (Codex R1 #3097: p.id
+// больше не считается «контентом» сам по себе — edit-запись без правок
+// закрывается без предупреждения о потере данных). Порядок ключей фиксирован,
+// строки нормализуются (trim), позиция корзины сводится к значимым полям.
+export const wizardContentSignature = (content: WizardContentShape): string => {
+  const patient = {
+    id: content.patient.id ?? null,
+    fio: String(content.patient.fio || '').trim(),
+    phone: String(content.patient.phone || '').trim(),
+    address: String(content.patient.address || '').trim(),
+    birth_date: String(content.patient.birth_date || '').trim(),
+    gender: String(content.patient.gender || '').trim(),
+  };
+  const items = Array.isArray(content.cart.items) ? content.cart.items : [];
+  const cart = {
+    items: items.map((item) => ({
+      service_id: (item as { service_id?: unknown }).service_id ?? null,
+      doctor_id: (item as { doctor_id?: unknown }).doctor_id ?? null,
+      quantity: (item as { quantity?: unknown }).quantity ?? 1,
+    })),
+    discount_mode: String(content.cart.discount_mode || 'none'),
+    all_free: Boolean(content.cart.all_free),
+  };
+  return JSON.stringify({ patient, cart });
+};
+
 export default {
   PATIENT_NAME_PATTERN,
   MIXED_REPEAT_WARNING,
   STEP_PATIENT,
   STEP_CART,
   TOTAL_STEPS,
+  wizardContentSignature,
   getLocalISODate,
   normalizeWizardContractValue,
   getWizardRecordKind,

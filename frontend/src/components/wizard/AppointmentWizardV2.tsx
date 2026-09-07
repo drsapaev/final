@@ -209,6 +209,7 @@ import {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  wizardContentSignature,
   formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
@@ -397,6 +398,29 @@ const AppointmentWizardV2 = ({
           }
         });
 
+        // Fix F (Codex R1 #3097): снимок исходного содержимого мастера.
+        // Предупреждение «есть несохранённые данные» показывается только
+        // когда пользователь РЕАЛЬНО изменил что-то относительно исходного
+        // состояния, а не просто открыл существующую запись (p.id больше
+        // не считается «контентом» сам по себе).
+        initialContentRef.current = wizardContentSignature({
+          patient: {
+            id: (resolveInitialPatientId(initialData) as string | number | null) ?? null,
+            fio: String(initialData.patient_fio || initialData.patient_name || initialDataPatient.fio || ''),
+            phone: formatUzbekPhoneDisplay(
+              String(initialData.phone || initialData.patient_phone || initialDataPatient.phone || '')
+            ),
+            address: String(initialData.address || initialDataPatient.address || ''),
+            birth_date: birthDate,
+            gender: normalizeGenderForForm(resolvePatientGenderValue(initialData))
+          },
+          cart: {
+            items: initialCartItems as unknown as Array<Record<string, unknown>>,
+            discount_mode: String(initialData.discount_mode || 'none'),
+            all_free: Boolean(initialData.all_free || false)
+          }
+        });
+
         // ✅ ИСПРАВЛЕНО: Синхронизация formattedBirthDate
         if (birthDate) {
           setFormattedBirthDate(convertDateFromISO(birthDate));
@@ -407,6 +431,11 @@ const AppointmentWizardV2 = ({
         setServiceSearchQuery('');
         setShowAllServices(false);
         // New appointment mode intentionally avoids persistent draft storage for patient PHI.
+        // Fix F (Codex R1 #3097): исходный снимок пустой формы
+        initialContentRef.current = wizardContentSignature({
+          patient: { id: null, fio: '', phone: '', address: '', birth_date: '', gender: '' },
+          cart: { items: [], discount_mode: 'none', all_free: false }
+        });
       }
     }
   }, [isOpen, editMode, initialData, activeTab]);
@@ -520,6 +549,11 @@ const AppointmentWizardV2 = ({
   const nextStepRef = useRef<() => void>(() => {});
   const handleCompleteRef = useRef<() => Promise<void>>(async () => {});
 
+  // Fix F (Codex R1 #3097): снимок исходного содержимого мастера на момент
+  // открытия (edit-mode данные или пустая форма). Служит базой для diff'а
+  // «есть ли реально несохранённые правки» при закрытии.
+  const initialContentRef = useRef<string>('');
+
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
 
@@ -578,6 +612,14 @@ const AppointmentWizardV2 = ({
     // Сбрасываем ошибку при изменении
     setPhoneError(null);
 
+    // Fix F (Codex R1 #3097): инвалидируем незавершённую проверку при ЛЮБОМ
+    // изменении номера, включая неполные/пустые значения. Прежде requestId
+    // увеличивался только при запуске новой проверки (после валидности
+    // 12 цифр), поэтому ответ по старому валидному номеру мог восстановить
+    // предупреждение о дубликате и кнопку выбора чужого пациента, пока
+    // пользователь уже стёр или исправил номер.
+    phoneCheckSeqRef.current += 1;
+
     // Дебаунс проверки
     if (phoneCheckTimeout) clearTimeout(phoneCheckTimeout);
     const timeout = setTimeout(() => checkPhoneUniqueness(formatted), 500);
@@ -602,6 +644,13 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(STEP_PATIENT);
+    // Fix F (Codex R1 #3097): после явного сброса формы исходным состоянием
+    // становится пустая форма — закрытие мастера без правок не предупреждает
+    // о потере данных.
+    initialContentRef.current = wizardContentSignature({
+      patient: { id: null, fio: '', phone: '', address: '', birth_date: '', gender: '' },
+      cart: { items: [], discount_mode: 'none', all_free: false }
+    });
     toast.success(t('misc.aw_form_cleared'));
   };
 
@@ -616,6 +665,10 @@ const AppointmentWizardV2 = ({
       setPatientSuggestions([]);
       setShowSuggestions(false);
       setPatientSearchError(null);
+      // Fix F (Codex R1 #3097): сбрасываем и спиннер. Прежде при инвалидации
+      // короткого запроса isSearchingPatients оставался true навсегда:
+      // собственный finally устаревшего запроса уже не совпадал по requestId.
+      setIsSearchingPatients(false);
       return;
     }
 
@@ -705,6 +758,19 @@ const AppointmentWizardV2 = ({
         id: null // ✅ Сброс ID
       }
     }));
+
+    // Fix F (Codex R1 #3097): инвалидируем НЕМЕДЛЕННО при изменении ввода,
+    // а не только при старте дебаунс-запроса. Иначе ответ на «Ali» мог
+    // приехать в 300-мс окне после ввода «Vali», когда его requestId ещё
+    // был актуален, — и саджесты по «Ali» открывались поверх нового ввода.
+    patientSearchSeqRef.current += 1;
+    if (!value || value.trim().length < 2) {
+      // Короткий ввод: не ждём дебаунса, сразу гасим саджесты и спиннер
+      setPatientSuggestions([]);
+      setShowSuggestions(false);
+      setPatientSearchError(null);
+      setIsSearchingPatients(false);
+    }
 
     // Дебаунс поиска
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -1454,20 +1520,27 @@ const AppointmentWizardV2 = ({
 
   // Есть ли введённый пользователем контент, который будет потерян
   const wizardHasUserContent = (): boolean => {
+    // Fix F (Codex R1 #3097): «контент» больше не выводится из полей напрямую
+    // (p.id делал любую открытую в edit-mode запись «грязной» сразу после
+    // загрузки). Вместо этого текущее состояние сравнивается со снимком
+    // исходного содержимого на момент открытия мастера.
     const p = wizardData.patient;
-    const hasPatient = Boolean(
-      (p.fio && p.fio.trim()) ||
-      (p.phone && p.phone.trim()) ||
-      (p.address && p.address.trim()) ||
-      p.birth_date ||
-      p.gender ||
-      p.id
-    );
-    const hasCart =
-      (wizardData.cart.items?.length ?? 0) > 0 ||
-      wizardData.cart.discount_mode !== 'none' ||
-      Boolean(wizardData.cart.all_free);
-    return Boolean(hasPatient || hasCart);
+    const current = wizardContentSignature({
+      patient: {
+        id: p.id ?? null,
+        fio: p.fio || '',
+        phone: p.phone || '',
+        address: p.address || '',
+        birth_date: p.birth_date || '',
+        gender: p.gender || ''
+      },
+      cart: {
+        items: (wizardData.cart.items ?? []) as unknown as Array<Record<string, unknown>>,
+        discount_mode: wizardData.cart.discount_mode || 'none',
+        all_free: Boolean(wizardData.cart.all_free)
+      }
+    });
+    return current !== initialContentRef.current;
   };
 
   const requestCloseInFlightRef = useRef(false);
