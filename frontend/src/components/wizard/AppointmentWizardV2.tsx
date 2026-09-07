@@ -1444,7 +1444,11 @@ const AppointmentWizardV2 = ({
         fio: p.fio || '',
         phone: p.phone || '',
         address: p.address || '',
-        birth_date: p.birth_date || '',
+        // Codex R4 PR 3097 (P2): частично введённая дата («01.0») живёт только
+        // в formattedBirthDate, ISO остаётся пустым — сравнение с пустым
+        // baseline молча теряло видимый ввод при закрытии. Пока маска
+        // неполная, ISO пуст, а в подпись уходит сам видимый ввод.
+        birth_date: p.birth_date || convertDateToISO(formattedBirthDate) || formattedBirthDate || '',
         gender: p.gender || ''
       },
       cart: {

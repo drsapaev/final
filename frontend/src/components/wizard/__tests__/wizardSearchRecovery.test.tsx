@@ -420,3 +420,19 @@ describe('Fix F (Codex R3 #3097): refresh helpers keep user edits out of the bas
     expect(refreshBaselineAfterServiceResolution('broken {', resolved)).toBeNull();
   });
 });
+
+describe('Fix F (Codex R4 #3097): partial birth-date input tracked in dirty state', () => {
+  it('wizardHasUserContent falls back to the visible mask value when ISO is empty (P2 regression)', () => {
+    // Прежний баг: частичный ввод даты («01.0») жил только в formattedBirthDate,
+    // ISO оставался пустым и совпадал с пустым baseline — закрытие молча теряло
+    // видимый ввод.
+    const source = fs.readFileSync(wizardPath, 'utf8');
+    const hasContent = source.slice(
+      source.indexOf('const wizardHasUserContent = (): boolean => {'),
+      source.indexOf('return current !== initialContentRef.current;')
+    );
+    expect(hasContent).toContain(
+      "birth_date: p.birth_date || convertDateToISO(formattedBirthDate) || formattedBirthDate || ''"
+    );
+  });
+});
