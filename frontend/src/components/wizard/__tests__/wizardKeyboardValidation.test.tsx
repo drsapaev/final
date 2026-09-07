@@ -123,4 +123,24 @@ describe('Fix E: keyboard & validation contract', () => {
       'selectedGender === gender || (!selectedGender && gender === \'male\') ? 0 : -1'
     );
   });
+
+  it('arrow keys move DOM focus together with the selection (Codex R2)', () => {
+    // Регрессия R2: обработчик стрелок вычислял следующий вариант из
+    // selectedGender и НЕ перемещал DOM-фокус. При пустом selectedGender
+    // ArrowRight выбирал male повторно, а последующие стрелки меняли
+    // значение, оставляя фокус на кнопке с tabIndex=-1.
+    const radioBlock = extractSourceBlock(
+      patientStep,
+      'role="radiogroup"',
+      'errors.gender &&'
+    );
+    // Следующий вариант — из фокусного элемента/направления, а не только из значения
+    expect(radioBlock).toContain("document.activeElement");
+    expect(radioBlock).toContain("e.key === 'ArrowRight' ? 1 : -1");
+    // Фокус следует за выбором (roving tabindex)
+    expect(radioBlock).toContain('genderRadioRefs.current[nextIdx]?.focus()');
+    // Кнопки регистрируют DOM-ссылки и помечены data-gender
+    expect(patientStep).toContain('ref={(el) => { genderRadioRefs.current[genderIdx] = el; }}');
+    expect(patientStep).toContain('data-gender={gender}');
+  });
 });
