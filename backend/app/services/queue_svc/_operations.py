@@ -4,14 +4,16 @@ Split from queue_service.py.
 """
 from __future__ import annotations
 
+from app.core.roles import DOCTOR_ROLE_SPELLINGS
+from app.core.specialties import expand_queue_tags
+from app.crud import queue_resource_routing
+from app.models.online_queue import QueueResource
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase, _now
 from app.services.user_mgmt._base import (
     INCOMPLETE_DOCTOR_SPECIALTY,
     is_doctor_profile_incomplete,
 )
-from app.core.specialties import expand_queue_tags
-from app.core.roles import DOCTOR_ROLE_SPELLINGS
 
 
 def _unbookable_doctor_ids(
@@ -275,16 +277,25 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
 
     def calculate_next_number(cls, db: Session, daily_queue: DailyQueue) -> int:
-        """Вычислить следующий номер в очереди"""
+        """Вычислить следующий номер в очереди.
+
+        QD-2C: ресурсная очередь (queue_resource_id установлен) берёт
+        стартовый номер из строки реестра
+        (QueueResource.start_number_online — сиды 0059 перенесли
+        LIVE-значения синтетика, до QD-2E значения совпадают)."""
         max_number = (
             db.query(func.max(OnlineQueueEntry.number))
             .filter(OnlineQueueEntry.queue_id == daily_queue.id)
             .scalar()
         ) or 0
 
-        start_number = getattr(
-            daily_queue, "start_number", None
-        ) or cls.SPECIALTY_START_NUMBERS.get("default", 1)
+        start_number = getattr(daily_queue, "start_number", None)
+        if not start_number and daily_queue.queue_resource_id:
+            resource = db.get(QueueResource, daily_queue.queue_resource_id)
+            if resource is not None and resource.start_number_online:
+                start_number = int(resource.start_number_online)
+        if not start_number:
+            start_number = cls.SPECIALTY_START_NUMBERS.get("default", 1)
         return max(max_number + 1, start_number)
 
     @classmethod
@@ -357,17 +368,31 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         db: Session,
         *,
         day: date,
-        specialist_id: int,
+        specialist_id: int | None,
         queue_tag: str | None = None,
         defaults: dict[str, Any] | None = None,
     ) -> DailyQueue:
         """
         Получить или создать ежедневную очередь
 
+        QD-2C runtime switch: если queue_tag имеет активную строку в
+        queue_resources (прямо сейчас lab/ecg — сиды 0059), очередь
+        тега принадлежит РЕСУРСУ, а не врачу: существующая активная
+        (day, tag)-очередь возвращается как есть (унификация тег-первый
+        — мост двойного владения и ресурсные строки это ОДНА и та же
+        поверхность), новой очередью становится resource-owned строка
+        (specialist NULL, queue_resource_id, капы из реестра).
+        specialist_id в этой ветке игнорируется (в т.ч. синтетик —
+        doctorless-тег не форкает параллельную очередь на враче).
+        Теги без строки реестра идут по прежнему пути врача
+        байт-идентично (general/stomatology/специальности до QD-2E).
+
         Args:
             db: Database session
             day: Дата очереди
-            specialist_id: ID врача (ForeignKey на doctors.id)
+            specialist_id: ID врача (ForeignKey на doctors.id); None
+                допустим ТОЛЬКО для тега со строкой реестра (ресурсная
+                ветка не требует врача)
             queue_tag: Тег очереди (опционально)
             defaults: Значения по умолчанию
 
@@ -375,9 +400,61 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             DailyQueue instance
 
         Raises:
-            IntegrityError: Если врач с specialist_id не существует
+            ValueError: Если врач с specialist_id не существует (ветка
+                врача; ресурсная ветка врача не требует)
         """
         defaults = defaults or {}
+
+        # QD-2C: тег реестра → ресурсная ось (унификация тег-первый)
+        if queue_tag:
+            resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
+            if resource is not None:
+                existing = queue_resource_routing.find_active_tag_queue(
+                    db, day, queue_tag
+                )
+                if existing is not None:
+                    return existing
+                queue_settings = self._load_queue_settings(db)
+                daily_queue = DailyQueue(
+                    day=day,
+                    specialist_id=None,
+                    queue_resource_id=int(resource.id),
+                    queue_tag=queue_tag,
+                    active=True,
+                    online_start_time=f"{int(queue_settings.get('queue_start_hour', 7)):02d}:00",
+                    online_end_time=f"{int(queue_settings.get('queue_end_hour', 9)):02d}:00",
+                    max_online_entries=(
+                        queue_resource_routing.resource_queue_defaults(resource)[
+                            "max_online_entries"
+                        ]
+                    ),
+                    cabinet_number=defaults.get("cabinet_number"),
+                    cabinet_floor=defaults.get("cabinet_floor"),
+                    cabinet_building=defaults.get("cabinet_building"),
+                )
+                db.add(daily_queue)
+                try:
+                    db.flush()
+                except Exception as e:
+                    db.rollback()
+                    logger.error(
+                        "Failed to create resource DailyQueue: day=%s, "
+                        "queue_resource_id=%s, queue_tag=%s, error=%s",
+                        day,
+                        resource.id,
+                        queue_tag,
+                        e,
+                    )
+                    raise
+                logger.info(
+                    "Created resource DailyQueue id=%s day=%s resource=%s "
+                    "queue_tag=%s",
+                    daily_queue.id,
+                    day,
+                    resource.id,
+                    queue_tag,
+                )
+                return daily_queue
 
         # ✅ SECURITY: Проверяем существование врача перед созданием очереди
         # SSOT: DailyQueue.specialist_id ссылается на Doctor.id
@@ -483,13 +560,20 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
         fallback_start = default_start
         if fallback_start is None:
-            if daily_queue and getattr(daily_queue, "start_number", None):
+            # QD-2C: ресурсная очередь стартует с нумерации реестра
+            # (QueueResource.start_number_online — сиды 0059 перенесли
+            # LIVE-значения синтетика, до QD-2E значения совпадают)
+            if daily_queue is not None and daily_queue.queue_resource_id:
+                resource = db.get(QueueResource, daily_queue.queue_resource_id)
+                if resource is not None and resource.start_number_online:
+                    fallback_start = int(resource.start_number_online)
+            elif daily_queue and getattr(daily_queue, "start_number", None):
                 fallback_start = daily_queue.start_number
-            else:
-                tag_key = queue_tag or "default"
-                fallback_start = start_numbers.get(
-                    tag_key, self.SPECIALTY_START_NUMBERS.get(tag_key, 1)
-                )
+        if fallback_start is None:
+            tag_key = queue_tag or "default"
+            fallback_start = start_numbers.get(
+                tag_key, self.SPECIALTY_START_NUMBERS.get(tag_key, 1)
+            )
 
         if fallback_start is None:
             fallback_start = self.SPECIALTY_START_NUMBERS.get("default", 1)

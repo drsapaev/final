@@ -14,6 +14,7 @@ from typing import Any
 from app.core.config import settings
 from app.crud import clinic as crud_clinic
 from app.crud import telegram_config as crud_telegram
+from app.crud.queue_resource_routing import resolve_tag_resource
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.visit import Visit
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
@@ -713,7 +714,17 @@ class VisitConfirmationService:
                 if visit_doctor:
                     specialist_doctor_id = visit_doctor.id
 
-            if queue_tag == "ecg" and not specialist_doctor_id:
+            # QD-2C runtime switch: тег со строкой в queue_resources
+            # (сиды 0059 — lab/ecg) маршрутизируется на РЕСУРСНОЙ оси:
+            # синтетик не резолвится (specialist остаётся None),
+            # get_or_create_daily_queue ниже найдёт/создаст ресурсную
+            # очередь. Теги без строки реестра — старый путь.
+            registry_tag = (
+                not specialist_doctor_id
+                and resolve_tag_resource(self.repository.db, queue_tag) is not None
+            )
+
+            if queue_tag == "ecg" and not specialist_doctor_id and not registry_tag:
                 ecg_resource = self.repository.get_active_user_by_username(
                     "ecg_resource"
                 )
@@ -726,7 +737,7 @@ class VisitConfirmationService:
                             "ECG resource user id=%s has no doctor row",
                             ecg_resource.id,
                         )
-            elif queue_tag == "lab" and not specialist_doctor_id:
+            elif queue_tag == "lab" and not specialist_doctor_id and not registry_tag:
                 lab_resource = self.repository.get_active_user_by_username(
                     "lab_resource"
                 )
@@ -745,7 +756,7 @@ class VisitConfirmationService:
                             lab_resource.id,
                         )
 
-            if not specialist_doctor_id:
+            if not specialist_doctor_id and not registry_tag:
                 daily_queue = self._get_active_daily_queue_by_tag(today, queue_tag)
                 if not daily_queue:
                     logger.info(

@@ -8,6 +8,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.crud import clinic as crud_clinic
+from app.crud.queue_resource_routing import resolve_tag_resource
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
@@ -56,7 +57,64 @@ class VisitConfirmationRepository:
             .first()
         )
 
-    def get_or_create_daily_queue(self, day: date, specialist_id: int, queue_tag: str):
+    def get_or_create_daily_queue(
+        self, day: date, specialist_id: int | None, queue_tag: str
+    ):
+        """QD-2C runtime switch: тег со строкой в queue_resources (сиды
+        0059 — lab/ecg) резолвится на РЕСУРСНОЙ оси (specialist_id
+        игнорируется, может быть None): существующая активная
+        (day, tag)-очередь возвращается как есть, новой очередью
+        становится resource-owned строка. Теги без строки реестра —
+        прежний путь врача байт-идентично."""
+        # QD-2C: тег реестра → ресурсная ось
+        if queue_tag:
+            resource = resolve_tag_resource(self.db, queue_tag)
+            if resource is not None:
+                existing_by_tag = (
+                    self.db.query(DailyQueue)
+                    .filter(
+                        DailyQueue.day == day,
+                        DailyQueue.queue_tag == queue_tag,
+                        DailyQueue.active == True,
+                    )
+                    .first()
+                )
+                if existing_by_tag:
+                    logger.info(
+                        "[QD-2C] Reusing existing DailyQueue id=%s day=%s "
+                        "queue_tag=%s",
+                        existing_by_tag.id,
+                        day,
+                        queue_tag,
+                    )
+                    return existing_by_tag
+                settings = crud_clinic.get_queue_settings(self.db)
+                daily_queue = DailyQueue(
+                    day=day,
+                    specialist_id=None,
+                    queue_resource_id=int(resource.id),
+                    queue_tag=queue_tag,
+                    active=True,
+                    online_start_time=f"{int(settings.get('queue_start_hour', 7)):02d}:00",
+                    online_end_time=f"{int(settings.get('queue_end_hour', 9)):02d}:00",
+                    max_online_entries=resource.max_online_per_day,
+                )
+                self.db.add(daily_queue)
+                try:
+                    self.db.flush()
+                except Exception:
+                    self.db.rollback()
+                    raise
+                logger.info(
+                    "[QD-2C] Created resource DailyQueue id=%s day=%s "
+                    "resource=%s queue_tag=%s",
+                    daily_queue.id,
+                    day,
+                    resource.id,
+                    queue_tag,
+                )
+                return daily_queue
+
         doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
         if not doctor:
             logger.error(

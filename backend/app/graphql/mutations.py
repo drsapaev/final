@@ -38,6 +38,9 @@ from app.crud.appointment import (
 )
 from app.crud.clinic import get_queue_settings
 from app.crud.patient import soft_delete_patient
+from app.crud.queue_resource_routing import (
+    resolve_tag_resource as _resolve_tag_resource,
+)
 from app.crud.visit import create_visit
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.services.appointment_eligibility import (
@@ -1039,15 +1042,23 @@ class Mutation:
                 # get_or_create_daily_queue это query-then-insert без
                 # unique-констрейнта; advisory lock (Postgres) закрывает гонку
                 # двух первых joinQueue. SQLite (тесты) пропускает.
+                # QD-2C: тег реестра лочится по (tag, day) — ресурсная
+                # очередь одна на день независимо от переданного врача
+                # (унификация тег-первый в get_or_create_daily_queue).
                 if db.bind is not None and db.bind.dialect.name == "postgresql":
+                    if _resolve_tag_resource(db, input.queue_tag) is not None:
+                        lock_key = (
+                            f"daily_queue:tag:{input.queue_tag}:"
+                            f"{today.isoformat()}"
+                        )
+                    else:
+                        lock_key = (
+                            f"daily_queue:{input.doctor_id}:"
+                            f"{today.isoformat()}:{input.queue_tag or ''}"
+                        )
                     db.execute(
                         text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
-                        {
-                            "k": (
-                                f"daily_queue:{input.doctor_id}:"
-                                f"{today.isoformat()}:{input.queue_tag or ''}"
-                            )
-                        },
+                        {"k": lock_key},
                     )
 
                 # SSOT: get_or_create_daily_queue (уникальность day+specialist+tag).

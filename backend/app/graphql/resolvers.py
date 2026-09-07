@@ -305,6 +305,10 @@ def daily_queue_to_type(queue: DailyQueue) -> DailyQueueType:
         day=queue.day,
         queue_tag=queue.queue_tag,
         active=queue.active,
+        # QD-2C: ось владения выводится из queue_resource_id (как в
+        # DailyQueueOut): мост двойного владения — resource
+        queue_resource_id=queue.queue_resource_id,
+        owner_kind="resource" if queue.queue_resource_id else "doctor",
         opened_at=queue.opened_at,
         cabinet_number=queue.cabinet_number,
         cabinet_floor=queue.cabinet_floor,

@@ -35,6 +35,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.crud import clinic as crud_clinic
+from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
@@ -824,7 +826,7 @@ def validate_queue_token(
 def get_or_create_daily_queue(
     db: Session,
     day: date,
-    specialist_id: int,
+    specialist_id: int | None,
     queue_tag: str | None = None,
     cabinet_number: str | None = None,
     cabinet_floor: int | None = None,
@@ -836,7 +838,45 @@ def get_or_create_daily_queue(
     Теперь очереди уникальны по (day, specialist_id, queue_tag)
 
     ⭐ ВАЖНО: specialist_id канонически хранит Doctor.id (ForeignKey на doctors.id).
+
+    QD-2C runtime switch: тег со строкой в queue_resources (сиды 0059
+    — lab/ecg) — докторлесс: существующая активная (day, tag)-очередь
+    возвращается (унификация тег-первый), новой очередью становится
+    resource-owned строка (specialist NULL, queue_resource_id, капы из
+    реестра); specialist_id игнорируется и может быть None. Теги без
+    строки реестра — прежний путь врача байт-идентично.
     """
+    # QD-2C: тег реестра → ресурсная ось (унификация тег-первый)
+    if queue_tag:
+        resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
+        if resource is not None:
+            existing_by_tag = (
+                db.query(DailyQueue)
+                .filter(
+                    DailyQueue.day == day,
+                    DailyQueue.queue_tag == queue_tag,
+                    DailyQueue.active.is_(True),
+                )
+                .first()
+            )
+            if existing_by_tag:
+                return existing_by_tag
+            queue_settings = crud_clinic.get_queue_settings(db)
+            daily_queue = DailyQueue(
+                day=day,
+                specialist_id=None,
+                queue_resource_id=int(resource.id),
+                queue_tag=queue_tag,
+                active=True,
+                online_start_time=f"{int(queue_settings.get('queue_start_hour', 7)):02d}:00",
+                online_end_time=f"{int(queue_settings.get('queue_end_hour', 9)):02d}:00",
+                max_online_entries=resource.max_online_per_day,
+            )
+            db.add(daily_queue)
+            db.commit()
+            db.refresh(daily_queue)
+            return daily_queue
+
     doctor_exists = db.query(Doctor).filter(Doctor.id == specialist_id).first()
     if not doctor_exists:
         raise ValueError(
