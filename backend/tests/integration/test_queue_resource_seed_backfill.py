@@ -1467,13 +1467,15 @@ def test_transaction_atomicity_rolls_back_earlier_seed() -> None:
 # ===================== G. downgrade =====================
 
 
-def test_downgrade_clears_references_and_keeps_registry_rows() -> None:
-    """Downgrade reverses the backfill (references nulled, specialist
-    preserved) and CONSERVES the registry rows — no provenance marker
-    can distinguish an exact-identity occupant that pre-dates this
-    revision from one this revision inserted (Codex round-1 P2), so
-    data wins: the two inert rows stay (nothing reads them until
-    QD-2C; downgrading further drops the table itself)."""
+def test_downgrade_conserves_references_and_registry_rows() -> None:
+    """Downgrade CONSERVES both axes of what 0059 wrote: the registry
+    rows AND the queue_resource_id references. No provenance marker
+    can distinguish an exact-identity occupant (or a pre-existing
+    link) from what this revision inserted/backfilled (Codex
+    round-1 P2 for the rows, round-2 P2 for the references), so
+    data wins: the dual-ownership bridge keeps both owners on every
+    backfilled row, the references stay inert until QD-2C, and
+    downgrading further drops the table and the column themselves."""
     module = _load_migration_0059()
     conn = _scratch_connection()
     try:
@@ -1482,12 +1484,15 @@ def test_downgrade_clears_references_and_keeps_registry_rows() -> None:
         module._apply_seed_and_backfill(conn)
         seeded = _resource_rows(conn)
         assert len(seeded) == 2
+        lab_resource = next(row for row in seeded if row.code == "lab")
 
         module._restore_pre_seed_state(conn)
 
-        # the backfill is reversed...
+        # the reference survives: provenance cannot be proven, so the
+        # link stays (the specialist axis is untouched — both owners
+        # remain set, nothing is orphaned)
         row = _queue_row(conn, queues["lab"][0])
-        assert row.queue_resource_id is None
+        assert row.queue_resource_id == lab_resource.id
         assert row.specialist_id == lab_doctor_id
         assert row.queue_tag == "lab"
         assert bool(row.active) is True
@@ -1539,8 +1544,63 @@ def test_downgrade_preserves_preexisting_exact_identity_row() -> None:
         assert lab_row.start_number_online == 1
         assert lab_row.max_online_per_day == 15
         assert lab_row.default_cabinet is None
-        # and the backfill was still reversed
-        assert _queue_row(conn, queue_id).queue_resource_id is None
+        # and the backfill link also survives — the conservative
+        # contract clears nothing, ever (round-2 P2: the link's
+        # provenance is exactly as unprovable as the row's)
+        assert _queue_row(conn, queue_id).queue_resource_id == preexisting_id
+    finally:
+        conn.close()
+
+
+def test_downgrade_preserves_preexisting_hand_applied_link() -> None:
+    """The Codex round-2 P2 scenario, pinned end-to-end: a 0058-era
+    installation may already hold BOTH a hand-applied exact-identity
+    registry row AND a queue linked to it (a state the upgrade's
+    no-op path deliberately accepts — _seed_resource no-ops on the
+    row, _backfill_tag no-ops on the link). The downgrade must not
+    destroy that operator-owned link: _SELECT_REFERENCING_QUEUES
+    cannot distinguish a reference 0059 backfilled from one that
+    pre-dates it, so nulling "all references" was silently clearing
+    operator data. The conservative contract (round-1 P2 for rows,
+    round-2 P2 for references) conserves both — byte-identical."""
+    module = _load_migration_0059()
+    conn = _scratch_connection()
+    try:
+        lab_doctor_id, _, _, _ = _canonical_environment(conn, with_queues=False)
+        # the hand-applied 0058-era state: registry row + linked queue
+        conn.execute(
+            sa.text(
+                "INSERT INTO queue_resources (code, queue_tag, "
+                "display_name, active, start_number_online, "
+                "max_online_per_day, default_cabinet) "
+                "VALUES ('lab', 'lab', 'Лаборатория', true, 1, 15, NULL)"
+            )
+        )
+        (preexisting_id,) = conn.execute(
+            sa.text("SELECT id FROM queue_resources WHERE code = 'lab'")
+        ).fetchone()
+        queue_id = _seed_queue(
+            conn,
+            specialist_id=lab_doctor_id,
+            queue_tag="lab",
+            queue_resource_id=preexisting_id,
+        )
+
+        # upgrade: exact-identity no-op for the row AND the link
+        module._apply_seed_and_backfill(conn)
+        assert _queue_row(conn, queue_id).queue_resource_id == preexisting_id
+
+        module._restore_pre_seed_state(conn)
+
+        # the operator-owned link survives byte-identical, the doctor
+        # axis untouched — the downgrade wrote nothing at all
+        row = _queue_row(conn, queue_id)
+        assert row.queue_resource_id == preexisting_id
+        assert row.specialist_id == lab_doctor_id
+        assert row.queue_tag == "lab"
+        assert bool(row.active) is True
+        lab_row = next(r for r in _resource_rows(conn) if r.code == "lab")
+        assert lab_row.id == preexisting_id
     finally:
         conn.close()
 
@@ -1616,8 +1676,9 @@ def test_downgrade_noop_when_nothing_seeded() -> None:
 
 def test_downgrade_rerun_after_downgrade_is_still_clean() -> None:
     """Downgrade -> upgrade again is a clean exact-identity no-op for
-    the seeds (the conservative contract keeps the rows, so the
-    re-upgrade path is the hand-applied-row path)."""
+    the seeds AND the links (the conservative contract keeps the rows
+    and the references, so the re-upgrade path is the hand-applied
+    state path twice over — rows and links)."""
     module = _load_migration_0059()
     conn = _scratch_connection()
     try:

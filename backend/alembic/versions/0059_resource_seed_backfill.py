@@ -90,19 +90,25 @@ when general_resource is missing) is exactly the drift these aborts
 surface on staging databases — repair is explicit, never silent.
 
 Downgrade is strict where data can be lost and conservative where it
-cannot (the Codex round-1 P2 ruling): it refuses to strip a reference
-that would leave a queue with BOTH owners NULL (the QD-2A
-backup-restore P1 lesson: an ownerless queue with live entries),
-then nulls exactly the references this revision wrote — and NEVER
-deletes the registry rows: an exact-identity occupant may pre-date
-this revision (the upgrade no-op path deliberately accepts
-hand-applied rows — the 0056 incident-drift precedent), and no
-provenance marker distinguishes them from rows this revision
-inserted, so deleting possibly-pre-existing registry data is worse
-than leaving two inert rows (nothing reads them until QD-2C, and
-downgrading further drops the queue_resources table itself). It
-exists for schema-history reversibility, not as a routine production
-operation.
+cannot (the Codex round-1 P2 ruling on registry rows, extended to
+references by the round-2 P2 ruling): it aborts on shapes only a
+LATER stage can produce (more than one exact-identity registry row;
+a resource-owned queue with BOTH owners NULL — the QD-2A
+backup-restore P1 lesson), and it never writes a single row. The
+registry rows stay: an exact-identity occupant may pre-date this
+revision (the upgrade no-op path deliberately accepts hand-applied
+rows — the 0056 incident-drift precedent), and no provenance marker
+distinguishes them from rows this revision inserted. The
+queue_resource_id references stay for the same reason:
+_backfill_tag accepts a hand-applied link as a no-op, so a
+reference may equally pre-date this revision, and nulling possibly
+operator-owned links is worse than leaving them — every reference
+this revision backfilled still carries its specialist_id (the
+dual-ownership bridge), nothing reads queue_resource_id until
+QD-2C, and downgrading further (0058) drops the queue_resources
+table and the column themselves. The downgrade exists for
+schema-history reversibility and as a loud later-stage-write
+detector, not as a routine production operation or a data restore.
 
 The upgrade/downgrade logic lives in module-level functions so tests
 can run them against a scratch SQLite connection without an alembic
@@ -250,13 +256,11 @@ _SELECT_REFERENCING_QUEUES = sa.text("""
     ORDER BY id
     """)
 
-_CLEAR_QUEUE_RESOURCE = sa.text("""
-    UPDATE daily_queues SET queue_resource_id = NULL WHERE id = :queue_id
-    """)
-
-# NOTE: no DELETE statement exists in this revision by design — the
-# downgrade conserves the registry rows (provenance cannot be proven;
-# see _restore_pre_seed_state).
+# NOTE: no DELETE statement and no NULL-clearing UPDATE exists in this
+# revision by design — the downgrade conserves BOTH the registry rows
+# AND the queue_resource_id references (provenance cannot be proven;
+# see _restore_pre_seed_state and the Codex round-1/round-2 P2
+# rulings).
 
 
 def _abort(message: str) -> None:
@@ -575,25 +579,32 @@ def _apply_seed_and_backfill(conn) -> dict[str, int]:
 
 
 def _restore_pre_seed_state(conn) -> None:
-    """Downgrade core: reverse the backfill, CONSERVE the registry.
+    """Downgrade core: conserve everything, abort on later-stage shapes.
 
-    Strict where data can be lost, conservative where it cannot:
+    Strict where data can be lost, conservative where it cannot (the
+    Codex round-1 P2 ruling on registry rows, extended to references
+    by the round-2 P2 ruling):
 
-    - refuses to strip a reference that would leave BOTH owners NULL —
-    an ownerless queue is the QD-2A backup-restore P1 shape and is
-    never produced silently (such rows are written by a later stage,
-    not by this revision);
-    - nulls exactly the references this revision backfilled
-    (specialist_id was preserved by construction, so every 0059
-    reference still has its doctor owner);
-    - NEVER deletes the registry rows. An exact-identity occupant may
-    pre-date this revision (the upgrade no-op path deliberately
-    accepts hand-applied rows — the 0056 incident-drift precedent),
-    and no provenance marker distinguishes them from rows this
-    revision inserted; deleting possibly-pre-existing registry data
-    is worse than leaving two inert rows. Nothing reads the registry
-    until QD-2C, and downgrading further (0058) drops the
-    queue_resources table itself.
+    - aborts on more than one exact-identity registry row (a shape
+    this revision never produces — it inserts at most one and
+    refuses duplicates on upgrade);
+    - aborts on a resource-owned queue with BOTH owners NULL — an
+    ownerless queue is the QD-2A backup-restore P1 shape, written by
+    a later stage (QD-2C+), not by this revision; downgrade that
+    stage first;
+    - NEVER deletes the registry rows and NEVER clears the
+    queue_resource_id references: both may pre-date this revision.
+    The upgrade no-op path deliberately accepts hand-applied
+    exact-identity registry rows AND hand-applied links (the 0056
+    incident-drift precedent), so no provenance marker distinguishes
+    what this revision wrote from what an operator applied, and
+    nulling possibly operator-owned links is worse than leaving
+    them. Every reference this revision backfilled still carries
+    its specialist_id (the dual-ownership bridge), nothing reads
+    queue_resource_id until QD-2C, and downgrading further (0058)
+    drops the queue_resources table and the column themselves. The
+    re-upgrade after this downgrade is a clean exact-identity no-op
+    for both the rows and the links.
     """
     for spec in _SEED_SPECS:
         existing = conn.execute(
@@ -632,10 +643,10 @@ def _restore_pre_seed_state(conn) -> None:
                 "rows changed"
             )
 
-        for row in referencing:
-            conn.execute(_CLEAR_QUEUE_RESOURCE, {"queue_id": row.id})
-        # deliberately no DELETE: the registry rows stay (see the
-        # docstring — provenance cannot be proven, so data wins)
+        # deliberately no writes of any kind: neither the registry
+        # rows nor the queue_resource_id references are cleared —
+        # provenance cannot be proven, so data wins (see the
+        # docstring and the Codex round-1/round-2 P2 rulings)
 
 
 def upgrade() -> None:
