@@ -135,7 +135,7 @@ const PatientStepV2 = ({
               <button
               type="button"
               onClick={onRetrySearch}
-              // Codex R2 #3097: Enter на этой кнопке должен НАЖИМАТЬ её, а не
+              // Codex R2 PR 3097: Enter на этой кнопке должен НАЖИМАТЬ её, а не
               // проваливаться в глобальный обработчик мастера (preventDefault
               // + переход к следующему шагу гасил родную активацию кнопки).
               onKeyDown={(e) => {

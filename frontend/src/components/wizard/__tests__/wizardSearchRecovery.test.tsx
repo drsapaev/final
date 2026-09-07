@@ -136,7 +136,7 @@ describe('Fix F: wizard search-race contract', () => {
 });
 
 // =====================================================================
-// Codex R1 #3097 regressions
+// Codex R1 PR 3097 regressions
 // =====================================================================
 
 describe('Fix F Codex R1 regressions', () => {
@@ -196,7 +196,7 @@ describe('Fix F Codex R1 regressions', () => {
   });
 
   it('auto-hydration (service_id / gender) refreshes the dirty baseline (Codex R2 P2)', () => {
-    // Codex R2 #3097: резолвинг вынесен в чистую функцию (потолок LOC PR-45),
+    // Codex R2 PR 3097: резолвинг вынесен в чистую функцию (потолок LOC PR-45),
     // эффект гидрации обязан перезаписывать снимок после разрешённого service_id.
     const hydration = extractSourceBlock(
       source,
@@ -204,7 +204,7 @@ describe('Fix F Codex R1 regressions', () => {
       '}, [servicesData, wizardData.cart.items]);'
     );
     expect(hydration).toContain('initialContentRef.current = wizardContentSignature(');
-    expect(hydration).toContain('Codex R2 #3097');
+    expect(hydration).toContain('Codex R2 PR 3097');
 
     // Сама чистая функция резолвит service_id по коду (p09 = p9) и имени
     const utilsSource = readWizardUtilsSource();
@@ -235,7 +235,7 @@ describe('Fix F Codex R1 regressions', () => {
   });
 
   it('wizardContentSignature: unchanged edit data is stable, real edits change the signature (real behavior)', () => {
-    // Codex R1 #3097: открыли существующую запись и сразу закрыли —
+    // Codex R1 PR 3097: открыли существующую запись и сразу закрыли —
     // предупреждение о потере данных появляться не должно. Поведение
     // проверяется на реальной функции, а не на тексте исходника.
     const initialPatient = {

@@ -394,7 +394,7 @@ const AppointmentWizardV2 = ({
           }
         });
 
-        // Fix F (Codex R1 #3097): снимок исходного содержимого мастера.
+        // Fix F (Codex R1 PR 3097): снимок исходного содержимого мастера.
         // Предупреждение «есть несохранённые данные» показывается только
         // когда пользователь РЕАЛЬНО изменил что-то относительно исходного
         // состояния, а не просто открыл существующую запись (p.id больше
@@ -427,7 +427,7 @@ const AppointmentWizardV2 = ({
         setServiceSearchQuery('');
         setShowAllServices(false);
         // New appointment mode intentionally avoids persistent draft storage for patient PHI.
-        // Fix F (Codex R1 #3097): исходный снимок пустой формы
+        // Fix F (Codex R1 PR 3097): исходный снимок пустой формы
         initialContentRef.current = wizardContentSignature({
           patient: { id: null, fio: '', phone: '', address: '', birth_date: '', gender: '' },
           cart: { items: [], discount_mode: 'none', all_free: false }
@@ -469,7 +469,7 @@ const AppointmentWizardV2 = ({
           };
         });
 
-        // Codex R2 #3097: авто-гидрация пола — НЕ правка пользователя;
+        // Codex R2 PR 3097: авто-гидрация пола — НЕ правка пользователя;
         // обновляем снимок, чтобы закрытие нетронутой записи не давало
         // ложного предупреждения о несохранённых данных.
         initialContentRef.current = wizardContentSignature({
@@ -564,7 +564,7 @@ const AppointmentWizardV2 = ({
   const nextStepRef = useRef<() => void>(() => {});
   const handleCompleteRef = useRef<() => Promise<void>>(async () => {});
 
-  // Fix F (Codex R1 #3097): снимок исходного содержимого мастера на момент
+  // Fix F (Codex R1 PR 3097): снимок исходного содержимого мастера на момент
   // открытия (edit-mode данные или пустая форма). Служит базой для diff'а
   // «есть ли реально несохранённые правки» при закрытии.
   const initialContentRef = useRef<string>('');
@@ -627,7 +627,7 @@ const AppointmentWizardV2 = ({
     // Сбрасываем ошибку при изменении
     setPhoneError(null);
 
-    // Fix F (Codex R1 #3097): инвалидируем незавершённую проверку при ЛЮБОМ
+    // Fix F (Codex R1 PR 3097): инвалидируем незавершённую проверку при ЛЮБОМ
     // изменении номера, включая неполные/пустые значения. Прежде requestId
     // увеличивался только при запуске новой проверки (после валидности
     // 12 цифр), поэтому ответ по старому валидному номеру мог восстановить
@@ -659,7 +659,7 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(STEP_PATIENT);
-    // Fix F (Codex R1 #3097): после явного сброса формы исходным состоянием
+    // Fix F (Codex R1 PR 3097): после явного сброса формы исходным состоянием
     // становится пустая форма — закрытие мастера без правок не предупреждает
     // о потере данных.
     initialContentRef.current = wizardContentSignature({
@@ -680,7 +680,7 @@ const AppointmentWizardV2 = ({
       setPatientSuggestions([]);
       setShowSuggestions(false);
       setPatientSearchError(null);
-      // Fix F (Codex R1 #3097): сбрасываем и спиннер. Прежде при инвалидации
+      // Fix F (Codex R1 PR 3097): сбрасываем и спиннер. Прежде при инвалидации
       // короткого запроса isSearchingPatients оставался true навсегда:
       // собственный finally устаревшего запроса уже не совпадал по requestId.
       setIsSearchingPatients(false);
@@ -774,7 +774,7 @@ const AppointmentWizardV2 = ({
       }
     }));
 
-    // Fix F (Codex R1 #3097): инвалидируем НЕМЕДЛЕННО при изменении ввода,
+    // Fix F (Codex R1 PR 3097): инвалидируем НЕМЕДЛЕННО при изменении ввода,
     // а не только при старте дебаунс-запроса. Иначе ответ на «Ali» мог
     // приехать в 300-мс окне после ввода «Vali», когда его requestId ещё
     // был актуален, — и саджесты по «Ali» открывались поверх нового ввода.
@@ -968,7 +968,7 @@ const AppointmentWizardV2 = ({
   useEffect(() => {
     // ✅ ИСПРАВЛЕНО: Разрешаем услуги не только в editMode, но и когда servicesData загружены
     if (servicesData.length > 0 && wizardData.cart.items.length > 0) {
-      // Codex R2 #3097: резолвинг вынесен в resolveCartServiceReferences (потолок LOC PR-45)
+      // Codex R2 PR 3097: резолвинг вынесен в resolveCartServiceReferences (потолок LOC PR-45)
       const resolution = resolveCartServiceReferences(
         wizardData.cart.items as unknown as Array<Record<string, unknown>>,
         servicesData as unknown as Array<Record<string, unknown>>
@@ -985,7 +985,7 @@ const AppointmentWizardV2 = ({
         }
       }));
 
-      // Codex R2 #3097: гидрация service_id по справочнику — НЕ правка
+      // Codex R2 PR 3097: гидрация service_id по справочнику — НЕ правка
       // пользователя. Обновляем исходный снимок корзины, иначе закрытие
       // нетронутой записи давало ложное предупреждение о потере данных
       // (снимок содержал service_id: null, состояние — уже разрешённый ID).
@@ -1451,7 +1451,7 @@ const AppointmentWizardV2 = ({
 
   // Есть ли введённый пользователем контент, который будет потерян
   const wizardHasUserContent = (): boolean => {
-    // Fix F (Codex R1 #3097): «контент» больше не выводится из полей напрямую
+    // Fix F (Codex R1 PR 3097): «контент» больше не выводится из полей напрямую
     // (p.id делал любую открытую в edit-mode запись «грязной» сразу после
     // загрузки). Вместо этого текущее состояние сравнивается со снимком
     // исходного содержимого на момент открытия мастера.
