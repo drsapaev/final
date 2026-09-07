@@ -216,6 +216,8 @@ import {
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
   categories,
+  splitFioForUpdate,
+  persistCardChangesIfEdited,
 } from './wizardUtils';
 
 const AppointmentWizardV2 = ({
@@ -323,6 +325,8 @@ const AppointmentWizardV2 = ({
   // PR-25: queue profiles for dynamic department filtering
   const [queueProfiles, setQueueProfiles] = useState<QueueProfileDto[]>([]);
   const [formattedBirthDate, setFormattedBirthDate] = useState('');
+  // Fix B: снимок выбранной карточки (база диффа изменений).
+  const selectedCardSnapshotRef = useRef<{ id: string | number | null; phoneDigits: string; address: string; birthDate: string; sex: string } | null>(null);
   const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({} as Record<string, unknown>);
   const [isRepeatEligibilityLoading, setIsRepeatEligibilityLoading] = useState(false);
 
@@ -732,6 +736,16 @@ const AppointmentWizardV2 = ({
 
     // Обновляем отформатированную дату
     setFormattedBirthDate(convertDateFromISO(patient.birth_date || ''));
+    // Fix B: снимок карточки на момент выбора (база для диффа изменений).
+    selectedCardSnapshotRef.current = {
+      id: patient.id ?? null,
+      phoneDigits: String(patient.phone || '').replace(/\D/g, ''),
+      address: String(patient.address || ''),
+      birthDate: String(patient.birth_date || ''),
+      sex: genderToPatientSexForApi(
+        normalizeGenderForForm(resolvePatientGenderValue(patient)),
+      ) ?? '',
+    };
     setShowSuggestions(false);
     setErrors((prev) => ({ ...prev, fio: null }));
   };
@@ -1796,7 +1810,30 @@ const AppointmentWizardV2 = ({
         return;
       }
 
-      const initialPatientSex = genderToPatientSexForApi(resolvePatientGenderValue(initialData));
+      // === Fix B: явное сохранение изменённой карточки (patients API) ===
+      // Телефон/адрес/дата/пол редактируемы, но раньше не сохранялись.
+      // Изменённые поля сохраняются ДО корзины и проверяются чтением;
+      // неизменённая карточка не порождает update-запрос. Ошибка сохранения
+      // останавливает отправку без сообщения об успехе.
+      const cardPersisted = await persistCardChangesIfEdited({
+        patientId,
+        snapshot: selectedCardSnapshotRef.current,
+        current: {
+          phoneDigits: normalizedPhoneDigits,
+          address: wizardData.patient.address,
+          birthDate: wizardData.patient.birth_date,
+          sex: selectedPatientSex ?? '',
+        },
+        normalizedPhone,
+        updatePatient,
+        getPatient,
+        logger,
+        toast,
+        t,
+      });
+      if (!cardPersisted) return;
+
+            const initialPatientSex = genderToPatientSexForApi(resolvePatientGenderValue(initialData));
       if (editMode && patientId && selectedPatientSex && selectedPatientSex !== initialPatientSex) {
         // UX Audit Stage 3 (Wizard issue 5.1):
         // Заменён raw fetch() PUT на updatePatient() из api/patients.
@@ -2433,8 +2470,10 @@ const AppointmentWizardV2 = ({
         logger.log('📝 Режим редактирования: visits пустой, обновляем только данные пациента через patients API');
 
         // Обновляем данные пациента через отдельный endpoint
+        // Fix B: PatientUpdate не принимает full_name (молча отбрасывался) —
+        // отправляем раздельные именные поля из ФИО.
         const patientUpdateData: Record<string, unknown> = {
-          full_name: wizardData.patient.fio || wizardData.patient.name,
+          ...splitFioForUpdate(String(wizardData.patient.fio || wizardData.patient.name || '')),
           phone: normalizedPhone,
           birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate,
           sex: selectedPatientSex,

@@ -106,6 +106,13 @@ const PatientStepV2 = ({
             </div>
           </div>
 
+          {/* Fix B: пользователь явно видит, что редактирует выбранную карточку */}
+          {safeData.id &&
+          <div className="patient-step-v2__phone-hint">
+            {t('misc.psv_card_edit_hint')}
+          </div>
+          }
+
           {errors.fio &&
           <span className="patient-step-v2__error-inline">
               <AlertCircle size={14} />

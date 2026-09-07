@@ -6287,6 +6287,9 @@ const en = {
 
     // ─── AppointmentWizardV2.jsx (aw_) ─────────────────────────────────────
     aw_phone_already_exists: 'Пациент с таким номером уже существует',
+    psv_card_edit_hint: 'Editing the selected patient card. Phone, address and birth date changes will be saved.',
+    aw_card_save_failed: 'Failed to save card changes: {message}. The record was not created.',
+    aw_card_save_not_persisted: 'Card changes were not saved. The record was not created. Please try again.',
     aw_form_cleared: 'Форма очищена',
     aw_no_name: 'Без имени',
     aw_unknown_service: 'Неизвестная услуга',
