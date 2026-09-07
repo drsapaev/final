@@ -316,12 +316,18 @@ export interface CartQuoteRequestOptions {
   // — каталог-цена); выбирается по фактическому маршруту команды.
   pricingMode?: 'cart' | 'edit_delta' | 'full_update';
   itemsOverride?: QuoteCartSource['items'];
+  // Codex R6 #3095 (P2): edit-delta контекст — квота биллит ту же дельту,
+  // что и команда (активная запись того же дня, уже содержащая услугу,
+  // биллит max(запрошено − есть, 0)). Передаётся только для edit_delta.
+  patientId?: number | string | null;
+  targetDate?: string | null;
+  preferredEntryIds?: Array<number | string>;
 }
 
 export const buildCartQuoteRequest = (
   cart: QuoteCartSource | null | undefined,
   options: CartQuoteRequestOptions = {}
-): { items: Array<{ service_id: number; quantity: number; custom_price?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string } | null => {
+): { items: Array<{ service_id: number; quantity: number; custom_price?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } | null => {
   const rawItems = (options.itemsOverride ?? (Array.isArray(cart?.items) ? cart.items : [])) || [];
   const items = rawItems
     .filter((item) => item && item.service_id != null)
@@ -338,12 +344,30 @@ export const buildCartQuoteRequest = (
       return quoteItem;
     });
   if (items.length === 0) return null;
-  return {
+  const request: { items: Array<{ service_id: number; quantity: number; custom_price?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } = {
     items,
     discount_mode: String(cart?.discount_mode || 'none'),
     all_free: Boolean(cart?.all_free),
     pricing_mode: options.pricingMode || 'cart',
   };
+  // Codex R6 #3095 (P2): edit-delta контекст — backend биллит в квоте ту же
+  // дельту, которую реально выставит команда (см. _edit_delta_billable_quantity).
+  if (options.pricingMode === 'edit_delta') {
+    const patientIdNum = Number(options.patientId);
+    if (options.patientId != null && Number.isFinite(patientIdNum) && patientIdNum > 0) {
+      request.patient_id = patientIdNum;
+    }
+    if (options.targetDate) {
+      request.target_date = String(options.targetDate);
+    }
+    const entryIds = (options.preferredEntryIds || [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    if (entryIds.length > 0) {
+      request.preferred_entry_ids = entryIds;
+    }
+  }
+  return request;
 };
 
 // =====================================================================

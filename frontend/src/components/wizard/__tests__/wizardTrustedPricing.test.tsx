@@ -126,8 +126,13 @@ describe('Fix D: trusted pricing contract', () => {
   it('quote request is rebuilt on any cart/discount change (old preview invalidated)', () => {
     // Codex R1 PR 3095: в edit-режиме квота дополнительно зависит от identity
     // (edit-дельта) и справочника услуг; Codex R2 PR 3095: ещё и от маршрута
-    // команды (fullUpdateQuoteRoute — QR-записи квотируются по full-update)
-    expect(source).toContain('}, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute, quoteRefreshNonce]);');
+    // команды (fullUpdateQuoteRoute — QR-записи квотируются по full-update);
+    // Codex R6 PR 3095: и от пациента (edit-контекст дельты: patient_id +
+    // target_date + preferred entries входят в запрос квоты)
+    expect(source).toContain('}, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute, quoteRefreshNonce, wizardData.patient?.id]);');
+    expect(source).toContain('patientId: wizardData.patient?.id ?? null');
+    expect(source).toContain('targetDate: getLocalISODate()');
+    expect(source).toContain('preferredEntryIds: Array.from(editOriginalServiceIdentity.queueIds)');
   });
 
   it('CartStepV2 no longer zeroes repeat consultations (backend owns discounts)', () => {
@@ -153,7 +158,10 @@ describe('Fix D: trusted pricing contract', () => {
   it('quote items carry unit price, quantity, discount and final price', () => {
     const backend = readBackendCartSource();
     expect(backend).toContain('service_name=service.name');
-    expect(backend).toContain('quantity=item_req.quantity');
+    // Codex R6 PR 3095 (P2): edit_delta биллит дельту (priced_qty = billable),
+    // cart/full_update — полное запрошенное количество
+    expect(backend).toContain('quantity=priced_qty');
+    expect(backend).toContain('priced_qty = billable_qty if quote_req.pricing_mode == "edit_delta" else item_req.quantity');
     expect(backend).toContain('discount_percent=discount_percent');
     expect(backend).toContain('final_price=final_price');
   });

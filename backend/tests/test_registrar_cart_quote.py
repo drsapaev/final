@@ -644,3 +644,256 @@ def test_edit_delta_fresh_quote_token_passes_revalidation(
         "/api/v1/registrar/cart/edit-delta", headers=token_headers, json=payload
     )
     assert ok.status_code != 409, ok.text
+
+
+# ===================== Codex R6 #3095 =====================
+
+
+def _active_entry_with_service(
+    db: Session, *, patient_id: int, service: Service, existing_qty: int, specialist_id=None
+):
+    """Active same-day queue entry for the patient that already contains the
+    service with the given quantity — the routing target of the edit-delta
+    command (RegistrarEditDeltaService._find_active_entry predicate)."""
+    import json as _json
+
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+
+    daily_queue = DailyQueue(
+        day=date.today(),
+        specialist_id=specialist_id,
+        queue_tag=service.queue_tag or service.department_key,
+        active=True,
+    )
+    db.add(daily_queue)
+    db.flush()
+    entry = OnlineQueueEntry(
+        queue_id=daily_queue.id,
+        number=1,
+        patient_id=patient_id,
+        source="desk",
+        status="waiting",
+        services=[
+            {
+                "service_id": service.id,
+                "code": service.service_code or service.code,
+                "name": service.name,
+                "qty": existing_qty,
+                "price": float(service.price or 0),
+            }
+        ],
+    )
+    entry.services = _json.loads(_json.dumps(entry.services))
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+def _quote_with_context(client: TestClient, admin_user, items, *, extra: dict):
+    payload = {
+        "items": items,
+        "discount_mode": "none",
+        "all_free": False,
+        "pricing_mode": "edit_delta",
+    }
+    payload.update(extra)
+    return client.post(
+        "/api/v1/registrar/cart/quote", headers=_auth_headers(admin_user), json=payload
+    )
+
+
+def test_quote_edit_delta_with_context_bills_the_delta_the_command_bills(
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor
+):
+    """Codex R6 #3095 (P2): when the added service routes to an active
+    same-day entry that ALREADY contains it, the command bills only
+    max(requested − existing, 0) (_append_to_existing_entry) — the quote
+    with the edit context must validate the SAME delta, not the full
+    requested quantity (the confirmed amount must never exceed the actual
+    invoice delta)."""
+    service = _service(db_session, code="FIXD-R6-1", price=100000.00)
+    service.queue_tag = "fixd_r6_tag"
+    db_session.commit()
+    entry = _active_entry_with_service(
+        db_session,
+        patient_id=test_patient.id,
+        service=service,
+        existing_qty=2,
+        specialist_id=test_doctor.id,
+    )
+
+    quoted = _quote_with_context(
+        client,
+        admin_user,
+        [{"service_id": service.id, "quantity": 5}],
+        extra={
+            "patient_id": test_patient.id,
+            "target_date": date.today().isoformat(),
+            "preferred_entry_ids": [entry.id],
+        },
+    )
+    assert quoted.status_code == 200, quoted.text
+    body = quoted.json()
+    # Command routing: entry holds 2 → billed 5 − 2 = 3 × 100000
+    assert body["items"][0]["quantity"] == 3
+    assert float(body["items"][0]["final_price"]) == 300000
+    assert float(body["total_amount"]) == 300000
+
+
+def test_quote_edit_delta_without_context_bills_full_quantity(
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor
+):
+    """Legacy contract preserved: a quote WITHOUT the edit context (older
+    clients) still prices the full requested quantity."""
+    service = _service(db_session, code="FIXD-R6-2", price=100000.00)
+    service.queue_tag = "fixd_r6_tag2"
+    db_session.commit()
+    _active_entry_with_service(
+        db_session,
+        patient_id=test_patient.id,
+        service=service,
+        existing_qty=2,
+        specialist_id=test_doctor.id,
+    )
+
+    quoted = _quote_with_context(
+        client, admin_user, [{"service_id": service.id, "quantity": 5}], extra={}
+    )
+    assert quoted.status_code == 200
+    body = quoted.json()
+    assert body["items"][0]["quantity"] == 5
+    assert float(body["total_amount"]) == 500000
+
+
+def test_edit_delta_command_accepts_the_context_bound_delta_token(
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor
+):
+    """Round-trip: quote WITH context → command WITH the same context passes
+    the pricing gate (the revalidation recomputes the same delta and thus
+    the same token)."""
+    service = _service(db_session, code="FIXD-R6-3", price=100000.00)
+    service.queue_tag = "fixd_r6_tag3"
+    db_session.commit()
+    entry = _active_entry_with_service(
+        db_session,
+        patient_id=test_patient.id,
+        service=service,
+        existing_qty=2,
+        specialist_id=test_doctor.id,
+    )
+
+    context = {
+        "patient_id": test_patient.id,
+        "target_date": date.today().isoformat(),
+        "preferred_entry_ids": [entry.id],
+    }
+    quoted = _quote_with_context(
+        client, admin_user, [{"service_id": service.id, "quantity": 5}], extra=context
+    )
+    token = quoted.json()["quote_token"]
+
+    payload = {
+        **context,
+        "payment_method": "cash",
+        "discount_mode": "none",
+        "all_free": False,
+        "services": [{"service_id": service.id, "quantity": 5, "specialist_id": None}],
+        "quote_token": token,
+    }
+    ok = client.post(
+        "/api/v1/registrar/cart/edit-delta", headers=_auth_headers(admin_user), json=payload
+    )
+    assert ok.status_code != 409, ok.text
+
+
+def test_edit_delta_command_rejects_full_quantity_token_when_entry_holds_service(
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor
+):
+    """The exact Codex R6 scenario: a token confirming the FULL requested
+    quantity (5 × 100000) can no longer validate a save whose real invoice
+    delta is 3 × 100000 — the context-aware revalidation recomputes the
+    delta, finds the token stale and returns 409 instead of confirming an
+    amount greater than what will be billed."""
+    service = _service(db_session, code="FIXD-R6-4", price=100000.00)
+    service.queue_tag = "fixd_r6_tag4"
+    db_session.commit()
+    entry = _active_entry_with_service(
+        db_session,
+        patient_id=test_patient.id,
+        service=service,
+        existing_qty=2,
+        specialist_id=test_doctor.id,
+    )
+
+    # Context-less quote bills the full 5 × 100000 (legacy behavior)
+    quoted = _quote_with_context(
+        client, admin_user, [{"service_id": service.id, "quantity": 5}], extra={}
+    )
+    full_token = quoted.json()["quote_token"]
+    assert float(quoted.json()["total_amount"]) == 500000
+
+    payload = {
+        "patient_id": test_patient.id,
+        "target_date": date.today().isoformat(),
+        "preferred_entry_ids": [entry.id],
+        "payment_method": "cash",
+        "discount_mode": "none",
+        "all_free": False,
+        "services": [{"service_id": service.id, "quantity": 5, "specialist_id": None}],
+        "quote_token": full_token,
+    }
+    rejected = client.post(
+        "/api/v1/registrar/cart/edit-delta", headers=_auth_headers(admin_user), json=payload
+    )
+    assert rejected.status_code == 409, rejected.text
+
+
+def test_create_cart_skips_settings_reload_when_token_validated(
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor, monkeypatch
+):
+    """Codex R6 #3095 (P2): "price the save directly from the validated
+    values" — after the token revalidation the save path must NOT re-read
+    the discount settings (an unlocked reload would see settings rows
+    inserted after revalidation, which FOR UPDATE cannot lock). With a
+    validated token the ONLY settings read is the locked snapshot inside
+    the revalidation."""
+    from app.api.v1.endpoints.registrar_wizard import _cart as cart_module
+
+    service = _service(db_session, code="FIXD-R6-5", price=50000.00)
+
+    quoted = _quote(client, admin_user, [{"service_id": service.id, "quantity": 1}])
+    token = quoted.json()["quote_token"]
+
+    calls: list[bool] = []
+    real_loader = cart_module._load_registration_discount_settings
+
+    def spy(db, lock_rows: bool = False):
+        calls.append(lock_rows)
+        return real_loader(db, lock_rows=lock_rows)
+
+    monkeypatch.setattr(cart_module, "_load_registration_discount_settings", spy)
+
+    payload = {
+        "patient_id": test_patient.id,
+        "discount_mode": "none",
+        "payment_method": "cash",
+        "quote_token": token,
+        "visits": [
+            {
+                "doctor_id": test_doctor.id,
+                "visit_date": date.today().isoformat(),
+                "department": "general",
+                "services": [{"service_id": service.id, "quantity": 1}],
+            }
+        ],
+    }
+    saved = client.post(
+        "/api/v1/registrar/cart", headers=_auth_headers(admin_user), json=payload
+    )
+    assert saved.status_code == 200, saved.text
+    assert float(saved.json()["total_amount"]) == 50000
+    assert calls == [True], (
+        "the locked snapshot inside revalidation is the only settings read; "
+        "the unlocked save-time reload is gone"
+    )

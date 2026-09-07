@@ -31,6 +31,7 @@ def create_cart_appointments(
     # silently created an invoice for a DIFFERENT amount. The token binds the
     # save command to the exact pricing the registrar confirmed; a mismatch
     # is a hard 409 — the registrar must re-confirm, not be over/undercharged.
+    validated_settings: dict[str, Any] | None = None
     if cart_data.quote_token:
         flat_items = [
             CartQuoteItemRequest(
@@ -41,7 +42,12 @@ def create_cart_appointments(
             for visit_req in cart_data.visits
             for s in visit_req.services
         ]
-        _assert_quote_token_matches(
+        # Codex R6 #3095 (P2): price the save from the validated values —
+        # the snapshot returned here is the LOCKED settings state the
+        # confirmed quote was computed from; a concurrent admin INSERT of a
+        # previously-missing settings row cannot flip the invoice after the
+        # token passed.
+        validated_settings = _assert_quote_token_matches(
             db,
             items=flat_items,
             discount_mode=cart_data.discount_mode,
@@ -66,7 +72,11 @@ def create_cart_appointments(
 
         # Получаем настройки очереди
         queue_settings = crud_clinic.get_queue_settings(db)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
-        registration_settings = _load_registration_discount_settings(db)
+        # Codex R6 #3095 (P2): when a quote token was validated, the settings
+        # snapshot it produced IS the pricing truth for this save — do not
+        # re-read (an unlocked reload would see settings rows inserted by the
+        # admin endpoint after revalidation, which FOR UPDATE cannot lock).
+        registration_settings = validated_settings or _load_registration_discount_settings(db)
 
         created_visits = []
         created_visit_amounts: dict[int, Decimal] = {}
@@ -398,7 +408,52 @@ def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, appr
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _quote_core(db: Session, quote_req: CartQuoteRequest, lock_pricing_rows: bool = False) -> CartQuoteResponse:
+def _edit_delta_billable_quantity(
+    db: Session,
+    *,
+    service: Service,
+    requested_qty: int,
+    patient_id: int,
+    target_date: date,
+    preferred_entry_ids: set[int],
+) -> int:
+    """Codex R6 #3095 (P2): mirror the edit-delta command's billing quantity.
+
+    RegistrarEditDeltaService routes an added service to the patient's
+    active same-day entry with the same queue_tag; when that entry ALREADY
+    contains the service, _append_to_existing_entry bills only
+    max(requested − existing, 0) — never the full requested quantity. The
+    quote must validate the SAME billable amount, otherwise the confirmed
+    total exceeds the actual invoice delta. Read-only: reuses the service's
+    own routing/payload predicates instead of duplicating them (no drift).
+    """
+    edit_service = RegistrarEditDeltaService(db)
+    queue_tag = service.queue_tag or service.department_key
+    if not queue_tag:
+        return requested_qty
+    entry = edit_service._find_active_entry(
+        patient_id=patient_id,
+        queue_tag=queue_tag,
+        target_date=target_date,
+        preferred_entry_ids=preferred_entry_ids,
+    )
+    if entry is None:
+        return requested_qty
+    existing_payload = edit_service._find_service_payload(
+        edit_service._coerce_services(entry.services), service
+    )
+    if not existing_payload:
+        return requested_qty
+    existing_qty = edit_service._payload_quantity(existing_payload)
+    return max(requested_qty - existing_qty, 0)
+
+
+def _quote_core(
+    db: Session,
+    quote_req: CartQuoteRequest,
+    lock_pricing_rows: bool = False,
+    registration_settings: dict[str, Any] | None = None,
+) -> CartQuoteResponse:
     """Shared pricing core for /registrar/cart/quote AND the save-time
     revalidation of the confirmed quote (Codex R3 #3095 P1). Raises the same
     HTTP errors either way; returns the quote with its binding token.
@@ -414,7 +469,14 @@ def _quote_core(db: Session, quote_req: CartQuoteRequest, lock_pricing_rows: boo
     услуги, чтобы регистратор увидел проблему до сохранения.
     """
     effective_discount_mode = _resolve_effective_discount_mode(quote_req)
-    registration_settings = _load_registration_discount_settings(db, lock_rows=lock_pricing_rows)
+    # Codex R6 #3095 (P2): the save-time revalidation passes ITS OWN locked
+    # settings snapshot in — quote and save are then priced from the exact
+    # same values even for settings rows that do not exist yet (FOR UPDATE
+    # cannot lock a row that is absent, so a concurrent admin INSERT of a
+    # previously-missing key must not change the invoice after the token
+    # was accepted).
+    if registration_settings is None:
+        registration_settings = _load_registration_discount_settings(db, lock_rows=lock_pricing_rows)
 
     # Codex R2 #3095 (P2): approval_status обязан отражать контракт
     # ВЫБРАННОЙ команды сохранения. RegistrarEditDeltaService._create_visit
@@ -485,6 +547,21 @@ def _quote_core(db: Session, quote_req: CartQuoteRequest, lock_pricing_rows: boo
             base_price = Decimal(str(service.price))
             unit_final = Decimal("0") if effective_discount_mode == "all_free" else base_price
             discount_percent = 0
+            # Codex R6 #3095 (P2): with edit context the billable quantity is
+            # the DELTA the command will actually bill (active same-day entry
+            # already holding the service → max(requested − existing, 0)),
+            # not the full requested quantity.
+            if quote_req.patient_id is not None and quote_req.target_date is not None:
+                billable_qty = _edit_delta_billable_quantity(
+                    db,
+                    service=service,
+                    requested_qty=item_req.quantity,
+                    patient_id=quote_req.patient_id,
+                    target_date=quote_req.target_date,
+                    preferred_entry_ids=set(quote_req.preferred_entry_ids),
+                )
+            else:
+                billable_qty = item_req.quantity
         elif quote_req.pricing_mode == "full_update":
             # Codex R2 #3095 (P1): зеркало _full_update_create_single_
             # independent_entry: консультация при repeat/benefit → 0,
@@ -529,7 +606,11 @@ def _quote_core(db: Session, quote_req: CartQuoteRequest, lock_pricing_rows: boo
             else:
                 discount_percent = 0
 
-        final_price = (unit_final * Decimal(item_req.quantity)).quantize(
+        # Codex R6 #3095 (P2): edit_delta prices the BILLABLE delta quantity;
+        # the other modes price the full requested quantity.
+        priced_qty = billable_qty if quote_req.pricing_mode == "edit_delta" else item_req.quantity
+
+        final_price = (unit_final * Decimal(priced_qty)).quantize(
             Decimal("0.01")
         )
         if quote_req.pricing_mode == "full_update":
@@ -547,7 +628,7 @@ def _quote_core(db: Session, quote_req: CartQuoteRequest, lock_pricing_rows: boo
                 service_id=service.id,
                 service_name=service.name,
                 unit_price=base_price,
-                quantity=item_req.quantity,
+                quantity=priced_qty,
                 discount_percent=discount_percent,
                 final_price=final_price,
             )
@@ -580,13 +661,36 @@ def _assert_quote_token_matches(
     all_free: bool,
     pricing_mode: str,
     quote_token: str | None,
-) -> None:
+    patient_id: int | None = None,
+    target_date: date | None = None,
+    preferred_entry_ids: list[int] | None = None,
+) -> dict[str, Any] | None:
     """Save-command revalidation shared by /registrar/cart, edit-delta and
     full-update (Codex R4 #3095 P1). Recomputes the quote on the CURRENT
     catalog/settings with row locks held to the end of the caller's
-    transaction and rejects a stale token with 409."""
+    transaction and rejects a stale token with 409.
+
+    Codex R6 #3095 (P2): the edit-delta command MUST revalidate with the
+    SAME edit context (patient_id/target_date/preferred entries) the quote
+    used — the billable quantity is a routing-dependent delta, so a
+    context-less recompute would price the full quantity and falsely reject
+    the confirmed token with 409.
+
+    Codex R6 #3095 (P2): returns the LOCKED settings snapshot the fresh
+    quote was priced from. The caller prices the save from THIS snapshot
+    instead of re-reading settings ("price the save directly from the
+    validated values"): FOR UPDATE cannot lock settings rows that do not
+    exist yet, so a concurrent admin INSERT (admin settings endpoint) of a
+    previously-missing key between revalidation and the save's own reload
+    could otherwise flip the invoice to the newly inserted discount while
+    the token still validated the old one. With the snapshot the invoice is
+    computed from exactly the values the registrar confirmed. Returns None
+    when no token was supplied (legacy no-quote callers keep their own
+    unlocked load).
+    """
     if not quote_token:
-        return
+        return None
+    settings_snapshot = _load_registration_discount_settings(db, lock_rows=True)
     fresh_quote = _quote_core(
         db,
         CartQuoteRequest(
@@ -594,8 +698,12 @@ def _assert_quote_token_matches(
             discount_mode=discount_mode,
             all_free=all_free,
             pricing_mode=pricing_mode,
+            patient_id=patient_id,
+            target_date=target_date,
+            preferred_entry_ids=list(preferred_entry_ids or []),
         ),
         lock_pricing_rows=True,
+        registration_settings=settings_snapshot,
     )
     if fresh_quote.quote_token != quote_token:
         logger.warning(
@@ -610,6 +718,7 @@ def _assert_quote_token_matches(
                 f"Текущая сумма корзины: {fresh_quote.total_amount} сум"
             ),
         )
+    return settings_snapshot
 
 
 @router.post("/registrar/cart/edit-delta", response_model=EditDeltaResponse)
@@ -632,6 +741,12 @@ def apply_registrar_cart_edit_delta(
         all_free=request.all_free,
         pricing_mode="edit_delta",
         quote_token=request.quote_token,
+        # Codex R6 #3095 (P2): revalidate under the SAME edit context the
+        # quote was computed with — the billable quantity is a
+        # routing-dependent delta.
+        patient_id=request.patient_id,
+        target_date=request.target_date,
+        preferred_entry_ids=request.existing_queue_entry_ids,
     )
     try:
         result = RegistrarEditDeltaService(db).apply(

@@ -1183,6 +1183,17 @@ const AppointmentWizardV2 = ({
     const quoteRequest = buildCartQuoteRequest(wizardData.cart, {
       pricingMode: quotePricingMode,
       itemsOverride: quoteSourceItems,
+      // Codex R6 PR 3095 (P2): edit-delta контекст — backend биллит в квоте
+      // ту же дельту, которую реально выставит команда (активная запись того
+      // же дня, уже содержащая услугу, биллит только недостающее количество).
+      // Зеркало сабмита: patientId + getLocalISODate() + originalQueueIds.
+      ...(quotePricingMode === 'edit_delta'
+        ? {
+            patientId: wizardData.patient?.id ?? null,
+            targetDate: getLocalISODate(),
+            preferredEntryIds: Array.from(editOriginalServiceIdentity.queueIds),
+          }
+        : {}),
     });
     if (!quoteRequest) {
       cartQuoteRequestIdRef.current += 1; // инвалидируем незавершённые запросы
@@ -1230,7 +1241,7 @@ const AppointmentWizardV2 = ({
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute, quoteRefreshNonce]);
+  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute, quoteRefreshNonce, wizardData.patient?.id]);
 
   const repeatSuggestionSummary = useMemo(() => {
     if (!consultationCartItems.length) {
@@ -2041,6 +2052,15 @@ const AppointmentWizardV2 = ({
             // ⭐ FIX: Не продолжаем с fallback - это создавало дубликаты!
             logger.error('❌ Ошибка обновления QR-записи:', updateError);
             const errorMessage = getErrorMessage(updateError) || t('misc.aw_unknown_error');
+            // Codex R6 PR 3095 (P2): stale-quote 409 — invalidate + refetch
+            // (как в create-пути), иначе каждый retry resubmit'ит
+            // отвергнутый токен, пока регистратор не тронет корзину.
+            const updErr = updateError as Error & { status?: number; response?: { status?: number } };
+            if (updErr.status === 409 || updErr.response?.status === 409) {
+              setCartQuote(null);
+              setCartQuoteStatus('idle');
+              setQuoteRefreshNonce((n) => n + 1);
+            }
             toast.error(t('misc.aw_record_update_error', { message: errorMessage }));
             setIsProcessing(false);
             return; // ⭐ CRITICAL: Не создаём дубликаты через cart endpoint
@@ -2185,6 +2205,14 @@ const AppointmentWizardV2 = ({
             return;
           } catch (editDeltaError: unknown) {
             logger.error('[AppointmentWizardV2] edit delta failed', editDeltaError);
+            // Codex R6 PR 3095 (P2): stale-quote 409 — invalidate + refetch
+            // (как в create-пути), иначе retry повторяет отвергнутый токен.
+            const deltaErr = editDeltaError as Error & { status?: number; response?: { status?: number } };
+            if (deltaErr.status === 409 || deltaErr.response?.status === 409) {
+              setCartQuote(null);
+              setCartQuoteStatus('idle');
+              setQuoteRefreshNonce((n) => n + 1);
+            }
             toast.error(getErrorMessage(editDeltaError) || t('misc.aw_record_update_failed'));
             return;
           }

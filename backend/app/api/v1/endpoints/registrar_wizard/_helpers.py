@@ -273,6 +273,16 @@ class CartQuoteRequest(BaseModel):
     # custom_price в контракте маршрута не участвует). Квота обязана
     # выбирать контракт по фактическому маршруту команды, а не по editMode.
     pricing_mode: str = Field(default="cart", pattern="^(cart|edit_delta|full_update)$")
+    # Codex R6 #3095 (P2): контекст edit-delta — квота обязана биллить ту же
+    # дельту, что и команда: если добавляемая услуга направляется в активную
+    # запись того же дня, УЖЕ содержащую услугу,
+    # RegistrarEditDeltaService._append_to_existing_entry биллит только
+    # max(запрошено − уже есть, 0), а не полное количество. cart/full_update
+    # и legacy-вызовы оставляют поля пустыми — квота считается по полному
+    # количеству, как раньше.
+    patient_id: int | None = None
+    target_date: date | None = None
+    preferred_entry_ids: list[int] = Field(default_factory=list)
 
 
 class CartQuoteItemResponse(BaseModel):

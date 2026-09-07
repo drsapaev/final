@@ -71011,6 +71011,36 @@
             "pattern": "^(cart|edit_delta|full_update)$",
             "title": "Pricing Mode",
             "default": "cart"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date"
+          },
+          "preferred_entry_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Preferred Entry Ids"
           }
         },
         "type": "object",

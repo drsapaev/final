@@ -24272,6 +24272,12 @@ export type components = {
              * @default cart
              */
             pricing_mode: string;
+            /** Patient Id */
+            patient_id?: number | null;
+            /** Target Date */
+            target_date?: string | null;
+            /** Preferred Entry Ids */
+            preferred_entry_ids?: number[];
         };
         /** CartQuoteResponse */
         CartQuoteResponse: {
