@@ -89,13 +89,20 @@ outside the routing surface: they stay untouched and do not abort
 when general_resource is missing) is exactly the drift these aborts
 surface on staging databases — repair is explicit, never silent.
 
-Downgrade is strict and symmetric (0056/0057 convention): it refuses
-to strip a reference that would leave a queue with BOTH owners NULL
-(the QD-2A backup-restore P1 lesson: an ownerless queue with live
-entries), then nulls the references this revision wrote and deletes
-exactly the seeded registry rows (by exact code+queue_tag identity).
-It exists for schema-history reversibility, not as a routine
-production operation.
+Downgrade is strict where data can be lost and conservative where it
+cannot (the Codex round-1 P2 ruling): it refuses to strip a reference
+that would leave a queue with BOTH owners NULL (the QD-2A
+backup-restore P1 lesson: an ownerless queue with live entries),
+then nulls exactly the references this revision wrote — and NEVER
+deletes the registry rows: an exact-identity occupant may pre-date
+this revision (the upgrade no-op path deliberately accepts
+hand-applied rows — the 0056 incident-drift precedent), and no
+provenance marker distinguishes them from rows this revision
+inserted, so deleting possibly-pre-existing registry data is worse
+than leaving two inert rows (nothing reads them until QD-2C, and
+downgrading further drops the queue_resources table itself). It
+exists for schema-history reversibility, not as a routine production
+operation.
 
 The upgrade/downgrade logic lives in module-level functions so tests
 can run them against a scratch SQLite connection without an alembic
@@ -247,9 +254,9 @@ _CLEAR_QUEUE_RESOURCE = sa.text("""
     UPDATE daily_queues SET queue_resource_id = NULL WHERE id = :queue_id
     """)
 
-_DELETE_RESOURCE = sa.text("""
-    DELETE FROM queue_resources WHERE id = :queue_resource_id
-    """)
+# NOTE: no DELETE statement exists in this revision by design — the
+# downgrade conserves the registry rows (provenance cannot be proven;
+# see _restore_pre_seed_state).
 
 
 def _abort(message: str) -> None:
@@ -568,14 +575,25 @@ def _apply_seed_and_backfill(conn) -> dict[str, int]:
 
 
 def _restore_pre_seed_state(conn) -> None:
-    """Downgrade core: remove exactly what this revision wrote.
+    """Downgrade core: reverse the backfill, CONSERVE the registry.
 
-    Strict symmetric precondition (0056/0057 convention): refuses to
-    strip a reference that would leave BOTH owners NULL — an ownerless
-    queue with live entries is the QD-2A backup-restore P1 shape and
-    is never produced silently. Then nulls the references this
-    revision backfilled (specialist_id was preserved by construction)
-    and deletes the exact seeded registry rows.
+    Strict where data can be lost, conservative where it cannot:
+
+    - refuses to strip a reference that would leave BOTH owners NULL —
+    an ownerless queue is the QD-2A backup-restore P1 shape and is
+    never produced silently (such rows are written by a later stage,
+    not by this revision);
+    - nulls exactly the references this revision backfilled
+    (specialist_id was preserved by construction, so every 0059
+    reference still has its doctor owner);
+    - NEVER deletes the registry rows. An exact-identity occupant may
+    pre-date this revision (the upgrade no-op path deliberately
+    accepts hand-applied rows — the 0056 incident-drift precedent),
+    and no provenance marker distinguishes them from rows this
+    revision inserted; deleting possibly-pre-existing registry data
+    is worse than leaving two inert rows. Nothing reads the registry
+    until QD-2C, and downgrading further (0058) drops the
+    queue_resources table itself.
     """
     for spec in _SEED_SPECS:
         existing = conn.execute(
@@ -616,7 +634,8 @@ def _restore_pre_seed_state(conn) -> None:
 
         for row in referencing:
             conn.execute(_CLEAR_QUEUE_RESOURCE, {"queue_id": row.id})
-        conn.execute(_DELETE_RESOURCE, {"queue_resource_id": resource_id})
+        # deliberately no DELETE: the registry rows stay (see the
+        # docstring — provenance cannot be proven, so data wins)
 
 
 def upgrade() -> None:

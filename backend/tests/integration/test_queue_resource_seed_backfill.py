@@ -26,8 +26,12 @@ dedup. The pins here protect every half of that contract:
   before and after (the old runtime resolves through them until
   QD-2C), and the migration's SQL never writes users / doctors /
   services / queue_entries and never emits DDL (data-only stage);
-- the DOWNGRADE half: strict symmetric removal that refuses to orphan
-  a resource-owned queue (specialist_id NULL + queue_resource_id set).
+- the DOWNGRADE half: reverses the backfill (references nulled,
+  specialist preserved) while refusing to orphan a resource-owned
+  queue (specialist_id NULL + queue_resource_id set) and never
+  deleting the registry rows — provenance cannot be proven, so
+  possibly-pre-existing data always wins (the Codex round-1 P2
+  ruling, pinned with the exact hand-applied-row scenario).
 
 The migration logic runs against a scratch SQLite connection (the
 0056/0057 pattern); CI runs the authoritative `alembic upgrade head`
@@ -424,7 +428,10 @@ def test_migration_never_writes_protected_tables() -> None:
     """The only tables stage B may write are queue_resources and
     daily_queues.queue_resource_id — the synthetic identities
     (users/doctors), the service catalog and queue entries are
-    read-only inputs (they carry the old runtime until QD-2C/E)."""
+    read-only inputs (they carry the old runtime until QD-2C/E), and
+    NOTHING is ever deleted (the Codex round-1 P2 ruling: the
+    downgrade conserves registry rows because provenance cannot be
+    proven)."""
     module = _load_migration_0059()
     writes = [
         sql
@@ -434,19 +441,19 @@ def test_migration_never_writes_protected_tables() -> None:
     assert writes, "expected the migration to carry write statements"
     for sql in writes:
         assert re.match(
-            r"\s*(INSERT\s+INTO\s+queue_resources|"
-            r"UPDATE\s+daily_queues|DELETE\s+FROM\s+queue_resources)\b",
+            r"\s*(INSERT\s+INTO\s+queue_resources|UPDATE\s+daily_queues)\b",
             sql,
         ), sql
 
 
 def test_migration_writes_registry_and_queue_axis() -> None:
-    """Positive control: the migration does write its two tables."""
+    """Positive control: the migration writes exactly its two tables
+    and never deletes anything (data-preserving by construction)."""
     module = _load_migration_0059()
     combined = "\n".join(sql for _, sql in _module_sql_statements(module))
     assert "INSERT INTO queue_resources" in combined
     assert "UPDATE daily_queues SET queue_resource_id" in combined
-    assert "DELETE FROM queue_resources" in combined
+    assert "DELETE" not in combined.upper()
 
 
 # ===================== B. resource seed =====================
@@ -1460,23 +1467,80 @@ def test_transaction_atomicity_rolls_back_earlier_seed() -> None:
 # ===================== G. downgrade =====================
 
 
-def test_downgrade_removes_seeds_and_clears_references() -> None:
+def test_downgrade_clears_references_and_keeps_registry_rows() -> None:
+    """Downgrade reverses the backfill (references nulled, specialist
+    preserved) and CONSERVES the registry rows — no provenance marker
+    can distinguish an exact-identity occupant that pre-dates this
+    revision from one this revision inserted (Codex round-1 P2), so
+    data wins: the two inert rows stay (nothing reads them until
+    QD-2C; downgrading further drops the table itself)."""
     module = _load_migration_0059()
     conn = _scratch_connection()
     try:
         lab_doctor_id, _, _, queues = _canonical_environment(conn)
 
         module._apply_seed_and_backfill(conn)
-        assert len(_resource_rows(conn)) == 2
+        seeded = _resource_rows(conn)
+        assert len(seeded) == 2
 
         module._restore_pre_seed_state(conn)
 
-        assert _resource_rows(conn) == []
+        # the backfill is reversed...
         row = _queue_row(conn, queues["lab"][0])
         assert row.queue_resource_id is None
         assert row.specialist_id == lab_doctor_id
         assert row.queue_tag == "lab"
         assert bool(row.active) is True
+        # ...and the registry rows survive unchanged
+        assert _resource_rows(conn) == seeded
+    finally:
+        conn.close()
+
+
+def test_downgrade_preserves_preexisting_exact_identity_row() -> None:
+    """The Codex round-1 P2 scenario: a hand-applied lab registry row
+    that PRE-DATES the migration (upgrade no-ops on it and only
+    backfills the reference) must survive the downgrade — rolling
+    back 0059 can never destroy data that existed before it."""
+    module = _load_migration_0059()
+    conn = _scratch_connection()
+    try:
+        lab_doctor_id, _, _, _ = _canonical_environment(conn, with_queues=False)
+        # the pre-existing hand-applied row (exact expected identity)
+        conn.execute(
+            sa.text(
+                "INSERT INTO queue_resources (code, queue_tag, "
+                "display_name, active, start_number_online, "
+                "max_online_per_day, default_cabinet) "
+                "VALUES ('lab', 'lab', 'Лаборатория', true, 1, 15, NULL)"
+            )
+        )
+        (preexisting_id,) = conn.execute(
+            sa.text("SELECT id FROM queue_resources WHERE code = 'lab'")
+        ).fetchone()
+        queue_id = _seed_queue(conn, specialist_id=lab_doctor_id, queue_tag="lab")
+
+        # upgrade: exact-identity no-op for lab, only the backfill runs
+        module._apply_seed_and_backfill(conn)
+        assert _queue_row(conn, queue_id).queue_resource_id == preexisting_id
+
+        module._restore_pre_seed_state(conn)
+
+        # the pre-existing row is intact — byte-identical (the ecg
+        # seed also survives: the conservative contract deletes
+        # nothing, ever)
+        rows = _resource_rows(conn)
+        assert sorted(row.code for row in rows) == ["ecg", "lab"]
+        lab_row = next(row for row in rows if row.code == "lab")
+        assert lab_row.id == preexisting_id
+        assert lab_row.queue_tag == "lab"
+        assert lab_row.display_name == "Лаборатория"
+        assert bool(lab_row.active) is True
+        assert lab_row.start_number_online == 1
+        assert lab_row.max_online_per_day == 15
+        assert lab_row.default_cabinet is None
+        # and the backfill was still reversed
+        assert _queue_row(conn, queue_id).queue_resource_id is None
     finally:
         conn.close()
 
@@ -1510,8 +1574,10 @@ def test_downgrade_refuses_to_orphan_resource_owned_queue() -> None:
 
 
 def test_downgrade_keeps_unrelated_registry_rows() -> None:
-    """Downgrade deletes EXACTLY the seeded rows: an operator-owned
-    registry row sharing code or queue_tag spelling survives."""
+    """Reference clearing targets only the exact code+queue_tag pair:
+    an operator-owned row sharing spelling but not the identity pair
+    is never touched (and by the conservative contract, never deleted
+    either)."""
     module = _load_migration_0059()
     conn = _scratch_connection()
     try:
@@ -1531,8 +1597,9 @@ def test_downgrade_keeps_unrelated_registry_rows() -> None:
 
         module._restore_pre_seed_state(conn)
 
-        rows = _resource_rows(conn)
-        assert [row.code for row in rows] == ["laboratory"]
+        # everything survives; nothing is ever deleted
+        codes = sorted(row.code for row in _resource_rows(conn))
+        assert codes == ["ecg", "lab", "laboratory"]
     finally:
         conn.close()
 
@@ -1543,5 +1610,26 @@ def test_downgrade_noop_when_nothing_seeded() -> None:
     try:
         module._restore_pre_seed_state(conn)  # must not raise
         assert _resource_rows(conn) == []
+    finally:
+        conn.close()
+
+
+def test_downgrade_rerun_after_downgrade_is_still_clean() -> None:
+    """Downgrade -> upgrade again is a clean exact-identity no-op for
+    the seeds (the conservative contract keeps the rows, so the
+    re-upgrade path is the hand-applied-row path)."""
+    module = _load_migration_0059()
+    conn = _scratch_connection()
+    try:
+        _, _, _, queues = _canonical_environment(conn)
+
+        module._apply_seed_and_backfill(conn)
+        module._restore_pre_seed_state(conn)
+        module._apply_seed_and_backfill(conn)  # must not raise
+
+        row = _queue_row(conn, queues["lab"][0])
+        lab_resource = next(r for r in _resource_rows(conn) if r.code == "lab")
+        assert row.queue_resource_id == lab_resource.id
+        assert len(_resource_rows(conn)) == 2
     finally:
         conn.close()
