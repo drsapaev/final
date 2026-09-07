@@ -531,7 +531,7 @@ def _revision_graph() -> dict[str, tuple[str, ...]]:
     return graph
 
 
-def test_alembic_chain_single_head_0059() -> None:
+def test_alembic_chain_single_head_0060() -> None:
     graph = _revision_graph()
     assert "0056_queue_resource_role_cleanup" in graph
     assert graph["0056_queue_resource_role_cleanup"] == (
@@ -556,9 +556,15 @@ def test_alembic_chain_single_head_0059() -> None:
     assert graph["0059_resource_seed_backfill"] == (
         "0058_queue_resource_expand",
     )
+    # PR-1: the chain head moved to 0060 (visits.reminder_sent_at — the
+    # real schema for the reminder-pipeline idempotency stamp).
+    assert "0060_visit_reminder_sent_at" in graph
+    assert graph["0060_visit_reminder_sent_at"] == (
+        "0059_resource_seed_backfill",
+    )
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0059_resource_seed_backfill"]
+    assert heads == ["0060_visit_reminder_sent_at"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

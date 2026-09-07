@@ -101,11 +101,18 @@ def make_visit(pipeline_db):
     Uses a plain sessionmaker (no savepoint wrapper) so the data is visible
     to the worker's own engine/connection — exactly like production, where
     the producer's transaction has long since committed when the worker runs.
+
+    Rows are DELETED on teardown: the suite shares one session-scoped
+    sqlite file DB, and leftover rows (4 visits/users per run) break the
+    row-count assertions of unrelated tests that run later alphabetically
+    (setup/slot-reservation/specialized-panels analytics).
     """
     from app.models.clinic import Doctor
     from app.models.patient import Patient
     from app.models.user import User
     from app.models.visit import Visit
+
+    created: list[tuple[int, int, int, int]] = []
 
     def _make() -> int:
         suffix = uuid.uuid4().hex[:8]
@@ -148,11 +155,25 @@ def make_visit(pipeline_db):
             )
             s.add(visit)
             s.commit()
+            created.append((visit.id, patient.id, doctor.id, user.id))
             return visit.id
         finally:
             s.close()
 
-    return _make
+    yield _make
+
+    # Teardown: bulk deletes in FK-safe order (no cascade-dependent rows
+    # exist — these visits have no services/invoices attached).
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        for visit_id, patient_id, doctor_id, user_id in created:
+            s.query(Visit).filter(Visit.id == visit_id).delete()
+            s.query(Patient).filter(Patient.id == patient_id).delete()
+            s.query(Doctor).filter(Doctor.id == doctor_id).delete()
+            s.query(User).filter(User.id == user_id).delete()
+        s.commit()
+    finally:
+        s.close()
 
 
 @pytest.fixture
