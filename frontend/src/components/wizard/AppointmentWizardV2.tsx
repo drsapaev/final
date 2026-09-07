@@ -1119,14 +1119,14 @@ const AppointmentWizardV2 = ({
     };
   }, [isOpen, wizardData.patient.id, consultationCartItems]);
 
-  // Fix D (Codex R1 #3095): исходные услуги edit-записи — единый источник
+  // Fix D (Codex R1 PR 3095): исходные услуги edit-записи — единый источник
   // для сабмита и edit-квоты (см. buildEditOriginalServiceIdentity).
   const editOriginalServiceIdentity = useMemo(
     () => buildEditOriginalServiceIdentity(Boolean(editMode), initialData, servicesData),
     [editMode, initialData, servicesData]
   );
 
-  // Codex R2 #3095 (P1): маршрут команды edit-записи. QR-записи
+  // Codex R2 PR 3095 (P1): маршрут команды edit-записи. QR-записи
   // (online_queue + source=online) сабмитятся через /queue/online-entry/
   // {id}/full-update (ПОЛНАЯ корзина, свои правила цен) — квота обязана
   // использовать контракт этого маршрута, а не edit_delta. Предикат
@@ -1152,11 +1152,11 @@ const AppointmentWizardV2 = ({
       return;
     }
 
-    // Fix D (Codex R1 #3095, P1): в edit-режиме /registrar/cart/edit-delta
+    // Fix D (Codex R1 PR 3095, P1): в edit-режиме /registrar/cart/edit-delta
     // выставляет ТОЛЬКО новые услуги и по СВОИМ правилам (без repeat/benefit
     // скидок, только all_free→0). Квота обязана показывать ровно то, что
     // будет в invoice: считаем дельту тем же предикатом, что и сабмит.
-    // Codex R2 #3095 (P1): для QR-записей (online_queue) сабмит идёт через
+    // Codex R2 PR 3095 (P1): для QR-записей (online_queue) сабмит идёт через
     // /queue/online-entry/{id}/full-update ПОЛНОЙ корзины — квотируем всю
     // корзину по контракту этого маршрута (pricing_mode='full_update'),
     // иначе repeat/benefit-консультации квотировались по полной каталоговой
@@ -1183,7 +1183,7 @@ const AppointmentWizardV2 = ({
     if (!quoteRequest) {
       cartQuoteRequestIdRef.current += 1; // инвалидируем незавершённые запросы
       if (isEditModeQuote) {
-        // Codex R2 #3095 (P1): пустая дельта — ВАЛИДНЫЙ edit-флоу (изменили
+        // Codex R2 PR 3095 (P1): пустая дельта — ВАЛИДНЫЙ edit-флоу (изменили
         // только данные пациента или удалили услуги). Раньше квота оставалась
         // в 'idle' и handleComplete блокировал сабмит требованием 'ready'.
         // Нулевая готовая квота подтверждение не блокирует.
@@ -1945,7 +1945,7 @@ const AppointmentWizardV2 = ({
       initialRecordKind === 'appointment');
 
 
-      // Fix D (Codex R1 #3095): identity множеств считаются ОДИН раз через
+      // Fix D (Codex R1 PR 3095): identity множеств считаются ОДИН раз через
       // useMemo (buildEditOriginalServiceIdentity) и шарятся сабмитом и
       // edit-квотой — квота строится из РОВНО того же edit-delta payload.
       const editOriginalIdentity = editOriginalServiceIdentity;
@@ -2037,7 +2037,7 @@ const AppointmentWizardV2 = ({
           }
         }
 
-        // Fix D (Codex R1 #3095): множества исходных услуг вынесены в
+        // Fix D (Codex R1 PR 3095): множества исходных услуг вынесены в
         // buildEditOriginalServiceIdentity (wizardUtils); здесь используются
         // те же значения, что и в edit-квоте.
         const originalServiceCodes = editOriginalIdentity.serviceCodes;

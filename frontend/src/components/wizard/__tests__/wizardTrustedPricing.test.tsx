@@ -124,8 +124,8 @@ describe('Fix D: trusted pricing contract', () => {
   });
 
   it('quote request is rebuilt on any cart/discount change (old preview invalidated)', () => {
-    // Codex R1 #3095: в edit-режиме квота дополнительно зависит от identity
-    // (edit-дельта) и справочника услуг; Codex R2 #3095: ещё и от маршрута
+    // Codex R1 PR 3095: в edit-режиме квота дополнительно зависит от identity
+    // (edit-дельта) и справочника услуг; Codex R2 PR 3095: ещё и от маршрута
     // команды (fullUpdateQuoteRoute — QR-записи квотируются по full-update)
     expect(source).toContain('}, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute]);');
   });
@@ -185,7 +185,7 @@ describe('Fix D: quote shape', () => {
 });
 
 // =====================================================================
-// 4. Codex R2 #3095
+// 4. Codex R2 PR 3095
 // =====================================================================
 
 describe('Fix D Codex R2: quote contract follows the actual command route', () => {
@@ -211,7 +211,7 @@ describe('Fix D Codex R2: quote contract follows the actual command route', () =
     // Изменили только данные пациента / удалили услуги → квотировать нечего,
     // но сабмит обязан проходить: в edit-режиме ставится нулевая ready-квота.
     expect(source).toContain("setCartQuote({ items: [], total_amount: 0, approval_status: 'approved' });");
-    expect(source).toContain('Codex R2 #3095 (P1): пустая дельта');
+    expect(source).toContain('Codex R2 PR 3095 (P1): пустая дельта');
     // вне edit-режима поведение прежнее (idle)
     expect(source).toContain("setCartQuoteStatus('idle');");
   });

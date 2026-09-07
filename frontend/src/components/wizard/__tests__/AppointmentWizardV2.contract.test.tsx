@@ -194,7 +194,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
 
   it('treats service_details as existing services in edit mode to avoid duplicate queues', () => {
     const source = readCombinedWizardSource();
-    // Codex R1 #3095: identity-множества вынесены в
+    // Codex R1 PR 3095: identity-множества вынесены в
     // buildEditOriginalServiceIdentity (wizardUtils), поэтому блок ищется там
     const existingServicesBlock = extractSourceBlock(
       source,
