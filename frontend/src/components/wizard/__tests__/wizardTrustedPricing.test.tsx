@@ -48,6 +48,7 @@ describe('Fix D: buildCartQuoteRequest', () => {
       ],
       discount_mode: 'repeat',
       all_free: false,
+      pricing_mode: 'cart',
     });
   });
 
@@ -55,6 +56,40 @@ describe('Fix D: buildCartQuoteRequest', () => {
     expect(buildCartQuoteRequest({ items: [] })).toBeNull();
     expect(buildCartQuoteRequest({ items: [{ quantity: 2 }] })).toBeNull();
     expect(buildCartQuoteRequest(null)).toBeNull();
+  });
+
+  it('mirrors custom_price into the quote request (Codex R1 P2)', () => {
+    // Квота обязана учитывать врачебную переопределённую цену так же, как
+    // это делает /registrar/cart при выставлении инвойса.
+    const request = buildCartQuoteRequest({
+      items: [{ service_id: 11, quantity: 2, custom_price: 80000 }],
+    });
+    expect(request).toEqual({
+      items: [{ service_id: 11, quantity: 2, custom_price: 80000 }],
+      discount_mode: 'none',
+      all_free: false,
+      pricing_mode: 'cart',
+    });
+    // custom_price отсутствует → поле не добавляется
+    const plain = buildCartQuoteRequest({ items: [{ service_id: 12, quantity: 1 }] });
+    expect(plain?.items[0]).not.toHaveProperty('custom_price', expect.anything());
+    expect(Object.prototype.hasOwnProperty.call(plain?.items[0] ?? {}, 'custom_price')).toBe(false);
+  });
+
+  it('edit-mode quote carries pricing_mode=edit_delta over the delta items (Codex R1 P1)', () => {
+    // /registrar/cart/edit-delta выставляет ТОЛЬКО новые услуги и по своим
+    // правилам (без repeat/benefit скидок). Квота edit-режима обязана
+    // запрашивать именно дельту с pricing_mode='edit_delta'.
+    const delta = buildCartQuoteRequest(
+      { items: [{ service_id: 1, quantity: 1 }, { service_id: 2, quantity: 3 }] },
+      { pricingMode: 'edit_delta', itemsOverride: [{ service_id: 2, quantity: 3 }] }
+    );
+    expect(delta).toEqual({
+      items: [{ service_id: 2, quantity: 3 }],
+      discount_mode: 'none',
+      all_free: false,
+      pricing_mode: 'edit_delta',
+    });
   });
 });
 
@@ -89,7 +124,9 @@ describe('Fix D: trusted pricing contract', () => {
   });
 
   it('quote request is rebuilt on any cart/discount change (old preview invalidated)', () => {
-    expect(source).toContain('}, [isOpen, wizardData.cart]);');
+    // Codex R1 #3095: в edit-режиме квота дополнительно зависит от identity
+    // (edit-дельта) и справочника услуг
+    expect(source).toContain('}, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity]);');
   });
 
   it('CartStepV2 no longer zeroes repeat consultations (backend owns discounts)', () => {

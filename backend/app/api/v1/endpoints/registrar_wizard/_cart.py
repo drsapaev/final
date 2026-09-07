@@ -386,28 +386,44 @@ def quote_cart_prices(
                 detail=f"Для услуги «{service.name}» не указана цена",
             )
 
-        base_price = Decimal(str(service.price))
-        unit_final = _apply_service_discount(
-            base_price,
-            effective_discount_mode,
-            registration_settings,
-            service.is_consultation,
-        )
-
-        # Процент скидки для отображения (зеркало _apply_service_discount)
-        if effective_discount_mode == "all_free":
-            discount_percent = 100
-        elif effective_discount_mode == "repeat" and service.is_consultation:
-            raw = Decimal(
-                str(registration_settings.get("repeat_visit_discount", 0) or 0)
-            )
-            discount_percent = int(max(Decimal("0"), min(raw, Decimal("100"))))
-        elif effective_discount_mode == "benefit" and service.is_consultation:
-            discount_percent = (
-                100 if registration_settings.get("benefit_consultation_free", True) else 0
-            )
-        else:
+        # Codex R1 #3095 (P1): mode 'edit_delta' повторяет ценообразование
+        # RegistrarEditDeltaService один-в-один: только all_free→0,
+        # custom_price и repeat/benefit скидки НЕ применяются. Это гарантирует,
+        # что подтверждённая в edit-режиме сумма совпадает с тем, что
+        # edit-delta реально выставит в invoice.
+        if quote_req.pricing_mode == "edit_delta":
+            base_price = Decimal(str(service.price))
+            unit_final = Decimal("0") if effective_discount_mode == "all_free" else base_price
             discount_percent = 0
+        else:
+            # Mode 'cart' — зеркало пути сохранения /registrar/cart:
+            # врачебная переопределённая цена (Codex R1 #3095 P2), затем
+            # скидочный хелпер SSOT.
+            base_price = (
+                item_req.custom_price
+                if item_req.custom_price is not None
+                else Decimal(str(service.price))
+            )
+            unit_final = _apply_service_discount(
+                base_price,
+                effective_discount_mode,
+                registration_settings,
+                service.is_consultation,
+            )
+            # Процент скидки для отображения (зеркало _apply_service_discount)
+            if effective_discount_mode == "all_free":
+                discount_percent = 100
+            elif effective_discount_mode == "repeat" and service.is_consultation:
+                raw = Decimal(
+                    str(registration_settings.get("repeat_visit_discount", 0) or 0)
+                )
+                discount_percent = int(max(Decimal("0"), min(raw, Decimal("100"))))
+            elif effective_discount_mode == "benefit" and service.is_consultation:
+                discount_percent = (
+                    100 if registration_settings.get("benefit_consultation_free", True) else 0
+                )
+            else:
+                discount_percent = 0
 
         final_price = (unit_final * Decimal(item_req.quantity)).quantize(
             Decimal("0.01")

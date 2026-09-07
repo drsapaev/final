@@ -24243,6 +24243,10 @@ export type components = {
              * @default 1
              */
             quantity: number;
+            /**
+             * Custom Price
+             */
+            custom_price?: number | null;
         };
         /** CartQuoteItemResponse */
         CartQuoteItemResponse: {
@@ -24273,6 +24277,11 @@ export type components = {
              * @default false
              */
             all_free: boolean;
+            /**
+             * Pricing Mode
+             * @default cart
+             */
+            pricing_mode: string;
         };
         /** CartQuoteResponse */
         CartQuoteResponse: {

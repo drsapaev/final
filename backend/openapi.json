@@ -70924,6 +70924,17 @@
             "minimum": 1.0,
             "title": "Quantity",
             "default": 1
+          },
+          "custom_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Price"
           }
         },
         "type": "object",
@@ -70990,6 +71001,12 @@
             "type": "boolean",
             "title": "All Free",
             "default": false
+          },
+          "pricing_mode": {
+            "type": "string",
+            "title": "Pricing Mode",
+            "default": "cart",
+            "pattern": "^(cart|edit_delta)$"
           }
         },
         "type": "object",

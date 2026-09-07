@@ -162,3 +162,89 @@ def test_quote_unknown_service_is_404(
 ):
     response = _quote(client, admin_user, [{"service_id": 999999999, "quantity": 1}])
     assert response.status_code == 404
+
+
+# ===================== Codex R1 #3095 =====================
+
+
+def test_quote_honors_custom_price_in_cart_mode(
+    client: TestClient, db_session: Session, admin_user
+):
+    """Codex R1 P2: custom_price зеркалится в квоту, иначе квота (каталог
+    100000) расходится с инвойсом /registrar/cart (врачебная цена 80000)."""
+    service = _service(db_session, code="FIXD-CP", price=100000.00)
+
+    response = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [
+                {"service_id": service.id, "quantity": 2, "custom_price": 80000}
+            ],
+            "discount_mode": "none",
+            "all_free": False,
+            "pricing_mode": "cart",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert float(body["items"][0]["unit_price"]) == 80000
+    assert float(body["items"][0]["final_price"]) == 160000
+    assert float(body["total_amount"]) == 160000
+
+
+def test_quote_edit_delta_mode_ignores_repeat_discount(
+    client: TestClient, db_session: Session, admin_user
+):
+    """Codex R1 P1: edit-delta НЕ применяет repeat-скидку (RegistrarEditDelta
+    Service считает каталоговую цену) — квота edit_delta обязана повторять
+    это, иначе подтверждение расходится с invoice edit-дельты."""
+    service = _service(
+        db_session, code="FIXD-ED", price=100000.00, is_consultation=True
+    )
+    _set_settings(db_session, repeat_visit_discount=50)
+
+    # cart-режим: repeat-скидка применяется (50%)
+    cart_mode = _quote(
+        client, admin_user,
+        [{"service_id": service.id, "quantity": 1}],
+        discount_mode="repeat",
+    )
+    assert float(cart_mode.json()["items"][0]["final_price"]) == 50000
+
+    # edit_delta-режим: каталоговая цена, скидка НЕ применяется
+    edit_delta = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [{"service_id": service.id, "quantity": 1}],
+            "discount_mode": "repeat",
+            "all_free": False,
+            "pricing_mode": "edit_delta",
+        },
+    )
+    assert edit_delta.status_code == 200
+    body = edit_delta.json()
+    assert float(body["items"][0]["final_price"]) == 100000
+    assert body["items"][0]["discount_percent"] == 0
+
+
+def test_quote_edit_delta_mode_applies_all_free_zero(
+    client: TestClient, db_session: Session, admin_user
+):
+    """edit_delta-режим: all_free → 0 (единственное правило edit-delta)."""
+    service = _service(db_session, code="FIXD-ED2", price=100000.00)
+
+    edit_delta = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [{"service_id": service.id, "quantity": 3}],
+            "discount_mode": "none",
+            "all_free": True,
+            "pricing_mode": "edit_delta",
+        },
+    )
+    assert edit_delta.status_code == 200
+    assert float(edit_delta.json()["total_amount"]) == 0
+    assert edit_delta.json()["approval_status"] in ("pending", "approved")

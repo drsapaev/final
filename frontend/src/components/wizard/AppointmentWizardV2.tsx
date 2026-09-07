@@ -213,6 +213,8 @@ import {
   type CartQuote,
   type CartQuoteStatus,
   buildCartQuoteRequest,
+  buildEditOriginalServiceIdentity,
+  isEditDeltaNewItem,
   formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
@@ -1117,6 +1119,13 @@ const AppointmentWizardV2 = ({
     };
   }, [isOpen, wizardData.patient.id, consultationCartItems]);
 
+  // Fix D (Codex R1 #3095): исходные услуги edit-записи — единый источник
+  // для сабмита и edit-квоты (см. buildEditOriginalServiceIdentity).
+  const editOriginalServiceIdentity = useMemo(
+    () => buildEditOriginalServiceIdentity(Boolean(editMode), initialData, servicesData),
+    [editMode, initialData, servicesData]
+  );
+
   // ===================== FIX D: КВОТА ЦЕН КОРЗИНЫ =====================
 
   // Любое изменение корзины/скидки инвалидирует предыдущую квоту и
@@ -1127,7 +1136,27 @@ const AppointmentWizardV2 = ({
       return;
     }
 
-    const quoteRequest = buildCartQuoteRequest(wizardData.cart);
+    // Fix D (Codex R1 #3095, P1): в edit-режиме /registrar/cart/edit-delta
+    // выставляет ТОЛЬКО новые услуги и по СВОИМ правилам (без repeat/benefit
+    // скидок, только all_free→0). Квота обязана показывать ровно то, что
+    // будет в invoice: считаем дельту тем же предикатом, что и сабмит.
+    const isEditModeQuote = editMode === true;
+    const rawCartItems = (wizardData.cart.items ?? []) as Array<Record<string, unknown>>;
+    let quoteSourceItems: Array<Record<string, unknown>> = rawCartItems;
+    let quotePricingMode: 'cart' | 'edit_delta' = 'cart';
+    if (isEditModeQuote) {
+      quotePricingMode = 'edit_delta';
+      quoteSourceItems = rawCartItems.filter((item) => {
+        const service = servicesData.find((s) => String(s.id) === String(item.service_id));
+        if (!service) return false; // зеркало сабмита: услуга вне справочника не сабмитится
+        return isEditDeltaNewItem(item, service, editOriginalServiceIdentity);
+      });
+    }
+
+    const quoteRequest = buildCartQuoteRequest(wizardData.cart, {
+      pricingMode: quotePricingMode,
+      itemsOverride: quoteSourceItems,
+    });
     if (!quoteRequest) {
       cartQuoteRequestIdRef.current += 1; // инвалидируем незавершённые запросы
       setCartQuote(null);
@@ -1160,7 +1189,7 @@ const AppointmentWizardV2 = ({
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [isOpen, wizardData.cart]);
+  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity]);
 
   const repeatSuggestionSummary = useMemo(() => {
     if (!consultationCartItems.length) {
@@ -1883,12 +1912,13 @@ const AppointmentWizardV2 = ({
       initialRecordKind === 'appointment');
 
 
-      const originalServiceIds = new Set();
-      const originalQueueIds = new Set<string | number>(); // ✅ Moved here for availability in handleComplete
-      // PR-14: collect updated_at per queue entry for optimistic locking.
-      // Map<entryId, isoString> — passed to applyRegistrarEditDelta as
-      // expectedEntryUpdatedAt so backend can detect concurrent edits.
-      const entryUpdatedAtMap: Record<string, string> = {};
+      // Fix D (Codex R1 #3095): identity множеств считаются ОДИН раз через
+      // useMemo (buildEditOriginalServiceIdentity) и шарятся сабмитом и
+      // edit-квотой — квота строится из РОВНО того же edit-delta payload.
+      const editOriginalIdentity = editOriginalServiceIdentity;
+      const originalServiceIds = editOriginalIdentity.serviceIds;
+      const originalQueueIds = editOriginalIdentity.queueIds; // ✅ available throughout handleComplete
+      const entryUpdatedAtMap = editOriginalIdentity.entryUpdatedAtMap;
 
       if (hasQueueEntries) {
         // ✅ Устанавливаем source по умолчанию для записей типа visit
@@ -1974,215 +2004,11 @@ const AppointmentWizardV2 = ({
           }
         }
 
-        // Определяем исходные услуги из initialData
-        const originalServiceCodes = new Set();
-        const originalServiceNames = new Set();
-        // originalQueueIds moved to higher scope
-
-        if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
-          logger.log('📋 Извлечение исходных услуг из service_details:', initialData.service_details);
-          initialData.service_details.forEach((serviceDetail) => {
-            if (!serviceDetail) return;
-
-            const serviceId = serviceDetail.service_id || serviceDetail.id || null;
-            const serviceCode = serviceDetail.service_code || serviceDetail.code || null;
-            const serviceName = serviceDetail.service_name || serviceDetail.name || null;
-            const queueId = resolveExplicitQueueEntryId(serviceDetail, { allowLegacyId: false });
-
-            if (serviceId) originalServiceIds.add(serviceId);
-            if (queueId) originalQueueIds.add(queueId);
-            // PR-14: collect updated_at for optimistic locking
-            if (queueId) {
-              const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || initialData.updated_at || initialData.last_changed_at;
-              if (ts) entryUpdatedAtMap[queueId] = ts;
-            }
-            if (serviceCode) originalServiceCodes.add(String(serviceCode).toUpperCase().trim());
-            if (serviceName) originalServiceNames.add(String(serviceName).toLowerCase().trim());
-          });
-        }
-
-        // ✅ ПРИОРИТЕТ 1: service_codes - наиболее надежный источник для записей типа visit
-        if (Array.isArray(initialData.service_codes) && initialData.service_codes.length > 0) {
-          logger.log('📋 Извлечение услуг из service_codes:', initialData.service_codes);
-          initialData.service_codes.forEach((code) => {
-            if (code) {
-              const normalizedCode = code.toUpperCase().trim();
-              originalServiceCodes.add(normalizedCode);
-              // Находим service_id по service_code
-              const service = servicesData.find((s) => {
-                if (!s.service_code) return false;
-                const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
-                const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                const codeNoZero = normalizedCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                return serviceCodeUpper === normalizedCode || serviceCodeNoZero === codeNoZero;
-              });
-              if (service) {
-                originalServiceIds.add(service.id);
-                originalServiceNames.add(service.name.toLowerCase().trim());
-                logger.log(`  ✅ Найден service_id=${service.id} для кода "${code}"`);
-              } else {
-                logger.warn(`  ⚠️ Услуга с кодом "${code}" не найдена в servicesData`);
-              }
-            }
-          });
-        }
-
-        // ✅ ПРИОРИТЕТ 1.5: services (если service_codes пуст) - может быть кодами
-        // ⚠️ ВАЖНО: services может содержать коды (k01, d05) или имена
-        if (originalServiceIds.size === 0 && Array.isArray(initialData.services) && initialData.services.length > 0) {
-          logger.log('📋 service_codes пуст, используем services как коды:', initialData.services);
-          initialData.services.forEach((serviceValue) => {
-            const normalizedRawValue = normalizeServiceSelectionValue(serviceValue);
-            const normalizedRawName = normalizeServiceSelectionName(serviceValue);
-
-            if (normalizedRawValue || normalizedRawName) {
-              const normalizedValue = normalizedRawValue.toUpperCase().trim();
-
-              // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
-              // ⚠️ ВАЖНО: Коды могут быть в формате 'K01', 'k01', 'K01: Название' и т.д.
-              let service = servicesData.find((s) => {
-                if (!s.service_code) return false;
-                const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
-                // Убираем ведущие нули для сравнения (k01 = k1)
-                const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-
-                // Прямое сравнение
-                if (serviceCodeUpper === normalizedValue) return true;
-                // Сравнение без ведущих нулей
-                if (serviceCodeNoZero === valueNoZero) return true;
-                // Сравнение с учетом возможного формата 'K01: Название'
-                const serviceCodeBase = serviceCodeUpper.split(':')[0].trim();
-                const valueBase = normalizedValue.split(':')[0].trim();
-                if (serviceCodeBase === valueBase) return true;
-
-                return false;
-              });
-
-              // Если не нашли по коду, пробуем по имени (fallback)
-              if (!service) {
-                const normalizedName = normalizedRawName.toLowerCase().trim();
-                service = servicesData.find((s) =>
-                s.name && s.name.toLowerCase().trim() === normalizedName
-                );
-              }
-
-              if (service) {
-                originalServiceIds.add(service.id);
-                if (service.service_code) {
-                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
-                }
-                originalServiceNames.add(service.name.toLowerCase().trim());
-                logger.log(`  ✅ Найден service_id=${service.id} для "${normalizedRawValue || normalizedRawName}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
-              } else {
-                // ✅ УЛУЧШЕНО: Показываем примеры кодов из servicesData для отладки
-                const exampleCodes = servicesData.
-                filter((s) => s.service_code).
-                slice(0, 10).
-                map((s) => `${s.service_code}: ${s.name}`).
-                join(', ');
-                logger.warn(`  ⚠️ Услуга "${normalizedRawValue || normalizedRawName || '[empty]'}" не найдена в servicesData. Примеры кодов: ${exampleCodes}`);
-              }
-            }
-          });
-        }
-
-        // ✅ ПРИОРИТЕТ 2: queue_numbers - основной источник для всех типов записей
-        if (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) {
-          logger.log('📋 Извлечение услуг из queue_numbers:', initialData.queue_numbers);
-          initialData.queue_numbers.forEach((q) => {
-            if (q && q.service_id) {
-              originalServiceIds.add(q.service_id);
-              const queueId = resolveExplicitQueueEntryId(q);
-              if (queueId) originalQueueIds.add(queueId); // ✅ Сохраняем ID записи очереди
-              // PR-14: collect updated_at for optimistic locking
-              if (queueId) {
-                const ts = q.updated_at || q.last_changed_at || initialData.updated_at || initialData.last_changed_at;
-                if (ts) entryUpdatedAtMap[queueId] = ts;
-              }
-              // Находим service_code и name по service_id
-              const service = servicesData.find((s) => s.id === q.service_id);
-              if (service) {
-                if (service.service_code) {
-                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
-                }
-                originalServiceNames.add(service.name.toLowerCase().trim());
-              }
-            }
-            if (q && q.service_code) {
-              const normalizedCode = q.service_code.toUpperCase().trim();
-              originalServiceCodes.add(normalizedCode);
-              const service = servicesData.find((s) =>
-              s.service_code && s.service_code.toUpperCase().trim() === normalizedCode
-              );
-              if (service) {
-                originalServiceIds.add(service.id);
-                originalServiceNames.add(service.name.toLowerCase().trim());
-              }
-            }
-            if (q && q.service_name) {
-              const normalizedName = q.service_name.toLowerCase().trim();
-              originalServiceNames.add(normalizedName);
-              const service = servicesData.find((s) =>
-              s.name && s.name.toLowerCase().trim() === normalizedName
-              );
-              if (service) {
-                originalServiceIds.add(service.id);
-                if (service.service_code) {
-                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
-                }
-              }
-            }
-          });
-        }
-
-        // ✅ ПРИОРИТЕТ 3: services (массив строк) - может быть кодами или именами
-        if (Array.isArray(initialData.services) && initialData.services.length > 0) {
-          logger.log('📋 Извлечение услуг из services:', initialData.services);
-          initialData.services.forEach((serviceValue) => {
-            const normalizedRawValue = normalizeServiceSelectionValue(serviceValue);
-            const normalizedRawName = normalizeServiceSelectionName(serviceValue);
-
-            if (normalizedRawValue || normalizedRawName) {
-              const normalizedValue = normalizedRawValue.toUpperCase().trim();
-              const normalizedName = normalizedRawName.toLowerCase().trim();
-
-              // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
-              let service = servicesData.find((s) => {
-                if (!s.service_code) return false;
-                const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
-                // Убираем ведущие нули для сравнения (k01 = k1)
-                const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                return serviceCodeUpper === normalizedValue || serviceCodeNoZero === valueNoZero;
-              });
-
-              // Если не нашли по коду, пробуем по имени
-              if (!service) {
-                service = servicesData.find((s) =>
-                s.name && s.name.toLowerCase().trim() === normalizedName
-                );
-              }
-
-              if (service) {
-                originalServiceIds.add(service.id);
-                if (service.service_code) {
-                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
-                }
-                originalServiceNames.add(service.name.toLowerCase().trim());
-                logger.log(`  ✅ Найден service_id=${service.id} для "${normalizedRawValue || normalizedRawName}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
-              } else {
-                logger.warn(`  ⚠️ Услуга "${normalizedRawValue || normalizedRawName || '[empty]'}" не найдена в servicesData (ни по коду, ни по имени)`);
-              }
-            }
-          });
-        }
-
-        logger.log('📋 Исходные услуги определены:', {
-          serviceIds: Array.from(originalServiceIds),
-          serviceCodes: Array.from(originalServiceCodes),
-          serviceNames: Array.from(originalServiceNames)
-        });
+        // Fix D (Codex R1 #3095): множества исходных услуг вынесены в
+        // buildEditOriginalServiceIdentity (wizardUtils); здесь используются
+        // те же значения, что и в edit-квоте.
+        const originalServiceCodes = editOriginalIdentity.serviceCodes;
+        const originalServiceNames = editOriginalIdentity.serviceNames;
 
         // Определяем новые услуги (которых не было в исходной записи)
         // Сначала собираем все новые услуги с doctor_id для последующей конвертации

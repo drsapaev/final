@@ -243,12 +243,21 @@ class RepeatEligibilityPreviewResponse(BaseModel):
 class CartQuoteItemRequest(BaseModel):
     service_id: int
     quantity: int = Field(default=1, ge=1)
+    # Codex R1 #3095 (P2): зеркало ServiceItemRequest.custom_price — иначе
+    # квота считала каталоговую цену, а /registrar/cart считал инвойс по
+    # врачебной переопределённой цене, и подтверждение расходилось со счётом.
+    custom_price: Decimal | None = None
 
 
 class CartQuoteRequest(BaseModel):
     items: list[CartQuoteItemRequest] = Field(default_factory=list)
     discount_mode: str = Field(default="none")  # none|repeat|benefit
     all_free: bool = Field(default=False)
+    # Codex R1 #3095 (P1): 'cart' — правила пути сохранения /registrar/cart
+    # (_apply_service_discount), 'edit_delta' — точные правила
+    # /registrar/cart/edit-delta (RegistrarEditDeltaService: только
+    # all_free→0, repeat/benefit скидки НЕ применяются).
+    pricing_mode: str = Field(default="cart", pattern="^(cart|edit_delta)$")
 
 
 class CartQuoteItemResponse(BaseModel):
