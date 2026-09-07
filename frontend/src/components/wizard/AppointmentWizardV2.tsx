@@ -1432,7 +1432,7 @@ const AppointmentWizardV2 = ({
       const target = e.target as HTMLElement | null;
 
       // Ctrl+Enter - завершить (глобальный шорткат). Обрабатывается ДО
-      // guard'а интерактивных целей (Codex R1 #3096): иначе фокус на
+      // guard'а интерактивных целей (Codex R1 PR 3096): иначе фокус на
       // кнопке/ссылке/селекте/contenteditable завершал обработчик раньше,
       // и задокументированный Ctrl+Enter «Завершить» переставал работать.
       if (e.key === 'Enter' && e.ctrlKey) {

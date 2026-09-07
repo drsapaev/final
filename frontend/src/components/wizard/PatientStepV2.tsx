@@ -165,7 +165,7 @@ const PatientStepV2 = ({
             onKeyDown={(e) => {
               // UX Audit R-2.4: ARIA radiogroup keyboard navigation.
               // Arrow keys move between options, Tab moves out.
-              // Codex R2 #3096: следующий вариант вычисляется из ФОКУСНОГО
+              // Codex R2 PR 3096: следующий вариант вычисляется из ФОКУСНОГО
               // radio + направления, фокус перемещается вместе со значением —
               // иначе фокус оставался на кнопке, чей tabIndex стал -1, и
               // группа теряла клавиатурную навигацию.
