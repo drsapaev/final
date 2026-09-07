@@ -102,6 +102,15 @@ can run them against a scratch SQLite connection without an alembic
 context (the 0056/0057 pattern). No DDL is emitted anywhere: the
 chain head moves 0058 → 0059 with data-only statements, and CI runs
 the authoritative ``alembic upgrade head`` on real PostgreSQL.
+
+Revision-id note: alembic's auto-created ``alembic_version.version_num``
+column is VARCHAR(32) — the id is deliberately
+``0059_resource_seed_backfill`` (27 chars; the 0055
+queue_resource_provisioning precedent already sits at exactly 32).
+A 33-char first draft passed every scratch-SQLite test (SQLite
+ignores VARCHAR widths) and failed only on real PostgreSQL at the
+version stamp (PR #3101 CI round-1); the regression pin lives in the
+test suite.
 """
 
 from __future__ import annotations
@@ -111,12 +120,15 @@ import sqlalchemy as sa
 from alembic import op
 
 # Revision identifiers — chained after 0058_queue_resource_expand.
-revision = "0059_queue_resource_seed_backfill"
+# The id must stay <= 32 chars: alembic_version.version_num is
+# VARCHAR(32) — scratch SQLite tests do not enforce the width, real
+# PostgreSQL does (PR #3101 CI round-1).
+revision = "0059_resource_seed_backfill"
 down_revision = "0058_queue_resource_expand"
 branch_labels = None
 depends_on = None
 
-_MIGRATION_NAME = "0059_queue_resource_seed_backfill"
+_MIGRATION_NAME = "0059_resource_seed_backfill"
 
 # The two canonical seed specs (QD-2B FINAL). display_name values are
 # the canonical 0055 vocabulary (departments.name_ru / queue_profiles

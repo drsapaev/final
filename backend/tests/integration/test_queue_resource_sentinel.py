@@ -550,14 +550,15 @@ def test_alembic_chain_single_head_0059() -> None:
         "0057_lab_resource_internal_role",
     )
     # QD-2B: the chain head moved to 0059 (lab/ecg registry seeds +
-    # deterministic queue_resource_id backfill — data only).
-    assert "0059_queue_resource_seed_backfill" in graph
-    assert graph["0059_queue_resource_seed_backfill"] == (
+    # deterministic queue_resource_id backfill — data only; the id
+    # stays <= 32 chars: alembic_version.version_num is VARCHAR(32)).
+    assert "0059_resource_seed_backfill" in graph
+    assert graph["0059_resource_seed_backfill"] == (
         "0058_queue_resource_expand",
     )
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0059_queue_resource_seed_backfill"]
+    assert heads == ["0059_resource_seed_backfill"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

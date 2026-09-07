@@ -48,7 +48,7 @@ import sqlalchemy as sa
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / "backend"
 MIGRATION_0059 = (
-    BACKEND_ROOT / "alembic" / "versions" / "0059_queue_resource_seed_backfill.py"
+    BACKEND_ROOT / "alembic" / "versions" / "0059_resource_seed_backfill.py"
 )
 
 # non-secret placeholder mirroring the 0055 seed marker (the suite
@@ -64,7 +64,7 @@ _DAY_2 = "2026-09-08"
 
 def _load_migration_0059():
     spec = importlib.util.spec_from_file_location(
-        "migration_0059_queue_resource_seed_backfill", MIGRATION_0059
+        "migration_0059_resource_seed_backfill", MIGRATION_0059
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -380,8 +380,19 @@ def _canonical_environment(conn, *, with_queues: bool = True):
 
 def test_migration_module_chain_ids() -> None:
     module = _load_migration_0059()
-    assert module.revision == "0059_queue_resource_seed_backfill"
+    assert module.revision == "0059_resource_seed_backfill"
     assert module.down_revision == "0058_queue_resource_expand"
+
+
+def test_revision_id_fits_alembic_version_column() -> None:
+    """alembic's auto-created alembic_version.version_num column is
+    VARCHAR(32): a longer revision id passes every scratch-SQLite test
+    (SQLite ignores VARCHAR widths) and explodes only on real
+    PostgreSQL at the version stamp — exactly what PR #3101 CI
+    round-1 caught. Both ends of the new link must fit."""
+    module = _load_migration_0059()
+    assert len(module.revision) <= 32
+    assert len(module.down_revision) <= 32
 
 
 _SQL_CONSTANT_RE = re.compile(r"^_(SELECT|INSERT|UPDATE|DELETE)_")
