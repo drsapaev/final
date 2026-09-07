@@ -49,4 +49,9 @@ class TestPatientService:
 
         assert exc_info.value.status_code == 400
         assert "номером телефона" in str(exc_info.value.detail)
+        # Fix A: machine-readable code for the registrar wizard contract.
+        detail = exc_info.value.detail
+        assert isinstance(detail, dict)
+        assert detail["code"] == "patient_phone_exists"
+        assert "номером телефона" in detail["message"]
         assert not mock_audit.called

@@ -225,6 +225,9 @@ const PatientStepV2 = ({
                 <AlertCircle size={14} />
                 {phoneError.message}
               </span>
+              {/* Fix A: кнопка явного выбора показывается только когда карточка
+                  найдена; без неё пользователь очищает телефон или меняет ввод. */}
+              {phoneError?.patient &&
               <button
               type="button"
               onClick={() => onSelectPatient(phoneError.patient)}
@@ -232,6 +235,7 @@ const PatientStepV2 = ({
 
                 Выбрать {phoneError?.patient?.fio || t('misc.psv_etogo_patsienta')}
               </button>
+              }
             </div>
           }
         </div>

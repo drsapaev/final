@@ -6287,6 +6287,7 @@ const en = {
 
     // ─── AppointmentWizardV2.jsx (aw_) ─────────────────────────────────────
     aw_phone_already_exists: 'Пациент с таким номером уже существует',
+    aw_phone_exists_choose: 'A patient with this number already exists: {fio}. Select their card below or clear the phone to create a new patient.',
     aw_form_cleared: 'Форма очищена',
     aw_no_name: 'Без имени',
     aw_unknown_service: 'Неизвестная услуга',
