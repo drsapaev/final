@@ -139,9 +139,17 @@ class RegistrarWizardQueueAssignmentService:
         queue_assignments. The loop continued, and the visit was activated
         with stale data (non-empty queue_assignments but 0 real DB entries).
 
-        Fix: on failure, rollback restores the session, queue_assignments
-        is CLEARED to remove stale dicts, and the loop BREAKS. The visit
-        is NOT activated (queue_assignments is empty).
+        P2-1c fix: queue_assignments is CLEARED on failure and the visit is
+        NOT activated (queue_assignments is empty).
+
+        Codex R1 #3092 (P1, savepoint successor of _rollback_session): a full
+        db.rollback() is incompatible with the atomic cart
+        (/registrar/cart + create_visit(commit=False)) — it destroyed the
+        flushed-but-uncommitted cart rows, after which the endpoint committed
+        an empty transaction and returned 200 with phantom visit IDs.
+        Queue assignment for the visit now runs inside a SAVEPOINT: a failure
+        rolls back only THIS visit's queue entries (P2-1c partial-assignment
+        contract preserved), while the cart transaction stays intact.
 
         Contract (consistent with P2-1b):
             Partial queue assignment is intentionally unsupported. On any
@@ -154,8 +162,20 @@ class RegistrarWizardQueueAssignmentService:
             return []
 
         queue_assignments: list[dict[str, Any]] = []
-        for queue_tag in unique_queue_tags:
-            try:
+        # Codex R1 #3092 (P1): предыдущий _rollback_session() делал ПОЛНЫЙ
+        # db.rollback() сессии. В атомарной корзине (/registrar/cart с
+        # create_visit(commit=False)) визиты/invoice лежат в той же транзакции
+        # как flush-нутые, но не закоммиченные строки — полный rollback стирал
+        # корзину, после чего endpoint делал db.commit() и возвращал 200 с ID
+        # несуществующих визитов.
+        # Теперь присвоение номеров ОДНОГО визита изолируется SAVEPOINT-ом:
+        # сбой откатывает только записи ЭТОГО визита, корзина не затрагивается.
+        # Один savepoint на визит (а не на тег) сохраняет контракт P2-1c
+        # «частичное присвоение не поддерживается»: после сбоя в БД не остаётся
+        # ни одной записи очереди текущего визита.
+        nested = self.db.begin_nested()
+        try:
+            for queue_tag in unique_queue_tags:
                 prepared_assignment = assignment_service.prepare_wizard_queue_assignment(
                     visit,
                     queue_tag,
@@ -165,26 +185,36 @@ class RegistrarWizardQueueAssignmentService:
                 assignment = self._materialize_prepared_assignment(prepared_assignment)
                 if assignment:
                     queue_assignments.append(assignment)
-            except Exception as exc:
+        except Exception as exc:
+            # Откат ТОЛЬКО до savepoint — частичные записи этого визита
+            # уничтожаются, внешняя транзакция корзины жива.
+            try:
+                nested.rollback()
+            except Exception as rollback_error:
                 logger.error(
-                    "Ошибка присвоения очереди %s для визита %d: %s",
-                    queue_tag,
+                    "Ошибка rollback savepoint очередей визита %d: %s",
                     visit.id,
-                    str(exc),
+                    str(rollback_error),
                     exc_info=True,
                 )
-                # P2-1c: rollback to restore the session after failure.
-                self._rollback_session()
-                # P2-1c: CLEAR stale data. The rollback destroyed all
-                # flushed entries, so any dicts in queue_assignments
-                # reference non-existent DB rows. Without clearing, the
-                # caller would see non-empty queue_assignments and
-                # activate the visit with 0 real queue entries.
-                queue_assignments.clear()
-                # P2-1c: BREAK — after a full rollback, the session state
-                # is reset. Continuing the loop would re-query stale data
-                # and potentially create partial/inconsistent state.
-                break
+            logger.error(
+                "Ошибка присвоения очередей для визита %d: %s",
+                visit.id,
+                str(exc),
+                exc_info=True,
+            )
+            # P2-1c: CLEAR stale data — откаченные savepoint-ом записи больше
+            # не существуют в БД, поэтому словари в queue_assignments ссылаются
+            # на несуществующие строки. Без очистки вызывающий увидел бы
+            # непустой список и активировал визит без реальных записей.
+            queue_assignments.clear()
+            # P2-1c: обработка останавливается на этом визите — состояние
+            # попытки откачено; продолжение могло бы создать частичное
+            # состояние. Цикл по тегам прерван исключением естественным
+            # образом.
+        else:
+            # Успех — фиксируем savepoint (RELEASE SAVEPOINT)
+            nested.commit()
 
         return queue_assignments
 
@@ -214,13 +244,3 @@ class RegistrarWizardQueueAssignmentService:
             allocation_mode="create_entry",
             **handoff.create_entry_kwargs,
         )
-
-    def _rollback_session(self) -> None:
-        rollback = getattr(self.db, "rollback", None)
-        if not callable(rollback):
-            return
-
-        try:
-            rollback()
-        except Exception as rollback_error:
-            logger.error("Ошибка при rollback wizard queue assignment: %s", rollback_error)

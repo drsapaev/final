@@ -8,16 +8,38 @@ of re-executing the handler.
 Audit (PR-6) found this was missing — mobile clients that retry on
 timeout could create duplicate appointments / payments / patients.
 
-Implementation: in-memory LRU cache keyed by (user_id, idempotency_key).
-For production with multiple workers, this should be backed by Redis;
-for now in-memory is sufficient to satisfy the contract and tests.
+Implementation: in-memory LRU cache keyed by (user_id, idempotency_key),
+PLUS an optional Redis-backed distributed claim layer (Codex R1 #3092 P1).
+
+Codex R1 (PR #3092): staging runs two backend workers
+(ops/compose.staging.yml); a per-process cache records the key only AFTER the
+handler completes, so a lost response retried on ANOTHER worker — or a retry
+overlapping the first request — re-executes /registrar/cart and creates
+duplicate visits/invoices despite the reused key.
+
+Distributed layer (active when IDEMPOTENCY_REDIS_URL or ARQ_REDIS_URL is
+reachable):
+  1. Atomic in-flight claim: SET idem:{user}:{key}:claim <token> NX EX TTL.
+     A request that fails to claim either replays the stored response
+     (idem:{user}:{key}:resp) or receives 409 Conflict (still in flight on
+     another worker) — the handler is never executed twice for one key.
+  2. Completed 2xx responses are stored in Redis and replayed by any worker;
+     non-2xx responses release the claim so the client can retry.
+Redis unavailability degrades to the original per-process in-memory behavior
+(claimed-but-never-finished keys expire via TTL, so a crashed worker cannot
+lock a key forever).
 """
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import time
+import uuid
 from collections import OrderedDict
 from typing import Any
+
+import redis as redis_lib
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -77,6 +99,146 @@ def get_idempotency_cache() -> IdempotencyResponseCache:
     return _idempotency_cache
 
 
+class DistributedIdempotencyClaim:
+    """Redis-backed atomic claim + response replay for Idempotency-Key.
+
+    Contract (Codex R1 #3092 P1):
+      - acquire(user_id, key) -> bool: True iff THIS caller may execute the
+        handler. Uses SET NX (atomic across workers/processes).
+      - store_response(user_id, key, response, ttl): persist a 2xx snapshot
+        for cross-worker replay.
+      - load_response(user_id, key) -> Response | None: replay snapshot.
+      - release(user_id, key): drop the in-flight claim (called on handler
+        completion, success or failure).
+      - Every operation is best-effort: a Redis failure never breaks traffic,
+        it only degrades to the per-process in-memory cache.
+    """
+
+    def __init__(self, redis_url: str, ttl: int = _CACHE_TTL_SECONDS) -> None:
+        self._ttl = ttl
+        self._prefix = "idem"
+        try:
+            self._client = redis_lib.Redis.from_url(
+                redis_url,
+                socket_connect_timeout=0.25,
+                socket_timeout=0.25,
+                decode_responses=True,
+            )
+            self._client.ping()
+            self._available = True
+            logger.info("Idempotency distributed claim active via Redis (%s)", redis_url)
+        except Exception as exc:  # pragma: no cover - depends on deployment
+            logger.warning("Idempotency Redis unavailable (%s); using in-memory cache only", exc)
+            self._client = None
+            self._available = False
+
+    @property
+    def available(self) -> bool:
+        return self._available
+
+    @staticmethod
+    def _claim_key(user_id: int, key: str) -> str:
+        return f"idem:{user_id}:{key}:claim"
+
+    @staticmethod
+    def _resp_key(user_id: int, key: str) -> str:
+        return f"idem:{user_id}:{key}:resp"
+
+    def _run(self, op, *args, **kwargs):
+        try:
+            return op(*args, **kwargs)
+        except Exception as exc:
+            logger.warning("Idempotency Redis op failed: %s", exc)
+            self._available = False
+            return None
+
+    def acquire(self, user_id: int, key: str) -> bool:
+        if not self._available or self._client is None:
+            return True  # degrade: caller proceeds (in-memory path)
+        ok = self._run(
+            self._client.set,
+            self._claim_key(user_id, key),
+            uuid.uuid4().hex,
+            nx=True,
+            ex=self._ttl,
+        )
+        return bool(ok)
+
+    def load_response(self, user_id: int, key: str) -> Response | None:
+        if not self._available or self._client is None:
+            return None
+        raw = self._run(self._client.get, self._resp_key(user_id, key))
+        if not raw:
+            return None
+        try:
+            snapshot = json.loads(raw)
+            body = base64.b64decode(snapshot["body_b64"])
+            return Response(
+                content=body,
+                status_code=int(snapshot["status"]),
+                headers=dict(snapshot["headers"]),
+                media_type=snapshot.get("media_type"),
+            )
+        except Exception as exc:
+            logger.warning("Idempotency snapshot decode failed: %s", exc)
+            return None
+
+    def store_response(self, user_id: int, key: str, response: Response, ttl: int | None = None) -> None:
+        if not self._available or self._client is None:
+            return
+        body = getattr(response, "body", b"") or b""
+        snapshot = json.dumps(
+            {
+                "status": response.status_code,
+                "headers": dict(response.headers),
+                "media_type": response.media_type,
+                "body_b64": base64.b64encode(body).decode("ascii"),
+            }
+        )
+        self._run(
+            self._client.set,
+            self._resp_key(user_id, key),
+            snapshot,
+            ex=ttl or self._ttl,
+        )
+
+    def release(self, user_id: int, key: str) -> None:
+        if not self._available or self._client is None:
+            return
+        self._run(self._client.delete, self._claim_key(user_id, key))
+
+    def has_in_flight(self, user_id: int, key: str) -> bool:
+        """Claim marker present = some worker is executing this key."""
+        if not self._available or self._client is None:
+            return False
+        return bool(self._run(self._client.get, self._claim_key(user_id, key)))
+
+
+_distributed_claim: DistributedIdempotencyClaim | None = None
+
+
+def get_distributed_claim() -> DistributedIdempotencyClaim | None:
+    """Lazily build the Redis claim layer from settings.
+
+    IDEMPOTENCY_REDIS_URL takes precedence; None falls back to ARQ_REDIS_URL
+    (the same Redis the arq worker already uses) so existing deployments gain
+    the distributed guarantee without extra configuration.
+    """
+    global _distributed_claim
+    if _distributed_claim is not None:
+        return _distributed_claim
+    try:
+        from app.core.config import settings
+
+        redis_url = settings.IDEMPOTENCY_REDIS_URL or settings.ARQ_REDIS_URL
+    except Exception:  # pragma: no cover - settings not initialized (tests)
+        return None
+    if not redis_url:
+        return None
+    _distributed_claim = DistributedIdempotencyClaim(redis_url)
+    return _distributed_claim
+
+
 class IdempotencyMiddleware(BaseHTTPMiddleware):
     """Idempotency-Key middleware (PR-6).
 
@@ -102,7 +264,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # Default to 0 if unauthenticated (rare for POST, but defensive)
         user_id = self._resolve_user_id(request)
 
-        # Check cache
+        # Check local (per-process) cache first — fastest path
         cached = _idempotency_cache.get(user_id, idempotency_key)
         if cached is not None:
             logger.info(
@@ -111,8 +273,53 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
             return cached
 
+        # Codex R1 #3092 (P1): distributed claim across workers. A retry may
+        # land on a different worker (staging runs two) or overlap the first
+        # request; the per-process cache alone cannot deduplicate either case.
+        claim = get_distributed_claim()
+        claim_acquired = True
+        if claim is not None and claim.available:
+            replayed = claim.load_response(user_id, idempotency_key)
+            if replayed is not None:
+                logger.info(
+                    "Idempotency distributed replay: user=%s key=%s path=%s",
+                    user_id, idempotency_key, request.url.path,
+                )
+                return replayed
+            claim_acquired = claim.acquire(user_id, idempotency_key)
+            if not claim_acquired:
+                # Another worker holds the claim. Its response may have
+                # completed between our acquire attempt and now — re-check
+                # before rejecting.
+                replayed = claim.load_response(user_id, idempotency_key)
+                if replayed is not None:
+                    logger.info(
+                        "Idempotency distributed replay (post-inflight): user=%s key=%s",
+                        user_id, idempotency_key,
+                    )
+                    return replayed
+                logger.warning(
+                    "Idempotency conflict: key=%s user=%s is in flight on another worker",
+                    idempotency_key, user_id,
+                )
+                return Response(
+                    status_code=409,
+                    headers={"Retry-After": "1", "Cache-Control": "no-store"},
+                    content=(
+                        '{"detail": "Request with this Idempotency-Key is '
+                        'still being processed. Retry with the same key."}'
+                    ),
+                    media_type="application/json",
+                )
+
         # Execute handler
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            # Handler crashed — release the claim so the client can retry.
+            if claim is not None and claim.available and claim_acquired:
+                claim.release(user_id, idempotency_key)
+            raise
 
         # Cache only successful responses (2xx) — don't cache errors,
         # client should be able to retry with the same key after fixing
@@ -132,6 +339,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 media_type=response.media_type,
             )
             _idempotency_cache.set(user_id, idempotency_key, cached_response)
+            if claim is not None and claim.available and claim_acquired:
+                # Codex R1 #3092 (P1): snapshot for CROSS-WORKER replay, then
+                # drop the in-flight claim so later retries replay instead
+                # of conflicting.
+                claim.store_response(user_id, idempotency_key, cached_response)
+                claim.release(user_id, idempotency_key)
             logger.info(
                 "Idempotency cached: user=%s key=%s method=%s path=%s status=%s",
                 user_id, idempotency_key, request.method, request.url.path, response.status_code,
@@ -144,6 +357,10 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 media_type=response.media_type,
             )
 
+        # Non-2xx is not cached — release the claim so the client can retry
+        # with the same key after fixing the issue.
+        if claim is not None and claim.available and claim_acquired:
+            claim.release(user_id, idempotency_key)
         return response
 
     def _resolve_user_id(self, request: Request) -> int:

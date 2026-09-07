@@ -324,6 +324,74 @@ class TestP21cStaleDataFix:
         finally:
             verify.close()
 
+    def test_queue_failure_does_not_wipe_cart_transaction(
+        self, session_factory, clean_db
+    ):
+        """REGRESSION (Codex R1 #3092 P1, savepoint contract):
+
+        In the atomic cart flow (/registrar/cart, create_visit(commit=False))
+        the cart's visits/invoice are flushed-but-uncommitted in the SAME
+        session when queue assignment runs. The former _rollback_session()
+        (full db.rollback()) destroyed them: the endpoint then committed an
+        empty transaction and returned 200 with phantom visit IDs.
+
+        Contract now: a queue-tag failure rolls back ONLY the queue work of
+        this visit (savepoint); rows staged by the cart transaction survive,
+        so the endpoint's commit persists a complete cart.
+        """
+        setup = session_factory()
+        visit_id, tags = _setup_visit_with_three_tags(setup)
+        setup.close()
+
+        session, service = _make_service_with_failing_tag(
+            session_factory, visit_id, tags[1]
+        )
+
+        visit = session.query(Visit).filter(Visit.id == visit_id).first()
+        from app.services.morning_assignment import MorningAssignmentService
+        morning_service = MorningAssignmentService(session)
+
+        # Simulate the cart transaction: a second visit staged (flushed,
+        # NOT committed) in the same session — this is the invoice/second
+        # visit the cart endpoint would commit after queue assignment.
+        cart_visit = Visit(
+            patient_id=visit.patient_id,
+            doctor_id=visit.doctor_id,
+            visit_date=date.today(),
+            department="general",
+            status="confirmed",
+        )
+        session.add(cart_visit)
+        session.flush()
+        cart_visit_id = cart_visit.id
+
+        assignments = service._assign_same_day_queues_for_visit(
+            morning_service, visit, date.today(), source="desk"
+        )
+        # Contract P2-1c still holds: this visit's queue work is discarded
+        assert len(assignments) == 0
+
+        # The cart's own db.commit() must now persist the staged cart row
+        session.commit()
+        session.close()
+
+        verify = session_factory()
+        try:
+            staged = verify.query(Visit).filter(Visit.id == cart_visit_id).first()
+            assert staged is not None, (
+                "Codex R1 #3092: queue failure wiped the flushed-but-uncommitted "
+                "cart visit (full-session rollback) — endpoint would return 200 "
+                "with phantom visit IDs. Savepoint must protect the cart."
+            )
+            entries = verify.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.visit_id == visit_id
+            ).all()
+            assert len(entries) == 0, (
+                f"Expected 0 queue entries for the failed visit, got {len(entries)}"
+            )
+        finally:
+            verify.close()
+
     def test_all_tags_succeed_normal_operation(
         self, session_factory, clean_db
     ):
