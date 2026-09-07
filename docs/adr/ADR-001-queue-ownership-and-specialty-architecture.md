@@ -209,6 +209,26 @@ moved to explicit tags) that must land BEFORE stage E can retire
 `general_resource` — stage E is gated on zero live references for all three
 synthetic pairs, so general queues can never be left without an owner.
 
+### Stage B landing note (2026-09-07, QD-2B — migration 0059)
+
+Stage B landed the seeds from LIVE catalog proof (a tag seeds only when its
+active services are homogeneous `requires_doctor = false`) and the
+deterministic backfill. Three clarifications the landing made explicit:
+
+- "duplicate resolution" in the table above is **loud abort, never dedup**:
+  more than one ACTIVE queue for one `(day, resource tag)` stops the
+  migration with a full per-row inventory, and the repair (deactivate or
+  reassign) is an explicit operator decision. No QueueEntry merge ever
+  happens in stage B — the partial active uniqueness arrives in stage D.
+- The backfill is the **dual-ownership bridge**: `specialist_id` keeps
+  pointing at the old synthetic Doctor while `queue_resource_id` is set. The
+  destination follows `queue_tag` (exact-tag-wins), never the owner username
+  — a `general_resource`-owned `lab` queue bridges onto the lab resource.
+- Seed configuration **transfers the live synthetic Doctor numbering** (the
+  values the queue machinery reads today, not the 0055 constants) with
+  display names from the canonical 0055 vocabulary; `default_cabinet` stays
+  NULL because no canonical cabinet source exists.
+
 ### Guidance for readers of this ADR
 
 Anything that routes, authorizes, or reports on queues must treat ownership
