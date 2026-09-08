@@ -186,6 +186,26 @@ def _user_authorized_in_db(
         return False, None, False
 
 
+def _principal_refusal_response() -> Response:
+    """Codex R8 #3092 (P1): non-executing failure for a refused principal.
+
+    Прежнее поведение — fall-through к эндпоинту — опиралось на допущение,
+    что эндпоинт сам пере-аутентифицирует и откажет. Это неверно для
+    деактивированного пользователя: get_current_user/require_roles не
+    проверяют is_active, поэтому запрос ДЕАКТИВИРОВАННОГО регистратора
+    проходил дальше, эндпоинт КОММИТИЛ корзину, а middleware не хранил
+    исход — потерянный ответ с тем же ключом исполнял команду повторно
+    (дубли визитов, счетов и позиций очереди). Теперь отказ принципалу —
+    НЕИСПОЛНЯЮЩИЙ ответ 403: эндпоинт не запускается, ничего не коммитится,
+    claim освобождается, привязка ключа сохраняется для восстановления.
+    """
+    return Response(
+        status_code=403,
+        content='{"detail": "Пользователь деактивирован или сессия недействительна"}',
+        media_type="application/json",
+    )
+
+
 def _resolve_request_db(request: Any):
     """Open the SAME session source the request's endpoint will use.
 
@@ -646,7 +666,10 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     "Idempotency replay refused (principal not authorized): user=%s key=%s path=%s",
                     user_id, idempotency_key, request.url.path,
                 )
-                return await call_next(request)
+                # Codex R8 #3092 (P1): НЕИСПОЛНЯЮЩИЙ отказ — эндпоинт не
+                # запускается, снапшот не эвиктится (восстановление после
+                # реактивации по тому же ключу).
+                return _principal_refusal_response()
             permitted = self._role_permitted_for_replay(request, cached_role, current_role, current_superuser)
             if permitted is True or (
                 permitted is None and (cached_role is None or current_role == cached_role)
@@ -701,7 +724,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         "Idempotency distributed replay refused (principal not authorized): user=%s key=%s path=%s",
                         user_id, idempotency_key, request.url.path,
                     )
-                    return await call_next(request)
+                    # Codex R8 #3092 (P1): неисполняющий отказ, снапшот хранится.
+                    return _principal_refusal_response()
                 permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
                 if permitted is True or (
                     permitted is None and (stored_role is None or current_role == stored_role)
@@ -745,16 +769,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # a revoked/deactivated principal must not receive
                     # the cached response here either. Codex R6: the endpoint
                     # policy decides on role change (snapshot KEPT on refusal).
+                    # Codex R8 #3092 (P1): principal refusal is NON-EXECUTING.
                     authorized, current_role, current_superuser = await self._principal_authorized(request, principal_payload)
-                    permitted = (
-                        self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
-                        if authorized else False
-                    )
-                    if not authorized or permitted is False or (
+                    if not authorized:
+                        logger.warning(
+                            "Idempotency post-inflight replay refused (principal not authorized): user=%s key=%s path=%s",
+                            user_id, idempotency_key, request.url.path,
+                        )
+                        return _principal_refusal_response()
+                    permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
+                    if permitted is False or (
                         permitted is None and stored_role is not None and current_role != stored_role
                     ):
                         logger.warning(
-                            "Idempotency post-inflight replay refused (principal not authorized or role not permitted): user=%s key=%s path=%s",
+                            "Idempotency post-inflight replay refused (role not permitted): user=%s key=%s path=%s",
                             user_id, idempotency_key, request.url.path,
                         )
                         return await call_next(request)
@@ -789,14 +817,19 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         )
         if not exec_authorized:
             # Fail-closed: nothing is stored or bound for an unauthorized
-            # principal — the endpoint re-authenticates (401/403 + audit).
+            # principal.
+            # Codex R8 #3092 (P1): отказ принципала теперь НЕИСПОЛНЯЮЩИЙ —
+            # прежний fall-through к эндпоинту исполнял команду для
+            # деактивированного пользователя (require_roles не проверяет
+            # is_active), коммитил корзину БЕЗ сохранения исхода — потерянный
+            # ответ с тем же ключом дублировал визиты/счета/очередь.
             logger.warning(
                 "Idempotency execute path refused pre-execution (principal not authorized): user=%s key=%s path=%s",
                 user_id, idempotency_key, request.url.path,
             )
             if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                 claim.release(user_id, idempotency_key, claim_token)
-            return await call_next(request)
+            return _principal_refusal_response()
 
         # Execute handler with a lease-renewal loop (Codex R2 #3092 P2):
         # while this worker is still executing, the in-flight claim is

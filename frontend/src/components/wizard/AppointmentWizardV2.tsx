@@ -2593,11 +2593,17 @@ const AppointmentWizardV2 = ({
         // потерять корзину). Привязка сохраняется только для неоднозначных
         // исходов: сеть/таймаут/5xx (неизвестно, закоммичено ли) и 409
         // (запрос может быть ещё в полёте на другом воркере).
+        // Codex R8 PR 3092 (P2): 403 тоже НЕ «доказательство не-коммита» —
+        // replay-policy ветка backend удерживает ЗАКОММИЧЕННЫЙ снапшот,
+        // пропуская к эндпоинту 403 при временно неавторизованной роли.
+        // Очистка единственного ключа, способного вернуть закоммиченный
+        // результат, привела бы к дубликату после восстановления роли.
         const definitiveNonCommit =
           typeof cartErr.status === 'number' &&
           cartErr.status >= 400 &&
           cartErr.status < 500 &&
-          cartErr.status !== 409;
+          cartErr.status !== 409 &&
+          cartErr.status !== 403;
         if (definitiveNonCommit) {
           logger.log('Fix C (Codex R3): definitive non-commit response — releasing the bound idempotency key for a corrected retry');
           cartIdempotencyKeyRef.current = null;

@@ -543,9 +543,12 @@ def test_cross_principal_replay_is_blocked(two_workers):
 
 def test_replay_refused_when_principal_no_longer_authorized(two_workers, monkeypatch):
     """Codex R3 #3092 (P1): replay happens only AFTER authorization. A cached
-    2xx must not be served to a principal that no longer passes the DB check
-    (revoked token / deactivated user) — the request falls through to the
-    endpoint instead."""
+    2xx must not be served to a principal that no longer passes the DB check.
+
+    Codex R8 #3092 (P1): the refusal is now NON-EXECUTING — the guarded write
+    must not run for a refused principal (the endpoint does NOT re-verify
+    is_active, so the old fall-through executed the command and duplicated
+    committed state on retry). 403 + no execution + snapshot kept."""
     client1, client2, counters, _ = two_workers
     key = "revoked-key"
     h1 = auth_headers("1")
@@ -555,14 +558,22 @@ def test_replay_refused_when_principal_no_longer_authorized(two_workers, monkeyp
     assert counters["w1"]["calls"] == 1
 
     # The DB authorization check now fails for this principal
+    original_check = idem_module._check_principal_authorized_sync
     monkeypatch.setattr(
         idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None, False)
     )
     second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
-    assert second.status_code == 200  # fell through to the endpoint handler
-    assert counters["w2"]["calls"] == 1, (
-        "unauthorized principal must not receive the cached response"
+    assert second.status_code == 403  # non-executing refusal (Codex R8)
+    assert counters["w2"]["calls"] == 0, (
+        "unauthorized principal must not receive the cached response NOR re-execute the write"
     )
+
+    # After the principal is authorized again, the SAME key replays the
+    # stored snapshot (it was kept, not evicted).
+    monkeypatch.setattr(idem_module, "_check_principal_authorized_sync", original_check)
+    third = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert third.status_code == 200
+    assert counters["w2"]["calls"] == 0, "snapshot survives the refusal"
 
 
 def test_principal_authorization_check_fails_closed(fake_redis, monkeypatch):
@@ -661,10 +672,44 @@ def test_post_inflight_replay_is_authorized_too(two_workers, monkeypatch):
         idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None, False)
     )
     second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
-    assert second.status_code == 200  # fell through to the endpoint
-    assert counters["w2"]["calls"] == 1, (
-        "post-inflight replay must not bypass authorization"
+    # Codex R8 #3092 (P1): non-executing refusal instead of fall-through.
+    assert second.status_code == 403
+    assert counters["w2"]["calls"] == 0, (
+        "post-inflight replay must not bypass authorization NOR re-execute the write"
     )
+
+
+def test_execute_path_refused_principal_does_not_execute(two_workers, monkeypatch):
+    """Codex R8 #3092 (P1): the execute path must not run the guarded write
+    for a principal the DB authorization refuses (deactivated user with a
+    still-valid token — get_current_user/require_roles never check
+    is_active). The refusal is a non-executing 403: no handler call, no
+    stored outcome, claim released — after reactivation the same key
+    executes fresh."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "deactivated-registrar"
+    h1 = auth_headers("1")
+
+    original_check = idem_module._check_principal_authorized_sync
+    # The user was deactivated AFTER login: canonical auth would let the
+    # request through, but the DB authorization check refuses it.
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None, False)
+    )
+    refused = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert refused.status_code == 403
+    assert counters["w2"]["calls"] == 0, (
+        "a refused principal must never reach the handler (no duplicate commits)"
+    )
+    assert not any("deactivated-registrar" in k for k in fake_redis.store), (
+        "no outcome is stored for a refused principal"
+    )
+
+    # Reactivation: the same key now executes normally (nothing was stored).
+    monkeypatch.setattr(idem_module, "_check_principal_authorized_sync", original_check)
+    retry = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
+    assert retry.status_code == 200
+    assert counters["w2"]["calls"] == 1
 
 
 def test_require_roles_publishes_policy_for_introspection():
@@ -878,9 +923,13 @@ def test_execute_path_authorizes_once_and_retains_outcome(two_workers, monkeypat
 
 def test_pre_execution_authorization_failure_stores_nothing(two_workers, monkeypatch):
     """Codex R6 #3092 (P1): fail-closed — when the pre-execution authorization
-    cannot establish the role (transient DB failure), nothing is stored or
-    bound; the endpoint re-authenticates and a retry re-executes from
-    scratch (no snapshot for an unverified role)."""
+    cannot establish the role, nothing is stored or bound and a retry
+    re-executes from scratch (no snapshot for an unverified role).
+
+    Codex R8 #3092 (P1): the refusal is now a NON-EXECUTING 403 — the
+    guarded write must not run for a refused principal (the endpoint does
+    not re-verify is_active, so the old fall-through executed the command
+    and duplicated committed state on a lost-response retry)."""
     monkeypatch.setattr(
         idem_module, "_check_principal_authorized_sync", lambda *a, **k: (False, None, False)
     )
@@ -889,12 +938,12 @@ def test_pre_execution_authorization_failure_stores_nothing(two_workers, monkeyp
     h1 = auth_headers("1")
 
     first = client1.post("/echo", headers={**h1, "Idempotency-Key": key})
-    assert first.status_code == 200  # fell through to the endpoint
-    assert counters["w1"]["calls"] == 1
+    assert first.status_code == 403  # non-executing refusal
+    assert counters["w1"]["calls"] == 0
 
     second = client2.post("/echo", headers={**h1, "Idempotency-Key": key})
-    assert second.status_code == 200
-    assert counters["w2"]["calls"] == 1, (
+    assert second.status_code == 403
+    assert counters["w2"]["calls"] == 0, (
         "nothing was stored for the unauthorized principal — the retry re-executes"
     )
 
