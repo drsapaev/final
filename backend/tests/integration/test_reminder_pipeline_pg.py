@@ -1,9 +1,9 @@
-"""Reminder pipeline — PostgreSQL row-lock claim semantics (Codex P2).
+"""Reminder pipeline — PostgreSQL atomic-claim race semantics (Codex P2).
 
-``test_reminder_pipeline.py`` runs on SQLite, where ``SELECT ... FOR
-UPDATE`` is a no-op — the sequential idempotency contract is covered
-there, but the CONCURRENT claim race (two overlapping deliveries for the
-same visit) can only be proven against real PostgreSQL row locks.
+``test_reminder_pipeline.py`` runs on SQLite — the sequential idempotency
+contract is covered there, but the CONCURRENT claim race (two overlapping
+deliveries for the same visit) can only be proven against real PostgreSQL
+row locking.
 
 This module is self-contained: it sets its own environment defaults
 BEFORE importing app modules (same pattern as ``test_gate_d.py``), builds
@@ -21,6 +21,7 @@ conftest puts ``backend/`` on sys.path and pytest.ini's ``-m "not gate_d"``
 deselects everything here; the sys.path insert above keeps the dedicated
 ``--noconftest`` CI step working without the conftest.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -98,12 +99,14 @@ def test_concurrent_reminder_jobs_send_exactly_once(
     pg_engine, cleanup_rows, monkeypatch: pytest.MonkeyPatch
 ):
     """Two overlapping deliveries for the same visit race the idempotency
-    guard. The ``SELECT ... FOR UPDATE`` claim in ``send_visit_reminder``
-    must serialize them: the loser blocks until the winner commits the
-    ``reminder_sent_at`` stamp, re-reads the row, and skips the send —
-    exactly one notification dispatch per visit, no matter how the jobs
-    overlap. Without the row lock both readers would see a NULL stamp and
-    both would dispatch (calls == 2)."""
+    guard. The atomic conditional-UPDATE claim in ``send_visit_reminder``
+    (``UPDATE ... SET reminder_sent_at = now() WHERE id = X AND
+    reminder_sent_at IS NULL``) must serialize them: the loser blocks on
+    the winner's row lock until the claim commits, then re-evaluates the
+    predicate, matches 0 rows, and skips the send — exactly one
+    notification dispatch per visit, no matter how the jobs overlap.
+    Without the conditional predicate both writers would stamp and both
+    would dispatch (calls == 2)."""
     from app.models.clinic import Doctor
     from app.models.patient import Patient
     from app.models.user import User
@@ -163,8 +166,8 @@ def test_concurrent_reminder_jobs_send_exactly_once(
 
     async def _spy(self, db, vid, hours_before=24):
         calls.append({"visit_id": vid, "hours_before": hours_before})
-        # Hold the claimed row across the await — the window a second
-        # unguarded reader would exploit to double-send.
+        # Simulate slow provider I/O AFTER the claim committed — the window
+        # an unguarded second reader would exploit to double-send.
         await asyncio.sleep(0.2)
         return {"success": True, "channel": "telegram"}
 
@@ -183,7 +186,7 @@ def test_concurrent_reminder_jobs_send_exactly_once(
     assert not t1.is_alive() and not t2.is_alive(), "worker jobs deadlocked"
 
     assert len(calls) == 1, (
-        f"exactly one dispatch expected under the FOR UPDATE claim, "
+        f"exactly one dispatch expected under the atomic claim, "
         f"got {len(calls)}: {calls}"
     )
     assert calls[0]["visit_id"] == visit_id

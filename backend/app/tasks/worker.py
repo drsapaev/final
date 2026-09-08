@@ -19,7 +19,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
 from arq import cron
@@ -52,7 +51,7 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
     argument of this job is a hint for logging only (the service owns the
     channel decision).
     """
-    from sqlalchemy import create_engine
+    from sqlalchemy import create_engine, func, update
     from sqlalchemy.orm import Session
 
     from app.models.visit import Visit
@@ -62,29 +61,48 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
 
     engine = create_engine(str(settings.DATABASE_URL))
     db = Session(engine)
+    claimed = False
     try:
-        # Atomic claim (SELECT ... FOR UPDATE): a concurrent delivery for
-        # the same visit blocks here until this transaction commits, then
-        # re-reads the row and sees reminder_sent_at — two overlapping jobs
-        # can never both pass the guard and double-send. No-op on SQLite
-        # (the sequential contract is covered in test_reminder_pipeline.py);
-        # the PostgreSQL race is proven by
-        # tests/integration/test_reminder_pipeline_pg.py (gate_d marker).
-        visit = db.query(Visit).filter(Visit.id == visit_id).with_for_update().first()
-        if not visit:
-            logger.warning("job.send_visit_reminder: visit %s not found", visit_id)
+        # Phase 1 — short atomic claim (Codex round 2, P2): one conditional
+        # UPDATE takes the idempotency stamp. The row lock lives ONLY for
+        # this statement — it is never held across the notification await
+        # (a slow Telegram/PWA call must not block concurrent reschedules,
+        # cancellations or status writes on the same visit). A concurrent
+        # delivery's UPDATE blocks until this commits, then re-evaluates
+        # ``reminder_sent_at IS NULL`` and matches 0 rows — two overlapping
+        # jobs can never both dispatch. The PostgreSQL race is proven by
+        # tests/integration/test_reminder_pipeline_pg.py (gate_d marker);
+        # the sequential contract lives in test_reminder_pipeline.py.
+        claim = db.execute(
+            update(Visit)
+            .where(Visit.id == visit_id, Visit.reminder_sent_at.is_(None))
+            .values(reminder_sent_at=func.now())
+        )
+        db.commit()
+        if claim.rowcount == 0:
+            # Either the visit is gone or a concurrent delivery won the
+            # claim — distinguish for honest logs.
+            exists = db.query(Visit.id).filter(Visit.id == visit_id).first()
+            if not exists:
+                logger.warning(
+                    "job.send_visit_reminder: visit %s not found", visit_id
+                )
+            else:
+                logger.info(
+                    "job.send_visit_reminder: visit %s already reminded "
+                    "(claim lost), skipping",
+                    visit_id,
+                )
             return
+        claimed = True
 
-        # Idempotency: skip if a reminder was already stamped for this visit
-        if visit.reminder_sent_at is not None:
-            logger.info(
-                "job.send_visit_reminder: visit %s already reminded at %s, skipping",
-                visit_id, visit.reminder_sent_at,
-            )
-            return
-
-        # Send via the real notification service — real contract:
-        # send_confirmation_reminder(self, db, visit_id, hours_before=24).
+        # Phase 2 — dispatch OUTSIDE any transaction/lock. Crash-window
+        # tradeoff (documented): if the worker dies after the claim commit
+        # but before the provider call completes, the stamp stays set and
+        # the reminder is lost (at-most-once). That is accepted over the
+        # alternative — holding the visit row lock across external I/O for
+        # up to the job timeout, blocking every concurrent write to the
+        # same visit.
         service = NotificationService(db)
         result = await service.send_confirmation_reminder(db, visit_id, hours_before=24)
 
@@ -93,18 +111,26 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
                 "job.send_visit_reminder: send failed for visit %s: %s",
                 visit_id, result.get("error", "unknown"),
             )
-            # Don't mark as sent — let arq retry
+            # Release the claim in the handler below — let arq retry.
             raise RuntimeError(f"Notification send failed: {result.get('error')}")
 
-        # Mark as sent (ORM attribute — same column the idempotency guard read)
-        visit.reminder_sent_at = datetime.now(UTC)
-        db.commit()
+        # Phase 3 — the claim IS the stamp; nothing further to write.
         logger.info(
             "job.send_visit_reminder: visit %s reminded via %s",
             visit_id, result.get("channel", channel),
         )
     except Exception:
+        # Rollback first — the failed service call may have left uncommitted
+        # partial state on the session. Then release OUR claim so arq's
+        # retry can re-deliver (at-least-once for in-process failures).
         db.rollback()
+        if claimed:
+            db.execute(
+                update(Visit)
+                .where(Visit.id == visit_id)
+                .values(reminder_sent_at=None)
+            )
+            db.commit()
         logger.exception("job.send_visit_reminder failed for visit %s", visit_id)
         raise  # arq will retry per retry_policy
     finally:

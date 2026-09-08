@@ -366,7 +366,19 @@ class VisitsApiService:
                 detail="Cannot reschedule a visit that has been started",
             )
 
-        upd = table.update().where(table.c.id == visit_id).values(visit_date=new_date).returning(table)
+        # PR-1 (Codex round 2, P1): the reminder stamp is only valid for
+        # the CURRENT schedule — rescheduling must invalidate it, otherwise
+        # the next reminder job silently no-ops on the stale stamp and the
+        # patient never gets a reminder for the new date.
+        reschedule_values: dict = {"visit_date": new_date}
+        if hasattr(table.c, "reminder_sent_at"):
+            reschedule_values["reminder_sent_at"] = None
+        upd = (
+            table.update()
+            .where(table.c.id == visit_id)
+            .values(**reschedule_values)
+            .returning(table)
+        )
         row = self.repository.execute(upd).mappings().first()
         if not row:
             raise HTTPException(404, "Visit not found")

@@ -569,6 +569,12 @@ def reschedule_visit(
 
     # R-27 fix: обновляем и дату, и опционально время
     update_values: dict = {"visit_date": new_date}
+    # PR-1 (Codex round 2, P1): the reminder stamp is only valid for the
+    # CURRENT schedule — rescheduling must invalidate it, otherwise the
+    # next reminder job silently no-ops on the stale stamp and the patient
+    # never gets a reminder for the new date.
+    if hasattr(t.c, "reminder_sent_at"):
+        update_values["reminder_sent_at"] = None
     if new_time is not None:
         # Валидация формата HH:MM
         new_time_str = new_time.strip()
@@ -642,8 +648,13 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
         )
 
     tomorrow = date.today() + timedelta(days=1)
+    tomorrow_values: dict = {"visit_date": tomorrow}
+    # PR-1 (Codex round 2, P1): reschedule invalidates the reminder stamp —
+    # same contract as the /reschedule route above.
+    if hasattr(t.c, "reminder_sent_at"):
+        tomorrow_values["reminder_sent_at"] = None
     upd = (
-        t.update().where(t.c.id == visit_id).values(visit_date=tomorrow).returning(t)
+        t.update().where(t.c.id == visit_id).values(**tomorrow_values).returning(t)
     )
     row = db.execute(upd).mappings().first()
     if not row:

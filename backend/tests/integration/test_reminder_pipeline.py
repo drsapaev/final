@@ -35,7 +35,7 @@ import socket
 import sys
 import uuid
 from datetime import date
-from urllib.parse import urlsplit, urlparse, urlunsplit
+from urllib.parse import urlparse, urlsplit, urlunsplit
 
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
@@ -384,9 +384,7 @@ async def test_worker_send_failure_does_not_stamp_and_raises(
 
 
 @pytest.mark.asyncio
-async def test_worker_second_run_does_not_resend(
-    pipeline_db, make_visit, reminder_spy
-):
+async def test_worker_second_run_does_not_resend(pipeline_db, make_visit, reminder_spy):
     """Criterion 5 (idempotency half): a repeat run — arq retry or duplicate
     enqueue — must not send a second notification."""
     from app.models.visit import Visit
@@ -476,9 +474,9 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
         # -- 1. REAL producer enqueue -------------------------------------
         job_id = await enqueue_reminder(visit_id=visit_id)
         assert job_id == deterministic_job_id
-        assert await pool.exists(f"{job_key_prefix}{job_id}"), (
-            "job must exist on the real queue after enqueue"
-        )
+        assert await pool.exists(
+            f"{job_key_prefix}{job_id}"
+        ), "job must exist on the real queue after enqueue"
 
         # -- 2. Worker picks it up, service called with right args --------
         worker = Worker(
@@ -495,9 +493,9 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
         )
         await asyncio.wait_for(worker.async_run(), timeout=60)
 
-        assert len(reminder_spy) == 1, (
-            "burst worker must deliver exactly one service call"
-        )
+        assert (
+            len(reminder_spy) == 1
+        ), "burst worker must deliver exactly one service call"
         assert reminder_spy[0]["visit_id"] == visit_id
         assert reminder_spy[0]["hours_before"] == 24
         # The job must have COMPLETED on the worker (a raise here would mean
@@ -524,7 +522,10 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
             "send_visit_reminder",
             visit_id=visit_id,
             channel="telegram",
-            _job_id=f"reminder:visit:{visit_id}:telegram:e2e-retry-{uuid.uuid4().hex[:6]}",
+            _job_id=(
+                f"reminder:visit:{visit_id}:telegram:"
+                f"e2e-retry-{uuid.uuid4().hex[:6]}"
+            ),
         )
         worker2 = Worker(
             functions=WorkerSettings.functions,
@@ -540,9 +541,9 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
         )
         await asyncio.wait_for(worker2.async_run(), timeout=60)
 
-        assert len(reminder_spy) == 1, (
-            "second delivery with a fresh job ID must NOT resend"
-        )
+        assert (
+            len(reminder_spy) == 1
+        ), "second delivery with a fresh job ID must NOT resend"
         # The forced second job must have COMPLETED (clean skip, not a crash)
         result = await asyncio.wait_for(
             Job(retry_id, pool, _queue_name=QUEUE_NAME).result(timeout=10), timeout=15
@@ -562,3 +563,87 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
             pass
         close = getattr(pool, "aclose", None) or pool.close
         await close()
+
+
+# ---------------------------------------------------------------------------
+# 6. Reschedule invalidates the reminder stamp (Codex round 2, P1)
+# ---------------------------------------------------------------------------
+
+
+def _stamp_and_reschedule_setup(pipeline_db, make_visit):
+    """Create a visit, stamp reminder_sent_at (as if already reminded),
+    return (visit_id, session, new_date)."""
+    from datetime import datetime, timedelta, UTC
+
+    from app.models.visit import Visit
+
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    s.query(Visit).filter(Visit.id == visit_id).update(
+        {"reminder_sent_at": datetime.now(UTC)}
+    )
+    s.commit()
+    return visit_id, s, date.today() + timedelta(days=3)
+
+
+def test_service_reschedule_clears_reminder_stamp(pipeline_db, make_visit):
+    """Codex round 2 P1: the stamp is only valid for the CURRENT schedule.
+    VisitsApiService.reschedule_visit must clear it — otherwise the next
+    reminder job silently no-ops on the stale stamp and the patient never
+    gets a reminder for the new date."""
+    from app.models.visit import Visit
+    from app.services.visits_api_service import VisitsApiService
+
+    visit_id, s, new_date = _stamp_and_reschedule_setup(pipeline_db, make_visit)
+    try:
+        service = VisitsApiService(s)
+        service.reschedule_visit(visit_id=visit_id, new_date=new_date)
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == new_date
+        assert (
+            row.reminder_sent_at is None
+        ), "reschedule must invalidate the stale reminder stamp"
+    finally:
+        s.close()
+
+
+def test_reschedule_route_clears_reminder_stamp(pipeline_db, make_visit):
+    """Same contract for the POST /visits/{visit_id}/reschedule route
+    (it performs its own table update, independent of the service)."""
+    from app.api.v1.endpoints.visits import reschedule_visit as reschedule_route
+    from app.models.visit import Visit
+
+    visit_id, s, new_date = _stamp_and_reschedule_setup(pipeline_db, make_visit)
+    try:
+        reschedule_route(visit_id=visit_id, new_date=new_date, new_time=None, db=s)
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == new_date
+        assert (
+            row.reminder_sent_at is None
+        ), "reschedule route must invalidate the stale reminder stamp"
+    finally:
+        s.close()
+
+
+def test_reschedule_tomorrow_route_clears_reminder_stamp(pipeline_db, make_visit):
+    """Same contract for POST /visits/{visit_id}/reschedule/tomorrow."""
+    from datetime import timedelta
+
+    from app.api.v1.endpoints.visits import (
+        reschedule_visit_tomorrow as reschedule_tomorrow_route,
+    )
+    from app.models.visit import Visit
+
+    visit_id, s, _new_date = _stamp_and_reschedule_setup(pipeline_db, make_visit)
+    try:
+        reschedule_tomorrow_route(visit_id=visit_id, db=s)
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == date.today() + timedelta(days=1)
+        assert (
+            row.reminder_sent_at is None
+        ), "tomorrow-reschedule must invalidate the stale reminder stamp"
+    finally:
+        s.close()
