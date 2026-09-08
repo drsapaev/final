@@ -148,6 +148,13 @@ class EditDeltaServiceItem(BaseModel):
     service_id: int
     quantity: int = Field(default=1, ge=1)
     specialist_id: int | None = None
+    # Codex R11 #3095 (P2): the edit-delta QUOTE must mirror the command's
+    # create-path gate — an item that would create a new queue entry needs a
+    # resolvable specialist when no active queue exists for the tag/date.
+    # Without the specialist context on the quote item the gate cannot
+    # distinguish a command the save accepts from one it rejects with 400
+    # AFTER the registrar confirmed the price.
+    specialist_id: int | None = None
 
 
 class EditDeltaRequest(BaseModel):
@@ -262,6 +269,12 @@ class CartQuoteItemRequest(BaseModel):
     # врачебной переопределённой цене, и подтверждение расходилось со счётом.
     # Codex R8 #3095 (P2): та же точность 2dp (см. ServiceItemRequest).
     custom_price: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
+    # Codex R11 #3095 (P2): зеркало EditDeltaServiceItem.specialist_id —
+    # edit-квота обязана зеркалить гейт создания команды: позиция без
+    # активной записи того же дня требует резолвимого специалиста, когда
+    # для queue_tag/даты нет активной очереди. Без контекста специалиста
+    # квота подтверждала цену команды, которая на сохранении возвращала 400.
+    specialist_id: int | None = None
 
 
 class CartQuoteRequest(BaseModel):

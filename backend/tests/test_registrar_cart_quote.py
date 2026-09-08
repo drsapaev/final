@@ -49,6 +49,26 @@ def _service(db: Session, *, code: str, price, is_consultation: bool = False) ->
     return service
 
 
+
+def _active_daily_queue(db: Session, *, queue_tag: str, specialist_id: int) -> None:
+    """R11 #3095: the edit-delta create-path gate (quote AND save-time
+    revalidation) mirrors _resolve_daily_queue, which requires an active
+    queue for the tag/date when no specialist resolves. Token-test fixtures
+    must make the command actually executable — otherwise the save fails
+    with 400 "No active queue exists" before the pricing gate under test."""
+    from app.models.online_queue import DailyQueue
+
+    db.add(
+        DailyQueue(
+            day=date.today(),
+            specialist_id=specialist_id,
+            queue_tag=queue_tag,
+            active=True,
+        )
+    )
+    db.commit()
+
+
 def _set_settings(db: Session, **values) -> None:
     for key, value in values.items():
         row = db.query(ClinicSettings).filter(ClinicSettings.key == key).first()
@@ -567,7 +587,7 @@ def test_cart_without_quote_token_still_saves_backward_compatible(
 
 
 def test_edit_delta_quote_token_rejects_stale_pricing_409(
-    client: TestClient, db_session: Session, admin_user, test_patient
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor
 ):
     """Codex R4 #3095 (P1): the edit-delta command revalidates the confirmed
     edit quote BEFORE any mutation — an admin price change after confirmation
@@ -576,6 +596,9 @@ def test_edit_delta_quote_token_rejects_stale_pricing_409(
     # R10 #3095: маршрутизируемая услуга — команда требует queue_tag.
     service.queue_tag = "fixd_edt1_tag"
     db_session.commit()
+    # R11 #3095: активная очередь делает команду исполнимой — гейт создания
+    # (зеркало _resolve_daily_queue) пропускает к ценовому гейту теста.
+    _active_daily_queue(db_session, queue_tag="fixd_edt1_tag", specialist_id=test_doctor.id)
 
     quoted = client.post(
         "/api/v1/registrar/cart/quote",
@@ -611,7 +634,7 @@ def test_edit_delta_quote_token_rejects_stale_pricing_409(
 
 
 def test_edit_delta_fresh_quote_token_passes_revalidation(
-    client: TestClient, db_session: Session, admin_user, test_patient
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor
 ):
     """Fresh token for the same payload (re-quoted after the price change)
     passes revalidation — the command proceeds past the pricing gate."""
@@ -621,6 +644,8 @@ def test_edit_delta_fresh_quote_token_passes_revalidation(
     # R10 #3095: маршрутизируемая услуга — команда требует queue_tag.
     service.queue_tag = "fixd_edt2_tag"
     db_session.commit()
+    # R11 #3095: см. EDT-1 — команда должна быть исполнимой.
+    _active_daily_queue(db_session, queue_tag="fixd_edt2_tag", specialist_id=test_doctor.id)
 
     token_headers = {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
     quoted = client.post(
@@ -1059,3 +1084,38 @@ def test_save_path_locks_service_rows_in_sorted_order(
     )
     # Pricing behavior unchanged (50000×1 + 70000×2)
     assert float(response.total_amount) == 190000
+
+
+# ===================== Codex R11 #3095 (P2) =====================
+
+
+def test_quote_edit_delta_rejects_unresolvable_create_target_like_the_command(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """Codex R11 #3095 (P2): an edit that ADDS a queue-tagged service while
+    the patient has NO active same-day entry routes the command to
+    _create_new_queue_entry → _resolve_daily_queue, which raises
+    "No active queue exists for queue_tag=...; specialist_id is required"
+    when neither the item nor the service supplies a specialist. The quote
+    with the edit context must mirror that gate BEFORE issuing the token —
+    otherwise the registrar confirms a price for a command the save can
+    never accept (token revalidation repeats the successful quote, then the
+    mutation returns 400)."""
+    service = _service(db_session, code="FIXD-R11-1", price=100000.00)
+    service.queue_tag = "fixd_r11_tag"
+    # No default specialist on the service either — exactly the combination
+    # the command's _resolve_daily_queue refuses.
+    service.doctor_id = None
+    db_session.commit()
+
+    quoted = _quote_with_context(
+        client,
+        admin_user,
+        [{"service_id": service.id, "quantity": 2}],
+        extra={
+            "patient_id": test_patient.id,
+            "target_date": date.today().isoformat(),
+        },
+    )
+    assert quoted.status_code == 400, quoted.text
+    assert "No active queue exists" in (quoted.json().get("detail") or ""), quoted.text

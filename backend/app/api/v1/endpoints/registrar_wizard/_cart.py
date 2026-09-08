@@ -11,6 +11,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _load_registration_discount_settings,
     _resolve_effective_discount_mode,
 )  # noqa: F401
+from app.models.online_queue import DailyQueue
 
 
 @router.post("/registrar/cart", response_model=CartResponse)
@@ -416,6 +417,7 @@ def _edit_delta_billable_quantity(
     patient_id: int,
     target_date: date,
     preferred_entry_ids: set[int],
+    specialist_id: int | None = None,
 ) -> int:
     """Codex R6 #3095 (P2): mirror the edit-delta command's billing quantity.
 
@@ -445,6 +447,35 @@ def _edit_delta_billable_quantity(
         preferred_entry_ids=preferred_entry_ids,
     )
     if entry is None:
+        # Codex R11 #3095 (P2): the command routes a no-entry edit to
+        # _create_new_queue_entry → _resolve_daily_queue, which refuses
+        # ("No active queue exists for queue_tag=...; specialist_id is
+        # required") when neither the item nor the service supplies a
+        # specialist. Mirror that gate HERE, read-only, BEFORE the token is
+        # issued: a confirmed quote for a command the save can never accept
+        # is a false confirmation (save-time token revalidation repeats the
+        # successful quote, then the mutation returns 400). The resolution
+        # expression is IDENTICAL to _resolve_daily_queue (item specialist
+        # or the service's default doctor) — no drift.
+        resolved_specialist_id = specialist_id or service.doctor_id
+        target_queue_exists = (
+            db.query(DailyQueue.id)
+            .filter(
+                DailyQueue.day == target_date,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active.is_(True),
+            )
+            .first()
+            is not None
+        )
+        if not target_queue_exists and not resolved_specialist_id:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"No active queue exists for queue_tag={queue_tag}; "
+                    "specialist_id is required"
+                ),
+            )
         return requested_qty
     existing_payload = edit_service._find_service_payload(
         edit_service._coerce_services(entry.services), service
@@ -602,6 +633,7 @@ def _quote_core(
                     patient_id=quote_req.patient_id,
                     target_date=quote_req.target_date,
                     preferred_entry_ids=set(quote_req.preferred_entry_ids),
+                    specialist_id=item_req.specialist_id,
                 )
             else:
                 billable_qty = item_req.quantity
