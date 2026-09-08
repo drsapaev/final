@@ -1237,9 +1237,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
         Returns the lowercase role labels the matched route accepts:
         - empty frozenset: the route carries no require_roles dependency —
-          any authenticated principal is authorized (require_roles itself
-          authorizes exactly these roles, superusers, and is silent for
-          routes that never called it);
+          the resolver could not find a published policy. This does NOT
+          mean unrestricted access: the endpoint may enforce authorization
+          INLINE (e.g. queue.py combines get_current_user +
+          staff_authorization_service.can_read_queue() + a doctor-ownership
+          check). The replay policy treats it as unknown — see
+          _role_permitted_for_replay.
         - None: the policy could NOT be determined (no app in scope, no
           matching route) — callers fall back to the conservative R4
           role-label comparison.
@@ -1311,7 +1314,15 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         if allowed is None:
             return None
         if not allowed:
-            return True
+            # Codex R12 #3092 (P1): NO require_roles dependency on the matched
+            # route means the middleware cannot statically evaluate the
+            # endpoint's authorization — the handler may enforce it INLINE
+            # (e.g. queue.py: get_current_user + can_read_queue +
+            # doctor-ownership). An empty allowed set is INSUFFICIENT policy
+            # information, not unrestricted access: fall back to the
+            # conservative R4 comparison — same role replays, a changed role
+            # falls through so the inline authorization re-runs for real.
+            return None
         if not current_role:
             return False
         return current_role.strip().lower() in allowed

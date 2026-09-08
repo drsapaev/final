@@ -2643,8 +2643,8 @@ const AppointmentWizardV2 = ({
             errorMessage = t('misc.aw_no_permissions');
           }
           toast.error(errorMessage, { style: TOAST_ERROR_STYLE });
-          // Закрываем мастер при ошибке прав доступа
-          onClose?.();
+          // Codex R12 PR 3092 (P2): НЕ закрываем мастер на 403 — close-эффект очистил бы
+          // recovery-refs; реплей после восстановления роли, новый ключ дублировал бы корзину.
         } else {
           toast.error(t('misc.aw_record_creation_error', { message: errorMessage }));
         }

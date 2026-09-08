@@ -159,6 +159,36 @@ describe('Fix C (Codex R3 #3092): key binding release on definitive failures', (
   });
 });
 
+describe('Fix C (Codex R12 PR 3092): recovery binding survives the replay-403 path', () => {
+  const readWizardSource = () => fs.readFileSync(
+    path.resolve(__dirname, '../AppointmentWizardV2.tsx'),
+    'utf8'
+  );
+
+  it('keeps the wizard open on 403 so the close effect never clears the recovery refs', () => {
+    // R12 P2: replay-policy 403 удерживает ЗАКОММИЧЕННЫЙ снапшот на backend
+    // (R8). Прежний 403-путь вызывал onClose?.() → close-эффект очищал
+    // cartIdempotencyKeyRef/cartIdempotencyPayloadRef → после восстановления
+    // роли повтор уходил с НОВЫМ ключом и записывал корзину заново (дубли
+    // визитов/счетов/очереди). Теперь мастер остаётся открытым: повтор
+    // (тот же ключ + payload → гвардия proceed → реплей) возможен прямо
+    // здесь, а закрытие — осознанное действие регистратора.
+    const source = readWizardSource();
+    const start = source.indexOf('if (isPermissionError) {');
+    const end = source.indexOf('return; // ❌ НЕ закрываем мастер при других ошибках', start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const permissionBlock = source.slice(start, end);
+    expect(permissionBlock).not.toContain('onClose?.()');
+    // Привязка ключ+payload не освобождается на этом пути (освобождение —
+    // только definitiveNonCommit/reconcile выше по catch-блоку).
+    expect(permissionBlock).not.toContain('cartIdempotencyKeyRef.current = null');
+    expect(permissionBlock).not.toContain('cartIdempotencyPayloadRef.current = null');
+    // Контекст решения задокументирован у ветки (R8-семантика replay-policy 403)
+    expect(permissionBlock).toContain('Codex R12 PR 3092');
+  });
+});
+
 describe('Fix C (Codex R11 PR 3092): uncertain-outcome 409 recovery path', () => {
   const readWizardSource = () => fs.readFileSync(
     path.resolve(__dirname, '../AppointmentWizardV2.tsx'),

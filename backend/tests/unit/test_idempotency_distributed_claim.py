@@ -173,6 +173,19 @@ def _make_app(counter: dict, call_next_error: Exception | None = None) -> FastAP
         counter["calls"] += 1
         return {"ok": True, "calls": counter["calls"]}
 
+    @app.post("/inline-auth")
+    async def _inline_auth() -> Any:
+        # Codex R12 #3092 (P1): mirror of queue.py:533-606 — authorization
+        # enforced INSIDE the handler (no require_roles dependency):
+        # get_current_user + staff_authorization_service.can_read_queue() +
+        # a doctor-ownership check decide whether patient_name is exposed.
+        from fastapi.responses import JSONResponse
+
+        counter["inline"]["calls"] += 1
+        if not counter["inline"]["allowed"]:
+            return JSONResponse(status_code=403, content={"detail": "inline authz refused"})
+        return {"ok": True, "patient_name": "Тестовый Пациент"}
+
     @app.post("/boom")
     async def _boom() -> dict[str, str]:
         counter["calls"] += 1
@@ -218,7 +231,7 @@ def two_workers(fake_redis: FakeRedis):
         return _ids.setdefault(username, 9000 + len(_ids) + 1)
     idem_module._resolve_principal_id_sync = _harness_resolve
 
-    counters = {"w1": {"calls": 0}, "w2": {"calls": 0}}
+    counters = {"w1": {"calls": 0, "inline": {"calls": 0, "allowed": True}}, "w2": {"calls": 0, "inline": {"calls": 0, "allowed": True}}}
     client1 = TestClient(_make_app(counters["w1"]), raise_server_exceptions=False)
     client2 = TestClient(_make_app(counters["w2"]), raise_server_exceptions=False)
     yield client1, client2, counters, fake_redis
@@ -970,6 +983,75 @@ def test_superuser_replays_across_role_change(two_workers, monkeypatch):
     second = client2.post("/cart-like", headers={**h1, "Idempotency-Key": key})
     assert second.status_code == 200
     assert counters["w2"]["calls"] == 0, "superuser bypass → replay, not re-execution"
+
+
+def test_role_permitted_treats_empty_policy_as_unknown():
+    """Codex R12 #3092 (P1): a matched route WITHOUT a require_roles
+    dependency resolves to an EMPTY allowed set — that is INSUFFICIENT
+    POLICY INFORMATION, not unrestricted access. The middleware cannot
+    statically evaluate handler-level (inline) authorization, so the
+    replay decision must fall back to the conservative R4 comparison
+    (same role → replay, changed role → refuse/re-execute) instead of
+    unconditionally replaying."""
+    from types import SimpleNamespace
+
+    middleware = IdempotencyMiddleware(app=None)
+    request = SimpleNamespace(scope={})
+    # Instance-level shadow of the resolver (no class-attribute mutation —
+    # _endpoint_allowed_roles is a staticmethod and must stay untouched for
+    # the resolver test below).
+    middleware._endpoint_allowed_roles = lambda req: frozenset()
+    assert middleware._role_permitted_for_replay(request, "Registrar", "Cashier", False) is None
+    # Same-role replay keeps working through the R4 fallback (handled by
+    # the caller: None + unchanged role label → replay).
+    assert middleware._role_permitted_for_replay(request, "Registrar", "Registrar", False) is None
+
+
+def test_role_change_does_not_bypass_inline_authorization(two_workers, monkeypatch):
+    """Codex R12 #3092 (P1): re-run inline authorization before replay.
+
+    An endpoint that enforces authorization INSIDE the handler (no
+    require_roles — mirror of queue.py:533-606: get_current_user +
+    can_read_queue + doctor-ownership) must not have its cached response
+    replayed after a role change: the empty allowed set does not authorize
+    the new role. The retry must fall through so the INLINE authorization
+    re-runs and 403s the now-unauthorized role instead of exposing the
+    cached patient_name."""
+    client1, client2, counters, _ = two_workers
+    key = "inline-authz-role-change"
+    h1 = auth_headers("1")
+
+    # Registrar passes the inline check; the response (with patient_name)
+    # is committed and stored under the Registrar role.
+    first = client1.post("/inline-auth", headers={**h1, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["inline"]["calls"] == 1
+
+    # Same-role replay still works (R4 fallback: unchanged role label).
+    same_role = client2.post("/inline-auth", headers={**h1, "Idempotency-Key": key})
+    assert same_role.status_code == 200
+    assert counters["w2"]["inline"]["calls"] == 0, (
+        "same-role replay must not re-execute the handler"
+    )
+
+    # The principal's role changes (Registrar → Cashier); the handler's
+    # INLINE authorization now refuses (can_read_queue / ownership fail).
+    monkeypatch.setattr(
+        idem_module, "_check_principal_authorized_sync", lambda *a, **k: (True, "Cashier", False)
+    )
+    counters["w2"]["inline"]["allowed"] = False
+
+    second = client2.post("/inline-auth", headers={**h1, "Idempotency-Key": key})
+    assert second.status_code == 403, (
+        "empty allowed set must NOT authorize a role-changed replay — "
+        "the inline authorization must re-run"
+    )
+    assert counters["w2"]["inline"]["calls"] == 1, (
+        "the handler (inline authorization) must have re-executed"
+    )
+    assert "patient_name" not in second.text, (
+        "the cached Registrar response must not be exposed to the Cashier role"
+    )
 
 
 def test_role_change_with_unknown_policy_blocks_replay(two_workers, monkeypatch):
