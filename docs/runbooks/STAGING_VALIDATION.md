@@ -347,14 +347,32 @@ cd backend
 arq app.tasks.worker.WorkerSettings
 
 # Terminal 2: enqueue a test reminder
+# (Codex round 9: schedule_version is a REQUIRED producer argument — the
+# worker rejects unversioned jobs. The version is built from the visit's
+# date, time and reminder generation.)
 cd backend
 python -c "
 import asyncio
 from app.tasks import enqueue_reminder
+from app.tasks.scheduler import build_reminder_schedule_version
+from app.db.session import SessionLocal
+from app.models.visit import Visit
 
 async def main():
-    job_id = await enqueue_reminder(visit_id=1, channel='telegram')
-    print(f'Enqueued job: {job_id}')
+    db = SessionLocal()
+    try:
+        visit = db.query(Visit).filter(Visit.id == 1).first()
+        if visit is None:
+            print('Visit 1 not found — create a test visit first')
+            return
+        version = build_reminder_schedule_version(visit)
+        print(f'Schedule version: {version}')
+        job_id = await enqueue_reminder(
+            visit_id=1, channel='telegram', schedule_version=version
+        )
+        print(f'Enqueued job: {job_id}')
+    finally:
+        db.close()
 
 asyncio.run(main())
 "

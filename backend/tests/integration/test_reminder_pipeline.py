@@ -71,11 +71,24 @@ FIXTURE_VERSION = f"{date.today().isoformat()}T10:00#0"
 
 
 class _FakePool:
-    """Minimal arq pool stand-in capturing enqueue_job calls."""
+    """Minimal arq pool stand-in capturing enqueue_job calls.
 
-    def __init__(self, job="job-ok", exc: Exception | None = None):
-        self._job = job
+    ``job`` may be a single value or a LIST of per-call return values
+    (Codex round 9, P2: the first enqueue can return None for a retained
+    result and the retried attempt returns a real job). ``job_key_exists``
+    mimics pool.exists(job_key_prefix + id): True = genuinely queued.
+    """
+
+    def __init__(
+        self,
+        job="job-ok",
+        exc: Exception | None = None,
+        job_key_exists: bool = True,
+    ):
+        self._jobs = list(job) if isinstance(job, list) else [job]
         self._exc = exc
+        self.job_key_exists = job_key_exists
+        self.exists_calls: list[str] = []
         self.calls: list[tuple[str, tuple, dict]] = []
         self.closed = False
 
@@ -83,7 +96,13 @@ class _FakePool:
         self.calls.append((func, args, kwargs))
         if self._exc is not None:
             raise self._exc
-        return self._job
+        if len(self._jobs) > 1:
+            return self._jobs.pop(0)
+        return self._jobs[0]
+
+    async def exists(self, key: str) -> bool:
+        self.exists_calls.append(key)
+        return self.job_key_exists
 
     async def aclose(self):
         self.closed = True
@@ -421,7 +440,9 @@ async def test_worker_send_failure_does_not_stamp_and_raises(
     monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _failing)
 
     visit_id = make_visit()
-    with pytest.raises(RuntimeError, match="Notification send failed"):
+    from arq.worker import Retry
+
+    with pytest.raises(Retry):
         await send_visit_reminder(
             {},
             visit_id=visit_id,
@@ -592,11 +613,37 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
         finally:
             fresh.close()
 
-        # -- 3. Queue-level dedupe: deterministic job ID ------------------
+        # -- 3. Queue-level dedupe vs retained result (round 9) ----------
+        # Step 2 COMPLETED this job: the job key is gone and the result is
+        # retained. A same-ID re-enqueue now returns None and the scheduler
+        # (round 9, P2) re-enqueues under an attempt suffix — the DB-level
+        # idempotency still prevents a resend.
         dup_id = await enqueue_reminder(
             visit_id=visit_id, schedule_version=schedule_version
         )
-        assert dup_id == job_id  # same deterministic ID, honest skip
+        assert dup_id.startswith(
+            job_id + ":attempt:"
+        ), f"retained-result re-enqueue must use an attempt suffix: {dup_id}"
+        assert await pool.exists(
+            f"{job_key_prefix}{dup_id}"
+        ), "the attempt job must be really queued"
+
+        worker3 = Worker(
+            functions=WorkerSettings.functions,
+            redis_pool=pool,
+            queue_name=QUEUE_NAME,
+            burst=True,
+            poll_delay=0.05,
+            job_timeout=30,
+            keep_result=60,
+            handle_signals=False,
+            max_jobs=1,
+            log_results=False,
+        )
+        await asyncio.wait_for(worker3.async_run(), timeout=60)
+        assert (
+            len(reminder_spy) == 1
+        ), "the attempt job must not resend (already reminded)"
 
         # -- 4. DB-level idempotency: fresh job ID forces a real run ------
         retry_id = await _enqueue(
@@ -840,7 +887,9 @@ def test_worker_failure_releases_only_own_claim(
 
     monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _failing_spy)
 
-    with pytest.raises(RuntimeError, match="Notification send failed"):
+    from arq.worker import Retry
+
+    with pytest.raises(Retry):
         asyncio.run(
             send_visit_reminder(
                 {},
@@ -1316,3 +1365,81 @@ def test_reschedule_during_dispatch_prevents_stale_record(
         assert row.reminder_claimed_at is None
     finally:
         s.close()
+
+
+@pytest.mark.asyncio
+async def test_delivery_failure_gives_up_after_backoffs(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 9, P1: after the three deferred attempts the failure
+    becomes permanent (RuntimeError) — the reminder is recorded as
+    permanently failed, lease released, stamp still NULL."""
+    from app.models.visit import Visit
+    from app.services.notifications_pkg._reminders import RemindersMixin
+    from app.tasks.worker import send_visit_reminder
+
+    async def _failing(self, db, visit_id, hours_before=24):
+        return {"success": False, "error": "telegram unavailable"}
+
+    monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _failing)
+
+    visit_id = make_visit()
+    with pytest.raises(RuntimeError, match="Notification send failed"):
+        await send_visit_reminder(
+            {"job_try": 4},
+            visit_id=visit_id,
+            channel="telegram",
+            schedule_version=FIXTURE_VERSION,
+        )
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_sent_at is None
+        assert row.reminder_claimed_at is None
+    finally:
+        s.close()
+
+
+@pytest.mark.asyncio
+async def test_enqueue_retained_result_requeues_with_attempt_suffix(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Codex round 9, P2: enqueue_job returning None is ambiguous — it may
+    be a retained RESULT (job not on the queue anymore) rather than a live
+    duplicate. A failed delivery leaves the generation unchanged, so a
+    re-enqueue for the same schedule reuses the failed job's ID and must
+    NOT be treated as an honest skip. The scheduler inspects the live job
+    key and retries under a unique attempt suffix."""
+    from app.tasks import enqueue_reminder
+
+    # First enqueue hits a retained result (None) with NO live job key;
+    # the retried attempt lands on the queue and returns a real job.
+    pool = _FakePool(job=[None, "job-attempt"], job_key_exists=False)
+
+    async def _fake_create_pool(redis_settings):
+        return pool
+
+    import arq
+
+    monkeypatch.setattr(arq, "create_pool", _fake_create_pool)
+
+    job_id = await enqueue_reminder(visit_id=11, schedule_version="2026-09-08T10:00#0")
+    assert job_id.startswith(
+        "reminder:visit:11:2026-09-08T10:00#0:telegram:attempt:"
+    ), f"expected attempt-suffixed id, got {job_id}"
+    assert len(pool.exists_calls) == 1  # exactly one ambiguity check
+    assert len(pool.calls) == 2  # original + attempt retry
+    assert pool.calls[1][2]["_job_id"] == job_id
+    assert pool.closed
+
+    # Genuinely queued duplicate: live job key exists -> honest skip.
+    pool2 = _FakePool(job=None, job_key_exists=True)
+
+    async def _fake_create_pool2(redis_settings):
+        return pool2
+
+    monkeypatch.setattr(arq, "create_pool", _fake_create_pool2)
+    dup_id = await enqueue_reminder(visit_id=11, schedule_version="2026-09-08T10:00#0")
+    assert dup_id == "reminder:visit:11:2026-09-08T10:00#0:telegram"
+    assert pool2.exists_calls and len(pool2.calls) == 1  # no second enqueue

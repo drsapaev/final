@@ -70,12 +70,49 @@ async def _enqueue(func_name: str, **kwargs: Any) -> str:
             job = await pool.enqueue_job(
                 func_name, **kwargs, _job_id=job_id, _queue_name=QUEUE_NAME
             )
+            if job is None:
+                # enqueue_job returns None when EITHER the live job key OR
+                # the retained result key matches (Codex round 9, P2) — a
+                # retained result does NOT prove the job is still queued.
+                # A failed delivery leaves reminder_generation unchanged, so
+                # a manual re-enqueue for the same schedule reuses the
+                # failed job's ID and would enqueue NOTHING until the result
+                # retention expires. Distinguish: re-enqueue under a unique
+                # attempt suffix when only the result remains.
+                from arq.constants import job_key_prefix
+
+                if await pool.exists(f"{job_key_prefix}{job_id}"):
+                    # Genuinely queued or running — idempotent skip. Honest:
+                    # the job DOES exist, so returning the ID is true.
+                    logger.info(
+                        "task.enqueue.skip_duplicate job_id=%s func=%s",
+                        job_id, func_name,
+                    )
+                else:
+                    attempt_id = f"{job_id}:attempt:{uuid4()}"
+                    logger.info(
+                        "task.enqueue.retained_result_retry job_id=%s -> %s",
+                        job_id, attempt_id,
+                    )
+                    job = await pool.enqueue_job(
+                        func_name,
+                        **kwargs,
+                        _job_id=attempt_id,
+                        _queue_name=QUEUE_NAME,
+                    )
+                    if job is None:
+                        raise TaskEnqueueError(
+                            f"enqueue_job returned None even for a fresh "
+                            f"attempt id ({attempt_id}); refusing to report "
+                            f"success for a job that is not on the queue"
+                        )
+                    job_id = attempt_id
         finally:
             await _close_pool(pool)
 
         if job is None:
-            # Job with this ID already enqueued — idempotent skip. Honest:
-            # the job DOES exist on the queue, so returning the ID is true.
+            # Unreachable in practice: the None branch above either skips
+            # honestly or re-enqueues with a fresh attempt id.
             logger.info("task.enqueue.skip_duplicate job_id=%s func=%s", job_id, func_name)
         else:
             logger.info("task.enqueue.ok job_id=%s func=%s queue=%s", job_id, func_name, QUEUE_NAME)

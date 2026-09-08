@@ -42,6 +42,21 @@ LEASE_TTL = timedelta(minutes=10)
 # Job implementations
 # ---------------------------------------------------------------------------
 
+def _delivery_retry(ctx, message: str) -> Exception:
+    """Codex round 9, P1: arq 0.28 has no ``retry_policy`` worker setting —
+    an ordinary exception after a provider outage would permanently fail the
+    job on its FIRST attempt and nothing would ever reschedule it. Transient
+    delivery failures therefore raise arq ``Retry`` with 10s/60s/300s
+    backoff; after the third deferral the failure is made permanent."""
+    from arq.worker import Retry
+
+    job_try = int((ctx or {}).get("job_try") or 1)
+    backoff = [10, 60, 300]
+    if job_try <= len(backoff):
+        return Retry(defer=backoff[job_try - 1])
+    return RuntimeError(message)
+
+
 def _parse_schedule_version(version: str) -> tuple:
     """Parse "{date}T{time or '-'}#{generation}" into its three parts."""
     date_part, _, rest = version.partition("T")
@@ -111,8 +126,6 @@ async def send_visit_reminder(
     """
     from sqlalchemy import create_engine, func, or_, update
     from sqlalchemy.orm import Session
-
-    from datetime import date
 
     from app.models.visit import Visit
     from app.services.notification_service import NotificationService
@@ -227,16 +240,56 @@ async def send_visit_reminder(
             )
             raise Retry(defer=defer)
 
+        # Post-claim revalidation + snapshot pin (Codex round 9, P1): a
+        # reschedule may commit between the claim and the provider call.
+        # Re-read the row now to (a) abort BEFORE sending when the claimed
+        # schedule version no longer matches, and (b) pin the claimed
+        # snapshot in the session's identity map — the real service
+        # re-queries the visit through THIS session, so it builds the
+        # message from the claimed state instead of a later one.
+        claimed_visit = db.query(Visit).filter(Visit.id == visit_id).first()
+        if claimed_visit is None or not _schedule_matches(
+            claimed_visit, schedule_version
+        ):
+            db.execute(
+                update(Visit)
+                .where(
+                    Visit.id == visit_id,
+                    Visit.reminder_claimed_at == our_lease,
+                )
+                .values(reminder_claimed_at=None)
+            )
+            db.commit()
+            logger.info(
+                "job.send_visit_reminder: visit %s schedule moved between "
+                "claim and dispatch — aborting before send",
+                visit_id,
+            )
+            return
+
+        # Dispatch OUTSIDE any transaction/lock. A reschedule during the
+        # dispatch is resolved by the generation-guarded finalize below.
         service = NotificationService(db)
-        result = await service.send_confirmation_reminder(db, visit_id, hours_before=24)
+        try:
+            result = await service.send_confirmation_reminder(
+                db, visit_id, hours_before=24
+            )
+        except Exception as exc:
+            raise _delivery_retry(
+                ctx, f"notification dispatch error for visit {visit_id}: {exc}"
+            ) from exc
 
         if not result.get("success"):
             logger.warning(
                 "job.send_visit_reminder: send failed for visit %s: %s",
                 visit_id, result.get("error", "unknown"),
             )
-            # Release the lease in the handler below — let arq retry.
-            raise RuntimeError(f"Notification send failed: {result.get('error')}")
+            # Release the lease in the handler below; arq defers with
+            # backoff (Codex round 9, P1).
+            raise _delivery_retry(
+                ctx,
+                f"Notification send failed: {result.get('error')}",
+            )
 
         # Record the delivery only now — the provider acknowledged it — and
         # release the lease in the same statement, bound to OUR lease value
@@ -379,21 +432,6 @@ def _redact_redis_url(url: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Retry policy
-# ---------------------------------------------------------------------------
-
-async def retry_policy(ctx, exc_type, exc, task):
-    """Retry up to 3 times with exponential backoff: 10s, 60s, 300s."""
-    retry_count = ctx.get("job_try", 0)
-    if retry_count >= 3:
-        logger.error("retry_policy: giving up after %d tries on %s: %s", retry_count, task, exc)
-        return False
-    backoff = [10, 60, 300][min(retry_count, 2)]
-    logger.warning("retry_policy: retry %d in %ds for %s", retry_count + 1, backoff, task)
-    return backoff
-
-
-# ---------------------------------------------------------------------------
 # Worker settings — entry point for `arq` CLI
 # ---------------------------------------------------------------------------
 
@@ -427,7 +465,6 @@ class WorkerSettings:
 
     on_startup = startup
     on_shutdown = shutdown
-    retry_policy = retry_policy
 
     redis_settings = _parse_redis_settings(settings.ARQ_REDIS_URL)
 
