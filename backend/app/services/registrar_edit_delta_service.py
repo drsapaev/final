@@ -166,6 +166,16 @@ class RegistrarEditDeltaService:
                     preferred_entry_ids=item_preferred,
                     specialist_id=item.specialist_id,
                 )
+                # Codex R9 PR 3118 (P1): услуга уже на АКТИВНОМ визите этого
+                # дня без записи очереди — правка количества создала бы
+                # дублирующий визит. Громкий отказ до _create_new_queue_entry;
+                # проверяется ПОСЛЕ более специфичного запрета переноса к
+                # другому врачу, чтобы причина отказа была точной.
+                self._assert_service_not_on_active_visit_without_entry(
+                    patient_id=patient_id,
+                    service_id=service.id,
+                    target_date=target_date,
+                )
                 delta = self._create_new_queue_entry(
                     patient=patient,
                     service=service,
@@ -359,6 +369,43 @@ class RegistrarEditDeltaService:
             raise ValueError(
                 "Услуга уже выполнена или отменена в этот день — изменение количества "
                 "недоступно. Для корректировки используйте отмену/корректировку визита"
+            )
+
+    def _assert_service_not_on_active_visit_without_entry(
+        self,
+        *,
+        patient_id: int,
+        service_id: int,
+        target_date: date,
+    ) -> None:
+        """Codex R9 PR 3118 (P1): visit-only строки не маршрутизируются
+        edit-delta.
+
+        /registrar/queues/today может отдать запись с record_kind=visit БЕЗ
+        OnlineQueueEntry: originalQuantities известны, но queue_entry_id нет.
+        Прежнее поведение при отсутствии активной записи очереди —
+        _create_new_queue_entry: создавался ВТОРОЙ визит с целевым
+        количеством, а исходный VisitService оставался прежним (двойное
+        начисление). Изменение количества позиции, уже привязанной к активному
+        визиту этого дня, — визит-команда (отдельный контракт, в разработке):
+        здесь громкий отказ вместо тихого дубликата. Добавление НОВОЙ услуги
+        (не привязанной к визитам дня) работает как раньше."""
+        on_active_visit = (
+            self.db.query(VisitService)
+            .join(Visit, Visit.id == VisitService.visit_id)
+            .filter(
+                Visit.patient_id == patient_id,
+                VisitService.service_id == service_id,
+                Visit.visit_date == target_date,
+                Visit.status.notin_(VISIT_POSITION_BLOCKED_STATUSES),
+            )
+            .first()
+        )
+        if on_active_visit:
+            raise ValueError(
+                "Услуга уже привязана к визиту этого дня без записи очереди — "
+                "изменение количества выполняется через корректировку визита, "
+                "а не через редактирование корзины"
             )
 
     def _assert_not_doctor_change_of_existing_position(

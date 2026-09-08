@@ -24,6 +24,15 @@ describe('W2-PR2: resolveEditRecordDate', () => {
     ).toBe('2026-09-15');
   });
 
+  it('Codex R9 PR 3118: appointment_date записи предпочтительнее queue_time (adaptTimeFields подставляет created_at)', () => {
+    expect(
+      resolveEditRecordDate({
+        appointment_date: '2026-09-20',
+        queue_time: '2026-09-01T10:00:00',
+      })
+    ).toBe('2026-09-20');
+  });
+
   it('откатывается к дате из queue_time, когда record_date отсутствует', () => {
     expect(resolveEditRecordDate({ queue_time: '2026-09-15T09:30:00' })).toBe('2026-09-15');
   });

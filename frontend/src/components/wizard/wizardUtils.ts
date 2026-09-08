@@ -74,6 +74,17 @@ export const resolveEditRecordDate = (
     return recordDate.trim();
   }
 
+  // Codex R9 PR 3118 (P1): адаптер рабочего списка несёт record_date
+  // (канонический день строки /registrar/queues/today) и appointment_date
+  // (день, назначенный самой записи, для appointment-строк R-22). Они
+  // предпочтительнее queue_time: adaptTimeFields подставляет created_at,
+  // когда queue_time отсутствует, — и днём записи становился день СОЗДАНИЯ,
+  // из-за чего правка будущей записи таргетила «сегодня».
+  const appointmentDate = initialData.appointment_date;
+  if (typeof appointmentDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate.trim())) {
+    return appointmentDate.trim();
+  }
+
   // Fallback: date part of queue_time (ISO datetime of the queue day).
   const queueTime = initialData.queue_time;
   if (typeof queueTime === 'string') {
@@ -1037,12 +1048,24 @@ export interface EditDeltaTargetItem {
   service_id: string | number;
   quantity: number;
   specialist_id: string | number | null;
+  /** Идентичность исходной записи позиции (Codex R8 PR 3115). */
+  queue_entry_id?: number;
 }
 
 export interface EditDeltaTargetBuild {
   items: EditDeltaTargetItem[];
   hasNew: boolean;
   hasQuantityChange: boolean;
+  /**
+   * Codex R9 PR 3118 (P1): изменившиеся позиции БЕЗ идентичности записи
+   * очереди (visit-only строки /registrar/queues/today — visit есть,
+   * OnlineQueueEntry отсутствует). edit-delta не может их мутировать:
+   * backend не нашёл бы активную запись и создал бы ВТОРОЙ визит с целевым
+   * количеством, оставив исходный VisitService прежним. Такие позиции
+   * НЕ попадают в payload — вызывающий код обязан громко отказать в сабмите
+   * (визит-команда — отдельный контракт), молча пропустить = ложный «успех».
+   */
+  unroutable: Array<{ service_id: string | number; name: string }>;
 }
 
 // Собирает edit-delta payload из ВСЕЙ корзины (целевое состояние позиции),
@@ -1059,7 +1082,7 @@ export const buildEditDeltaTargetItems = (
   servicesData: WizardServiceRecord[],
   identity: EditOriginalServiceIdentity,
 ): EditDeltaTargetBuild => {
-  const build: EditDeltaTargetBuild = { items: [], hasNew: false, hasQuantityChange: false };
+  const build: EditDeltaTargetBuild = { items: [], hasNew: false, hasQuantityChange: false, unroutable: [] };
   (cartItems || []).forEach((item) => {
     if (!item || item.service_id == null) return;
     const service = servicesData.find((s) => String(s.id) === String(item.service_id));
@@ -1077,23 +1100,39 @@ export const buildEditDeltaTargetItems = (
     const originalQty = identity.originalQuantities.get(String(item.service_id));
     if (originalQty === undefined) return;
     if (quantity === originalQty) return; // без изменений — no-op
+    // Codex R9 PR 3118 (P1): правка количества существующей позиции возможна
+    // ТОЛЬКО когда известна её запись очереди. visit-only строка (без
+    // OnlineQueueEntry) не маршрутизируется: включение в edit-delta создало
+    // бы дублирующий визит на backend. Позиция уходит в unroutable —
+    // сабмит блокируется с явной причиной.
+    const originalQueueId = item.original_queue_id ?? item.queue_entry_id ?? null;
+    if (originalQueueId == null || !Number.isFinite(Number(originalQueueId))) {
+      build.unroutable.push({ service_id: item.service_id as string | number, name: String(service.name ?? item.service_id) });
+      return;
+    }
     build.hasQuantityChange = true;
-    // Codex R8 #3115 (P1): существующая позиция сохраняет идентичность своей
+    // Codex R8 PR 3115 (P1): существующая позиция сохраняет идентичность своей
     // записи (original_queue_id из service_details). При одном service_id под
     // разными врачами/записями правится ИМЕННО названная запись, а не
     // ближайшая по глобальному preferred-набору.
-    const originalQueueId = item.original_queue_id ?? item.queue_entry_id ?? null;
     build.items.push({
       service_id: item.service_id as string | number,
       quantity,
       specialist_id: null,
-      ...(originalQueueId != null && Number.isFinite(Number(originalQueueId))
-        ? { queue_entry_id: Number(originalQueueId) }
-        : {}),
+      queue_entry_id: Number(originalQueueId),
     });
   });
   return build;
 };
+
+// Codex R9 PR 3118 (P1): громкий отказ для visit-only позиций (визит без
+// записи очереди) — изменение количества через edit-delta невозможно, пока
+// не существует визит-команда. Молчаливый пропуск позиции = ложный «успех».
+export const describeUnroutableEditDeltaRows = (
+  rows: Array<{ name: string }>,
+): string =>
+  `Изменение количества для «${rows.map((r) => r.name).join('», «')}» недоступно: у позиции нет номера очереди. ` +
+  'Используйте отмену/корректировку визита или обратитесь к администратору.';
 
 export default {
   PATIENT_NAME_PATTERN,

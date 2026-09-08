@@ -215,6 +215,7 @@ import {
   buildCartQuoteRequest,
   buildEditOriginalServiceIdentity,
   buildEditDeltaTargetItems,
+  describeUnroutableEditDeltaRows,
   resolveEditRecordDate,
   formatBirthDateInput,
   convertDateToISO,
@@ -1184,11 +1185,22 @@ const AppointmentWizardV2 = ({
       // (новые услуги + изменившиеся количества существующих позиций).
       // Раньше квотировались только новые услуги, и подтверждённая сумма
       // игнорировала изменение количества существующей позиции.
-      quoteSourceItems = buildEditDeltaTargetItems(
+      const editDeltaBuild = buildEditDeltaTargetItems(
         rawCartItems,
         servicesData,
         editOriginalServiceIdentity,
-      ).items as unknown as Array<Record<string, unknown>>;
+      );
+      // Codex R9 PR 3118 (P1): visit-only позиции (визит без записи очереди)
+      // не маршрутизируются edit-delta — подтверждение блокируется громкой
+      // ошибкой ещё на этапе квоты, а не молча исключается из суммы.
+      if (editDeltaBuild.unroutable.length > 0) {
+        cartQuoteRequestIdRef.current += 1;
+        setCartQuote(null);
+        setCartQuoteStatus('error');
+        setCartQuoteError(describeUnroutableEditDeltaRows(editDeltaBuild.unroutable));
+        return;
+      }
+      quoteSourceItems = editDeltaBuild.items as unknown as Array<Record<string, unknown>>;
     } else if (isEditModeQuote && fullUpdateQuoteRoute) {
       quotePricingMode = 'full_update';
     }
@@ -2175,6 +2187,15 @@ const AppointmentWizardV2 = ({
           servicesData,
           editOriginalIdentity,
         );
+
+        // Codex R9 PR 3118 (P1): visit-only позиции (визит без записи очереди)
+        // громко блокируют сабмит — edit-delta не маршрутизирует правку без
+        // записи очереди; включение создало бы дублирующий визит на backend.
+        if (editDeltaBuild.unroutable.length > 0) {
+          setErrors((prev) => ({ ...prev, quote: describeUnroutableEditDeltaRows(editDeltaBuild.unroutable) }));
+          setCurrentStep(STEP_CART);
+          return;
+        }
 
         if (editMode && editDeltaBuild.items.length > 0) {
           const patientDataForEditDelta: Record<string, unknown> = {
