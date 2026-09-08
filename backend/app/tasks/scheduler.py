@@ -102,20 +102,43 @@ async def _enqueue(func_name: str, **kwargs: Any) -> str:
 # Public task API
 # ---------------------------------------------------------------------------
 
-async def enqueue_reminder(visit_id: int, channel: str = "telegram") -> str:
+async def enqueue_reminder(
+    visit_id: int,
+    channel: str = "telegram",
+    *,
+    schedule_version: str | None = None,
+) -> str:
     """Send a reminder N hours before a visit.
 
     Args:
         visit_id: Target visit.
         channel: 'telegram' | 'sms' | 'email'.
+        schedule_version: the visit's CURRENT schedule (e.g.
+            ``visit_date.isoformat()``). Versioning the job ID by the
+            schedule is what makes re-enqueueing after a reschedule safe
+            (Codex round 4, P1): arq keeps a completed job's result for
+            keep_result seconds, and during that window a plain
+            deterministic ID collides with the retained result —
+            ``enqueue_job`` returns None, nothing is queued, and (with the
+            stamp cleared by the reschedule) the new reminder would
+            silently strand. With the schedule in the ID, the rescheduled
+            visit re-enqueues under a fresh ID. Same-schedule duplicate
+            enqueues still dedupe to one job. Callers that cannot supply
+            the version get a unique random suffix — never stranded, at
+            the cost of losing same-schedule dedupe (the worker's lease +
+            stamp guard remains the correctness backstop either way).
 
     Returns: job_id.
     """
+    if schedule_version is None:
+        _job_id = f"reminder:visit:{visit_id}:{channel}:{uuid4()}"
+    else:
+        _job_id = f"reminder:visit:{visit_id}:{schedule_version}:{channel}"
     return await _enqueue(
         "send_visit_reminder",
         visit_id=visit_id,
         channel=channel,
-        _job_id=f"reminder:visit:{visit_id}:{channel}",  # idempotent per (visit, channel)
+        _job_id=_job_id,
     )
 
 

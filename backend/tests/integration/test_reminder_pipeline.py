@@ -249,15 +249,15 @@ async def test_enqueue_reminder_targets_clinic_queue_with_deterministic_job_id(
 
     monkeypatch.setattr(arq, "create_pool", _fake_create_pool)
 
-    job_id = await enqueue_reminder(visit_id=42)
+    job_id = await enqueue_reminder(visit_id=42, schedule_version="2026-09-08")
 
-    assert job_id == "reminder:visit:42:telegram"
+    assert job_id == "reminder:visit:42:2026-09-08:telegram"
     func, args, kwargs = pool.calls[0]
     assert func == "send_visit_reminder"
     assert args == ()
     assert kwargs["visit_id"] == 42
     assert kwargs["channel"] == "telegram"
-    assert kwargs["_job_id"] == "reminder:visit:42:telegram"
+    assert kwargs["_job_id"] == "reminder:visit:42:2026-09-08:telegram"
     # THE fix: no _queue_name meant arq's default 'arq:queue' — a queue the
     # worker never listens on.
     assert kwargs["_queue_name"] == "clinic"
@@ -281,8 +281,44 @@ async def test_enqueue_duplicate_job_id_returns_id_honestly(
 
     monkeypatch.setattr(arq, "create_pool", _fake_create_pool)
 
-    job_id = await enqueue_reminder(visit_id=7)
-    assert job_id == "reminder:visit:7:telegram"
+    job_id = await enqueue_reminder(visit_id=7, schedule_version="2026-09-08")
+    assert job_id == "reminder:visit:7:2026-09-08:telegram"
+
+
+@pytest.mark.asyncio
+async def test_enqueue_reminder_job_id_is_schedule_versioned(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Codex round 4, P1: a rescheduled visit must re-enqueue under a NEW
+    job ID — arq retains a completed job's result for keep_result seconds,
+    and during that window the old deterministic ID makes enqueue_job
+    return None (nothing queued) while the reschedule already cleared the
+    stamp: the new reminder would silently strand. Versioning by the
+    schedule keeps same-schedule dedupe AND un-strands reschedules."""
+    from app.tasks import enqueue_reminder
+
+    pool = _FakePool()
+
+    async def _fake_create_pool(redis_settings):
+        return pool
+
+    import arq
+
+    monkeypatch.setattr(arq, "create_pool", _fake_create_pool)
+
+    id_before = await enqueue_reminder(visit_id=9, schedule_version="2026-09-08")
+    id_after = await enqueue_reminder(visit_id=9, schedule_version="2026-09-10")
+    assert id_before == "reminder:visit:9:2026-09-08:telegram"
+    assert id_after == "reminder:visit:9:2026-09-10:telegram"
+    assert id_before != id_after  # reschedule -> fresh ID -> cannot strand
+
+    # No schedule version: unique random suffix — never strands, never
+    # false-dedupes (the worker's lease + stamp guard is the backstop).
+    id_rand_a = await enqueue_reminder(visit_id=9)
+    id_rand_b = await enqueue_reminder(visit_id=9)
+    assert id_rand_a.startswith("reminder:visit:9:telegram:")
+    assert id_rand_b.startswith("reminder:visit:9:telegram:")
+    assert id_rand_a != id_rand_b
 
 
 @pytest.mark.asyncio
@@ -352,6 +388,7 @@ async def test_worker_calls_service_by_real_contract_and_stamps_reminder_sent_at
         visit = fresh.query(Visit).filter(Visit.id == visit_id).first()
         assert visit is not None
         assert visit.reminder_sent_at is not None
+        assert visit.reminder_claimed_at is None  # lease released on finalize
     finally:
         fresh.close()
 
@@ -379,6 +416,7 @@ async def test_worker_send_failure_does_not_stamp_and_raises(
         visit = fresh.query(Visit).filter(Visit.id == visit_id).first()
         assert visit is not None
         assert visit.reminder_sent_at is None  # retry will re-attempt
+        assert visit.reminder_claimed_at is None  # lease released on failure
     finally:
         fresh.close()
 
@@ -451,7 +489,8 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
     # Deterministic producer job ID — a leftover job hash from a previous
     # run (same visit number in a fresh temp DB!) makes enqueue_job return
     # None (dedupe) and the whole test would silently see zero deliveries.
-    deterministic_job_id = f"reminder:visit:{visit_id}:telegram"
+    schedule_version = date.today().isoformat()
+    deterministic_job_id = f"reminder:visit:{visit_id}:{schedule_version}:telegram"
 
     pool = await create_pool(RedisSettings.from_dsn(REDIS_URL))
 
@@ -472,7 +511,9 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
         await _clean_slate()
 
         # -- 1. REAL producer enqueue -------------------------------------
-        job_id = await enqueue_reminder(visit_id=visit_id)
+        job_id = await enqueue_reminder(
+            visit_id=visit_id, schedule_version=schedule_version
+        )
         assert job_id == deterministic_job_id
         assert await pool.exists(
             f"{job_key_prefix}{job_id}"
@@ -514,7 +555,9 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
             fresh.close()
 
         # -- 3. Queue-level dedupe: deterministic job ID ------------------
-        dup_id = await enqueue_reminder(visit_id=visit_id)
+        dup_id = await enqueue_reminder(
+            visit_id=visit_id, schedule_version=schedule_version
+        )
         assert dup_id == job_id  # same deterministic ID, honest skip
 
         # -- 4. DB-level idempotency: fresh job ID forces a real run ------
@@ -579,8 +622,9 @@ def _stamp_and_reschedule_setup(pipeline_db, make_visit):
 
     visit_id = make_visit()
     s = sessionmaker(bind=pipeline_db)()
+    stamped = datetime.now(UTC)
     s.query(Visit).filter(Visit.id == visit_id).update(
-        {"reminder_sent_at": datetime.now(UTC)}
+        {"reminder_sent_at": stamped, "reminder_claimed_at": stamped}
     )
     s.commit()
     return visit_id, s, date.today() + timedelta(days=3)
@@ -604,6 +648,9 @@ def test_service_reschedule_clears_reminder_stamp(pipeline_db, make_visit):
         assert (
             row.reminder_sent_at is None
         ), "reschedule must invalidate the stale reminder stamp"
+        assert (
+            row.reminder_claimed_at is None
+        ), "reschedule must release a live lease too"
     finally:
         s.close()
 
@@ -623,6 +670,9 @@ def test_reschedule_route_clears_reminder_stamp(pipeline_db, make_visit):
         assert (
             row.reminder_sent_at is None
         ), "reschedule route must invalidate the stale reminder stamp"
+        assert (
+            row.reminder_claimed_at is None
+        ), "reschedule route must release a live lease too"
     finally:
         s.close()
 
@@ -645,6 +695,9 @@ def test_reschedule_tomorrow_route_clears_reminder_stamp(pipeline_db, make_visit
         assert (
             row.reminder_sent_at is None
         ), "tomorrow-reschedule must invalidate the stale reminder stamp"
+        assert (
+            row.reminder_claimed_at is None
+        ), "tomorrow-reschedule must release a live lease too"
     finally:
         s.close()
 
@@ -689,6 +742,9 @@ def test_telegram_move_visit_clears_reminder_stamp(pipeline_db, make_visit):
         assert (
             row.reminder_sent_at is None
         ), "telegram move must invalidate the stale reminder stamp"
+        assert (
+            row.reminder_claimed_at is None
+        ), "telegram move must release a live lease too"
 
         # Cleanup: audit rows written by this call reference the shared DB.
         s.query(AuditLog).filter(
@@ -702,11 +758,10 @@ def test_telegram_move_visit_clears_reminder_stamp(pipeline_db, make_visit):
 def test_worker_failure_releases_only_own_claim(
     pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
 ):
-    """Codex round 3 P2: the compensation must not erase a NEWER delivery's
-    stamp. If the stamp changed between our claim and our failure (reschedule
-    cleared it and another delivery re-claimed), releasing our claim is a
-    no-op and the newer stamp survives — otherwise the next job would send
-    a duplicate reminder."""
+    """Codex round 3 P2: the release must only ever touch OUR OWN lease. If
+    the lease changed between our claim and our failure (reschedule cleared
+    it and another delivery re-claimed), releasing is a no-op and the newer
+    lease survives — otherwise the next job would send a duplicate."""
     from datetime import datetime, timedelta, UTC
 
     from app.models.visit import Visit
@@ -714,12 +769,13 @@ def test_worker_failure_releases_only_own_claim(
     from app.tasks.worker import send_visit_reminder
 
     visit_id = make_visit()
-    newer_stamp = datetime.now(UTC) + timedelta(minutes=1)
+    newer_lease = datetime.now(UTC) + timedelta(minutes=1)
 
     async def _failing_spy(self, db, vid, hours_before=24):
-        # A concurrent delivery re-claims while OUR dispatch is in flight.
+        # A concurrent delivery re-claims while OUR dispatch is in flight
+        # (reschedule cleared our lease, the newer job took its own).
         db.query(Visit).filter(Visit.id == vid).update(
-            {"reminder_sent_at": newer_stamp}
+            {"reminder_claimed_at": newer_lease}
         )
         db.commit()
         return {"success": False, "error": "telegram unavailable"}
@@ -733,13 +789,100 @@ def test_worker_failure_releases_only_own_claim(
     try:
         row = s.query(Visit).filter(Visit.id == visit_id).first()
         # sqlite round-trips DATETIME as naive — compare tz-stripped; the
-        # essential assertion is that the stamp is NOT None (not erased by
-        # our compensation) and still holds the newer delivery's value.
+        # essential assertions: our compensation did NOT erase the newer
+        # delivery's lease, and no delivery was recorded by either job.
+        assert row.reminder_sent_at is None, "no delivery may be recorded"
         assert (
-            row.reminder_sent_at is not None
-        ), "compensation must not erase a newer delivery's stamp"
-        assert row.reminder_sent_at == newer_stamp.replace(
+            row.reminder_claimed_at is not None
+        ), "compensation must not erase a newer delivery's lease"
+        assert row.reminder_claimed_at == newer_lease.replace(
             tzinfo=None
-        ), f"newer stamp must survive: {row.reminder_sent_at!r}"
+        ), f"newer lease must survive: {row.reminder_claimed_at!r}"
     finally:
         s.close()
+
+
+def test_expired_lease_is_reclaimed_after_crash(pipeline_db, make_visit, reminder_spy):
+    """Codex round 4, P1 (crash recovery): a lease left behind by a killed
+    worker — no compensation ran — must not strand the reminder forever.
+    Once LEASE_TTL passes, a retry re-claims, delivers, and records."""
+    from datetime import datetime, timedelta, UTC
+
+    from app.models.visit import Visit
+    from app.tasks.worker import LEASE_TTL, send_visit_reminder
+
+    visit_id = make_visit()
+    stale = datetime.now(UTC) - LEASE_TTL - timedelta(minutes=1)
+    s = sessionmaker(bind=pipeline_db)()
+    s.query(Visit).filter(Visit.id == visit_id).update({"reminder_claimed_at": stale})
+    s.commit()
+    s.close()
+
+    asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+
+    assert len(reminder_spy) == 1, "stale lease must be reclaimable"
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_sent_at is not None
+        assert row.reminder_claimed_at is None
+    finally:
+        s.close()
+
+
+def test_live_lease_blocks_reclaim(pipeline_db, make_visit, reminder_spy):
+    """The inverse of crash recovery: a LIVE lease (fresh claim, dispatch
+    still in flight in another worker) must NOT be stolen by an overlapping
+    delivery — exactly one dispatch per visit."""
+    from datetime import datetime, UTC
+
+    from app.models.visit import Visit
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()
+    fresh = datetime.now(UTC)
+    s = sessionmaker(bind=pipeline_db)()
+    s.query(Visit).filter(Visit.id == visit_id).update({"reminder_claimed_at": fresh})
+    s.commit()
+    s.close()
+
+    asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+
+    assert reminder_spy == [], "a live lease must block a second delivery"
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_sent_at is None
+        assert row.reminder_claimed_at == fresh.replace(tzinfo=None)
+    finally:
+        s.close()
+
+
+def test_claim_rejects_visits_not_pending_confirmation(
+    pipeline_db, make_visit, reminder_spy
+):
+    """Codex round 4, P1: the claim is restricted to the reminder-eligible
+    lifecycle status — a visit that is already confirmed, closed, or
+    canceled must never receive an obsolete confirmation request with
+    actionable buttons."""
+    from app.models.visit import Visit
+    from app.tasks.worker import send_visit_reminder
+
+    for status in ("confirmed", "closed", "canceled"):
+        visit_id = make_visit()
+        s = sessionmaker(bind=pipeline_db)()
+        s.query(Visit).filter(Visit.id == visit_id).update({"status": status})
+        s.commit()
+        s.close()
+
+        asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+
+        s = sessionmaker(bind=pipeline_db)()
+        try:
+            row = s.query(Visit).filter(Visit.id == visit_id).first()
+            assert row.reminder_sent_at is None
+            assert row.reminder_claimed_at is None
+        finally:
+            s.close()
+
+    assert reminder_spy == [], "non-eligible visits must never dispatch"

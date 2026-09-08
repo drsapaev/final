@@ -7,8 +7,16 @@ reminder_sent_at = NOW()) used raw SQL against a column that existed in
 neither the ORM model nor any migration, so every real job run died with
 UndefinedColumn before it could even reach the notification service.
 
-This revision makes the column real: a plain nullable TIMESTAMPTZ on
+This revision makes the columns real: two plain nullable TIMESTAMPTZ on
 ``visits``, mirroring the neighboring ``confirmed_at`` typing convention.
+
+``reminder_claimed_at`` is the worker's short-lived lease (Codex round 4,
+P1): the job claims a visit by stamping it, dispatches the notification
+OUTSIDE any transaction, and only then records ``reminder_sent_at`` and
+releases the lease. A lease older than the worker's LEASE_TTL is stale
+(worker died mid-job) and is reclaimable by a retry — the reminder is
+never permanently stranded by a crash, and no delivery is ever recorded
+before the provider acknowledges it.
 Strictly additive DDL — no data migration, no backfill (every existing
 visit is correctly "never reminded"), no runtime switch. The ORM gains the
 same column in the same PR and the worker switches from raw SQL to the ORM
@@ -40,7 +48,12 @@ def upgrade() -> None:
         "visits",
         sa.Column("reminder_sent_at", sa.DateTime(timezone=True), nullable=True),
     )
+    op.add_column(
+        "visits",
+        sa.Column("reminder_claimed_at", sa.DateTime(timezone=True), nullable=True),
+    )
 
 
 def downgrade() -> None:
+    op.drop_column("visits", "reminder_claimed_at")
     op.drop_column("visits", "reminder_sent_at")

@@ -98,15 +98,15 @@ def cleanup_rows(pg_engine):
 def test_concurrent_reminder_jobs_send_exactly_once(
     pg_engine, cleanup_rows, monkeypatch: pytest.MonkeyPatch
 ):
-    """Two overlapping deliveries for the same visit race the idempotency
-    guard. The atomic conditional-UPDATE claim in ``send_visit_reminder``
-    (``UPDATE ... SET reminder_sent_at = now() WHERE id = X AND
-    reminder_sent_at IS NULL``) must serialize them: the loser blocks on
-    the winner's row lock until the claim commits, then re-evaluates the
-    predicate, matches 0 rows, and skips the send — exactly one
-    notification dispatch per visit, no matter how the jobs overlap.
-    Without the conditional predicate both writers would stamp and both
-    would dispatch (calls == 2)."""
+    """Two overlapping deliveries for the same visit race the lease claim.
+    The atomic conditional-UPDATE claim in ``send_visit_reminder``
+    (``UPDATE ... SET reminder_claimed_at = :lease WHERE id = X AND
+    reminder_sent_at IS NULL AND no live lease``) must serialize them: the
+    loser blocks on the winner's row lock until the claim commits, then
+    re-evaluates the predicate, matches 0 rows, and skips the send —
+    exactly one notification dispatch per visit, no matter how the jobs
+    overlap. Without the conditional predicate both writers would claim
+    and both would dispatch (calls == 2)."""
     from app.models.clinic import Doctor
     from app.models.patient import Patient
     from app.models.user import User

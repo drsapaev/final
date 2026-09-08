@@ -87,8 +87,17 @@ class Visit(Base):
     # штампуется воркером после успешной отправки напоминания; повторные
     # запуски job'а (arq retry / повторный enqueue) видят NOT NULL и
     # пропускают отправку. Канонический путь записи — только воркер
-    # (app/tasks/worker.py), схема — миграция 0059.
+    # (app/tasks/worker.py), схема — миграция 0060.
     reminder_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    # ✅ Lease (короткоживущий claim) того же job'а: ставится ДО dispatch,
+    # чтобы две конкурирующие доставки не отправили дважды, и снимается
+    # после успешной записи reminder_sent_at (или при неудаче). Lease старше
+    # LEASE_TTL воркера — след умершего процесса и подлежит перев claim'у.
+    # Схема — миграция 0060.
+    reminder_claimed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 

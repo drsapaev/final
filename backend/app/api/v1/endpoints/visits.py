@@ -575,6 +575,8 @@ def reschedule_visit(
     # never gets a reminder for the new date.
     if hasattr(t.c, "reminder_sent_at"):
         update_values["reminder_sent_at"] = None
+    if hasattr(t.c, "reminder_claimed_at"):
+        update_values["reminder_claimed_at"] = None
     if new_time is not None:
         # Валидация формата HH:MM
         new_time_str = new_time.strip()
@@ -653,6 +655,8 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
     # same contract as the /reschedule route above.
     if hasattr(t.c, "reminder_sent_at"):
         tomorrow_values["reminder_sent_at"] = None
+    if hasattr(t.c, "reminder_claimed_at"):
+        tomorrow_values["reminder_claimed_at"] = None
     upd = (
         t.update().where(t.c.id == visit_id).values(**tomorrow_values).returning(t)
     )

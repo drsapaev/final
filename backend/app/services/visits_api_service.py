@@ -373,6 +373,8 @@ class VisitsApiService:
         reschedule_values: dict = {"visit_date": new_date}
         if hasattr(table.c, "reminder_sent_at"):
             reschedule_values["reminder_sent_at"] = None
+        if hasattr(table.c, "reminder_claimed_at"):
+            reschedule_values["reminder_claimed_at"] = None
         upd = (
             table.update()
             .where(table.c.id == visit_id)

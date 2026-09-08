@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from arq import cron
@@ -32,6 +32,11 @@ from app.core.config import settings  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
+# Lease must comfortably outlive the worst dispatch: arq's job_timeout
+# is 300s, so a 10-minute TTL can only expire for a DEAD worker, never
+# for a live one still awaiting the provider.
+LEASE_TTL = timedelta(minutes=10)
+
 
 # ---------------------------------------------------------------------------
 # Job implementations
@@ -41,18 +46,33 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
     """Send a reminder to a patient about an upcoming visit.
 
     Enqueued by app.tasks.scheduler.enqueue_reminder().
-    Idempotent at the DB level: ``visits.reminder_sent_at`` (ORM column,
-    migration 0060) is stamped on success, so arq retries and duplicate
-    enqueues never send a second notification.
 
-    Calls the real notification service by its actual contract:
-    ``NotificationSenderService.send_confirmation_reminder(db, visit_id,
-    hours_before=...)`` — the service re-resolves the visit and dispatches
-    to Telegram/PWA/phone via _determine_best_channel(). The ``channel``
-    argument of this job is a hint for logging only (the service owns the
-    channel decision).
+    Delivery protocol (Codex rounds 2-4): a short atomic lease claim, the
+    provider dispatch OUTSIDE any transaction/lock, and the permanent
+    ``reminder_sent_at`` record only AFTER the provider acknowledges.
+
+    1. Lease claim — one conditional UPDATE stamps ``reminder_claimed_at``
+       only for a reminder-eligible visit (status ``pending_confirmation``,
+       never reminded, no live lease; a lease older than LEASE_TTL belongs
+       to a dead worker and is reclaimable). The row lock lives ONLY for
+       this statement — never across the notification await. Two
+       overlapping deliveries can never both claim (proven against real
+       PostgreSQL by tests/integration/test_reminder_pipeline_pg.py,
+       gate_d marker).
+    2. Dispatch — NotificationSenderService.send_confirmation_reminder()
+       by its real contract. A crash between claim and dispatch leaves a
+       lease that expires: the arq retry re-claims and delivers — the
+       reminder is never stranded by a crash (Codex round 4, P1). The
+       residual at-least-once window (crash AFTER the provider accepted
+       but BEFORE the record) is inherent to external sends without a
+       provider-side idempotency key.
+    3. Finalize — ``reminder_sent_at`` is recorded and the lease released
+       in one statement bound to OUR lease value, so a concurrent
+       reschedule/re-claim can never be overwritten by this job (Codex
+       round 3, P2). On failure the lease is released the same way and
+       arq retries.
     """
-    from sqlalchemy import create_engine, update
+    from sqlalchemy import create_engine, func, or_, update
     from sqlalchemy.orm import Session
 
     from app.models.visit import Visit
@@ -62,53 +82,54 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
 
     engine = create_engine(str(settings.DATABASE_URL))
     db = Session(engine)
-    # The exact stamp value THIS job wrote. A Python-side clock keeps the
-    # value byte-identical across the write and the later equality check on
-    # every dialect (a SQL-side now() + RETURNING round-trip is fragile on
-    # SQLite, where CURRENT_TIMESTAMP is second-precision TEXT).
-    our_stamp: datetime | None = None
+    # Python-side clock: the lease value must be byte-identical between the
+    # claim write and the later equality guards on every dialect (a SQL
+    # now() + RETURNING round-trip is fragile on SQLite, where
+    # CURRENT_TIMESTAMP is second-precision TEXT).
+    our_lease: datetime | None = None
     try:
-        # Phase 1 — short atomic claim (Codex round 2, P2): one conditional
-        # UPDATE takes the idempotency stamp. The row lock lives ONLY for
-        # this statement — it is never held across the notification await
-        # (a slow Telegram/PWA call must not block concurrent reschedules,
-        # cancellations or status writes on the same visit). A concurrent
-        # delivery's UPDATE blocks until this commits, then re-evaluates
-        # ``reminder_sent_at IS NULL`` and matches 0 rows — two overlapping
-        # jobs can never both dispatch. The PostgreSQL race is proven by
-        # tests/integration/test_reminder_pipeline_pg.py (gate_d marker);
-        # the sequential contract lives in test_reminder_pipeline.py.
-        our_stamp = datetime.now(UTC)
+        our_lease = datetime.now(UTC)
         claim = db.execute(
             update(Visit)
-            .where(Visit.id == visit_id, Visit.reminder_sent_at.is_(None))
-            .values(reminder_sent_at=our_stamp)
+            .where(
+                Visit.id == visit_id,
+                Visit.status == "pending_confirmation",
+                Visit.reminder_sent_at.is_(None),
+                or_(
+                    Visit.reminder_claimed_at.is_(None),
+                    Visit.reminder_claimed_at < our_lease - LEASE_TTL,
+                ),
+            )
+            .values(reminder_claimed_at=our_lease)
         )
         db.commit()
         if claim.rowcount == 0:
-            # Either the visit is gone or a concurrent delivery won the
-            # claim — distinguish for honest logs.
-            our_stamp = None
-            exists = db.query(Visit.id).filter(Visit.id == visit_id).first()
-            if not exists:
+            our_lease = None
+            visit = db.query(Visit).filter(Visit.id == visit_id).first()
+            if not visit:
                 logger.warning(
                     "job.send_visit_reminder: visit %s not found", visit_id
                 )
-            else:
+            elif visit.status != "pending_confirmation":
+                logger.info(
+                    "job.send_visit_reminder: visit %s not pending "
+                    "confirmation (status=%s), skipping",
+                    visit_id, visit.status,
+                )
+            elif visit.reminder_sent_at is not None:
                 logger.info(
                     "job.send_visit_reminder: visit %s already reminded "
-                    "(claim lost), skipping",
-                    visit_id,
+                    "at %s, skipping",
+                    visit_id, visit.reminder_sent_at,
+                )
+            else:
+                logger.info(
+                    "job.send_visit_reminder: visit %s has a live lease "
+                    "(claimed_at=%s), skipping",
+                    visit_id, visit.reminder_claimed_at,
                 )
             return
 
-        # Phase 2 — dispatch OUTSIDE any transaction/lock. Crash-window
-        # tradeoff (documented): if the worker dies after the claim commit
-        # but before the provider call completes, the stamp stays set and
-        # the reminder is lost (at-most-once). That is accepted over the
-        # alternative — holding the visit row lock across external I/O for
-        # up to the job timeout, blocking every concurrent write to the
-        # same visit.
         service = NotificationService(db)
         result = await service.send_confirmation_reminder(db, visit_id, hours_before=24)
 
@@ -117,32 +138,39 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
                 "job.send_visit_reminder: send failed for visit %s: %s",
                 visit_id, result.get("error", "unknown"),
             )
-            # Release the claim in the handler below — let arq retry.
+            # Release the lease in the handler below — let arq retry.
             raise RuntimeError(f"Notification send failed: {result.get('error')}")
 
-        # Phase 3 — the claim IS the stamp; nothing further to write.
-        logger.info(
-            "job.send_visit_reminder: visit %s reminded via %s",
-            visit_id, result.get("channel", channel),
+        # Record the delivery only now — the provider acknowledged it — and
+        # release the lease in the same statement, bound to OUR lease value.
+        finalized = db.execute(
+            update(Visit)
+            .where(Visit.id == visit_id, Visit.reminder_claimed_at == our_lease)
+            .values(reminder_sent_at=func.now(), reminder_claimed_at=None)
         )
+        db.commit()
+        if finalized.rowcount == 0:
+            logger.warning(
+                "job.send_visit_reminder: lease for visit %s was no longer "
+                "ours at finalize; delivery not recorded",
+                visit_id,
+            )
+        else:
+            logger.info(
+                "job.send_visit_reminder: visit %s reminded via %s",
+                visit_id, result.get("channel", channel),
+            )
     except Exception:
         # Rollback first — the failed service call may have left uncommitted
-        # partial state on the session. Then release ONLY OUR OWN claim:
-        # the equality predicate makes the compensation a no-op when a
-        # concurrent reschedule has cleared the stamp and a newer delivery
-        # has since claimed or successfully reminded the visit (Codex round
-        # 3, P2) — erasing their stamp would cause a duplicate reminder.
-        # (at-least-once for in-process failures; arq will retry per
-        # retry_policy.)
+        # partial state on the session. Then release ONLY OUR OWN lease (the
+        # equality predicate makes this a no-op once a reschedule cleared it
+        # or a newer delivery re-claimed) so arq's retry can re-deliver.
         db.rollback()
-        if our_stamp is not None:
+        if our_lease is not None:
             db.execute(
                 update(Visit)
-                .where(
-                    Visit.id == visit_id,
-                    Visit.reminder_sent_at == our_stamp,
-                )
-                .values(reminder_sent_at=None)
+                .where(Visit.id == visit_id, Visit.reminder_claimed_at == our_lease)
+                .values(reminder_claimed_at=None)
             )
             db.commit()
         logger.exception("job.send_visit_reminder failed for visit %s", visit_id)

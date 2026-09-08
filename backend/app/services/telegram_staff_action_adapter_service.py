@@ -401,6 +401,7 @@ class TelegramStaffActionAdapterService:
             # paths; otherwise the worker's conditional claim matches zero
             # rows and the patient gets no reminder for the new date.
             visit.reminder_sent_at = None
+            visit.reminder_claimed_at = None
             queue_result = self.queue_service.staff_move_visit_queue_link(
                 self.db,
                 visit_id=visit_id,
