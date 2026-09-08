@@ -277,11 +277,14 @@ describe('Fix F Codex R1 regressions', () => {
       "document.addEventListener('keydown', handleKeyDown);"
     );
     expect(handler).toContain('if (confirmDialogOpenRef.current) return;');
-    // флаг обновляется синхронно на каждом рендере
-    expect(source).toContain('confirmDialogOpenRef.current = confirmDialogOpen;');
-    // useConfirm отдаёт флаг открытости третьим элементом
+    // Codex R9 PR 3097 (P1): флаг открытости выводится ЛОКАЛЬНО в мастере
+    // (обёртка confirm-функции); общий useConfirm остаётся в исходном
+    // 2-элементном контракте — shared-файлы вне скоупа PR не меняются.
+    expect(source).toContain('confirmDialogOpenRef.current = true;');
+    expect(source).toContain('confirmDialogOpenRef.current = false;');
     const dialogSource = fs.readFileSync(confirmDialogPath, 'utf8');
-    expect(dialogSource).toContain('return [confirm, dialog, state.isOpen] as [');
+    expect(dialogSource).toContain('return [confirm, dialog] as [');
+    expect(dialogSource).not.toContain('state.isOpen] as [');
   });
 
   it('Enter on the retry button activates the button, not the wizard shortcut (Codex R2 P2)', () => {

@@ -248,13 +248,17 @@ const AppointmentWizardV2 = ({
   const t = rawT;
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
-  // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
-  const [confirmRaw, confirmDialog, confirmDialogOpen] = useConfirm();
-  // Codex R3 PR 3097 (P2): флаг для document-keydown обработчика (он
-  // регистрируется с фиксированными зависимостями — читаем через ref).
+  // Codex R9 PR 3097 (P1): tracking «диалог открыт» — ЛОКАЛЬНО в мастере
+  // (общий useConfirm восстановлен в исходном 2-элементном контракте —
+  // ConfirmDialog в denied scope); флаг читается keydown-обработчиком через ref.
+  const [confirmBase, confirmDialog] = useConfirm();
+  // Codex R3 PR 3097 (P2): keydown-обработчик читает флаг через ref (фикс. зависимости).
   const confirmDialogOpenRef = useRef(false);
-  confirmDialogOpenRef.current = confirmDialogOpen;
-  const confirm = confirmRaw;
+  const confirm = useCallback((options: Record<string, unknown>) => {
+    confirmDialogOpenRef.current = true;
+    const result = confirmBase(options);
+    return result.finally(() => { confirmDialogOpenRef.current = false; });
+  }, [confirmBase]);
 
   // ADR-0015: queue + patients APIs accessed via hooks.
   const { applyRegistrarEditDelta, createQueueEntriesBatch, updateOnlineQueueEntry } = useQueueApi();
@@ -529,8 +533,7 @@ const AppointmentWizardV2 = ({
     }
   }, [isOpen]);
 
-  // Codex R5 PR 3097 (P2): условное размонтирование (EditPatientModal)
-  // минует isOpen-эффект — гасим дебаунсы на unmount.
+  // Codex R5 PR 3097 (P2): условное размонтирование минует isOpen-эффект — гасим дебаунсы на unmount.
   useWizardSearchUnmountCleanup(() => [searchTimeout, phoneCheckTimeout]);
 
   // Safeguard: Ensure wizardData structure is valid
@@ -658,13 +661,9 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(STEP_PATIENT);
-    // Codex R8 PR 3097 (P2): сброс формы также сбрасывает состояние ошибки
-    // поиска — иначе пустая форма сохраняет баннер прошлой неудачи с
-    // нерабочей кнопкой Retry (запрос уже очищен).
+    // Codex R8 PR 3097 (P2): сброс также чистит ошибку поиска (иначе пустая форма хранит баннер с нерабочим Retry).
     setPatientSearchError(null);
-    // Fix F (Codex R1 PR 3097): после явного сброса формы исходным состоянием
-    // становится пустая форма — закрытие мастера без правок не предупреждает
-    // о потере данных.
+    // Fix F (Codex R1 PR 3097): после сброса исходное состояние — пустая форма (закрытие не предупреждает).
     initialContentRef.current = wizardContentSignature({
       patient: { id: null, fio: '', phone: '', address: '', birth_date: '', gender: '' },
       cart: { items: [], discount_mode: 'none', all_free: false }
