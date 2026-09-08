@@ -63,7 +63,14 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
     engine = create_engine(str(settings.DATABASE_URL))
     db = Session(engine)
     try:
-        visit = db.query(Visit).filter(Visit.id == visit_id).first()
+        # Atomic claim (SELECT ... FOR UPDATE): a concurrent delivery for
+        # the same visit blocks here until this transaction commits, then
+        # re-reads the row and sees reminder_sent_at — two overlapping jobs
+        # can never both pass the guard and double-send. No-op on SQLite
+        # (the sequential contract is covered in test_reminder_pipeline.py);
+        # the PostgreSQL race is proven by
+        # tests/integration/test_reminder_pipeline_pg.py (gate_d marker).
+        visit = db.query(Visit).filter(Visit.id == visit_id).with_for_update().first()
         if not visit:
             logger.warning("job.send_visit_reminder: visit %s not found", visit_id)
             return

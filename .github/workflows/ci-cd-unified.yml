@@ -1044,6 +1044,16 @@ jobs:
           echo "Placeholder coverage report - tests completed successfully" > htmlcov/index.html
         fi
 
+    # PR-1 reminder pipeline (Codex P2): the concurrent-claim race on
+    # visits.reminder_sent_at can only be proven under real PostgreSQL row
+    # locks (SQLite ignores FOR UPDATE). gate_d is excluded from the main
+    # suite above; this step runs the dedicated proof against the job's
+    # postgres service.
+    - name: 🧪 Reminder PG concurrency (gate_d)
+      run: |
+        cd backend
+        pytest tests/integration/test_reminder_pipeline_pg.py -m gate_d --noconftest
+
     - name: 🧪 Critical E2E Smoke
       run: |
         cd backend

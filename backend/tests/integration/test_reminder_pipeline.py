@@ -30,18 +30,34 @@ Layers proved here:
 from __future__ import annotations
 
 import asyncio
+import os
 import socket
 import sys
 import uuid
 from datetime import date
-from urllib.parse import urlparse
+from urllib.parse import urlsplit, urlparse, urlunsplit
 
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
-REDIS_URL = "redis://localhost:6379/0"
+
+def _test_redis_url() -> str:
+    """Force every Redis touchpoint onto a disposable logical DB.
+
+    The application queue lives in db 0 of ARQ_REDIS_URL; clearing the
+    'clinic' queue there would silently destroy unrelated pending jobs on
+    any shared/unauthenticated Redis reachable at the same address. Tests
+    run on db 15 (the conventional pytest sandbox DB — the app never uses
+    it), whatever host/port the environment points at.
+    """
+    raw = os.environ.get("ARQ_REDIS_URL") or "redis://localhost:6379"
+    parts = urlsplit(raw)
+    return urlunsplit((parts.scheme, parts.netloc, "/15", parts.query, parts.fragment))
+
+
+REDIS_URL = _test_redis_url()
 
 
 # ---------------------------------------------------------------------------
@@ -132,13 +148,18 @@ def make_visit(pipeline_db):
             doctor = Doctor(user_id=user.id, specialty="Кардиология", active=True)
             s.add(doctor)
             s.flush()
+            # Synthetic-data policy (AGENTS.md): no real-looking
+            # name+phone fixtures. Operator prefix 00 does not exist in
+            # the +998 numbering plan and the address carries an explicit
+            # SYNTHETIC marker, so the bundle cannot be mistaken for real
+            # patient data.
             patient = Patient(
-                first_name="Пайплайн",
+                first_name="Синтетик",
                 last_name=f"Тест_{suffix}",
-                middle_name="Тестович",
-                phone=f"+99890{int(uuid.uuid4().int % 10**7):07d}",
+                middle_name="Синтетикович",
+                phone=f"+998000{int(uuid.uuid4().int % 10**6):06d}",
                 birth_date=date(1990, 1, 1),
-                address="Тестовый адрес",
+                address="SYNTHETIC-REMINDER-PIPELINE-FIXTURE",
             )
             s.add(patient)
             s.flush()
