@@ -14,6 +14,11 @@ import { toast } from 'react-toastify';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+// Codex R10 PR 3118 (P1): канонизация специальностей — через УСТАНОВЛЕННУЮ
+// SSOT-таблицу алиасов (doctorPanelShared), выровненную с backend
+// DOCTOR_QUEUE_SPECIALTY_VARIANTS (AGENTS.md: не допускать дрейфа SSOT между
+// маппинг-слоями doctor/queue).
+import { SPECIALTY_ALIASES } from '../../utils/doctorPanelShared';
 import { ClipboardList, FlaskConical, Stethoscope, Syringe } from 'lucide-react';
 
 // =====================================================================
@@ -113,7 +118,29 @@ export interface WizardDoctorRecord {
  * (DailyQueue.specialist_id) и выбранный врач терялся. Пустой результат —
  * валидный ответ: UI показывает ограничение, сабмит блокируется валидацией
  * «для услуги требуется врач».
+ *
+ * Codex R10 PR 3118 (P1): сопоставление — через каноническую таблицу алиасов
+ * (doctorPanelShared.SPECIALTY_ALIASES, выровнена с backend
+ * DOCTOR_QUEUE_SPECIALTY_VARIANTS), а не через substring: подстрока отбрасывала
+ * валидные пары вида department_key="dental" ↔ specialty="dentistry" (обе
+ * формы живут в репо: dev_seed создаёт dental-услуги, нормализация докторов
+ * хранит dentistry) — стоматологические консультации оставались без врача.
+ * Ключ услуги сначала канонизируется ("dental" → "dentistry"), затем
+ * специальность врача сравнивается с каноном и его алиасами; пары вне
+ * таблицы сравниваются только на точное совпадение (без подстрок).
  */
+const _specialtyAliasIndex: Record<string, Set<string>> = Object.fromEntries(
+  Object.entries(SPECIALTY_ALIASES).map(([canonical, aliases]) => [
+    canonical,
+    new Set([canonical, ...aliases.map((a) => String(a).toLowerCase())]),
+  ]),
+);
+
+const _canonicalSpecialtyOf = (rawKey: string): string =>
+  Object.keys(_specialtyAliasIndex).find(
+    (canonical) => _specialtyAliasIndex[canonical].has(rawKey),
+  ) ?? rawKey;
+
 export const filterDoctorsForService = (
   doctors: Array<WizardDoctorRecord | null | undefined> | null | undefined,
   serviceDepartmentKey: string | null | undefined,
@@ -123,10 +150,14 @@ export const filterDoctorsForService = (
     : [];
   const key = String(serviceDepartmentKey || '').toLowerCase().trim();
   if (!key) return all;
+  const canonicalKey = _canonicalSpecialtyOf(key);
+  const accepted = _specialtyAliasIndex[canonicalKey];
   return all.filter((doctor) => {
     const docSpecialty = String(doctor.specialty || '').toLowerCase().trim();
-    return !docSpecialty || docSpecialty === key ||
-      docSpecialty.includes(key) || key.includes(docSpecialty);
+    if (!docSpecialty) return true; // пустая специальность — как раньше
+    if (accepted) return accepted.has(docSpecialty);
+    // Пара вне таблицы алиасов: точное совпадение, без подстрок.
+    return docSpecialty === canonicalKey;
   });
 };
 

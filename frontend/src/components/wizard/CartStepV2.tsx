@@ -607,7 +607,11 @@ const CartStepV2 = ({
         )}
 
         {/* Ошибки валидации */}
-        {Boolean(errors?.cart || errors?.doctors || errors?.repeat) &&
+        {/* Codex R10 PR 3118 (P2): errors?.quote в условии — сообщение уже
+            приоритизирует errors.quote, но блок скрывался, когда квота
+            простаивает/загружается и выставлена ТОЛЬКО quote-ошибка: кнопка
+            выглядела «нажатой в пустоту». */}
+        {Boolean(errors?.cart || errors?.doctors || errors?.repeat || errors?.quote) &&
         <div style={{
           padding: 'var(--mac-spacing-2)',
           background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',

@@ -466,10 +466,23 @@ class RegistrarEditDeltaService:
         - по визиту есть ОПЛАЧЕННЫЙ счёт — уменьшение = возврат, это отдельный
           финансовый контракт (wave2 PR3), а не побочный эффект редактирования.
         Оба случая отвергаются с явной причиной вместо имитации сохранения.
+
+        Codex R10 PR 3118 (P1): чтение визита — ПОД блокировкой строки
+        (SELECT ... FOR UPDATE) и держится до конца транзакции edit-delta.
+        Платёжные потоки (PaymentInvariantService.create_payment_for_visit /
+        create_pending_payment) сериализуются на ТОЙ ЖЕ блокировке Visit,
+        поэтому кассир/провайдер не может закоммитить платёж ПОСЛЕ проверки
+        гварда, но ДО коммита edit-delta: тот, кто первым взял блокировку,
+        тот и идёт первым, а второй видит уже закоммиченное состояние.
         """
         if not entry.visit_id:
             return
-        visit = self.db.query(Visit).filter(Visit.id == entry.visit_id).first()
+        visit = (
+            self.db.query(Visit)
+            .filter(Visit.id == entry.visit_id)
+            .with_for_update()
+            .first()
+        )
         if visit is None:
             return
         if visit.status in VISIT_POSITION_BLOCKED_STATUSES:
@@ -530,6 +543,26 @@ class RegistrarEditDeltaService:
             raise ValueError(
                 "По услуге зарегистрирована оплата — уменьшение количества выполняется "
                 "через возврат/корректировку оплаты"
+            )
+        # Codex R10 PR 3118 (P1): инициализированный провайдерский платёж
+        # (Click/PayMe/Kaspi) остаётся в статусе pending с ФИКСИРОВАННОЙ суммой
+        # и платёжной ссылкой (PaymentInitService сохраняет PaymentStatus.PENDING
+        # вместе с URL от провайдера). Редукция вычитает только PENDING-счёт;
+        # Payment.amount и payment_url остались бы на старое количество —
+        # пациент доплатил бы по ссылке за уже уменьшенную услугу. Снижение
+        # доступно только после отмены/завершения этого платежа.
+        pending_payment = (
+            self.db.query(Payment)
+            .filter(
+                Payment.visit_id == visit.id,
+                Payment.status == "pending",
+            )
+            .first()
+        )
+        if pending_payment:
+            raise ValueError(
+                "По услуге создан неоплаченный онлайн-платёж — уменьшение количества "
+                "недоступно: сначала отмените платёж или завершите оплату"
             )
 
     def _apply_patient_data(self, patient: Patient, patient_data: dict[str, Any]) -> None:

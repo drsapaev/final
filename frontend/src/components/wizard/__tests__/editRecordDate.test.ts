@@ -101,3 +101,47 @@ describe('W2-PR2: filterDoctorsForService (без fallback на всех)', () =
     expect(filterDoctorsForService([null, { id: 1, specialty: 'cardiology' }], 'cardiology')).toHaveLength(1);
   });
 });
+
+// =====================================================================
+// Codex R10 PR 3118 (P1): канонические алиасы специальностей вместо
+// substring-сопоставления. Обе стороны пары живут в репо: dev_seed
+// создаёт dental-услуги (department_key="dental"), нормализация докторов
+// хранит dentistry. Таблица алиасов — SSOT doctorPanelShared
+// (выровнена с backend DOCTOR_QUEUE_SPECIALTY_VARIANTS).
+// =====================================================================
+describe('Codex R10 PR 3118: filterDoctorsForService — канонические алиасы', () => {
+  it('dental-услуга находит dentistry-врача (дефект из находки)', () => {
+    const dentists = [{ id: 7, specialty: 'dentistry' }];
+    expect(filterDoctorsForService(dentists, 'dental')).toEqual(dentists);
+  });
+
+  it('обратная пара: dentistry-услуга находит dental-врача (алиас направления)', () => {
+    const dentists = [{ id: 8, specialty: 'dental' }];
+    expect(filterDoctorsForService(dentists, 'dentistry')).toEqual(dentists);
+  });
+
+  it('другие алиасы таблицы: cardio → cardiology, stomatology → dentistry', () => {
+    const cardio = [{ id: 1, specialty: 'cardiology' }];
+    expect(filterDoctorsForService(cardio, 'cardio')).toEqual(cardio);
+    const dentists = [{ id: 9, specialty: 'stomatology' }];
+    expect(filterDoctorsForService(dentists, 'dentistry')).toEqual(dentists);
+  });
+
+  it('регистр алиасов не важен (Cardiologist/Cardio в таблице — в нижнем регистре)', () => {
+    const doctors = [{ id: 4, specialty: 'cardiologist' }];
+    expect(filterDoctorsForService(doctors, 'cardiology')).toEqual(doctors);
+  });
+
+  it('пара ВНЕ таблицы больше не матчится подстрокой: surgery ≠ surgeon', () => {
+    // Прежний substring-код: 'surgeon'.includes('surgery') === false,
+    // но 'surgeon'.includes('surg') — нет пары; проверяем честный
+    // непрофильный случай: partial-совпадения не открывают врача.
+    const surgeons = [{ id: 10, specialty: 'surgeon' }];
+    expect(filterDoctorsForService(surgeons, 'surgery')).toEqual([]);
+  });
+
+  it('точное совпадение для ключей вне таблицы сохраняется', () => {
+    const surgeons = [{ id: 11, specialty: 'surgery' }];
+    expect(filterDoctorsForService(surgeons, 'surgery')).toEqual(surgeons);
+  });
+});

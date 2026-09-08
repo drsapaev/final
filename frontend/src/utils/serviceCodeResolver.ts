@@ -414,7 +414,18 @@ export function normalizeServicesFromInitialData(initialData: Record<string, unk
             return Boolean(serviceName && queueName && serviceName === queueName);
         });
 
-        if (!match) return null;
+        // Codex R10 PR 3118 (P1): у обычной записи очереди (adaptQueueEntry)
+        // identity записи живёт ТОЛЬКО на верхнем уровне initialData
+        // (queue_entry_id); ни сгенерированные queue_numbers, ни
+        // service_details из read-модели не копируют его на каждую услугу.
+        // Без fallback все позиции нормализуются без original_queue_id и
+        // правка количества блокировалась как unroutable. Все услуги записи
+        // принадлежат одной записи очереди → верхнеуровневый id корректен
+        // для каждой позиции; явные per-service/per-row id (выше) приоритетны.
+        if (!match) {
+            const topLevelEntryId = pickExplicitQueueEntryId(initialData);
+            return topLevelEntryId ?? null;
+        }
 
         const matchedQueue = match as Record<string, unknown>;
         const matchedQueueEntryId = pickExplicitQueueEntryId(matchedQueue);
