@@ -911,6 +911,11 @@ def get_or_create_daily_queue(
                 online_start_time=f"{int(queue_settings.get('queue_start_hour', 7)):02d}:00",
                 online_end_time=f"{int(queue_settings.get('queue_end_hour', 9)):02d}:00",
                 max_online_entries=resource.max_online_per_day,
+                # Codex round-8 P2: канонический кабинет реестра — во
+                # ВСЕХ ветках создания (GQL joinQueue здесь; тикеты и
+                # уведомления читают cabinet_number очереди), паритет
+                # с queue_svc-конструктором (round-7)
+                cabinet_number=resource.default_cabinet,
             )
             db.add(daily_queue)
             db.commit()

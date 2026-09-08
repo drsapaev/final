@@ -64,7 +64,9 @@ class QueueCabinetUpdateRequest(BaseModel):
 class QueueCabinetResponse(BaseModel):
     id: int
     day: str
-    specialist_id: int
+    # QD-2C (Codex round-8 P1): ресурсные очереди (specialist NULL)
+    # — врач-ось отсутствует по дизайну, владелец = реестр
+    specialist_id: int | None
     specialist_name: str
     queue_tag: str | None
     cabinet_number: str | None

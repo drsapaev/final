@@ -80,6 +80,39 @@ class QueueDomainService:
         return f"Специалист #{specialist_id}"
 
     def _build_cabinet_payload(self, queue: object) -> dict[str, Any]:
+        # QD-2C (Codex round-8 P1): resource-owned очередь (specialist
+        # NULL) — врач-ось отсутствует ПО ДИЗАЙНУ: владелец = реестр,
+        # кабинет — из QueueResource.default_cabinet (копируется при
+        # создании), sync-семантика «нет связанного врача» не является
+        # integrity-проблемой.
+        is_resource_owned = queue.specialist_id is None and getattr(
+            queue, "queue_resource_id", None
+        )
+        if is_resource_owned:
+            resource = getattr(queue, "queue_resource", None)
+            queue_cabinet = queue.cabinet_number
+            return {
+                "id": queue.id,
+                "day": queue.day.isoformat(),
+                "specialist_id": None,
+                "specialist_name": (
+                    resource.display_name if resource else "Ресурс очереди"
+                ),
+                "queue_tag": queue.queue_tag,
+                "cabinet_number": queue_cabinet,
+                "doctor_cabinet": None,
+                "effective_cabinet": queue_cabinet,
+                "cabinet_floor": queue.cabinet_floor,
+                "cabinet_building": queue.cabinet_building,
+                "entries_count": self.read_repository.count_entries(queue_id=queue.id),
+                "active": queue.active,
+                "linked_doctor_found": False,
+                "doctor_has_cabinet": False,
+                "sync_status": "resource_owned",
+                "integrity_warnings": (
+                    [] if queue_cabinet else ["effective_cabinet_missing"]
+                ),
+            }
         doctor = self.read_repository.get_doctor(queue.specialist_id)
         doctor_cabinet = getattr(doctor, "cabinet", None) if doctor else None
         linked_doctor_found = doctor is not None

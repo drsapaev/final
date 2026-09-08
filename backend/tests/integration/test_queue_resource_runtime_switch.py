@@ -1971,3 +1971,126 @@ def test_analytics_department_filter_includes_resource_queues(
     )
     assert cardio_stats["total_queues"] == 1  # the doctor queue only
     assert cardio_stats["total_entries"] == 1
+
+
+# ===================== R. Codex round-8 pins =====================
+
+
+def test_mobile_queues_status_represents_resource_axis(
+    db_session: Session,
+) -> None:
+    """Codex round-8 P1: /api/v1/mobile/queues/status enumerates the
+    morning-pre-created lab row (specialist NULL) — the DTO carried
+    doctor_id: int, so the builder raised ValidationError and the
+    handler returned 500. The response now represents the resource
+    axis: doctor_id NULL, the registry display_name, the tag as the
+    specialty; doctor rows are unchanged."""
+    try:
+        _test_mobile_queues_status_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "lab_res18", "dr_mob18")
+
+
+def _test_mobile_queues_status_body(db_session: Session) -> None:
+    import asyncio
+
+    from app.api.v1.endpoints.mobile_api_extended import get_queues_status
+
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    resource_queue = queue_service.get_or_create_daily_queue(
+        db_session, day=date.today(), specialist_id=None, queue_tag="lab"
+    )
+    user = _make_user(db_session, username="dr_mob18", role="doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="cardio")
+    doctor_queue = queue_service.get_or_create_daily_queue(
+        db_session, day=date.today(), specialist_id=doctor.id, queue_tag="cardio"
+    )
+
+    viewer = _make_user(db_session, username="lab_res18", role="Admin")
+    payload = asyncio.run(get_queues_status(current_user=viewer, db=db_session))
+    rows = {row.doctor_id: row for row in payload["queues"]}
+
+    resource_row = rows[None]
+    assert resource_row.doctor_name == "Ресурс очереди"
+    assert resource_row.specialty == "lab"
+
+    doctor_row = rows[doctor.id]
+    assert doctor_row.specialty == "cardio"
+
+    # both axes enumerated — the resource queue is not dropped
+    assert resource_queue is not None
+    assert doctor_queue is not None
+
+
+def test_cabinet_info_represents_resource_axis(db_session: Session) -> None:
+    """Codex round-8 P1: /api/v1/admin/queues/cabinet-info required
+    specialist_id: int — a resource-owned row failed the DTO and the
+    handler 500'd. The payload now represents the resource axis
+    (specialist_id NULL, registry display_name, sync_status
+    resource_owned — no missing-doctor integrity noise) and the DTO
+    accepts every payload row."""
+    from app.api.v1.endpoints.queue_cabinet_management import QueueCabinetResponse
+    from app.services.queue_domain_service import QueueDomainService
+
+    resource = _make_resource(db_session, code="lab", queue_tag="lab")
+    resource.default_cabinet = "7"
+    db_session.commit()
+    resource_queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    _make_waiting_entry(db_session, resource_queue, number=1)
+
+    payloads = QueueDomainService(db_session).list_queue_cabinet_info(
+        day=_DAY, specialist_id=None, cabinet_number=None
+    )
+    # every payload row must construct the DTO without a ValidationError
+    items = [QueueCabinetResponse(**item) for item in payloads]
+
+    resource_item = next(i for i in items if i.id == resource_queue.id)
+    assert resource_item.specialist_id is None
+    assert resource_item.specialist_name == "Ресурс очереди"
+    assert resource_item.sync_status == "resource_owned"
+    assert resource_item.cabinet_number == "7"
+    assert resource_item.effective_cabinet == "7"
+    assert resource_item.doctor_cabinet is None
+    assert resource_item.linked_doctor_found is False
+    assert "linked_doctor_missing" not in resource_item.integrity_warnings
+    assert resource_item.entries_count == 1
+
+
+def test_registry_cabinet_persisted_in_every_creation_path(
+    db_session: Session,
+) -> None:
+    """Codex round-8 P2: the registry's canonical cabinet must land on
+    the resource queue whichever writer creates it first — the GQL
+    joinQueue SSOT copy, the visit-confirmation repository and the
+    round-6 legacy-writer branch, with the same parity as the
+    queue_svc constructor (round-7)."""
+    from app.repositories.queue_api_repository import QueueApiRepository
+    from app.repositories.visit_confirmation_repository import (
+        VisitConfirmationRepository,
+    )
+
+    _make_resource(db_session, code="lab", queue_tag="lab", max_online_per_day=5)
+    _make_resource(db_session, code="ecg", queue_tag="ecg", max_online_per_day=5)
+    _make_resource(db_session, code="bio", queue_tag="bio", max_online_per_day=5)
+    db_session.query(QueueResource).update(
+        {"default_cabinet": "7"}, synchronize_session=False
+    )
+    db_session.commit()
+
+    gql_queue = crud_queue.get_or_create_daily_queue(db_session, _DAY, None, "lab")
+    confirmation_queue = VisitConfirmationRepository(
+        db_session
+    ).get_or_create_daily_queue(_DAY, None, "ecg")
+    legacy_queue = QueueApiRepository(db_session).get_or_create_registry_queue(
+        day=_DAY, queue_tag="bio"
+    )
+
+    for queue, path in (
+        (gql_queue, "gql"),
+        (confirmation_queue, "confirmation"),
+        (legacy_queue, "legacy-writer"),
+    ):
+        assert queue.cabinet_number == "7", path
+        assert queue.specialist_id is None, path

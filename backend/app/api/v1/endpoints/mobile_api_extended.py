@@ -96,7 +96,10 @@ class ServiceSearchRequest(BaseModel):
 class QueueStatusResponse(BaseModel):
     """Статус очереди"""
 
-    doctor_id: int
+    # QD-2C (Codex round-8 P1): ресурсные очереди тега (specialist
+    # NULL) — doctor_id nullable, владелец представлен осью ресурса
+    # (doctor_name = display_name реестра, specialty = queue_tag).
+    doctor_id: int | None
     doctor_name: str
     specialty: str
     current_number: int
@@ -352,8 +355,21 @@ async def get_queues_status(
             result.append(
                 QueueStatusResponse(
                     doctor_id=queue.specialist_id,
-                    doctor_name=_doctor_full_name(doctor),
-                    specialty=_doctor_specialty(doctor),
+                    doctor_name=(
+                        # QD-2C (Codex round-8 P1): resource-owned
+                        # очередь — владелец из реестра, ось — тег
+                        queue.queue_resource.display_name
+                        if (
+                            queue.specialist_id is None
+                            and queue.queue_resource is not None
+                        )
+                        else _doctor_full_name(doctor)
+                    ),
+                    specialty=(
+                        queue.queue_tag
+                        if (queue.specialist_id is None and queue.queue_tag)
+                        else _doctor_specialty(doctor)
+                    ),
                     current_number=current_number,
                     total_numbers=total_numbers,
                     estimated_wait_time=estimated_wait,

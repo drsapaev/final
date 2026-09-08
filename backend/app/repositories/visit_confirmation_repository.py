@@ -112,6 +112,9 @@ class VisitConfirmationRepository:
                     online_start_time=f"{int(settings.get('queue_start_hour', 7)):02d}:00",
                     online_end_time=f"{int(settings.get('queue_end_hour', 9)):02d}:00",
                     max_online_entries=resource.max_online_per_day,
+                    # Codex round-8 P2: канонический кабинет реестра —
+                    # паритет с queue_svc-конструктором (round-7)
+                    cabinet_number=resource.default_cabinet,
                 )
                 self.db.add(daily_queue)
                 try:
