@@ -15,6 +15,11 @@ points at the job's postgres service.
 Run locally:
     cd backend && DATABASE_URL=postgresql+psycopg://clinic:pw@localhost:5432/clinicdb \
         pytest tests/integration/test_reminder_pipeline_pg.py -m gate_d --noconftest
+
+NOTE: this module is collected by the main suite too — there the repo
+conftest puts ``backend/`` on sys.path and pytest.ini's ``-m "not gate_d"``
+deselects everything here; the sys.path insert above keeps the dedicated
+``--noconftest`` CI step working without the conftest.
 """
 from __future__ import annotations
 
@@ -27,17 +32,18 @@ from datetime import date
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))  # backend/
 
 os.environ.setdefault(
     "DATABASE_URL",
     "postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb",
 )
-# Exact test_gate_d.py env contract: ENV=test + explicit SECRET_KEY +
-# sqlite disabled. NOTE: TESTING=1 is deliberately NOT set — the config
-# validator forbids TESTING=1 unless ENV is an explicit dev value, and
-# "test" is treated as production-hardened.
-os.environ.setdefault("ENV", "test")
+# Environment contract for the isolated (--noconftest) CI step: ENV=dev keeps
+# the production-only config gates (ENCRYPTION_KEY / SMS provider) from
+# firing, and TESTING=1 is deliberately NOT set — the config validator
+# forbids it outside explicit dev values. The schema/behavior under test is
+# env-independent.
+os.environ.setdefault("ENV", "dev")
 os.environ.setdefault(
     "SECRET_KEY", "test-secret-key-for-reminder-pg-concurrency-32-chars"
 )
