@@ -189,8 +189,12 @@ async def logout(
                 access_jti = _payload.get("jti")
                 _exp = _payload.get("exp")
                 if _exp:
-                    from datetime import datetime as _dt
-                    access_exp = _dt.utcfromtimestamp(_exp)
+                    # timezone-AWARE: the blacklist service compares exp against
+                    # now(UTC); a naive datetime raised "can't compare
+                    # offset-naive and offset-aware datetimes" and silently
+                    # skipped the per-token revocation (Sentry 3E, #3122).
+                    from datetime import datetime as _dt, timezone as _tz
+                    access_exp = _dt.fromtimestamp(_exp, tz=_tz.utc)
             except Exception:
                 # Non-blocking: если не удалось декодировать — просто не отзываем jti.
                 pass
