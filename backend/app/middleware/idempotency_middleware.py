@@ -305,6 +305,37 @@ class IdempotencyResponseCache:
 _idempotency_cache = IdempotencyResponseCache()
 
 
+# ── Codex R9 #3092 (P1): in-process mirror of the execution-intent marker ───
+# When Redis is unavailable the distributed claim layer degrades to
+# in-memory coordination; the intent marker follows the same pattern so a
+# retry on THIS worker never blindly re-executes after a lost outcome.
+# Cross-worker reconciliation without Redis is impossible by design — the
+# marker is best-effort, exactly like the claim itself.
+_execution_intent_ttl_seconds = _CACHE_TTL_SECONDS
+_local_execution_intents: OrderedDict[tuple[str, str], float] = OrderedDict()
+
+
+def _sweep_local_execution_intents(now: float | None = None) -> None:
+    now = time.time() if now is None else now
+    stale = [k for k, expires_at in _local_execution_intents.items() if expires_at <= now]
+    for k in stale:
+        _local_execution_intents.pop(k, None)
+
+
+def _mark_local_execution_intent(user_id: int | str, key: str) -> None:
+    _sweep_local_execution_intents()
+    _local_execution_intents[(str(user_id), key)] = time.time() + _execution_intent_ttl_seconds
+
+
+def _clear_local_execution_intent(user_id: int | str, key: str) -> None:
+    _local_execution_intents.pop((str(user_id), key), None)
+
+
+def _local_execution_intent_exists(user_id: int | str, key: str) -> bool:
+    _sweep_local_execution_intents()
+    return (str(user_id), key) in _local_execution_intents
+
+
 def get_idempotency_cache() -> IdempotencyResponseCache:
     return _idempotency_cache
 
@@ -538,6 +569,51 @@ class DistributedIdempotencyClaim:
         if not self._ensure_available() or self._client is None:
             return False
         return bool(self._run(self._client.get, self._claim_key(user_id, key)))
+
+    # ── Codex R9 #3092 (P1): durable pre-execution intent marker ──────────
+    #
+    # The endpoint commits the cart INSIDE call_next while the idempotency
+    # outcome is only stored AFTER the response materializes. A worker that
+    # dies in between loses its short renewable claim (90 s) and the same-key
+    # retry re-executes the write — duplicating visits, invoices and queue
+    # entries. The intent marker is written BEFORE the handler runs and lives
+    # as long as the response snapshot would have (_ttl): a retry that finds
+    # an intent but NO stored response knows a previous attempt reached
+    # execution with an UNKNOWN outcome and must not blindly re-execute.
+
+    @staticmethod
+    def _intent_key(user_id: int | str, key: str) -> str:
+        return f"idem:{user_id}:{key}:intent"
+
+    def mark_execution_intent(self, user_id: int | str, key: str) -> None:
+        """Best-effort durable marker: 'this key reached execution'."""
+        if not self._ensure_available() or self._client is None:
+            _mark_local_execution_intent(user_id, key)
+            return
+        self._run(
+            self._client.set,
+            self._intent_key(user_id, key),
+            "1",
+            ex=self._ttl,
+        )
+        # Mirror locally too: Redis degradation after marking must not turn a
+        # later retry into a blind re-execution on THIS worker.
+        _mark_local_execution_intent(user_id, key)
+
+    def clear_execution_intent(self, user_id: int | str, key: str) -> None:
+        """Outcome is KNOWN (response stored, or the endpoint returned a
+        completed non-2xx without committing) — the marker is no longer
+        needed and the retry contract returns to its previous shape."""
+        if self._ensure_available() and self._client is not None:
+            self._run(self._client.delete, self._intent_key(user_id, key))
+        _clear_local_execution_intent(user_id, key)
+
+    def execution_intent_exists(self, user_id: int | str, key: str) -> bool:
+        if self._ensure_available() and self._client is not None:
+            marked = bool(self._run(self._client.exists, self._intent_key(user_id, key)))
+            if marked:
+                return True
+        return _local_execution_intent_exists(user_id, key)
 
 
 _distributed_claim: DistributedIdempotencyClaim | None = None
@@ -831,6 +907,33 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 claim.release(user_id, idempotency_key, claim_token)
             return _principal_refusal_response()
 
+        # Codex R9 #3092 (P1): reconcile-before-execute. The endpoint commits
+        # the cart inside call_next while the idempotency OUTCOME is stored
+        # only after the response materializes — a worker that dies in that
+        # window loses its 90 s lease and the same-key retry re-executed the
+        # write (duplicate visits/invoices/queue entries). A durable intent
+        # marker is written BEFORE the handler runs: a retry that finds the
+        # marker but NO stored response knows a previous attempt reached
+        # execution with an UNKNOWN outcome and is refused (409) instead of
+        # blindly re-executing. The registrar verifies the worklist and uses
+        # a fresh key if nothing was applied — a safe no-op beats a duplicate.
+        if claim is not None and claim.try_available():
+            uncertain_outcome = claim.execution_intent_exists(user_id, idempotency_key)
+        else:
+            uncertain_outcome = _local_execution_intent_exists(user_id, idempotency_key)
+        if uncertain_outcome:
+            logger.warning(
+                "Idempotency execution intent without a stored outcome (retry refused): user=%s key=%s path=%s",
+                user_id, idempotency_key, request.url.path,
+            )
+            if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
+                claim.release(user_id, idempotency_key, claim_token)
+            return self._uncertain_outcome_response()
+        if claim is not None and claim.try_available():
+            claim.mark_execution_intent(user_id, idempotency_key)
+        else:
+            _mark_local_execution_intent(user_id, idempotency_key)
+
         # Execute handler with a lease-renewal loop (Codex R2 #3092 P2):
         # while this worker is still executing, the in-flight claim is
         # periodically extended so a slow-but-alive request never lapses;
@@ -847,6 +950,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         except Exception:
             # Handler crashed — release the claim so the client can retry.
+            # Codex R9 #3092 (P1): the intent marker is KEPT — the crash may
+            # have happened after the endpoint's commit, so the outcome stays
+            # unknown and the retry must reconcile (409), not re-execute.
             if lease_task is not None:
                 lease_task.cancel()
             if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
@@ -886,6 +992,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # original success.
                 claim.store_response(user_id, idempotency_key, cached_response, payload_hash=incoming_hash, principal_role=exec_role)
                 claim.release(user_id, idempotency_key, claim_token)
+            # Codex R9 #3092 (P1): outcome is now durable — drop the intent
+            # marker so later same-key requests replay normally.
+            if claim is not None and claim.try_available():
+                claim.clear_execution_intent(user_id, idempotency_key)
+            else:
+                _clear_local_execution_intent(user_id, idempotency_key)
             logger.info(
                 "Idempotency cached: user=%s key=%s method=%s path=%s status=%s",
                 user_id, idempotency_key, request.method, request.url.path, response.status_code,
@@ -900,6 +1012,15 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
         # Non-2xx is not cached — release the claim so the client can retry
         # with the same key after fixing the issue.
+        # Codex R9 #3092 (P1): a RETURNED error response means the endpoint
+        # completed its validation without a commit — the outcome is known
+        # (nothing applied), so the intent marker is cleared and the
+        # documented retry-after-fixing contract keeps working. (An exception
+        # AFTER a commit surfaces as a crash above — there the marker is kept.)
+        if claim is not None and claim.try_available():
+            claim.clear_execution_intent(user_id, idempotency_key)
+        else:
+            _clear_local_execution_intent(user_id, idempotency_key)
         if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
             claim.release(user_id, idempotency_key, claim_token)
         return response
@@ -915,6 +1036,26 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 'different request payload. The original data may already be '
                 'saved — do not retry changed data with the same key; verify '
                 'the record state first."}'
+            ),
+            media_type="application/json",
+        )
+
+    @staticmethod
+    def _uncertain_outcome_response() -> Response:
+        """409 for a retry whose previous attempt reached execution but left
+        no known outcome (Codex R9 #3092 P1). Re-executing a cart write with
+        an unknown outcome duplicates visits, invoices and queue entries; a
+        conservative refusal turns the duplicate risk into a verifiable
+        no-op: the registrar checks the worklist and retries with a NEW key
+        only if nothing was applied."""
+        return Response(
+            status_code=409,
+            headers={"Cache-Control": "no-store"},
+            content=(
+                '{"detail": "Предыдущая попытка с этим ключом Idempotency не '
+                'завершилась корректно: результат неизвестен. Проверьте рабочий '
+                'список — запись могла сохраниться. Если изменений нет, '
+                'повторите операцию с НОВЫМ ключом Idempotency."}'
             ),
             media_type="application/json",
         )
@@ -973,11 +1114,36 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         Runs the sync query in a worker thread; fails CLOSED — a broken DB
         check never results in a replay (the request falls through to the
         endpoint, which re-authenticates anyway).
+
+        Codex R9 #3092 (P1): the SUBJECT SELECTION mirrors deps.py exactly —
+        canonical 2FA tokens carry BOTH a numeric ``sub`` and a ``username``
+        claim, and get_current_user resolves the account through
+        _subject_from_payload, which PREFERS the username claim (numeric
+        text subject → by id, else by username). Resolving only by the
+        numeric sub authorized replays for a registrar the endpoint itself
+        would refuse (e.g. after an admin rename the username no longer
+        exists → endpoint 401) — a cached PHI-bearing cart response could be
+        replayed under a token the canonical dependency rejects.
         """
-        sub = principal_payload.get("sub")
-        sub_text = str(sub) if sub is not None else ""
-        user_id = int(sub_text) if sub_text.isdigit() else None
-        username = None if user_id is not None else (sub_text or None)
+        username_claim = principal_payload.get("username")
+        if isinstance(username_claim, str) and username_claim:
+            # Canonical primary subject: the username claim (deps.py:91-105).
+            # Numeric text resolves by id, text by username — exactly like
+            # get_current_user's primary lookup.
+            user_id = int(username_claim) if username_claim.isdigit() else None
+            username = None if user_id is not None else username_claim
+        else:
+            sub = principal_payload.get("sub")
+            if isinstance(sub, str) and sub:
+                sub_text = sub
+                user_id = int(sub_text) if sub_text.isdigit() else None
+                username = None if user_id is not None else sub_text
+            elif isinstance(sub, int):
+                # Legacy numeric (non-stringified) sub — get_current_user's
+                # fallback resolves it by id.
+                user_id, username = sub, None
+            else:
+                user_id, username = None, None
         jti = principal_payload.get("jti")
         try:
             return await asyncio.to_thread(

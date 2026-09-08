@@ -98,6 +98,13 @@ class FakeRedis:
             raise ConnectionError("simulated transient redis failure")
         return 1 if self.store.pop(key, None) is not None else 0
 
+    def exists(self, key: str) -> int:
+        """Codex R9 #3092: EXISTS probe for the execution-intent marker."""
+        if self.fail_next_ops > 0:
+            self.fail_next_ops -= 1
+            raise ConnectionError("simulated transient redis failure")
+        return 1 if key in self.store else 0
+
     def eval(self, script: str, numkeys: int, key: str, *args: str) -> int:
         """Emulate the two Lua compare-and-* scripts used by the claim."""
         if self.fail_next_ops > 0:
@@ -169,6 +176,15 @@ def _make_app(counter: dict, call_next_error: Exception | None = None) -> FastAP
     async def _boom() -> dict[str, str]:
         counter["calls"] += 1
         raise RuntimeError("simulated handler crash")
+
+    @app.post("/bad")
+    async def _bad() -> Any:
+        # Returns (does not raise) a non-2xx: the endpoint completed its
+        # validation without committing — outcome KNOWN.
+        from fastapi.responses import JSONResponse
+
+        counter["calls"] += 1
+        return JSONResponse(status_code=400, content={"detail": "validation failed"})
 
     return app
 
@@ -255,8 +271,12 @@ def test_in_flight_claim_replays_if_response_landed_between_attempts(two_workers
     assert counters["w2"]["calls"] == 0
 
 
-def test_handler_crash_releases_claim_so_retry_reruns(two_workers):
-    """Non-2xx/crash releases the claim — client can retry with the same key."""
+def test_handler_crash_keeps_intent_retry_reconciles_instead_of_rerunning(two_workers):
+    """Codex R9 #3092 (P1): the crash may have happened AFTER the endpoint's
+    commit — the outcome is unknown, so the retry reconciles (409) instead of
+    blindly re-executing the write. The in-flight claim IS released (the
+    refusal must not leave a stale lock); the intent marker survives so the
+    key can never silently re-execute its way to a duplicate."""
     client1, client2, counters, fake_redis = two_workers
 
     first = client1.post("/boom", headers={**auth_headers("1"), "Idempotency-Key": "crash-key"})
@@ -264,13 +284,70 @@ def test_handler_crash_releases_claim_so_retry_reruns(two_workers):
     assert nkey("1", "crash-key", "claim") not in fake_redis.store, (
         "crashed handler must release the in-flight claim"
     )
+    assert nkey("1", "crash-key", "intent") in fake_redis.store, (
+        "the pre-execution intent marker survives the crash (unknown outcome)"
+    )
 
     second = client2.post("/boom", headers={**auth_headers("1"), "Idempotency-Key": "crash-key"})
-    assert second.status_code == 500
+    assert second.status_code == 409
+    assert counters["w1"]["calls"] == 1
+    assert counters["w2"]["calls"] == 0, (
+        "retry after an unknown-outcome crash must NOT re-execute the write"
+    )
+
+
+def test_returned_non_2xx_clears_intent_so_retry_reruns(two_workers):
+    """A RETURNED error response means the endpoint completed without a
+    commit — the outcome is known, so the intent marker is cleared and the
+    documented retry-with-the-same-key contract keeps working."""
+    client1, client2, counters, fake_redis = two_workers
+
+    first = client1.post("/bad", headers={**auth_headers("1"), "Idempotency-Key": "bad-key"})
+    assert first.status_code == 400
+    assert nkey("1", "bad-key", "intent") not in fake_redis.store, (
+        "a returned error clears the intent marker (outcome known: nothing applied)"
+    )
+
+    second = client2.post("/bad", headers={**auth_headers("1"), "Idempotency-Key": "bad-key"})
+    assert second.status_code == 400
     assert counters["w1"]["calls"] == 1
     assert counters["w2"]["calls"] == 1, (
-        "retry after failure must re-execute (errors are not cached)"
+        "retry after a known-outcome failure re-executes (errors are not cached)"
     )
+
+
+def test_lost_outcome_retry_refused_then_replays_once_response_lands(two_workers):
+    """The 90-second lost-response window: a previous attempt marked the
+    execution intent and died before storing the outcome. The retry is
+    refused with 409 (uncertain), never re-executed; once the response IS
+    stored, the same key replays it normally."""
+    client1, client2, counters, fake_redis = two_workers
+
+    # A previous attempt reached execution on worker 1 and died right after
+    # the marker (no stored response) — simulated directly:
+    claim = idem_module._distributed_claim
+    claim.mark_execution_intent(
+        idem_module.IdempotencyMiddleware._namespace({"sub": "1"}), "lost-key"
+    )
+
+    retry = client2.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "lost-key"})
+    assert retry.status_code == 409
+    assert counters["w2"]["calls"] == 0, "no blind re-execution over an unknown outcome"
+
+    # The outcome lands (e.g. the outcome was actually stored by recovery):
+    from fastapi import Response as FastAPIResponse
+
+    claim.store_response(
+        idem_module.IdempotencyMiddleware._namespace({"sub": "1"}),
+        "lost-key",
+        FastAPIResponse(content=b'{"ok": true, "recovered": true}', status_code=200),
+        payload_hash=idem_module.payload_hash(b""),
+        principal_role="Registrar",
+    )
+    replay = client2.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "lost-key"})
+    assert replay.status_code == 200
+    assert replay.json()["recovered"] is True
+    assert counters["w2"]["calls"] == 0, "replay, not re-execution"
 
 
 def test_redis_unavailable_falls_back_to_in_memory(monkeypatch):
@@ -970,3 +1047,98 @@ def test_expired_token_bypasses_replay_zero_leeway(two_workers):
     assert counters["w2"]["calls"] == 1, (
         "expired token bypasses idempotency — the endpoint re-authenticates (401 in production)"
     )
+
+
+# ===================== Codex R9 #3092 (P1): canonical subject =====================
+
+
+def test_replay_authorizes_by_username_claim_like_get_current_user(two_workers, monkeypatch):
+    """Canonical 2FA tokens carry BOTH numeric sub and a username claim;
+    get_current_user resolves the account through _subject_from_payload,
+    which PREFERS the username claim. The middleware must select the same
+    subject: captured authorization args must contain the USERNAME, not the
+    numeric id from sub."""
+    client1, client2, counters, fake_redis = two_workers
+
+    captured: dict[str, Any] = {}
+
+    def _spy(request, user_id, username, jti):
+        captured["user_id"] = user_id
+        captured["username"] = username
+        return True, "Registrar", False
+
+    monkeypatch.setattr(idem_module, "_check_principal_authorized_sync", _spy)
+
+    token = create_canonical_token(sub="42", username="registrar_1")
+    first = client1.post(
+        "/echo", headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "subj-key"}
+    )
+    assert first.status_code == 200
+    assert captured["username"] == "registrar_1", (
+        "the username claim must be the primary subject, exactly like deps.py"
+    )
+    assert captured["user_id"] is None
+
+
+def test_replay_refused_when_username_claim_no_longer_resolves(two_workers, monkeypatch):
+    """After an admin RENAMES a registrar, the old token's username no longer
+    exists: the endpoint's get_current_user refuses (401), so the middleware
+    must refuse the replay too — previously it resolved the numeric sub and
+    replayed the cached PHI-bearing cart response under a token the endpoint
+    itself would reject."""
+    client1, client2, counters, fake_redis = two_workers
+
+    from app.core.security import create_access_token as _cat  # noqa: F401
+
+    token = create_canonical_token(sub="42", username="registrar_1")
+
+    # First request: user 'registrar_1' exists → authorized + stored.
+    idem_module._check_principal_authorized_sync = _make_username_checker(
+        existing={"registrar_1"}, renamed_to="registrar_2"
+    )
+    first = client1.post(
+        "/echo", headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "rename-key"}
+    )
+    assert first.status_code == 200
+
+    # Admin renames the user; the SAME token now fails the endpoint's
+    # username lookup (user_id=None, username='registrar_1' → not found).
+    idem_module._check_principal_authorized_sync = _make_username_checker(
+        existing={"registrar_2"}, renamed_to="registrar_2"
+    )
+    replay = client2.post(
+        "/echo", headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "rename-key"}
+    )
+    assert replay.status_code == 403, (
+        "a stored response must not replay for a principal the endpoint would refuse"
+    )
+    assert counters["w2"]["calls"] == 0
+
+
+# ── helpers for the canonical-subject tests ──
+
+
+def create_canonical_token(sub: str, username: str) -> str:
+    """A canonical 2FA-style token: numeric sub AND username claim."""
+    from app.core.security import create_access_token
+
+    return create_access_token({"sub": sub, "username": username})
+
+
+def _make_username_checker(existing: set[str], renamed_to: str):
+    """Stub of the DB authorization query with get_current_user's subject
+    semantics: numeric subject → by id; text subject → by username."""
+
+    def _checker(request, user_id, username, jti):
+        if user_id is not None:
+            # Numeric subjects resolve by id in get_current_user's primary
+            # lookup — but a canonical token with a username claim NEVER
+            # reaches this branch (the middleware mirrors deps.py).
+            return (True, "Registrar", False) if str(user_id) == "42" else (False, None, False)
+        if username is None:
+            return False, None, False
+        if username.isdigit():
+            return (True, "Registrar", False) if username == "42" else (False, None, False)
+        return (True, "Registrar", False) if username in existing else (False, None, False)
+
+    return _checker
