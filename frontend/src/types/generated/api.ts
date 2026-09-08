@@ -24237,6 +24237,8 @@ export type components = {
             quantity: number;
             /** Custom Price */
             custom_price?: number | string | null;
+            /** Specialist Id */
+            specialist_id?: number | null;
         };
         /** CartQuoteItemResponse */
         CartQuoteItemResponse: {

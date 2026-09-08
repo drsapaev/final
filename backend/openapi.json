@@ -70939,6 +70939,17 @@
               }
             ],
             "title": "Custom Price"
+          },
+          "specialist_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Id"
           }
         },
         "type": "object",
