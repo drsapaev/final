@@ -459,14 +459,23 @@ def _edit_delta_quote_context(
     item_preferred: set[int] = (
         {int(queue_entry_id)} if queue_entry_id is not None else preferred_entry_ids
     )
-    entry = edit_service._find_active_entry(
-        patient_id=patient_id,
-        queue_tag=queue_tag,
-        target_date=target_date,
-        preferred_entry_ids=item_preferred,
-        specialist_id=specialist_id,
-        lock=lock,
-    )
+    try:
+        entry = edit_service._find_active_entry(
+            patient_id=patient_id,
+            queue_tag=queue_tag,
+            target_date=target_date,
+            preferred_entry_ids=item_preferred,
+            specialist_id=specialist_id,
+            lock=lock,
+            # Codex R11 #3115 (P1): явный queue_entry_id строг и в квоте —
+            # устаревшая идентичность отклоняется ДО выпуска токена (иначе
+            # токен подтверждал дельту, посчитанную по чужой записи).
+            strict_entry_id=queue_entry_id,
+        )
+    except ValueError as exc:
+        # Команда конвертирует ValueError в 400 на эндпоинте; квота
+        # отвечает тем же 400 с тем же сообщением — контракт один.
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if entry is None:
         # Codex R11 #3095 (P2): the command routes a no-entry edit to
         # _create_new_queue_entry → _resolve_daily_queue, which refuses

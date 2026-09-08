@@ -114,6 +114,11 @@ class RegistrarEditDeltaService:
                 # Codex R8 #3115 (P1): мутирующая команда фиксирует выбранную
                 # запись до конца транзакции.
                 lock=True,
+                # Codex R11 #3115 (P1): явно названный ID — строгий селектор,
+                # а не мягкое предпочтение: устаревшая идентичность — 400.
+                strict_entry_id=(
+                    int(item.queue_entry_id) if item.queue_entry_id is not None else None
+                ),
             )
 
             if entry:
@@ -489,6 +494,7 @@ class RegistrarEditDeltaService:
         preferred_entry_ids: set[int],
         specialist_id: int | None = None,
         lock: bool = False,
+        strict_entry_id: int | None = None,
     ) -> OnlineQueueEntry | None:
         # Codex R8 #3115 (P1): lock=True фиксирует выбранную запись до конца
         # транзакции (SELECT ... FOR UPDATE) — отмена/смена статуса между
@@ -510,6 +516,17 @@ class RegistrarEditDeltaService:
             preferred = [entry for entry in entries if entry.id in preferred_entry_ids]
             if preferred:
                 entries = preferred
+            elif strict_entry_id is not None:
+                # Codex R11 #3115 (P1): явный queue_entry_id — СТРОГИЙ селектор.
+                # Прежний код при пустом preferred оставлял полный список
+                # кандидатов (entries[0] — мутировала и биллила ЧУЖУЮ строку
+                # очереди) или проваливался в создание новой записи (тихая
+                # ре-регистрация). Устаревшая идентичность — громкий отказ.
+                raise ValueError(
+                    f"Указанная запись очереди ({strict_entry_id}) больше не "
+                    "активна в этот день — обновите данные записи и повторите "
+                    "попытку"
+                )
         if specialist_id is not None:
             # W2-PR1 (ADR-001): очередь принадлежит врачу. Явно запрошенный
             # специалист не может дослать позицию в чужую очередь того же
@@ -910,9 +927,11 @@ class RegistrarEditDeltaService:
     ) -> PaymentInvoice | None:
         total_amount = sum(visit_delta_amounts.values(), Decimal("0"))
         visit_ids = list(visit_delta_amounts.keys())
-        invoice = (
-            self.db.query(PaymentInvoice)
-            .join(PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id)
+        # Кандидат на доначисление ищется БЕЗ блокировки (только чтобы найти
+        # id счёта); сама мутация — под FOR UPDATE (см. ниже).
+        candidate_link = (
+            self.db.query(PaymentInvoiceVisit)
+            .join(PaymentInvoice, PaymentInvoice.id == PaymentInvoiceVisit.invoice_id)
             .filter(
                 PaymentInvoice.patient_id == patient_id,
                 PaymentInvoice.status == "pending",
@@ -921,9 +940,7 @@ class RegistrarEditDeltaService:
             .order_by(PaymentInvoice.created_at.desc())
             .first()
         )
-        if invoice:
-            invoice.total_amount = Decimal(str(invoice.total_amount or 0)) + total_amount
-        else:
+        if candidate_link is None:
             invoice = PaymentInvoice(
                 patient_id=patient_id,
                 total_amount=total_amount,
@@ -934,6 +951,29 @@ class RegistrarEditDeltaService:
             )
             self.db.add(invoice)
             self.db.flush()
+        else:
+            # Codex R11 #3115 (P1, тело ревью): чтение счёта ПОД блокировкой
+            # строки + ревалидация статуса в той же транзакции — зеркало
+            # R10-фикса снижения. Без этого init_invoice_payment мог
+            # заблокировать счёт, отправить провайдеру СТАРУЮ сумму и
+            # закоммитить processing, а этот рост доначислял бы
+            # total_amount уже обрабатываемому счёту (провайдер соберёт
+            # старую сумму, визит/очередь уже содержат рост). Параллельные
+            # росты тоже сериализуются: второй видит закоммиченный итог.
+            invoice = (
+                self.db.query(PaymentInvoice)
+                .filter(PaymentInvoice.id == candidate_link.invoice_id)
+                .with_for_update()
+                .first()
+            )
+            if invoice is None:
+                raise ValueError("Счёт по визиту не найден при доначислении")
+            if invoice.status != "pending":
+                raise ValueError(
+                    f"Счёт по визиту уже обрабатывается (статус {invoice.status}) — "
+                    "увеличение количества выполняется через новую позицию или корректировку оплаты"
+                )
+            invoice.total_amount = Decimal(str(invoice.total_amount or 0)) + total_amount
 
         for visit_id, visit_amount in visit_delta_amounts.items():
             link = (
