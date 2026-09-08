@@ -93492,7 +93492,14 @@
             "title": "Day"
           },
           "specialist_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Specialist Id"
           },
           "specialist_name": {
