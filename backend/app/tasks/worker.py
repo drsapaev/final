@@ -322,7 +322,13 @@ async def send_visit_reminder(
         # AND the generation we claimed for (Codex round 8, P1): if the
         # schedule changed while we were dispatching, the delivery (for the
         # OLD schedule) must not be recorded — the new generation's job
-        # delivers for the new schedule.
+        # delivers for the new schedule. Codex round 13, P2: the finalize
+        # ALSO predicates on the lifecycle status — a confirmation or
+        # cancellation committing while the provider call was in flight
+        # means this delivery is an obsolete confirmation request and must
+        # not be recorded as the visit's reminder (the visit left
+        # pending_confirmation, so no replacement job will be enqueued and
+        # the stamp staying NULL cannot cause a resend).
         v_gen = (
             _parse_schedule_version(schedule_version)[2]
             if schedule_version is not None
@@ -331,6 +337,7 @@ async def send_visit_reminder(
         finalize_conditions = [
             Visit.id == visit_id,
             Visit.reminder_claimed_at == our_lease,
+            Visit.status == "pending_confirmation",
         ]
         if v_gen is not None:
             finalize_conditions.append(Visit.reminder_generation == v_gen)
@@ -341,9 +348,10 @@ async def send_visit_reminder(
         )
         db.commit()
         if finalized.rowcount == 0:
-            # Either the lease was taken from us or the generation moved on
-            # (reschedule during dispatch). Release the lease if it is still
-            # ours, but never record an old-schedule delivery.
+            # Either the lease was taken from us, the generation moved on
+            # (reschedule during dispatch), or the lifecycle status
+            # changed (confirm/cancel during dispatch). Release the lease
+            # if it is still ours, but never record an obsolete delivery.
             db.execute(
                 update(Visit)
                 .where(

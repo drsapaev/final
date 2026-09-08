@@ -355,10 +355,14 @@ arq app.tasks.worker.WorkerSettings
 # such a visit and the check would prove nothing. Select the first
 # REMINDER-ELIGIBLE visit instead; if none exists, create a clearly
 # synthetic one (AGENTS.md synthetic-data policy: 00-operator prefix,
-# SYNTHETIC markers).)
+# SYNTHETIC markers).
+# Codex round 13, P2: the fallback generates a UNIQUE per-run suffix —
+# re-running the check after a reminder was delivered must not collide
+# with the unique username/email of a previously created entity.)
 cd backend
 python -c "
 import asyncio
+import uuid
 from datetime import date
 
 from app.tasks import enqueue_reminder
@@ -384,10 +388,10 @@ async def main():
             .first()
         )
         if visit is None:
-            suffix = 'stgcheck'
+            suffix = uuid.uuid4().hex[:8]
             user = User(
                 username=f'stgcheck_{suffix}',
-                email=f'{suffix}@synthetic.invalid',
+                email=f'stgcheck-{suffix}@synthetic.invalid',
                 full_name='SYNTHETIC staging-check doctor',
                 hashed_password='not-a-login-hash',
                 role='Doctor', is_active=True, is_superuser=False,

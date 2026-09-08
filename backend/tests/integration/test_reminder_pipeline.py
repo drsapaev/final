@@ -1716,6 +1716,49 @@ async def test_service_body_ends_transaction_before_dispatch(
 
 
 @pytest.mark.asyncio
+async def test_status_change_during_dispatch_not_recorded(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 13, P2: a confirmation/cancellation committing while
+    the provider call is in flight makes the delivery an obsolete
+    confirmation request — the finalize must NOT record it as the
+    visit's reminder. The visit left pending_confirmation, so no
+    replacement job will be enqueued and the stamp staying NULL cannot
+    cause a resend; the lease is still released."""
+    from app.models.visit import Visit
+    from app.services.notifications_pkg._reminders import RemindersMixin
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()
+
+    async def _spy(self, db, vid, hours_before=24):
+        # The patient confirms while the provider call is in flight.
+        db.query(Visit).filter(Visit.id == vid).update({"status": "confirmed"})
+        db.commit()
+        return {"success": True, "channel": "telegram"}
+
+    monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _spy)
+
+    await send_visit_reminder(
+        {},
+        visit_id=visit_id,
+        channel="telegram",
+        schedule_version=FIXTURE_VERSION,
+    )
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.status == "confirmed"
+        assert (
+            row.reminder_sent_at is None
+        ), "an obsolete delivery must not be recorded after a status change"
+        assert row.reminder_claimed_at is None, "the lease is still released"
+    finally:
+        s.close()
+
+
+@pytest.mark.asyncio
 async def test_delivery_failure_gives_up_after_backoffs(
     pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
 ):
