@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import MetaData, Table, select, text
+from sqlalchemy import MetaData, Table, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -80,6 +80,14 @@ class VisitWithServices(BaseModel):
     services: list[VisitServiceIn]
 
 
+# PR-1 (Codex round 11+13, P1): the lease-coordination refusal detail —
+# shared by both reschedule routes (wait-budget expiry AND the atomic
+# conditional UPDATE losing the race to a claim).
+_REMINDER_IN_PROGRESS = (
+    "Reminder delivery is in progress for this visit; retry in a few seconds"
+)
+
+
 def _visits(db: Session) -> Table:
     """
     Return reflected visits table. Использует autoload_with, не bind.
@@ -121,14 +129,12 @@ def _update_queue_entries_for_visit_owner(
         return
 
     db.execute(
-        text(
-            """
+        text("""
             UPDATE queue_entries
             SET status = :status_value
             WHERE visit_id = :visit_id
               AND patient_id = :patient_id
-            """
-        ),
+            """),
         {
             "status_value": status_value,
             "visit_id": visit_id,
@@ -235,14 +241,18 @@ def list_visits(
     "/visits",
     response_model=VisitOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES))],
+    dependencies=[
+        Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES))
+    ],
     summary="Создать визит",
 )
 def create_visit(
     request: Request,
     payload: VisitCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)),
+    current_user=Depends(
+        require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES)
+    ),
 ):
     _ensure_doctor_can_create_visit_for_payload(db, payload, current_user)
     result = VisitsApiService(db).create_visit(
@@ -276,13 +286,15 @@ def get_visit(
 @router.post(
     "/visits/{visit_id}/services",
     summary="Добавить услугу к визиту",
-response_model=dict[str, Any],
+    response_model=dict[str, Any],
 )
 def add_service(
     visit_id: int,
     item: VisitServiceIn,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Cashier")),
+    current_user=Depends(
+        require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Cashier")
+    ),
 ):
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
@@ -300,7 +312,9 @@ def set_status(
     visit_id: int,
     status_new: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES, "Registrar")),
+    current_user=Depends(
+        require_roles("Admin", *DOCTOR_FAMILY_GATE_ROLES, "Registrar")
+    ),
 ):
     # H-3 (Launch Blockers Audit): visit state machine.
     # Previously this endpoint validated ONLY the target status (it
@@ -384,7 +398,7 @@ def set_status(
         started_at=getattr(visit, "started_at", None),
         finished_at=getattr(visit, "finished_at", None),
         notes=visit.notes,
-        planned_date=visit.visit_date
+        planned_date=visit.visit_date,
     )
 
 
@@ -495,8 +509,7 @@ def force_reopen_visit(
     if payload.reason and hasattr(visit, "notes"):
         existing_notes = visit.notes or ""
         visit.notes = (
-            existing_notes
-            + f"\n[Force reopen: → {payload.target_status}] "
+            existing_notes + f"\n[Force reopen: → {payload.target_status}] "
             f"Reason: {payload.reason}"
         )
     # Clear the finished_at timestamp so the visit's duration metrics
@@ -538,7 +551,9 @@ def force_reopen_visit(
 def reschedule_visit(
     visit_id: int,
     new_date: date = Query(..., alias="new_date"),
-    new_time: str | None = Query(None, alias="new_time", description="Опциональное новое время в формате HH:MM"),
+    new_time: str | None = Query(
+        None, alias="new_time", description="Опциональное новое время в формате HH:MM"
+    ),
     db: Session = Depends(get_db),
 ):
     """
@@ -590,9 +605,7 @@ def reschedule_visit(
         if hasattr(t.c, "reminder_sent_at"):
             update_values["reminder_sent_at"] = None
         if hasattr(t.c, "reminder_generation"):
-            update_values["reminder_generation"] = (
-                t.c.reminder_generation + 1
-            )
+            update_values["reminder_generation"] = t.c.reminder_generation + 1
     if new_time is not None:
         # Валидация формата HH:MM
         if not _isValid_time_str(new_time_str):
@@ -602,48 +615,59 @@ def reschedule_visit(
             )
         update_values["visit_time"] = new_time_str
 
-    # PR-1 (Codex round 11, P1): a schedule mutation must never COMMIT
+    # PR-1 (Codex round 11+13, P1): a schedule mutation must never COMMIT
     # under a LIVE reminder lease — the in-flight old-generation worker
     # would dispatch the obsolete appointment details (its finalize is
     # generation-guarded, so the reminder would then be sent AGAIN for
     # the new generation and the patient would receive two messages,
     # the first describing an appointment that no longer exists). Wait
-    # for the dispatch to resolve; refuse with 409 when the lease
-    # survives the whole wait budget. A stale lease (dead worker) never
-    # blocks — same reclaim contract as the worker's claim predicate.
+    # for the dispatch to resolve, refuse with 409 when the lease
+    # survives the whole wait budget, and bind the mutation ITSELF to
+    # the no-live-lease predicate (round 13: the wait alone is not
+    # atomic — a claim can land between the last poll and the UPDATE).
+    # A stale lease (dead worker) never blocks — same reclaim contract
+    # as the worker's claim predicate. A no-op reschedule preserves the
+    # reminder state and needs no coordination.
+    lease_free = None
     if schedule_changed and hasattr(t.c, "reminder_claimed_at"):
-        from app.tasks.lease import wait_for_reminder_lease_clear
+        from datetime import datetime
+
+        from app.tasks.lease import LEASE_TTL, wait_for_reminder_lease_clear
 
         if not wait_for_reminder_lease_clear(db, visit_id):
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "Reminder delivery is in progress for this visit; "
-                    "retry in a few seconds"
-                ),
-            )
+            raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
+        lease_free = or_(
+            t.c.reminder_claimed_at.is_(None),
+            t.c.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
+        )
 
-    upd = (
-        t.update().where(t.c.id == visit_id).values(**update_values).returning(t)
-    )
-    row = db.execute(upd).mappings().first()
+    upd = t.update().where(t.c.id == visit_id)
+    if lease_free is not None:
+        upd = upd.where(lease_free)
+    row = db.execute(upd.values(**update_values).returning(t)).mappings().first()
     if not row:
+        if (
+            lease_free is not None
+            and db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
+        ):
+            # The visit exists — the conditional UPDATE lost the race to
+            # a claim that landed after the wait loop's last poll.
+            raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
         raise HTTPException(404, "Visit not found")
 
     # [FIX] Обновляем статус в очереди для старой даты
     try:
         from sqlalchemy import text
+
         # Помечаем старую запись очереди как перенесенную
         db.execute(
-            text(
-                """
+            text("""
                 UPDATE queue_entries
                 SET status = 'rescheduled'
                 WHERE visit_id = :visit_id
                   AND patient_id = :patient_id
-                """
-            ),
-            {"visit_id": visit_id, "patient_id": vrow.get("patient_id")}
+                """),
+            {"visit_id": visit_id, "patient_id": vrow.get("patient_id")},
         )
     except Exception:
         pass
@@ -694,47 +718,48 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
         if hasattr(t.c, "reminder_sent_at"):
             tomorrow_values["reminder_sent_at"] = None
         if hasattr(t.c, "reminder_generation"):
-            tomorrow_values["reminder_generation"] = (
-                t.c.reminder_generation + 1
-            )
+            tomorrow_values["reminder_generation"] = t.c.reminder_generation + 1
         # The lease is preserved — see the /reschedule route comment
         # (Codex round 8, P1) — and the mutation below is lease-coordinated
-        # (Codex round 11, P1).
-    if tomorrow != vrow.get("visit_date") and hasattr(
-        t.c, "reminder_claimed_at"
-    ):
-        from app.tasks.lease import wait_for_reminder_lease_clear
+        # (Codex round 11+13, P1).
+    lease_free = None
+    if tomorrow != vrow.get("visit_date") and hasattr(t.c, "reminder_claimed_at"):
+        from datetime import datetime
+
+        from app.tasks.lease import LEASE_TTL, wait_for_reminder_lease_clear
 
         if not wait_for_reminder_lease_clear(db, visit_id):
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "Reminder delivery is in progress for this visit; "
-                    "retry in a few seconds"
-                ),
-            )
+            raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
+        lease_free = or_(
+            t.c.reminder_claimed_at.is_(None),
+            t.c.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
+        )
 
-    upd = (
-        t.update().where(t.c.id == visit_id).values(**tomorrow_values).returning(t)
-    )
-    row = db.execute(upd).mappings().first()
+    upd = t.update().where(t.c.id == visit_id)
+    if lease_free is not None:
+        upd = upd.where(lease_free)
+    row = db.execute(upd.values(**tomorrow_values).returning(t)).mappings().first()
     if not row:
+        if (
+            lease_free is not None
+            and db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
+        ):
+            raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
         raise HTTPException(404, "Visit not found")
 
     # [FIX] Обновляем статус в очереди для старой даты
     try:
         from sqlalchemy import text
+
         # Помечаем старую запись очереди как перенесенную
         db.execute(
-            text(
-                """
+            text("""
                 UPDATE queue_entries
                 SET status = 'rescheduled'
                 WHERE visit_id = :visit_id
                   AND patient_id = :patient_id
-                """
-            ),
-            {"visit_id": visit_id, "patient_id": vrow.get("patient_id")}
+                """),
+            {"visit_id": visit_id, "patient_id": vrow.get("patient_id")},
         )
     except Exception:
         pass

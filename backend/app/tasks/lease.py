@@ -28,6 +28,7 @@ import logging
 import time
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -110,3 +111,15 @@ def wait_for_reminder_lease_clear(
             return False
         waited = True
         time.sleep(poll)
+
+
+def lease_free_condition(claimed_at_column, cutoff: datetime):
+    """SQLAlchemy condition asserting the row holds NO live lease.
+
+    True when the lease is absent or older than ``cutoff`` (a dead
+    worker's lease). Works for ORM class attributes AND reflected Core
+    table columns — the atomic mutation of every schedule-mutating path
+    binds itself to this predicate (round 13, P1: the wait loop alone is
+    not atomic — a claim can land between the last poll and the UPDATE).
+    """
+    return or_(claimed_at_column.is_(None), claimed_at_column < cutoff)

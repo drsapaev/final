@@ -41,10 +41,10 @@ logger = logging.getLogger(__name__)
 # provider.
 from app.tasks.lease import LEASE_TTL  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Job implementations
 # ---------------------------------------------------------------------------
+
 
 def _delivery_retry(ctx, message: str) -> Exception:
     """Codex round 9, P1: arq 0.28 has no ``retry_policy`` worker setting —
@@ -148,11 +148,18 @@ async def send_visit_reminder(
 
     logger.info(
         "job.send_visit_reminder visit_id=%s channel=%s schedule_version=%s",
-        visit_id, channel, schedule_version,
+        visit_id,
+        channel,
+        schedule_version,
     )
 
     engine = create_engine(str(settings.DATABASE_URL))
-    db = Session(engine)
+    # expire_on_commit=False (Codex round 12, P2): the notification service
+    # ends the read-only transaction before the provider await, and its
+    # post-commit attribute reads (patient phone/chat id) must stay
+    # in-memory — an expired-instance refresh would reopen a transaction
+    # right under the await, defeating the whole point.
+    db = Session(engine, expire_on_commit=False)
     # Python-side clock: the lease value must be byte-identical between the
     # claim write and the later equality guards on every dialect (a SQL
     # now() + RETURNING round-trip is fragile on SQLite, where
@@ -201,9 +208,7 @@ async def send_visit_reminder(
             our_lease = None
             visit = db.query(Visit).filter(Visit.id == visit_id).first()
             if not visit:
-                logger.warning(
-                    "job.send_visit_reminder: visit %s not found", visit_id
-                )
+                logger.warning("job.send_visit_reminder: visit %s not found", visit_id)
                 return
             if schedule_version is not None and not _schedule_matches(
                 visit, schedule_version
@@ -211,7 +216,9 @@ async def send_visit_reminder(
                 logger.info(
                     "job.send_visit_reminder: visit %s schedule moved on "
                     "(job version %s, visit %s %s) — stale job, skipping",
-                    visit_id, schedule_version, visit.visit_date,
+                    visit_id,
+                    schedule_version,
+                    visit.visit_date,
                     visit.visit_time,
                 )
                 return
@@ -219,14 +226,16 @@ async def send_visit_reminder(
                 logger.info(
                     "job.send_visit_reminder: visit %s not pending "
                     "confirmation (status=%s), skipping",
-                    visit_id, visit.status,
+                    visit_id,
+                    visit.status,
                 )
                 return
             if visit.reminder_sent_at is not None:
                 logger.info(
                     "job.send_visit_reminder: visit %s already reminded "
                     "at %s, skipping",
-                    visit_id, visit.reminder_sent_at,
+                    visit_id,
+                    visit.reminder_sent_at,
                 )
                 return
             # The only remaining reason the claim lost: a LIVE lease held by
@@ -252,7 +261,9 @@ async def send_visit_reminder(
             logger.info(
                 "job.send_visit_reminder: visit %s has a live lease "
                 "(claimed_at=%s), deferring redelivery by %.0fs",
-                visit_id, visit.reminder_claimed_at, defer,
+                visit_id,
+                visit.reminder_claimed_at,
+                defer,
             )
             raise Retry(defer=defer)
 
@@ -296,7 +307,8 @@ async def send_visit_reminder(
         if not result.get("success"):
             logger.warning(
                 "job.send_visit_reminder: send failed for visit %s: %s",
-                visit_id, result.get("error", "unknown"),
+                visit_id,
+                result.get("error", "unknown"),
             )
             # Release the lease in the handler below; arq defers with
             # backoff (Codex round 9, P1).
@@ -350,7 +362,8 @@ async def send_visit_reminder(
         else:
             logger.info(
                 "job.send_visit_reminder: visit %s reminded via %s",
-                visit_id, result.get("channel", channel),
+                visit_id,
+                result.get("channel", channel),
             )
     except Exception as exc:
         # Rollback first — the failed service call may have left uncommitted
@@ -391,7 +404,8 @@ async def send_visit_reminder(
             logger.warning(
                 "job.send_visit_reminder: transient database failure for "
                 "visit %s — deferring: %r",
-                visit_id, retry_exc,
+                visit_id,
+                retry_exc,
             )
             raise retry_exc from exc
         logger.exception("job.send_visit_reminder failed for visit %s", visit_id)
@@ -417,9 +431,15 @@ async def run_data_retention(ctx) -> None:
         db.close()
 
 
-async def generate_scheduled_report(ctx, *, report_type: str, filters: dict | None = None) -> None:
+async def generate_scheduled_report(
+    ctx, *, report_type: str, filters: dict | None = None
+) -> None:
     """Generate a scheduled report. See reporting_service."""
-    logger.info("job.generate_scheduled_report type=%s filters=%s", report_type, list((filters or {}).keys()))
+    logger.info(
+        "job.generate_scheduled_report type=%s filters=%s",
+        report_type,
+        list((filters or {}).keys()),
+    )
     # TODO: wire to actual reporting_service.generate_scheduled_report
     # For now, log and complete successfully.
     await asyncio.sleep(0.1)
@@ -455,8 +475,11 @@ async def run_lab_follow_up_reminders(ctx) -> None:
 # Worker lifecycle
 # ---------------------------------------------------------------------------
 
+
 async def startup(ctx) -> None:
-    logger.info("arq.worker.startup redis=%s", _redact_redis_url(settings.ARQ_REDIS_URL))
+    logger.info(
+        "arq.worker.startup redis=%s", _redact_redis_url(settings.ARQ_REDIS_URL)
+    )
 
 
 async def shutdown(ctx) -> None:
@@ -477,6 +500,7 @@ def _redact_redis_url(url: str) -> str:
 # ---------------------------------------------------------------------------
 # Worker settings — entry point for `arq` CLI
 # ---------------------------------------------------------------------------
+
 
 def _parse_redis_settings(url: str) -> RedisSettings:
     """Parse redis://[:password@]host:port/db into RedisSettings."""
@@ -501,10 +525,15 @@ QUEUE_NAME = "clinic"
 
 class WorkerSettings:
     """arq worker configuration. Run with:
-        arq app.tasks.worker.WorkerSettings
+    arq app.tasks.worker.WorkerSettings
     """
 
-    functions = [send_visit_reminder, run_data_retention, generate_scheduled_report, run_lab_follow_up_reminders]
+    functions = [
+        send_visit_reminder,
+        run_data_retention,
+        generate_scheduled_report,
+        run_lab_follow_up_reminders,
+    ]
 
     on_startup = startup
     on_shutdown = shutdown

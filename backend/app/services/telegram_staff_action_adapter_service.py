@@ -394,36 +394,71 @@ class TelegramStaffActionAdapterService:
             if new_visit_date < date.today():
                 raise TelegramStaffActionAdapterError("new_visit_date_in_past")
 
-            # PR-1 (Codex round 11, P1): same lease coordination as the
+            # PR-1 (Codex round 11+13, P1): same lease coordination as the
             # HTTP/service reschedule paths — a schedule mutation must
             # never COMMIT while a reminder delivery holds the lease, or
             # the in-flight old-generation worker dispatches the obsolete
             # details and the reminder is then sent again for the new
             # generation. Wait for the dispatch to resolve; refuse when
-            # the lease survives the wait budget. A no-op move preserves
-            # the reminder state and needs no coordination.
-            if new_visit_date != visit.visit_date:
-                from app.tasks.lease import wait_for_reminder_lease_clear
+            # the lease survives the wait budget; and bind the mutation
+            # ITSELF to the no-live-lease predicate (round 13: the wait
+            # alone is not atomic — a claim can land between the last
+            # poll and the UPDATE). A no-op move preserves the reminder
+            # state and needs no coordination.
+            previous_visit_date = visit.visit_date
+            schedule_changed = new_visit_date != previous_visit_date
+            if schedule_changed:
+                from sqlalchemy import or_
+
+                from app.tasks.lease import (
+                    LEASE_TTL,
+                    wait_for_reminder_lease_clear,
+                )
 
                 if not wait_for_reminder_lease_clear(self.db, visit_id):
                     raise TelegramStaffActionAdapterError(
                         "reminder_delivery_in_progress"
                     )
-
-            previous_visit_date = visit.visit_date
-            visit.visit_date = new_visit_date
-            # PR-1 (Codex rounds 3+5): moving a visit invalidates the
-            # reminder state — same contract as the HTTP/service reschedule
-            # paths — but only when the schedule actually changes: a no-op
-            # move must preserve it (Codex round 5, P2).
-            if new_visit_date != previous_visit_date:
-                visit.reminder_sent_at = None
-                visit.reminder_generation = (
-                    visit.reminder_generation or 0
-                ) + 1
-                # The lease is preserved — Codex round 8, P1 (a delivery in
-                # flight keeps its finalize binding; new-generation jobs are
-                # deferred by the live lease instead of duplicating it).
+                generation = (
+                    self.db.query(Visit.reminder_generation)
+                    .filter(Visit.id == visit_id)
+                    .scalar()
+                    or 0
+                )
+                claimed = (
+                    self.db.query(Visit)
+                    .filter(
+                        Visit.id == visit_id,
+                        or_(
+                            Visit.reminder_claimed_at.is_(None),
+                            Visit.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
+                        ),
+                    )
+                    .update(
+                        {
+                            "visit_date": new_visit_date,
+                            "reminder_sent_at": None,
+                            "reminder_generation": generation + 1,
+                        },
+                        synchronize_session=False,
+                    )
+                )
+                if claimed == 0:
+                    # The visit still exists — the conditional UPDATE lost
+                    # the race to a claim that landed after the wait loop's
+                    # last poll (the mutation would commit under a live
+                    # dispatch).
+                    raise TelegramStaffActionAdapterError(
+                        "reminder_delivery_in_progress"
+                    )
+                # Sync the identity-map instance with the atomic UPDATE.
+                self.db.refresh(visit)
+            else:
+                visit.visit_date = new_visit_date
+            # The lease is never written by mutations — Codex round 8, P1
+            # (a delivery in flight keeps its finalize binding;
+            # new-generation jobs are deferred by the live lease instead
+            # of duplicating it).
             queue_result = self.queue_service.staff_move_visit_queue_link(
                 self.db,
                 visit_id=visit_id,
@@ -439,9 +474,7 @@ class TelegramStaffActionAdapterService:
                 telegram_chat_id=telegram_chat_id,
                 extra={
                     "previous_visit_date": (
-                        previous_visit_date.isoformat()
-                        if previous_visit_date
-                        else None
+                        previous_visit_date.isoformat() if previous_visit_date else None
                     ),
                     "visit_date": visit.visit_date.isoformat(),
                     "queue_entry_status": queue_result.get("status"),
@@ -641,19 +674,32 @@ class TelegramStaffActionAdapterService:
             telegram_chat_id=telegram_chat_id,
         )
         try:
-            schedule = self.db.query(Schedule).filter(Schedule.id == schedule_id).first()
+            schedule = (
+                self.db.query(Schedule).filter(Schedule.id == schedule_id).first()
+            )
             if not schedule:
                 raise TelegramStaffActionAdapterError("schedule_not_found")
-            if start_time is None and end_time is None and breaks is None and active is None:
+            if (
+                start_time is None
+                and end_time is None
+                and breaks is None
+                and active is None
+            ):
                 raise TelegramStaffActionAdapterError("schedule_change_empty")
-            if start_time is not None and end_time is not None and start_time >= end_time:
+            if (
+                start_time is not None
+                and end_time is not None
+                and start_time >= end_time
+            ):
                 raise TelegramStaffActionAdapterError("schedule_time_range_invalid")
 
             previous = {
-                "start_time": schedule.start_time.isoformat()
-                if schedule.start_time
-                else None,
-                "end_time": schedule.end_time.isoformat() if schedule.end_time else None,
+                "start_time": (
+                    schedule.start_time.isoformat() if schedule.start_time else None
+                ),
+                "end_time": (
+                    schedule.end_time.isoformat() if schedule.end_time else None
+                ),
                 "active": schedule.active,
             }
             if start_time is not None:
@@ -674,12 +720,12 @@ class TelegramStaffActionAdapterService:
                 telegram_chat_id=telegram_chat_id,
                 extra={
                     "previous": previous,
-                    "start_time": schedule.start_time.isoformat()
-                    if schedule.start_time
-                    else None,
-                    "end_time": schedule.end_time.isoformat()
-                    if schedule.end_time
-                    else None,
+                    "start_time": (
+                        schedule.start_time.isoformat() if schedule.start_time else None
+                    ),
+                    "end_time": (
+                        schedule.end_time.isoformat() if schedule.end_time else None
+                    ),
                     "active": schedule.active,
                 },
             )

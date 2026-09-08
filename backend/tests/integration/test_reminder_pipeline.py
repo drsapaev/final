@@ -1619,6 +1619,102 @@ def test_telegram_move_visit_is_lease_coordinated(
         s.close()
 
 
+def test_reschedule_atomic_update_rejects_lease_race(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 13, P1: the wait loop alone is NOT atomic — a claim can
+    land between the last poll and the schedule UPDATE. The mutation is
+    therefore bound to the no-live-lease predicate itself: when a live
+    lease appears at UPDATE time (simulated here — the wait reports clear
+    while a lease exists), the conditional UPDATE matches zero rows and
+    the mutation refuses with 409 instead of committing under a dispatch."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.api.v1.endpoints.visits import reschedule_visit
+    from app.models.visit import Visit
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    # The wait reports CLEAR (simulating the lease-free read), but the
+    # live lease is still in the DB when the conditional UPDATE runs.
+    monkeypatch.setattr(
+        lease_mod, "wait_for_reminder_lease_clear", lambda *a, **kw: True
+    )
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            reschedule_visit(
+                visit_id=visit_id,
+                new_date=date.today() + timedelta(days=3),
+                new_time=None,
+                db=s,
+            )
+        assert exc_info.value.status_code == 409
+        assert "Reminder delivery is in progress" in exc_info.value.detail
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == date.today(), "schedule unchanged"
+        assert row.reminder_generation == 0, "generation untouched"
+        assert row.reminder_sent_at is None, "stamp untouched"
+        assert row.reminder_claimed_at is not None, "lease untouched"
+    finally:
+        s.close()
+
+
+@pytest.mark.asyncio
+async def test_service_body_ends_transaction_before_dispatch(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 12, P2: the provider dispatch can hold the connection
+    for up to the arq job timeout (300s). The REAL service body ends the
+    read-only transaction BEFORE awaiting the provider — asserted inside
+    the stubbed provider call — so max_jobs slow dispatches can never pin
+    every connection in an idle-in-transaction state. The session mirrors
+    the worker's configuration (expire_on_commit=False), so the pwa
+    branch's post-commit attribute reads stay in-memory instead of
+    reopening a transaction."""
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+    from app.services.notification_service import NotificationService
+
+    visit_id = make_visit()
+    # The fixture patient's phone is a +998 number, so the real channel
+    # selection resolves to "pwa" — the await under test is the SMS send.
+
+    s = sessionmaker(bind=pipeline_db, expire_on_commit=False)()
+    try:
+        patient_id = s.get(Visit, visit_id).patient_id
+    finally:
+        s.close()
+
+    svc = NotificationService()
+    observed: dict = {}
+
+    # The channel selection resolves to "pwa" (the fixture phone is a
+    # +998 number). Stub the pwa dispatch itself — the assertion target
+    # is the transaction state AT THE PROVIDER AWAIT, wherever it lives.
+    async def _stub_pwa_invitation(patient, data):
+        observed["in_transaction"] = s.in_transaction()
+        return {"success": True, "channel": "pwa"}
+
+    svc._send_pwa_invitation = _stub_pwa_invitation  # type: ignore[method-assign]
+
+    s = sessionmaker(bind=pipeline_db, expire_on_commit=False)()
+    try:
+        result = await svc.send_confirmation_reminder(s, visit_id, hours_before=24)
+        assert result["success"] is True
+        assert result.get("channel") == "pwa"
+        assert observed["in_transaction"] is False, (
+            "the read-only transaction must be committed before the " "provider await"
+        )
+        assert s.get(Patient, patient_id) is not None
+    finally:
+        s.close()
+
+
 @pytest.mark.asyncio
 async def test_delivery_failure_gives_up_after_backoffs(
     pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch

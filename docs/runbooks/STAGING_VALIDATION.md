@@ -349,26 +349,74 @@ arq app.tasks.worker.WorkerSettings
 # Terminal 2: enqueue a test reminder
 # (Codex round 9: schedule_version is a REQUIRED producer argument — the
 # worker rejects unversioned jobs. The version is built from the visit's
-# date, time and reminder generation.)
+# date, time and reminder generation.
+# Codex round 12, P2: visit 1 may be confirmed, canceled, already
+# reminded or lacking a schedule — the worker would legitimately skip
+# such a visit and the check would prove nothing. Select the first
+# REMINDER-ELIGIBLE visit instead; if none exists, create a clearly
+# synthetic one (AGENTS.md synthetic-data policy: 00-operator prefix,
+# SYNTHETIC markers).)
 cd backend
 python -c "
 import asyncio
+from datetime import date
+
 from app.tasks import enqueue_reminder
 from app.tasks.scheduler import build_reminder_schedule_version
 from app.db.session import SessionLocal
+from app.models.clinic import Doctor
+from app.models.patient import Patient
+from app.models.user import User
 from app.models.visit import Visit
 
 async def main():
     db = SessionLocal()
     try:
-        visit = db.query(Visit).filter(Visit.id == 1).first()
+        visit = (
+            db.query(Visit)
+            .filter(
+                Visit.status == 'pending_confirmation',
+                Visit.visit_date.isnot(None),
+                Visit.reminder_sent_at.is_(None),
+                Visit.reminder_claimed_at.is_(None),
+            )
+            .order_by(Visit.id)
+            .first()
+        )
         if visit is None:
-            print('Visit 1 not found — create a test visit first')
-            return
+            suffix = 'stgcheck'
+            user = User(
+                username=f'stgcheck_{suffix}',
+                email=f'{suffix}@synthetic.invalid',
+                full_name='SYNTHETIC staging-check doctor',
+                hashed_password='not-a-login-hash',
+                role='Doctor', is_active=True, is_superuser=False,
+            )
+            db.add(user); db.flush()
+            doctor = Doctor(user_id=user.id, specialty='SYNTHETIC', active=True)
+            db.add(doctor); db.flush()
+            patient = Patient(
+                first_name='Синтетик', last_name='StagingCheck',
+                middle_name='SYNTHETIC',
+                phone='+998000000000',
+                birth_date=date(1990, 1, 1),
+                address='SYNTHETIC-STAGING-CHECK',
+            )
+            db.add(patient); db.flush()
+            visit = Visit(
+                patient_id=patient.id, doctor_id=doctor.id,
+                visit_date=date.today(), visit_time='10:00',
+                status='pending_confirmation', discount_mode='none',
+                department='cardiology',
+                confirmation_token=f'stgcheck-{suffix}',
+                confirmation_channel='telegram',
+            )
+            db.add(visit); db.commit()
+            print(f'Created SYNTHETIC eligible visit id={visit.id}')
         version = build_reminder_schedule_version(visit)
-        print(f'Schedule version: {version}')
+        print(f'Eligible visit id={visit.id}, schedule version: {version}')
         job_id = await enqueue_reminder(
-            visit_id=1, channel='telegram', schedule_version=version
+            visit_id=visit.id, channel='telegram', schedule_version=version
         )
         print(f'Enqueued job: {job_id}')
     finally:
@@ -377,15 +425,15 @@ async def main():
 asyncio.run(main())
 "
 
-# Watch Terminal 1 for log output:
-# Expected: 'job.send_visit_reminder visit_id=1 channel=telegram'
-# Then: 'job.send_visit_reminder: visit 1 reminded via telegram' (if send succeeds)
-# Or: 'job.send_visit_reminder: send failed for visit 1: <error>' (if Telegram bot not configured)
+# Watch Terminal 1 for log output (substitute the printed visit id):
+# Expected: 'job.send_visit_reminder visit_id=<visit.id> channel=telegram'
+# Then: 'job.send_visit_reminder: visit <visit.id> reminded via telegram' (if send succeeds)
+# Or: 'job.send_visit_reminder: send failed for visit <visit.id>: <error>' (if Telegram bot not configured)
 ```
 
 ### Expected
 
-- Worker logs show `task.enqueue.ok job_id=reminder:visit:1:telegram`
+- Worker logs show `task.enqueue.ok job_id=reminder:visit:<visit.id>:telegram` (the selected or created synthetic visit id)
 - Worker attempts to send via `NotificationService.send_confirmation_reminder`
 - If Telegram bot is configured: reminder delivered, `visits.reminder_sent_at` set
 - If not configured: job fails + retries 3x with 10s/60s/300s backoff, then gives up

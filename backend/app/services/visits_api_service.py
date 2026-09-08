@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import MetaData, Table, select, text
+from sqlalchemy import MetaData, Table, or_, select, text
 
 _REFLECTED_META = MetaData()
 from sqlalchemy.orm import Session
@@ -16,6 +16,12 @@ from app.core.audit import extract_model_changes
 from app.models.visit import Visit
 from app.repositories.visits_api_repository import VisitsApiRepository
 from app.services.service_mapping import normalize_service_code
+
+# PR-1 (Codex round 11+13, P1): shared lease-coordination refusal detail
+# (mirrors the reschedule routes' constant in app/api/v1/endpoints/visits.py).
+_REMINDER_IN_PROGRESS = (
+    "Reminder delivery is in progress for this visit; retry in a few seconds"
+)
 
 
 class VisitsApiService:
@@ -34,16 +40,24 @@ class VisitsApiService:
     # create). One shared MetaData reflects each table exactly once; later
     # Table(...) calls return the cached reflection without I/O.
     def _visits(self) -> Table:
-        return Table("visits", _REFLECTED_META, autoload_with=self.repository.get_bind())
+        return Table(
+            "visits", _REFLECTED_META, autoload_with=self.repository.get_bind()
+        )
 
     def _vservices(self) -> Table:
-        return Table("visit_services", _REFLECTED_META, autoload_with=self.repository.get_bind())
+        return Table(
+            "visit_services", _REFLECTED_META, autoload_with=self.repository.get_bind()
+        )
 
     def _patients(self) -> Table:
-        return Table("patients", _REFLECTED_META, autoload_with=self.repository.get_bind())
+        return Table(
+            "patients", _REFLECTED_META, autoload_with=self.repository.get_bind()
+        )
 
     def _doctors(self) -> Table:
-        return Table("doctors", _REFLECTED_META, autoload_with=self.repository.get_bind())
+        return Table(
+            "doctors", _REFLECTED_META, autoload_with=self.repository.get_bind()
+        )
 
     def _users(self) -> Table:
         return Table("users", _REFLECTED_META, autoload_with=self.repository.get_bind())
@@ -59,14 +73,12 @@ class VisitsApiService:
             return
 
         self.repository.execute(
-            text(
-                """
+            text("""
                 UPDATE queue_entries
                 SET status = :status_value
                 WHERE visit_id = :visit_id
                   AND patient_id = :patient_id
-                """
-            ),
+                """),
             {
                 "status_value": status_value,
                 "visit_id": visit_id,
@@ -191,9 +203,13 @@ class VisitsApiService:
     def get_visit(self, *, visit_id: int) -> dict[str, Any]:
         visits_table = self._visits()
         services_table = self._vservices()
-        visit_row = self.repository.execute(
-            select(visits_table).where(visits_table.c.id == visit_id)
-        ).mappings().first()
+        visit_row = (
+            self.repository.execute(
+                select(visits_table).where(visits_table.c.id == visit_id)
+            )
+            .mappings()
+            .first()
+        )
         if not visit_row:
             raise HTTPException(404, "Visit not found")
         visit = dict(visit_row)
@@ -201,17 +217,21 @@ class VisitsApiService:
         patient_id = visit.get("patient_id")
         if patient_id:
             patients_table = self._patients()
-            patient_row = self.repository.execute(
-                select(
-                    patients_table.c.id,
-                    patients_table.c.last_name,
-                    patients_table.c.first_name,
-                    patients_table.c.middle_name,
-                    patients_table.c.birth_date,
-                    patients_table.c.phone,
-                    patients_table.c.address,
-                ).where(patients_table.c.id == patient_id)
-            ).mappings().first()
+            patient_row = (
+                self.repository.execute(
+                    select(
+                        patients_table.c.id,
+                        patients_table.c.last_name,
+                        patients_table.c.first_name,
+                        patients_table.c.middle_name,
+                        patients_table.c.birth_date,
+                        patients_table.c.phone,
+                        patients_table.c.address,
+                    ).where(patients_table.c.id == patient_id)
+                )
+                .mappings()
+                .first()
+            )
             if patient_row:
                 patient = dict(patient_row)
                 patient_name = " ".join(
@@ -242,21 +262,25 @@ class VisitsApiService:
         if doctor_id:
             doctors_table = self._doctors()
             users_table = self._users()
-            doctor_row = self.repository.execute(
-                select(
-                    doctors_table.c.id,
-                    doctors_table.c.specialty,
-                    doctors_table.c.cabinet,
-                    users_table.c.full_name.label("doctor_full_name"),
-                    users_table.c.username.label("doctor_username"),
-                )
-                .select_from(
-                    doctors_table.outerjoin(
-                        users_table, users_table.c.id == doctors_table.c.user_id
+            doctor_row = (
+                self.repository.execute(
+                    select(
+                        doctors_table.c.id,
+                        doctors_table.c.specialty,
+                        doctors_table.c.cabinet,
+                        users_table.c.full_name.label("doctor_full_name"),
+                        users_table.c.username.label("doctor_username"),
                     )
+                    .select_from(
+                        doctors_table.outerjoin(
+                            users_table, users_table.c.id == doctors_table.c.user_id
+                        )
+                    )
+                    .where(doctors_table.c.id == doctor_id)
                 )
-                .where(doctors_table.c.id == doctor_id)
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
             if doctor_row:
                 doctor = dict(doctor_row)
                 doctor_name = (
@@ -349,9 +373,11 @@ class VisitsApiService:
                 detail="visits table has no visit_date column; check your schema.",
             )
 
-        visit_row = self.repository.execute(
-            select(table).where(table.c.id == visit_id)
-        ).mappings().first()
+        visit_row = (
+            self.repository.execute(select(table).where(table.c.id == visit_id))
+            .mappings()
+            .first()
+        )
         if not visit_row:
             raise HTTPException(404, "Visit not found")
 
@@ -381,31 +407,42 @@ class VisitsApiService:
                 )
             # The lease is preserved — Codex round 8, P1 (see the
             # /visits/{id}/reschedule route comment).
-            # PR-1 (Codex round 11, P1): the mutation must never COMMIT
+            # PR-1 (Codex round 11+13, P1): the mutation must never COMMIT
             # under a live lease — wait for the in-flight dispatch to
             # resolve, refuse with 409 when the lease survives the wait
-            # budget (same contract as the HTTP reschedule endpoints).
+            # budget, and bind the mutation ITSELF to the no-live-lease
+            # predicate (round 13: the wait alone is not atomic).
+            lease_free = None
             if hasattr(table.c, "reminder_claimed_at"):
-                from app.tasks.lease import wait_for_reminder_lease_clear
+                from app.tasks.lease import (
+                    LEASE_TTL,
+                    wait_for_reminder_lease_clear,
+                )
 
-                if not wait_for_reminder_lease_clear(
-                    self.repository.db, visit_id
-                ):
-                    raise HTTPException(
-                        status_code=409,
-                        detail=(
-                            "Reminder delivery is in progress for this "
-                            "visit; retry in a few seconds"
-                        ),
-                    )
-        upd = (
-            table.update()
-            .where(table.c.id == visit_id)
-            .values(**reschedule_values)
-            .returning(table)
+                if not wait_for_reminder_lease_clear(self.repository.db, visit_id):
+                    raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
+                lease_free = or_(
+                    table.c.reminder_claimed_at.is_(None),
+                    table.c.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
+                )
+        else:
+            lease_free = None
+        upd = table.update().where(table.c.id == visit_id)
+        if lease_free is not None:
+            upd = upd.where(lease_free)
+        row = (
+            self.repository.execute(upd.values(**reschedule_values).returning(table))
+            .mappings()
+            .first()
         )
-        row = self.repository.execute(upd).mappings().first()
         if not row:
+            if (
+                lease_free is not None
+                and self.repository.execute(select(table).where(table.c.id == visit_id))
+                .mappings()
+                .first()
+            ):
+                raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
             raise HTTPException(404, "Visit not found")
 
         try:
@@ -423,4 +460,3 @@ class VisitsApiService:
     def reschedule_visit_tomorrow(self, *, visit_id: int) -> dict[str, Any]:
         tomorrow = date.today() + timedelta(days=1)
         return self.reschedule_visit(visit_id=visit_id, new_date=tomorrow)
-
