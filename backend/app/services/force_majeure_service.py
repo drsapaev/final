@@ -16,7 +16,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.crud.queue_resource_routing import resolve_registry_tag_queue_for_specialist
+from app.crud.queue_resource_routing import (
+    resolve_registry_tag_queue_for_specialist,
+    resource_start_number,
+)
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.payment import Payment
@@ -142,6 +145,13 @@ class ForceMajeureService:
 
         # Получаем следующий номер в очереди на завтра
         next_number = self._get_next_queue_number(tomorrow_queue.id)
+        # QD-2C (Codex round-9 P2): нумерация ресурсной поверхности
+        # стартует с QueueResource.start_number_online — иначе
+        # перенесённые пациенты получают номера вне канонической
+        # последовательности (пустая очередь -> 1, а не старт реестра)
+        resource_floor = resource_start_number(self.db, tomorrow_queue)
+        if resource_floor is not None and next_number < resource_floor:
+            next_number = resource_floor
 
         for entry in entries:
             try:

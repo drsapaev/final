@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import get_queue_settings, update_queue_settings
+from app.repositories.queue_api_repository import QueueApiRepository
 from app.repositories.queue_limits_repository import QueueLimitsRepository
 
 
@@ -167,11 +168,27 @@ class QueueLimitsApiService:
         if not doctor:
             raise ValueError("DOCTOR_NOT_FOUND")
 
-        daily_queue = self.repository.get_or_create_daily_queue(
-            day=limit_data.day,
-            specialist_id=limit_data.doctor_id,
-            max_online_entries=limit_data.max_online_entries,
-        )
+        # QD-2C (Codex round-9 P1): registry-tag специалист (синтетик
+        # lab/ecg) — лимит применяется к (day, tag)-ПОВЕРХНОСТИ
+        # (resource-owned), а НЕ к doctor-keyed тени: иначе лимит
+        # устанавливается на неиспользуемую строку, пока присоединения
+        # живут с прежним ресурсным капом. Не-registry врачи — прежний
+        # путь байт-идентично.
+        registry_queue = None
+        if doctor.specialty:
+            registry_queue = QueueApiRepository(
+                self.repository.db
+            ).get_or_create_registry_queue(
+                day=limit_data.day, queue_tag=doctor.specialty
+            )
+        if registry_queue is not None:
+            daily_queue = registry_queue
+        else:
+            daily_queue = self.repository.get_or_create_daily_queue(
+                day=limit_data.day,
+                specialist_id=limit_data.doctor_id,
+                max_online_entries=limit_data.max_online_entries,
+            )
         daily_queue.max_online_entries = limit_data.max_online_entries
         self.repository.save()
 

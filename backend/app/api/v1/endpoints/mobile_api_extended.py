@@ -419,8 +419,21 @@ async def get_my_queue_position(
             result.append(
                 {
                     "queue_id": position.queue_id,
-                    "doctor_name": _doctor_full_name(doctor),
-                    "specialty": _doctor_specialty(doctor),
+                    # QD-2C (Codex round-9 P2): resource-owned очередь —
+                    # владелец из реестра, ось — тег (иначе «Неизвестно»)
+                    "doctor_name": (
+                        queue.queue_resource.display_name
+                        if (
+                            queue.specialist_id is None
+                            and queue.queue_resource is not None
+                        )
+                        else _doctor_full_name(doctor)
+                    ),
+                    "specialty": (
+                        queue.queue_tag
+                        if (queue.specialist_id is None and queue.queue_tag)
+                        else _doctor_specialty(doctor)
+                    ),
                     "my_number": position.number,
                     "current_number": current_number,
                     "patients_before_me": max(0, patients_before),

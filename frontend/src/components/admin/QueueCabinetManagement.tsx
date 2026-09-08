@@ -247,7 +247,9 @@ const QueueCabinetManagement = () => {
                   {queue.specialist_name || t('admin2.qcm_specialist_fallback', { id: queue.specialist_id })}
                 </div>
                 <div className="admin-fs-xs-tertiary-3">
-                  ID {queue.specialist_id}
+                  {queue.specialist_id === null
+                    ? t('admin2.qcm_resource_tag_line', { tag: queue.queue_tag || '—' })
+                    : `ID ${queue.specialist_id}`}
                 </div>
               </div>
             </div>
@@ -262,9 +264,11 @@ const QueueCabinetManagement = () => {
               <div className="admin-primary-fw-600-1">
                 {queue.effective_cabinet || t('admin2.qcm_not_specified')}
               </div>
-              <div className="admin-fs-xs-tertiary-2">
-                {t('admin2.qcm_queue_doctor_line', { queue: queue.cabinet_number || '—', doctor: queue.doctor_cabinet || '—' })}
-              </div>
+              {queue.specialist_id === null ? null : (
+                <div className="admin-fs-xs-tertiary-2">
+                  {t('admin2.qcm_queue_doctor_line', { queue: queue.cabinet_number || '—', doctor: queue.doctor_cabinet || '—' })}
+                </div>
+              )}
             </div>
           ),
           cabinet_floor: (
@@ -291,40 +295,58 @@ const QueueCabinetManagement = () => {
           ),
           sync_state: (
             <div className="admin-d-flex-fd-column-gap-6">
-              <Badge
-                variant={
-                  queue.sync_status === 'synced'
-                    ? 'success'
-                    : queue.sync_status === 'stale'
-                      ? 'warning'
-                      : 'secondary'
-                }
-              >
-                {queue.sync_status === 'synced'
-                  ? t('admin2.qcm_sync_state_synced')
-                  : queue.sync_status === 'stale'
-                    ? t('admin2.qcm_sync_state_stale')
-                    : queue.sync_status === 'missing_doctor'
-                      ? t('admin2.qcm_sync_state_missing_doctor')
-                      : t('admin2.qcm_sync_state_missing_cabinet')}
-              </Badge>
-              <div className="admin-d-flex-fw-wrap-gap-6">
-                <Badge
-                  variant={queue.linked_doctor_found ? 'success' : 'warning'}
-                  className="admin-fs-xs"
-                >
-                  {queue.linked_doctor_found ? t('admin2.qcm_doctor_found') : t('admin2.qcm_doctor_not_found')}
-                </Badge>
-                <Badge
-                  variant={queue.doctor_has_cabinet ? 'success' : 'warning'}
-                  className="admin-fs-xs"
-                >
-                  {queue.doctor_has_cabinet ? t('admin2.qcm_doctor_cabinet_set') : t('admin2.qcm_doctor_cabinet_empty')}
-                </Badge>
-              </div>
-              <div className="admin-fs-xs-tertiary-1">
-                {t('admin2.qcm_canonical_hint')}
-              </div>
+              {queue.sync_status === 'resource_owned' ? (
+                <>
+                  <Badge variant="success">
+                    {t('admin2.qcm_sync_state_resource')}
+                  </Badge>
+                  <div className="admin-d-flex-fw-wrap-gap-6">
+                    <Badge variant="secondary" className="admin-fs-xs">
+                      {t('admin2.qcm_resource_owner')}
+                    </Badge>
+                  </div>
+                  <div className="admin-fs-xs-tertiary-1">
+                    {t('admin2.qcm_resource_hint')}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Badge
+                    variant={
+                      queue.sync_status === 'synced'
+                        ? 'success'
+                        : queue.sync_status === 'stale'
+                          ? 'warning'
+                          : 'secondary'
+                    }
+                  >
+                    {queue.sync_status === 'synced'
+                      ? t('admin2.qcm_sync_state_synced')
+                      : queue.sync_status === 'stale'
+                        ? t('admin2.qcm_sync_state_stale')
+                        : queue.sync_status === 'missing_doctor'
+                          ? t('admin2.qcm_sync_state_missing_doctor')
+                          : t('admin2.qcm_sync_state_missing_cabinet')}
+                  </Badge>
+                  <div className="admin-d-flex-fw-wrap-gap-6">
+                    <Badge
+                      variant={queue.linked_doctor_found ? 'success' : 'warning'}
+                      className="admin-fs-xs"
+                    >
+                      {queue.linked_doctor_found ? t('admin2.qcm_doctor_found') : t('admin2.qcm_doctor_not_found')}
+                    </Badge>
+                    <Badge
+                      variant={queue.doctor_has_cabinet ? 'success' : 'warning'}
+                      className="admin-fs-xs"
+                    >
+                      {queue.doctor_has_cabinet ? t('admin2.qcm_doctor_cabinet_set') : t('admin2.qcm_doctor_cabinet_empty')}
+                    </Badge>
+                  </div>
+                  <div className="admin-fs-xs-tertiary-1">
+                    {t('admin2.qcm_canonical_hint')}
+                  </div>
+                </>
+              )}
               {Array.isArray(queue.integrity_warnings) && queue.integrity_warnings.length > 0 ? (
                 <div className="admin-fs-xs-tertiary">
                   {queue.integrity_warnings.join(', ')}

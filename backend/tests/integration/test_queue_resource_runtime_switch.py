@@ -2094,3 +2094,137 @@ def test_registry_cabinet_persisted_in_every_creation_path(
     ):
         assert queue.cabinet_number == "7", path
         assert queue.specialist_id is None, path
+
+
+# ===================== S. Codex round-9 pins =====================
+
+
+def test_queue_limits_route_to_registry_surface(db_session: Session) -> None:
+    """Codex round-9 P1: PUT /admin/doctor-queue-limit for the synthetic
+    lab/ecg doctor applies the limit to the (day, tag) RESOURCE surface
+    (the queue joins actually use), not to a doctor-keyed shadow row
+    the repository would otherwise create. set_doctor_queue_limit
+    COMMITs — durable rows cleaned in the finally."""
+    try:
+        _test_queue_limits_route_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "lab_res19")
+
+
+def _test_queue_limits_route_body(db_session: Session) -> None:
+    from app.api.v1.endpoints.queue_limits import DoctorQueueLimit
+    from app.services.queue_limits_api_service import QueueLimitsApiService
+
+    user = _make_user(db_session, username="lab_res19", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab", max_online_per_day=15)
+    surface = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+
+    payload = QueueLimitsApiService(db_session).set_doctor_queue_limit(
+        limit_data=DoctorQueueLimit(
+            doctor_id=synthetic.id, day=_DAY, max_online_entries=7
+        )
+    )
+    assert payload["success"] is True
+
+    db_session.refresh(surface)
+    assert surface.max_online_entries == 7  # the limit lands on the surface
+    # no doctor-keyed shadow row was forked
+    doctor_rows = (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.day == _DAY, DailyQueue.specialist_id == synthetic.id)
+        .all()
+    )
+    assert doctor_rows == []
+
+
+def test_force_majeure_transfer_floors_at_resource_start(
+    db_session: Session,
+) -> None:
+    """Codex round-9 P2: a transfer onto an EMPTY tomorrow resource
+    surface numbers the moved entries from
+    QueueResource.start_number_online — the same canonical sequence
+    every resource allocation path uses — instead of 1."""
+    try:
+        _test_force_majeure_floor_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "lab_res20")
+
+
+def _test_force_majeure_floor_body(db_session: Session) -> None:
+    from app.services.force_majeure_service import ForceMajeureService
+
+    user = _make_user(db_session, username="lab_res20", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab", start_number_online=31)
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    entry = _make_waiting_entry(db_session, queue, number=31)
+
+    service = ForceMajeureService(db_session)
+    pending = service.get_pending_entries(specialist_id=synthetic.id, target_date=_DAY)
+    assert [e.id for e in pending] == [entry.id]
+
+    result = service.transfer_entries_to_tomorrow(
+        entries=pending,
+        specialist_id=synthetic.id,
+        reason="round-9 pin",
+        performed_by_id=1,
+        send_notifications=False,
+    )
+    assert result["success"] is True
+    assert result["transferred"] == 1
+    # the moved entry carries the registry floor number, not 1
+    assert result["details"][0]["new_number"] == 31
+
+
+def test_mobile_my_position_labels_resource_queue(db_session: Session) -> None:
+    """Codex round-9 P2: /api/v1/mobile/queues/my-position for a
+    patient waiting on a resource-owned queue reports the registry
+    display_name and the queue tag — not «Неизвестно» for both."""
+    import asyncio
+
+    from app.api.v1.endpoints.mobile_api_extended import get_my_queue_position
+    from app.models.patient import Patient
+
+    try:
+        patient_user = _make_user(db_session, username="pat_res21", role="Patient")
+        patient = Patient(
+            user_id=patient_user.id, last_name="Пациентов", first_name="Пациент"
+        )
+        db_session.add(patient)
+        db_session.commit()
+        db_session.refresh(patient)
+
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        entry = OnlineQueueEntry(
+            queue_id=queue.id,
+            number=31,
+            status="waiting",
+            source="desk",
+            patient_id=patient.id,
+        )
+        db_session.add(entry)
+        db_session.commit()
+
+        payload = asyncio.run(
+            get_my_queue_position(current_user=patient_user, db=db_session)
+        )
+        assert len(payload["positions"]) == 1
+        row = payload["positions"][0]
+        assert row["doctor_name"] == "Ресурс очереди"
+        assert row["specialty"] == "lab"
+        assert row["my_number"] == 31
+    finally:
+        db_session.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.patient_id == patient.id
+        ).delete(synchronize_session=False)
+        db_session.delete(patient)
+        db_session.commit()
+        _durable_cleanup(db_session, "pat_res21")
