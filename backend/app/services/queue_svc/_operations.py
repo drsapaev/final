@@ -448,9 +448,17 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                             "max_online_entries"
                         ]
                     ),
-                    cabinet_number=defaults.get("cabinet_number"),
-                    cabinet_floor=defaults.get("cabinet_floor"),
-                    cabinet_building=defaults.get("cabinet_building"),
+                    # Codex round-7 P1: кабинет ОБЩЕЙ очереди тега — из
+                    # реестра (default_cabinet; сиды 0059 держат NULL —
+                    # канонического источника нет), НЕ из кабинета
+                    # направившего врача в defaults: строка
+                    # переиспользуется всеми пациентами тега/дня, а
+                    # тикеты/уведомления читают cabinet_number очереди —
+                    # первый создатель не должен уводить весь lab/ecg в
+                    # свой кабинет. floor/building у реестра нет — NULL.
+                    cabinet_number=resource.default_cabinet,
+                    cabinet_floor=None,
+                    cabinet_building=None,
                 )
                 db.add(daily_queue)
                 try:

@@ -1868,3 +1868,106 @@ def test_registry_recheck_uses_locked_resolve(db_session: Session) -> None:
         assert lock_pos != -1, name
         recheck = src.find("resolve_tag_resource_locked", lock_pos)
         assert recheck > lock_pos, name
+
+
+# ===================== Q. Codex round-7 pins =====================
+
+
+def test_registry_queue_cabinet_comes_from_registry_not_doctor_defaults(
+    db_session: Session,
+) -> None:
+    """Codex round-7 P1: the shared tag queue must NOT inherit the
+    referring doctor's cabinet (morning assignment / registrar batch
+    pass the doctor's room in ``defaults`` — whichever doctor creates
+    the queue first would direct every lab/ecg ticket to that room).
+    The cabinet comes from the registry row (0059 seeds NULL — no
+    canonical source); floor/building stay unset."""
+    user = _make_user(db_session, username="dr_cab17", role="doctor")
+    referring = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    referring.cabinet = "42"
+    db_session.commit()
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    _make_resource(
+        db_session,
+        code="ecg",
+        queue_tag="ecg",
+        display_name="ЭКГ",
+    )
+    db_session.query(QueueResource).filter(QueueResource.queue_tag == "ecg").update(
+        {"default_cabinet": "7"}, synchronize_session=False
+    )
+    db_session.commit()
+
+    # the registrar-batch shape: doctor-keyed call with the referring
+    # doctor's cabinet in defaults for a REGISTRY tag
+    queue = queue_service.get_or_create_daily_queue(
+        db_session,
+        day=_DAY,
+        specialist_id=referring.id,
+        queue_tag="lab",
+        defaults={
+            "max_online_entries": 5,
+            "cabinet_number": referring.cabinet,
+            "cabinet_floor": 3,
+            "cabinet_building": "B",
+        },
+    )
+    assert queue.queue_resource_id is not None
+    assert queue.cabinet_number is None  # NOT the referring doctor's "42"
+    assert queue.cabinet_floor is None
+    assert queue.cabinet_building is None
+
+    # the registry's canonical cabinet transfers when it is set
+    ecg_queue = queue_service.get_or_create_daily_queue(
+        db_session,
+        day=_DAY,
+        specialist_id=referring.id,
+        queue_tag="ecg",
+        defaults={"cabinet_number": referring.cabinet},
+    )
+    assert ecg_queue.cabinet_number == "7"
+
+
+def test_analytics_department_filter_includes_resource_queues(
+    db_session: Session,
+) -> None:
+    """Codex round-7 P2: department-filtered queue analytics must not
+    drop resource-owned queues (specialist NULL) — the queue tag is
+    the department axis for resource rows, so lab reports count the
+    live resource queue's entries instead of returning zero."""
+    from datetime import datetime
+
+    from app.services.analytics import AnalyticsService
+
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    resource_queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    served = _make_waiting_entry(db_session, resource_queue, number=1)
+    served.status = "served"
+    _make_waiting_entry(db_session, resource_queue, number=2)
+    db_session.commit()
+
+    user = _make_user(db_session, username="dr_anl17", role="doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="cardio")
+    doctor_queue = _make_queue(
+        db_session, specialist_id=doctor.id, queue_tag="cardio", active=True
+    )
+    _make_waiting_entry(db_session, doctor_queue, number=1)
+
+    start = datetime(2026, 9, 6, 0, 0, 0)
+    end = datetime(2026, 9, 8, 23, 59, 59)
+
+    lab_stats = AnalyticsService.get_queue_statistics(
+        db_session, start_date=start, end_date=end, department="lab"
+    )
+    assert lab_stats["total_queues"] == 1
+    assert lab_stats["total_entries"] == 2
+    assert lab_stats["total_served"] == 1
+    assert "lab" in lab_stats["by_department"]
+
+    cardio_stats = AnalyticsService.get_queue_statistics(
+        db_session, start_date=start, end_date=end, department="cardio"
+    )
+    assert cardio_stats["total_queues"] == 1  # the doctor queue only
+    assert cardio_stats["total_entries"] == 1
