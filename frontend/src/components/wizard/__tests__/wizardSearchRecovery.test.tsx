@@ -100,15 +100,45 @@ describe('Fix F: wizard search-race contract', () => {
     expect(patientStep).toContain("t('misc.aw_search_retry')");
   });
 
+  it('clearing the form invalidates the in-flight search and phone check', () => {
+    // Codex R10 PR 3097 (P2): «Очистить форму» при незавершённом поиске
+    // раньше НЕ инвалидирует запрос — его catch восстанавливал баннер
+    // ошибки на пустой форме (с Retry, которому нечего перезапускать).
+    // Теперь и clearDraft, и закрытие вызывают общий resetSearchInteractionState.
+    const clearBlock = extractSourceBlock(
+      source,
+      'const clearDraft = () => {',
+      'toast.success(t(\'misc.aw_form_cleared\'));'
+    );
+    expect(clearBlock).toContain('resetSearchInteractionState();');
+
+    const helperBlock = extractSourceBlock(
+      source,
+      'const resetSearchInteractionState = () => {',
+      '};\n\n  // Safeguard'
+    );
+    // seq +1 делает ответ in-flight запроса устаревшим (catch не применит его)
+    expect(helperBlock).toContain('patientSearchSeqRef.current += 1;');
+    expect(helperBlock).toContain('phoneCheckSeqRef.current += 1;');
+    // отложенные debounce-таймеры снимаются — отложенный поиск не стартует
+    // уже после очистки/закрытия
+    expect(helperBlock).toContain('clearTimeout(t)');
+    // спиннер и саджесты гасятся, ошибка поиска снимается — состояние чистое
+    expect(helperBlock).toContain('setIsSearchingPatients(false);');
+    expect(helperBlock).toContain('setPatientSuggestions([]);');
+    expect(helperBlock).toContain('setShowSuggestions(false);');
+    expect(helperBlock).toContain('setPatientSearchError(null);');
+  });
+
   it('closing the wizard cancels pending debounces and search state', () => {
     const closeBlock = extractSourceBlock(
       source,
       '✅ ИСПРАВЛЕНО: Сброс состояния мастера при закрытии',
       'Safeguard: Ensure wizardData structure is valid'
     );
-    expect(closeBlock).toContain('clearTimeout(searchTimeout)');
-    expect(closeBlock).toContain('clearTimeout(phoneCheckTimeout)');
-    expect(closeBlock).toContain('setPatientSearchError(null);');
+    // Codex R10 PR 3097: сброс вынесен в общий resetSearchInteractionState —
+    // закрытие проходит через него (те же гарантии Fix F).
+    expect(closeBlock).toContain('resetSearchInteractionState();');
   });
 
   it('close with user-entered content goes through a discard confirmation', () => {

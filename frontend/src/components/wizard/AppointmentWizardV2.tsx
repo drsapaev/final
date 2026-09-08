@@ -517,24 +517,24 @@ const AppointmentWizardV2 = ({
       setActiveServiceCategory('specialists');
       setServiceSearchQuery('');
       setShowAllServices(false);
-      // Fix F: при закрытии отменяем незавершённые дебаунсы/поиски и
-      // сбрасываем поисковые состояния (ничего не «догоняет» форму после
-      // закрытия; PHI-состояния не живут дольше формы)
-      if (searchTimeout) clearTimeout(searchTimeout);
-      if (phoneCheckTimeout) clearTimeout(phoneCheckTimeout);
-      setSearchTimeout(null);
-      setPhoneCheckTimeout(null);
-      patientSearchSeqRef.current += 1;
-      phoneCheckSeqRef.current += 1;
-      setPatientSuggestions([]);
-      setShowSuggestions(false);
-      setIsSearchingPatients(false);
-      setPatientSearchError(null);
+      // Fix F: при закрытии ничего не «догоняет» форму — общий сброс поисковых состояний.
+      resetSearchInteractionState();
     }
   }, [isOpen]);
 
   // Codex R5 PR 3097 (P2): условное размонтирование минует isOpen-эффект — гасим дебаунсы на unmount.
   useWizardSearchUnmountCleanup(() => [searchTimeout, phoneCheckTimeout]);
+  // Codex R10 PR 3097 (P2): общий сброс активного поиска (используется clearDraft и закрытием).
+  const resetSearchInteractionState = () => {
+    patientSearchSeqRef.current += 1;
+    phoneCheckSeqRef.current += 1;
+    [searchTimeout, phoneCheckTimeout].forEach((t) => t && clearTimeout(t));
+    setSearchTimeout(null); setPhoneCheckTimeout(null);
+    setIsSearchingPatients(false);
+    setPatientSuggestions([]);
+    setShowSuggestions(false);
+    setPatientSearchError(null);
+  };
 
   // Safeguard: Ensure wizardData structure is valid
   useEffect(() => {
@@ -661,8 +661,8 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(STEP_PATIENT);
-    // Codex R8 PR 3097 (P2): сброс также чистит ошибку поиска (иначе пустая форма хранит баннер с нерабочим Retry).
-    setPatientSearchError(null);
+    // R8/R10 PR 3097: сброс чистит ошибку поиска и инвалидирует активный поиск/проверку телефона.
+    resetSearchInteractionState();
     // Fix F (Codex R1 PR 3097): после сброса исходное состояние — пустая форма (закрытие не предупреждает).
     initialContentRef.current = wizardContentSignature({
       patient: { id: null, fio: '', phone: '', address: '', birth_date: '', gender: '' },
