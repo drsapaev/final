@@ -375,12 +375,12 @@ class VisitsApiService:
         if new_date != visit_row.get("visit_date"):
             if hasattr(table.c, "reminder_sent_at"):
                 reschedule_values["reminder_sent_at"] = None
-            if hasattr(table.c, "reminder_claimed_at"):
-                reschedule_values["reminder_claimed_at"] = None
             if hasattr(table.c, "reminder_generation"):
                 reschedule_values["reminder_generation"] = (
                     table.c.reminder_generation + 1
                 )
+            # The lease is preserved — Codex round 8, P1 (see the
+            # /visits/{id}/reschedule route comment).
         upd = (
             table.update()
             .where(table.c.id == visit_id)

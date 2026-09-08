@@ -665,7 +665,7 @@ def _stamp_and_reschedule_setup(pipeline_db, make_visit):
         {"reminder_sent_at": stamped, "reminder_claimed_at": stamped}
     )
     s.commit()
-    return visit_id, s, date.today() + timedelta(days=3)
+    return visit_id, s, date.today() + timedelta(days=3), stamped
 
 
 def test_service_reschedule_clears_reminder_stamp(pipeline_db, make_visit):
@@ -676,7 +676,9 @@ def test_service_reschedule_clears_reminder_stamp(pipeline_db, make_visit):
     from app.models.visit import Visit
     from app.services.visits_api_service import VisitsApiService
 
-    visit_id, s, new_date = _stamp_and_reschedule_setup(pipeline_db, make_visit)
+    visit_id, s, new_date, stamped = _stamp_and_reschedule_setup(
+        pipeline_db, make_visit
+    )
     try:
         service = VisitsApiService(s)
         service.reschedule_visit(visit_id=visit_id, new_date=new_date)
@@ -686,9 +688,12 @@ def test_service_reschedule_clears_reminder_stamp(pipeline_db, make_visit):
         assert (
             row.reminder_sent_at is None
         ), "reschedule must invalidate the stale reminder stamp"
-        assert (
-            row.reminder_claimed_at is None
-        ), "reschedule must release a live lease too"
+        assert row.reminder_claimed_at == stamped.replace(
+            tzinfo=None
+        ), "reschedule must preserve the live lease (round 8)"
+        assert row.reminder_claimed_at == stamped.replace(
+            tzinfo=None
+        ), "reschedule must preserve the live lease (round 8), value intact"
     finally:
         s.close()
 
@@ -699,7 +704,9 @@ def test_reschedule_route_clears_reminder_stamp(pipeline_db, make_visit):
     from app.api.v1.endpoints.visits import reschedule_visit as reschedule_route
     from app.models.visit import Visit
 
-    visit_id, s, new_date = _stamp_and_reschedule_setup(pipeline_db, make_visit)
+    visit_id, s, new_date, stamped = _stamp_and_reschedule_setup(
+        pipeline_db, make_visit
+    )
     try:
         reschedule_route(visit_id=visit_id, new_date=new_date, new_time=None, db=s)
 
@@ -708,9 +715,12 @@ def test_reschedule_route_clears_reminder_stamp(pipeline_db, make_visit):
         assert (
             row.reminder_sent_at is None
         ), "reschedule route must invalidate the stale reminder stamp"
-        assert (
-            row.reminder_claimed_at is None
-        ), "reschedule route must release a live lease too"
+        assert row.reminder_claimed_at == stamped.replace(
+            tzinfo=None
+        ), "reschedule route must preserve the live lease (round 8)"
+        assert row.reminder_claimed_at == stamped.replace(
+            tzinfo=None
+        ), "reschedule route must preserve the live lease (round 8), value intact"
     finally:
         s.close()
 
@@ -724,7 +734,9 @@ def test_reschedule_tomorrow_route_clears_reminder_stamp(pipeline_db, make_visit
     )
     from app.models.visit import Visit
 
-    visit_id, s, _new_date = _stamp_and_reschedule_setup(pipeline_db, make_visit)
+    visit_id, s, _new_date, stamped = _stamp_and_reschedule_setup(
+        pipeline_db, make_visit
+    )
     try:
         reschedule_tomorrow_route(visit_id=visit_id, db=s)
 
@@ -733,9 +745,12 @@ def test_reschedule_tomorrow_route_clears_reminder_stamp(pipeline_db, make_visit
         assert (
             row.reminder_sent_at is None
         ), "tomorrow-reschedule must invalidate the stale reminder stamp"
-        assert (
-            row.reminder_claimed_at is None
-        ), "tomorrow-reschedule must release a live lease too"
+        assert row.reminder_claimed_at == stamped.replace(
+            tzinfo=None
+        ), "tomorrow-reschedule must preserve the live lease (round 8)"
+        assert row.reminder_claimed_at == stamped.replace(
+            tzinfo=None
+        ), "tomorrow-reschedule must preserve the live lease (round 8), value intact"
     finally:
         s.close()
 
@@ -752,7 +767,9 @@ def test_telegram_move_visit_clears_reminder_stamp(pipeline_db, make_visit):
         TelegramStaffActionAdapterService,
     )
 
-    visit_id, s, new_date = _stamp_and_reschedule_setup(pipeline_db, make_visit)
+    visit_id, s, new_date, stamped = _stamp_and_reschedule_setup(
+        pipeline_db, make_visit
+    )
     try:
         visit = s.query(Visit).filter(Visit.id == visit_id).first()
         actor_user_id = (
@@ -780,9 +797,12 @@ def test_telegram_move_visit_clears_reminder_stamp(pipeline_db, make_visit):
         assert (
             row.reminder_sent_at is None
         ), "telegram move must invalidate the stale reminder stamp"
-        assert (
-            row.reminder_claimed_at is None
-        ), "telegram move must release a live lease too"
+        assert row.reminder_claimed_at == stamped.replace(
+            tzinfo=None
+        ), "telegram move must preserve the live lease (round 8)"
+        assert row.reminder_claimed_at == stamped.replace(
+            tzinfo=None
+        ), "telegram move must preserve the live lease (round 8), value intact"
 
         # Cleanup: audit rows written by this call reference the shared DB.
         s.query(AuditLog).filter(
@@ -1212,6 +1232,87 @@ def test_unversioned_job_is_rejected(pipeline_db, make_visit, reminder_spy):
     try:
         row = s.query(Visit).filter(Visit.id == visit_id).first()
         assert row.reminder_sent_at is None
+        assert row.reminder_claimed_at is None
+    finally:
+        s.close()
+
+
+def test_reschedule_during_dispatch_prevents_stale_record(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 8, P1: a reschedule landing while a delivery is in
+    flight bumps the generation and preserves the lease. The in-flight
+    worker's finalize is generation-guarded: its OLD-schedule delivery is
+    NOT recorded (only the lease is released), and the new generation's
+    job can then claim and deliver for the new schedule."""
+    import asyncio
+
+    from app.models.visit import Visit
+    from app.services.notifications_pkg._reminders import RemindersMixin
+    from app.tasks.scheduler import build_reminder_schedule_version
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()  # generation 0, date today, time "10:00"
+
+    async def _spy(self, db, vid, hours_before=24):
+        # The reschedule lands while the provider call is in flight:
+        # stamp cleared, generation bumped, lease PRESERVED (round 8).
+        db.query(Visit).filter(Visit.id == vid).update(
+            {"reminder_sent_at": None, "reminder_generation": 1}
+        )
+        db.commit()
+        return {"success": True, "channel": "telegram"}
+
+    monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _spy)
+
+    # Old-generation delivery: the provider accepts, but the finalize must
+    # refuse to record it (generation moved on underneath the dispatch).
+    old_version = f"{date.today().isoformat()}T10:00#0"
+    asyncio.run(
+        send_visit_reminder(
+            {},
+            visit_id=visit_id,
+            channel="telegram",
+            schedule_version=old_version,
+        )
+    )
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_generation == 1
+        assert (
+            row.reminder_sent_at is None
+        ), "an old-schedule delivery must not be recorded after a reschedule"
+        assert (
+            row.reminder_claimed_at is None
+        ), "the in-flight worker must release the lease at finalize"
+    finally:
+        s.close()
+
+    # The new generation's job now delivers AND records.
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        fresh = s.query(Visit).filter(Visit.id == visit_id).first()
+        new_version = build_reminder_schedule_version(fresh)
+    finally:
+        s.close()
+
+    asyncio.run(
+        send_visit_reminder(
+            {},
+            visit_id=visit_id,
+            channel="telegram",
+            schedule_version=new_version,
+        )
+    )
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert (
+            row.reminder_sent_at is not None
+        ), "the new generation must deliver and record"
         assert row.reminder_claimed_at is None
     finally:
         s.close()

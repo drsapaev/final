@@ -402,10 +402,12 @@ class TelegramStaffActionAdapterService:
             # move must preserve it (Codex round 5, P2).
             if new_visit_date != previous_visit_date:
                 visit.reminder_sent_at = None
-                visit.reminder_claimed_at = None
                 visit.reminder_generation = (
                     visit.reminder_generation or 0
                 ) + 1
+                # The lease is preserved — Codex round 8, P1 (a delivery in
+                # flight keeps its finalize binding; new-generation jobs are
+                # deferred by the live lease instead of duplicating it).
             queue_result = self.queue_service.staff_move_visit_queue_link(
                 self.db,
                 visit_id=visit_id,

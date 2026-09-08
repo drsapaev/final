@@ -583,11 +583,12 @@ def reschedule_visit(
         # the next reminder job silently no-ops on the stale stamp and the
         # patient never gets a reminder for the new date. The generation
         # bump makes the schedule version immutable and never-repeating
-        # (Codex round 7, P1).
+        # (Codex round 7, P1). The lease is deliberately PRESERVED (Codex
+        # round 8, P1): a delivery already in flight keeps its finalize
+        # binding; the live lease defers new-generation jobs until the old
+        # attempt resolves (or the TTL expires), preventing duplicates.
         if hasattr(t.c, "reminder_sent_at"):
             update_values["reminder_sent_at"] = None
-        if hasattr(t.c, "reminder_claimed_at"):
-            update_values["reminder_claimed_at"] = None
         if hasattr(t.c, "reminder_generation"):
             update_values["reminder_generation"] = (
                 t.c.reminder_generation + 1
@@ -671,12 +672,12 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
     if tomorrow != vrow.get("visit_date"):
         if hasattr(t.c, "reminder_sent_at"):
             tomorrow_values["reminder_sent_at"] = None
-        if hasattr(t.c, "reminder_claimed_at"):
-            tomorrow_values["reminder_claimed_at"] = None
         if hasattr(t.c, "reminder_generation"):
             tomorrow_values["reminder_generation"] = (
                 t.c.reminder_generation + 1
             )
+        # The lease is preserved — see the /reschedule route comment
+        # (Codex round 8, P1).
     upd = (
         t.update().where(t.c.id == visit_id).values(**tomorrow_values).returning(t)
     )

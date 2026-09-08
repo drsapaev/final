@@ -239,17 +239,45 @@ async def send_visit_reminder(
             raise RuntimeError(f"Notification send failed: {result.get('error')}")
 
         # Record the delivery only now — the provider acknowledged it — and
-        # release the lease in the same statement, bound to OUR lease value.
+        # release the lease in the same statement, bound to OUR lease value
+        # AND the generation we claimed for (Codex round 8, P1): if the
+        # schedule changed while we were dispatching, the delivery (for the
+        # OLD schedule) must not be recorded — the new generation's job
+        # delivers for the new schedule.
+        v_gen = (
+            _parse_schedule_version(schedule_version)[2]
+            if schedule_version is not None
+            else None
+        )
+        finalize_conditions = [
+            Visit.id == visit_id,
+            Visit.reminder_claimed_at == our_lease,
+        ]
+        if v_gen is not None:
+            finalize_conditions.append(Visit.reminder_generation == v_gen)
         finalized = db.execute(
             update(Visit)
-            .where(Visit.id == visit_id, Visit.reminder_claimed_at == our_lease)
+            .where(*finalize_conditions)
             .values(reminder_sent_at=func.now(), reminder_claimed_at=None)
         )
         db.commit()
         if finalized.rowcount == 0:
+            # Either the lease was taken from us or the generation moved on
+            # (reschedule during dispatch). Release the lease if it is still
+            # ours, but never record an old-schedule delivery.
+            db.execute(
+                update(Visit)
+                .where(
+                    Visit.id == visit_id,
+                    Visit.reminder_claimed_at == our_lease,
+                )
+                .values(reminder_claimed_at=None)
+            )
+            db.commit()
             logger.warning(
                 "job.send_visit_reminder: lease for visit %s was no longer "
-                "ours at finalize; delivery not recorded",
+                "ours or the schedule moved on at finalize; delivery not "
+                "recorded",
                 visit_id,
             )
         else:
