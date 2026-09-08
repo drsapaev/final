@@ -309,6 +309,61 @@ def test_idempotency_same_key_returns_cached_response_no_second_cart(
     assert invoices == 1, "две отправки с одним ключом создали вторую корзину"
 
 
+def test_idempotency_key_survives_token_refresh_same_user(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """Codex R11 #3092 (P1): mobile login tokens carry sub=username, while
+    /mobile/auth/refresh re-issues sub=user.id (+username claim). Hashing
+    the raw sub moved the same user's keys to another namespace after the
+    refresh: a lost-response retry with the SAME Idempotency-Key re-executed
+    the cart and created a duplicate. The namespace is derived from the
+    canonically resolved DB user id — the retry after the refresh REPLAYS
+    the stored outcome."""
+    service = Service(
+        code="FIXR11-NS",
+        name="R11 Namespace Service",
+        price=100000.00,
+        duration_minutes=30,
+        active=True,
+        requires_doctor=False,
+        is_consultation=False,
+    )
+    db_session.add(service)
+    db_session.commit()
+    db_session.refresh(service)
+
+    payload = _cart_payload(patient_id=test_patient.id, visits=[_visit(service.id)])
+    key = "r11-namespace-refresh-key"
+
+    # Попытка 1 — токен формы mobile LOGIN (sub=username, без username-claim):
+    from app.services.authentication_service import authentication_service
+
+    login_token = authentication_service.create_access_token({"sub": admin_user.username})
+    first = client.post(
+        "/api/v1/registrar/cart",
+        headers={"Authorization": f"Bearer {login_token}", "Idempotency-Key": key},
+        json=payload,
+    )
+    assert first.status_code == 200, first.text
+    first_invoice_id = first.json()["invoice_id"]
+
+    # Попытка 2 — «потерянный ответ», ретрай ПОСЛЕ refresh: токен формы
+    # REFRESH (sub=user.id + username claim), тот же ключ и payload.
+    second = client.post(
+        "/api/v1/registrar/cart",
+        headers=_auth_headers(admin_user) | {"Idempotency-Key": key},
+        json=payload,
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["invoice_id"] == first_invoice_id, (
+        "ретрай после refresh-ротации токена должен вернуть закоммиченный ответ "
+        "(один namespace на пользователя), а не создать вторую корзину"
+    )
+
+    _, invoices, _ = _counts(db_session, test_patient.id)
+    assert invoices == 1, "дрейф namespace после refresh создал вторую корзину"
+
+
 def test_idempotency_new_key_creates_new_operation(
     client: TestClient, db_session: Session, admin_user, test_patient
 ):

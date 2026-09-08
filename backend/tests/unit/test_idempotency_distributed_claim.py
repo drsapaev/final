@@ -132,8 +132,9 @@ def auth_headers(sub: str = "1") -> dict[str, str]:
 
 
 def nkey(sub: str, key: str, kind: str) -> str:
-    """Redis key under the hashed namespace of the given principal."""
-    ns = IdempotencyMiddleware._namespace({"sub": sub})
+    """Redis key under the hashed CANONICAL namespace of the given principal
+    (Codex R11 #3092: the harness stubs resolve sub "1"/"2" to user 1/2)."""
+    ns = IdempotencyMiddleware._namespace(int(sub))
     return f"idem:{ns}:{key}:{kind}"
 
 
@@ -203,8 +204,19 @@ def two_workers(fake_redis: FakeRedis):
     # Reset the module-level distributed singleton and wire the fake
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
     idem_module._distributed_claim = _make_claim(fake_redis)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    # Codex R11 #3092: the canonical resolution is stubbed — numeric subs are
+    # user ids as-is; username subjects get a stable synthetic id (same
+    # username -> same namespace within the harness run).
+    def _harness_resolve(request, user_id, username, _ids={}):
+        if user_id is not None:
+            return user_id
+        if not username:
+            return None
+        return _ids.setdefault(username, 9000 + len(_ids) + 1)
+    idem_module._resolve_principal_id_sync = _harness_resolve
 
     counters = {"w1": {"calls": 0}, "w2": {"calls": 0}}
     client1 = TestClient(_make_app(counters["w1"]), raise_server_exceptions=False)
@@ -213,6 +225,7 @@ def two_workers(fake_redis: FakeRedis):
 
     idem_module._distributed_claim = saved
     idem_module._check_principal_authorized_sync = saved_auth
+    idem_module._resolve_principal_id_sync = saved_resolve
 
 
 def test_retry_on_other_worker_replays_response_executes_once(two_workers):
@@ -327,7 +340,7 @@ def test_lost_outcome_retry_refused_then_replays_once_response_lands(two_workers
     # the marker (no stored response) — simulated directly:
     claim = idem_module._distributed_claim
     claim.mark_execution_intent(
-        idem_module.IdempotencyMiddleware._namespace({"sub": "1"}), "lost-key"
+        idem_module.IdempotencyMiddleware._namespace(1), "lost-key"
     )
 
     retry = client2.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "lost-key"})
@@ -338,7 +351,7 @@ def test_lost_outcome_retry_refused_then_replays_once_response_lands(two_workers
     from fastapi import Response as FastAPIResponse
 
     claim.store_response(
-        idem_module.IdempotencyMiddleware._namespace({"sub": "1"}),
+        idem_module.IdempotencyMiddleware._namespace(1),
         "lost-key",
         FastAPIResponse(content=b'{"ok": true, "recovered": true}', status_code=200),
         payload_hash=idem_module.payload_hash(b""),
@@ -354,12 +367,16 @@ def test_redis_unavailable_falls_back_to_in_memory(monkeypatch):
     """Redis down → per-process behavior (original PR-6 contract), no crash."""
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
     claim = object.__new__(DistributedIdempotencyClaim)
     claim._ttl = 24 * 60 * 60
     claim._client = None
     claim._available = False
     idem_module._distributed_claim = claim
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9001
+    )
 
     try:
         counter = {"calls": 0}
@@ -375,6 +392,7 @@ def test_redis_unavailable_falls_back_to_in_memory(monkeypatch):
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
 
 
 def test_store_response_snapshot_round_trip(fake_redis):
@@ -711,17 +729,79 @@ def test_authorization_resolves_through_dependency_override():
     assert override.session.used, "the override session (endpoint's DB) must be queried"
 
 
-def test_namespace_is_stable_per_sub_and_hashed():
-    """The namespace is a deterministic hash of the verified sub — no raw
-    usernames/ids in cache keys, no collisions between principals."""
+def test_namespace_is_stable_per_canonical_user_and_hashed():
+    """The namespace is a deterministic hash of the CANONICAL user id —
+    no raw usernames/ids in cache keys, no collisions between principals
+    (Codex R11 #3092: derived from the DB-resolved id, not the raw sub)."""
     from hashlib import sha256
 
-    ns1 = IdempotencyMiddleware._namespace({"sub": "1"})
-    ns1_again = IdempotencyMiddleware._namespace({"sub": "1"})
-    ns2 = IdempotencyMiddleware._namespace({"sub": "2"})
+    ns1 = IdempotencyMiddleware._namespace(1)
+    ns1_again = IdempotencyMiddleware._namespace(1)
+    ns2 = IdempotencyMiddleware._namespace(2)
     assert ns1 == ns1_again
     assert ns1 != ns2
-    assert ns1 == sha256(b"1").hexdigest()[:32]
+    assert ns1 == sha256(b"user:1").hexdigest()[:32]
+
+
+def test_login_and_refresh_token_shapes_share_one_namespace(two_workers, monkeypatch):
+    """Codex R11 #3092 (P1): a mobile login token carries sub=username,
+    /mobile/auth/refresh re-issues sub=user.id (+username claim) — the SAME
+    key sent before and after the refresh must land in ONE namespace: the
+    retry after the refresh REPLAYS the stored outcome instead of
+    re-executing the write (duplicate appointment)."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "refresh-storm-key"
+
+    # Attempt 1: login-shape token (sub=username, no username claim)
+    from app.core.config import settings
+    import jwt as pyjwt
+    from datetime import datetime, timedelta, UTC
+
+    login_payload = {
+        "sub": "alice.smith",  # username shape — the harness stub must map it
+        "exp": datetime.now(UTC) + timedelta(minutes=5),
+    }
+    login_token = pyjwt.encode(login_payload, settings.SECRET_KEY, algorithm="HS256")
+
+    # The canonical resolution maps the username to user id 1 (stub seam)
+    monkeypatch.setattr(
+        idem_module,
+        "_resolve_principal_id_sync",
+        lambda request, user_id, username: 1 if username == "alice.smith" else user_id,
+    )
+
+    first = client1.post("/echo", headers={**{"Authorization": f"Bearer {login_token}"}, "Idempotency-Key": key})
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    # Attempt 2 (retry after refresh): refresh-shape token — sub="1",
+    # username claim present. SAME key, same (empty) payload.
+    second = client2.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": key})
+    assert second.status_code == 200
+    assert counters["w2"]["calls"] == 0, (
+        "the post-refresh retry must REPLAY the stored outcome (one namespace), not re-execute"
+    )
+
+
+def test_unresolvable_principal_is_refused_non_executing(two_workers, monkeypatch):
+    """Codex R11 #3092 (P1): a principal that does NOT resolve to a DB row
+    (deleted user / broken resolution) has NO namespace — fail CLOSED with
+    the non-executing 403 (Codex R8 contract): the endpoint never runs
+    (nothing commits), nothing is stored or replayed under any namespace."""
+    client1, client2, counters, fake_redis = two_workers
+    saved_resolve = idem_module._resolve_principal_id_sync
+    monkeypatch.setattr(idem_module, "_resolve_principal_id_sync", lambda *a, **k: None)
+
+    response = client1.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "ghost-key"})
+    assert response.status_code == 403
+    assert counters["w1"]["calls"] == 0, "non-executing refusal"
+
+    # Nothing was stored under ANY namespace: after the resolution recovers,
+    # the same key executes fresh (no stale replay surface exists).
+    monkeypatch.setattr(idem_module, "_resolve_principal_id_sync", saved_resolve)
+    response2 = client1.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "ghost-key"})
+    assert response2.status_code == 200
+    assert counters["w1"]["calls"] == 1
 
 
 # =====================================================================

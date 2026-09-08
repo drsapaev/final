@@ -2579,11 +2579,43 @@ const AppointmentWizardV2 = ({
         cartIdempotencyPayloadRef.current = null;
       } catch (cartError: unknown) {
         // Обработка ошибок создания корзины
-        const cartErr = cartError as Error & { status?: number; message?: string };
+        const cartErr = cartError as Error & {
+          status?: number;
+          message?: string;
+          response?: { data?: { code?: string; detail?: string } };
+        };
         let errorMessage = cartErr.message || t('misc.aw_record_creation_error_status', { status: cartErr.status || 'network' });
         const isPermissionError = cartErr.status === 403;
 
         logger.error('❌ Ошибка создания корзины:', cartErr.status, errorMessage);
+
+        // Codex R11 PR 3092 (P2): 409 бывает двух родов, и FE обязан их
+        // различать. IN-FLIGHT (другой воркер ещё обрабатывает) — ключ
+        // удерживается, повтор с тем же ключом вернёт закоммиченный ответ.
+        // UNCERTAIN-OUTCOME (маркер намерения без сохранённого ответа —
+        // воркер умер после коммита-окна) — повтор со старым ключом вечно
+        // получает тот же 409, а смена payload заблокирована гвардией:
+        // единственный выход — ОСМЫСЛЕННАЯ сверка с рабочим списком и
+        // РОТАЦИЯ ключа. Диалог подтверждения — тот самый путь
+        // восстановления: registrar убеждается, что ничего не применилось,
+        // и только тогда ключ освобождается.
+        const backendCode = cartErr.response?.data?.code;
+        if (cartErr.status === 409 && backendCode === 'idempotency_uncertain_outcome') {
+          const reconciled = await confirm({
+            title: t('misc.aw_idem_uncertain_title'),
+            message: t('misc.aw_idem_uncertain_message'),
+            confirmLabel: t('misc.aw_idem_uncertain_confirm'),
+            cancelLabel: t('misc.aw_idem_uncertain_cancel'),
+            intent: 'danger',
+          });
+          if (reconciled) {
+            logger.warn('Fix C (Codex R11): uncertain-outcome reconciled — rotating the idempotency key');
+            cartIdempotencyKeyRef.current = null;
+            cartIdempotencyPayloadRef.current = null;
+            toast.info(t('misc.aw_idem_key_released'), { style: TOAST_WARNING_STYLE });
+          }
+          return; // ❌ НЕ закрываем мастер: корзина сохранена, ключ разведён
+        }
 
         // Codex R3 PR 3092 (P2): definitive 4xx (кроме 409) доказывает, что
         // операция НЕ закоммичена — backend откатил транзакцию и освободил

@@ -186,6 +186,80 @@ def _user_authorized_in_db(
         return False, None, False
 
 
+def _user_id_from_principal(principal_payload: dict[str, Any]) -> tuple[int | None, str | None]:
+    """Subject selection mirrored from deps.py (Codex R9 #3092 P1).
+
+    The username claim is the canonical primary subject: numeric text
+    resolves by id, text by username. Without it, a numeric sub resolves
+    by id, a text sub by username. Shared by the namespace resolution
+    (Codex R11 #3092 P1) and the DB authorization check so both see the
+    SAME account for a given token.
+    """
+    username_claim = principal_payload.get("username")
+    if isinstance(username_claim, str) and username_claim:
+        user_id = int(username_claim) if username_claim.isdigit() else None
+        return (user_id, None) if user_id is not None else (None, username_claim)
+    sub = principal_payload.get("sub")
+    if isinstance(sub, str) and sub:
+        user_id = int(sub) if sub.isdigit() else None
+        return (user_id, None) if user_id is not None else (None, sub)
+    if isinstance(sub, int):
+        # Legacy numeric (non-stringified) sub — get_current_user's
+        # fallback resolves it by id.
+        return sub, None
+    return None, None
+
+
+def _resolve_principal_id_sync(
+    request: Any, user_id: int | None, username: str | None
+) -> int | None:
+    """Canonical DB user id for the namespace (Codex R11 #3092 P1).
+
+    Mobile login tokens carry ``sub=username`` while /mobile/auth/refresh
+    issues tokens with ``sub=user.id`` (+ username claim). Hashing the raw
+    sub moved the same user's keys to a different namespace after token
+    refresh, so a lost-response retry after the refresh could not find the
+    stored outcome and re-executed the write (duplicate appointment).
+    Resolution-only: is_active/blacklist checks stay with the fail-closed
+    _principal_authorized. Returns None (missing row / broken DB) → the
+    caller refuses non-executing (fail-closed, Codex R8-consistent): the
+    endpoint never runs, nothing commits under a wrong namespace.
+    """
+    if user_id is None and not username:
+        return None
+    try:
+        generator = _resolve_request_db(request)
+        try:
+            db = next(generator)
+            from sqlalchemy import select
+
+            from app.models.user import User
+
+            stmt = (
+                select(User.id).where(User.id == user_id)
+                if user_id is not None
+                else select(User.id).where(User.username == username)
+            )
+            row = db.execute(stmt).first()
+            return int(row[0]) if row is not None else None
+        finally:
+            try:
+                next(generator)
+            except StopIteration:
+                pass
+            except Exception:  # pragma: no cover - generator teardown
+                pass
+    except Exception:
+        # Fail CLOSED: without a canonical id there is NO namespace and no
+        # idempotency protection can be evaluated — the caller refuses
+        # non-executing instead of running the endpoint unprotected.
+        logger.warning(
+            "Idempotency principal namespace resolution failed; refusing",
+            exc_info=True,
+        )
+        return None
+
+
 def _principal_refusal_response() -> Response:
     """Codex R8 #3092 (P1): non-executing failure for a refused principal.
 
@@ -708,7 +782,25 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         principal_payload = self._verified_principal(request)
         if principal_payload is None:
             return await call_next(request)
-        user_id = self._namespace(principal_payload)
+        # Codex R11 #3092 (P1): the namespace comes from the CANONICALLY
+        # RESOLVED user id (login token sub=username vs refresh token
+        # sub=user.id must share ONE namespace — see _resolve_principal_id_sync).
+        subject_user_id, subject_username = _user_id_from_principal(principal_payload)
+        canonical_id = await asyncio.to_thread(
+            _resolve_principal_id_sync, request, subject_user_id, subject_username
+        )
+        if canonical_id is None:
+            # Unresolvable principal (missing row / DB outage): NO namespace —
+            # fail CLOSED like every other principal refusal (Codex R8): the
+            # endpoint is not executed (nothing commits), nothing is stored
+            # or replayed under any namespace. A missing account cannot
+            # commit: the endpoint's own get_current_user would 401 it.
+            logger.warning(
+                "Idempotency principal namespace unresolved; refusing (non-executing): path=%s",
+                request.url.path,
+            )
+            return _principal_refusal_response()
+        user_id = self._namespace(canonical_id)
 
         # Codex R4 #3092 (P1): resolve the distributed claim BEFORE the local
         # cache check — the role-mismatch fall-through needs it to drop a
@@ -875,7 +967,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     status_code=409,
                     headers={"Retry-After": "1", "Cache-Control": "no-store"},
                     content=(
-                        '{"detail": "Request with this Idempotency-Key is '
+                        '{"code": "idempotency_in_flight", "detail": "Request with this Idempotency-Key is '
                         'still being processed. Retry with the same key."}'
                     ),
                     media_type="application/json",
@@ -1032,7 +1124,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             status_code=409,
             headers={"Cache-Control": "no-store"},
             content=(
-                '{"detail": "This Idempotency-Key was already used with a '
+                '{"code": "idempotency_payload_mismatch", "detail": "This Idempotency-Key was already used with a '
                 'different request payload. The original data may already be '
                 'saved — do not retry changed data with the same key; verify '
                 'the record state first."}'
@@ -1052,7 +1144,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             status_code=409,
             headers={"Cache-Control": "no-store"},
             content=(
-                '{"detail": "Предыдущая попытка с этим ключом Idempotency не '
+                '{"code": "idempotency_uncertain_outcome", "detail": "Предыдущая попытка с этим ключом Idempotency не '
                 'завершилась корректно: результат неизвестен. Проверьте рабочий '
                 'список — запись могла сохраниться. Если изменений нет, '
                 'повторите операцию с НОВЫМ ключом Idempotency."}'
@@ -1092,14 +1184,18 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             return None
 
     @staticmethod
-    def _namespace(principal_payload: dict[str, Any]) -> str:
-        """Stable per-principal cache namespace from the verified sub claim.
+    def _namespace(canonical_user_id: int) -> str:
+        """Stable per-principal cache namespace from the CANONICAL user id.
 
-        Hashed: no usernames/ids in Redis keys, no collision between a text
-        sub (username) and a colon-bearing value.
+        Codex R11 #3092 (P1): the raw ``sub`` differs between token shapes
+        (mobile login: sub=username; /mobile/auth/refresh: sub=user.id +
+        username claim) — hashing it moved the same user's keys to another
+        namespace after refresh. The namespace is derived from the DB-
+        resolved user id, so every token shape of the same account maps to
+        ONE namespace. Hashed: no usernames/ids in Redis keys.
         """
-        sub = str(principal_payload.get("sub") or "")
-        return hashlib.sha256(sub.encode("utf-8")).hexdigest()[:32]
+        subject = f"user:{int(canonical_user_id)}"
+        return hashlib.sha256(subject.encode("utf-8")).hexdigest()[:32]
 
     async def _principal_authorized(self, request: Request, principal_payload: dict[str, Any]) -> tuple[bool, str | None, bool]:
         """DB-backed authorization before any replay (Codex R3/R4/R6 #3092).
@@ -1125,25 +1221,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         exists → endpoint 401) — a cached PHI-bearing cart response could be
         replayed under a token the canonical dependency rejects.
         """
-        username_claim = principal_payload.get("username")
-        if isinstance(username_claim, str) and username_claim:
-            # Canonical primary subject: the username claim (deps.py:91-105).
-            # Numeric text resolves by id, text by username — exactly like
-            # get_current_user's primary lookup.
-            user_id = int(username_claim) if username_claim.isdigit() else None
-            username = None if user_id is not None else username_claim
-        else:
-            sub = principal_payload.get("sub")
-            if isinstance(sub, str) and sub:
-                sub_text = sub
-                user_id = int(sub_text) if sub_text.isdigit() else None
-                username = None if user_id is not None else sub_text
-            elif isinstance(sub, int):
-                # Legacy numeric (non-stringified) sub — get_current_user's
-                # fallback resolves it by id.
-                user_id, username = sub, None
-            else:
-                user_id, username = None, None
+        user_id, username = _user_id_from_principal(principal_payload)
         jti = principal_payload.get("jti")
         try:
             return await asyncio.to_thread(

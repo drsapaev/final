@@ -158,3 +158,29 @@ describe('Fix C (Codex R3 #3092): key binding release on definitive failures', (
     expect(catchBlock).toContain('cartIdempotencyPayloadRef.current = null;');
   });
 });
+
+describe('Fix C (Codex R11 #3092): uncertain-outcome 409 recovery path', () => {
+  const readWizardSource = () => fs.readFileSync(
+    path.resolve(__dirname, '../AppointmentWizardV2.tsx'),
+    'utf8'
+  );
+
+  it('distinguishes uncertain-outcome 409 from in-flight 409 and rotates the key after reconciliation', () => {
+    // R11 P2: uncertain-outcome 409 (маркер намерения без ответа) удерживал
+    // ключ вечно: повтор с тем же ключом снова 409, смена payload заблокирована
+    // гвардией, единственный выход — закрыть мастера и потерять корзину.
+    const source = readWizardSource();
+    const start = source.indexOf('} catch (cartError: unknown) {');
+    const end = source.indexOf('if (isPermissionError) {', start);
+    const catchBlock = source.slice(start, end);
+    // код ошибки различается на уровне контракта
+    expect(catchBlock).toContain("backendCode === 'idempotency_uncertain_outcome'");
+    expect(catchBlock).toContain('cartErr.status === 409');
+    // осмысленная сверка: диалог подтверждения перед ротацией
+    expect(catchBlock).toContain("t('misc.aw_idem_uncertain_message')");
+    expect(catchBlock).toContain('const reconciled = await confirm(');
+    // ротация = освобождение связки ключ+payload (следующий сабмит биндит новый)
+    expect(catchBlock).toContain('cartIdempotencyKeyRef.current = null;');
+    expect(catchBlock).toContain('cartIdempotencyPayloadRef.current = null;');
+  });
+});
