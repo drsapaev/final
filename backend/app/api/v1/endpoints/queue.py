@@ -363,7 +363,16 @@ def get_queue_statistics(
             "name": (
                 daily_queue.specialist.user.full_name
                 if (daily_queue.specialist and daily_queue.specialist.user)
-                else f"Врач #{specialist_id}"
+                else (
+                    # QD-2C (Codex round-6 P1): resource surface — the
+                    # registry display_name, not "Врач #None"
+                    daily_queue.queue_resource.display_name
+                    if (
+                        daily_queue.specialist_id is None
+                        and daily_queue.queue_resource
+                    )
+                    else f"Врач #{specialist_id}"
+                )
             ),
         },
         "day": day.isoformat(),
@@ -507,7 +516,16 @@ def get_today_queue(
                 or daily_queue.specialist.user.username
             )
             if (daily_queue.specialist and daily_queue.specialist.user)
-            else f"Врач #{daily_queue.specialist_id}"
+            else (
+                # QD-2C (Codex round-6 P1): resource surface — the
+                # registry display_name, not "Врач #None"
+                daily_queue.queue_resource.display_name
+                if (
+                    daily_queue.specialist_id is None
+                    and daily_queue.queue_resource
+                )
+                else f"Врач #{daily_queue.specialist_id}"
+            )
         ),
         is_open=daily_queue.opened_at is not None,
         opened_at=daily_queue.opened_at,

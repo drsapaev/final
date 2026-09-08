@@ -6,6 +6,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.crud.queue_resource_routing import resolve_registry_tag_queue_for_specialist
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.refund_deposit import (
     DepositTransaction,
@@ -28,14 +29,26 @@ class ForceMajeureApiRepository:
         specialist_id: int,
         target_date: date | None,
     ) -> list[OnlineQueueEntry]:
+        """QD-2C (Codex round-6 P1): entry-id requests for a registry-tag
+        specialist select entries by the tag SURFACE (the resource-owned
+        queue has specialist NULL and never matches the doctor filter);
+        non-registry specialists keep the doctor-keyed filter."""
         queue_day = target_date or date.today()
+        surface = resolve_registry_tag_queue_for_specialist(
+            self.db, queue_day, specialist_id, None
+        )
+        owner_filter = (
+            OnlineQueueEntry.queue_id == surface.id
+            if surface is not None
+            else DailyQueue.specialist_id == specialist_id
+        )
         return (
             self.db.query(OnlineQueueEntry)
             .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
             .filter(
                 OnlineQueueEntry.id.in_(entry_ids),
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
-                DailyQueue.specialist_id == specialist_id,
+                owner_filter,
                 DailyQueue.day == queue_day,
             )
             .all()

@@ -64,6 +64,45 @@ def resolve_tag_resource(db: Session, queue_tag: str | None) -> QueueResource | 
     )
 
 
+def resolve_tag_resource_locked(
+    db: Session, queue_tag: str | None
+) -> QueueResource | None:
+    """Registry row re-read for the post-lock recheck (QD-2C, Codex
+    round-6 P2).
+
+    Two defects of re-reading with ``resolve_tag_resource`` after the
+    advisory lock:
+
+    - the session identity map returns the FIRST resolve's cached
+      object (active=True) even after an operator's deactivation
+      committed — ``populate_existing()`` forces the refresh;
+    - nothing kept a concurrent deactivation from committing between
+      the recheck and the queue INSERT (the advisory lock only
+      serializes queue creators — no QueueResource update path takes
+      it). On PostgreSQL the row lock (SELECT ... FOR UPDATE) is held
+      through the insertion until the creator's transaction commits:
+      the deactivating UPDATE blocks, and the NEXT creator's locked
+      re-read sees active=False and skips creation.
+
+    SQLite (tests) has no FOR UPDATE — the sequential-test semantics
+    plus the identity-map refresh cover the observable behavior.
+    """
+    if not queue_tag:
+        return None
+    query = (
+        db.query(QueueResource)
+        .filter(
+            QueueResource.queue_tag == queue_tag,
+            QueueResource.active.is_(True),
+        )
+        .order_by(QueueResource.id.asc())
+        .populate_existing()
+    )
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        query = query.with_for_update()
+    return query.first()
+
+
 def find_active_tag_queue(db: Session, day: date, queue_tag: str) -> DailyQueue | None:
     """The active queue for (day, queue_tag), whatever its owner.
 
@@ -203,22 +242,42 @@ def prefer_registry_surface(
     day: date,
     specialist_id: int | None,
 ) -> DailyQueue | None:
-    """Prefer the ACTIVE registry surface over an inactive legacy row
-    (QD-2C, Codex round-5 P1).
+    """Prefer the registry surface over a legacy doctor-keyed row
+    (QD-2C; Codex round-5 P1 inactive shadows, round-6 P1 active
+    shadows).
 
-    A doctor-keyed lookup without an ``active`` predicate can return
-    a DEACTIVATED legacy synthetic-owned row for the same day — while
-    the live routing surface is the active resource-owned queue (e.g.
-    an operator deactivated the legacy queue after the switch). Every
-    such lookup must prefer the active registry surface before
-    accepting the inactive row: patients would otherwise join a
-    disabled queue while the staff surfaces operate the live one.
+    Round-5 (inactive shadow): a doctor-keyed lookup without an
+    ``active`` predicate can return a DEACTIVATED legacy
+    synthetic-owned row for the same day — while the live routing
+    surface is the active resource-owned queue. Patients would
+    otherwise join a disabled queue while the staff surfaces operate
+    the live one.
 
-    Doctor queues keep the legacy behavior: an inactive doctor queue
-    without a registry surface is returned unchanged (None stays
-    None).
+    Round-6 (active shadow): the still-mounted legacy writers
+    (``POST /queue/legacy/open`` creates an active UNTAGGED doctor
+    row through ``QueueApiRepository``) can re-create an active
+    legacy row for the synthetic specialist right next to the live
+    resource queue. An active legacy candidate is therefore only
+    accepted AFTER resolving the registry surface: reception must
+    open/report/token-validate the ONE (day, tag) surface the
+    tag-based arrivals (GraphQL, join) are using, not a parallel
+    doctor-owned shadow. A row already on the resource axis (bridged
+    or resource-owned) is accepted as-is; a surface equal to the
+    candidate changes nothing.
+
+    Doctor queues keep the legacy behavior: a doctor row without a
+    registry surface (active or not, None included) is returned
+    unchanged.
     """
     if daily_queue is not None and daily_queue.active:
+        if daily_queue.queue_resource_id is not None:
+            # already the resource axis (bridged / resource-owned)
+            return daily_queue
+        surface = resolve_registry_tag_queue_for_specialist(
+            db, day, specialist_id, None
+        )
+        if surface is not None and surface.id != daily_queue.id:
+            return surface
         return daily_queue
     surface = resolve_registry_tag_queue_for_specialist(db, day, specialist_id, None)
     if surface is not None:

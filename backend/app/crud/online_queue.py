@@ -874,7 +874,11 @@ def get_or_create_daily_queue(
     # существующая resource-owned очередь остаётся поверхностью,
     # новые ресурсные очереди — только при АКТИВНОЙ строке;
     # Codex round-4 P2: активность строки перепроверяется ПОСЛЕ лока —
-    # деактивация между resolve и lock не должна приводить к созданию)
+    # деактивация между resolve и lock не должна приводить к созданию;
+    # Codex round-6 P2: перепроверка под row-lock (FOR UPDATE) и с
+    # populate_existing — идентити-кэш сессии не возвращает
+    # устаревший активный объект, блокировка строки держится до
+    # вставки)
     if queue_tag:
         surface = queue_resource_routing.tag_routes_to_resource(db, queue_tag, day)
         if surface is not None:
@@ -882,7 +886,9 @@ def get_or_create_daily_queue(
         resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
         if resource is not None:
             queue_resource_routing.lock_registry_tag_creation(db, queue_tag, day)
-            resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
+            resource = queue_resource_routing.resolve_tag_resource_locked(
+                db, queue_tag
+            )
         if resource is not None:
             existing_by_tag = (
                 db.query(DailyQueue)

@@ -1051,7 +1051,7 @@ def test_validate_queue_token_resolves_resource_queue(db_session: Session) -> No
         specialist_id=synthetic.id,
         department="lab",
         is_clinic_wide=False,
-        expires_at=datetime(2026, 9, 8, 12, 0, 0),
+        expires_at=datetime(2099, 1, 1, 12, 0, 0),
         active=True,
     )
     db_session.add(token)
@@ -1075,7 +1075,7 @@ def test_validate_queue_token_doctor_token_unchanged(db_session: Session) -> Non
         specialist_id=doctor.id,
         department="cardiology",
         is_clinic_wide=False,
-        expires_at=datetime(2026, 9, 8, 12, 0, 0),
+        expires_at=datetime(2099, 1, 1, 12, 0, 0),
         active=True,
     )
     db_session.add(token)
@@ -1127,7 +1127,7 @@ def test_get_qr_token_info_resolves_resource_queue(db_session: Session) -> None:
         specialist_id=synthetic.id,
         department="lab",
         is_clinic_wide=False,
-        expires_at=datetime(2026, 9, 8, 12, 0, 0),
+        expires_at=datetime(2099, 1, 1, 12, 0, 0),
         active=True,
     )
     db_session.add(token)
@@ -1241,26 +1241,29 @@ def test_online_queue_status_and_availability_resolve_resource(
 ) -> None:
     """Codex round-3 P1 (/online-queue/status, availability): the
     specialist-keyed lookups resolve the resource queue instead of
-    reporting queue_exists=False / creating ghosts."""
+    reporting queue_exists=False / creating ghosts. The availability
+    check rejects PAST days (DATE_PAST) — the world rides a dynamic
+    future day so the pin never rots with the wall clock."""
     from app.crud.online_queue import check_queue_availability, get_queue_status
 
+    future_day = date.today() + timedelta(days=1)
     user = _make_user(db_session, username="lab_res7", role="Resource")
     synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
     _make_resource(db_session, code="lab", queue_tag="lab", max_online_per_day=2)
     queue = queue_service.get_or_create_daily_queue(
-        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        db_session, day=future_day, specialist_id=None, queue_tag="lab"
     )
     _make_waiting_entry(db_session, queue, number=1)
     _make_waiting_entry(db_session, queue, number=2)
 
-    status = get_queue_status(db_session, _DAY, synthetic.id)
+    status = get_queue_status(db_session, future_day, synthetic.id)
     assert status["queue_exists"] is True
     assert status["queue_id"] == queue.id
     assert status["total_entries"] == 2
     assert status["waiting_entries"] == 2
 
     availability = check_queue_availability(
-        db_session, _DAY, specialist_id=synthetic.id
+        db_session, future_day, specialist_id=synthetic.id
     )
     # cap reached (2/2) — resolved THROUGH the resource queue, not a ghost
     assert availability["available"] is False
@@ -1406,7 +1409,7 @@ def test_token_validation_prefers_active_surface(db_session: Session) -> None:
         specialist_id=synthetic.id,
         department="lab",
         is_clinic_wide=False,
-        expires_at=datetime(2026, 9, 8, 12, 0, 0),
+        expires_at=datetime(2099, 1, 1, 12, 0, 0),
         active=True,
     )
     db_session.add(token)
@@ -1505,3 +1508,363 @@ def test_doctor_complete_rejects_resource_entry_for_non_admin(
     # the doctor-family role spellings equally rejected
     exc = _attempt("Registrar")
     assert exc is not None and exc.status_code == 403
+
+
+# ===================== P. Codex round-6 pins =====================
+
+
+def _shadow_world(db_session: Session) -> tuple:
+    """The round-6 P1 scenario world: the live resource surface for a
+    registry tag + an ACTIVE UNTAGGED doctor-keyed shadow row (what
+    the pre-fix POST /queue/legacy/open writer created for the
+    synthetic specialist next to the resource queue)."""
+    user = _make_user(db_session, username="lab_res11", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    surface = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    shadow = _make_queue(
+        db_session, specialist_id=synthetic.id, queue_tag=None, active=True
+    )
+    return synthetic, surface, shadow
+
+
+def test_prefer_registry_surface_over_active_legacy_shadow(
+    db_session: Session,
+) -> None:
+    """Codex round-6 P1 (read side): an ACTIVE untagged legacy row
+    must not shadow the live registry surface — token validation and
+    the canonical status/open paths report the ONE (day, tag) surface
+    the tag-based arrivals use."""
+    synthetic, surface, shadow = _shadow_world(db_session)
+
+    resolved = queue_resource_routing.prefer_registry_surface(
+        db_session, shadow, _DAY, synthetic.id
+    )
+    assert resolved is not None and resolved.id == surface.id
+
+    # a candidate already on the resource axis passes through unchanged
+    passthrough = queue_resource_routing.prefer_registry_surface(
+        db_session, surface, _DAY, synthetic.id
+    )
+    assert passthrough is not None and passthrough.id == surface.id
+
+
+def test_prefer_registry_surface_doctor_row_without_surface_unchanged(
+    db_session: Session,
+) -> None:
+    """Guard: an active doctor-keyed row for a NON-registry specialty
+    is returned as-is — the switch never touches doctor routing."""
+    user = _make_user(db_session, username="dr_real11", role="doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="cardio")
+    queue = _make_queue(
+        db_session, specialist_id=doctor.id, queue_tag="cardio", active=True
+    )
+
+    resolved = queue_resource_routing.prefer_registry_surface(
+        db_session, queue, _DAY, doctor.id
+    )
+    assert resolved is queue
+
+
+def test_legacy_open_routes_to_registry_surface(db_session: Session) -> None:
+    """Codex round-6 P1 (write side): /queue/legacy/open for the
+    synthetic specialist returns the live resource surface instead of
+    the doctor-keyed shadow — no new doctor row is forked."""
+    from app.services.queue_api_service import QueueApiService
+
+    synthetic, surface, _shadow = _shadow_world(db_session)
+
+    resolved = QueueApiService(db_session).get_or_create_daily_queue(
+        day=_DAY, specialist_id=synthetic.id
+    )
+    assert resolved.id == surface.id
+    # the (day, lab) tag surface is the ONLY tagged queue — no fork
+    tagged = _tag_queues(db_session, _DAY, "lab")
+    assert [q.id for q in tagged] == [surface.id]
+
+
+def test_legacy_open_creates_resource_queue_when_none_exists(
+    db_session: Session,
+) -> None:
+    """Codex round-6 P1 (write side, first creation): the registry
+    queue is created resource-owned (specialist NULL, caps from the
+    registry row) — NOT as a doctor-keyed row for the synthetic."""
+    from app.services.queue_api_service import QueueApiService
+
+    user = _make_user(db_session, username="lab_res12", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    resource = _make_resource(
+        db_session, code="lab", queue_tag="lab", max_online_per_day=17
+    )
+
+    resolved = QueueApiService(db_session).get_or_create_daily_queue(
+        day=_DAY, specialist_id=synthetic.id
+    )
+    assert resolved.specialist_id is None
+    assert resolved.queue_resource_id == resource.id
+    assert resolved.queue_tag == "lab"
+    assert resolved.max_online_entries == 17
+    doctor_rows = (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.day == _DAY, DailyQueue.specialist_id == synthetic.id)
+        .all()
+    )
+    assert doctor_rows == []
+
+
+def test_legacy_get_daily_queue_prefers_registry_surface(
+    db_session: Session,
+) -> None:
+    """Codex round-6 P1 (close/today/statistics path): the legacy
+    doctor-keyed LOOKUP resolves the registry surface — open and close
+    address the same queue, no 404 on the resource surface."""
+    from app.services.queue_api_service import QueueApiService
+
+    synthetic, surface, _shadow = _shadow_world(db_session)
+
+    resolved = QueueApiService(db_session).get_daily_queue(
+        day=_DAY, specialist_id=synthetic.id
+    )
+    assert resolved is not None and resolved.id == surface.id
+
+
+def test_legacy_open_close_coherence_on_resource_surface(
+    db_session: Session,
+) -> None:
+    """open addresses the resource surface; close finds the SAME queue
+    (get_daily_queue surface-first) — opened_at toggles on one row,
+    never on a doctor shadow. open/close COMMIT — durable rows
+    cleaned in the finally."""
+    try:
+        _test_legacy_open_close_coherence_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "lab_res15")
+
+
+def _test_legacy_open_close_coherence_body(db_session: Session) -> None:
+    from app.services.queue_api_service import QueueApiService
+
+    user = _make_user(db_session, username="lab_res15", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    service = QueueApiService(db_session)
+
+    opened = service.get_or_create_daily_queue(day=_DAY, specialist_id=synthetic.id)
+    assert opened.specialist_id is None  # the resource surface, no fork
+
+    service.open_daily_queue(opened)
+    db_session.refresh(opened)
+    assert opened.opened_at is not None
+
+    closed = service.get_daily_queue(day=_DAY, specialist_id=synthetic.id)
+    assert closed is not None and closed.id == opened.id  # same surface
+    service.close_daily_queue(closed)
+    db_session.refresh(opened)
+    assert opened.opened_at is None
+
+    doctor_rows = (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.day == _DAY, DailyQueue.specialist_id == synthetic.id)
+        .all()
+    )
+    assert doctor_rows == []
+
+
+def test_legacy_statistics_label_registry_display_name(
+    db_session: Session,
+) -> None:
+    """Codex round-6 P1 (label): the legacy statistics endpoint for a
+    resource surface reports the registry display_name — not
+    \"Врач #None\" — and counts the surface entries."""
+    from app.api.v1.endpoints.queue import get_queue_statistics
+
+    synthetic, surface, _shadow = _shadow_world(db_session)
+    _make_waiting_entry(db_session, surface, number=2)
+    admin = _make_user(db_session, username="admin_stats", role="Admin")
+
+    payload = get_queue_statistics(
+        synthetic.id, day=_DAY, db=db_session, current_user=admin
+    )
+    assert payload["success"] is True
+    assert payload["specialist"]["name"] == "Ресурс очереди"
+    assert payload["statistics"]["total_entries"] == 1
+
+
+def test_force_majeure_pending_entries_see_resource_queue(
+    db_session: Session,
+) -> None:
+    """Codex round-6 P1-2: the force-majeure pending list for the
+    synthetic specialist sees the resource-owned queue (specialist
+    NULL) through the tag surface — the doctor-keyed filter alone
+    would return nothing to transfer or cancel."""
+    from app.services.force_majeure_service import ForceMajeureService
+
+    user = _make_user(db_session, username="lab_res13", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    entry = _make_waiting_entry(db_session, queue, number=3)
+
+    entries = ForceMajeureService(db_session).get_pending_entries(
+        specialist_id=synthetic.id, target_date=_DAY
+    )
+    assert [e.id for e in entries] == [entry.id]
+
+
+def test_force_majeure_entry_ids_select_resource_entries(
+    db_session: Session,
+) -> None:
+    """Codex round-6 P1-2: entry-id transfer/cancel requests select
+    the resource entries for the synthetic specialist (the
+    ForceMajeureApiRepository doctor filter never matches
+    specialist NULL)."""
+    from app.repositories.force_majeure_api_repository import (
+        ForceMajeureApiRepository,
+    )
+
+    user = _make_user(db_session, username="lab_res16", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    entry = _make_waiting_entry(db_session, queue, number=4)
+
+    entries = ForceMajeureApiRepository(db_session).list_pending_entries_by_ids(
+        [entry.id], specialist_id=synthetic.id, target_date=_DAY
+    )
+    assert [e.id for e in entries] == [entry.id]
+
+
+def test_force_majeure_transfer_moves_to_resource_tomorrow_queue(
+    db_session: Session,
+) -> None:
+    """Codex round-6 P1-2 (transfer): the entries move to the TOMORROW
+    registry surface (resource-owned), not to a doctor-owned fork —
+    Admin/Registrar can actually operate the interruption. transfer
+    COMMITs — durable rows cleaned in the finally."""
+    try:
+        _test_force_majeure_transfer_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "lab_res14")
+
+
+def _test_force_majeure_transfer_body(db_session: Session) -> None:
+    from app.services.force_majeure_service import ForceMajeureService
+
+    user = _make_user(db_session, username="lab_res14", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    resource = _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    entry = _make_waiting_entry(db_session, queue, number=5)
+
+    service = ForceMajeureService(db_session)
+    pending = service.get_pending_entries(specialist_id=synthetic.id, target_date=_DAY)
+    assert [e.id for e in pending] == [entry.id]
+
+    tomorrow = date.today() + timedelta(days=1)
+    result = service.transfer_entries_to_tomorrow(
+        entries=pending,
+        specialist_id=synthetic.id,
+        reason="round-6 pin",
+        performed_by_id=1,
+        send_notifications=False,
+    )
+    assert result["success"] is True
+    assert result["transferred"] == 1
+
+    tomorrow_queue = (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.day == tomorrow, DailyQueue.queue_tag == "lab")
+        .first()
+    )
+    assert tomorrow_queue is not None
+    assert tomorrow_queue.queue_resource_id == resource.id
+    assert tomorrow_queue.specialist_id is None
+    doctor_tomorrow = (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.day == tomorrow, DailyQueue.specialist_id == synthetic.id)
+        .all()
+    )
+    assert doctor_tomorrow == []
+
+    db_session.refresh(entry)
+    assert entry.status == "cancelled"
+    moved = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.queue_id == tomorrow_queue.id)
+        .all()
+    )
+    assert len(moved) == 1
+    assert moved[0].priority == ForceMajeureService.TRANSFER_PRIORITY
+    assert moved[0].patient_id == entry.patient_id
+
+
+def test_locked_recheck_helper_pg_gated_and_refreshing(
+    db_session: Session,
+) -> None:
+    """Codex round-6 P2: the post-lock recheck helper carries the row
+    lock (FOR UPDATE — pg-gated like the advisory lock) and the
+    identity-map refresh (populate_existing). Sequential sqlite: the
+    same verdicts as the plain resolve (active row → row; deactivated
+    or unknown → None)."""
+    import inspect
+
+    from app.crud import queue_resource_routing as qrr
+
+    resource = _make_resource(db_session, code="lab", queue_tag="lab")
+
+    row = qrr.resolve_tag_resource_locked(db_session, "lab")
+    assert row is not None and row.id == resource.id and row.active is True
+    assert qrr.resolve_tag_resource_locked(db_session, "ecg") is None
+
+    source = inspect.getsource(qrr.resolve_tag_resource_locked)
+    assert "populate_existing" in source
+    assert "with_for_update" in source
+    assert "postgresql" in source
+
+    resource.active = False
+    db_session.commit()
+    assert qrr.resolve_tag_resource_locked(db_session, "lab") is None
+
+
+def test_registry_recheck_uses_locked_resolve(db_session: Session) -> None:
+    """Codex round-6 P2 (source pin): every creation branch rechecks
+    the registry row AFTER the lock with the ROW-LOCKED helper — a
+    deactivation committing while a creator holds the advisory lock
+    cannot slip a new resource queue past the disable."""
+    import inspect
+
+    from app.crud import online_queue as crud_online_queue
+    from app.repositories import queue_api_repository as qar
+    from app.repositories import visit_confirmation_repository as vcr
+    from app.services.queue_svc import _operations as queue_ops
+
+    targets = (
+        ("crud", inspect.getsource(crud_online_queue.get_or_create_daily_queue)),
+        (
+            "queue_svc",
+            inspect.getsource(queue_ops.OperationsMixin.get_or_create_daily_queue),
+        ),
+        (
+            "repository",
+            inspect.getsource(
+                vcr.VisitConfirmationRepository.get_or_create_daily_queue
+            ),
+        ),
+        (
+            "legacy-repo",
+            inspect.getsource(qar.QueueApiRepository.get_or_create_registry_queue),
+        ),
+    )
+    for name, src in targets:
+        lock_pos = src.find("lock_registry_tag_creation")
+        assert lock_pos != -1, name
+        recheck = src.find("resolve_tag_resource_locked", lock_pos)
+        assert recheck > lock_pos, name

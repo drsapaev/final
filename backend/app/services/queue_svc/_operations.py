@@ -421,8 +421,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     db, queue_tag, day
                 )
                 # Codex round-4 P2: перепроверка ПОСЛЕ лока — деактивация
-                # строки между resolve и lock не должна создавать очередь
-                resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
+                # строки между resolve и lock не должна создавать очередь;
+                # round-6 P2: перепроверка под row-lock (FOR UPDATE) и с
+                # populate_existing — кэш сессии не возвращает устаревший
+                # активный объект, блокировка строки держится до вставки
+                resource = queue_resource_routing.resolve_tag_resource_locked(
+                    db, queue_tag
+                )
             if resource is not None:
                 existing = queue_resource_routing.find_active_tag_queue(
                     db, day, queue_tag

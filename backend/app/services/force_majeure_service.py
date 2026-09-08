@@ -16,6 +16,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.crud.queue_resource_routing import resolve_registry_tag_queue_for_specialist
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.payment import Payment
@@ -28,6 +29,7 @@ from app.models.refund_deposit import (
     RefundType,
 )
 from app.models.visit import Visit
+from app.repositories.queue_api_repository import QueueApiRepository
 from app.services.fcm_service import get_fcm_service
 
 logger = logging.getLogger(__name__)
@@ -79,7 +81,17 @@ class ForceMajeureService:
             query = query.filter(OnlineQueueEntry.queue_id == queue_id)
 
         if specialist_id:
-            query = query.filter(DailyQueue.specialist_id == specialist_id)
+            # QD-2C (Codex round-6 P1): resource-owned queues of a
+            # registry tag are invisible to the specialist filter
+            # (specialist NULL) — Admin/Registrar address the tag
+            # SURFACE of the specialist, not the doctor owner.
+            surface = resolve_registry_tag_queue_for_specialist(
+                self.db, target_date, specialist_id, None
+            )
+            if surface is not None:
+                query = query.filter(OnlineQueueEntry.queue_id == surface.id)
+            else:
+                query = query.filter(DailyQueue.specialist_id == specialist_id)
 
         query = query.filter(
             DailyQueue.day == target_date,
@@ -334,7 +346,22 @@ class ForceMajeureService:
         }
 
     def _get_or_create_queue(self, specialist_id: int, target_date: date) -> DailyQueue:
-        """Получить или создать очередь на указанную дату"""
+        """Получить или создать очередь на указанную дату
+
+        QD-2C (Codex round-6 P1): форс-мажор перенос идёт на
+        поверхность реестра — ресурсную очередь (day, tag), а не
+        параллельную врачебную; теги без строки реестра сохраняют
+        прежний путь врача байт-идентично."""
+        doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
+        if doctor is not None and doctor.specialty:
+            registry_queue = QueueApiRepository(
+                self.db
+            ).get_or_create_registry_queue(
+                day=target_date, queue_tag=doctor.specialty
+            )
+            if registry_queue is not None:
+                return registry_queue
+
         queue = self.db.query(DailyQueue).filter(
             DailyQueue.specialist_id == specialist_id,
             DailyQueue.day == target_date
@@ -342,7 +369,6 @@ class ForceMajeureService:
 
         if not queue:
             # Получаем информацию о специалисте
-            doctor = self.db.query(Doctor).filter(Doctor.id == specialist_id).first()
             queue_tag = None
             if doctor and doctor.specialty:
                 queue_tag = doctor.specialty.lower().replace(" ", "_")
