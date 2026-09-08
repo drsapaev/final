@@ -590,16 +590,31 @@ def call_patient(
 
         async def send_to_display():
             manager = get_display_manager()
-            specialist_name = (
-                entry.queue.specialist.full_name
-                if entry.queue.specialist
-                else f"Специалист #{entry.queue.specialist_id}"
-            )
+            # QD-2C (Codex round-12 P1): resource/bridged очередь —
+            # владелец и кабинет объявления с оси ресурса (реестр),
+            # иначе табло и голосовое объявление показывают
+            # «Специалист #None» без кабинета при живом реестровом
+            queue = entry.queue
+            if queue.queue_resource_id is not None:
+                resource = queue.queue_resource
+                specialist_name = (
+                    resource.display_name if resource else "Ресурс очереди"
+                )
+                cabinet = queue.cabinet_number or (
+                    resource.default_cabinet if resource else None
+                )
+            else:
+                specialist_name = (
+                    queue.specialist.full_name
+                    if queue.specialist
+                    else f"Специалист #{queue.specialist_id}"
+                )
+                cabinet = None  # TODO: Добавить кабинет в модель
 
             await manager.broadcast_patient_call(
                 queue_entry=entry,
                 doctor_name=specialist_name,
-                cabinet=None,  # TODO: Добавить кабинет в модель
+                cabinet=cabinet,
             )
 
         # Запускаем асинхронную отправку в фоне

@@ -2580,3 +2580,141 @@ def _test_queue_analytics_body(
     db_session.commit()
     other_payload = get_queue_analytics(other.id, db=db_session, current_user=admin)
     assert other_payload["totals"]["online_joins"] == 9
+
+
+# ===================== V. Codex round-12 pins =====================
+
+
+def test_legacy_call_broadcasts_resource_owner(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-12 P1: POST /queue/call/{entry_id} on a resource
+    queue broadcasts the registry owner and the queue's registry-sourced
+    cabinet to the display/voice announcement — not «Специалист #None»
+    with no cabinet. The route COMMITs — durable rows cleaned in the
+    finally."""
+    import asyncio
+
+    from app.services import display_websocket as dw
+
+    broadcast_calls: dict = {}
+
+    class FakeManager:
+        connections: list = []
+
+        async def broadcast_patient_call(self, **kwargs):
+            broadcast_calls.update(kwargs)
+
+    monkeypatch.setattr(dw, "get_display_manager", lambda: FakeManager())
+
+    try:
+        from app.api.v1.endpoints.queue import call_patient
+
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        resource = (
+            db_session.query(QueueResource)
+            .filter(QueueResource.queue_tag == "lab")
+            .first()
+        )
+        resource.default_cabinet = "7"
+        db_session.commit()
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        db_session.refresh(queue)
+        entry = _make_waiting_entry(db_session, queue, number=31)
+        caller = _make_user(db_session, username="lab_res31", role="Registrar")
+
+        async def scenario():
+            result = call_patient(entry.id, db=db_session, current_user=caller)
+            await asyncio.sleep(0.05)  # let the fire-and-forget task run
+            return result
+
+        payload = asyncio.run(scenario())
+        assert payload["success"] is True
+        assert broadcast_calls["doctor_name"] == "Ресурс очереди"
+        assert broadcast_calls["cabinet"] == "7"
+        db_session.refresh(entry)
+        assert entry.status == "called"
+    finally:
+        _durable_cleanup(db_session, "lab_res31")
+
+
+def test_registrar_cards_build_from_resource_owner(db_session: Session) -> None:
+    """Codex round-12 P2: GET /registrar/queues/today marks resource
+    queues as their own owner — no linked_doctor_missing warning, the
+    registry display_name as the specialist identity and the queue's
+    cabinet instead of «Специалист #None» / N/A."""
+    from app.api.v1.endpoints.registrar_integration._queue_ops import (
+        _build_queue_payload,
+        _process_online_queue_entries,
+    )
+
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    resource = (
+        db_session.query(QueueResource).filter(QueueResource.queue_tag == "lab").first()
+    )
+    resource.default_cabinet = "7"
+    db_session.commit()
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    db_session.refresh(queue)
+    assert queue.cabinet_number == "7"
+    entry = _make_waiting_entry(db_session, queue, number=31)
+
+    queues_by_specialty: dict = {}
+    _process_online_queue_entries(db_session, [entry], [], queues_by_specialty, set())
+    bucket = queues_by_specialty["laboratory"]  # the tag->specialty mapping
+    assert "linked_doctor_missing" not in bucket.get("integrity_warnings", [])
+    assert bucket["resource_display_name"] == "Ресурс очереди"
+    assert bucket["resource_cabinet"] == "7"
+
+    payload = _build_queue_payload(
+        queue_data=bucket,
+        specialty="laboratory",
+        queue_number=1,
+        entries=[{"id": entry.id, "status": "waiting"}],
+    )
+    assert payload["specialist_name"] == "Ресурс очереди"
+    assert payload["cabinet"] == "7"
+    assert payload["has_integrity_warnings"] is False
+
+
+def test_assign_queue_token_metadata_resource_cabinet(
+    db_session: Session,
+) -> None:
+    """Codex round-12 P2: the QR token metadata advertises the registry
+    owner and the queue's registry-sourced cabinet (not the synthetic
+    doctor's stale one) once the surface is resource-owned. The token
+    COMMITs — durable rows cleaned in the finally."""
+    try:
+        _test_qr_metadata_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "lab_res32")
+
+
+def _test_qr_metadata_body(db_session: Session) -> None:
+    user = _make_user(db_session, username="lab_res32", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    synthetic.cabinet = "42"  # the STALE legacy cabinet
+    db_session.commit()
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    resource = (
+        db_session.query(QueueResource).filter(QueueResource.queue_tag == "lab").first()
+    )
+    resource.default_cabinet = "7"
+    db_session.commit()
+
+    _token_value, metadata = queue_service.assign_queue_token(
+        db_session,
+        specialist_id=synthetic.id,
+        department="lab",
+        generated_by_user_id=None,
+        target_date=_DAY,
+        queue_tag="lab",
+        commit=False,
+    )
+    assert metadata["cabinet"] == "7"  # NOT the synthetic's stale "42"
+    assert metadata["specialist_name"] == "Ресурс очереди"
+    assert metadata["queue_id"] is not None

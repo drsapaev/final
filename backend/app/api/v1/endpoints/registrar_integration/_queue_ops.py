@@ -509,7 +509,11 @@ def _process_online_queue_entries(
 
         doctor = db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
         integrity_warnings: list[str] = []
-        if not doctor:
+        # QD-2C (Codex round-12 P2): ресурсная очередь (queue_resource_id)
+        # — владелец по дизайну РЕЕСТР, не врач: без linked_doctor_missing-шума;
+        # карточка строится от оси ресурса (display_name + кабинет очереди)
+        resource_owned = daily_queue.queue_resource_id is not None
+        if not doctor and not resource_owned:
             integrity_warnings.append("linked_doctor_missing")
 
         specialty = None
@@ -542,6 +546,14 @@ def _process_online_queue_entries(
             bucket["doctor"] = doctor
             bucket["doctor_id"] = doctor.id
         _register_bucket_doctor(bucket, doctor)
+        if resource_owned:
+            resource = daily_queue.queue_resource
+            bucket["resource_display_name"] = (
+                resource.display_name if resource else "Ресурс очереди"
+            )
+            bucket["resource_cabinet"] = daily_queue.cabinet_number or (
+                resource.default_cabinet if resource else None
+            )
 
         entry_time = (
             online_entry.queue_time
@@ -777,12 +789,21 @@ def _build_queue_payload(
         "specialist_name": (
             queue_data["doctor"].user.full_name
             if queue_data.get("doctor") and queue_data["doctor"].user
-            else f"Специалист #{queue_data['doctor_id']}"
+            else (
+                # QD-2C (Codex round-12 P2): resource-ось — display_name
+                # реестра вместо «Специалист #None»
+                queue_data.get("resource_display_name")
+                or f"Специалист #{queue_data['doctor_id']}"
+            )
         ),
         "specialists": specialists,
         "specialty": specialty,
         "timezone": "Asia/Tashkent",
-        "cabinet": queue_data["doctor"].cabinet if queue_data.get("doctor") else "N/A",
+        "cabinet": (
+            queue_data["doctor"].cabinet
+            if queue_data.get("doctor")
+            else (queue_data.get("resource_cabinet") or "N/A")
+        ),
         "integrity_warnings": list(dict.fromkeys(queue_data.get("integrity_warnings", []))),
         "has_integrity_warnings": bool(queue_data.get("integrity_warnings")),
         "opened_at": datetime.now(UTC).isoformat(),

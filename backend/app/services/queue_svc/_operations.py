@@ -728,13 +728,28 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if doctor and doctor.user:
             specialist_name = doctor.user.full_name or doctor.user.username
 
+        # QD-2C (Codex round-12 P2): поверхность = ресурсная очередь —
+        # владелец/кабинет QR-метаданных с оси ресурса (реестр), а не с
+        # синтетика: иначе /online-queue/qrcode и /registrar/generate-qr
+        # рекламируют устаревший/отсутствующий кабинет при живом
+        # реестровом назначении
+        cabinet = getattr(doctor, "cabinet", None) if doctor else None
+        if daily_queue is not None and daily_queue.queue_resource_id is not None:
+            resource = daily_queue.queue_resource
+            specialist_name = (
+                resource.display_name if resource is not None else "Ресурс очереди"
+            )
+            cabinet = daily_queue.cabinet_number or (
+                resource.default_cabinet if resource is not None else None
+            )
+
         metadata = {
             "day": day,
             "queue_id": daily_queue.id if daily_queue else None,
             "specialist_name": specialist_name
             or ("Все специалисты" if is_clinic_wide else None),
             "specialty": doctor.specialty if doctor else "clinic",
-            "cabinet": getattr(doctor, "cabinet", None) if doctor else None,
+            "cabinet": cabinet,
             "start_time": (
                 daily_queue.online_start_time
                 if daily_queue
