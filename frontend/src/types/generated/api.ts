@@ -32796,7 +32796,7 @@ export type components = {
             /** Day */
             day: string;
             /** Specialist Id */
-            specialist_id: number;
+            specialist_id: number | null;
             /** Specialist Name */
             specialist_name: string;
             /** Queue Tag */
