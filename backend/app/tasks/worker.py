@@ -42,30 +42,43 @@ LEASE_TTL = timedelta(minutes=10)
 # Job implementations
 # ---------------------------------------------------------------------------
 
-async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") -> None:
+async def send_visit_reminder(
+    ctx,
+    *,
+    visit_id: int,
+    channel: str = "telegram",
+    schedule_version: str | None = None,
+) -> None:
     """Send a reminder to a patient about an upcoming visit.
 
     Enqueued by app.tasks.scheduler.enqueue_reminder().
 
-    Delivery protocol (Codex rounds 2-4): a short atomic lease claim, the
-    provider dispatch OUTSIDE any transaction/lock, and the permanent
-    ``reminder_sent_at`` record only AFTER the provider acknowledges.
+    Delivery protocol (Codex rounds 2-5): a short atomic lease claim bound
+    to the visit's CURRENT schedule, the provider dispatch OUTSIDE any
+    transaction/lock, and the permanent ``reminder_sent_at`` record only
+    AFTER the provider acknowledges.
 
     1. Lease claim — one conditional UPDATE stamps ``reminder_claimed_at``
        only for a reminder-eligible visit (status ``pending_confirmation``,
        never reminded, no live lease; a lease older than LEASE_TTL belongs
-       to a dead worker and is reclaimable). The row lock lives ONLY for
-       this statement — never across the notification await. Two
-       overlapping deliveries can never both claim (proven against real
-       PostgreSQL by tests/integration/test_reminder_pipeline_pg.py,
-       gate_d marker).
+       to a dead worker and is reclaimable). When the producer supplied a
+       ``schedule_version`` (the schedule the job was enqueued for), the
+       claim ALSO binds to ``visit_date == schedule_version`` — a stale job
+       left queued by a reschedule can never deliver for the old schedule
+       (Codex round 5, P1). The row lock lives ONLY for this statement —
+       never across the notification await. Two overlapping deliveries can
+       never both claim (proven against real PostgreSQL by
+       tests/integration/test_reminder_pipeline_pg.py, gate_d marker).
     2. Dispatch — NotificationSenderService.send_confirmation_reminder()
        by its real contract. A crash between claim and dispatch leaves a
        lease that expires: the arq retry re-claims and delivers — the
-       reminder is never stranded by a crash (Codex round 4, P1). The
-       residual at-least-once window (crash AFTER the provider accepted
-       but BEFORE the record) is inherent to external sends without a
-       provider-side idempotency key.
+       reminder is never stranded by a crash (Codex round 4, P1). An
+       overlapping delivery hitting a LIVE lease raises arq ``Retry`` so
+       the redelivery is deferred until the lease resolves instead of
+       completing and never coming back (Codex round 5, P1). The residual
+       at-least-once window (crash AFTER the provider accepted but BEFORE
+       the record) is inherent to external sends without a provider-side
+       idempotency key.
     3. Finalize — ``reminder_sent_at`` is recorded and the lease released
        in one statement bound to OUR lease value, so a concurrent
        reschedule/re-claim can never be overwritten by this job (Codex
@@ -75,10 +88,15 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
     from sqlalchemy import create_engine, func, or_, update
     from sqlalchemy.orm import Session
 
+    from datetime import date
+
     from app.models.visit import Visit
     from app.services.notification_service import NotificationService
 
-    logger.info("job.send_visit_reminder visit_id=%s channel=%s", visit_id, channel)
+    logger.info(
+        "job.send_visit_reminder visit_id=%s channel=%s schedule_version=%s",
+        visit_id, channel, schedule_version,
+    )
 
     engine = create_engine(str(settings.DATABASE_URL))
     db = Session(engine)
@@ -89,18 +107,24 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
     our_lease: datetime | None = None
     try:
         our_lease = datetime.now(UTC)
-        claim = db.execute(
-            update(Visit)
-            .where(
-                Visit.id == visit_id,
-                Visit.status == "pending_confirmation",
-                Visit.reminder_sent_at.is_(None),
-                or_(
-                    Visit.reminder_claimed_at.is_(None),
-                    Visit.reminder_claimed_at < our_lease - LEASE_TTL,
-                ),
+        conditions = [
+            Visit.id == visit_id,
+            Visit.status == "pending_confirmation",
+            Visit.reminder_sent_at.is_(None),
+            or_(
+                Visit.reminder_claimed_at.is_(None),
+                Visit.reminder_claimed_at < our_lease - LEASE_TTL,
+            ),
+        ]
+        if schedule_version is not None:
+            # Bind the claim to the schedule this job was enqueued FOR: a
+            # stale job left queued by a reschedule must never deliver for
+            # the old schedule (Codex round 5, P1).
+            conditions.append(
+                Visit.visit_date == date.fromisoformat(schedule_version)
             )
-            .values(reminder_claimed_at=our_lease)
+        claim = db.execute(
+            update(Visit).where(*conditions).values(reminder_claimed_at=our_lease)
         )
         db.commit()
         if claim.rowcount == 0:
@@ -110,25 +134,56 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
                 logger.warning(
                     "job.send_visit_reminder: visit %s not found", visit_id
                 )
-            elif visit.status != "pending_confirmation":
+                return
+            if schedule_version is not None and visit.visit_date != date.fromisoformat(
+                schedule_version
+            ):
+                logger.info(
+                    "job.send_visit_reminder: visit %s schedule moved on "
+                    "(job version %s, visit %s) — stale job, skipping",
+                    visit_id, schedule_version, visit.visit_date,
+                )
+                return
+            if visit.status != "pending_confirmation":
                 logger.info(
                     "job.send_visit_reminder: visit %s not pending "
                     "confirmation (status=%s), skipping",
                     visit_id, visit.status,
                 )
-            elif visit.reminder_sent_at is not None:
+                return
+            if visit.reminder_sent_at is not None:
                 logger.info(
                     "job.send_visit_reminder: visit %s already reminded "
                     "at %s, skipping",
                     visit_id, visit.reminder_sent_at,
                 )
-            else:
-                logger.info(
-                    "job.send_visit_reminder: visit %s has a live lease "
-                    "(claimed_at=%s), skipping",
-                    visit_id, visit.reminder_claimed_at,
+                return
+            # The only remaining reason the claim lost: a LIVE lease held by
+            # another delivery. Returning cleanly would end this attempt AND
+            # leave nothing to retry after the lease resolves — if the owner
+            # then died, the reminder would strand forever (Codex round 5,
+            # P1). Defer THIS job until shortly after the observed lease can
+            # have expired; arq will re-run us to claim or re-defer.
+            from arq.worker import Retry
+
+            claimed_at = visit.reminder_claimed_at
+            if claimed_at is not None:
+                claimed_at = claimed_at.replace(tzinfo=UTC)
+                defer = max(
+                    30.0,
+                    min(
+                        (claimed_at + LEASE_TTL - datetime.now(UTC)).total_seconds(),
+                        LEASE_TTL.total_seconds(),
+                    ),
                 )
-            return
+            else:
+                defer = LEASE_TTL.total_seconds()
+            logger.info(
+                "job.send_visit_reminder: visit %s has a live lease "
+                "(claimed_at=%s), deferring redelivery by %.0fs",
+                visit_id, visit.reminder_claimed_at, defer,
+            )
+            raise Retry(defer=defer)
 
         service = NotificationService(db)
         result = await service.send_confirmation_reminder(db, visit_id, hours_before=24)

@@ -258,6 +258,7 @@ async def test_enqueue_reminder_targets_clinic_queue_with_deterministic_job_id(
     assert kwargs["visit_id"] == 42
     assert kwargs["channel"] == "telegram"
     assert kwargs["_job_id"] == "reminder:visit:42:2026-09-08:telegram"
+    assert kwargs["schedule_version"] == "2026-09-08"
     # THE fix: no _queue_name meant arq's default 'arq:queue' — a queue the
     # worker never listens on.
     assert kwargs["_queue_name"] == "clinic"
@@ -846,7 +847,13 @@ def test_live_lease_blocks_reclaim(pipeline_db, make_visit, reminder_spy):
     s.commit()
     s.close()
 
-    asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+    # Codex round 5, P1: a live lease must not merely skip — the job must
+    # DEFER (raise arq Retry) so a redelivery actually comes back after the
+    # lease resolves instead of completing and never returning.
+    from arq.worker import Retry
+
+    with pytest.raises(Retry):
+        asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
 
     assert reminder_spy == [], "a live lease must block a second delivery"
     s = sessionmaker(bind=pipeline_db)()
@@ -886,3 +893,177 @@ def test_claim_rejects_visits_not_pending_confirmation(
             s.close()
 
     assert reminder_spy == [], "non-eligible visits must never dispatch"
+
+
+def test_matching_schedule_version_delivers(pipeline_db, make_visit, reminder_spy):
+    """Codex round 5, P1 happy path: the job's schedule version matches the
+    visit's current date — the claim succeeds and the delivery happens."""
+    from datetime import date
+
+    from app.models.visit import Visit
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()  # visit_date = today
+    asyncio.run(
+        send_visit_reminder(
+            {},
+            visit_id=visit_id,
+            channel="telegram",
+            schedule_version=date.today().isoformat(),
+        )
+    )
+
+    assert len(reminder_spy) == 1
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_sent_at is not None
+        assert row.reminder_claimed_at is None
+    finally:
+        s.close()
+
+
+def test_stale_schedule_version_is_rejected(pipeline_db, make_visit, reminder_spy):
+    """Codex round 5, P1: a stale job (enqueued for the OLD schedule before
+    a reschedule) must never claim, dispatch, or stamp — otherwise it
+    delivers for the obsolete schedule and the correctly timed job skips."""
+    from datetime import timedelta
+
+    from app.models.visit import Visit
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()  # visit_date = today
+    stale_version = (date.today() - timedelta(days=2)).isoformat()
+
+    asyncio.run(
+        send_visit_reminder(
+            {},
+            visit_id=visit_id,
+            channel="telegram",
+            schedule_version=stale_version,
+        )
+    )
+
+    assert reminder_spy == [], "a stale job must never dispatch"
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_sent_at is None
+        assert row.reminder_claimed_at is None
+    finally:
+        s.close()
+
+
+def test_noop_reschedule_preserves_reminder_state(pipeline_db, make_visit):
+    """Codex round 5, P2: a reschedule to the SAME date (client retry,
+    same-value re-submit) must PRESERVE the reminder state — clearing it
+    would let a later job duplicate a reminder for the identical
+    appointment."""
+    from datetime import datetime, UTC
+
+    from app.models.visit import Visit
+    from app.services.visits_api_service import VisitsApiService
+
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        stamped = datetime.now(UTC)
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {"reminder_sent_at": stamped, "reminder_claimed_at": stamped}
+        )
+        s.commit()
+
+        current_date = s.query(Visit).filter(Visit.id == visit_id).first().visit_date
+        service = VisitsApiService(s)
+        service.reschedule_visit(visit_id=visit_id, new_date=current_date)
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == current_date
+        assert row.reminder_sent_at == stamped.replace(
+            tzinfo=None
+        ), "no-op reschedule must not clear the reminder stamp"
+        assert row.reminder_claimed_at == stamped.replace(
+            tzinfo=None
+        ), "no-op reschedule must not clear the lease"
+    finally:
+        s.close()
+
+
+def test_noop_reschedule_route_preserves_reminder_state(pipeline_db, make_visit):
+    """Same no-op contract for the POST /visits/{id}/reschedule route."""
+    from datetime import datetime, UTC
+
+    from app.api.v1.endpoints.visits import reschedule_visit as reschedule_route
+    from app.models.visit import Visit
+
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        stamped = datetime.now(UTC)
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {"reminder_sent_at": stamped, "reminder_claimed_at": stamped}
+        )
+        s.commit()
+
+        current_date = s.query(Visit).filter(Visit.id == visit_id).first().visit_date
+        reschedule_route(visit_id=visit_id, new_date=current_date, new_time=None, db=s)
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == current_date
+        assert row.reminder_sent_at == stamped.replace(tzinfo=None)
+        assert row.reminder_claimed_at == stamped.replace(tzinfo=None)
+    finally:
+        s.close()
+
+
+def test_noop_move_preserves_reminder_state(pipeline_db, make_visit):
+    """Same no-op contract for the Telegram /move_visit adapter."""
+    from datetime import datetime, UTC
+
+    from app.models.audit import AuditLog
+    from app.models.clinic import Doctor
+    from app.models.visit import Visit
+    from app.services.telegram_staff_action_adapter_service import (
+        TelegramStaffActionAdapterService,
+    )
+
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        stamped = datetime.now(UTC)
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {"reminder_sent_at": stamped, "reminder_claimed_at": stamped}
+        )
+        s.commit()
+
+        visit = s.query(Visit).filter(Visit.id == visit_id).first()
+        actor_user_id = (
+            s.query(Doctor).filter(Doctor.id == visit.doctor_id).first().user_id
+        )
+        current_date = visit.visit_date
+
+        service = TelegramStaffActionAdapterService(s)
+
+        class _StubQueue:
+            def staff_move_visit_queue_link(self, db, **kwargs):
+                return {"status": "skipped", "queue_time_preserved": None}
+
+        service.queue_service = _StubQueue()
+        result = service.staff_move_visit(
+            visit_id=visit_id,
+            new_visit_date=current_date,
+            actor_user_id=actor_user_id,
+        )
+
+        assert result["success"] is True
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == current_date
+        assert row.reminder_sent_at == stamped.replace(tzinfo=None)
+        assert row.reminder_claimed_at == stamped.replace(tzinfo=None)
+
+        s.query(AuditLog).filter(
+            AuditLog.entity_id == visit_id, AuditLog.entity_type == "visit"
+        ).delete()
+        s.commit()
+    finally:
+        s.close()

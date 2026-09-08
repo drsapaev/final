@@ -138,6 +138,7 @@ async def enqueue_reminder(
         "send_visit_reminder",
         visit_id=visit_id,
         channel=channel,
+        schedule_version=schedule_version,
         _job_id=_job_id,
     )
 

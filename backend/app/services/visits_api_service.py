@@ -366,15 +366,17 @@ class VisitsApiService:
                 detail="Cannot reschedule a visit that has been started",
             )
 
-        # PR-1 (Codex round 2, P1): the reminder stamp is only valid for
-        # the CURRENT schedule — rescheduling must invalidate it, otherwise
-        # the next reminder job silently no-ops on the stale stamp and the
-        # patient never gets a reminder for the new date.
+        # PR-1 (Codex rounds 2+5): the reminder state is only valid for the
+        # CURRENT schedule — rescheduling must invalidate it, otherwise the
+        # next reminder job silently no-ops on the stale stamp and the
+        # patient never gets a reminder for the new date. A NO-OP
+        # reschedule (same date re-submitted) preserves it.
         reschedule_values: dict = {"visit_date": new_date}
-        if hasattr(table.c, "reminder_sent_at"):
-            reschedule_values["reminder_sent_at"] = None
-        if hasattr(table.c, "reminder_claimed_at"):
-            reschedule_values["reminder_claimed_at"] = None
+        if new_date != visit_row.get("visit_date"):
+            if hasattr(table.c, "reminder_sent_at"):
+                reschedule_values["reminder_sent_at"] = None
+            if hasattr(table.c, "reminder_claimed_at"):
+                reschedule_values["reminder_claimed_at"] = None
         upd = (
             table.update()
             .where(table.c.id == visit_id)

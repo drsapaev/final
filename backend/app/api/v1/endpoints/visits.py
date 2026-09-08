@@ -568,18 +568,26 @@ def reschedule_visit(
         )
 
     # R-27 fix: обновляем и дату, и опционально время
+    new_time_str = new_time.strip() if new_time is not None else None
+    # PR-1 (Codex round 5, P2): a NO-OP reschedule (client retry, same
+    # date/time re-submitted) must PRESERVE the reminder state — clearing
+    # it would let a later job duplicate a reminder for the identical
+    # appointment. Invalidate only when the effective schedule changes.
+    schedule_changed = new_date != vrow.get("visit_date") or (
+        new_time_str is not None and new_time_str != vrow.get("visit_time")
+    )
     update_values: dict = {"visit_date": new_date}
-    # PR-1 (Codex round 2, P1): the reminder stamp is only valid for the
-    # CURRENT schedule — rescheduling must invalidate it, otherwise the
-    # next reminder job silently no-ops on the stale stamp and the patient
-    # never gets a reminder for the new date.
-    if hasattr(t.c, "reminder_sent_at"):
-        update_values["reminder_sent_at"] = None
-    if hasattr(t.c, "reminder_claimed_at"):
-        update_values["reminder_claimed_at"] = None
+    if schedule_changed:
+        # PR-1 (Codex round 2, P1): the reminder stamp is only valid for
+        # the CURRENT schedule — rescheduling must invalidate it, otherwise
+        # the next reminder job silently no-ops on the stale stamp and the
+        # patient never gets a reminder for the new date.
+        if hasattr(t.c, "reminder_sent_at"):
+            update_values["reminder_sent_at"] = None
+        if hasattr(t.c, "reminder_claimed_at"):
+            update_values["reminder_claimed_at"] = None
     if new_time is not None:
         # Валидация формата HH:MM
-        new_time_str = new_time.strip()
         if not _isValid_time_str(new_time_str):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -651,12 +659,14 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
 
     tomorrow = date.today() + timedelta(days=1)
     tomorrow_values: dict = {"visit_date": tomorrow}
-    # PR-1 (Codex round 2, P1): reschedule invalidates the reminder stamp —
-    # same contract as the /reschedule route above.
-    if hasattr(t.c, "reminder_sent_at"):
-        tomorrow_values["reminder_sent_at"] = None
-    if hasattr(t.c, "reminder_claimed_at"):
-        tomorrow_values["reminder_claimed_at"] = None
+    # PR-1 (Codex rounds 2+5): invalidate the reminder state only when the
+    # schedule actually changes — a no-op move to the existing date must
+    # preserve it.
+    if tomorrow != vrow.get("visit_date"):
+        if hasattr(t.c, "reminder_sent_at"):
+            tomorrow_values["reminder_sent_at"] = None
+        if hasattr(t.c, "reminder_claimed_at"):
+            tomorrow_values["reminder_claimed_at"] = None
     upd = (
         t.update().where(t.c.id == visit_id).values(**tomorrow_values).returning(t)
     )
