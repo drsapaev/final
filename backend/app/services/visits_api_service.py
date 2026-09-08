@@ -414,12 +414,12 @@ class VisitsApiService:
             # predicate (round 13: the wait alone is not atomic).
             lease_free = None
             if hasattr(table.c, "reminder_claimed_at"):
-                from app.tasks.lease import (
-                    LEASE_TTL,
-                    wait_for_reminder_lease_clear,
-                )
+                from app.tasks.lease import LEASE_TTL
 
-                if not wait_for_reminder_lease_clear(self.repository.db, visit_id):
+                # The lease polling goes through the repository — the
+                # service/repository boundary test forbids direct session
+                # access in the service logic.
+                if not self.repository.wait_for_reminder_lease_clear(visit_id):
                     raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
                 lease_free = or_(
                     table.c.reminder_claimed_at.is_(None),
