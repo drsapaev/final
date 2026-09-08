@@ -394,6 +394,22 @@ class TelegramStaffActionAdapterService:
             if new_visit_date < date.today():
                 raise TelegramStaffActionAdapterError("new_visit_date_in_past")
 
+            # PR-1 (Codex round 11, P1): same lease coordination as the
+            # HTTP/service reschedule paths — a schedule mutation must
+            # never COMMIT while a reminder delivery holds the lease, or
+            # the in-flight old-generation worker dispatches the obsolete
+            # details and the reminder is then sent again for the new
+            # generation. Wait for the dispatch to resolve; refuse when
+            # the lease survives the wait budget. A no-op move preserves
+            # the reminder state and needs no coordination.
+            if new_visit_date != visit.visit_date:
+                from app.tasks.lease import wait_for_reminder_lease_clear
+
+                if not wait_for_reminder_lease_clear(self.db, visit_id):
+                    raise TelegramStaffActionAdapterError(
+                        "reminder_delivery_in_progress"
+                    )
+
             previous_visit_date = visit.visit_date
             visit.visit_date = new_visit_date
             # PR-1 (Codex rounds 3+5): moving a visit invalidates the

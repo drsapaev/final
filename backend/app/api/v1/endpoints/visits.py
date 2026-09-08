@@ -602,6 +602,27 @@ def reschedule_visit(
             )
         update_values["visit_time"] = new_time_str
 
+    # PR-1 (Codex round 11, P1): a schedule mutation must never COMMIT
+    # under a LIVE reminder lease — the in-flight old-generation worker
+    # would dispatch the obsolete appointment details (its finalize is
+    # generation-guarded, so the reminder would then be sent AGAIN for
+    # the new generation and the patient would receive two messages,
+    # the first describing an appointment that no longer exists). Wait
+    # for the dispatch to resolve; refuse with 409 when the lease
+    # survives the whole wait budget. A stale lease (dead worker) never
+    # blocks — same reclaim contract as the worker's claim predicate.
+    if schedule_changed and hasattr(t.c, "reminder_claimed_at"):
+        from app.tasks.lease import wait_for_reminder_lease_clear
+
+        if not wait_for_reminder_lease_clear(db, visit_id):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Reminder delivery is in progress for this visit; "
+                    "retry in a few seconds"
+                ),
+            )
+
     upd = (
         t.update().where(t.c.id == visit_id).values(**update_values).returning(t)
     )
@@ -677,7 +698,22 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
                 t.c.reminder_generation + 1
             )
         # The lease is preserved — see the /reschedule route comment
-        # (Codex round 8, P1).
+        # (Codex round 8, P1) — and the mutation below is lease-coordinated
+        # (Codex round 11, P1).
+    if tomorrow != vrow.get("visit_date") and hasattr(
+        t.c, "reminder_claimed_at"
+    ):
+        from app.tasks.lease import wait_for_reminder_lease_clear
+
+        if not wait_for_reminder_lease_clear(db, visit_id):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Reminder delivery is in progress for this visit; "
+                    "retry in a few seconds"
+                ),
+            )
+
     upd = (
         t.update().where(t.c.id == visit_id).values(**tomorrow_values).returning(t)
     )

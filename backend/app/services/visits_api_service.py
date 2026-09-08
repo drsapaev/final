@@ -381,6 +381,23 @@ class VisitsApiService:
                 )
             # The lease is preserved — Codex round 8, P1 (see the
             # /visits/{id}/reschedule route comment).
+            # PR-1 (Codex round 11, P1): the mutation must never COMMIT
+            # under a live lease — wait for the in-flight dispatch to
+            # resolve, refuse with 409 when the lease survives the wait
+            # budget (same contract as the HTTP reschedule endpoints).
+            if hasattr(table.c, "reminder_claimed_at"):
+                from app.tasks.lease import wait_for_reminder_lease_clear
+
+                if not wait_for_reminder_lease_clear(
+                    self.repository.db, visit_id
+                ):
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Reminder delivery is in progress for this "
+                            "visit; retry in a few seconds"
+                        ),
+                    )
         upd = (
             table.update()
             .where(table.c.id == visit_id)

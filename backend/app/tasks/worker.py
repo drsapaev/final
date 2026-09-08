@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 from arq import cron
@@ -32,10 +32,14 @@ from app.core.config import settings  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-# Lease must comfortably outlive the worst dispatch: arq's job_timeout
-# is 300s, so a 10-minute TTL can only expire for a DEAD worker, never
-# for a live one still awaiting the provider.
-LEASE_TTL = timedelta(minutes=10)
+# The reminder lease TTL lives in app/tasks/lease.py — a deliberately
+# arq-free module — because the API/service reschedule paths import the
+# SAME constant for their round-11 coordination duty (a schedule mutation
+# must never commit under a live lease). The TTL must comfortably outlive
+# the worst dispatch: arq's job_timeout is 300s, so a 10-minute TTL can
+# only expire for a DEAD worker, never for a live one still awaiting the
+# provider.
+from app.tasks.lease import LEASE_TTL  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

@@ -39,6 +39,7 @@ from datetime import date
 from urllib.parse import urlparse, urlsplit, urlunsplit
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
@@ -701,19 +702,23 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
 
 def _stamp_and_reschedule_setup(pipeline_db, make_visit):
     """Create a visit, stamp reminder_sent_at (as if already reminded),
-    return (visit_id, session, new_date)."""
-    from datetime import datetime, timedelta, UTC
+    and stamp a STALE lease (dead worker — round 11: a LIVE lease would
+    make every schedule mutation refuse with 409 instead of proceeding).
+    Return (visit_id, session, new_date, lease_value)."""
+    from datetime import UTC, datetime, timedelta
 
     from app.models.visit import Visit
+    from app.tasks.worker import LEASE_TTL
 
     visit_id = make_visit()
     s = sessionmaker(bind=pipeline_db)()
     stamped = datetime.now(UTC)
+    stale_lease = stamped - LEASE_TTL - timedelta(minutes=1)
     s.query(Visit).filter(Visit.id == visit_id).update(
-        {"reminder_sent_at": stamped, "reminder_claimed_at": stamped}
+        {"reminder_sent_at": stamped, "reminder_claimed_at": stale_lease}
     )
     s.commit()
-    return visit_id, s, date.today() + timedelta(days=3), stamped
+    return visit_id, s, date.today() + timedelta(days=3), stale_lease
 
 
 def test_service_reschedule_clears_reminder_stamp(pipeline_db, make_visit):
@@ -724,7 +729,7 @@ def test_service_reschedule_clears_reminder_stamp(pipeline_db, make_visit):
     from app.models.visit import Visit
     from app.services.visits_api_service import VisitsApiService
 
-    visit_id, s, new_date, stamped = _stamp_and_reschedule_setup(
+    visit_id, s, new_date, stale_lease = _stamp_and_reschedule_setup(
         pipeline_db, make_visit
     )
     try:
@@ -736,12 +741,9 @@ def test_service_reschedule_clears_reminder_stamp(pipeline_db, make_visit):
         assert (
             row.reminder_sent_at is None
         ), "reschedule must invalidate the stale reminder stamp"
-        assert row.reminder_claimed_at == stamped.replace(
+        assert row.reminder_claimed_at == stale_lease.replace(
             tzinfo=None
-        ), "reschedule must preserve the live lease (round 8)"
-        assert row.reminder_claimed_at == stamped.replace(
-            tzinfo=None
-        ), "reschedule must preserve the live lease (round 8), value intact"
+        ), "reschedule preserves the lease value (round 8; live lease refuses)"
     finally:
         s.close()
 
@@ -752,7 +754,7 @@ def test_reschedule_route_clears_reminder_stamp(pipeline_db, make_visit):
     from app.api.v1.endpoints.visits import reschedule_visit as reschedule_route
     from app.models.visit import Visit
 
-    visit_id, s, new_date, stamped = _stamp_and_reschedule_setup(
+    visit_id, s, new_date, stale_lease = _stamp_and_reschedule_setup(
         pipeline_db, make_visit
     )
     try:
@@ -763,12 +765,9 @@ def test_reschedule_route_clears_reminder_stamp(pipeline_db, make_visit):
         assert (
             row.reminder_sent_at is None
         ), "reschedule route must invalidate the stale reminder stamp"
-        assert row.reminder_claimed_at == stamped.replace(
+        assert row.reminder_claimed_at == stale_lease.replace(
             tzinfo=None
-        ), "reschedule route must preserve the live lease (round 8)"
-        assert row.reminder_claimed_at == stamped.replace(
-            tzinfo=None
-        ), "reschedule route must preserve the live lease (round 8), value intact"
+        ), "reschedule route preserves the lease value (round 8; live refuses)"
     finally:
         s.close()
 
@@ -782,7 +781,7 @@ def test_reschedule_tomorrow_route_clears_reminder_stamp(pipeline_db, make_visit
     )
     from app.models.visit import Visit
 
-    visit_id, s, _new_date, stamped = _stamp_and_reschedule_setup(
+    visit_id, s, _new_date, stale_lease = _stamp_and_reschedule_setup(
         pipeline_db, make_visit
     )
     try:
@@ -793,12 +792,9 @@ def test_reschedule_tomorrow_route_clears_reminder_stamp(pipeline_db, make_visit
         assert (
             row.reminder_sent_at is None
         ), "tomorrow-reschedule must invalidate the stale reminder stamp"
-        assert row.reminder_claimed_at == stamped.replace(
+        assert row.reminder_claimed_at == stale_lease.replace(
             tzinfo=None
-        ), "tomorrow-reschedule must preserve the live lease (round 8)"
-        assert row.reminder_claimed_at == stamped.replace(
-            tzinfo=None
-        ), "tomorrow-reschedule must preserve the live lease (round 8), value intact"
+        ), "tomorrow-reschedule preserves the lease value (round 8; live refuses)"
     finally:
         s.close()
 
@@ -815,7 +811,7 @@ def test_telegram_move_visit_clears_reminder_stamp(pipeline_db, make_visit):
         TelegramStaffActionAdapterService,
     )
 
-    visit_id, s, new_date, stamped = _stamp_and_reschedule_setup(
+    visit_id, s, new_date, stale_lease = _stamp_and_reschedule_setup(
         pipeline_db, make_visit
     )
     try:
@@ -845,12 +841,9 @@ def test_telegram_move_visit_clears_reminder_stamp(pipeline_db, make_visit):
         assert (
             row.reminder_sent_at is None
         ), "telegram move must invalidate the stale reminder stamp"
-        assert row.reminder_claimed_at == stamped.replace(
+        assert row.reminder_claimed_at == stale_lease.replace(
             tzinfo=None
-        ), "telegram move must preserve the live lease (round 8)"
-        assert row.reminder_claimed_at == stamped.replace(
-            tzinfo=None
-        ), "telegram move must preserve the live lease (round 8), value intact"
+        ), "telegram move preserves the lease value (round 8; live refuses)"
 
         # Cleanup: audit rows written by this call reference the shared DB.
         s.query(AuditLog).filter(
@@ -1294,7 +1287,14 @@ def test_reschedule_during_dispatch_prevents_stale_record(
     flight bumps the generation and preserves the lease. The in-flight
     worker's finalize is generation-guarded: its OLD-schedule delivery is
     NOT recorded (only the lease is released), and the new generation's
-    job can then claim and deliver for the new schedule."""
+    job can then claim and deliver for the new schedule.
+
+    Codex round 11, P1 adds the OUTER layer of this defense: the real
+    HTTP/service/Telegram reschedule paths now WAIT for a live lease to
+    resolve before committing, so this interleaving is only reachable via
+    out-of-band row mutations (as simulated here). This test pins the
+    worker-side generation guard as defense in depth beneath that
+    coordination."""
     import asyncio
 
     from app.models.visit import Visit
@@ -1364,6 +1364,257 @@ def test_reschedule_during_dispatch_prevents_stale_record(
             row.reminder_sent_at is not None
         ), "the new generation must deliver and record"
         assert row.reminder_claimed_at is None
+    finally:
+        s.close()
+
+
+# ---------------------------------------------------------------------------
+# Codex round 11, P1: lease-coordinated schedule mutations
+# ---------------------------------------------------------------------------
+
+
+def _stamp_lease(engine, visit_id: int, claimed_at) -> None:
+    """Write a lease value directly — simulates a dispatch holding the
+    visit (the worker claims BEFORE the mutation window it guards)."""
+    from app.models.visit import Visit
+
+    s = sessionmaker(bind=engine)()
+    try:
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {"reminder_claimed_at": claimed_at}
+        )
+        s.commit()
+    finally:
+        s.close()
+
+
+def test_reschedule_waits_for_live_lease_then_proceeds(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 11, P1: a schedule mutation must not commit while a
+    delivery holds the lease. The reschedule waits (polls the lease) and
+    proceeds once the dispatch resolves — the in-flight worker can then
+    finalize for the OLD schedule, and only the NEXT generation sees the
+    mutated one."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.api.v1.endpoints.visits import reschedule_visit
+    from app.models.visit import Visit
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    polls = {"n": 0}
+
+    def _lease_resolves_during_wait(seconds):
+        # The in-flight dispatch finalizes and releases the lease while
+        # the reschedule is polling.
+        polls["n"] += 1
+        _stamp_lease(pipeline_db, visit_id, None)
+
+    monkeypatch.setattr(lease_mod.time, "sleep", _lease_resolves_during_wait)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        new_date = date.today() + timedelta(days=3)
+        reschedule_visit(visit_id=visit_id, new_date=new_date, new_time=None, db=s)
+        assert polls["n"] >= 1, "the mutation must wait while the lease is live"
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == new_date
+        assert row.reminder_generation == 1, "schedule change bumps the generation"
+        assert row.reminder_sent_at is None, "stamp invalidated for the new schedule"
+        assert row.reminder_claimed_at is None, "lease resolved before the commit"
+    finally:
+        s.close()
+
+
+def test_reschedule_refuses_when_lease_never_clears(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 11, P1: a live lease that survives the whole wait
+    budget refuses the mutation with 409 — the schedule (and the reminder
+    state) stays EXACTLY as it was, so no old-generation worker can
+    observe mutated state."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.api.v1.endpoints.visits import reschedule_visit
+    from app.models.visit import Visit
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    lease_ts = datetime.now(UTC)
+    _stamp_lease(pipeline_db, visit_id, lease_ts)
+
+    monkeypatch.setattr(lease_mod, "DISPATCH_WAIT_BUDGET_SECONDS", 0.3)
+    polls = {"n": 0}
+
+    def _no_sleep(seconds):
+        polls["n"] += 1
+
+    monkeypatch.setattr(lease_mod.time, "sleep", _no_sleep)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            reschedule_visit(
+                visit_id=visit_id,
+                new_date=date.today() + timedelta(days=3),
+                new_time=None,
+                db=s,
+            )
+        assert exc_info.value.status_code == 409
+        assert "Reminder delivery is in progress" in exc_info.value.detail
+        assert polls["n"] >= 1, "the wait must poll before refusing"
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == date.today(), "schedule unchanged"
+        assert row.reminder_generation == 0, "generation untouched"
+        assert row.reminder_claimed_at is not None, "lease untouched"
+    finally:
+        s.close()
+
+
+def test_stale_lease_does_not_block_reschedule(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 11, P1: a lease older than LEASE_TTL belongs to a dead
+    worker (the worker's own claim predicate reclaims it) and must NEVER
+    block a schedule mutation."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.api.v1.endpoints.visits import reschedule_visit
+    from app.models.visit import Visit
+    from app.tasks import lease as lease_mod
+    from app.tasks.worker import LEASE_TTL
+
+    visit_id = make_visit()
+    stale = datetime.now(UTC) - LEASE_TTL - timedelta(minutes=1)
+    _stamp_lease(pipeline_db, visit_id, stale)
+
+    def _must_not_wait(seconds):
+        raise AssertionError("a stale lease must not make the caller wait")
+
+    monkeypatch.setattr(lease_mod.time, "sleep", _must_not_wait)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        new_date = date.today() + timedelta(days=3)
+        reschedule_visit(visit_id=visit_id, new_date=new_date, new_time=None, db=s)
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == new_date
+        assert row.reminder_generation == 1
+    finally:
+        s.close()
+
+
+def test_noop_reschedule_skips_lease_coordination(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex rounds 5+11: a NO-OP reschedule (same date re-submitted)
+    preserves the reminder state and needs no lease coordination — a
+    client retry during an in-flight dispatch must not 409."""
+    from datetime import UTC, datetime
+
+    from app.api.v1.endpoints.visits import reschedule_visit
+    from app.models.visit import Visit
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    lease_ts = datetime.now(UTC)
+    _stamp_lease(pipeline_db, visit_id, lease_ts)
+
+    def _must_not_wait(seconds):
+        raise AssertionError("a no-op reschedule must not wait on the lease")
+
+    monkeypatch.setattr(lease_mod.time, "sleep", _must_not_wait)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        reschedule_visit(visit_id=visit_id, new_date=date.today(), new_time=None, db=s)
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_generation == 0, "no-op preserves the generation"
+        assert row.reminder_claimed_at is not None, "no-op preserves the lease"
+    finally:
+        s.close()
+
+
+def test_service_reschedule_is_lease_coordinated(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 11, P1: the service-level reschedule (used by the
+    internal API surface) carries the same coordination contract."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.visit import Visit
+    from app.services.visits_api_service import VisitsApiService
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    monkeypatch.setattr(lease_mod, "DISPATCH_WAIT_BUDGET_SECONDS", 0.3)
+    monkeypatch.setattr(lease_mod.time, "sleep", lambda seconds: None)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        svc = VisitsApiService(db=s)
+        with pytest.raises(HTTPException) as exc_info:
+            svc.reschedule_visit(
+                visit_id=visit_id, new_date=date.today() + timedelta(days=3)
+            )
+        assert exc_info.value.status_code == 409
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_generation == 0, "mutation refused — state intact"
+        assert row.reminder_claimed_at is not None
+    finally:
+        s.close()
+
+
+def test_telegram_move_visit_is_lease_coordinated(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 11, P1: the Telegram /move_visit staff action mutates
+    the schedule through the SAME coordination — a live lease refuses the
+    move instead of letting an in-flight worker send obsolete details."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.visit import Visit
+    from app.services.telegram_staff_action_adapter_service import (
+        TelegramStaffActionAdapterError,
+        TelegramStaffActionAdapterService,
+    )
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    monkeypatch.setattr(lease_mod, "DISPATCH_WAIT_BUDGET_SECONDS", 0.3)
+    monkeypatch.setattr(lease_mod.time, "sleep", lambda seconds: None)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        svc = TelegramStaffActionAdapterService(db=s)
+        # Audit plumbing is out of scope here — the test targets the
+        # lease coordination of the mutation itself.
+        monkeypatch.setattr(svc, "_confirmed", lambda **kwargs: None)
+        monkeypatch.setattr(svc, "_failed", lambda **kwargs: None)
+
+        with pytest.raises(
+            TelegramStaffActionAdapterError, match="reminder_delivery_in_progress"
+        ):
+            svc.staff_move_visit(
+                visit_id=visit_id,
+                new_visit_date=date.today() + timedelta(days=4),
+                actor_user_id=1,
+            )
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == date.today(), "move refused — schedule intact"
+        assert row.reminder_generation == 0
+        assert row.reminder_claimed_at is not None
     finally:
         s.close()
 
