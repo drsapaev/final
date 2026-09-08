@@ -101,6 +101,14 @@ class Visit(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # ✅ Поколение расписания (Codex round 7): инкрементируется каждым
+    # путём, меняющим расписание; входит в schedule_version джоба, делая
+    # версии неповторяющимися (цикл A→B→A не коллидирует с retained
+    # результатом arq). Схема — миграция 0060.
+    reminder_generation: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
     # ✅ SSOT: Источник визита (единственный источник истины)
     # 'online' = QR/Telegram регистрация
     # 'desk' = Регистратура

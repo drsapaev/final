@@ -403,6 +403,9 @@ class TelegramStaffActionAdapterService:
             if new_visit_date != previous_visit_date:
                 visit.reminder_sent_at = None
                 visit.reminder_claimed_at = None
+                visit.reminder_generation = (
+                    visit.reminder_generation or 0
+                ) + 1
             queue_result = self.queue_service.staff_move_visit_queue_link(
                 self.db,
                 visit_id=visit_id,

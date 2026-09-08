@@ -52,8 +52,22 @@ def upgrade() -> None:
         "visits",
         sa.Column("reminder_claimed_at", sa.DateTime(timezone=True), nullable=True),
     )
+    # Monotonic schedule generation (Codex round 7, P1): incremented by
+    # every schedule-mutating path, it makes reminder schedule versions
+    # immutable and never-repeating — an A→B→A reschedule cycle cannot
+    # collide with a retained arq result of the original A job.
+    op.add_column(
+        "visits",
+        sa.Column(
+            "reminder_generation",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+        ),
+    )
 
 
 def downgrade() -> None:
+    op.drop_column("visits", "reminder_generation")
     op.drop_column("visits", "reminder_claimed_at")
     op.drop_column("visits", "reminder_sent_at")

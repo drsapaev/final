@@ -173,9 +173,25 @@ def test_concurrent_reminder_jobs_send_exactly_once(
 
     monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _spy)
 
+    # Codex round 7: every delivery carries the schedule version (the
+    # fixture visit has date=today, time="10:00", generation=0).
+    from app.tasks.scheduler import build_reminder_schedule_version
+
+    _vs = sessionmaker(bind=pg_engine)()
+    _fresh = _vs.query(Visit).filter(Visit.id == visit_id).first()
+    fixture_version = build_reminder_schedule_version(_fresh)
+    _vs.close()
+
     def _run_job() -> None:
         started.wait(30)
-        asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=visit_id,
+                channel="telegram",
+                schedule_version=fixture_version,
+            )
+        )
 
     t1 = threading.Thread(target=_run_job, name="reminder-job-1")
     t2 = threading.Thread(target=_run_job, name="reminder-job-2")

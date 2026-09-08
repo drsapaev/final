@@ -59,6 +59,11 @@ def _test_redis_url() -> str:
 
 REDIS_URL = _test_redis_url()
 
+# Schedule version matching the make_visit fixture rows (date=today,
+# time="10:00", generation=0). Codex round 7: every delivery MUST carry a
+# schedule version — unversioned jobs are rejected by the worker.
+FIXTURE_VERSION = f"{date.today().isoformat()}T10:00#0"
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -249,16 +254,16 @@ async def test_enqueue_reminder_targets_clinic_queue_with_deterministic_job_id(
 
     monkeypatch.setattr(arq, "create_pool", _fake_create_pool)
 
-    job_id = await enqueue_reminder(visit_id=42, schedule_version="2026-09-08")
+    job_id = await enqueue_reminder(visit_id=42, schedule_version="2026-09-08T10:00#0")
 
-    assert job_id == "reminder:visit:42:2026-09-08:telegram"
+    assert job_id == "reminder:visit:42:2026-09-08T10:00#0:telegram"
     func, args, kwargs = pool.calls[0]
     assert func == "send_visit_reminder"
     assert args == ()
     assert kwargs["visit_id"] == 42
     assert kwargs["channel"] == "telegram"
-    assert kwargs["_job_id"] == "reminder:visit:42:2026-09-08:telegram"
-    assert kwargs["schedule_version"] == "2026-09-08"
+    assert kwargs["_job_id"] == "reminder:visit:42:2026-09-08T10:00#0:telegram"
+    assert kwargs["schedule_version"] == "2026-09-08T10:00#0"
     # THE fix: no _queue_name meant arq's default 'arq:queue' — a queue the
     # worker never listens on.
     assert kwargs["_queue_name"] == "clinic"
@@ -282,8 +287,8 @@ async def test_enqueue_duplicate_job_id_returns_id_honestly(
 
     monkeypatch.setattr(arq, "create_pool", _fake_create_pool)
 
-    job_id = await enqueue_reminder(visit_id=7, schedule_version="2026-09-08")
-    assert job_id == "reminder:visit:7:2026-09-08:telegram"
+    job_id = await enqueue_reminder(visit_id=7, schedule_version="2026-09-08T10:00#0")
+    assert job_id == "reminder:visit:7:2026-09-08T10:00#0:telegram"
 
 
 @pytest.mark.asyncio
@@ -307,19 +312,21 @@ async def test_enqueue_reminder_job_id_is_schedule_versioned(
 
     monkeypatch.setattr(arq, "create_pool", _fake_create_pool)
 
-    id_before = await enqueue_reminder(visit_id=9, schedule_version="2026-09-08")
-    id_after = await enqueue_reminder(visit_id=9, schedule_version="2026-09-10")
-    assert id_before == "reminder:visit:9:2026-09-08:telegram"
-    assert id_after == "reminder:visit:9:2026-09-10:telegram"
-    assert id_before != id_after  # reschedule -> fresh ID -> cannot strand
+    # A→B→A cycle (Codex round 7, P1): the GENERATION makes versions
+    # immutable and never-repeating — every reschedule re-enqueues under a
+    # fresh ID and can never collide with a retained arq result.
+    id_a0 = await enqueue_reminder(visit_id=9, schedule_version="2026-09-08T10:00#0")
+    id_b = await enqueue_reminder(visit_id=9, schedule_version="2026-09-10T10:00#1")
+    id_a1 = await enqueue_reminder(visit_id=9, schedule_version="2026-09-08T10:00#2")
+    assert id_a0 == "reminder:visit:9:2026-09-08T10:00#0:telegram"
+    assert id_b == "reminder:visit:9:2026-09-10T10:00#1:telegram"
+    assert id_a1 == "reminder:visit:9:2026-09-08T10:00#2:telegram"
+    assert len({id_a0, id_b, id_a1}) == 3  # never collide with retained results
 
-    # No schedule version: unique random suffix — never strands, never
-    # false-dedupes (the worker's lease + stamp guard is the backstop).
-    id_rand_a = await enqueue_reminder(visit_id=9)
-    id_rand_b = await enqueue_reminder(visit_id=9)
-    assert id_rand_a.startswith("reminder:visit:9:telegram:")
-    assert id_rand_b.startswith("reminder:visit:9:telegram:")
-    assert id_rand_a != id_rand_b
+    # The version is REQUIRED (Codex round 7, P1): unversioned jobs cannot
+    # be verified against the schedule and are rejected by the worker.
+    with pytest.raises(TypeError):
+        await enqueue_reminder(visit_id=9)
 
 
 @pytest.mark.asyncio
@@ -340,7 +347,7 @@ async def test_enqueue_redis_failure_raises_instead_of_fake_success(
     monkeypatch.setattr(arq, "create_pool", _fake_create_pool)
 
     with pytest.raises(TaskEnqueueError, match="send_visit_reminder"):
-        await enqueue_reminder(visit_id=1)
+        await enqueue_reminder(visit_id=1, schedule_version="2026-09-08T10:00#0")
 
 
 @pytest.mark.asyncio
@@ -355,7 +362,7 @@ async def test_enqueue_missing_arq_raises_instead_of_fake_success(
     monkeypatch.setitem(sys.modules, "arq", None)  # forces ImportError
 
     with pytest.raises(TaskEnqueueError):
-        await enqueue_reminder(visit_id=1)
+        await enqueue_reminder(visit_id=1, schedule_version="2026-09-08T10:00#0")
 
 
 # ---------------------------------------------------------------------------
@@ -376,7 +383,12 @@ async def test_worker_calls_service_by_real_contract_and_stamps_reminder_sent_at
     from app.tasks.worker import send_visit_reminder
 
     visit_id = make_visit()
-    await send_visit_reminder({}, visit_id=visit_id, channel="telegram")
+    await send_visit_reminder(
+        {},
+        visit_id=visit_id,
+        channel="telegram",
+        schedule_version=FIXTURE_VERSION,
+    )
 
     assert len(reminder_spy) == 1
     call = reminder_spy[0]
@@ -410,7 +422,12 @@ async def test_worker_send_failure_does_not_stamp_and_raises(
 
     visit_id = make_visit()
     with pytest.raises(RuntimeError, match="Notification send failed"):
-        await send_visit_reminder({}, visit_id=visit_id, channel="telegram")
+        await send_visit_reminder(
+            {},
+            visit_id=visit_id,
+            channel="telegram",
+            schedule_version=FIXTURE_VERSION,
+        )
 
     fresh = sessionmaker(bind=pipeline_db)()
     try:
@@ -430,8 +447,18 @@ async def test_worker_second_run_does_not_resend(pipeline_db, make_visit, remind
     from app.tasks.worker import send_visit_reminder
 
     visit_id = make_visit()
-    await send_visit_reminder({}, visit_id=visit_id, channel="telegram")
-    await send_visit_reminder({}, visit_id=visit_id, channel="telegram")
+    await send_visit_reminder(
+        {},
+        visit_id=visit_id,
+        channel="telegram",
+        schedule_version=FIXTURE_VERSION,
+    )
+    await send_visit_reminder(
+        {},
+        visit_id=visit_id,
+        channel="telegram",
+        schedule_version=FIXTURE_VERSION,
+    )
 
     assert len(reminder_spy) == 1  # second run skipped the send
 
@@ -444,7 +471,12 @@ async def test_worker_second_run_does_not_resend(pipeline_db, make_visit, remind
         fresh.close()
 
     # And a third run keeps both the send count and the stamp stable.
-    await send_visit_reminder({}, visit_id=visit_id, channel="telegram")
+    await send_visit_reminder(
+        {},
+        visit_id=visit_id,
+        channel="telegram",
+        schedule_version=FIXTURE_VERSION,
+    )
     assert len(reminder_spy) == 1
     fresh2 = sessionmaker(bind=pipeline_db)()
     try:
@@ -492,10 +524,9 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
     # None (dedupe) and the whole test would silently see zero deliveries.
     _vs = sessionmaker(bind=pipeline_db)()
     _visit_row = _vs.query(Visit).filter(Visit.id == visit_id).first()
-    schedule_version = (
-        f"{_visit_row.visit_date.isoformat()}T"
-        f"{_visit_row.visit_time if _visit_row.visit_time else '-'}"
-    )
+    from app.tasks.scheduler import build_reminder_schedule_version
+
+    schedule_version = build_reminder_schedule_version(_visit_row)
     _vs.close()
     deterministic_job_id = f"reminder:visit:{visit_id}:{schedule_version}:telegram"
 
@@ -790,7 +821,14 @@ def test_worker_failure_releases_only_own_claim(
     monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _failing_spy)
 
     with pytest.raises(RuntimeError, match="Notification send failed"):
-        asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=visit_id,
+                channel="telegram",
+                schedule_version=FIXTURE_VERSION,
+            )
+        )
 
     s = sessionmaker(bind=pipeline_db)()
     try:
@@ -825,7 +863,14 @@ def test_expired_lease_is_reclaimed_after_crash(pipeline_db, make_visit, reminde
     s.commit()
     s.close()
 
-    asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+    asyncio.run(
+        send_visit_reminder(
+            {},
+            visit_id=visit_id,
+            channel="telegram",
+            schedule_version=FIXTURE_VERSION,
+        )
+    )
 
     assert len(reminder_spy) == 1, "stale lease must be reclaimable"
     s = sessionmaker(bind=pipeline_db)()
@@ -859,7 +904,14 @@ def test_live_lease_blocks_reclaim(pipeline_db, make_visit, reminder_spy):
     from arq.worker import Retry
 
     with pytest.raises(Retry):
-        asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=visit_id,
+                channel="telegram",
+                schedule_version=FIXTURE_VERSION,
+            )
+        )
 
     assert reminder_spy == [], "a live lease must block a second delivery"
     s = sessionmaker(bind=pipeline_db)()
@@ -888,7 +940,14 @@ def test_claim_rejects_visits_not_pending_confirmation(
         s.commit()
         s.close()
 
-        asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=visit_id,
+                channel="telegram",
+                schedule_version=FIXTURE_VERSION,
+            )
+        )
 
         s = sessionmaker(bind=pipeline_db)()
         try:
@@ -904,19 +963,16 @@ def test_claim_rejects_visits_not_pending_confirmation(
 def test_matching_schedule_version_delivers(pipeline_db, make_visit, reminder_spy):
     """Codex round 5, P1 happy path: the job's schedule version matches the
     visit's current date — the claim succeeds and the delivery happens."""
-    from datetime import date
-
     from app.models.visit import Visit
     from app.tasks.worker import send_visit_reminder
 
     visit_id = make_visit()  # visit_date = today, visit_time = "10:00"
-    version = f"{date.today().isoformat()}T10:00"
     asyncio.run(
         send_visit_reminder(
             {},
             visit_id=visit_id,
             channel="telegram",
-            schedule_version=version,
+            schedule_version=FIXTURE_VERSION,
         )
     )
 
@@ -940,7 +996,7 @@ def test_stale_schedule_version_is_rejected(pipeline_db, make_visit, reminder_sp
     from app.tasks.worker import send_visit_reminder
 
     visit_id = make_visit()  # visit_date = today, visit_time = "10:00"
-    stale_version = f"{(date.today() - timedelta(days=2)).isoformat()}T10:00"
+    stale_version = f"{(date.today() - timedelta(days=2)).isoformat()}T10:00#0"
 
     asyncio.run(
         send_visit_reminder(
@@ -992,6 +1048,9 @@ def test_noop_reschedule_preserves_reminder_state(pipeline_db, make_visit):
         assert row.reminder_claimed_at == stamped.replace(
             tzinfo=None
         ), "no-op reschedule must not clear the lease"
+        assert (
+            row.reminder_generation == 0
+        ), "no-op reschedule must not bump the generation"
     finally:
         s.close()
 
@@ -1087,7 +1146,7 @@ def test_stale_time_version_is_rejected(pipeline_db, make_visit, reminder_spy):
     from app.tasks.worker import send_visit_reminder
 
     visit_id = make_visit()  # visit_date = today, visit_time = "10:00"
-    stale_version = f"{date.today().isoformat()}T09:00"
+    stale_version = f"{date.today().isoformat()}T09:00#0"
 
     asyncio.run(
         send_visit_reminder(
@@ -1099,6 +1158,56 @@ def test_stale_time_version_is_rejected(pipeline_db, make_visit, reminder_spy):
     )
 
     assert reminder_spy == [], "a stale time-only version must not dispatch"
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_sent_at is None
+        assert row.reminder_claimed_at is None
+    finally:
+        s.close()
+
+
+def test_stale_generation_is_rejected(pipeline_db, make_visit, reminder_spy):
+    """Codex round 7, P1: the generation binds the claim. After a
+    reschedule bumps the generation, an old job carrying the previous
+    generation must be rejected even with matching date and time."""
+    from app.models.visit import Visit
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()  # generation = 0
+    stale_gen_version = f"{date.today().isoformat()}T10:00#5"
+
+    asyncio.run(
+        send_visit_reminder(
+            {},
+            visit_id=visit_id,
+            channel="telegram",
+            schedule_version=stale_gen_version,
+        )
+    )
+
+    assert reminder_spy == [], "a stale generation must not dispatch"
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_sent_at is None
+        assert row.reminder_claimed_at is None
+    finally:
+        s.close()
+
+
+def test_unversioned_job_is_rejected(pipeline_db, make_visit, reminder_spy):
+    """Codex round 7, P1: unversioned jobs cannot be verified against the
+    current schedule and are rejected outright — the schedule_version is a
+    REQUIRED producer argument."""
+    from app.models.visit import Visit
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()
+
+    asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+
+    assert reminder_spy == [], "an unversioned job must not dispatch"
     s = sessionmaker(bind=pipeline_db)()
     try:
         row = s.query(Visit).filter(Visit.id == visit_id).first()

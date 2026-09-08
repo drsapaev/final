@@ -42,18 +42,28 @@ LEASE_TTL = timedelta(minutes=10)
 # Job implementations
 # ---------------------------------------------------------------------------
 
-def _schedule_matches(visit, schedule_version: str) -> bool:
-    """True when the visit's current date+time still match the schedule
-    version the job was enqueued for (format "{date}T{time}", "-" if the
-    visit has no time)."""
+def _parse_schedule_version(version: str) -> tuple:
+    """Parse "{date}T{time or '-'}#{generation}" into its three parts."""
+    date_part, _, rest = version.partition("T")
+    time_part, _, gen_part = rest.partition("#")
     from datetime import date
 
-    date_part, _, time_part = schedule_version.partition("T")
-    if visit.visit_date != date.fromisoformat(date_part):
+    return (
+        date.fromisoformat(date_part),
+        None if (not time_part or time_part == "-") else time_part,
+        int(gen_part),
+    )
+
+
+def _schedule_matches(visit, schedule_version: str) -> bool:
+    """True when the visit's current date, time AND reminder generation
+    still match the schedule version the job was enqueued for."""
+    v_date, v_time, v_gen = _parse_schedule_version(schedule_version)
+    if visit.visit_date != v_date:
         return False
-    if not time_part or time_part == "-":
-        return visit.visit_time is None
-    return visit.visit_time == time_part
+    if visit.visit_time != v_time:
+        return False
+    return visit.reminder_generation == v_gen
 
 
 async def send_visit_reminder(
@@ -132,17 +142,28 @@ async def send_visit_reminder(
         ]
         if schedule_version is not None:
             # Bind the claim to the FULL schedule this job was enqueued FOR
-            # (date AND time — Codex rounds 5+6, P1): a stale job left
-            # queued by a reschedule must never deliver for the old
-            # schedule, and a time-only move invalidates the version too.
-            # Format: "{visit_date.isoformat()}T{visit_time}" where an
-            # absent time is the literal "-".
-            date_part, _, time_part = schedule_version.partition("T")
-            conditions.append(Visit.visit_date == date.fromisoformat(date_part))
-            if time_part and time_part != "-":
-                conditions.append(Visit.visit_time == time_part)
+            # (date, time AND generation — Codex rounds 5-7, P1): a stale
+            # job left queued by a reschedule must never deliver for the
+            # old schedule, and any schedule change invalidates the
+            # version. Format: "{date}T{time or '-'}#{generation}".
+            v_date, v_time, v_gen = _parse_schedule_version(schedule_version)
+            conditions.append(Visit.visit_date == v_date)
+            if v_time is not None:
+                conditions.append(Visit.visit_time == v_time)
             else:
                 conditions.append(Visit.visit_time.is_(None))
+            conditions.append(Visit.reminder_generation == v_gen)
+        else:
+            # Every producer MUST supply a schedule version (required
+            # keyword in enqueue_reminder). An unversioned job cannot be
+            # verified against the current schedule and is rejected
+            # outright (Codex round 7, P1).
+            logger.warning(
+                "job.send_visit_reminder: visit %s has no schedule "
+                "version — rejecting unversioned delivery",
+                visit_id,
+            )
+            return
         claim = db.execute(
             update(Visit).where(*conditions).values(reminder_claimed_at=our_lease)
         )

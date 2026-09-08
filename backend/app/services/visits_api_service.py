@@ -377,6 +377,10 @@ class VisitsApiService:
                 reschedule_values["reminder_sent_at"] = None
             if hasattr(table.c, "reminder_claimed_at"):
                 reschedule_values["reminder_claimed_at"] = None
+            if hasattr(table.c, "reminder_generation"):
+                reschedule_values["reminder_generation"] = (
+                    table.c.reminder_generation + 1
+                )
         upd = (
             table.update()
             .where(table.c.id == visit_id)

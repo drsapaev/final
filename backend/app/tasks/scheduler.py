@@ -102,47 +102,54 @@ async def _enqueue(func_name: str, **kwargs: Any) -> str:
 # Public task API
 # ---------------------------------------------------------------------------
 
+def build_reminder_schedule_version(visit) -> str:
+    """SSOT for the reminder schedule-version format (Codex rounds 5-7).
+
+    The version covers the full schedule (date AND time) plus the visit's
+    monotonic ``reminder_generation`` (bumped by every schedule-mutating
+    path), so a version is IMMUTABLE and never repeats: a reschedule cycle
+    A→B→A produces three distinct generations, and the A→B→A re-enqueue can
+    never collide with the retained arq result of the original A job.
+
+    Format: ``"{visit_date.isoformat()}T{visit_time or '-'}#{generation}"``.
+    """
+    return (
+        f"{visit.visit_date.isoformat()}T"
+        f"{visit.visit_time or '-'}#"
+        f"{visit.reminder_generation or 0}"
+    )
+
+
 async def enqueue_reminder(
     visit_id: int,
     channel: str = "telegram",
     *,
-    schedule_version: str | None = None,
+    schedule_version: str,
 ) -> str:
     """Send a reminder N hours before a visit.
 
     Args:
         visit_id: Target visit.
         channel: 'telegram' | 'sms' | 'email'.
-        schedule_version: the visit's CURRENT full schedule — date AND
-            time, e.g. ``f"{visit_date.isoformat()}T{visit_time}"`` with
-            the literal ``"-"`` when the visit has no time (Codex round 6:
-            a time-only reschedule must version too). Versioning the job
-            ID by the
-            schedule is what makes re-enqueueing after a reschedule safe
-            (Codex round 4, P1): arq keeps a completed job's result for
-            keep_result seconds, and during that window a plain
-            deterministic ID collides with the retained result —
-            ``enqueue_job`` returns None, nothing is queued, and (with the
-            stamp cleared by the reschedule) the new reminder would
-            silently strand. With the schedule in the ID, the rescheduled
-            visit re-enqueues under a fresh ID. Same-schedule duplicate
-            enqueues still dedupe to one job. Callers that cannot supply
-            the version get a unique random suffix — never stranded, at
-            the cost of losing same-schedule dedupe (the worker's lease +
-            stamp guard remains the correctness backstop either way).
+        schedule_version: REQUIRED — the visit's CURRENT schedule version
+            (``build_reminder_schedule_version(visit)``). Versioning the
+            job by the schedule generation is what makes the reminder
+            pipeline safe (Codex rounds 4-7): arq retains a completed
+            job's result for keep_result seconds, and a value-based or
+            missing version either collides with that retained result
+            (enqueue_job returns None → the reminder silently strands) or
+            lets a stale queued job deliver for an obsolete schedule. The
+            worker REJECTS jobs whose version no longer matches the visit
+            (date, time and generation all bind).
 
     Returns: job_id.
     """
-    if schedule_version is None:
-        _job_id = f"reminder:visit:{visit_id}:{channel}:{uuid4()}"
-    else:
-        _job_id = f"reminder:visit:{visit_id}:{schedule_version}:{channel}"
     return await _enqueue(
         "send_visit_reminder",
         visit_id=visit_id,
         channel=channel,
         schedule_version=schedule_version,
-        _job_id=_job_id,
+        _job_id=f"reminder:visit:{visit_id}:{schedule_version}:{channel}",
     )
 
 

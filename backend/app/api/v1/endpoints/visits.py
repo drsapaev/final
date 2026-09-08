@@ -581,11 +581,17 @@ def reschedule_visit(
         # PR-1 (Codex round 2, P1): the reminder stamp is only valid for
         # the CURRENT schedule — rescheduling must invalidate it, otherwise
         # the next reminder job silently no-ops on the stale stamp and the
-        # patient never gets a reminder for the new date.
+        # patient never gets a reminder for the new date. The generation
+        # bump makes the schedule version immutable and never-repeating
+        # (Codex round 7, P1).
         if hasattr(t.c, "reminder_sent_at"):
             update_values["reminder_sent_at"] = None
         if hasattr(t.c, "reminder_claimed_at"):
             update_values["reminder_claimed_at"] = None
+        if hasattr(t.c, "reminder_generation"):
+            update_values["reminder_generation"] = (
+                t.c.reminder_generation + 1
+            )
     if new_time is not None:
         # Валидация формата HH:MM
         if not _isValid_time_str(new_time_str):
@@ -667,6 +673,10 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
             tomorrow_values["reminder_sent_at"] = None
         if hasattr(t.c, "reminder_claimed_at"):
             tomorrow_values["reminder_claimed_at"] = None
+        if hasattr(t.c, "reminder_generation"):
+            tomorrow_values["reminder_generation"] = (
+                t.c.reminder_generation + 1
+            )
     upd = (
         t.update().where(t.c.id == visit_id).values(**tomorrow_values).returning(t)
     )
