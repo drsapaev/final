@@ -70,6 +70,18 @@ def _parse_schedule_version(version: str) -> tuple:
     )
 
 
+def _claim_still_valid(claimed_visit, schedule_version: str) -> bool:
+    """Codex round 10, P1: the post-claim revalidation must recheck the
+    lifecycle status TOO — a confirmation/cancellation committing between
+    the claim and the dispatch must not receive an obsolete reminder with
+    actionable buttons."""
+    return (
+        claimed_visit is not None
+        and claimed_visit.status == "pending_confirmation"
+        and _schedule_matches(claimed_visit, schedule_version)
+    )
+
+
 def _schedule_matches(visit, schedule_version: str) -> bool:
     """True when the visit's current date, time AND reminder generation
     still match the schedule version the job was enqueued for."""
@@ -248,9 +260,7 @@ async def send_visit_reminder(
         # re-queries the visit through THIS session, so it builds the
         # message from the claimed state instead of a later one.
         claimed_visit = db.query(Visit).filter(Visit.id == visit_id).first()
-        if claimed_visit is None or not _schedule_matches(
-            claimed_visit, schedule_version
-        ):
+        if not _claim_still_valid(claimed_visit, schedule_version):
             db.execute(
                 update(Visit)
                 .where(
@@ -338,19 +348,48 @@ async def send_visit_reminder(
                 "job.send_visit_reminder: visit %s reminded via %s",
                 visit_id, result.get("channel", channel),
             )
-    except Exception:
+    except Exception as exc:
         # Rollback first — the failed service call may have left uncommitted
         # partial state on the session. Then release ONLY OUR OWN lease (the
         # equality predicate makes this a no-op once a reschedule cleared it
         # or a newer delivery re-claimed) so arq's retry can re-deliver.
         db.rollback()
         if our_lease is not None:
-            db.execute(
-                update(Visit)
-                .where(Visit.id == visit_id, Visit.reminder_claimed_at == our_lease)
-                .values(reminder_claimed_at=None)
+            try:
+                db.execute(
+                    update(Visit)
+                    .where(
+                        Visit.id == visit_id,
+                        Visit.reminder_claimed_at == our_lease,
+                    )
+                    .values(reminder_claimed_at=None)
+                )
+                db.commit()
+            except Exception:
+                # The DB itself is failing — do not mask the original error;
+                # a stranded lease self-heals via LEASE_TTL expiry.
+                logger.warning(
+                    "job.send_visit_reminder: lease release for visit %s "
+                    "failed (database unavailable); relying on LEASE_TTL "
+                    "expiry",
+                    visit_id,
+                )
+        from sqlalchemy.exc import DBAPIError
+
+        if isinstance(exc, DBAPIError):
+            # Codex round 10, P1: only Retry/RetryJob/cancellation are
+            # requeued by arq 0.28 — an ordinary SQLAlchemy exception would
+            # permanently drop the reminder on a transient database outage.
+            retry_exc = _delivery_retry(
+                ctx,
+                f"transient database failure for visit {visit_id}: {exc}",
             )
-            db.commit()
+            logger.warning(
+                "job.send_visit_reminder: transient database failure for "
+                "visit %s — deferring: %r",
+                visit_id, retry_exc,
+            )
+            raise retry_exc from exc
         logger.exception("job.send_visit_reminder failed for visit %s", visit_id)
         raise
     finally:

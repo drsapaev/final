@@ -33,6 +33,7 @@ import asyncio
 import os
 import socket
 import sys
+import tempfile
 import uuid
 from datetime import date
 from urllib.parse import urlparse, urlsplit, urlunsplit
@@ -1443,3 +1444,72 @@ async def test_enqueue_retained_result_requeues_with_attempt_suffix(
     dup_id = await enqueue_reminder(visit_id=11, schedule_version="2026-09-08T10:00#0")
     assert dup_id == "reminder:visit:11:2026-09-08T10:00#0:telegram"
     assert pool2.exists_calls and len(pool2.calls) == 1  # no second enqueue
+
+
+def test_claim_still_valid_rechecks_status_and_schedule():
+    """Codex round 10, P1: the post-claim revalidation rechecks the
+    lifecycle status alongside the full schedule version — a confirmation
+    or cancellation committing between claim and dispatch aborts before
+    any send."""
+    from types import SimpleNamespace
+
+    from app.tasks.worker import _claim_still_valid
+
+    def _visit(status="pending_confirmation", vdate=None, vtime="10:00", gen=0):
+        from datetime import date as _date
+
+        return SimpleNamespace(
+            status=status,
+            visit_date=vdate or _date.today(),
+            visit_time=vtime,
+            reminder_generation=gen,
+        )
+
+    version = f"{date.today().isoformat()}T10:00#0"
+    assert _claim_still_valid(_visit(), version) is True
+    assert _claim_still_valid(_visit(status="confirmed"), version) is False
+    assert _claim_still_valid(_visit(status="canceled"), version) is False
+    assert _claim_still_valid(_visit(status="closed"), version) is False
+    assert _claim_still_valid(None, version) is False
+    assert (
+        _claim_still_valid(_visit(vtime="09:00"), version) is False
+    ), "a time change must invalidate the claim"
+    assert (
+        _claim_still_valid(_visit(gen=3), version) is False
+    ), "a generation bump must invalidate the claim"
+
+
+def test_transient_database_failure_defers(pipeline_db, make_visit, monkeypatch):
+    """Codex round 10, P1: a transient database outage during the claim
+    must defer the job (arq Retry), not permanently drop the reminder —
+    only Retry/RetryJob/cancellation are requeued by arq 0.28."""
+    from datetime import timedelta
+
+    from app.core.config import settings
+    from app.tasks.worker import send_visit_reminder
+
+    make_visit()  # unused row on the real test DB
+    # Point the worker at a fresh sqlite file with NO tables: the claim's
+    # UPDATE raises OperationalError (a DBAPIError) — the canonical
+    # transient database failure shape.
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    broken_url = f"sqlite:///{path}"
+    monkeypatch.setattr(settings, "DATABASE_URL", broken_url)
+
+    from arq.worker import Retry
+
+    # The DBAPIError raised by the claim is translated to an arq Retry
+    # (defer 10s on the first attempt) — the job is deferred, not dropped.
+    with pytest.raises(Retry):
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=1,
+                channel="telegram",
+                schedule_version=(
+                    f"{(date.today() + timedelta(days=1)).isoformat()}T" f"10:00#0"
+                ),
+            )
+        )
+    os.remove(path)
