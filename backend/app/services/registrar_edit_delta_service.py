@@ -72,6 +72,20 @@ class RegistrarEditDeltaService:
         if not patient:
             raise ValueError(f"Patient {patient_id} not found")
 
+        queue_entry_ids = set(existing_queue_entry_ids or [])
+
+        # W2-PR2: каноническая дата редактирования. Редактируем ТЕ записи,
+        # которые названы в existing_queue_entry_ids, поэтому их день —
+        # единственный допустимый target_date. Прежний контракт «фронт шлёт
+        # getLocalISODate()» молча переносил правку записи на будущую дату
+        # в «сегодня» (визит создавался today, исходная запись оставалась
+        # нетронутой — дата терялась).
+        target_date = self.resolve_edit_target_day(
+            patient_id=patient_id,
+            preferred_entry_ids=queue_entry_ids,
+            requested_target_date=target_date,
+        )
+
         # R-08 fix: optimistic locking — проверяем что existing entries не были
         # изменены другим пользователем с момента последнего чтения frontend'ом.
         if expected_entry_updated_at:
@@ -82,7 +96,6 @@ class RegistrarEditDeltaService:
         if patient_data:
             self._apply_patient_data(patient, patient_data)
 
-        queue_entry_ids = set(existing_queue_entry_ids or [])
         queue_numbers: dict[int, list[dict[str, Any]]] = {}
         visit_delta_amounts: dict[int, Decimal] = {}
         updated_queue_entries: list[dict[str, Any]] = []
@@ -237,6 +250,9 @@ class RegistrarEditDeltaService:
 
         return {
             "success": True,
+            # W2-PR2: фактическая дата, в которую легли правки (день
+            # редактируемых записей, не обязательно запрошенная).
+            "target_date": target_date.isoformat(),
             "message": (
                 "Запись обновлена. Добавленные услуги сохранены в существующей очереди."
                 if total_amount > 0
@@ -484,6 +500,52 @@ class RegistrarEditDeltaService:
             patient.sex = patient_data["sex"]
         if patient_data.get("birth_date") is not None:
             patient.birth_date = patient_data["birth_date"]
+
+    def resolve_edit_target_day(
+        self,
+        *,
+        patient_id: int,
+        preferred_entry_ids: set[int] | list[int],
+        requested_target_date: date,
+    ) -> date:
+        """W2-PR2: каноническая дата редактирования = день редактируемых записей.
+
+        preferred-записи (existing_queue_entry_ids) — единственный источник
+        истины о дате: их очередь (DailyQueue.day) определяет, ГДЕ искать
+        активные позиции и КОГДА создавать новые визиты. Запрошенная дата
+        используется только когда preferred не названы вовсе (флоу без
+        существующих записей) или ни одна из названных не активна — прежнее
+        поведение сохраняется, ничего не канонизируется молча в обход данных.
+
+        Мультидневный набор preferred — громкий отказ: правки разных дней
+        одной командой создали бы выбор «какой визит имеется в виду», который
+        может сделать только оператор (продуктовое решение, см. W2-PR2 PR).
+        """
+        ids = {int(i) for i in (preferred_entry_ids or set())}
+        if not ids:
+            return requested_target_date
+        rows = (
+            self.db.query(OnlineQueueEntry.id, DailyQueue.day)
+            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+            .filter(
+                OnlineQueueEntry.id.in_(ids),
+                OnlineQueueEntry.patient_id == patient_id,
+                OnlineQueueEntry.status.in_(ACTIVE_APPEND_STATUSES),
+                DailyQueue.active.is_(True),
+            )
+            .all()
+        )
+        days = {row.day for row in rows}
+        if not days:
+            return requested_target_date
+        if len(days) > 1:
+            day_list = ", ".join(sorted(day.isoformat() for day in days))
+            raise ValueError(
+                "Выбранные записи относятся к разным датам "
+                f"({day_list}). Редактирование записей разных дат одной "
+                "операцией недоступно — откройте каждую дату отдельно"
+            )
+        return days.pop()
 
     def _find_active_entry(
         self,
@@ -854,6 +916,26 @@ class RegistrarEditDeltaService:
         queue_tag: str | None,
         target_date: date,
     ) -> DailyQueue:
+        # W2-PR2 (ADR-001): очередь принадлежит ВРАЧУ. Если позиция привязана
+        # к специалисту — разрешаем очередь ТОЛЬКО через канонический
+        # get_or_create_daily_queue (поиск по (day, specialist_id, active),
+        # при отсутствии — создание собственной очереди врача). Прежний поиск
+        # по (day, queue_tag) с возвратом первой по id очереди повторял
+        # до-PR26 антипаттерн: услуга врача B попадала в очередь врача A
+        # (или resource-очередь) того же тега — выбранный врач терялся.
+        resolved_specialist_id = specialist_id or service.doctor_id
+        if resolved_specialist_id is not None:
+            return queue_service.get_or_create_daily_queue(
+                self.db,
+                day=target_date,
+                specialist_id=resolved_specialist_id,
+                queue_tag=queue_tag,
+                defaults={},
+            )
+        # Услуга без врача (specialist_id не назван и service.doctor_id пуст):
+        # легаси-поведение — активная очередь того же тега (в т.ч. owned
+        # ресурсом по QD-2A), иначе громкий отказ вместо тихого «первая
+        # попавшаяся».
         existing = (
             self.db.query(DailyQueue)
             .filter(
@@ -866,18 +948,8 @@ class RegistrarEditDeltaService:
         )
         if existing:
             return existing
-
-        resolved_specialist_id = specialist_id or service.doctor_id
-        if not resolved_specialist_id:
-            raise ValueError(
-                f"No active queue exists for queue_tag={queue_tag}; specialist_id is required"
-            )
-        return queue_service.get_or_create_daily_queue(
-            self.db,
-            day=target_date,
-            specialist_id=resolved_specialist_id,
-            queue_tag=queue_tag,
-            defaults={},
+        raise ValueError(
+            f"No active queue exists for queue_tag={queue_tag}; specialist_id is required"
         )
 
     def _apply_invoice_delta(

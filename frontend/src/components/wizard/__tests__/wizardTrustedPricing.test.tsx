@@ -147,10 +147,12 @@ describe('Fix D: trusted pricing contract', () => {
     // (edit-дельта) и справочника услуг; Codex R2 PR 3095: ещё и от маршрута
     // команды (fullUpdateQuoteRoute — QR-записи квотируются по full-update);
     // Codex R6 PR 3095: и от пациента (edit-контекст дельты: patient_id +
-    // target_date + preferred entries входят в запрос квоты)
-    expect(source).toContain('}, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute, quoteRefreshNonce, wizardData.patient?.id]);');
+    // target_date + preferred entries входят в запрос квоты);
+    // W2-PR2: и от дня редактируемой записи (editRecordDate)
+    expect(source).toContain('}, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, editRecordDate, fullUpdateQuoteRoute, quoteRefreshNonce, wizardData.patient?.id]);');
     expect(source).toContain('patientId: wizardData.patient?.id ?? null');
-    expect(source).toContain('targetDate: getLocalISODate()');
+    // W2-PR2: день редактируемой записи, не «сегодня»
+    expect(source).toContain('targetDate: editRecordDate ?? getLocalISODate()');
     expect(source).toContain('preferredEntryIds: Array.from(editOriginalServiceIdentity.queueIds)');
   });
 

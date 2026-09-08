@@ -631,6 +631,28 @@ def _quote_core(
             ):
                 service_row_map[int(_svc.id)] = _svc
 
+    # W2-PR2: канонический день edit-квоты — зеркало RegistrarEditDelta
+    # Service.apply (та же resolve_edit_target_day): день предпочтённых записей,
+    # а не запрошенная строка. Прежний контракт «фронт шлёт getLocalISODate()»
+    # квотировал и сохранял правку записи на будущую дату в «сегодня».
+    # Резолв один на запрос (не на позицию); мультидневный набор preferred —
+    # громкий 400, как в команде. Revalidation проходит через ТУ ЖЕ ветку с
+    # теми же сырыми входами → токен квоты остаётся согласованным.
+    edit_target_date = quote_req.target_date
+    if (
+        quote_req.pricing_mode == "edit_delta"
+        and quote_req.patient_id is not None
+        and quote_req.preferred_entry_ids
+    ):
+        try:
+            edit_target_date = RegistrarEditDeltaService(db).resolve_edit_target_day(
+                patient_id=quote_req.patient_id,
+                preferred_entry_ids=set(quote_req.preferred_entry_ids),
+                requested_target_date=quote_req.target_date or date.today(),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
     for item_req in quote_req.items:
         if int(item_req.service_id) in service_row_map:
             service: Service | None = service_row_map[int(item_req.service_id)]
@@ -692,14 +714,16 @@ def _quote_core(
             # Codex R8 #3115 (P1/P2): per-item queue_entry_id routing mirror +
             # decrease quotes price the RECORDED unit charge (full-update rows
             # store line totals), the same value the command subtracts.
+            # W2-PR2: день — канонический день редактируемых записей.
             decrease_charge: Decimal | None = None
-            if quote_req.patient_id is not None and quote_req.target_date is not None:
+            if quote_req.patient_id is not None and edit_target_date is not None:
                 billable_qty, decrease_charge = _edit_delta_quote_context(
                     db,
                     service=service,
                     requested_qty=item_req.quantity,
                     patient_id=quote_req.patient_id,
-                    target_date=quote_req.target_date,
+                    # W2-PR2: канонический день (день редактируемых записей).
+                    target_date=edit_target_date,
                     preferred_entry_ids=set(quote_req.preferred_entry_ids),
                     specialist_id=item_req.specialist_id,
                     queue_entry_id=item_req.queue_entry_id,

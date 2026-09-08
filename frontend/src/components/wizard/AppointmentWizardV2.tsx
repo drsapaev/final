@@ -215,6 +215,7 @@ import {
   buildCartQuoteRequest,
   buildEditOriginalServiceIdentity,
   buildEditDeltaTargetItems,
+  resolveEditRecordDate,
   formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
@@ -1130,6 +1131,14 @@ const AppointmentWizardV2 = ({
     [editMode, initialData, servicesData]
   );
 
+  // W2-PR2: день редактируемой записи — edit-квота и edit-сабмит целились в
+  // НЕГО, а не в «сегодня» (getLocalISODate терял будущую дату записи).
+  // Backend дополнительно канонизирует день по preferred-записям.
+  const editRecordDate = useMemo(
+    () => (editMode ? resolveEditRecordDate(initialData) : null),
+    [editMode, initialData]
+  );
+
   // Codex R2 PR 3095 (P1): маршрут команды edit-записи. QR-записи
   // (online_queue + source=online) сабмитятся через /queue/online-entry/
   // {id}/full-update (ПОЛНАЯ корзина, свои правила цен) — квота обязана
@@ -1190,11 +1199,11 @@ const AppointmentWizardV2 = ({
       // Codex R6 PR 3095 (P2): edit-delta контекст — backend биллит в квоте
       // ту же дельту, которую реально выставит команда (активная запись того
       // же дня, уже содержащая услугу, биллит только недостающее количество).
-      // Зеркало сабмита: patientId + getLocalISODate() + originalQueueIds.
+      // W2-PR2: зеркало сабмита — день редактируемой записи (не «сегодня»).
       ...(quotePricingMode === 'edit_delta'
         ? {
             patientId: wizardData.patient?.id ?? null,
-            targetDate: getLocalISODate(),
+            targetDate: editRecordDate ?? getLocalISODate(),
             preferredEntryIds: Array.from(editOriginalServiceIdentity.queueIds),
           }
         : {}),
@@ -1245,7 +1254,7 @@ const AppointmentWizardV2 = ({
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute, quoteRefreshNonce, wizardData.patient?.id]);
+  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, editRecordDate, fullUpdateQuoteRoute, quoteRefreshNonce, wizardData.patient?.id]);
 
   const repeatSuggestionSummary = useMemo(() => {
     if (!consultationCartItems.length) {
@@ -2190,7 +2199,10 @@ const AppointmentWizardV2 = ({
             });
             const editDeltaResult = await applyRegistrarEditDelta({
               patientId,
-              targetDate: getLocalISODate(),
+              // W2-PR2: день редактируемой записи (зеркало edit-квоты и
+              // backend-канонизации по preferred-записям) — правка будущей
+              // записи больше не переносится в «сегодня».
+              targetDate: editRecordDate ?? getLocalISODate(),
               patientData: patientDataForEditDelta,
               paymentMethod: wizardData.payment.method,
               discountMode: wizardData.cart.discount_mode,

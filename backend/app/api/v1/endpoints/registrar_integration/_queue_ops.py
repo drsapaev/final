@@ -693,6 +693,7 @@ def _serialize_queue_entry(
     latest_lab_report: dict | None,
     entry_department_key: str | None,
     entry_department: str | None,
+    record_date: Any = None,
 ) -> dict:
     """R-22 Phase 4: Serialize a single queue entry into the API response dict."""
     can_mark_paid = "mark_paid" in available_actions
@@ -751,6 +752,10 @@ def _serialize_queue_entry(
         "type": entry_type,
         "record_type": entry_type,
         "queue_entry_id": entry_wrapper.get("queue_entry_id"),
+        # W2-PR2: канонический день записи (день очереди/визита, для которого
+        # построен лист) — редактирование должно целился в этот день, а не в
+        # «сегодня» на момент запроса (см. AppointmentWizardV2 targetDate).
+        "record_date": record_date.isoformat() if record_date else None,
         "department_key": entry_department_key,
         "department": entry_department,
         "session_id": getattr(entry_data, 'session_id', None),

@@ -27,6 +27,9 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.visit import Visit, VisitService
+from app.models.user import User
+from app.models.clinic import Doctor
+from app.core.security import get_password_hash
 from app.services.service_mapping import normalize_service_code
 
 PRICE = Decimal("25000")
@@ -101,6 +104,28 @@ def _create_entry(
     db_session.commit()
     db_session.refresh(entry)
     return entry
+
+
+def _create_doctor(db_session, *, username: str) -> Doctor:
+    """W2-PR2: реальный второй врач — get_or_create_daily_queue проверяет
+    существование Doctor (FK-целостность ADR-001), фиктивный id больше не
+    проходит."""
+    user = User(
+        username=username,
+        email=f"{username}@test.com",
+        full_name=username,
+        hashed_password=get_password_hash("doctor123"),
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.flush()
+    doctor = Doctor(user_id=user.id, specialty="Кардиология", active=True)
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+    return doctor
 
 
 def _create_visit(
@@ -503,7 +528,13 @@ def test_edit_delta_same_service_from_other_doctor_does_not_merge(
 ):
     """Одинаковая услуга у разных врачей не сливается по service_id
     (ADR-001: очередь принадлежит врачу). Позиция врача A не растёт, когда
-    услуга явно запрошена у врача B."""
+    услуга явно запрошена у врача B: новая позиция создаётся в очереди B.
+
+    W2-PR2: preferred-записи (existing_queue_entry_ids) определяют день
+    редактирования (канонизация resolve_edit_target_day), поэтому сценарий
+    «позиция врача B» формируется БЕЗ preferred — день дельты остаётся явно
+    названным (target_date), и гарды переноса дня записи не срабатывают.
+    """
     service = _create_service(
         db_session, code="TSQ-MRG-01", name="TS Merge", queue_tag="laboratory_general"
     )
@@ -522,8 +553,8 @@ def test_edit_delta_same_service_from_other_doctor_does_not_merge(
         visit_id=visit.id,
     )
 
-    # Врач B: своя очередь того же дня и того же queue_tag
-    other_specialist_id = test_doctor.id + 100
+    # Врач B: реальный Doctor + своя очередь того же queue_tag
+    other_specialist_id = _create_doctor(db_session, username="ts_merge_doctor_b").id
     queue_b = _create_queue(
         db_session,
         specialist_id=other_specialist_id,
@@ -532,7 +563,9 @@ def test_edit_delta_same_service_from_other_doctor_does_not_merge(
     )
     assert queue_b.day != queue_a.day
 
-    # Дельта на завтра (дата очереди B): явный specialist B, preferred = [entry_a]
+    # Дельта на завтра (дата очереди B): явный specialist B, preferred НЕ
+    # передаются — W2-PR2: preferred означал бы «редактируем запись A» и
+    # канонизировал бы день в день записи A.
     target_day = date.today() + timedelta(days=1)
     response = _post_edit_delta(
         client,
@@ -542,7 +575,7 @@ def test_edit_delta_same_service_from_other_doctor_does_not_merge(
             {"service_id": service.id, "quantity": 1, "specialist_id": other_specialist_id}
         ],
         target_date=target_day,
-        entry_ids=[entry_a.id],
+        entry_ids=[],
     )
 
     assert response.status_code == 200, response.text

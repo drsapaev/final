@@ -26921,6 +26921,8 @@ export type components = {
             updated_queue_entries?: {
                 [key: string]: unknown;
             }[];
+            /** Target Date */
+            target_date?: string | null;
         };
         /** EditDeltaServiceItem */
         EditDeltaServiceItem: {

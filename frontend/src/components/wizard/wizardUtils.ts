@@ -42,6 +42,84 @@ export const getLocalISODate = () => {
 };
 
 // =====================================================================
+// W2-PR2: КАНОНИЧЕСКАЯ ДАТА РЕДАКТИРУЕМОЙ ЗАПИСИ
+// =====================================================================
+
+/**
+ * День записи, открытой в мастере в режиме редактирования.
+ *
+ * Источник истины — read-модель: `record_date` (день очереди/визита,
+ * проставляется backend'ом в /registrar/queues/today). Fallback — дата из
+ * `queue_time` (timestamp дня очереди; и то, и другое относятся к дню
+ * записи, а не к «сегодня» на момент запроса).
+ *
+ * Раньше edit-сабмит и edit-квота шлы `targetDate: getLocalISODate()` —
+ * правка записи на будущую дату уходила в «сегодня»: визит создавался
+ * сегодня, исходная запись оставалась нетронутой (дата терялась).
+ * Backend дополнительно канонизирует день по preferred-записям
+ * (RegistrarEditDeltaService.resolve_edit_target_day) — эта функция лишь
+ * посылает корректную дату сразу, чтобы квота и команда совпадали с первого
+ * запроса (без 409-рефетча).
+ *
+ * Возвращает 'YYYY-MM-DD' или null, если день записи неизвестен
+ * (вызывающий код откатывается к getLocalISODate()).
+ */
+export const resolveEditRecordDate = (
+  initialData: Record<string, unknown> | null | undefined
+): string | null => {
+  if (!initialData) return null;
+
+  const recordDate = initialData.record_date;
+  if (typeof recordDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(recordDate.trim())) {
+    return recordDate.trim();
+  }
+
+  // Fallback: date part of queue_time (ISO datetime of the queue day).
+  const queueTime = initialData.queue_time;
+  if (typeof queueTime === 'string') {
+    const match = queueTime.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+  }
+
+  return null;
+};
+
+// =====================================================================
+// W2-PR2: ФИЛЬТР ВРАЧЕЙ ПО ПРОФИЛЮ УСЛУГИ (ADR-001)
+// =====================================================================
+
+export interface WizardDoctorRecord {
+  id?: string | number;
+  specialty?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Врачи, допустимые для услуги по её department_key (PR-23 P0 #1).
+ *
+ * W2-PR2: fallback «нет совпадений → показать ВСЕХ врачей» удалён — врач без
+ * профильной специальности становился владельцем очереди
+ * (DailyQueue.specialist_id) и выбранный врач терялся. Пустой результат —
+ * валидный ответ: UI показывает ограничение, сабмит блокируется валидацией
+ * «для услуги требуется врач».
+ */
+export const filterDoctorsForService = (
+  doctors: Array<WizardDoctorRecord | null | undefined> | null | undefined,
+  serviceDepartmentKey: string | null | undefined,
+): WizardDoctorRecord[] => {
+  const all: WizardDoctorRecord[] = Array.isArray(doctors)
+    ? doctors.filter((d): d is WizardDoctorRecord => Boolean(d))
+    : [];
+  const key = String(serviceDepartmentKey || '').toLowerCase().trim();
+  if (!key) return all;
+  return all.filter((doctor) => {
+    const docSpecialty = String(doctor.specialty || '').toLowerCase().trim();
+    return !docSpecialty || docSpecialty === key ||
+      docSpecialty.includes(key) || key.includes(docSpecialty);
+  });
+};
+
+// =====================================================================
 // CONTRACT / NORMALIZATION HELPERS
 // =====================================================================
 
