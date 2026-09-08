@@ -1470,8 +1470,7 @@ const AppointmentWizardV2 = ({
     return current !== initialContentRef.current;
   };
 
-  // Codex R11 #3097 (P2): выделенный флаг «сабмит в полёте» — проп isProcessing
-  // перегружен ЗАГРУЗКОЙ пациента в edit-обёртках (X/Escape молча блокировались).
+  // Codex R11 PR 3097 (P2): проп isProcessing перегружен ЗАГРУЗКОЙ пациента
   const submitInFlightRef = useRef(false);
   const requestCloseInFlightRef = useRef(false);
   const requestClose = async () => {
@@ -1652,8 +1651,7 @@ const AppointmentWizardV2 = ({
     }
 
     setIsProcessing(true);
-    submitInFlightRef.current = true; // R11 #3097: окно сабмита открыто
-
+    submitInFlightRef.current = true; // R11 PR 3097: окно сабмита открыто
     try {
       // ✅ ИСПРАВЛЕНО: Валидация корзины перед подготовкой данных
       if (!wizardData.cart.items || wizardData.cart.items.length === 0) {
@@ -2654,7 +2652,7 @@ const AppointmentWizardV2 = ({
       toast.error(getErrorMessage(error) || t('misc.aw_error_occurred'));
     } finally {
       setIsProcessing(false);
-      submitInFlightRef.current = false; // R11 #3097: закрыто на всех путях
+      submitInFlightRef.current = false; // R11 PR 3097: закрыто на всех путях
     }
   };
   handleCompleteRef.current = handleComplete;

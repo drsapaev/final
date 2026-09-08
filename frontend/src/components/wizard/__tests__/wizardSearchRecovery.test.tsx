@@ -155,13 +155,13 @@ describe('Fix F: wizard search-race contract', () => {
       'const requestClose = async () => {',
       'const requestCloseRef = useRef<() => void>(() => {});'
     );
-    // Codex R11 #3097: гвардия смотрит на выделенный флаг сабмита…
+    // Codex R11 PR 3097: гвардия смотрит на выделенный флаг сабмита…
     expect(requestCloseBlock).toContain('if (submitInFlightRef.current) return;');
     // …и НИКОГДА на перегруженный проп isProcessing
     expect(requestCloseBlock).not.toContain('if (isProcessing) return;');
   });
 
-  it('submission window opens/closes in handleComplete, not the isProcessing prop (Codex R11 #3097 P2)', () => {
+  it('submission window opens/closes in handleComplete, not the isProcessing prop (Codex R11 PR 3097 P2)', () => {
     // Красная зона дефекта: EditPatientModal передаёт isProcessing={loading}
     // (загрузка пациента), и старый гвард `if (isProcessing) return` блокировал
     // X/Escape пока грузятся данные — при зависшем fetch навсегда.
