@@ -205,6 +205,10 @@ def test_quote_edit_delta_mode_ignores_repeat_discount(
     service = _service(
         db_session, code="FIXD-ED", price=100000.00, is_consultation=True
     )
+    # R10 #3095: услуга должна быть маршрутизируемой — команда edit-delta
+    # отвергает услуги без queue_tag, а квота теперь зеркалит этот gate.
+    service.queue_tag = "fixd_ed_tag"
+    db_session.commit()
     _set_settings(db_session, repeat_visit_discount=50)
 
     # cart-режим: repeat-скидка применяется (50%)
@@ -237,6 +241,9 @@ def test_quote_edit_delta_mode_applies_all_free_zero(
 ):
     """edit_delta-режим: all_free → 0 (единственное правило edit-delta)."""
     service = _service(db_session, code="FIXD-ED2", price=100000.00)
+    # R10 #3095: маршрутизируемая услуга (см. test_quote_edit_delta_rejects_…)
+    service.queue_tag = "fixd_ed2_tag"
+    db_session.commit()
 
     edit_delta = client.post(
         "/api/v1/registrar/cart/quote",
@@ -264,6 +271,9 @@ def test_quote_edit_delta_all_free_reports_approved_like_the_command(
     квота edit_delta не должна предупреждать о согласовании, которого
     команда не выполняет."""
     service = _service(db_session, code="FIXD-ED3", price=100000.00)
+    # R10 #3095: маршрутизируемая услуга (см. test_quote_edit_delta_rejects_…)
+    service.queue_tag = "fixd_ed3_tag"
+    db_session.commit()
     # Явно выключаем авто-approve: раньше это давало "pending" в квоте,
     # тогда как команда сохранения пишет "approved".
     _set_settings(db_session, all_free_auto_approve=False)
@@ -563,6 +573,9 @@ def test_edit_delta_quote_token_rejects_stale_pricing_409(
     edit quote BEFORE any mutation — an admin price change after confirmation
     yields 409, never a silently different invoice."""
     service = _service(db_session, code="FIXD-EDT-1", price=50000.00)
+    # R10 #3095: маршрутизируемая услуга — команда требует queue_tag.
+    service.queue_tag = "fixd_edt1_tag"
+    db_session.commit()
 
     quoted = client.post(
         "/api/v1/registrar/cart/quote",
@@ -605,6 +618,9 @@ def test_edit_delta_fresh_quote_token_passes_revalidation(
     from tests.conftest import mint_access_token
 
     service = _service(db_session, code="FIXD-EDT-2", price=50000.00)
+    # R10 #3095: маршрутизируемая услуга — команда требует queue_tag.
+    service.queue_tag = "fixd_edt2_tag"
+    db_session.commit()
 
     token_headers = {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
     quoted = client.post(
@@ -765,6 +781,37 @@ def test_quote_edit_delta_without_context_bills_full_quantity(
     body = quoted.json()
     assert body["items"][0]["quantity"] == 5
     assert float(body["total_amount"]) == 500000
+
+
+def test_quote_edit_delta_rejects_unroutable_service_like_the_command(
+    client: TestClient, db_session: Session, admin_user, test_patient, test_doctor
+):
+    """Codex R10 #3095 (P2): a service with BOTH routing fields unset
+    (queue_tag, department_key) is rejected by the save command
+    (RegistrarEditDeltaService.apply → 400 "Service {id} has no queue
+    tag"). The edit quote must fail with the SAME reason — with and
+    without the edit context — instead of confirming a full-quantity
+    amount the registrar can never save."""
+    service = _service(db_session, code="FIXD-R10-1", price=100000.00)
+    assert not service.queue_tag and not service.department_key
+
+    with_context = _quote_with_context(
+        client,
+        admin_user,
+        [{"service_id": service.id, "quantity": 2}],
+        extra={
+            "patient_id": test_patient.id,
+            "target_date": date.today().isoformat(),
+        },
+    )
+    assert with_context.status_code == 400, with_context.text
+    assert "has no queue tag" in with_context.json()["detail"]
+
+    without_context = _quote_with_context(
+        client, admin_user, [{"service_id": service.id, "quantity": 2}], extra={}
+    )
+    assert without_context.status_code == 400, without_context.text
+    assert "has no queue tag" in without_context.json()["detail"]
 
 
 def test_edit_delta_command_accepts_the_context_bound_delta_token(

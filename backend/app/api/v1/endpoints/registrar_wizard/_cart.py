@@ -430,7 +430,14 @@ def _edit_delta_billable_quantity(
     edit_service = RegistrarEditDeltaService(db)
     queue_tag = service.queue_tag or service.department_key
     if not queue_tag:
-        return requested_qty
+        # Codex R10 #3095 (P2): the command REJECTS an unroutable service
+        # (apply → ValueError "Service {id} has no queue tag" → 400). The
+        # quote mirrors that gate instead of billing the full quantity for
+        # a service the save can never accept.
+        raise HTTPException(
+            status_code=400,
+            detail=f"Service {service.id} has no queue tag",
+        )
     entry = edit_service._find_active_entry(
         patient_id=patient_id,
         queue_tag=queue_tag,
@@ -573,6 +580,16 @@ def _quote_core(
             base_price = Decimal(str(service.price))
             unit_final = Decimal("0") if effective_discount_mode == "all_free" else base_price
             discount_percent = 0
+            # Codex R10 #3095 (P2): the command's routing gate mirrors into
+            # the quote for BOTH context paths — without the edit context the
+            # helper below is not called at all, so an unroutable service
+            # must be rejected here (same reason as the save: 400 "no queue
+            # tag"), never confirmed as a billable full quantity.
+            if not (service.queue_tag or service.department_key):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Service {service.id} has no queue tag",
+                )
             # Codex R6 #3095 (P2): with edit context the billable quantity is
             # the DELTA the command will actually bill (active same-day entry
             # already holding the service → max(requested − existing, 0)),
