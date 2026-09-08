@@ -12,6 +12,7 @@ from app.crud.patient import normalize_patient_name
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
+from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.user import User
@@ -26,7 +27,13 @@ ACTIVE_APPEND_STATUSES = ("waiting", "called", "in_service", "diagnostics")
 # редактированием корзины), "canceled" — деньги прошли цепочку отмены,
 # "paid" — legacy-статус. Снижение по оплаченному счёту = возврат —
 # отдельный финансовый контракт (wave2 PR3), а не побочный эффект редактирования.
-VISIT_POSITION_BLOCKED_STATUSES = ("closed", "canceled", "paid")
+# Codex R9 PR 3115 (P1): "expired" — терминальный статус по SSOT
+# visit_lifecycle_service (истёкшее подтверждение). Пропуск expired давал две
+# дыры: снижение мутировало терминальный визит, чья запись оставалась
+# appendable; а если запись уже не appendable, _assert_service_not_on_blocked_visit
+# тоже не находила визит — команда создавала дубликат визита для той же услуги
+# и дня.
+VISIT_POSITION_BLOCKED_STATUSES = ("closed", "canceled", "paid", "expired")
 
 
 @dataclass(frozen=True)
@@ -434,6 +441,27 @@ class RegistrarEditDeltaService:
             raise ValueError(
                 "По услуге идёт обработка платежа — уменьшение количества недоступно, "
                 "дождитесь завершения оплаты или обратитесь в кассу"
+            )
+        # Codex R9 PR 3115 (P1): канонические строки Payment проверяются
+        # ОТДЕЛЬНО от PaymentInvoice. Платёжные потоки (например, подтверждение
+        # кассиром) коммитят Payment со статусом paid/completed БЕЗ синхронной
+        # записи PaymentInvoice — счёт может отсутствовать или оставаться
+        # pending. Гард выше такие визиты пропускал, и edit-delta снижал
+        # услугу и даже уменьшал устаревший pending-счёт без возврата денег.
+        # Деньги получены (или уже уходят провайдеру) — снижение количества
+        # возможно только через возврат/корректировку оплаты.
+        payment_taken = (
+            self.db.query(Payment)
+            .filter(
+                Payment.visit_id == visit.id,
+                Payment.status.in_(("paid", "processing", "completed")),
+            )
+            .first()
+        )
+        if payment_taken:
+            raise ValueError(
+                "По услуге зарегистрирована оплата — уменьшение количества выполняется "
+                "через возврат/корректировку оплаты"
             )
 
     def _apply_patient_data(self, patient: Patient, patient_data: dict[str, Any]) -> None:

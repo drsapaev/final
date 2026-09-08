@@ -1651,7 +1651,7 @@ const AppointmentWizardV2 = ({
     const totalAmount = Number(cartQuote.total_amount) || 0;
 
     // Itemized breakdown из квоты: услуга × количество, скидка, итог строки
-    // Codex R8 #3115 (P2): отрицательные значения снижения показываются СО
+    // Codex R8 PR 3115 (P2): отрицательные значения снижения показываются СО
     // ЗНАКОМ — «бесплатно» только для ровно нуля; otherwise the confirmation
     // hid the invoice reduction and mispresented an adjustment as a freebie.
     const formatQuoteAmount = (value: number) =>

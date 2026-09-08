@@ -64,7 +64,7 @@ describe('W2-PR1: buildEditDeltaTargetItems', () => {
     expect(build.items).toEqual([{ service_id: 1, quantity: 3, specialist_id: null }]);
   });
 
-  it('Codex R8 #3115: существующая позиция несёт queue_entry_id из original_queue_id', () => {
+  it('Codex R8 PR 3115: существующая позиция несёт queue_entry_id из original_queue_id', () => {
     const identity = identityWithQuantities({ '1': 2 });
     const build = buildEditDeltaTargetItems(
       [{ service_id: 1, quantity: 4, original_queue_id: 777 }],
@@ -76,7 +76,7 @@ describe('W2-PR1: buildEditDeltaTargetItems', () => {
     ]);
   });
 
-  it('Codex R8 #3115: очередь-идентичность не отправляется, если она неизвестна', () => {
+  it('Codex R8 PR 3115: очередь-идентичность не отправляется, если она неизвестна', () => {
     const identity = identityWithQuantities({ '1': 2 });
     const build = buildEditDeltaTargetItems(
       [{ service_id: 1, quantity: 4 }],

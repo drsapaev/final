@@ -360,3 +360,83 @@ def test_quote_routes_by_item_queue_entry_id(
     )
 
     assert Decimal(str(quote["total_amount"])) == PRICE  # дельта 5→6 = 1×цена
+
+
+# ===================== CODEX R9 PR 3115 =====================
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_decrease_blocked_for_expired_visit(
+    client, db_session, registrar_auth_headers, test_patient, test_doctor
+):
+    """Codex R9 PR 3115 (P1): expired — терминальный статус SSOT
+    visit_lifecycle_service. Снижение по визиту с истёкшим подтверждением
+    запрещено с явной причиной: мутировать терминальный визит нельзя, а если
+    его запись уже не appendable — команда не должна создавать дубликат
+    визита для той же услуги и дня."""
+    service = _create_service(
+        db_session, code="R9-EXP-01", name="R9 Expired", queue_tag="laboratory_general"
+    )
+    queue = _create_queue(
+        db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general", day=date.today()
+    )
+    visit = _create_visit(db_session, patient=test_patient, doctor_id=test_doctor.id, department="laboratory_general")
+    visit.status = "expired"
+    db_session.commit()
+    entry = _create_entry(
+        db_session, queue=queue, patient=test_patient, service=service,
+        quantity=2, price=25000, total_amount=50000, visit_id=visit.id,
+    )
+
+    response = _post_edit_delta(
+        client, registrar_auth_headers,
+        patient_id=test_patient.id,
+        services=[{"service_id": service.id, "quantity": 1}],
+        entry_ids=[entry.id],
+    )
+
+    assert response.status_code == 400, response.text
+    assert "выполнена или отменена" in response.json()["detail"]
+    payload = _payload(db_session, entry.id)
+    assert payload["quantity"] == 2  # состояние не изменено
+
+
+@pytest.mark.parametrize("payment_status", ["paid", "processing", "completed"])
+@pytest.mark.integration
+@pytest.mark.queue
+def test_decrease_blocked_by_canonical_payment_row_without_synced_invoice(
+    client, db_session, registrar_auth_headers, test_patient, test_doctor, payment_status
+):
+    """Codex R9 PR 3115 (P1): кассовые потоки коммитят Payment (paid/completed)
+    БЕЗ синхронной PaymentInvoice — счёт отсутствует или остаётся pending.
+    Гард, проверяющий только PaymentInvoice.status, пропускал снижение и
+    уменьшение устаревшего pending-счёта без возврата денег. Канонические
+    строки Payment блокируют снижение так же, как оплаченный счёт."""
+    from app.models.payment import Payment
+
+    service = _create_service(
+        db_session, code=f"R9-PAY-{payment_status[:3].upper()}", name="R9 Payment", queue_tag="laboratory_general"
+    )
+    queue = _create_queue(
+        db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general", day=date.today()
+    )
+    visit = _create_visit(db_session, patient=test_patient, doctor_id=test_doctor.id, department="laboratory_general")
+    db_session.add(Payment(visit_id=visit.id, amount=Decimal("50000"), currency="UZS", method="cash", status=payment_status))
+    db_session.commit()
+    entry = _create_entry(
+        db_session, queue=queue, patient=test_patient, service=service,
+        quantity=2, price=25000, total_amount=50000, visit_id=visit.id,
+    )
+
+    response = _post_edit_delta(
+        client, registrar_auth_headers,
+        patient_id=test_patient.id,
+        services=[{"service_id": service.id, "quantity": 1}],
+        entry_ids=[entry.id],
+    )
+
+    assert response.status_code == 400, response.text
+    assert "зарегистрирована оплата" in response.json()["detail"]
+    payload = _payload(db_session, entry.id)
+    assert payload["quantity"] == 2  # состояние не изменено
