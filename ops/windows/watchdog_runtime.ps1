@@ -36,7 +36,16 @@ $MainTree = 'C:\final'
 $Port = 18000
 $StateFile = Join-Path $MainTree 'output\windows\watchdog_failures.txt'
 $LogFile = Join-Path $MainTree 'output\windows\watchdog.log'
-$CloudflaredExe = Join-Path $env:ProgramFiles 'cloudflared\cloudflared.exe'
+# The tunnel MSI installs to Program Files (x86) on 64-bit Windows
+# (observed 2026-09-09: the single-ProgramFiles path made the watchdog
+# unable to restore the tunnel after cloudflared died).
+$CloudflaredExe = @(
+    (Join-Path ${env:ProgramFiles(x86)} 'cloudflared\cloudflared.exe'),
+    (Join-Path $env:ProgramFiles 'cloudflared\cloudflared.exe')
+) | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $CloudflaredExe) {
+    $CloudflaredExe = Join-Path ${env:ProgramFiles(x86)} 'cloudflared\cloudflared.exe'
+}
 
 function Write-WatchdogLog {
     param([string] $Message)
