@@ -577,6 +577,29 @@ class RegistrarEditDeltaService:
         )
         delta_amount = (decrease_unit_price if delta_qty < 0 else unit_price) * Decimal(delta_qty)
 
+        # Codex R10 #3115 (P1): рост ПЕРЕОЦЕНИВАЕТ позицию средневзвешенной
+        # ценой за единицу: старые единицы сохраняют фактически записанную
+        # стоимость, добавленные биллятся по текущей каталоговой (delta_amount).
+        # Иначе VisitService/entry-пейлоад переписывали бы ВСЕ единицы на новую
+        # каталоговую цену, хотя счёт выставляет только дельту: визит 1×100
+        # при росте до 2 по цене 150 давал VisitService 2×150=300 против
+        # invoice 100+150=250 — PaymentInvariantService.compute_total_cost
+        # считал бы 300 канонической стоимостью визита и собирал бы лишние 50.
+        # Средневзвешенная цена согласует representations: строка VisitService
+        # (qty × blended) == payload (qty × blended) == entry.total_amount
+        # == invoice (записанный итог + дельта).
+        row_unit_price = unit_price
+        if delta_qty > 0 and existing_payload:
+            previous_recorded_unit = self._recorded_unit_charge(
+                entry=entry, payload=existing_payload, previous_qty=existing_qty
+            )
+            blended_unit = (
+                previous_recorded_unit * Decimal(existing_qty) + delta_amount
+            ) / Decimal(requested_qty)
+            row_unit_price = blended_unit.quantize(Decimal("0.01"))
+            existing_payload["price"] = float(row_unit_price)
+            existing_payload["unit_price"] = float(row_unit_price)
+
         changed_at = queue_service.get_local_timestamp(self.db)
 
         if delta_qty != 0:
@@ -619,7 +642,7 @@ class RegistrarEditDeltaService:
                 service=service,
                 requested_qty=requested_qty,
                 delta_qty=delta_qty,
-                unit_price=unit_price,
+                unit_price=row_unit_price,
             )
 
         return self._delta_result(
@@ -773,9 +796,11 @@ class RegistrarEditDeltaService:
         """W2-PR1: целевое состояние позиции VisitService.
 
         Существующая строка получает АБСОЛЮТНОЕ целевое количество — прежний
-        max(current, requested) молча проглатывал уменьшение. Рост, как и
-        раньше, приводит цену позиции к текущей цене каталога; снижение цену
-        не трогает (вычитается фактически начисленная сумма)."""
+        max(current, requested) молча проглатывал уменьшение. Рост приходит
+        со средневзвешенной ценой за единицу (Codex R10 #3115 (P1)): старые
+        единицы сохраняют записанную стоимость, добавленные биллятся по
+        каталогу — итог строки совпадает с invoice; снижение цену не трогает
+        (вычитается фактически начисленная сумма)."""
         existing = (
             self.db.query(VisitService)
             .filter(VisitService.visit_id == visit.id, VisitService.service_id == service.id)
@@ -957,13 +982,26 @@ class RegistrarEditDeltaService:
         )
         if link is None:
             return None
+        # Codex R10 #3115 (P1): чтение счёта ПОД блокировкой строки +
+        # повторная валидация статуса в той же транзакции. Без этого гонка
+        # с init_invoice_payment (чтение pending → запрос провайдеру на
+        # старую сумму → processing) могла пройти мимо guard'а: снижение
+        # уменьшало pending-счёт ПОСЛЕ того, как провайдеру ушла старая
+        # сумма. FOR UPDATE сериализует обе операции: кто первый взял
+        # блокировку, второй видит закоммиченное состояние.
         invoice = (
             self.db.query(PaymentInvoice)
             .filter(PaymentInvoice.id == link.invoice_id)
+            .with_for_update()
             .first()
         )
         if invoice is None:
             return None
+        if invoice.status != "pending":
+            raise ValueError(
+                f"Счёт по визиту уже обрабатывается (статус {invoice.status}) — "
+                "уменьшение количества выполняется через возврат/корректировку оплаты"
+            )
         new_visit_amount = Decimal(str(link.visit_amount or 0)) + amount
         new_total = Decimal(str(invoice.total_amount or 0)) + amount
         if new_visit_amount < 0 or new_total < 0:
