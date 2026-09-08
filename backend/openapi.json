@@ -70950,6 +70950,17 @@
               }
             ],
             "title": "Specialist Id"
+          },
+          "queue_entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Entry Id"
           }
         },
         "type": "object",
@@ -78048,6 +78059,17 @@
               }
             ],
             "title": "Specialist Id"
+          },
+          "queue_entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Entry Id"
           }
         },
         "type": "object",

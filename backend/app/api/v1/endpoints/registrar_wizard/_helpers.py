@@ -156,6 +156,11 @@ class EditDeltaServiceItem(BaseModel):
     # Codex R13 #3095 (P2): the save-time token revalidation mirrors this
     # specialist too — see apply_registrar_cart_edit_delta.
     specialist_id: int | None = None
+    # Codex R8 #3115 (P1): идентичность исходной записи позиции — при одном
+    # service_id под разными врачами/записями правится ИМЕННО названная
+    # запись, а не ближайшая по глобальному preferred-набору.
+    queue_entry_id: int | None = None
+(fix(wizard): edit-delta decrease/routing correctness (Codex R8 #3115))
 
 
 class EditDeltaRequest(BaseModel):
@@ -278,6 +283,9 @@ class CartQuoteItemRequest(BaseModel):
     # специалиста, когда для queue_tag/даты нет активной очереди; без него
     # квота подтверждала цену команды, возвращавшей на сохранении 400.
     specialist_id: int | None = None
+    # Codex R8 #3115 (P1): зеркало EditDeltaServiceItem.queue_entry_id —
+    # квота маршрутизирует позицию по ТЕМ ЖЕ правилам, что и команда.
+    queue_entry_id: int | None = None
 
 
 class CartQuoteRequest(BaseModel):

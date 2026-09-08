@@ -64,6 +64,28 @@ describe('W2-PR1: buildEditDeltaTargetItems', () => {
     expect(build.items).toEqual([{ service_id: 1, quantity: 3, specialist_id: null }]);
   });
 
+  it('Codex R8 #3115: существующая позиция несёт queue_entry_id из original_queue_id', () => {
+    const identity = identityWithQuantities({ '1': 2 });
+    const build = buildEditDeltaTargetItems(
+      [{ service_id: 1, quantity: 4, original_queue_id: 777 }],
+      servicesData,
+      identity,
+    );
+    expect(build.items).toEqual([
+      { service_id: 1, quantity: 4, specialist_id: null, queue_entry_id: 777 },
+    ]);
+  });
+
+  it('Codex R8 #3115: очередь-идентичность не отправляется, если она неизвестна', () => {
+    const identity = identityWithQuantities({ '1': 2 });
+    const build = buildEditDeltaTargetItems(
+      [{ service_id: 1, quantity: 4 }],
+      servicesData,
+      identity,
+    );
+    expect(build.items).toEqual([{ service_id: 1, quantity: 4, specialist_id: null }]);
+  });
+
   it('снижение количества — такая же дельта, как и рост', () => {
     const identity = identityWithQuantities({ '1': 3 });
     const build = buildEditDeltaTargetItems(

@@ -24239,6 +24239,8 @@ export type components = {
             custom_price?: number | string | null;
             /** Specialist Id */
             specialist_id?: number | null;
+            /** Queue Entry Id */
+            queue_entry_id?: number | null;
         };
         /** CartQuoteItemResponse */
         CartQuoteItemResponse: {
@@ -26931,6 +26933,8 @@ export type components = {
             quantity: number;
             /** Specialist Id */
             specialist_id?: number | null;
+            /** Queue Entry Id */
+            queue_entry_id?: number | null;
         };
         /**
          * EmailVerificationConfirmRequest

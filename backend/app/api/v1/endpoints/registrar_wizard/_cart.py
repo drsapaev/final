@@ -409,7 +409,7 @@ def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, appr
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _edit_delta_billable_quantity(
+def _edit_delta_quote_context(
     db: Session,
     *,
     service: Service,
@@ -418,7 +418,9 @@ def _edit_delta_billable_quantity(
     target_date: date,
     preferred_entry_ids: set[int],
     specialist_id: int | None = None,
-) -> int:
+    queue_entry_id: int | None = None,
+    lock: bool = False,
+) -> tuple[int, Decimal | None]:
     """Codex R6 #3095 (P2): mirror the edit-delta command's billing quantity.
 
     W2-PR1: the command bills the SIGNED target-state delta
@@ -430,6 +432,18 @@ def _edit_delta_billable_quantity(
     never merges into another doctor's same-tag queue. Read-only: reuses
     the service's own routing/payload predicates instead of duplicating
     them (no drift).
+
+    Codex R8 #3115 (P1/P2):
+    - per-item routing: явный queue_entry_id позиции выбирает запись, как и
+      в команде (одинаковый service_id под разными врачами не мутирует
+      «ближайшую» запись);
+    - возвращает ВТОРОЕ значение — записанную цену за единицу для снижения
+      (_recorded_unit_charge: full-update строки хранят line-total, а не
+      unit-цену); квота снижения обязана токенизировать ТУ ЖЕ сумму,
+      которую спишет команда (для роста это цена каталога — None);
+    - lock=True (save-ревалидация) фиксирует выбранную запись FOR UPDATE
+      до конца транзакции — отмена записи между ревалидацией и применением
+      не меняет маршрутизацию/дельту.
     """
     edit_service = RegistrarEditDeltaService(db)
     queue_tag = service.queue_tag or service.department_key
@@ -442,12 +456,16 @@ def _edit_delta_billable_quantity(
             status_code=400,
             detail=f"Service {service.id} has no queue tag",
         )
+    item_preferred: set[int] = (
+        {int(queue_entry_id)} if queue_entry_id is not None else preferred_entry_ids
+    )
     entry = edit_service._find_active_entry(
         patient_id=patient_id,
         queue_tag=queue_tag,
         target_date=target_date,
-        preferred_entry_ids=preferred_entry_ids,
+        preferred_entry_ids=item_preferred,
         specialist_id=specialist_id,
+        lock=lock,
     )
     if entry is None:
         # Codex R11 #3095 (P2): the command routes a no-entry edit to
@@ -479,14 +497,22 @@ def _edit_delta_billable_quantity(
                     "specialist_id is required"
                 ),
             )
-        return requested_qty
+        return requested_qty, None
     existing_payload = edit_service._find_service_payload(
         edit_service._coerce_services(entry.services), service
     )
     if not existing_payload:
-        return requested_qty
+        return requested_qty, None
     existing_qty = edit_service._payload_quantity(existing_payload)
-    return requested_qty - existing_qty
+    delta = requested_qty - existing_qty
+    decrease_charge = (
+        edit_service._recorded_unit_charge(
+            entry=entry, payload=existing_payload, previous_qty=existing_qty
+        )
+        if delta < 0
+        else None
+    )
+    return delta, decrease_charge
 
 
 def _quote_core(
@@ -654,8 +680,12 @@ def _quote_core(
             # SIGNED (requested − existing): increases bill the remainder,
             # decreases bill negative, equal quantities bill zero — the quote
             # mirrors the command's target-state semantics exactly.
+            # Codex R8 #3115 (P1/P2): per-item queue_entry_id routing mirror +
+            # decrease quotes price the RECORDED unit charge (full-update rows
+            # store line totals), the same value the command subtracts.
+            decrease_charge: Decimal | None = None
             if quote_req.patient_id is not None and quote_req.target_date is not None:
-                billable_qty = _edit_delta_billable_quantity(
+                billable_qty, decrease_charge = _edit_delta_quote_context(
                     db,
                     service=service,
                     requested_qty=item_req.quantity,
@@ -663,9 +693,15 @@ def _quote_core(
                     target_date=quote_req.target_date,
                     preferred_entry_ids=set(quote_req.preferred_entry_ids),
                     specialist_id=item_req.specialist_id,
+                    queue_entry_id=item_req.queue_entry_id,
+                    lock=lock_pricing_rows,
                 )
             else:
                 billable_qty = item_req.quantity
+            if billable_qty < 0 and decrease_charge is not None:
+                # Снижение: команда вычитает записанную цену (не каталог);
+                # квота токенизирует ровно ту же сумму за единицу.
+                unit_final = decrease_charge
         elif quote_req.pricing_mode == "full_update":
             # Codex R2 #3095 (P1): зеркало _full_update_create_single_
             # independent_entry: консультация при repeat/benefit → 0,
@@ -850,6 +886,8 @@ def apply_registrar_cart_edit_delta(
                 service_id=s.service_id,
                 quantity=s.quantity,
                 specialist_id=s.specialist_id,
+                # Codex R8 #3115 (P1): зеркало per-item маршрутизации
+                queue_entry_id=s.queue_entry_id,
             )
             for s in request.services
         ],
@@ -872,6 +910,8 @@ def apply_registrar_cart_edit_delta(
                     service_id=item.service_id,
                     quantity=item.quantity,
                     specialist_id=item.specialist_id,
+                    # Codex R8 #3115 (P1): правка мутирует именованную запись
+                    queue_entry_id=item.queue_entry_id,
                 )
                 for item in request.services
             ],

@@ -1651,11 +1651,16 @@ const AppointmentWizardV2 = ({
     const totalAmount = Number(cartQuote.total_amount) || 0;
 
     // Itemized breakdown из квоты: услуга × количество, скидка, итог строки
+    // Codex R8 #3115 (P2): отрицательные значения снижения показываются СО
+    // ЗНАКОМ — «бесплатно» только для ровно нуля; otherwise the confirmation
+    // hid the invoice reduction and mispresented an adjustment as a freebie.
+    const formatQuoteAmount = (value: number) =>
+      `${new Intl.NumberFormat('ru-RU').format(value)} ${t('misc.aw_currency_sum')}`;
     const itemizedLines = cartQuote.items.map((item) => {
       const qty = Number(item.quantity ?? 1);
       const finalPrice = Number(item.final_price) || 0;
       const discountSuffix = item.discount_percent > 0 ? ` (−${item.discount_percent}%)` : '';
-      const priceStr = finalPrice > 0 ? `${new Intl.NumberFormat('ru-RU').format(finalPrice)} ${t('misc.aw_currency_sum')}` : t('misc.aw_free');
+      const priceStr = finalPrice !== 0 ? formatQuoteAmount(finalPrice) : t('misc.aw_free');
       return `• ${item.service_name}${qty > 1 ? ` ×${qty}` : ''}${discountSuffix} — ${priceStr}`;
     });
 
@@ -1665,7 +1670,7 @@ const AppointmentWizardV2 = ({
       ...itemizedLines,
       '',
       doctorCount > 1 ? t('misc.aw_summary_doctors_count', { count: doctorCount }) : null,
-      totalAmount > 0 ? t('misc.aw_summary_total', { amount: new Intl.NumberFormat('ru-RU').format(totalAmount) }) : t('misc.aw_summary_free'),
+      totalAmount !== 0 ? t('misc.aw_summary_total', { amount: formatQuoteAmount(totalAmount) }) : t('misc.aw_summary_free'),
       cartQuote.approval_status === 'pending' ? t('misc.aw_quote_pending_approval') : null,
     ].filter(Boolean);
 

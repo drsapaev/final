@@ -34,6 +34,11 @@ class RegistrarEditDeltaItem:
     service_id: int
     quantity: int = 1
     specialist_id: int | None = None
+    # Codex R8 #3115 (P1): идентичность исходной записи позиции. При одном
+    # service_id под разными врачами/записями только она определяет, ЧЬЯ
+    # позиция правится: глобальный preferred-набор выбирал бы ближайшую
+    # запись и мог мутировать позицию врача A при правке строки врача B.
+    queue_entry_id: int | None = None
 
 
 class RegistrarEditDeltaService:
@@ -86,12 +91,22 @@ class RegistrarEditDeltaService:
                 raise ValueError(f"Service {service.id} has no queue tag")
 
             requested_qty = max(int(item.quantity or 1), 1)
+            # Codex R8 #3115 (P1): индивидуальная маршрутизация позиции —
+            # явная запись позиции имеет приоритет над глобальным набором.
+            item_preferred: set[int] = (
+                {int(item.queue_entry_id)}
+                if item.queue_entry_id is not None
+                else queue_entry_ids
+            )
             entry = self._find_active_entry(
                 patient_id=patient_id,
                 queue_tag=queue_tag,
                 target_date=target_date,
-                preferred_entry_ids=queue_entry_ids,
+                preferred_entry_ids=item_preferred,
                 specialist_id=item.specialist_id,
+                # Codex R8 #3115 (P1): мутирующая команда фиксирует выбранную
+                # запись до конца транзакции.
+                lock=True,
             )
 
             if entry:
@@ -123,7 +138,7 @@ class RegistrarEditDeltaService:
                     patient_id=patient_id,
                     service=service,
                     target_date=target_date,
-                    preferred_entry_ids=queue_entry_ids,
+                    preferred_entry_ids=item_preferred,
                     specialist_id=item.specialist_id,
                 )
                 delta = self._create_new_queue_entry(
@@ -401,6 +416,25 @@ class RegistrarEditDeltaService:
                 "По услуге есть оплаченный счёт — уменьшение количества выполняется "
                 "через возврат/корректировку оплаты"
             )
+        # Codex R8 #3115 (P1): счёт в статусе processing — платёж уже уходит
+        # провайдеру. Снижение изменило бы очередь/визит, но редукция вычитает
+        # только PENDING-счета, поэтому processing-счёт остался бы на прежнюю
+        # сумму — пациент был бы обязан за старое количество. Корректировка —
+        # через скоординированную платёжную операцию, не через edit-delta.
+        processing = (
+            self.db.query(PaymentInvoice)
+            .join(PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id)
+            .filter(
+                PaymentInvoiceVisit.visit_id == visit.id,
+                PaymentInvoice.status == "processing",
+            )
+            .first()
+        )
+        if processing:
+            raise ValueError(
+                "По услуге идёт обработка платежа — уменьшение количества недоступно, "
+                "дождитесь завершения оплаты или обратитесь в кассу"
+            )
 
     def _apply_patient_data(self, patient: Patient, patient_data: dict[str, Any]) -> None:
         if patient_data.get("full_name"):
@@ -426,20 +460,24 @@ class RegistrarEditDeltaService:
         target_date: date,
         preferred_entry_ids: set[int],
         specialist_id: int | None = None,
+        lock: bool = False,
     ) -> OnlineQueueEntry | None:
-        entries = (
-            self.db.query(OnlineQueueEntry)
-            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-            .filter(
-                OnlineQueueEntry.patient_id == patient_id,
-                OnlineQueueEntry.status.in_(ACTIVE_APPEND_STATUSES),
-                DailyQueue.day == target_date,
-                DailyQueue.queue_tag == queue_tag,
-                DailyQueue.active.is_(True),
-            )
-            .order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc())
-            .all()
+        # Codex R8 #3115 (P1): lock=True фиксирует выбранную запись до конца
+        # транзакции (SELECT ... FOR UPDATE) — отмена/смена статуса между
+        # ревалидацией квоты и применением команды не может сменить
+        # наблюдаемое состояние (READ COMMITTED).
+        query = self.db.query(OnlineQueueEntry).join(
+            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
         )
+        if lock:
+            query = query.with_for_update()
+        entries = query.filter(
+            OnlineQueueEntry.patient_id == patient_id,
+            OnlineQueueEntry.status.in_(ACTIVE_APPEND_STATUSES),
+            DailyQueue.day == target_date,
+            DailyQueue.queue_tag == queue_tag,
+            DailyQueue.active.is_(True),
+        ).order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc()).all()
         if preferred_entry_ids:
             preferred = [entry for entry in entries if entry.id in preferred_entry_ids]
             if preferred:
@@ -501,7 +539,14 @@ class RegistrarEditDeltaService:
         # Снижение вычитает фактически начисленную сумму позиции (цена из
         # payload), а не текущую цену каталога — иначе entry.total_amount
         # разошёлся бы с тем, что реально выставлено ранее.
-        decrease_unit_price = Decimal(str(existing_payload.get("price"))) if (delta_qty < 0 and existing_payload and existing_payload.get("price") is not None) else unit_price
+        # Codex R8 #3115 (P1): снижение вычитает ФАКТИЧЕСКИ записанную цену
+        # за единицу (см. _recorded_unit_charge), а не цену каталога и не
+        # line-total из payload full-update-строки.
+        decrease_unit_price = (
+            self._recorded_unit_charge(entry=entry, payload=existing_payload, previous_qty=existing_qty)
+            if (delta_qty < 0 and existing_payload and existing_payload.get("price") is not None)
+            else unit_price
+        )
         delta_amount = (decrease_unit_price if delta_qty < 0 else unit_price) * Decimal(delta_qty)
 
         changed_at = queue_service.get_local_timestamp(self.db)
@@ -960,6 +1005,52 @@ class RegistrarEditDeltaService:
                 return payload
         return None
 
+    def _recorded_unit_charge(
+        self,
+        *,
+        entry: OnlineQueueEntry,
+        payload: dict[str, Any],
+        previous_qty: int,
+    ) -> Decimal:
+        """Codex R8 #3115 (P1): фактически ЗАПИСАННАЯ цена за единицу позиции.
+
+        Конвенции записчиков payload различаются: full-update сохраняет в
+        price ПОЛНУЮ сумму строки (unit × quantity), а desk/edit-delta —
+        цену за единицу. Умножение «цены из payload» на дельту для
+        full-update-строки списывало бы line-total повторно (снижение
+        3→1 при 100/усл. вычитало бы 600 вместо 200).
+
+        Правило вывода:
+        1) явный payload["unit_price"] — канонический источник (новые строки);
+        2) quantity <= 1 — конвенции совпадают, price и есть цена за единицу;
+        3) по сумме записи: total_amount == Σ price (line-total конвенция,
+           как у full-update) И != Σ price×qty → цена за единицу = price/qty;
+        4) иначе — unit-конвенция: price (desk/edit-delta строки).
+        """
+        raw_price = payload.get("price")
+        if raw_price is None:
+            return Decimal("0")
+        price = Decimal(str(raw_price))
+        if "unit_price" in payload and payload.get("unit_price") is not None:
+            return Decimal(str(payload["unit_price"]))
+        if previous_qty <= 1:
+            return price
+        services = self._coerce_services(entry.services)
+        line_sum = sum(
+            (Decimal(str(p.get("price") or 0)) for p in services), Decimal("0")
+        )
+        unit_sum = sum(
+            (
+                Decimal(str(p.get("price") or 0)) * Decimal(int(self._payload_quantity(p) or 1))
+                for p in services
+            ),
+            Decimal("0"),
+        )
+        total = Decimal(str(entry.total_amount or 0))
+        if total == line_sum and line_sum != unit_sum:
+            return price / Decimal(previous_qty)
+        return price
+
     def _payload_quantity(self, payload: dict[str, Any] | None) -> int:
         if not payload:
             return 0
@@ -986,6 +1077,10 @@ class RegistrarEditDeltaService:
             "quantity": quantity,
             "qty": quantity,
             "price": float(unit_price),
+            # Codex R8 #3115 (P1): явная цена за единицу — payload-поле price
+            # в разных записчиках означает разное (unit или line-total);
+            # это поле снимает неоднозначность для будущих правок снижения.
+            "unit_price": float(unit_price),
         }
 
     def _service_response_payload(

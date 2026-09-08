@@ -327,12 +327,12 @@ export interface CartQuoteRequestOptions {
 export const buildCartQuoteRequest = (
   cart: QuoteCartSource | null | undefined,
   options: CartQuoteRequestOptions = {}
-): { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } | null => {
+): { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } | null => {
   const rawItems = (options.itemsOverride ?? (Array.isArray(cart?.items) ? cart.items : [])) || [];
   const items = rawItems
     .filter((item) => item && item.service_id != null)
     .map((item) => {
-      const quoteItem: { service_id: number; quantity: number; custom_price?: number; specialist_id?: number } = {
+      const quoteItem: { service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number } = {
         service_id: Number(item.service_id),
         quantity: Math.max(1, Number(item.quantity || 1)),
       };
@@ -357,10 +357,16 @@ export const buildCartQuoteRequest = (
       if (specialistId != null && Number.isFinite(Number(specialistId)) && Number(specialistId) > 0) {
         quoteItem.specialist_id = Number(specialistId);
       }
+      // Codex R8 #3115 (P1): идентичность исходной записи зеркалится в квоту
+      const queueEntryId = (item as { queue_entry_id?: unknown }).queue_entry_id
+        ?? (item as { original_queue_id?: unknown }).original_queue_id;
+      if (queueEntryId != null && Number.isFinite(Number(queueEntryId)) && Number(queueEntryId) > 0) {
+        quoteItem.queue_entry_id = Number(queueEntryId);
+      }
       return quoteItem;
     });
   if (items.length === 0) return null;
-  const request: { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } = {
+  const request: { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } = {
     items,
     discount_mode: String(cart?.discount_mode || 'none'),
     all_free: Boolean(cart?.all_free),
@@ -994,10 +1000,18 @@ export const buildEditDeltaTargetItems = (
     if (originalQty === undefined) return;
     if (quantity === originalQty) return; // без изменений — no-op
     build.hasQuantityChange = true;
+    // Codex R8 #3115 (P1): существующая позиция сохраняет идентичность своей
+    // записи (original_queue_id из service_details). При одном service_id под
+    // разными врачами/записями правится ИМЕННО названная запись, а не
+    // ближайшая по глобальному preferred-набору.
+    const originalQueueId = item.original_queue_id ?? item.queue_entry_id ?? null;
     build.items.push({
       service_id: item.service_id as string | number,
       quantity,
       specialist_id: null,
+      ...(originalQueueId != null && Number.isFinite(Number(originalQueueId))
+        ? { queue_entry_id: Number(originalQueueId) }
+        : {}),
     });
   });
   return build;
