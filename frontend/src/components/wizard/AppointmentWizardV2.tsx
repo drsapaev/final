@@ -2589,16 +2589,12 @@ const AppointmentWizardV2 = ({
 
         logger.error('❌ Ошибка создания корзины:', cartErr.status, errorMessage);
 
-        // Codex R11 PR 3092 (P2): 409 бывает двух родов, и FE обязан их
-        // различать. IN-FLIGHT (другой воркер ещё обрабатывает) — ключ
+        // Codex R11 PR 3092 (P2): 409 двух родов. IN-FLIGHT — ключ
         // удерживается, повтор с тем же ключом вернёт закоммиченный ответ.
-        // UNCERTAIN-OUTCOME (маркер намерения без сохранённого ответа —
-        // воркер умер после коммита-окна) — повтор со старым ключом вечно
-        // получает тот же 409, а смена payload заблокирована гвардией:
-        // единственный выход — ОСМЫСЛЕННАЯ сверка с рабочим списком и
-        // РОТАЦИЯ ключа. Диалог подтверждения — тот самый путь
-        // восстановления: registrar убеждается, что ничего не применилось,
-        // и только тогда ключ освобождается.
+        // UNCERTAIN-OUTCOME (маркер намерения без ответа): повтор со старым
+        // ключом вечно 409, смена payload заблокирована гвардией — выход
+        // один: ОСМЫСЛЕННАЯ сверка с рабочим списком (диалог подтверждения)
+        // и РОТАЦИЯ ключа только после явного согласия регистратора.
         const backendCode = cartErr.response?.data?.code;
         if (cartErr.status === 409 && backendCode === 'idempotency_uncertain_outcome') {
           const reconciled = await confirm({
@@ -2609,12 +2605,12 @@ const AppointmentWizardV2 = ({
             intent: 'danger',
           });
           if (reconciled) {
-            logger.warn('Fix C (Codex R11): uncertain-outcome reconciled — rotating the idempotency key');
+            logger.warn('Fix C (Codex R11): reconciled — rotating the idempotency key');
             cartIdempotencyKeyRef.current = null;
             cartIdempotencyPayloadRef.current = null;
             toast.info(t('misc.aw_idem_key_released'), { style: TOAST_WARNING_STYLE });
           }
-          return; // ❌ НЕ закрываем мастер: корзина сохранена, ключ разведён
+          return; // НЕ закрываем мастер: ключ разведён, корзина сохранена
         }
 
         // Codex R3 PR 3092 (P2): definitive 4xx (кроме 409) доказывает, что

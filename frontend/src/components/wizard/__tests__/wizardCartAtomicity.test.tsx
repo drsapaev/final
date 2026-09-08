@@ -159,7 +159,7 @@ describe('Fix C (Codex R3 #3092): key binding release on definitive failures', (
   });
 });
 
-describe('Fix C (Codex R11 #3092): uncertain-outcome 409 recovery path', () => {
+describe('Fix C (Codex R11 PR 3092): uncertain-outcome 409 recovery path', () => {
   const readWizardSource = () => fs.readFileSync(
     path.resolve(__dirname, '../AppointmentWizardV2.tsx'),
     'utf8'
