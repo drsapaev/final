@@ -32,9 +32,21 @@ from app.models.user import User
 def _load_reconcile_module():
     """Load backend/scripts/reconcile_userless_active_doctors.py by path —
     backend/scripts has no package __init__, so a plain import cannot reach
-    it from the backend-rooted test run."""
-    path = pathlib.Path(__file__).resolve().parents[2] / "scripts" / (
-        "reconcile_userless_active_doctors.py"
+    it from the backend-rooted test run. Parent traversal (not parents[2]):
+    under mutmut the test copy lives in backend/mutants/tests/... where
+    scripts/ is not copied into the sandbox (nightly mutation #3103)."""
+    marker = pathlib.Path(__file__).resolve()
+    path = next(
+        (
+            p / "scripts" / "reconcile_userless_active_doctors.py"
+            for p in marker.parents
+            if (p / "scripts" / "reconcile_userless_active_doctors.py").is_file()
+        ),
+        None,
+    )
+    assert path is not None, (
+        "scripts/reconcile_userless_active_doctors.py not found in any parent "
+        "directory of the test file"
     )
     spec = importlib.util.spec_from_file_location(
         "reconcile_userless_active_doctors", path
