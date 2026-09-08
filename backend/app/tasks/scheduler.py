@@ -113,8 +113,11 @@ async def enqueue_reminder(
     Args:
         visit_id: Target visit.
         channel: 'telegram' | 'sms' | 'email'.
-        schedule_version: the visit's CURRENT schedule (e.g.
-            ``visit_date.isoformat()``). Versioning the job ID by the
+        schedule_version: the visit's CURRENT full schedule — date AND
+            time, e.g. ``f"{visit_date.isoformat()}T{visit_time}"`` with
+            the literal ``"-"`` when the visit has no time (Codex round 6:
+            a time-only reschedule must version too). Versioning the job
+            ID by the
             schedule is what makes re-enqueueing after a reschedule safe
             (Codex round 4, P1): arq keeps a completed job's result for
             keep_result seconds, and during that window a plain

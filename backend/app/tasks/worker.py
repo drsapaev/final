@@ -42,6 +42,20 @@ LEASE_TTL = timedelta(minutes=10)
 # Job implementations
 # ---------------------------------------------------------------------------
 
+def _schedule_matches(visit, schedule_version: str) -> bool:
+    """True when the visit's current date+time still match the schedule
+    version the job was enqueued for (format "{date}T{time}", "-" if the
+    visit has no time)."""
+    from datetime import date
+
+    date_part, _, time_part = schedule_version.partition("T")
+    if visit.visit_date != date.fromisoformat(date_part):
+        return False
+    if not time_part or time_part == "-":
+        return visit.visit_time is None
+    return visit.visit_time == time_part
+
+
 async def send_visit_reminder(
     ctx,
     *,
@@ -117,12 +131,18 @@ async def send_visit_reminder(
             ),
         ]
         if schedule_version is not None:
-            # Bind the claim to the schedule this job was enqueued FOR: a
-            # stale job left queued by a reschedule must never deliver for
-            # the old schedule (Codex round 5, P1).
-            conditions.append(
-                Visit.visit_date == date.fromisoformat(schedule_version)
-            )
+            # Bind the claim to the FULL schedule this job was enqueued FOR
+            # (date AND time — Codex rounds 5+6, P1): a stale job left
+            # queued by a reschedule must never deliver for the old
+            # schedule, and a time-only move invalidates the version too.
+            # Format: "{visit_date.isoformat()}T{visit_time}" where an
+            # absent time is the literal "-".
+            date_part, _, time_part = schedule_version.partition("T")
+            conditions.append(Visit.visit_date == date.fromisoformat(date_part))
+            if time_part and time_part != "-":
+                conditions.append(Visit.visit_time == time_part)
+            else:
+                conditions.append(Visit.visit_time.is_(None))
         claim = db.execute(
             update(Visit).where(*conditions).values(reminder_claimed_at=our_lease)
         )
@@ -135,13 +155,14 @@ async def send_visit_reminder(
                     "job.send_visit_reminder: visit %s not found", visit_id
                 )
                 return
-            if schedule_version is not None and visit.visit_date != date.fromisoformat(
-                schedule_version
+            if schedule_version is not None and not _schedule_matches(
+                visit, schedule_version
             ):
                 logger.info(
                     "job.send_visit_reminder: visit %s schedule moved on "
-                    "(job version %s, visit %s) — stale job, skipping",
+                    "(job version %s, visit %s %s) — stale job, skipping",
                     visit_id, schedule_version, visit.visit_date,
+                    visit.visit_time,
                 )
                 return
             if visit.status != "pending_confirmation":

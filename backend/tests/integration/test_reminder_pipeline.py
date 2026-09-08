@@ -490,7 +490,13 @@ async def test_reminder_end_to_end_via_real_clinic_queue(
     # Deterministic producer job ID — a leftover job hash from a previous
     # run (same visit number in a fresh temp DB!) makes enqueue_job return
     # None (dedupe) and the whole test would silently see zero deliveries.
-    schedule_version = date.today().isoformat()
+    _vs = sessionmaker(bind=pipeline_db)()
+    _visit_row = _vs.query(Visit).filter(Visit.id == visit_id).first()
+    schedule_version = (
+        f"{_visit_row.visit_date.isoformat()}T"
+        f"{_visit_row.visit_time if _visit_row.visit_time else '-'}"
+    )
+    _vs.close()
     deterministic_job_id = f"reminder:visit:{visit_id}:{schedule_version}:telegram"
 
     pool = await create_pool(RedisSettings.from_dsn(REDIS_URL))
@@ -903,13 +909,14 @@ def test_matching_schedule_version_delivers(pipeline_db, make_visit, reminder_sp
     from app.models.visit import Visit
     from app.tasks.worker import send_visit_reminder
 
-    visit_id = make_visit()  # visit_date = today
+    visit_id = make_visit()  # visit_date = today, visit_time = "10:00"
+    version = f"{date.today().isoformat()}T10:00"
     asyncio.run(
         send_visit_reminder(
             {},
             visit_id=visit_id,
             channel="telegram",
-            schedule_version=date.today().isoformat(),
+            schedule_version=version,
         )
     )
 
@@ -932,8 +939,8 @@ def test_stale_schedule_version_is_rejected(pipeline_db, make_visit, reminder_sp
     from app.models.visit import Visit
     from app.tasks.worker import send_visit_reminder
 
-    visit_id = make_visit()  # visit_date = today
-    stale_version = (date.today() - timedelta(days=2)).isoformat()
+    visit_id = make_visit()  # visit_date = today, visit_time = "10:00"
+    stale_version = f"{(date.today() - timedelta(days=2)).isoformat()}T10:00"
 
     asyncio.run(
         send_visit_reminder(
@@ -1065,5 +1072,37 @@ def test_noop_move_preserves_reminder_state(pipeline_db, make_visit):
             AuditLog.entity_id == visit_id, AuditLog.entity_type == "visit"
         ).delete()
         s.commit()
+    finally:
+        s.close()
+
+
+def test_stale_time_version_is_rejected(pipeline_db, make_visit, reminder_spy):
+    """Codex round 6, P1: the schedule version covers date AND time — a
+    time-only reschedule (same date, new visit_time) must invalidate the
+    version, so a stale job enqueued for the old time can neither claim,
+    dispatch, nor stamp."""
+    from datetime import date
+
+    from app.models.visit import Visit
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()  # visit_date = today, visit_time = "10:00"
+    stale_version = f"{date.today().isoformat()}T09:00"
+
+    asyncio.run(
+        send_visit_reminder(
+            {},
+            visit_id=visit_id,
+            channel="telegram",
+            schedule_version=stale_version,
+        )
+    )
+
+    assert reminder_spy == [], "a stale time-only version must not dispatch"
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.reminder_sent_at is None
+        assert row.reminder_claimed_at is None
     finally:
         s.close()
