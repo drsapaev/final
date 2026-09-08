@@ -1470,14 +1470,13 @@ const AppointmentWizardV2 = ({
     return current !== initialContentRef.current;
   };
 
+  // Codex R11 #3097 (P2): выделенный флаг «сабмит в полёте» — проп isProcessing
+  // перегружен ЗАГРУЗКОЙ пациента в edit-обёртках (X/Escape молча блокировались).
+  const submitInFlightRef = useRef(false);
   const requestCloseInFlightRef = useRef(false);
   const requestClose = async () => {
-    // Fix F: во время сохранения закрытие блокируется — «Сохранение…»
-    // не должно превращаться в тихую отмену без результата
-    if (isProcessing) return;
-    // Повторный запрос (например, Escape при уже открытом диалоге
-    // подтверждения) не открывает второй диалог
-    if (requestCloseInFlightRef.current) return;
+    if (submitInFlightRef.current) return;
+    if (requestCloseInFlightRef.current) return; // без второго диалога подтверждения
     requestCloseInFlightRef.current = true;
 
     try {
@@ -1653,6 +1652,7 @@ const AppointmentWizardV2 = ({
     }
 
     setIsProcessing(true);
+    submitInFlightRef.current = true; // R11 #3097: окно сабмита открыто
 
     try {
       // ✅ ИСПРАВЛЕНО: Валидация корзины перед подготовкой данных
@@ -2654,6 +2654,7 @@ const AppointmentWizardV2 = ({
       toast.error(getErrorMessage(error) || t('misc.aw_error_occurred'));
     } finally {
       setIsProcessing(false);
+      submitInFlightRef.current = false; // R11 #3097: закрыто на всех путях
     }
   };
   handleCompleteRef.current = handleComplete;

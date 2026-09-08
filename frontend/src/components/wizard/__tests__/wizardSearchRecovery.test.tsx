@@ -149,13 +149,37 @@ describe('Fix F: wizard search-race contract', () => {
     expect(source).toContain('onClick={requestClose}');
   });
 
-  it('close is blocked while processing (no fake cancellation)', () => {
+  it('close is blocked while SUBMITTING (no fake cancellation)', () => {
     const requestCloseBlock = extractSourceBlock(
       source,
       'const requestClose = async () => {',
       'const requestCloseRef = useRef<() => void>(() => {});'
     );
-    expect(requestCloseBlock).toContain('if (isProcessing) return;');
+    // Codex R11 #3097: гвардия смотрит на выделенный флаг сабмита…
+    expect(requestCloseBlock).toContain('if (submitInFlightRef.current) return;');
+    // …и НИКОГДА на перегруженный проп isProcessing
+    expect(requestCloseBlock).not.toContain('if (isProcessing) return;');
+  });
+
+  it('submission window opens/closes in handleComplete, not the isProcessing prop (Codex R11 #3097 P2)', () => {
+    // Красная зона дефекта: EditPatientModal передаёт isProcessing={loading}
+    // (загрузка пациента), и старый гвард `if (isProcessing) return` блокировал
+    // X/Escape пока грузятся данные — при зависшем fetch навсегда.
+    const openBlock = extractSourceBlock(
+      source,
+      'submitInFlightRef.current = true;',
+      'try {'
+    );
+    // Флаг открывается ВНУТРИ handleComplete (не в проп-обработчике)
+    expect(openBlock).toContain('submitInFlightRef.current = true;');
+
+    const finallyBlock = extractSourceBlock(
+      source,
+      'submitInFlightRef.current = false;',
+      'handleCompleteRef.current = handleComplete;'
+    );
+    // …и закрывается в finally handleComplete — на всех путях выхода
+    expect(finallyBlock).toContain('submitInFlightRef.current = false;');
   });
 
   it('panel Escape no longer bypasses the wizard close guard', () => {
