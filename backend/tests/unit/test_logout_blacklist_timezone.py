@@ -100,3 +100,30 @@ def test_logout_blacklist_receives_timezone_aware_expiry(db_session, monkeypatch
     )
     # (time_module imported for symmetry with the assertion message)
     assert time_module.monotonic() > 0
+
+
+def test_extract_access_token_meta_parses_bearer_and_returns_aware_expiry():
+    """The logout endpoint's extraction helper returns (jti, timezone-aware
+    expiry) from a Bearer header - the conversion that used to produce a
+    naive datetime and crash the blacklist comparison."""
+    from app.api.v1.endpoints import authentication as auth_module
+    from app.core.config import get_settings
+    import jwt
+
+    settings = get_settings()
+    payload = {"jti": "probe-jti", "exp": 1893456000, "sub": "7"}
+    token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+    jti, exp = auth_module._extract_access_token_meta(f"Bearer {token}")
+
+    assert jti == "probe-jti"
+    assert exp is not None and exp.tzinfo is not None, "expiry must be aware"
+    assert exp.timestamp() == pytest.approx(1893456000)
+
+
+def test_extract_access_token_meta_tolerates_garbage_header():
+    from app.api.v1.endpoints import authentication as auth_module
+
+    assert auth_module._extract_access_token_meta(None) == (None, None)
+    assert auth_module._extract_access_token_meta("") == (None, None)
+    assert auth_module._extract_access_token_meta("not-a-jwt") == (None, None)
