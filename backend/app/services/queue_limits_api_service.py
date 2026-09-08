@@ -47,6 +47,12 @@ class QueueLimitsApiService:
         for spec_data in specialties.values():
             total_usage = 0
             aggregate_cap = 0
+            # Codex round-11 P2: несколько активных врачей одной
+            # registry-backed специальности резолвят ОДНУ общую
+            # (today, tag)-поверхность — каждая считается в агрегат
+            # ровно один раз (usage/кап), счёт врачей остаётся
+            # раздельным (doctors_count).
+            counted_queue_ids: set[int] = set()
             for doctor in spec_data["doctors"]:
                 # Codex round-5 P2: a doctor may hold several ACTIVE queues
                 # for today under different tags (the quick-call surface
@@ -66,6 +72,9 @@ class QueueLimitsApiService:
                         self.db, today, doctor.id, None
                     )
                 if surface is not None:
+                    if surface.id in counted_queue_ids:
+                        continue  # the shared surface — already aggregated
+                    counted_queue_ids.add(surface.id)
                     queues = [surface]
                 else:
                     queues = self.repository.list_active_daily_queues(

@@ -46,15 +46,34 @@ def get_queue_analytics(
     if not end_dt:
         end_dt = date.today()
 
+    # QD-2C (Codex round-11 P2): specialist's registry tag — include the
+    # resource-axis rows (specialist NULL, queue_resource_id) in the
+    # HISTORICAL filter: the lab/ecg activity moved onto the resource
+    # surface, so a doctor-only join would return zero totals for the
+    # legacy specialist id despite recorded resource-queue rows.
+    from sqlalchemy import and_, or_
+
+    from app.models.clinic import Doctor
     from app.models.online_queue import DailyQueue, QueueStatistics
+
+    queue_filter = DailyQueue.specialist_id == specialist_id
+    doctor_row = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+    if doctor_row is not None and doctor_row.specialty:
+        queue_filter = or_(
+            DailyQueue.specialist_id == specialist_id,
+            and_(
+                DailyQueue.queue_resource_id.isnot(None),
+                DailyQueue.queue_tag == doctor_row.specialty,
+            ),
+        )
 
     # Получаем статистику
     stats = (
         db.query(QueueStatistics)
         .join(DailyQueue)
         .filter(
-        DailyQueue.specialist_id == specialist_id,
-        QueueStatistics.date >= start_dt,
+            queue_filter,
+            QueueStatistics.date >= start_dt,
             QueueStatistics.date <= end_dt,
         )
         .all()

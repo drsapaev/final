@@ -2422,3 +2422,161 @@ def _test_position_by_number_body(db_session: Session) -> None:
         service.get_position_entry_by_number(
             queue_number=99, specialist_id=synthetic.id
         )
+
+
+# ===================== U. Codex round-11 pins =====================
+
+
+def test_display_quick_call_resolves_resource_surface(
+    db_session: Session,
+) -> None:
+    """Codex round-11 P1: /display/quick/call-next?specialty=lab for a
+    non-doctor operator resolves the (today, tag) resource surface
+    BEFORE the doctor selection (the pure resource row has no
+    specialist; the bridged synthetic holds the Resource role the
+    doctor selection excludes) — the waiting patient is called, not a
+    404. The call COMMITs — durable rows cleaned in the finally."""
+    try:
+        _test_quick_call_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "lab_res26")
+
+
+def _test_quick_call_body(db_session: Session) -> None:
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    from app.services.display_websocket_api_service import DisplayWebSocketApiService
+
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    today = date.today()
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=today, specialist_id=None, queue_tag="lab"
+    )
+    entry = _make_waiting_entry(db_session, queue, number=31)
+
+    broadcast = AsyncMock()
+    service = DisplayWebSocketApiService(
+        db_session,
+        manager_provider=lambda: type(
+            "M", (), {"broadcast_patient_call": broadcast, "connections": []}
+        )(),
+    )
+    admin = _make_user(db_session, username="lab_res26", role="Admin")
+    result = asyncio.run(
+        service.quick_call_next(specialty="lab", board_id=None, current_user=admin)
+    )
+
+    assert result["success"] is True
+    assert result["call_data"]["number"] == 31
+    db_session.refresh(entry)
+    assert entry.status == "called"
+
+
+def test_queue_limits_dedupe_shared_surface(db_session: Session) -> None:
+    """Codex round-11 P2: two active doctors of the same registry-backed
+    specialty resolve ONE shared (today, tag) surface — the aggregate
+    counts its usage and cap exactly once; doctors_count stays 2.
+    Unique tag 'bio' keeps the pin independent of leaked worlds; the
+    write COMMITs — durable rows cleaned in the finally."""
+    try:
+        _test_limits_dedupe_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "bio_res27", "bio_res28")
+
+
+def _test_limits_dedupe_body(db_session: Session) -> None:
+    from app.api.v1.endpoints.queue_limits import DoctorQueueLimit
+    from app.services.queue_limits_api_service import QueueLimitsApiService
+
+    u1 = _make_user(db_session, username="bio_res27", role="Resource")
+    d1 = _make_doctor(db_session, user_id=u1.id, specialty="bio")
+    u2 = _make_user(db_session, username="bio_res28", role="doctor")
+    _make_doctor(db_session, user_id=u2.id, specialty="bio")
+    _make_resource(db_session, code="bio", queue_tag="bio", max_online_per_day=15)
+
+    today = date.today()
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=today, specialist_id=None, queue_tag="bio"
+    )
+    _make_waiting_entry(db_session, queue, number=31)
+    _make_waiting_entry(db_session, queue, number=32)
+
+    QueueLimitsApiService(db_session).set_doctor_queue_limit(
+        limit_data=DoctorQueueLimit(doctor_id=d1.id, day=today, max_online_entries=7)
+    )
+
+    blocks = {
+        block["specialty"]: block
+        for block in QueueLimitsApiService(db_session).get_queue_limits(specialty="bio")
+    }
+    bio = blocks["bio"]
+    assert bio["doctors_count"] == 2
+    assert bio["current_usage"] == 2  # ONCE, not doubled
+    assert bio["aggregate_max_per_day"] == 7  # ONCE, not doubled
+
+
+def test_queue_analytics_includes_resource_rows(db_session: Session) -> None:
+    """Codex round-11 P2: GET /queue/admin/queue-analytics/{specialist}
+    includes the resource-axis rows (specialist NULL) for the
+    specialist's registry tag — the legacy specialist id keeps its
+    totals instead of returning zeros despite recorded activity."""
+    from app.api.v1.endpoints.qr_queue._analytics import get_queue_analytics
+    from app.models.online_queue import QueueStatistics
+
+    try:
+        _test_queue_analytics_body(db_session, get_queue_analytics, QueueStatistics)
+    finally:
+        _durable_cleanup(db_session, "lab_res29", "admin_anl29", "dr_anl30")
+
+
+def _test_queue_analytics_body(
+    db_session, get_queue_analytics, QueueStatistics
+) -> None:
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    db_session.add(
+        QueueStatistics(
+            queue_id=queue.id,
+            date=_DAY,
+            online_joins=3,
+            desk_registrations=2,
+            telegram_joins=1,
+            confirmation_joins=0,
+            total_served=4,
+            total_no_show=1,
+        )
+    )
+    db_session.commit()
+
+    user = _make_user(db_session, username="lab_res29", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    admin = _make_user(db_session, username="admin_anl29", role="Admin")
+
+    payload = get_queue_analytics(synthetic.id, db=db_session, current_user=admin)
+    assert payload["totals"]["online_joins"] == 3
+    assert payload["totals"]["total_served"] == 4
+
+    # a non-registry doctor's analytics stay doctor-keyed
+    other_user = _make_user(db_session, username="dr_anl30", role="doctor")
+    other = _make_doctor(db_session, user_id=other_user.id, specialty="cardio")
+    cardio = _make_queue(
+        db_session, specialist_id=other.id, queue_tag="cardio", active=True
+    )
+    db_session.add(
+        QueueStatistics(
+            queue_id=cardio.id,
+            date=_DAY,
+            online_joins=9,
+            desk_registrations=0,
+            telegram_joins=0,
+            confirmation_joins=0,
+            total_served=1,
+            total_no_show=0,
+        )
+    )
+    db_session.commit()
+    other_payload = get_queue_analytics(other.id, db=db_session, current_user=admin)
+    assert other_payload["totals"]["online_joins"] == 9

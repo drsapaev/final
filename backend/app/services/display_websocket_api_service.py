@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy.orm import Session
 
 from app.core.specialties import canonical_specialty
+from app.crud import queue_resource_routing
 from app.repositories.display_websocket_api_repository import (
     DisplayWebSocketApiRepository,
 )
@@ -30,8 +31,26 @@ class DisplayWebSocketApiService:
         repository: DisplayWebSocketApiRepository | None = None,
         manager_provider: Callable = get_display_manager,  # type: ignore[type-arg]
     ):
+        self.db = db
         self.repository = repository or DisplayWebSocketApiRepository(db)
         self._manager_provider = manager_provider
+
+    def _resolve_registry_surface(self, specialty: str) -> object | None:
+        """QD-2C (Codex round-11 P1): the (today, tag) registry surface
+        for a registry-tag specialty, or None.
+
+        The quick-call route addresses a specialty; for a doctorless
+        registry tag the queue IS the (today, tag) surface — the pure
+        resource row has no specialist, and the bridged synthetic owner
+        holds the Resource role excluded from the doctor selection — so
+        the surface must be resolved BEFORE the doctor lookup, otherwise
+        the mounted quick-call returns 404 despite waiting patients.
+        Non-Session db (unit stubs) keeps the legacy doctor path."""
+        if not isinstance(self.db, Session):
+            return None
+        return queue_resource_routing.tag_routes_to_resource(
+            self.db, specialty, date.today()
+        )
 
     @staticmethod
     def _role_name(current_user: object) -> str:
@@ -185,6 +204,7 @@ class DisplayWebSocketApiService:
         board_id: str | None,
         current_user: object,
     ) -> dict:
+        registry_surface = None
         if self._role_name(current_user) == "doctor":
             doctor = self._current_doctor_or_403(current_user)
             if not self._same_specialty(getattr(doctor, "specialty", None), specialty):
@@ -193,17 +213,26 @@ class DisplayWebSocketApiService:
                     detail="Doctor can only quick-call patients for their own specialty",
                 )
         else:
-            doctor = self.repository.get_active_doctor_by_specialty(specialty)
-        if not doctor:
-            raise DisplayWebSocketApiDomainError(
-                status_code=404,
-                detail=f"Врач специальности {specialty} не найден",
-            )
+            doctor = None
+            # QD-2C (Codex round-11 P1): registry-tag specialty — the
+            # surface first (see _resolve_registry_surface); the
+            # doctor selection stays for non-registry specialties.
+            registry_surface = self._resolve_registry_surface(specialty)
+            if registry_surface is None:
+                doctor = self.repository.get_active_doctor_by_specialty(specialty)
+            if not doctor and registry_surface is None:
+                raise DisplayWebSocketApiDomainError(
+                    status_code=404,
+                    detail=f"Врач специальности {specialty} не найден",
+                )
 
-        daily_queue = self.repository.get_daily_queue_for_specialist(
-            day=date.today(),
-            specialist_id=doctor.id,
-        )
+        if registry_surface is not None:
+            daily_queue = registry_surface
+        else:
+            daily_queue = self.repository.get_daily_queue_for_specialist(
+                day=date.today(),
+                specialist_id=doctor.id,
+            )
 
         if daily_queue:
             self._ensure_doctor_can_call_queue(
