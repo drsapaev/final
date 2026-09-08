@@ -647,3 +647,99 @@ def test_reschedule_tomorrow_route_clears_reminder_stamp(pipeline_db, make_visit
         ), "tomorrow-reschedule must invalidate the stale reminder stamp"
     finally:
         s.close()
+
+
+def test_telegram_move_visit_clears_reminder_stamp(pipeline_db, make_visit):
+    """Codex round 3 P1: the Telegram /move_visit flow is a schedule change
+    like any reschedule — TelegramStaffActionAdapterService.staff_move_visit
+    must invalidate the stamp, otherwise the worker's conditional claim
+    matches zero rows and the patient gets no reminder for the new date."""
+    from app.models.audit import AuditLog
+    from app.models.clinic import Doctor
+    from app.models.visit import Visit
+    from app.services.telegram_staff_action_adapter_service import (
+        TelegramStaffActionAdapterService,
+    )
+
+    visit_id, s, new_date = _stamp_and_reschedule_setup(pipeline_db, make_visit)
+    try:
+        visit = s.query(Visit).filter(Visit.id == visit_id).first()
+        actor_user_id = (
+            s.query(Doctor).filter(Doctor.id == visit.doctor_id).first().user_id
+        )
+
+        service = TelegramStaffActionAdapterService(s)
+
+        class _StubQueue:
+            """The queue-link side effect is not under test here."""
+
+            def staff_move_visit_queue_link(self, db, **kwargs):
+                return {"status": "skipped", "queue_time_preserved": None}
+
+        service.queue_service = _StubQueue()
+        result = service.staff_move_visit(
+            visit_id=visit_id,
+            new_visit_date=new_date,
+            actor_user_id=actor_user_id,
+        )
+
+        assert result["success"] is True
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == new_date
+        assert (
+            row.reminder_sent_at is None
+        ), "telegram move must invalidate the stale reminder stamp"
+
+        # Cleanup: audit rows written by this call reference the shared DB.
+        s.query(AuditLog).filter(
+            AuditLog.entity_id == visit_id, AuditLog.entity_type == "visit"
+        ).delete()
+        s.commit()
+    finally:
+        s.close()
+
+
+def test_worker_failure_releases_only_own_claim(
+    pipeline_db, make_visit, monkeypatch: pytest.MonkeyPatch
+):
+    """Codex round 3 P2: the compensation must not erase a NEWER delivery's
+    stamp. If the stamp changed between our claim and our failure (reschedule
+    cleared it and another delivery re-claimed), releasing our claim is a
+    no-op and the newer stamp survives — otherwise the next job would send
+    a duplicate reminder."""
+    from datetime import datetime, timedelta, UTC
+
+    from app.models.visit import Visit
+    from app.services.notifications_pkg._reminders import RemindersMixin
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()
+    newer_stamp = datetime.now(UTC) + timedelta(minutes=1)
+
+    async def _failing_spy(self, db, vid, hours_before=24):
+        # A concurrent delivery re-claims while OUR dispatch is in flight.
+        db.query(Visit).filter(Visit.id == vid).update(
+            {"reminder_sent_at": newer_stamp}
+        )
+        db.commit()
+        return {"success": False, "error": "telegram unavailable"}
+
+    monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _failing_spy)
+
+    with pytest.raises(RuntimeError, match="Notification send failed"):
+        asyncio.run(send_visit_reminder({}, visit_id=visit_id, channel="telegram"))
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        # sqlite round-trips DATETIME as naive — compare tz-stripped; the
+        # essential assertion is that the stamp is NOT None (not erased by
+        # our compensation) and still holds the newer delivery's value.
+        assert (
+            row.reminder_sent_at is not None
+        ), "compensation must not erase a newer delivery's stamp"
+        assert row.reminder_sent_at == newer_stamp.replace(
+            tzinfo=None
+        ), f"newer stamp must survive: {row.reminder_sent_at!r}"
+    finally:
+        s.close()

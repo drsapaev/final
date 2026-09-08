@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from arq import cron
@@ -51,7 +52,7 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
     argument of this job is a hint for logging only (the service owns the
     channel decision).
     """
-    from sqlalchemy import create_engine, func, update
+    from sqlalchemy import create_engine, update
     from sqlalchemy.orm import Session
 
     from app.models.visit import Visit
@@ -61,7 +62,11 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
 
     engine = create_engine(str(settings.DATABASE_URL))
     db = Session(engine)
-    claimed = False
+    # The exact stamp value THIS job wrote. A Python-side clock keeps the
+    # value byte-identical across the write and the later equality check on
+    # every dialect (a SQL-side now() + RETURNING round-trip is fragile on
+    # SQLite, where CURRENT_TIMESTAMP is second-precision TEXT).
+    our_stamp: datetime | None = None
     try:
         # Phase 1 — short atomic claim (Codex round 2, P2): one conditional
         # UPDATE takes the idempotency stamp. The row lock lives ONLY for
@@ -73,15 +78,17 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
         # jobs can never both dispatch. The PostgreSQL race is proven by
         # tests/integration/test_reminder_pipeline_pg.py (gate_d marker);
         # the sequential contract lives in test_reminder_pipeline.py.
+        our_stamp = datetime.now(UTC)
         claim = db.execute(
             update(Visit)
             .where(Visit.id == visit_id, Visit.reminder_sent_at.is_(None))
-            .values(reminder_sent_at=func.now())
+            .values(reminder_sent_at=our_stamp)
         )
         db.commit()
         if claim.rowcount == 0:
             # Either the visit is gone or a concurrent delivery won the
             # claim — distinguish for honest logs.
+            our_stamp = None
             exists = db.query(Visit.id).filter(Visit.id == visit_id).first()
             if not exists:
                 logger.warning(
@@ -94,7 +101,6 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
                     visit_id,
                 )
             return
-        claimed = True
 
         # Phase 2 — dispatch OUTSIDE any transaction/lock. Crash-window
         # tradeoff (documented): if the worker dies after the claim commit
@@ -121,18 +127,26 @@ async def send_visit_reminder(ctx, *, visit_id: int, channel: str = "telegram") 
         )
     except Exception:
         # Rollback first — the failed service call may have left uncommitted
-        # partial state on the session. Then release OUR claim so arq's
-        # retry can re-deliver (at-least-once for in-process failures).
+        # partial state on the session. Then release ONLY OUR OWN claim:
+        # the equality predicate makes the compensation a no-op when a
+        # concurrent reschedule has cleared the stamp and a newer delivery
+        # has since claimed or successfully reminded the visit (Codex round
+        # 3, P2) — erasing their stamp would cause a duplicate reminder.
+        # (at-least-once for in-process failures; arq will retry per
+        # retry_policy.)
         db.rollback()
-        if claimed:
+        if our_stamp is not None:
             db.execute(
                 update(Visit)
-                .where(Visit.id == visit_id)
+                .where(
+                    Visit.id == visit_id,
+                    Visit.reminder_sent_at == our_stamp,
+                )
                 .values(reminder_sent_at=None)
             )
             db.commit()
         logger.exception("job.send_visit_reminder failed for visit %s", visit_id)
-        raise  # arq will retry per retry_policy
+        raise
     finally:
         db.close()
 

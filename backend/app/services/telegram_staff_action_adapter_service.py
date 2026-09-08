@@ -396,6 +396,11 @@ class TelegramStaffActionAdapterService:
 
             previous_visit_date = visit.visit_date
             visit.visit_date = new_visit_date
+            # PR-1 (Codex round 3, P1): moving a visit invalidates the
+            # reminder stamp — same contract as the HTTP/service reschedule
+            # paths; otherwise the worker's conditional claim matches zero
+            # rows and the patient gets no reminder for the new date.
+            visit.reminder_sent_at = None
             queue_result = self.queue_service.staff_move_visit_queue_link(
                 self.db,
                 visit_id=visit_id,
