@@ -90,7 +90,12 @@ def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user: User) -
 class ServiceItemRequest(BaseModel):
     service_id: int
     quantity: int = Field(default=1, ge=1)
-    custom_price: Decimal | None = None  # Для врачебного переопределения цены
+    # Codex R8 #3095 (P2): 2 десятичных знака — та же точность, что и у
+    # PostgreSQL Numeric(12,2) при сохранении. Раньше quote округлял строку
+    # до 2dp ПЕРЕД токеном, а путь сохранения аккумулировал сырое значение
+    # (1.005 → подтверждено 1.00, счёт 1.01); ограничение DTO делает обе
+    # стороны согласованными на единой точности.
+    custom_price: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
 
 
 class VisitRequest(BaseModel):
@@ -255,7 +260,8 @@ class CartQuoteItemRequest(BaseModel):
     # Codex R1 #3095 (P2): зеркало ServiceItemRequest.custom_price — иначе
     # квота считала каталоговую цену, а /registrar/cart считал инвойс по
     # врачебной переопределённой цене, и подтверждение расходилось со счётом.
-    custom_price: Decimal | None = None
+    # Codex R8 #3095 (P2): та же точность 2dp (см. ServiceItemRequest).
+    custom_price: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
 
 
 class CartQuoteRequest(BaseModel):

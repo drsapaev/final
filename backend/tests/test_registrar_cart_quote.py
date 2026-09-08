@@ -16,6 +16,7 @@ Quote endpoint переиспользует те же SSOT-хелперы, чт�
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -897,3 +898,46 @@ def test_create_cart_skips_settings_reload_when_token_validated(
         "the locked snapshot inside revalidation is the only settings read; "
         "the unlocked save-time reload is gone"
     )
+
+
+# ===================== Codex R8 #3095 (P2): ТОЧНОСТЬ custom_price =====================
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_custom_price_rejected_beyond_two_decimal_places(
+    client, db_session, admin_user, test_patient, test_doctor
+):
+    """custom_price точнее 2dp отвергается ДО вычислений (422): quote
+    округлял строку до 2dp при токенe, а путь сохранения аккумулировал
+    сырое значение и полагался на Numeric(12,2) — 1.005 подтверждался как
+    1.00, а сохранялся в счёт как 1.01. Единая точность DTO закрывает
+    расхождение, не меняя контракт для корректных 2dp-цен."""
+    service = _service(db_session, code="R8-PREC-01", price=Decimal("100"))
+
+    # custom_price с 3 знаками — отвергается схемой quote
+    quoted = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [{"service_id": service.id, "quantity": 2, "custom_price": "1.005"}],
+            "discount_mode": "none",
+            "all_free": False,
+            "pricing_mode": "cart",
+        },
+    )
+    assert quoted.status_code == 422, quoted.text
+
+    # 2dp-цена по-прежнему валидна и согласована
+    ok = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [{"service_id": service.id, "quantity": 2, "custom_price": "1.01"}],
+            "discount_mode": "none",
+            "all_free": False,
+            "pricing_mode": "cart",
+        },
+    )
+    assert ok.status_code == 200, ok.text
+    assert Decimal(str(ok.json()["total_amount"])) == Decimal("2.02")
