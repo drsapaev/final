@@ -2228,3 +2228,197 @@ def test_mobile_my_position_labels_resource_queue(db_session: Session) -> None:
         db_session.delete(patient)
         db_session.commit()
         _durable_cleanup(db_session, "pat_res21")
+
+
+# ===================== T. Codex round-10 pins =====================
+
+
+def test_display_call_patient_uses_resource_cabinet(db_session: Session) -> None:
+    """Codex round-10 P1: /display/call-patient on a resource queue
+    announces the registry owner and the queue's registry-sourced
+    cabinet — not a doctor-less «Врач» with no destination. The
+    service COMMITs — durable rows cleaned in the finally."""
+    from unittest.mock import AsyncMock
+
+    try:
+        _test_display_call_body(db_session, AsyncMock)
+    finally:
+        _durable_cleanup(db_session, "lab_res22")
+
+
+def _test_display_call_body(db_session: Session, async_mock_cls) -> None:
+    import asyncio
+
+    from app.services.display_websocket_api_service import DisplayWebSocketApiService
+
+    _make_resource(db_session, code="lab", queue_tag="lab", max_online_per_day=15)
+    resource = (
+        db_session.query(QueueResource).filter(QueueResource.queue_tag == "lab").first()
+    )
+    resource.default_cabinet = "7"
+    db_session.commit()
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+    )
+    db_session.refresh(queue)
+    assert queue.cabinet_number == "7"
+    entry = _make_waiting_entry(db_session, queue, number=31)
+
+    broadcast = async_mock_cls()
+    service = DisplayWebSocketApiService(
+        db_session,
+        manager_provider=lambda: type(
+            "M", (), {"broadcast_patient_call": broadcast, "connections": []}
+        )(),
+    )
+    admin = _make_user(db_session, username="lab_res22", role="Admin")
+    result = asyncio.run(
+        service.call_patient(entry_id=entry.id, board_ids=[], current_user=admin)
+    )
+
+    assert result["success"] is True
+    assert result["call_data"]["cabinet"] == "7"
+    assert result["call_data"]["doctor"] == "Ресурс очереди"
+    broadcast.assert_awaited_once()
+    _, kwargs = broadcast.call_args
+    assert kwargs["cabinet"] == "7"
+    assert kwargs["doctor_name"] == "Ресурс очереди"
+
+
+def test_cabinet_info_bridged_queue_classifies_resource(
+    db_session: Session,
+) -> None:
+    """Codex round-10 P2: a BRIDGED queue (the 0059 backfill shape —
+    specialist_id AND queue_resource_id both set) classifies as the
+    resource axis (the DailyQueueOut/GQL contract): the cabinet UI
+    gets resource_owned semantics, not doctor warnings."""
+    from app.api.v1.endpoints.queue_cabinet_management import QueueCabinetResponse
+    from app.services.queue_domain_service import QueueDomainService
+
+    resource = _make_resource(db_session, code="lab", queue_tag="lab")
+    resource.default_cabinet = "7"
+    db_session.commit()
+    user = _make_user(db_session, username="lab_res23", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    # the bridge: BOTH owners set (carrying the live cabinet the
+    # backfilled row would have)
+    bridged = _make_queue(
+        db_session,
+        specialist_id=synthetic.id,
+        queue_tag="lab",
+        queue_resource_id=resource.id,
+        active=True,
+    )
+    bridged.cabinet_number = "7"
+    db_session.commit()
+
+    payloads = QueueDomainService(db_session).list_queue_cabinet_info(
+        day=_DAY, specialist_id=None, cabinet_number=None
+    )
+    items = [QueueCabinetResponse(**item) for item in payloads]
+    bridged_item = next(i for i in items if i.id == bridged.id)
+    assert bridged_item.specialist_id == synthetic.id  # the bridge keeps both
+    assert bridged_item.sync_status == "resource_owned"
+    assert bridged_item.specialist_name == "Ресурс очереди"
+    assert bridged_item.effective_cabinet == "7"
+    assert "linked_doctor_missing" not in bridged_item.integrity_warnings
+
+
+def test_queue_limits_reads_surface_usage(db_session: Session) -> None:
+    """Codex round-10 P2: after the limit write lands on the resource
+    surface, the limits READS report that surface's usage and cap —
+    not zero usage with the doctor/global cap. Unique tag 'bio' keeps
+    the pin independent of leaked lab worlds. get_queue_limits reads
+    today's queues — durable rows cleaned in the finally."""
+    try:
+        _test_queue_limits_reads_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "bio_res24")
+
+
+def _test_queue_limits_reads_body(db_session: Session) -> None:
+    from app.api.v1.endpoints.queue_limits import DoctorQueueLimit
+    from app.services.queue_domain_service import QueueDomainService
+    from app.services.queue_limits_api_service import QueueLimitsApiService
+
+    user = _make_user(db_session, username="bio_res24", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="bio")
+    _make_resource(db_session, code="bio", queue_tag="bio", max_online_per_day=15)
+    today = date.today()
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=today, specialist_id=None, queue_tag="bio"
+    )
+    _make_waiting_entry(db_session, queue, number=31)
+    _make_waiting_entry(db_session, queue, number=32)
+
+    QueueLimitsApiService(db_session).set_doctor_queue_limit(
+        limit_data=DoctorQueueLimit(
+            doctor_id=synthetic.id, day=today, max_online_entries=7
+        )
+    )
+
+    blocks = {
+        block["specialty"]: block
+        for block in QueueLimitsApiService(db_session).get_queue_limits(specialty="bio")
+    }
+    bio = blocks["bio"]
+    assert bio["current_usage"] == 2  # the surface's entries
+    assert bio["aggregate_max_per_day"] == 7  # the enforced surface cap
+
+    status_rows = QueueDomainService(db_session).get_queue_limits_status(
+        day=today, specialty="bio"
+    )
+    row = next(r for r in status_rows if r["doctor_id"] == synthetic.id)
+    assert row["current_entries"] == 2
+    assert row["max_entries"] == 7
+    assert row["queue_opened"] is False
+
+
+def test_position_by_number_resolves_resource_queue(
+    db_session: Session,
+) -> None:
+    """Codex round-10 P2: GET /queue/position/by-number/{n} accepts the
+    legacy specialist id — the queue lookup resolves the (day, tag)
+    surface, so a valid resource ticket is found instead of 404. Uses
+    today's queue (the flow is today-keyed) — durable rows cleaned in
+    the finally."""
+    try:
+        _test_position_by_number_body(db_session)
+    finally:
+        _durable_cleanup(db_session, "lab_res25")
+
+
+def _test_position_by_number_body(db_session: Session) -> None:
+    from app.repositories.queue_position_api_repository import (
+        QueuePositionApiRepository,
+    )
+    from app.services.queue_position_api_service import (
+        QueuePositionApiDomainError,
+        QueuePositionApiService,
+    )
+
+    user = _make_user(db_session, username="lab_res25", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    today = date.today()
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=today, specialist_id=None, queue_tag="lab"
+    )
+    entry = _make_waiting_entry(db_session, queue, number=31)
+
+    found = QueuePositionApiRepository(db_session).get_today_queue_by_specialist(
+        specialist_id=synthetic.id, day=today
+    )
+    assert found is not None and found.id == queue.id
+
+    service = QueuePositionApiService(db_session)
+    resolved = service.get_position_entry_by_number(
+        queue_number=31, specialist_id=synthetic.id
+    )
+    assert resolved.id == entry.id
+
+    # the doctor-keyed-only lookup would have 404'd (no doctor rows)
+    with pytest.raises(QueuePositionApiDomainError):
+        service.get_position_entry_by_number(
+            queue_number=99, specialist_id=synthetic.id
+        )

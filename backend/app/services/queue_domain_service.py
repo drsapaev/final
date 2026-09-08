@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
+from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
 from app.repositories.queue_read_repository import QueueReadRepository
 from app.services.queue_service import queue_service
@@ -80,21 +81,22 @@ class QueueDomainService:
         return f"Специалист #{specialist_id}"
 
     def _build_cabinet_payload(self, queue: object) -> dict[str, Any]:
-        # QD-2C (Codex round-8 P1): resource-owned очередь (specialist
-        # NULL) — врач-ось отсутствует ПО ДИЗАЙНУ: владелец = реестр,
-        # кабинет — из QueueResource.default_cabinet (копируется при
-        # создании), sync-семантика «нет связанного врача» не является
-        # integrity-проблемой.
-        is_resource_owned = queue.specialist_id is None and getattr(
-            queue, "queue_resource_id", None
-        )
-        if is_resource_owned:
+        # QD-2C (Codex round-8 P1 / round-10 P2): resource-axis очередь
+        # (queue_resource_id — включая BRIDGED строки 0059, у которых
+        # specialist_id тоже установлен; контракт DailyQueueOut/GQL
+        # классифицирует мост как resource) — врач-ось отсутствует по
+        # дизайну: владелец = реестр, кабинет — из строки очереди
+        # (default_cabinet копируется при создании), sync-семантика
+        # «нет связанного врача» не является integrity-проблемой.
+        if getattr(queue, "queue_resource_id", None) is not None:
             resource = getattr(queue, "queue_resource", None)
             queue_cabinet = queue.cabinet_number
             return {
                 "id": queue.id,
                 "day": queue.day.isoformat(),
-                "specialist_id": None,
+                # the bridge KEEPS the doctor axis (0059 backfill shape);
+                # pure resource rows carry None
+                "specialist_id": queue.specialist_id,
                 "specialist_name": (
                     resource.display_name if resource else "Ресурс очереди"
                 ),
@@ -190,20 +192,41 @@ class QueueDomainService:
             # Preserve current runtime behavior: limits read paths resolve DailyQueue
             # by Doctor.user_id even though DailyQueue.specialist_id is modeled
             # against doctors.id.
-            daily_queue = self.read_repository.get_queue_by_specialist_day(
-                specialist_id=doctor.user_id,
-                day=day,
-            )
-
-            current_entries = 0
-            queue_opened = False
-            if daily_queue:
+            # QD-2C (Codex round-10 P2): registry-tag врач — usage/кап/
+            # открытость читаются с (day, tag)-ПОВЕРХНОСТИ (могла быть
+            # создана ресурсной после переключения), иначе отчёт
+            # показывает нулевую загрузку сразу после смены лимита.
+            # isinstance: unit-стабы могут передавать не-Session db —
+            # для них легаси-путь (их врачи не registry-теги).
+            surface = None
+            if doctor.specialty and isinstance(self.db, Session):
+                surface = (
+                    queue_resource_routing.resolve_registry_tag_queue_for_specialist(
+                        self.db, day, doctor.id, None
+                    )
+                )
+            if surface is not None:
+                daily_queue = surface
                 current_entries = self.read_repository.count_entries(
                     queue_id=daily_queue.id
                 )
                 queue_opened = daily_queue.opened_at is not None
-
-            max_entries = max_per_day_settings.get(doctor.specialty, 15)
+                max_entries = daily_queue.max_online_entries or max_per_day_settings.get(
+                    doctor.specialty, 15
+                )
+            else:
+                daily_queue = self.read_repository.get_queue_by_specialist_day(
+                    specialist_id=doctor.user_id,
+                    day=day,
+                )
+                current_entries = 0
+                queue_opened = False
+                if daily_queue:
+                    current_entries = self.read_repository.count_entries(
+                        queue_id=daily_queue.id
+                    )
+                    queue_opened = daily_queue.opened_at is not None
+                max_entries = max_per_day_settings.get(doctor.specialty, 15)
             result.append(
                 {
                     "doctor_id": doctor.id,

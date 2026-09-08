@@ -107,9 +107,22 @@ class DisplayWebSocketApiService:
         queue_entry.called_by_user_id = getattr(current_user, "id", None)
         self.repository.save()
 
-        doctor = queue_entry.queue.specialist
-        doctor_name = doctor.user.full_name if doctor and doctor.user else "Врач"
-        cabinet = doctor.cabinet if doctor else None
+        # QD-2C (Codex round-10 P1): resource/bridged очередь
+        # (queue_resource_id) — назначение вызова из оси ресурса:
+        # имя из реестра, кабинет из строки очереди (persisted
+        # default_cabinet / админ-override) с фолбэком на реестр;
+        # иначе вызванному пациенту не сообщается кабинет.
+        queue = queue_entry.queue
+        if getattr(queue, "queue_resource_id", None) is not None:
+            resource = getattr(queue, "queue_resource", None)
+            doctor_name = resource.display_name if resource is not None else "Врач"
+            cabinet = queue.cabinet_number or (
+                resource.default_cabinet if resource is not None else None
+            )
+        else:
+            doctor = queue.specialist
+            doctor_name = doctor.user.full_name if doctor and doctor.user else "Врач"
+            cabinet = doctor.cabinet if doctor else None
 
         manager = self._manager_provider()
         await manager.broadcast_patient_call(

@@ -8,6 +8,9 @@ from datetime import UTC, date, datetime
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import get_queue_settings, update_queue_settings
+from app.crud.queue_resource_routing import (
+    resolve_registry_tag_queue_for_specialist,
+)
 from app.repositories.queue_api_repository import QueueApiRepository
 from app.repositories.queue_limits_repository import QueueLimitsRepository
 
@@ -50,12 +53,29 @@ class QueueLimitsApiService:
                 # supports that) — enumerate ALL of them, both for usage
                 # and for the aggregate capacity; get_daily_queue would
                 # silently pick only the lowest-id row.
-                queues = self.repository.list_active_daily_queues(
-                    day=today,
-                    specialist_id=doctor.id,
-                )
+                # QD-2C (Codex round-10 P2): registry-tag врач — usage и
+                # кап читаются с (today, tag)-ПОВЕРХНОСТИ (ресурсной
+                # очереди, куда пишут и joins, и лимит-райтер), а не с
+                # doctor-keyed строк; иначе отчёт показывает нулевую
+                # загрузку сразу после смены лимита. isinstance:
+                # unit-стабы могут передавать не-Session db — для них
+                # легаси-путь (repository без поверхности).
+                surface = None
+                if doctor.specialty and isinstance(self.db, Session):
+                    surface = resolve_registry_tag_queue_for_specialist(
+                        self.db, today, doctor.id, None
+                    )
+                if surface is not None:
+                    queues = [surface]
+                else:
+                    queues = self.repository.list_active_daily_queues(
+                        day=today,
+                        specialist_id=doctor.id,
+                    )
                 for daily_queue in queues:
-                    total_usage += self.repository.count_entries(queue_id=daily_queue.id)
+                    total_usage += self.repository.count_entries(
+                        queue_id=daily_queue.id
+                    )
                     # enforcement reads the persisted per-queue cap
                     # (check_queue_limits -> max_online_entries) — the
                     # admin aggregate must sum THAT. Falsy -> 15 mirrors

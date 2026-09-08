@@ -356,18 +356,19 @@ async def get_queues_status(
                 QueueStatusResponse(
                     doctor_id=queue.specialist_id,
                     doctor_name=(
-                        # QD-2C (Codex round-8 P1): resource-owned
-                        # очередь — владелец из реестра, ось — тег
+                        # QD-2C (Codex round-8 P1 / round-10 P2): the
+                        # resource axis — bridged rows included; the
+                        # owner is the registry display_name
                         queue.queue_resource.display_name
-                        if (
-                            queue.specialist_id is None
-                            and queue.queue_resource is not None
-                        )
+                        if queue.queue_resource_id is not None
                         else _doctor_full_name(doctor)
                     ),
                     specialty=(
                         queue.queue_tag
-                        if (queue.specialist_id is None and queue.queue_tag)
+                        if (
+                            queue.queue_resource_id is not None
+                            and queue.queue_tag
+                        )
                         else _doctor_specialty(doctor)
                     ),
                     current_number=current_number,
@@ -419,19 +420,20 @@ async def get_my_queue_position(
             result.append(
                 {
                     "queue_id": position.queue_id,
-                    # QD-2C (Codex round-9 P2): resource-owned очередь —
-                    # владелец из реестра, ось — тег (иначе «Неизвестно»)
+                    # QD-2C (Codex round-9 P2 / round-10 P2): the
+                    # resource axis — bridged rows included; the owner
+                    # is the registry display_name, the axis is the tag
                     "doctor_name": (
                         queue.queue_resource.display_name
-                        if (
-                            queue.specialist_id is None
-                            and queue.queue_resource is not None
-                        )
+                        if queue.queue_resource_id is not None
                         else _doctor_full_name(doctor)
                     ),
                     "specialty": (
                         queue.queue_tag
-                        if (queue.specialist_id is None and queue.queue_tag)
+                        if (
+                            queue.queue_resource_id is not None
+                            and queue.queue_tag
+                        )
                         else _doctor_specialty(doctor)
                     ),
                     "my_number": position.number,

@@ -364,13 +364,11 @@ def get_queue_statistics(
                 daily_queue.specialist.user.full_name
                 if (daily_queue.specialist and daily_queue.specialist.user)
                 else (
-                    # QD-2C (Codex round-6 P1): resource surface — the
-                    # registry display_name, not "Врач #None"
+                    # QD-2C (Codex round-6 P1 / round-10 P2): the resource
+                    # axis (bridged rows included) — the registry
+                    # display_name, not "Врач #None"
                     daily_queue.queue_resource.display_name
-                    if (
-                        daily_queue.specialist_id is None
-                        and daily_queue.queue_resource
-                    )
+                    if daily_queue.queue_resource_id is not None
                     else f"Врач #{specialist_id}"
                 )
             ),
@@ -517,13 +515,11 @@ def get_today_queue(
             )
             if (daily_queue.specialist and daily_queue.specialist.user)
             else (
-                # QD-2C (Codex round-6 P1): resource surface — the
-                # registry display_name, not "Врач #None"
+                # QD-2C (Codex round-6 P1 / round-10 P2): the resource
+                # axis (bridged rows included) — the registry
+                # display_name, not "Врач #None"
                 daily_queue.queue_resource.display_name
-                if (
-                    daily_queue.specialist_id is None
-                    and daily_queue.queue_resource
-                )
+                if daily_queue.queue_resource_id is not None
                 else f"Врач #{daily_queue.specialist_id}"
             )
         ),
