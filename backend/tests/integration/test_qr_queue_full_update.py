@@ -807,3 +807,124 @@ def test_full_update_all_free_preserves_paid_visit_payment_state(
     assert paid_visit.department == "cardiology"
     assert paid_visit.doctor_id == test_doctor.id
     assert entry.discount_mode == "none"
+
+
+@pytest.mark.integration
+def test_full_update_rejects_zero_quantity_before_quote_revalidation(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_service,
+    test_doctor,
+    test_daily_queue,
+):
+    """Codex R9 #3095 (P2): the documented full-update API accepts a loose
+    list[dict]. A client submitting numeric quantity: 0 used to pass token
+    revalidation (0 coerced to 1 there) while the mutation read the original
+    zero — the row was saved with quantity zero and charged 0 against a
+    one-unit quote. The command itself must be normalized/validated BEFORE
+    the token check: quantity < 1 is a loud 400 and nothing is persisted."""
+    queue = DailyQueue(
+        day=date.today(),
+        specialist_id=test_doctor.id,
+        queue_tag=f"zero-qty-{test_doctor.id}",
+        active=True,
+    )
+    db_session.add(queue)
+    db_session.commit()
+    db_session.refresh(queue)
+    entry = OnlineQueueEntry(
+        queue_id=queue.id,
+        number=9,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        source="online",
+        status="waiting",
+    )
+    db_session.add(entry)
+    db_session.commit()
+    db_session.refresh(entry)
+
+    response = client.put(
+        f"/api/v1/queue/online-entry/{entry.id}/full-update",
+        headers=registrar_auth_headers,
+        json={
+            "patient_data": {
+                "patient_name": test_patient.short_name(),
+                "phone": test_patient.phone,
+                "birth_year": 1990,
+                "address": test_patient.address,
+            },
+            "visit_type": "paid",
+            "discount_mode": "none",
+            "services": [
+                {"service_id": test_service.id, "quantity": 0},
+                {"service_id": test_service.id, "quantity": 1},
+            ],
+            "all_free": False,
+        },
+    )
+
+    assert response.status_code == 400, response.text
+    assert "не меньше 1" in response.json()["detail"]
+    # Nothing persisted: the entry is untouched by the rejected command
+    db_session.expire_all()
+    fresh = db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry.id).one()
+    assert fresh.visit_id is None
+    visits = db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count()
+    assert visits == 0, "a rejected command must not create visits"
+
+
+@pytest.mark.integration
+def test_full_update_non_numeric_quantity_rejected(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+    test_service,
+    test_doctor,
+):
+    """Non-numeric quantity is a loud 400, not a silent coercion — the same
+    normalization guards both the token check and the mutation."""
+    queue = DailyQueue(
+        day=date.today(),
+        specialist_id=test_doctor.id,
+        queue_tag=f"zero-qty-bad-{test_doctor.id}",
+        active=True,
+    )
+    db_session.add(queue)
+    db_session.commit()
+    db_session.refresh(queue)
+    entry = OnlineQueueEntry(
+        queue_id=queue.id,
+        number=10,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        source="online",
+        status="waiting",
+    )
+    db_session.add(entry)
+    db_session.commit()
+    db_session.refresh(entry)
+
+    response = client.put(
+        f"/api/v1/queue/online-entry/{entry.id}/full-update",
+        headers=registrar_auth_headers,
+        json={
+            "patient_data": {
+                "patient_name": test_patient.short_name(),
+                "phone": test_patient.phone,
+                "birth_year": 1990,
+            },
+            "visit_type": "paid",
+            "discount_mode": "none",
+            "services": [{"service_id": test_service.id, "quantity": "abc"}],
+            "all_free": False,
+        },
+    )
+
+    assert response.status_code == 400, response.text
+    assert "Некорректное количество" in response.json()["detail"]

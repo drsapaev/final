@@ -1987,6 +1987,37 @@ def full_update_online_entry(
             db, entry_id, current_user
         )
 
+        # Codex R9 #3095 (P2): normalize the COMMAND itself before token
+        # revalidation. The documented full-update API accepts a loose
+        # list[dict], so a client may submit numeric quantity: 0. Previously
+        # the token check coerced 0 → 1 while the mutation read the original
+        # zero (service_item.get('quantity', 1)) — a token quoted for one unit
+        # was accepted and the row was saved with quantity zero / charged 0.
+        # Validation and mutation now read the SAME normalized values.
+        for _svc_item in request.services or []:
+            if not isinstance(_svc_item, dict) or _svc_item.get("service_id") is None:
+                continue
+            _raw_qty = _svc_item.get("quantity", 1)
+            try:
+                _qty = int(_raw_qty) if _raw_qty is not None else 1
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Некорректное количество для услуги ID "
+                        f"{_svc_item.get('service_id')}: {_raw_qty!r}"
+                    ),
+                ) from None
+            if _qty < 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Количество услуги должно быть не меньше 1 "
+                        f"(ID {_svc_item.get('service_id')})"
+                    ),
+                )
+            _svc_item["quantity"] = _qty
+
         # Codex R4 #3095 (P1): bind the confirmed quote to the command —
         # revalidate prices BEFORE any mutation. Item-level conversion mirrors
         # the per-line int() the command stores (see total_amount accumulation).

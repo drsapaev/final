@@ -505,14 +505,40 @@ def _quote_core(
     total_amount = Decimal("0")
     items: list[CartQuoteItemResponse] = []
 
+    # Codex R9 #3095 (P2): the save path acquires ALL service row locks in ONE
+    # deterministic (sorted id) order BEFORE calculating items. When only the
+    # default pricing settings exist, the settings query locks no rows, so two
+    # concurrent token-bound saves could reach the per-item loop together and
+    # lock the same services in opposite orders — a classic lock-order
+    # deadlock; PostgreSQL aborts one save. Sorted bulk acquisition gives every
+    # transaction the same global order, so waits always form a chain, never a
+    # cycle. Behavior (prices, 404s, token) is unchanged — this only fixes HOW
+    # the locks are taken.
+    service_row_map: dict[int, Service] = {}
+    if lock_pricing_rows:
+        _lock_ids = sorted({int(item_req.service_id) for item_req in quote_req.items})
+        if _lock_ids:
+            # One FOR UPDATE scan in sorted id order = deterministic lock
+            # acquisition; the returned rows fill the identity map reused by
+            # the item loop (no second read, same transaction snapshot).
+            for _svc in (
+                db.query(Service)
+                .filter(Service.id.in_(_lock_ids))
+                .order_by(Service.id)
+                .with_for_update()
+                .all()
+            ):
+                service_row_map[int(_svc.id)] = _svc
+
     for item_req in quote_req.items:
-        service_query = db.query(Service).filter(Service.id == item_req.service_id)
-        if lock_pricing_rows:
+        if int(item_req.service_id) in service_row_map:
+            service: Service | None = service_row_map[int(item_req.service_id)]
+        else:
             # Codex R4 #3095 (P1): the save path holds the row locks to the end
             # of its transaction, so a concurrent price change cannot slip in
-            # between token revalidation and invoice calculation.
-            service_query = service_query.with_for_update()
-        service = service_query.first()
+            # between token revalidation and invoice calculation. (Quote paths
+            # without lock_pricing_rows read without FOR UPDATE.)
+            service = db.query(Service).filter(Service.id == item_req.service_id).first()
         if not service:
             raise HTTPException(
                 status_code=404,

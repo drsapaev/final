@@ -941,3 +941,74 @@ def test_custom_price_rejected_beyond_two_decimal_places(
     )
     assert ok.status_code == 200, ok.text
     assert Decimal(str(ok.json()["total_amount"])) == Decimal("2.02")
+
+
+# ===================== Codex R9 #3095 =====================
+
+
+def test_save_path_locks_service_rows_in_sorted_order(
+    client: TestClient, db_session: Session, admin_user
+):
+    """Codex R9 #3095 (P2): the save path acquires service row locks in ONE
+    deterministic (sorted id) order. With only the default pricing settings,
+    the settings query locks no rows, so two concurrent token-bound saves
+    holding the same services in opposite item orders used to reach the
+    per-item loop together and lock in opposite orders — a lock-order
+    deadlock; PostgreSQL aborted one save. The lock query must therefore be a
+    single sorted bulk acquisition, not per-item lookups in request order."""
+    from sqlalchemy import event
+
+    from app.api.v1.endpoints.registrar_wizard._cart import _quote_core
+    from app.api.v1.endpoints.registrar_wizard._helpers import (
+        CartQuoteItemRequest,
+        CartQuoteRequest,
+    )
+
+    second = _service(db_session, code="R9-LOCK-B", price=50000.00)
+    first = _service(db_session, code="R9-LOCK-A", price=70000.00)
+
+    # Items deliberately in DESCENDING id order — the lock acquisition must
+    # still happen in ascending id order. (Built BEFORE the listener: lazy
+    # refreshes of these very instances are not part of the lock contract.)
+    quote_req = CartQuoteRequest(
+        items=[
+            CartQuoteItemRequest(service_id=second.id, quantity=1),
+            CartQuoteItemRequest(service_id=first.id, quantity=2),
+        ],
+        discount_mode="none",
+        all_free=False,
+        pricing_mode="cart",
+    )
+
+    statements: list[str] = []
+
+    def _capture(conn, cursor, statement, parameters, context, executemany):
+        normalized = " ".join(statement.split())
+        if "FROM services" in normalized:
+            statements.append(normalized)
+
+    engine = db_session.get_bind()
+    event.listen(engine, "before_cursor_execute", _capture)
+    try:
+        response = _quote_core(db_session, quote_req, lock_pricing_rows=True)
+    finally:
+        event.remove(engine, "before_cursor_execute", _capture)
+
+    lock_queries = [
+        s for s in statements if "ORDER BY services.id" in s and "IN" in s
+    ]
+    assert lock_queries, (
+        "the save path must prefetch+lock all service rows in one sorted "
+        f"query; captured: {statements}"
+    )
+    # Per-item locking reads in request order are gone: the locked save path
+    # must not issue per-item equality reads on the services table at all.
+    per_item = [
+        s for s in statements if "services.id =" in s
+    ]
+    assert not per_item, (
+        "per-item service reads must not remain in the locked save path: "
+        f"{per_item}"
+    )
+    # Pricing behavior unchanged (50000×1 + 70000×2)
+    assert float(response.total_amount) == 190000
