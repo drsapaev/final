@@ -391,6 +391,151 @@ export const isPhoneDuplicateErrorMessage = (message: unknown): boolean => {
   return normalized.includes('уже существует') && normalized.includes('телефон');
 };
 
+// IDEMPOTENCY KEY (Fix C: duplicate submit / lost-response retry)
+// =====================================================================
+
+// Один логический сабмит корзины = один Idempotency-Key. При потере ответа
+// и повторной отправке с тем же ключом backend вернёт кэшированный ответ
+// (IdempotencyMiddleware), а не создаст вторую корзину.
+export const createIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `cart-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+// Codex R2 PR 3092 (P1): ключ привязан к снимку payload первой попытки.
+// Чистая гвардия: 'bind' — первая попытка (ключ + снимок), 'proceed' —
+// повтор с теми же данными (кэш backend вернёт сохранённый ответ),
+// 'block' — повтор с ИЗМЕНЁННЫМИ данными и старым ключом (backend вернёт 409,
+// оригинальный успех нельзя натянуть на новые данные).
+export type CartIdempotencyGuardAction = 'bind' | 'proceed' | 'block';
+export interface CartIdempotencyGuardArgs {
+  existingKey: string | null;
+  existingPayload: string | null;
+  payload: string;
+  newKey: string;
+}
+export interface CartIdempotencyGuardResult {
+  action: CartIdempotencyGuardAction;
+  key: string | null;
+  payload: string | null;
+}
+export const cartIdempotencyGuard = (args: CartIdempotencyGuardArgs): CartIdempotencyGuardResult => {
+  if (!args.existingKey) {
+    return { action: 'bind', key: args.newKey, payload: args.payload };
+  }
+  if (args.existingPayload != null && args.existingPayload !== args.payload) {
+    return { action: 'block', key: args.existingKey, payload: args.existingPayload };
+  }
+  return { action: 'proceed', key: args.existingKey, payload: args.existingPayload };
+};
+
+// Общие стили тостов Fix C (токены --mac-*; общий модуль = без дублирования).
+export const TOAST_WARNING_STYLE = {
+  backgroundColor: 'color-mix(in srgb, var(--mac-warning), transparent 84%)',
+  border: '1px solid color-mix(in srgb, var(--mac-warning), transparent 72%)',
+  color: 'var(--mac-text-primary)'
+} as const;
+
+export const TOAST_ERROR_STYLE = {
+  backgroundColor: 'color-mix(in srgb, var(--mac-error), transparent 84%)',
+  border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
+  color: 'var(--mac-text-primary)'
+} as const;
+
+// =====================================================================
+// CART GROUPING BY VISIT (вынесено из AppointmentWizardV2 без изменения логики)
+// =====================================================================
+
+export interface WizardCartItemLike {
+  service_id?: unknown;
+  doctor_id?: unknown;
+  quantity?: number;
+  original_queue_id?: string | number | null;
+  service_code?: string | null;
+  service_name?: string | null;
+  name?: string | null;
+  visit_date?: string;
+  visit_time?: string | null;
+  _source?: string | null;
+  [key: string]: unknown;
+}
+
+export interface GroupedVisitLike {
+  doctor_id: string | number | null;
+  services: Array<{
+    service_id?: string | number;
+    quantity?: number;
+    original_queue_id?: string | number | null;
+    service_code?: string | null;
+    service_name?: string | null;
+    _source?: string | null;
+  }>;
+  visit_date?: string;
+  visit_time?: string | null;
+  department: string;
+  notes: string | null;
+}
+
+export const groupCartItemsByVisit = (
+  items: WizardCartItemLike[],
+  getDepartmentByService: (serviceId: string | number) => string,
+): GroupedVisitLike[] => {
+  const visits: Record<string, GroupedVisitLike> = {};
+
+  // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
+  const validItems = items.filter((item) => {
+    if (!item.service_id) {
+      logger.warn('⚠️ Пропущен элемент корзины без service_id:', item);
+      return false;
+    }
+    return true;
+  });
+
+  if (validItems.length === 0) {
+    logger.warn('⚠️ Нет валидных элементов в корзине');
+    return [];
+  }
+
+  validItems.forEach((item) => {
+    // Определяем отделение для услуги
+    const department = getDepartmentByService(item.service_id as string | number);
+
+    // ✅ ИСПРАВЛЕНО: Объединяем все процедуры в один визит
+    // Все процедуры (P, C, D_PROC) должны быть в одном визите с department = 'procedures'
+    let finalDepartment = department;
+    if (department === 'procedures') {
+      finalDepartment = 'procedures'; // Все процедуры в одном отделе
+    }
+
+    // Группируем по finalDepartment + doctor_id + visit_date + visit_time
+    const key = `${finalDepartment}_${item.doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
+
+    if (!visits[key]) {
+      visits[key] = {
+        doctor_id: (item.doctor_id as string | number) || null,
+        services: [],
+        visit_date: item.visit_date,
+        visit_time: item.visit_time || null,
+        department: finalDepartment,
+        notes: null
+      };
+    }
+
+    visits[key].services.push({
+      service_id: item.service_id as string | number,
+      quantity: item.quantity,
+      original_queue_id: item.original_queue_id || null,
+      service_code: item.service_code || null,
+      service_name: item.service_name || item.name || null,
+      _source: item._source || null
+    });
+  });
+
+  return Object.values(visits);
+};
+
 // =====================================================================
 // PATIENT ID RESOLUTION
 // =====================================================================
@@ -583,6 +728,7 @@ export default {
   isPatientSelectedFromCard,
   buildInheritedPatientClearPatch,
   isPhoneDuplicateErrorMessage,
+  createIdempotencyKey,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,

@@ -213,6 +213,12 @@ import {
   isPatientSelectedFromCard,
   buildInheritedPatientClearPatch,
   isPhoneDuplicateErrorMessage,
+  // Fix C (cart atomicity): ключ идемпотентности для финального сабмита корзины.
+  createIdempotencyKey,
+  cartIdempotencyGuard,
+  groupCartItemsByVisit,
+  TOAST_WARNING_STYLE,
+  TOAST_ERROR_STYLE,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
@@ -469,6 +475,9 @@ const AppointmentWizardV2 = ({
       setActiveServiceCategory('specialists');
       setServiceSearchQuery('');
       setShowAllServices(false);
+      // Fix C: незавершённая попытка сабмита отменена закрытием — ключ сбрасываем
+      cartIdempotencyKeyRef.current = null;
+      cartIdempotencyPayloadRef.current = null;
     }
   }, [isOpen]);
 
@@ -501,6 +510,13 @@ const AppointmentWizardV2 = ({
   const phoneRef = useRef<HTMLInputElement>(null);
   const nextStepRef = useRef<() => void>(() => {});
   const handleCompleteRef = useRef<() => Promise<void>>(async () => {});
+  // Fix C: защита от повторной отправки (двойной Enter / Ctrl+Enter / клик).
+  const submitLockRef = useRef(false);
+  // Fix C: один сабмит = один Idempotency-Key (живёт до успеха/закрытия).
+  const cartIdempotencyKeyRef = useRef<string | null>(null);
+  // Codex R2 PR 3092 (P1): ключ привязан к payload первой попытки —
+  // изменённый payload со старым ключом не отправляется (409 от hash-проверки).
+  const cartIdempotencyPayloadRef = useRef<string | null>(null);
 
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
@@ -575,6 +591,9 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(STEP_PATIENT);
+    // Fix C: очистка формы отменяет текущую попытку сабмита — ключ сбрасываем
+    cartIdempotencyKeyRef.current = null;
+    cartIdempotencyPayloadRef.current = null;
     toast.success(t('misc.aw_form_cleared'));
   };
 
@@ -1417,6 +1436,9 @@ const AppointmentWizardV2 = ({
         Boolean(target && interactiveTags.includes(target.tagName)) ||
         Boolean(target?.isContentEditable);
       if (isInteractiveTarget) return;
+      // Fix C: во время обработки повторный Enter/Ctrl+Enter игнорируется —
+      // раньше двойное нажатие дважды запускало handleComplete (две корзины).
+      if (isProcessing) return;
 
       // Enter - следующий шаг (кроме textarea)
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && target?.tagName !== 'TEXTAREA') {
@@ -1433,11 +1455,27 @@ const AppointmentWizardV2 = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentStep, totalSteps]);
+  }, [isOpen, currentStep, totalSteps, isProcessing]);
 
   // ===================== ЗАВЕРШЕНИЕ =====================
 
   const handleComplete = async () => {
+    // Fix C: реентерабельный лок — повторный вызов во время обработки
+    // (двойной Enter, Enter + Ctrl+Enter, клик + Enter) игнорируется.
+    if (submitLockRef.current) {
+      logger.warn('[AppointmentWizardV2] handleComplete re-entered while processing; ignored');
+      return;
+    }
+    submitLockRef.current = true;
+    try {
+      await runHandleComplete();
+    } finally {
+      submitLockRef.current = false;
+    }
+  };
+  handleCompleteRef.current = handleComplete;
+
+  const runHandleComplete = async () => {
     if (!validateStep(currentStep)) return;
 
     // P-022 fix: previously used toast.warning/toast.info as blocking validation
@@ -1562,7 +1600,10 @@ const AppointmentWizardV2 = ({
       }
 
       // ✅ ИСПРАВЛЕНО: Сначала группируем услуги по визитам
-      let visits: unknown[] = groupCartItemsByVisit();
+      let visits: unknown[] = groupCartItemsByVisit(
+        wizardData.cart.items as Parameters<typeof groupCartItemsByVisit>[0],
+        getDepartmentByService,
+      );
       if (!visits || visits.length === 0) {
         toast.error(t('misc.aw_cart_empty_or_invalid'));
         return;
@@ -2530,34 +2571,83 @@ const AppointmentWizardV2 = ({
         notes: wizardData.cart.notes
       };
 
-      // Создаём корзину визитов
-      // UX Audit Stage 3 (Wizard issue 5.1):
-      // Заменён raw fetch() POST на createRegistrarCart() из api/patients.
-      // createRegistrarCart бросает Error с .status, .message, .response при неудаче.
+      // Создаём корзину визитов (createRegistrarCart бросает Error с .status).
       let result;
       try {
-        result = await createRegistrarCart(cartData);
+        // Fix C + Codex R2 PR 3092 (P1): один сабмит = один ключ + снимок
+        // payload; изменённые данные со старым ключом запрещены (409).
+        const idemGuard = cartIdempotencyGuard({
+          existingKey: cartIdempotencyKeyRef.current,
+          existingPayload: cartIdempotencyPayloadRef.current,
+          payload: JSON.stringify(cartData),
+          newKey: createIdempotencyKey(),
+        });
+        if (idemGuard.action === 'block') {
+          logger.warn('Fix C (Codex R2): payload changed after the failed attempt');
+          toast.error(t('misc.aw_cart_retry_payload_changed'), { style: TOAST_WARNING_STYLE });
+          return; // НЕ отправляем: запись могла быть уже создана
+        }
+        cartIdempotencyKeyRef.current = idemGuard.key;
+        cartIdempotencyPayloadRef.current = idemGuard.payload;
+        result = await createRegistrarCart(cartData, { idempotencyKey: idemGuard.key as string });
+        cartIdempotencyKeyRef.current = null; // успех — ключ отработал
+        cartIdempotencyPayloadRef.current = null;
       } catch (cartError: unknown) {
         // Обработка ошибок создания корзины
-        const cartErr = cartError as Error & { status?: number; message?: string };
+        const cartErr = cartError as Error & {
+          status?: number;
+          message?: string;
+          response?: { data?: { code?: string; detail?: string } };
+        };
         let errorMessage = cartErr.message || t('misc.aw_record_creation_error_status', { status: cartErr.status || 'network' });
         const isPermissionError = cartErr.status === 403;
 
         logger.error('❌ Ошибка создания корзины:', cartErr.status, errorMessage);
 
+        // Codex R11 PR 3092 (P2): 409 двух родов: IN-FLIGHT — повтор с тем же
+        // ключом вернёт закоммиченный ответ; UNCERTAIN-OUTCOME — осмысленная
+        // сверка с рабочим списком и ротация ключа только после согласия.
+        const backendCode = cartErr.response?.data?.code;
+        if (cartErr.status === 409 && backendCode === 'idempotency_uncertain_outcome') {
+          const reconciled = await confirm({
+            title: t('misc.aw_idem_uncertain_title'),
+            message: t('misc.aw_idem_uncertain_message'),
+            confirmLabel: t('misc.aw_idem_uncertain_confirm'),
+            cancelLabel: t('misc.aw_idem_uncertain_cancel'),
+            intent: 'danger',
+          });
+          if (reconciled) {
+            logger.warn('Fix C (Codex R11): reconciled — rotating the idempotency key');
+            cartIdempotencyKeyRef.current = null;
+            cartIdempotencyPayloadRef.current = null;
+            toast.info(t('misc.aw_idem_key_released'), { style: TOAST_WARNING_STYLE });
+          }
+          return; // НЕ закрываем мастер: ключ разведён, корзина сохранена
+        }
+
+        // Codex R3/R8 PR 3092 (P2): definitive 4xx (кроме 409 и 403) доказывает
+        // не-коммит — ключ освобождается для исправленного ретрая. Неоднозначные
+        // исходы (сеть/таймаут/5xx/409/403) удерживают привязку: 403 несёт
+        // ЗАКОММИЧЕННЫЙ снапшот, очистка ключа дала бы дубликат.
+        const definitiveNonCommit =
+          typeof cartErr.status === 'number' &&
+          cartErr.status >= 400 &&
+          cartErr.status < 500 &&
+          cartErr.status !== 409 &&
+          cartErr.status !== 403;
+        if (definitiveNonCommit) {
+          logger.log('Fix C (Codex R3): definitive non-commit response — releasing the bound idempotency key for a corrected retry');
+          cartIdempotencyKeyRef.current = null;
+          cartIdempotencyPayloadRef.current = null;
+        }
+
         if (isPermissionError) {
           if (errorMessage.includes('Not enough permissions')) {
             errorMessage = t('misc.aw_no_permissions');
           }
-          toast.error(errorMessage, {
-            style: {
-              backgroundColor: 'color-mix(in srgb, var(--mac-error), transparent 84%)',
-              border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
-              color: 'var(--mac-text-primary)'
-            }
-          });
-          // Закрываем мастер при ошибке прав доступа
-          onClose?.();
+          toast.error(errorMessage, { style: TOAST_ERROR_STYLE });
+          // Codex R12 PR 3092 (P2): НЕ закрываем мастер на 403 — close-эффект очистил бы
+          // recovery-refs; реплей после восстановления роли, новый ключ дублировал бы корзину.
         } else {
           toast.error(t('misc.aw_record_creation_error', { message: errorMessage }));
         }
@@ -2594,77 +2684,7 @@ const AppointmentWizardV2 = ({
       setIsProcessing(false);
     }
   };
-  handleCompleteRef.current = handleComplete;
-
-  // Группировка элементов корзины по визитам
-  const groupCartItemsByVisit = (): unknown[] => {
-    const visits: Record<string, {
-      doctor_id: string | number | null;
-      services: Array<{
-        service_id?: string | number;
-        quantity?: number;
-        original_queue_id?: string | number | null;
-        service_code?: string | null;
-        service_name?: string | null;
-        _source?: string | null;
-      }>;
-      visit_date?: string;
-      visit_time?: string | null;
-      department: string;
-      notes: string | null;
-    }> = {};
-
-    // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
-    const validItems = wizardData.cart.items.filter((item) => {
-      if (!(item as { service_id?: string | number }).service_id) {
-        logger.warn('⚠️ Пропущен элемент корзины без service_id:', item);
-        return false;
-      }
-      return true;
-    });
-
-    if (validItems.length === 0) {
-      logger.warn('⚠️ Нет валидных элементов в корзине');
-      return [] as unknown[];
-    }
-
-    validItems.forEach((item) => {
-      // Определяем отделение для услуги
-      const department = getDepartmentByService((item as { service_id?: string | number }).service_id as string | number);
-
-      // ✅ ИСПРАВЛЕНО: Объединяем все процедуры в один визит
-      // Все процедуры (P, C, D_PROC) должны быть в одном визите с department = 'procedures'
-      let finalDepartment = department;
-      if (department === 'procedures') {
-        finalDepartment = 'procedures'; // Все процедуры в одном отделе
-      }
-
-      // Группируем по finalDepartment + doctor_id + visit_date + visit_time
-      const key = `${finalDepartment}_${(item as { doctor_id?: string | number }).doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
-
-      if (!visits[key]) {
-        visits[key] = {
-          doctor_id: (item as { doctor_id?: string | number }).doctor_id || null,
-          services: [],
-          visit_date: item.visit_date,
-          visit_time: item.visit_time || null,
-          department: finalDepartment,
-          notes: null
-        };
-      }
-
-      visits[key].services.push({
-        service_id: (item as { service_id?: string | number }).service_id,
-        quantity: item.quantity,
-        original_queue_id: item.original_queue_id || null,
-        service_code: item.service_code || null,
-        service_name: (item as { service_name?: string }).service_name || item.name || null,
-        _source: item._source || null
-      });
-    });
-
-    return Object.values(visits);
-  };
+  // (handleCompleteRef.current назначается после обёртки Fix C выше)
 
   const getDepartmentByService = (serviceId: string | number) => {
     // ✅ ИСПРАВЛЕНО: Проверка на null/undefined перед поиском
