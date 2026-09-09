@@ -819,3 +819,22 @@ def test_edit_delta_optimistic_locking_rejects_deleted_entry(
 
     assert response.status_code == 400, response.text
     assert "удалена" in response.json()["detail"]
+
+
+def test_decrease_guard_locks_the_visit_row():
+    """Codex R15 #3115 (P1): гвард снижения читает визит FOR UPDATE — то же
+    плечо синхронизации, что кассовый платёж
+    (PaymentInvariantService._load_visit_for_update). Без лока платёж мог
+    закоммитить оплату по старому количеству в окне до коммита снижения."""
+    import inspect
+
+    import app.services.registrar_edit_delta_service as svc
+
+    source = inspect.getsource(svc.RegistrarEditDeltaService._assert_decrease_allowed)
+    assert "with_for_update()" in source, (
+        "the decrease guard must read the visit FOR UPDATE so a concurrent "
+        "cashier payment cannot commit against the pre-reduction quantity"
+    )
+    assert "populate_existing()" in source, (
+        "the locked read must refresh the visit state (populate_existing)"
+    )

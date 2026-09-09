@@ -189,16 +189,19 @@ export async function applyRegistrarEditDelta({
   existingQueueEntryIds = [],
   // R-08 fix: optimistic locking — map of entry_id → ISO updated_at string.
   expectedEntryUpdatedAt = null,
+  // Codex R4 PR 3095 (P1): привязка подтверждённой edit-квоты к команде.
+  quoteToken = null,
 }: {
   patientId: string | number;
   targetDate: string;
   patientData?: Record<string, unknown> | null;
-  services: Array<{ service_id: string | number; quantity?: unknown; specialist_id?: string | number | null }>;
+  services: Array<{ service_id: string | number; quantity?: unknown; specialist_id?: string | number | null; queue_entry_id?: string | number | null }>;
   paymentMethod?: string;
   discountMode?: string;
   allFree?: boolean;
   existingQueueEntryIds?: Array<string | number>;
   expectedEntryUpdatedAt?: Record<string, string> | null;
+  quoteToken?: string | null;
 }): Promise<QueueActionResponse> {
   const payload: Record<string, unknown> = {
     patient_id: Number(patientId),
@@ -213,6 +216,14 @@ export async function applyRegistrarEditDelta({
       specialist_id: service.specialist_id === null || service.specialist_id === undefined
         ? null
         : Number(service.specialist_id),
+      // Codex R10 #3115 (P1): идентичность исходной записи позиции доходит до
+      // API — иначе backend при одном service_id под разными врачами/записями
+      // мутирует «ближайшую» запись по глобальному preferred-набору, а не ту,
+      // которую редактирует регистратор (buildEditDeltaTargetItems её уже
+      // проставляет). Отсутствует → null: глобальный контракт без изменений.
+      queue_entry_id: service.queue_entry_id === null || service.queue_entry_id === undefined
+        ? null
+        : Number(service.queue_entry_id),
     })),
     existing_queue_entry_ids: (existingQueueEntryIds || [])
       .filter((id) => id !== null && id !== undefined && id !== '')
@@ -221,6 +232,10 @@ export async function applyRegistrarEditDelta({
   // R-08 fix: add optimistic locking map if provided
   if (expectedEntryUpdatedAt && typeof expectedEntryUpdatedAt === 'object') {
     payload.expected_entry_updated_at = expectedEntryUpdatedAt;
+  }
+  // Codex R4 PR 3095 (P1): привязка подтверждённой edit-квоты
+  if (quoteToken) {
+    payload.quote_token = quoteToken;
   }
   const response = await api.post('/registrar/cart/edit-delta', payload);
   return mapQueueActionResponseDto(response.data as Record<string, unknown>);
@@ -240,6 +255,7 @@ export async function updateOnlineQueueEntry({
   services,
   allFree = false,
   aggregatedIds = null,
+  quoteToken = null,
 }: {
   entryId: string | number;
   patientData: Record<string, unknown> | null;
@@ -248,6 +264,7 @@ export async function updateOnlineQueueEntry({
   services: Array<{ service_id: string | number; quantity?: unknown }>;
   allFree?: boolean;
   aggregatedIds?: Array<string | number> | null;
+  quoteToken?: string | null;
 }): Promise<QueueActionResponse> {
   const payload = {
     patient_data: patientData,
@@ -259,6 +276,8 @@ export async function updateOnlineQueueEntry({
     })),
     all_free: allFree,
     aggregated_ids: aggregatedIds,
+    // Codex R4 PR 3095 (P1): привязка подтверждённой full-update квоты
+    ...(quoteToken ? { quote_token: quoteToken } : {}),
   };
   const response = await api.put(
     `/queue/online-entry/${Number(entryId)}/full-update`,

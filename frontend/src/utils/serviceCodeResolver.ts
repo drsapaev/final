@@ -414,7 +414,18 @@ export function normalizeServicesFromInitialData(initialData: Record<string, unk
             return Boolean(serviceName && queueName && serviceName === queueName);
         });
 
-        if (!match) return null;
+        // Codex R10 PR 3118 (P1): у обычной записи очереди (adaptQueueEntry)
+        // identity записи живёт ТОЛЬКО на верхнем уровне initialData
+        // (queue_entry_id); ни сгенерированные queue_numbers, ни
+        // service_details из read-модели не копируют его на каждую услугу.
+        // Без fallback все позиции нормализуются без original_queue_id и
+        // правка количества блокировалась как unroutable. Все услуги записи
+        // принадлежат одной записи очереди → верхнеуровневый id корректен
+        // для каждой позиции; явные per-service/per-row id (выше) приоритетны.
+        if (!match) {
+            const topLevelEntryId = pickExplicitQueueEntryId(initialData);
+            return topLevelEntryId ?? null;
+        }
 
         const matchedQueue = match as Record<string, unknown>;
         const matchedQueueEntryId = pickExplicitQueueEntryId(matchedQueue);
@@ -451,6 +462,18 @@ export function normalizeServicesFromInitialData(initialData: Record<string, unk
                 key = `name:${String(item.service_name).toLowerCase()}`;
             } else {
                 return; // Пропускаем пустые
+            }
+
+            // Codex R15 #3121 (P1): одна и та же услуга в ДВУХ записях очереди —
+            // две независимые позиции корзины. Ключ только по услуге выбрасывал
+            // вторую запись ещё на нормализации: мастер показывал одну позицию,
+            // а «неизменное» сохранение трактовало скрытую как удалённую и
+            // вызывало каскад отмены её визита и счёта. Ключ несёт идентичность
+            // записи (original_queue_id/queue_entry_id); позиции без
+            // идентичности дедуплицируются как прежде — по услуге.
+            const entryIdentity = item.original_queue_id ?? item.queue_entry_id ?? null;
+            if (entryIdentity !== null && entryIdentity !== undefined && entryIdentity !== '') {
+                key = `${String(entryIdentity)}:${key}`;
             }
 
             if (!seenKeys.has(key)) {

@@ -43,7 +43,8 @@ def test_registrar_record_action_can_cancel_online_queue_entry(
     assert payload["results"][0]["record_id"] == test_queue_entry.id
 
     db_session.refresh(test_queue_entry)
-    assert test_queue_entry.status == "canceled"
+    # R14: каноническое написание статуса записи — «cancelled».
+    assert test_queue_entry.status == "cancelled"
 
 
 @pytest.mark.integration

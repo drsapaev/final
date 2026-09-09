@@ -71,7 +71,7 @@ describe('queue API', () => {
       targetDate: '2026-05-31',
       patientData: { full_name: 'Test Patient', sex: 'F' },
       services: [
-        { service_id: '7', quantity: '2', specialist_id: null },
+        { service_id: '7', quantity: '2', specialist_id: null, queue_entry_id: 777 },
         { service_id: 8, quantity: 1, specialist_id: '3' },
       ],
       existingQueueEntryIds: ['10', 11],
@@ -84,9 +84,11 @@ describe('queue API', () => {
       payment_method: 'cash',
       discount_mode: 'none',
       all_free: false,
+      // Codex R10 PR 3115 (P1): queue_entry_id (идентичность исходной записи
+      // позиции) доходит до API; отсутствие — явный null (глобальный контракт).
       services: [
-        { service_id: 7, quantity: 2, specialist_id: null },
-        { service_id: 8, quantity: 1, specialist_id: 3 },
+        { service_id: 7, quantity: 2, specialist_id: null, queue_entry_id: 777 },
+        { service_id: 8, quantity: 1, specialist_id: 3, queue_entry_id: null },
       ],
       existing_queue_entry_ids: [10, 11],
     });

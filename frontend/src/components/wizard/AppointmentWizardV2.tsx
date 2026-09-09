@@ -213,13 +213,34 @@ import {
   isPatientSelectedFromCard,
   buildInheritedPatientClearPatch,
   isPhoneDuplicateErrorMessage,
+  // Fix C (cart atomicity): ключ идемпотентности для финального сабмита корзины.
+  createIdempotencyKey,
+  cartIdempotencyGuard,
+  groupCartItemsByVisit,
+  TOAST_WARNING_STYLE,
+  TOAST_ERROR_STYLE,
+  // Fix D (trusted pricing): типы квоты + построение запроса
+  type CartQuote,
+  type CartQuoteStatus,
+  buildCartQuoteRequest,
+  buildEditOriginalServiceIdentity,
+  buildEditDeltaTargetItems,
+  describeUnroutableEditDeltaRows,
+  resolveEditRecordDate,
+  isEditDeltaNewItem,
+  resolveCartServiceReferences,
+  refreshBaselineAfterGenderHydration,
+  refreshBaselineAfterServiceResolution,
+  useWizardSearchUnmountCleanup,
+  wizardContentSignature,
+  getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
-  categories,
+  categories
 } from './wizardUtils';
 
 const AppointmentWizardV2 = ({
@@ -243,9 +264,17 @@ const AppointmentWizardV2 = ({
   const t = rawT;
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
-  // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
-  const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw;
+  // Codex R9 PR 3097 (P1): tracking «диалог открыт» — ЛОКАЛЬНО в мастере
+  // (общий useConfirm восстановлен в исходном 2-элементном контракте —
+  // ConfirmDialog в denied scope); флаг читается keydown-обработчиком через ref.
+  const [confirmBase, confirmDialog] = useConfirm();
+  // Codex R3 PR 3097 (P2): keydown-обработчик читает флаг через ref (фикс. зависимости).
+  const confirmDialogOpenRef = useRef(false);
+  const confirm = useCallback((options: Record<string, unknown>) => {
+    confirmDialogOpenRef.current = true;
+    const result = confirmBase(options);
+    return result.finally(() => { confirmDialogOpenRef.current = false; });
+  }, [confirmBase]);
 
   // ADR-0015: queue + patients APIs accessed via hooks.
   const { applyRegistrarEditDelta, createQueueEntriesBatch, updateOnlineQueueEntry } = useQueueApi();
@@ -316,6 +345,11 @@ const AppointmentWizardV2 = ({
   const [errors, setErrors] = useState({} as Record<string, unknown>);
   const [patientSuggestions, setPatientSuggestions] = useState<PatientRecord[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  // Fix F: ошибка поиска пациентов — не маскируется под «не найдено»
+  const [patientSearchError, setPatientSearchError] = useState<string | null>(null);
+  // Fix F: только самый свежий поиск/проверка телефона применяют свой ответ
+  const patientSearchSeqRef = useRef(0);
+  const phoneCheckSeqRef = useRef(0);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [isSearchingPatients, setIsSearchingPatients] = useState(false); // UX Audit Registrar #11
   const [phoneCheckTimeout, setPhoneCheckTimeout] = useState<ReturnType<typeof setTimeout> | null>(null); // ✅ Timeout для проверки телефона
@@ -350,14 +384,9 @@ const AppointmentWizardV2 = ({
         const birthDate = String(birthDateRaw ?? '');
         const initialDataPatient = (initialData.patient as { fio?: string; phone?: string; address?: string } | null | undefined) ?? {};
         const initialCartItems = (() => {
-          logger.log('📦 AppointmentWizardV2: Using SSOT normalizeServicesFromInitialData');
           const items = normalizeServicesFromInitialData(initialData, []);
-          logger.log('📦 Initialized cart with items:', items);
-          logger.log('📦 InitialData full structure:', initialData);
-
-          if (items.length > 0) {
-            logger.log(`✅ SSOT: Услуги извлечены из источника: ${items[0]._source}`);
-          }
+          // ⭐ SSOT: унифицированная функция вместо 5 разных источников
+          logger.log('📦 SSOT initialized cart:', { count: items.length, source: items[0]?._source, items });
           return items;
         })();
         setActiveServiceCategory(resolveInitialServiceCategory(initialCartItems, activeTab));
@@ -392,6 +421,29 @@ const AppointmentWizardV2 = ({
           }
         });
 
+        // Fix F (Codex R1 PR 3097): снимок исходного содержимого мастера.
+        // Предупреждение «есть несохранённые данные» показывается только
+        // когда пользователь РЕАЛЬНО изменил что-то относительно исходного
+        // состояния, а не просто открыл существующую запись (p.id больше
+        // не считается «контентом» сам по себе).
+        initialContentRef.current = wizardContentSignature({
+          patient: {
+            id: (resolveInitialPatientId(initialData) as string | number | null) ?? null,
+            fio: String(initialData.patient_fio || initialData.patient_name || initialDataPatient.fio || ''),
+            phone: formatUzbekPhoneDisplay(
+              String(initialData.phone || initialData.patient_phone || initialDataPatient.phone || '')
+            ),
+            address: String(initialData.address || initialDataPatient.address || ''),
+            birth_date: birthDate,
+            gender: normalizeGenderForForm(resolvePatientGenderValue(initialData))
+          },
+          cart: {
+            items: initialCartItems as unknown as Array<Record<string, unknown>>,
+            discount_mode: String(initialData.discount_mode || 'none'),
+            all_free: Boolean(initialData.all_free || false)
+          }
+        });
+
         // ✅ ИСПРАВЛЕНО: Синхронизация formattedBirthDate
         if (birthDate) {
           setFormattedBirthDate(convertDateFromISO(birthDate));
@@ -402,6 +454,11 @@ const AppointmentWizardV2 = ({
         setServiceSearchQuery('');
         setShowAllServices(false);
         // New appointment mode intentionally avoids persistent draft storage for patient PHI.
+        // Fix F (Codex R1 PR 3097): исходный снимок пустой формы
+        initialContentRef.current = wizardContentSignature({
+          patient: { id: null, fio: '', phone: '', address: '', birth_date: '', gender: '' },
+          cart: { items: [], discount_mode: 'none', all_free: false }
+        });
       }
     }
   }, [isOpen, editMode, initialData, activeTab]);
@@ -419,8 +476,7 @@ const AppointmentWizardV2 = ({
       if (!token) return;
 
       try {
-        // UX Audit Stage 3 (Wizard issue 5.1):
-        // Заменён raw fetch() с багом двойного префикса `/api/v1/api/v1/patients/{id}`
+        // UX Audit Stage 3 (Wizard issue 5.1): Заменён raw fetch() с багом двойного префикса `/api/v1/api/v1/patients/{id}`
         // на централизованный api.get() через getPatient().
         // Раньше было: fetch(`${API_BASE}/api/v1/patients/${patientId}`) — двойной префикс!
         const patient = await getPatient(patientId);
@@ -438,6 +494,13 @@ const AppointmentWizardV2 = ({
             }
           };
         });
+
+        // Codex R2 PR 3097: авто-гидрация пола — НЕ правка пользователя.
+        // Codex R3 PR 3097 (P2): в снимке патчится ТОЛЬКО поле gender —
+        // гидрация service_id в нём сохраняется, правки пользователя не
+        // попадают.
+        const genderBaseline = refreshBaselineAfterGenderHydration(initialContentRef.current, normalizedGender);
+        if (genderBaseline) initialContentRef.current = genderBaseline;
       } catch (error: unknown) {
         logger.warn('[AppointmentWizardV2] Failed to hydrate edit-mode patient gender', {
           patientId,
@@ -469,8 +532,27 @@ const AppointmentWizardV2 = ({
       setActiveServiceCategory('specialists');
       setServiceSearchQuery('');
       setShowAllServices(false);
+      // Fix C: незавершённая попытка сабмита отменена закрытием — ключ сбрасываем
+      cartIdempotencyKeyRef.current = null;
+      cartIdempotencyPayloadRef.current = null;
+      // Fix F: при закрытии ничего не «догоняет» форму — общий сброс поисковых состояний.
+      resetSearchInteractionState();
     }
   }, [isOpen]);
+
+  // Codex R5 PR 3097 (P2): условное размонтирование минует isOpen-эффект — гасим дебаунсы на unmount.
+  useWizardSearchUnmountCleanup(() => [searchTimeout, phoneCheckTimeout]);
+  // Codex R10 PR 3097 (P2): общий сброс активного поиска (используется clearDraft и закрытием).
+  const resetSearchInteractionState = () => {
+    patientSearchSeqRef.current += 1;
+    phoneCheckSeqRef.current += 1;
+    [searchTimeout, phoneCheckTimeout].forEach((t) => t && clearTimeout(t));
+    setSearchTimeout(null); setPhoneCheckTimeout(null);
+    setIsSearchingPatients(false);
+    setPatientSuggestions([]);
+    setShowSuggestions(false);
+    setPatientSearchError(null);
+  };
 
   // Safeguard: Ensure wizardData structure is valid
   useEffect(() => {
@@ -489,6 +571,17 @@ const AppointmentWizardV2 = ({
     }
   }, [wizardData]);
 
+  // Fix D (trusted pricing): серверная квота цен корзины — единственный
+  // достоверный источник суммы (backend — SSOT расчёта скидок).
+  const [cartQuote, setCartQuote] = useState<CartQuote | null>(null);
+  // Codex R4 PR 3095 (P2): bump → quote effect re-runs (stale-token 409
+  // invalidates the quote and immediately requests the current pricing so
+  // the registrar can reconfirm instead of resubmitting the stale amount).
+  const [quoteRefreshNonce, setQuoteRefreshNonce] = useState(0);
+  const [cartQuoteStatus, setCartQuoteStatus] = useState<CartQuoteStatus>('idle');
+  const [cartQuoteError, setCartQuoteError] = useState('');
+  const cartQuoteRequestIdRef = useRef(0);
+
   // Состояние онлайн оплаты убрано
 
   // State for Service Selection (Step 2) - Lifted up for Header
@@ -501,6 +594,18 @@ const AppointmentWizardV2 = ({
   const phoneRef = useRef<HTMLInputElement>(null);
   const nextStepRef = useRef<() => void>(() => {});
   const handleCompleteRef = useRef<() => Promise<void>>(async () => {});
+  // Fix C: защита от повторной отправки (двойной Enter / Ctrl+Enter / клик).
+  const submitLockRef = useRef(false);
+  // Fix C: один сабмит = один Idempotency-Key (живёт до успеха/закрытия).
+  const cartIdempotencyKeyRef = useRef<string | null>(null);
+  // Codex R2 PR 3092 (P1): ключ привязан к payload первой попытки —
+  // изменённый payload со старым ключом не отправляется (409 от hash-проверки).
+  const cartIdempotencyPayloadRef = useRef<string | null>(null);
+
+  // Fix F (Codex R1 PR 3097): снимок исходного содержимого мастера на момент
+  // открытия (edit-mode данные или пустая форма). Служит базой для diff'а
+  // «есть ли реально несохранённые правки» при закрытии.
+  const initialContentRef = useRef<string>('');
 
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
@@ -517,10 +622,15 @@ const AppointmentWizardV2 = ({
       return;
     }
 
+    // Fix F: применяется только самая свежая проверка телефона
+    const requestId = ++phoneCheckSeqRef.current;
+
     try {
-      // UX Audit Stage 3 (Wizard issue 5.1):
-      // Заменён raw fetch() на searchPatientsByPhone() из api/patients.
+      // UX Audit Stage 3: searchPatientsByPhone() из api/patients.
       const data = await searchPatientsByPhone(normalizedPhone) as unknown as PatientRecord[];
+      if (requestId !== phoneCheckSeqRef.current) {
+        return; // устаревший ответ
+      }
       // Если найден пациент и это не тот же самый пациент (если мы редактируем, но тут мы создаем/ищем)
       // В мастере мы всегда предполагаем, что если ID не выбран, то это новый.
       // Если ID выбран, то мы не проверяем (или проверяем, не занят ли другим).
@@ -554,6 +664,14 @@ const AppointmentWizardV2 = ({
     // Сбрасываем ошибку при изменении
     setPhoneError(null);
 
+    // Fix F (Codex R1 PR 3097): инвалидируем незавершённую проверку при ЛЮБОМ
+    // изменении номера, включая неполные/пустые значения. Прежде requestId
+    // увеличивался только при запуске новой проверки (после валидности
+    // 12 цифр), поэтому ответ по старому валидному номеру мог восстановить
+    // предупреждение о дубликате и кнопку выбора чужого пациента, пока
+    // пользователь уже стёр или исправил номер.
+    phoneCheckSeqRef.current += 1;
+
     // Дебаунс проверки
     if (phoneCheckTimeout) clearTimeout(phoneCheckTimeout);
     const timeout = setTimeout(() => checkPhoneUniqueness(formatted), 500);
@@ -575,6 +693,10 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(STEP_PATIENT);
+    resetSearchInteractionState();
+    // Fix C: очистка формы отменяет текущую попытку сабмита — ключ сбрасываем
+    cartIdempotencyKeyRef.current = null;
+    cartIdempotencyPayloadRef.current = null;
     toast.success(t('misc.aw_form_cleared'));
   };
 
@@ -584,18 +706,31 @@ const AppointmentWizardV2 = ({
 
   const searchPatients = useCallback(async (query: string) => {
     if (!query || query.length < 2) {
+      patientSearchSeqRef.current += 1; // инвалидируем незавершённые запросы
       setPatientSuggestions([]);
       setShowSuggestions(false);
+      setPatientSearchError(null);
+      // Fix F (Codex R1 PR 3097): сбрасываем и спиннер. Прежде при инвалидации
+      // короткого запроса isSearchingPatients оставался true навсегда:
+      // собственный finally устаревшего запроса уже не совпадал по requestId.
+      setIsSearchingPatients(false);
       return;
     }
 
+    // Fix F: применяется только самый свежий ответ — устаревший не затирает
+    // результаты нового запроса и не переоткрывает саджесты.
+    const requestId = ++patientSearchSeqRef.current;
+
     // UX Audit Registrar #11: loading indicator во время поиска.
     setIsSearchingPatients(true);
+    setPatientSearchError(null);
 
     try {
-      // UX Audit Stage 3 (Wizard issue 5.1):
-      // Заменён raw fetch() на searchPatientsApi() из api/patients.
+      // UX Audit Stage 3: searchPatientsApi() из api/patients.
       const data = await searchPatientsApi(query) as unknown as PatientRecord[];
+      if (requestId !== patientSearchSeqRef.current) {
+        return; // Fix F: устаревший ответ
+      }
 
       // ✅ Формируем fio из отдельных полей, если его нет
       const patientsWithFio = data.map((patient) => {
@@ -641,11 +776,20 @@ const AppointmentWizardV2 = ({
       setPatientSuggestions(sorted.slice(0, 10)); // Максимум 10 результатов
       setShowSuggestions(true);
     } catch (error: unknown) {
+      if (requestId !== patientSearchSeqRef.current) {
+        return;
+      }
+      // Fix F: ошибка поиска показывается явно (с возможностью повтора),
+      // а не выглядит как «пациенты не найдены — будет создан новый».
       logger.error('Ошибка поиска пациентов:', error);
+      setPatientSuggestions([]);
+      setPatientSearchError(t('misc.aw_search_failed'));
     } finally {
-      setIsSearchingPatients(false);
+      if (requestId === patientSearchSeqRef.current) {
+        setIsSearchingPatients(false);
+      }
     }
-  }, []);
+  }, [t]);
 
   const handlePatientSearch = (value: string) => {
     // 🚨 FIX: Сбрасываем ID при изменении текста, чтобы не было "призраков"
@@ -672,6 +816,18 @@ const AppointmentWizardV2 = ({
       setFormattedBirthDate('');
       setPhoneError(null);
     }
+    // Fix F (Codex R1 PR 3097): инвалидируем НЕМЕДЛЕННО при изменении ввода,
+    // а не только при старте дебаунс-запроса. Иначе ответ на «Ali» мог
+    // приехать в 300-мс окне после ввода «Vali», когда его requestId ещё
+    // был актуален, — и саджесты по «Ali» открывались поверх нового ввода.
+    patientSearchSeqRef.current += 1;
+    if (!value || value.trim().length < 2) {
+      // Короткий ввод: не ждём дебаунса, сразу гасим саджесты и спиннер
+      setPatientSuggestions([]);
+      setShowSuggestions(false);
+      setPatientSearchError(null);
+      setIsSearchingPatients(false);
+    }
 
     // Дебаунс поиска
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -680,6 +836,10 @@ const AppointmentWizardV2 = ({
   };
 
   const selectPatient = (patient: PatientRecord) => {
+    // Codex R5 PR 3097 (P2): выбор инвалидирует активный поиск (его finally
+    // больше не сбросит спиннер) — сбрасываем здесь.
+    patientSearchSeqRef.current += 1;
+    setIsSearchingPatients(false);
     // ✅ УПРОЩЕНО: Формируем fio из отдельных полей для отображения (Single Source of Truth)
     // Backend уже нормализует ФИО, здесь только форматируем для UI
     let patientFio = patient.fio;
@@ -724,7 +884,16 @@ const AppointmentWizardV2 = ({
     // Fix A: при явном выборе другой карточки предыдущий конфликт телефона
     // больше не актуален.
     setPhoneError(null);
+
+    // Fix F: выбор карточки отменяет незавершённый поиск — иначе отложенный
+    // ответ (debounce 300 мс) переоткрывал саджесты поверх выбранной карточки
+    if (searchTimeout) clearTimeout(searchTimeout);
+    setSearchTimeout(null);
+    patientSearchSeqRef.current += 1;
+    setPatientSuggestions([]);
     setShowSuggestions(false);
+    setPatientSearchError(null);
+
     setErrors((prev) => ({ ...prev, fio: null }));
   };
 
@@ -850,126 +1019,30 @@ const AppointmentWizardV2 = ({
   useEffect(() => {
     // ✅ ИСПРАВЛЕНО: Разрешаем услуги не только в editMode, но и когда servicesData загружены
     if (servicesData.length > 0 && wizardData.cart.items.length > 0) {
-      const unresolvedCount = wizardData.cart.items.filter((i) => !i.service_id).length;
+      // Codex R2 PR 3097: резолвинг вынесен в resolveCartServiceReferences (потолок LOC PR-45)
+      const resolution = resolveCartServiceReferences(
+        wizardData.cart.items as unknown as Array<Record<string, unknown>>,
+        servicesData as unknown as Array<Record<string, unknown>>
+      );
+      if (!resolution) return;
 
-      // ✅ НОВОЕ: Проверяем также элементы с service_id, у которых имя не совпадает с SSOT
-      const hasNameMismatches = wizardData.cart.items.some((item) => {
-        if (!(item as { service_id?: string | number }).service_id) return false;
-        const service = servicesData.find((s) => s.id === (item as { service_id?: string | number }).service_id);
-        return service && service.name && service.name !== (item as { service_name?: string }).service_name;
-      });
+      logger.log('✅ Updating cart with resolved services:', resolution.items.length);
 
-      // Если нет ни нерешённых услуг, ни несоответствий имён — выходим
-      if (unresolvedCount === 0 && !hasNameMismatches) return;
-
-      logger.log('🔍 Attempting to resolve services...', {
-        servicesDataCount: servicesData.length,
-        cartItemsCount: wizardData.cart.items.length,
-        unresolvedItems: unresolvedCount
-      });
-
-      const updatedItems = wizardData.cart.items.map((item) => {
-        // ✅ Сначала синхронизируем элементы, у которых уже есть service_id, с SSOT (servicesData)
-        if ((item as { service_id?: string | number }).service_id) {
-          const service = servicesData.find((s) => s.id === (item as { service_id?: string | number }).service_id);
-
-          if (service) {
-            const nextName = service.name || (item as { service_name?: string }).service_name;
-            const nextPrice = service.price != null ? service.price : item.service_price || 0;
-
-            // Если название или цена отличаются от SSOT — обновляем элемент
-            if (nextName !== (item as { service_name?: string }).service_name || nextPrice !== item.service_price) {
-              return {
-                ...item,
-                service_name: nextName,
-                service_price: nextPrice,
-                // ✅ ВАЖНО: Сохраняем doctor_id при обновлении
-                doctor_id: (item as { doctor_id?: string | number }).doctor_id || null
-              };
-            }
-          }
-
-          // Если service_id есть и изменений нет — возвращаем элемент без изменений
-          // ✅ ВАЖНО: Убеждаемся, что doctor_id сохранен
-          return {
-            ...item,
-            doctor_id: (item as { doctor_id?: string | number }).doctor_id || null
-          };
+      setWizardData((prev) => ({
+        ...prev,
+        cart: {
+          ...prev.cart,
+          items: resolution.items as unknown as CartItem[]
         }
+      }));
 
-        // Ищем услугу по имени или коду (которое мы сохранили в service_name или _temp_name)
-        const searchName = item._temp_name || (item as { service_name?: string }).service_name;
-        if (!searchName) {
-          logger.warn('⚠️ Item has no searchable name:', item);
-          return item;
-        }
-
-        // ✅ ИСПРАВЛЕНО: Поиск по service_code (приоритет) и по name
-        // Приводим к верхнему регистру для сравнения кодов
-        const searchNameUpper = String(searchName).toUpperCase().trim();
-        // Убираем ведущие нули для сравнения (p09 = p9)
-        const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-
-        const foundService = servicesData.find((s) => {
-          if (!s.service_code) return false;
-          const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
-          const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-
-          // Прямое сравнение
-          if (serviceCodeUpper === searchNameUpper) return true;
-          // Сравнение без ведущих нулей (p09 = p9)
-          if (serviceCodeNoZero === searchNameNoZero) return true;
-          // Поиск по названию
-          if (s.name === searchName || s.name === searchNameUpper) return true;
-          return false;
-        });
-
-        if (foundService) {
-          logger.log(`✅ Service resolved: "${searchName}" -> ID ${foundService.id} (${foundService.name})`);
-          return {
-            ...item,
-            service_id: foundService.id,
-            service_name: foundService.name, // ✅ SSOT: Сохраняем полное название из servicesData
-            service_price: foundService.price || 0,
-            _temp_name: searchName, // Сохраняем исходный код для отладки
-            // ✅ ВАЖНО: Сохраняем doctor_id при резолвинге
-            doctor_id: (item as { doctor_id?: string | number }).doctor_id || null
-          };
-        }
-
-        logger.warn(`⚠️ Service not found in servicesData: "${searchName}". Available codes:`,
-        servicesData.slice(0, 20).map((s) => `${s.service_code || 'N/A'}: ${s.name || 'N/A'}`).filter((s) => s !== 'N/A: N/A'));
-
-        return item;
-      });
-
-      // ✅ ИСПРАВЛЕНО: Проверяем изменения, включая service_name
-      const hasChanges = updatedItems.some((item, index) => {
-        const prevItem = wizardData.cart.items[index];
-        return (item as { service_id?: string | number }).service_id !== prevItem.service_id ||
-        item.service_price !== prevItem.service_price ||
-        (item as { service_name?: string }).service_name !== prevItem.service_name; // ✅ Проверяем также изменение названия
-      });
-
-      if (hasChanges) {
-        logger.log('✅ Updating cart with resolved services:', updatedItems.length);
-        // ✅ УЛУЧШЕНО: Логируем какие услуги были разрешены
-        const resolved = updatedItems.filter((item, index) => {
-          const prevItem = wizardData.cart.items[index];
-          return (item as { service_id?: string | number }).service_id !== prevItem.service_id;
-        });
-        if (resolved.length > 0) {
-          logger.log('📋 Resolved services:', resolved.map((item) => `${item._temp_name || (item as { service_name?: string }).service_name} -> ${(item as { service_name?: string }).service_name} (ID: ${(item as { service_id?: string | number }).service_id})`));
-        }
-
-        setWizardData((prev) => ({
-          ...prev,
-          cart: {
-            ...prev.cart,
-            items: updatedItems
-          }
-        }));
-      }
+      // Codex R2 PR 3097: гидрация service_id — НЕ правка пользователя.
+      // Codex R3 PR 3097 (P2): в снимок вносится ТОЛЬКО гидрированный
+      // service_id; правки пользователя (ФИО/телефон/врач/количество),
+      // сделанные, пока шёл запрос /registrar/services, в снимок не
+      // попадают — закрытие не теряет их молча.
+      const refreshedBaseline = refreshBaselineAfterServiceResolution(initialContentRef.current, resolution.items);
+      if (refreshedBaseline) initialContentRef.current = refreshedBaseline;
     }
   }, [servicesData, wizardData.cart.items]); // ✅ ИСПРАВЛЕНО: Триггерим при изменении servicesData или корзины
 
@@ -1120,6 +1193,149 @@ const AppointmentWizardV2 = ({
       isCancelled = true;
     };
   }, [isOpen, wizardData.patient.id, consultationCartItems]);
+
+  // Fix D (Codex R1 PR 3095): исходные услуги edit-записи — единый источник
+  // для сабмита и edit-квоты (см. buildEditOriginalServiceIdentity).
+  const editOriginalServiceIdentity = useMemo(
+    () => buildEditOriginalServiceIdentity(Boolean(editMode), initialData, servicesData),
+    [editMode, initialData, servicesData]
+  );
+
+  // W2-PR2: день редактируемой записи — edit-квота и edit-сабмит целились в
+  // НЕГО, а не в «сегодня» (getLocalISODate терял будущую дату записи).
+  // Backend дополнительно канонизирует день по preferred-записям.
+  const editRecordDate = useMemo(
+    () => (editMode ? resolveEditRecordDate(initialData) : null),
+    [editMode, initialData]
+  );
+
+  // Codex R2 PR 3095 (P1): маршрут команды edit-записи. QR-записи
+  // (online_queue + source=online) сабмитятся через /queue/online-entry/
+  // {id}/full-update (ПОЛНАЯ корзина, свои правила цен) — квота обязана
+  // использовать контракт этого маршрута, а не edit_delta. Предикат
+  // синхронизирован с сабмитом (handleComplete, блок hasQueueEntries).
+  const fullUpdateQuoteRoute = useMemo(() => {
+    if (!editMode || !initialData) return false;
+    const recordKind = getWizardRecordKind(initialData);
+    const sourceKind = getWizardSourceKind(initialData);
+    const effectiveSource = sourceKind || (recordKind === 'visit' || recordKind === 'appointment' ? 'desk' : 'online');
+    const isOnlineQueueEntry = recordKind === 'online_queue' && effectiveSource === 'online';
+    if (!isOnlineQueueEntry) return false;
+    const queueEntryId = resolveOnlineQueueEntryId(initialData, recordKind, effectiveSource);
+    return Boolean(queueEntryId);
+  }, [editMode, initialData]);
+
+  // ===================== FIX D: КВОТА ЦЕН КОРЗИНЫ =====================
+
+  // Любое изменение корзины/скидки инвалидирует предыдущую квоту и
+  // перезапрашивает расчёт. Только ПОСЛЕДНИЙ ответ применяется
+  // (cartQuoteRequestIdRef) — устаревший ответ не затирает новый.
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    // Fix D (Codex R1 PR 3095, P1): в edit-режиме /registrar/cart/edit-delta
+    // выставляет ТОЛЬКО новые услуги и по СВОИМ правилам (без repeat/benefit
+    // скидок, только all_free→0). Квота обязана показывать ровно то, что
+    // будет в invoice: считаем дельту тем же предикатом, что и сабмит.
+    // Codex R2 PR 3095 (P1): для QR-записей (online_queue) сабмит идёт через
+    // /queue/online-entry/{id}/full-update ПОЛНОЙ корзины — квотируем всю
+    // корзину по контракту этого маршрута (pricing_mode='full_update'),
+    // иначе repeat/benefit-консультации квотировались по полной каталоговой
+    // цене, а сохранялись бесплатно.
+    const isEditModeQuote = editMode === true;
+    const rawCartItems = (wizardData.cart.items ?? []) as Array<Record<string, unknown>>;
+    let quoteSourceItems: Array<Record<string, unknown>> = rawCartItems;
+    let quotePricingMode: 'cart' | 'edit_delta' | 'full_update' = 'cart';
+    if (isEditModeQuote && !fullUpdateQuoteRoute) {
+      quotePricingMode = 'edit_delta';
+      // W2-PR1: квота зеркалит сабмит 1-в-1 — та же buildEditDeltaTargetItems
+      // (новые услуги + изменившиеся количества существующих позиций).
+      // Раньше квотировались только новые услуги, и подтверждённая сумма
+      // игнорировала изменение количества существующей позиции.
+      const editDeltaBuild = buildEditDeltaTargetItems(
+        rawCartItems,
+        servicesData,
+        editOriginalServiceIdentity,
+      );
+      // Codex R9 PR 3118 (P1): visit-only позиции (визит без записи очереди)
+      // не маршрутизируются edit-delta — подтверждение блокируется громкой
+      // ошибкой ещё на этапе квоты, а не молча исключается из суммы.
+      if (editDeltaBuild.unroutable.length > 0) {
+        cartQuoteRequestIdRef.current += 1;
+        setCartQuote(null);
+        setCartQuoteStatus('error');
+        setCartQuoteError(describeUnroutableEditDeltaRows(editDeltaBuild.unroutable));
+        return;
+      }
+      quoteSourceItems = editDeltaBuild.items as unknown as Array<Record<string, unknown>>;
+    } else if (isEditModeQuote && fullUpdateQuoteRoute) {
+      quotePricingMode = 'full_update';
+    }
+
+    const quoteRequest = buildCartQuoteRequest(wizardData.cart, {
+      pricingMode: quotePricingMode,
+      itemsOverride: quoteSourceItems,
+      // Codex R6 PR 3095 (P2): edit-delta контекст — backend биллит в квоте
+      // ту же дельту, которую реально выставит команда (активная запись того
+      // же дня, уже содержащая услугу, биллит только недостающее количество).
+      // W2-PR2: зеркало сабмита — день редактируемой записи (не «сегодня»).
+      ...(quotePricingMode === 'edit_delta'
+        ? {
+            patientId: wizardData.patient?.id ?? null,
+            targetDate: editRecordDate ?? getLocalISODate(),
+            preferredEntryIds: Array.from(editOriginalServiceIdentity.queueIds),
+          }
+        : {}),
+    });
+    if (!quoteRequest) {
+      cartQuoteRequestIdRef.current += 1; // инвалидируем незавершённые запросы
+      if (isEditModeQuote) {
+        // Codex R2 PR 3095 (P1): пустая дельта — ВАЛИДНЫЙ edit-флоу (изменили
+        // только данные пациента или удалили услуги). Раньше квота оставалась
+        // в 'idle' и handleComplete блокировал сабмит требованием 'ready'.
+        // Нулевая готовая квота подтверждение не блокирует.
+        setCartQuote({ items: [], total_amount: 0, approval_status: 'approved' });
+        setCartQuoteStatus('ready');
+        setCartQuoteError('');
+      } else {
+        setCartQuote(null);
+        setCartQuoteStatus('idle');
+        setCartQuoteError('');
+      }
+      return;
+    }
+
+    const requestId = ++cartQuoteRequestIdRef.current;
+    setCartQuoteStatus('loading');
+
+    const timeout = setTimeout(async () => {
+      try {
+        const response = await api.post('/registrar/cart/quote', quoteRequest) as import('axios').AxiosResponse<Record<string, unknown>>;
+        if (requestId !== cartQuoteRequestIdRef.current) {
+          return; // устаревший ответ: корзина уже изменилась
+        }
+        // Codex R4 PR 3095 (P1): токен привязки сохраняется для ВСЕХ режимов —
+        // каждая команда сохранения (cart / edit-delta / full-update)
+        // переиспользует свой подтверждённый квота-токен и пере-проверяет
+        // цены на момент подтверждения.
+        setCartQuote(response.data as unknown as CartQuote);
+        setCartQuoteStatus('ready');
+        setCartQuoteError('');
+      } catch (error: unknown) {
+        if (requestId !== cartQuoteRequestIdRef.current) {
+          return;
+        }
+        logger.warn('[AppointmentWizardV2] cart quote failed', error);
+        setCartQuote(null);
+        setCartQuoteStatus('error');
+        setCartQuoteError(getErrorMessage(error) || '');
+      }
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, editRecordDate, fullUpdateQuoteRoute, quoteRefreshNonce, wizardData.patient?.id]);
 
   const repeatSuggestionSummary = useMemo(() => {
     if (!consultationCartItems.length) {
@@ -1394,11 +1610,72 @@ const AppointmentWizardV2 = ({
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
+  // ===================== ЗАКРЫТИЕ С ЗАЩИТОЙ (Fix F) =====================
+
+  // Есть ли введённый пользователем контент, который будет потерян
+  const wizardHasUserContent = (): boolean => {
+    // Fix F (Codex R1 PR 3097): «контент» больше не выводится из полей напрямую
+    // (p.id делал любую открытую в edit-mode запись «грязной» сразу после
+    // загрузки). Вместо этого текущее состояние сравнивается со снимком
+    // исходного содержимого на момент открытия мастера.
+    const p = wizardData.patient;
+    const current = wizardContentSignature({
+      patient: {
+        id: p.id ?? null,
+        fio: p.fio || '',
+        phone: p.phone || '',
+        address: p.address || '',
+        // Codex R4 PR 3097 (P2): частичная маска («01.0») живёт только в
+        // formattedBirthDate (ISO пуст) — иначе закрытие молча теряло ввод.
+        birth_date: p.birth_date || convertDateToISO(formattedBirthDate) || formattedBirthDate || '',
+        gender: p.gender || ''
+      },
+      cart: {
+        items: (wizardData.cart.items ?? []) as unknown as Array<Record<string, unknown>>,
+        discount_mode: wizardData.cart.discount_mode || 'none',
+        all_free: Boolean(wizardData.cart.all_free)
+      }
+    });
+    return current !== initialContentRef.current;
+  };
+
+  // Codex R11 PR 3097 (P2): проп isProcessing перегружен ЗАГРУЗКОЙ пациента
+  const submitInFlightRef = useRef(false);
+  const requestCloseInFlightRef = useRef(false);
+  const requestClose = async () => {
+    if (submitInFlightRef.current) return;
+    if (requestCloseInFlightRef.current) return; // без второго диалога подтверждения
+    requestCloseInFlightRef.current = true;
+
+    try {
+      if (wizardHasUserContent()) {
+        const discardConfirmed = await confirm({
+          title: t('misc.aw_discard_changes_title'),
+          message: t('misc.aw_discard_changes_message'),
+          confirmLabel: t('misc.aw_discard_changes_confirm'),
+          cancelLabel: t('misc.cancel'),
+          intent: 'danger',
+        });
+        if (!discardConfirmed) return;
+      }
+      onClose?.();
+    } finally {
+      requestCloseInFlightRef.current = false;
+    }
+  };
+
+  const requestCloseRef = useRef<() => void>(() => {});
+  requestCloseRef.current = requestClose;
+
   // ===================== ГОРЯЧИЕ КЛАВИШИ =====================
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
+      // Codex R3 PR 3097 (P2): при открытом диалоге подтверждения шорткаты
+      // принадлежат ему (иначе Enter продвигал мастер под диалогом, а второй
+      // confirm() заменял ожидающий).
+      if (confirmDialogOpenRef.current) return;
       const target = e.target as HTMLElement | null;
 
       // Ctrl+Enter — завершить: обрабатывается ДО guard'а интерактивных
@@ -1417,6 +1694,18 @@ const AppointmentWizardV2 = ({
         Boolean(target && interactiveTags.includes(target.tagName)) ||
         Boolean(target?.isContentEditable);
       if (isInteractiveTarget) return;
+      // Fix C: во время обработки повторный Enter/Ctrl+Enter игнорируется —
+      // раньше двойное нажатие дважды запускало handleComplete (две корзины).
+      if (isProcessing) return;
+
+      // Fix F: Escape закрывает мастер через СОБСТВЕННУЮ защиту
+      // (несохранённые данные → подтверждение; сохранение → блокировка).
+      // Панельный setShowWizard(false) больше не обходит эту защиту.
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        requestCloseRef.current();
+        return;
+      }
 
       // Enter - следующий шаг (кроме textarea)
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && target?.tagName !== 'TEXTAREA') {
@@ -1433,11 +1722,25 @@ const AppointmentWizardV2 = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentStep, totalSteps]);
+  }, [isOpen, currentStep, totalSteps, isProcessing]);
 
   // ===================== ЗАВЕРШЕНИЕ =====================
 
   const handleComplete = async () => {
+    // Fix C: реентерабельный лок — повторный вызов во время обработки
+    // (двойной Enter, Enter + Ctrl+Enter, клик + Enter) игнорируется.
+    if (submitLockRef.current) {
+      logger.warn('[AppointmentWizardV2] handleComplete re-entered while processing; ignored');
+      return;
+    }
+    submitLockRef.current = true;
+    try {
+      await runHandleComplete();
+    } finally {
+      submitLockRef.current = false;
+    }
+  };
+  const runHandleComplete = async () => {
     if (!validateStep(currentStep)) return;
 
     // P-022 fix: previously used toast.warning/toast.info as blocking validation
@@ -1492,18 +1795,42 @@ const AppointmentWizardV2 = ({
     // Показываем что именно будет создано — услуги, количество визитов, сумма.
     // Раньше кнопка «Завершить» сразу создавала запись без preview.
     const cartItems = wizardData.cart.items || [];
-    const totalAmount = cartItems.reduce((sum, item) => sum + (Number((item as { price?: number | string }).price) || 0), 0);
-    const serviceCount = cartItems.length;
     const doctorCount = new Set(cartItems.map((item) => (item as { doctor_id?: string | number }).doctor_id).filter(Boolean)).size;
 
-    // PR-25: itemized breakdown — show each service + doctor + price
-    const itemizedLines = cartItems.map((item) => {
-      const svcName = (item as { service_name?: string }).service_name || item.name || t('misc.aw_service_hash', { id: (item as { service_id?: string | number }).service_id });
-      const qty = Number((item as { quantity?: number }).quantity ?? 1);
-      const price = Number((item as { price?: number | string }).price) || 0;
-      const docName = (item as { doctor_name?: string }).doctor_name || ((item as { doctor_id?: string | number }).doctor_id ? t('misc.aw_doctor_hash', { id: (item as { doctor_id?: string | number }).doctor_id }) : '');
-      const priceStr = price > 0 ? `${new Intl.NumberFormat('ru-RU').format(price * qty)} ${t('misc.aw_currency_sum')}` : t('misc.aw_free');
-      return `• ${svcName}${qty > 1 ? ` ×${qty}` : ''}${docName ? ` — ${docName}` : ''} — ${priceStr}`;
+    // Fix D (trusted pricing): подтверждение показывает ТОЛЬКО серверный
+    // расчёт (квота). Раньше сумма считалась из item.price (несуществующее
+    // поле) и показывала 0 для платных услуг. Если квота не готова —
+    // завершение блокируется: недостоверную сумму показывать нельзя.
+    if (cartQuoteStatus !== 'ready' || !cartQuote) {
+      const quoteError =
+        cartQuoteStatus === 'loading'
+          ? t('misc.aw_quote_calculating')
+          : t('misc.aw_quote_error');
+      setErrors((prev) => ({ ...prev, quote: quoteError }));
+      setCurrentStep(STEP_CART);
+      return;
+    }
+    setErrors((prev) => {
+      if (!prev.quote) return prev;
+      const next = { ...prev };
+      delete next.quote;
+      return next;
+    });
+
+    const totalAmount = Number(cartQuote.total_amount) || 0;
+
+    // Itemized breakdown из квоты: услуга × количество, скидка, итог строки
+    // Codex R8 PR 3115 (P2): отрицательные значения снижения показываются СО
+    // ЗНАКОМ — «бесплатно» только для ровно нуля; otherwise the confirmation
+    // hid the invoice reduction and mispresented an adjustment as a freebie.
+    const formatQuoteAmount = (value: number) =>
+      `${new Intl.NumberFormat('ru-RU').format(value)} ${t('misc.aw_currency_sum')}`;
+    const itemizedLines = cartQuote.items.map((item) => {
+      const qty = Number(item.quantity ?? 1);
+      const finalPrice = Number(item.final_price) || 0;
+      const discountSuffix = item.discount_percent > 0 ? ` (−${item.discount_percent}%)` : '';
+      const priceStr = finalPrice !== 0 ? formatQuoteAmount(finalPrice) : t('misc.aw_free');
+      return `• ${item.service_name}${qty > 1 ? ` ×${qty}` : ''}${discountSuffix} — ${priceStr}`;
     });
 
     const summaryLines = [
@@ -1512,7 +1839,8 @@ const AppointmentWizardV2 = ({
       ...itemizedLines,
       '',
       doctorCount > 1 ? t('misc.aw_summary_doctors_count', { count: doctorCount }) : null,
-      totalAmount > 0 ? t('misc.aw_summary_total', { amount: new Intl.NumberFormat('ru-RU').format(totalAmount) }) : t('misc.aw_summary_free'),
+      totalAmount !== 0 ? t('misc.aw_summary_total', { amount: formatQuoteAmount(totalAmount) }) : t('misc.aw_summary_free'),
+      cartQuote.approval_status === 'pending' ? t('misc.aw_quote_pending_approval') : null,
     ].filter(Boolean);
 
     // UX Audit Registrar #2: window.confirm() → useConfirm hook.
@@ -1545,7 +1873,7 @@ const AppointmentWizardV2 = ({
     }
 
     setIsProcessing(true);
-
+    submitInFlightRef.current = true; // R11 PR 3097: окно сабмита открыто
     try {
       // ✅ ИСПРАВЛЕНО: Валидация корзины перед подготовкой данных
       if (!wizardData.cart.items || wizardData.cart.items.length === 0) {
@@ -1562,7 +1890,10 @@ const AppointmentWizardV2 = ({
       }
 
       // ✅ ИСПРАВЛЕНО: Сначала группируем услуги по визитам
-      let visits: unknown[] = groupCartItemsByVisit();
+      let visits: unknown[] = groupCartItemsByVisit(
+        wizardData.cart.items as Parameters<typeof groupCartItemsByVisit>[0],
+        getDepartmentByService,
+      );
       if (!visits || visits.length === 0) {
         toast.error(t('misc.aw_cart_empty_or_invalid'));
         return;
@@ -1827,8 +2158,7 @@ const AppointmentWizardV2 = ({
 
       const initialPatientSex = genderToPatientSexForApi(resolvePatientGenderValue(initialData));
       if (editMode && patientId && selectedPatientSex && selectedPatientSex !== initialPatientSex) {
-        // UX Audit Stage 3 (Wizard issue 5.1):
-        // Заменён raw fetch() PUT на updatePatient() из api/patients.
+        // UX Audit Stage 3 (Wizard issue 5.1): Заменён raw fetch() PUT на updatePatient() из api/patients.
         try {
           await updatePatient(patientId, { sex: selectedPatientSex });
           logger.log('[AppointmentWizardV2] Persisted edit-mode patient gender before submit', {
@@ -1847,9 +2177,7 @@ const AppointmentWizardV2 = ({
         }
       }
 
-      // ✅ НОВОЕ: Проверяем, редактируется ли запись в очереди (QR или desk) и есть ли новые услуги
-      // Расширено для поддержки всех типов записей: online, desk, visit, appointment
-      // ✅ ИСПРАВЛЕНО Bug 1: Добавлены явные скобки для правильного приоритета операторов
+      // Проверяем, редактируется ли запись в очереди (QR/desk/visit/appointment)
       const initialRecordKind = getWizardRecordKind(initialData);
       const initialSourceKind = getWizardSourceKind(initialData);
       const hasQueueEntries = editMode && initialData && (
@@ -1860,29 +2188,23 @@ const AppointmentWizardV2 = ({
       initialRecordKind === 'visit' ||
       initialRecordKind === 'appointment');
 
-      const originalServiceIds = new Set();
-      const originalQueueIds = new Set<string | number>(); // ✅ Moved here for availability in handleComplete
-      // PR-14: collect updated_at per queue entry for optimistic locking.
-      // Map<entryId, isoString> — passed to applyRegistrarEditDelta as
-      // expectedEntryUpdatedAt so backend can detect concurrent edits.
-      const entryUpdatedAtMap: Record<string, string> = {};
+      // Fix D (Codex R1 PR 3095): identity множеств считаются ОДИН раз через
+      // useMemo (buildEditOriginalServiceIdentity) и шарятся сабмитом и
+      // edit-квотой — квота строится из РОВНО того же edit-delta payload.
+      const editOriginalIdentity = editOriginalServiceIdentity;
+      const originalServiceIds = editOriginalIdentity.serviceIds;
+      const originalQueueIds = editOriginalIdentity.queueIds; // ✅ available throughout handleComplete
+      const entryUpdatedAtMap = editOriginalIdentity.entryUpdatedAtMap;
 
       if (hasQueueEntries) {
         // ✅ Устанавливаем source по умолчанию для записей типа visit
         const effectiveSource = initialSourceKind || (
         initialRecordKind === 'visit' || initialRecordKind === 'appointment' ? 'desk' : 'online');
 
-        // ✅ Сценарий 3: Редактирование записи в очереди (QR или desk) с добавлением новых услуг
         const recordType = effectiveSource === 'online' ? 'QR-запись' : 'ручная запись';
-        logger.log(`📝 Редактирование ${recordType}, проверяем новые услуги...`, {
+        logger.log(`📝 Редактирование ${recordType}: проверяем новые услуги`, {
           source: initialData.source,
-          source_kind: initialData.source_kind,
           effectiveSource,
-          record_type: initialData.record_type,
-          record_kind: initialData.record_kind,
-          queue_numbers: Array.isArray(initialData.queue_numbers) ? initialData.queue_numbers.length :
-          initialData.queue_numbers ? 1 : 0,
-          service_codes: Array.isArray(initialData.service_codes) ? initialData.service_codes.length : 0,
           services: Array.isArray(initialData.services) ? initialData.services.length : 0
         });
 
@@ -1930,7 +2252,9 @@ const AppointmentWizardV2 = ({
               discountMode,
               services: cartServices,
               allFree,
-              aggregatedIds // ⭐ FIX: Передаём все ID для проверки дубликатов
+              aggregatedIds, // ⭐ FIX: Передаём все ID для проверки дубликатов
+              // Codex R4 PR 3095 (P1): привязка подтверждённой full-update квоты
+              quoteToken: cartQuote?.quote_token
             });
 
             logger.log('✅ QR-запись успешно обновлена:', updateResult);
@@ -1945,221 +2269,26 @@ const AppointmentWizardV2 = ({
             // ⭐ FIX: Не продолжаем с fallback - это создавало дубликаты!
             logger.error('❌ Ошибка обновления QR-записи:', updateError);
             const errorMessage = getErrorMessage(updateError) || t('misc.aw_unknown_error');
+            // Codex R6 PR 3095 (P2): stale-quote 409 — invalidate + refetch
+            // (как в create-пути), иначе каждый retry resubmit'ит
+            // отвергнутый токен, пока регистратор не тронет корзину.
+            const updErr = updateError as Error & { status?: number; response?: { status?: number } };
+            if (updErr.status === 409 || updErr.response?.status === 409) {
+              setCartQuote(null);
+              setCartQuoteStatus('idle');
+              setQuoteRefreshNonce((n) => n + 1);
+            }
             toast.error(t('misc.aw_record_update_error', { message: errorMessage }));
             setIsProcessing(false);
             return; // ⭐ CRITICAL: Не создаём дубликаты через cart endpoint
           }
         }
 
-        // Определяем исходные услуги из initialData
-        const originalServiceCodes = new Set();
-        const originalServiceNames = new Set();
-        // originalQueueIds moved to higher scope
-
-        if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
-          logger.log('📋 Извлечение исходных услуг из service_details:', initialData.service_details);
-          initialData.service_details.forEach((serviceDetail) => {
-            if (!serviceDetail) return;
-
-            const serviceId = serviceDetail.service_id || serviceDetail.id || null;
-            const serviceCode = serviceDetail.service_code || serviceDetail.code || null;
-            const serviceName = serviceDetail.service_name || serviceDetail.name || null;
-            const queueId = resolveExplicitQueueEntryId(serviceDetail, { allowLegacyId: false });
-
-            if (serviceId) originalServiceIds.add(serviceId);
-            if (queueId) originalQueueIds.add(queueId);
-            // PR-14: collect updated_at for optimistic locking
-            if (queueId) {
-              const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || initialData.updated_at || initialData.last_changed_at;
-              if (ts) entryUpdatedAtMap[queueId] = ts;
-            }
-            if (serviceCode) originalServiceCodes.add(String(serviceCode).toUpperCase().trim());
-            if (serviceName) originalServiceNames.add(String(serviceName).toLowerCase().trim());
-          });
-        }
-
-        // ✅ ПРИОРИТЕТ 1: service_codes - наиболее надежный источник для записей типа visit
-        if (Array.isArray(initialData.service_codes) && initialData.service_codes.length > 0) {
-          logger.log('📋 Извлечение услуг из service_codes:', initialData.service_codes);
-          initialData.service_codes.forEach((code) => {
-            if (code) {
-              const normalizedCode = code.toUpperCase().trim();
-              originalServiceCodes.add(normalizedCode);
-              // Находим service_id по service_code
-              const service = servicesData.find((s) => {
-                if (!s.service_code) return false;
-                const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
-                const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                const codeNoZero = normalizedCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                return serviceCodeUpper === normalizedCode || serviceCodeNoZero === codeNoZero;
-              });
-              if (service) {
-                originalServiceIds.add(service.id);
-                originalServiceNames.add(service.name.toLowerCase().trim());
-                logger.log(`  ✅ Найден service_id=${service.id} для кода "${code}"`);
-              } else {
-                logger.warn(`  ⚠️ Услуга с кодом "${code}" не найдена в servicesData`);
-              }
-            }
-          });
-        }
-
-        // ✅ ПРИОРИТЕТ 1.5: services (если service_codes пуст) - может быть кодами
-        // ⚠️ ВАЖНО: services может содержать коды (k01, d05) или имена
-        if (originalServiceIds.size === 0 && Array.isArray(initialData.services) && initialData.services.length > 0) {
-          logger.log('📋 service_codes пуст, используем services как коды:', initialData.services);
-          initialData.services.forEach((serviceValue) => {
-            const normalizedRawValue = normalizeServiceSelectionValue(serviceValue);
-            const normalizedRawName = normalizeServiceSelectionName(serviceValue);
-
-            if (normalizedRawValue || normalizedRawName) {
-              const normalizedValue = normalizedRawValue.toUpperCase().trim();
-
-              // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
-              // ⚠️ ВАЖНО: Коды могут быть в формате 'K01', 'k01', 'K01: Название' и т.д.
-              let service = servicesData.find((s) => {
-                if (!s.service_code) return false;
-                const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
-                // Убираем ведущие нули для сравнения (k01 = k1)
-                const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-
-                // Прямое сравнение
-                if (serviceCodeUpper === normalizedValue) return true;
-                // Сравнение без ведущих нулей
-                if (serviceCodeNoZero === valueNoZero) return true;
-                // Сравнение с учетом возможного формата 'K01: Название'
-                const serviceCodeBase = serviceCodeUpper.split(':')[0].trim();
-                const valueBase = normalizedValue.split(':')[0].trim();
-                if (serviceCodeBase === valueBase) return true;
-
-                return false;
-              });
-
-              // Если не нашли по коду, пробуем по имени (fallback)
-              if (!service) {
-                const normalizedName = normalizedRawName.toLowerCase().trim();
-                service = servicesData.find((s) =>
-                s.name && s.name.toLowerCase().trim() === normalizedName
-                );
-              }
-
-              if (service) {
-                originalServiceIds.add(service.id);
-                if (service.service_code) {
-                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
-                }
-                originalServiceNames.add(service.name.toLowerCase().trim());
-                logger.log(`  ✅ Найден service_id=${service.id} для "${normalizedRawValue || normalizedRawName}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
-              } else {
-                // ✅ УЛУЧШЕНО: Показываем примеры кодов из servicesData для отладки
-                const exampleCodes = servicesData.
-                filter((s) => s.service_code).
-                slice(0, 10).
-                map((s) => `${s.service_code}: ${s.name}`).
-                join(', ');
-                logger.warn(`  ⚠️ Услуга "${normalizedRawValue || normalizedRawName || '[empty]'}" не найдена в servicesData. Примеры кодов: ${exampleCodes}`);
-              }
-            }
-          });
-        }
-
-        // ✅ ПРИОРИТЕТ 2: queue_numbers - основной источник для всех типов записей
-        if (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) {
-          logger.log('📋 Извлечение услуг из queue_numbers:', initialData.queue_numbers);
-          initialData.queue_numbers.forEach((q) => {
-            if (q && q.service_id) {
-              originalServiceIds.add(q.service_id);
-              const queueId = resolveExplicitQueueEntryId(q);
-              if (queueId) originalQueueIds.add(queueId); // ✅ Сохраняем ID записи очереди
-              // PR-14: collect updated_at for optimistic locking
-              if (queueId) {
-                const ts = q.updated_at || q.last_changed_at || initialData.updated_at || initialData.last_changed_at;
-                if (ts) entryUpdatedAtMap[queueId] = ts;
-              }
-              // Находим service_code и name по service_id
-              const service = servicesData.find((s) => s.id === q.service_id);
-              if (service) {
-                if (service.service_code) {
-                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
-                }
-                originalServiceNames.add(service.name.toLowerCase().trim());
-              }
-            }
-            if (q && q.service_code) {
-              const normalizedCode = q.service_code.toUpperCase().trim();
-              originalServiceCodes.add(normalizedCode);
-              const service = servicesData.find((s) =>
-              s.service_code && s.service_code.toUpperCase().trim() === normalizedCode
-              );
-              if (service) {
-                originalServiceIds.add(service.id);
-                originalServiceNames.add(service.name.toLowerCase().trim());
-              }
-            }
-            if (q && q.service_name) {
-              const normalizedName = q.service_name.toLowerCase().trim();
-              originalServiceNames.add(normalizedName);
-              const service = servicesData.find((s) =>
-              s.name && s.name.toLowerCase().trim() === normalizedName
-              );
-              if (service) {
-                originalServiceIds.add(service.id);
-                if (service.service_code) {
-                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
-                }
-              }
-            }
-          });
-        }
-
-        // ✅ ПРИОРИТЕТ 3: services (массив строк) - может быть кодами или именами
-        if (Array.isArray(initialData.services) && initialData.services.length > 0) {
-          logger.log('📋 Извлечение услуг из services:', initialData.services);
-          initialData.services.forEach((serviceValue) => {
-            const normalizedRawValue = normalizeServiceSelectionValue(serviceValue);
-            const normalizedRawName = normalizeServiceSelectionName(serviceValue);
-
-            if (normalizedRawValue || normalizedRawName) {
-              const normalizedValue = normalizedRawValue.toUpperCase().trim();
-              const normalizedName = normalizedRawName.toLowerCase().trim();
-
-              // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
-              let service = servicesData.find((s) => {
-                if (!s.service_code) return false;
-                const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
-                // Убираем ведущие нули для сравнения (k01 = k1)
-                const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                return serviceCodeUpper === normalizedValue || serviceCodeNoZero === valueNoZero;
-              });
-
-              // Если не нашли по коду, пробуем по имени
-              if (!service) {
-                service = servicesData.find((s) =>
-                s.name && s.name.toLowerCase().trim() === normalizedName
-                );
-              }
-
-              if (service) {
-                originalServiceIds.add(service.id);
-                if (service.service_code) {
-                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
-                }
-                originalServiceNames.add(service.name.toLowerCase().trim());
-                logger.log(`  ✅ Найден service_id=${service.id} для "${normalizedRawValue || normalizedRawName}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
-              } else {
-                logger.warn(`  ⚠️ Услуга "${normalizedRawValue || normalizedRawName || '[empty]'}" не найдена в servicesData (ни по коду, ни по имени)`);
-              }
-            }
-          });
-        }
-
-        logger.log('📋 Исходные услуги определены:', {
-          serviceIds: Array.from(originalServiceIds),
-          serviceCodes: Array.from(originalServiceCodes),
-          serviceNames: Array.from(originalServiceNames)
-        });
+        // Fix D (Codex R1 PR 3095): множества исходных услуг вынесены в
+        // buildEditOriginalServiceIdentity (wizardUtils); здесь используются
+        // те же значения, что и в edit-квоте.
+        const originalServiceCodes = editOriginalIdentity.serviceCodes;
+        const originalServiceNames = editOriginalIdentity.serviceNames;
 
         // Определяем новые услуги (которых не было в исходной записи)
         // Сначала собираем все новые услуги с doctor_id для последующей конвертации
@@ -2235,19 +2364,27 @@ const AppointmentWizardV2 = ({
         // ✅ ИСПРАВЛЕНИЕ: Проверяем наличие новых услуг (как с врачами, так и без)
         const hasNewServices = newServices.length > 0 || newServicesWithoutDoctor.length > 0;
 
-        if (editMode && hasNewServices) {
-          const editDeltaServices: Array<{ service_id: string | number; quantity?: unknown; specialist_id?: string | number | null }> = [
-            ...newServices.map((item) => ({
-              service_id: item.service_id as string | number,
-              quantity: item.quantity,
-              specialist_id: item.specialist_id as string | number
-            })),
-            ...newServicesWithoutDoctor.map((item) => ({
-              service_id: item.service_id as string | number,
-              quantity: item.quantity,
-              specialist_id: null as string | number | null
-            }))
-          ];
+        // W2-PR1: edit-delta отправляет ЦЕЛЕВОЕ СОСТОЯНИЕ корзины — новые
+        // услуги И изменившиеся количества существующих позиций (знаковая
+        // дельта на backend). Раньше существующие позиции не отправлялись
+        // вовсе: изменение количества/скидки без добавления новой услуги
+        // завершалось «успехом», обновляя только данные пациента.
+        const editDeltaBuild = buildEditDeltaTargetItems(
+          (wizardData.cart.items ?? []) as Array<Record<string, unknown>>,
+          servicesData,
+          editOriginalIdentity,
+        );
+
+        // Codex R9 PR 3118 (P1): visit-only позиции (визит без записи очереди)
+        // громко блокируют сабмит — edit-delta не маршрутизирует правку без
+        // записи очереди; включение создало бы дублирующий визит на backend.
+        if (editDeltaBuild.unroutable.length > 0) {
+          setErrors((prev) => ({ ...prev, quote: describeUnroutableEditDeltaRows(editDeltaBuild.unroutable) }));
+          setCurrentStep(STEP_CART);
+          return;
+        }
+
+        if (editMode && editDeltaBuild.items.length > 0) {
           const patientDataForEditDelta: Record<string, unknown> = {
             full_name: wizardData.patient.fio || wizardData.patient.name,
             phone: normalizedPhone,
@@ -2262,35 +2399,62 @@ const AppointmentWizardV2 = ({
           });
 
           try {
-            logger.log('[AppointmentWizardV2] edit mode with new services; applying edit delta', {
-              serviceCount: editDeltaServices.length,
+            logger.log('[AppointmentWizardV2] edit mode with service delta; applying edit delta', {
+              serviceCount: editDeltaBuild.items.length,
+              hasNew: editDeltaBuild.hasNew,
+              hasQuantityChange: editDeltaBuild.hasQuantityChange,
               existingQueueEntryIds: Array.from(originalQueueIds)
             });
             const editDeltaResult = await applyRegistrarEditDelta({
               patientId,
-              targetDate: getLocalISODate(),
+              // W2-PR2: день редактируемой записи (зеркало edit-квоты и
+              // backend-канонизации по preferred-записям) — правка будущей
+              // записи больше не переносится в «сегодня».
+              targetDate: editRecordDate ?? getLocalISODate(),
               patientData: patientDataForEditDelta,
               paymentMethod: wizardData.payment.method,
               discountMode: wizardData.cart.discount_mode,
               allFree: wizardData.cart.all_free,
-              services: editDeltaServices,
+              services: editDeltaBuild.items,
               existingQueueEntryIds: Array.from(originalQueueIds),
               // PR-14: pass optimistic-locking map so backend can detect
               // concurrent edits (last-write-wins → 409 Conflict).
               expectedEntryUpdatedAt: Object.keys(entryUpdatedAtMap).length > 0 ? entryUpdatedAtMap : null,
+              // Codex R4 PR 3095 (P1): привязка подтверждённой edit-квоты
+              quoteToken: cartQuote?.quote_token,
             });
 
             if (!editDeltaResult?.success) {
               throw new Error(editDeltaResult?.message || 'Edit delta failed');
             }
 
-            await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'edit-delta');
+            // Codex R14 PR 3121 (P1): неудача отмены удалённых записей ПОСЛЕ
+            // успешного edit-delta — частичное сохранение. Отдельный catch
+            // (не общий R6-обработчик ниже): повторы edit-delta здесь
+            // недопустимы (правка уже применена), успех/закрытие не
+            // выполняются — пользователь видит явную ошибку и открытый
+            // мастер.
+            try {
+              await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'edit-delta');
+            } catch (cancelError: unknown) {
+              logger.error('[AppointmentWizardV2] removed-entry cancellation failed after edit-delta save (partial state)', cancelError);
+              toast.error(getErrorMessage(cancelError) || t('misc.aw_record_update_failed'));
+              return;
+            }
             toast.success(t('misc.aw_record_updated_short'));
             onComplete?.(editDeltaResult);
             onClose?.();
             return;
           } catch (editDeltaError: unknown) {
             logger.error('[AppointmentWizardV2] edit delta failed', editDeltaError);
+            // Codex R6 PR 3095 (P2): stale-quote 409 — invalidate + refetch
+            // (как в create-пути), иначе retry повторяет отвергнутый токен.
+            const deltaErr = editDeltaError as Error & { status?: number; response?: { status?: number } };
+            if (deltaErr.status === 409 || deltaErr.response?.status === 409) {
+              setCartQuote(null);
+              setCartQuoteStatus('idle');
+              setQuoteRefreshNonce((n) => n + 1);
+            }
             toast.error(getErrorMessage(editDeltaError) || t('misc.aw_record_update_failed'));
             return;
           }
@@ -2475,12 +2639,10 @@ const AppointmentWizardV2 = ({
         );
 
         try {
-          // UX Audit Stage 3 (Wizard issue 5.1):
-          // Заменён raw fetch() PUT на updatePatient() из api/patients.
+          // UX Audit Stage 3 (Wizard issue 5.1): Заменён raw fetch() PUT на updatePatient() из api/patients.
           // updatePatient() бросает Error с .message и .status при неудаче.
           await updatePatient(patientId, patientUpdateData);
           logger.log('✅ Данные пациента успешно обновлены');
-          toast.success(t('misc.aw_patient_data_updated'));
 
           // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
           const currentQueueIds = new Set(
@@ -2491,11 +2653,16 @@ const AppointmentWizardV2 = ({
 
           const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
+          // Codex R14 PR 3121 (P1): отмены выполняются ДО success-тоста и
+          // onComplete — неудача (QueueEntryCancelError) уходит в общий
+          // catch ниже: без ложного успеха, без закрытия мастера, с явным
+          // сообщением о частичном сохранении.
           if (removedQueueIds.length > 0) {
             logger.log(`🗑️ Найдены удаленные записи очереди (Update Path): ${removedQueueIds.join(', ')}`);
             await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'patient-update');
           }
 
+          toast.success(t('misc.aw_patient_data_updated'));
           onComplete?.({ success: true, message: t('misc.aw_patient_data_updated') });
           onClose?.();
           return;
@@ -2527,37 +2694,98 @@ const AppointmentWizardV2 = ({
         discount_mode: wizardData.cart.discount_mode,
         payment_method: wizardData.payment.method,
         all_free: wizardData.cart.all_free,
-        notes: wizardData.cart.notes
+        notes: wizardData.cart.notes,
+        // Codex R3 PR 3095 (P1): привязка подтверждённой квоты. Backend
+        // перепроверяет цены/настройки; расхождение → 409 «подтвердите новую
+        // сумму» вместо тихого invoice на другую сумму.
+        quote_token: cartQuote?.quote_token
       };
 
-      // Создаём корзину визитов
-      // UX Audit Stage 3 (Wizard issue 5.1):
-      // Заменён raw fetch() POST на createRegistrarCart() из api/patients.
-      // createRegistrarCart бросает Error с .status, .message, .response при неудаче.
+      // Создаём корзину визитов (createRegistrarCart бросает Error с .status).
       let result;
       try {
-        result = await createRegistrarCart(cartData);
+        // Fix C + Codex R2 PR 3092 (P1): один сабмит = один ключ + снимок
+        // payload; изменённые данные со старым ключом запрещены (409).
+        const idemGuard = cartIdempotencyGuard({
+          existingKey: cartIdempotencyKeyRef.current,
+          existingPayload: cartIdempotencyPayloadRef.current,
+          payload: JSON.stringify(cartData),
+          newKey: createIdempotencyKey(),
+        });
+        if (idemGuard.action === 'block') {
+          logger.warn('Fix C (Codex R2): payload changed after the failed attempt');
+          toast.error(t('misc.aw_cart_retry_payload_changed'), { style: TOAST_WARNING_STYLE });
+          return; // НЕ отправляем: запись могла быть уже создана
+        }
+        cartIdempotencyKeyRef.current = idemGuard.key;
+        cartIdempotencyPayloadRef.current = idemGuard.payload;
+        result = await createRegistrarCart(cartData, { idempotencyKey: idemGuard.key as string });
+        cartIdempotencyKeyRef.current = null; // успех — ключ отработал
+        cartIdempotencyPayloadRef.current = null;
       } catch (cartError: unknown) {
         // Обработка ошибок создания корзины
-        const cartErr = cartError as Error & { status?: number; message?: string };
+        const cartErr = cartError as Error & {
+          status?: number;
+          message?: string;
+          response?: { data?: { code?: string; detail?: string } };
+        };
         let errorMessage = cartErr.message || t('misc.aw_record_creation_error_status', { status: cartErr.status || 'network' });
         const isPermissionError = cartErr.status === 403;
 
         logger.error('❌ Ошибка создания корзины:', cartErr.status, errorMessage);
 
+        // Codex R11 PR 3092 (P2): IN-FLIGHT 409 — повтор вернёт закоммиченный
+        // ответ; UNCERTAIN-OUTCOME — сверка с рабочим списком + ротация ключа.
+        const backendCode = cartErr.response?.data?.code;
+        if (cartErr.status === 409 && backendCode === 'idempotency_uncertain_outcome') {
+          const reconciled = await confirm({
+            title: t('misc.aw_idem_uncertain_title'),
+            message: t('misc.aw_idem_uncertain_message'),
+            confirmLabel: t('misc.aw_idem_uncertain_confirm'),
+            cancelLabel: t('misc.aw_idem_uncertain_cancel'),
+            intent: 'danger',
+          });
+          if (reconciled) {
+            logger.warn('Fix C (Codex R11): reconciled — rotating the idempotency key');
+            cartIdempotencyKeyRef.current = null;
+            cartIdempotencyPayloadRef.current = null;
+            toast.info(t('misc.aw_idem_key_released'), { style: TOAST_WARNING_STYLE });
+          }
+          return; // НЕ закрываем мастер: ключ разведён, корзина сохранена
+        }
+
+        // Codex R3/R8 PR 3092 (P2): definitive 4xx (кроме 409/403) доказывает
+        // не-коммит — ключ освобождается; неоднозначные исходы удерживают
+        // привязку (403 несёт ЗАКОММИЧЕННЫЙ снапшот — очистка дала бы дубликат).
+        const definitiveNonCommit =
+          typeof cartErr.status === 'number' &&
+          cartErr.status >= 400 &&
+          cartErr.status < 500 &&
+          cartErr.status !== 409 &&
+          cartErr.status !== 403;
+        if (definitiveNonCommit) {
+          logger.log('Fix C (Codex R3): definitive non-commit response — releasing the bound idempotency key for a corrected retry');
+          cartIdempotencyKeyRef.current = null;
+          cartIdempotencyPayloadRef.current = null;
+        }
+
+        // Codex R4 PR 3095 (P2): stale-quote 409 — invalidate the quote and
+        // immediately request the current itemized pricing, so pressing
+        // Complete reconfirms the NEW amount instead of resubmitting the
+        // stale one indefinitely.
+        if (cartErr.status === 409) {
+          setCartQuote(null);
+          setCartQuoteStatus('idle');
+          setQuoteRefreshNonce((n) => n + 1);
+        }
+
         if (isPermissionError) {
           if (errorMessage.includes('Not enough permissions')) {
             errorMessage = t('misc.aw_no_permissions');
           }
-          toast.error(errorMessage, {
-            style: {
-              backgroundColor: 'color-mix(in srgb, var(--mac-error), transparent 84%)',
-              border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
-              color: 'var(--mac-text-primary)'
-            }
-          });
-          // Закрываем мастер при ошибке прав доступа
-          onClose?.();
+          toast.error(errorMessage, { style: TOAST_ERROR_STYLE });
+          // Codex R12 PR 3092 (P2): НЕ закрываем мастер на 403 — close-эффект очистил бы
+          // recovery-refs; реплей после восстановления роли, новый ключ дублировал бы корзину.
         } else {
           toast.error(t('misc.aw_record_creation_error', { message: errorMessage }));
         }
@@ -2569,9 +2797,7 @@ const AppointmentWizardV2 = ({
       // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
       // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
 
-      toast.success(editMode ? t('misc.aw_record_updated_bang') : t('misc.aw_record_created_success'));
-
-      // ✅ НОВОЕ: Обработка удаленных записей очереди (для cart creation path)
+      // Обработка удалённых записей очереди (cart path)
       const currentQueueIds = new Set(
         wizardData.cart.items.
           map((item) => item.original_queue_id).
@@ -2580,10 +2806,16 @@ const AppointmentWizardV2 = ({
 
       const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
+      // Codex R14 PR 3121 (P1): отмены выполняются ДО success-тоста и
+      // onComplete — неудача (QueueEntryCancelError) уходит в общий catch
+      // ниже: без ложного успеха, без закрытия мастера, с явным
+      // сообщением о частичном сохранении.
       if (removedQueueIds.length > 0) {
         logger.log(`🗑️ Найдены удаленные записи очереди (Cart Path): ${removedQueueIds.join(', ')}`);
         await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'cart-update');
       }
+
+      toast.success(editMode ? t('misc.aw_record_updated_bang') : t('misc.aw_record_created_success'));
 
       onComplete?.(result);
       onClose?.();
@@ -2592,136 +2824,15 @@ const AppointmentWizardV2 = ({
       toast.error(getErrorMessage(error) || t('misc.aw_error_occurred'));
     } finally {
       setIsProcessing(false);
+      submitInFlightRef.current = false; // R11 PR 3097: закрыто на всех путях
     }
   };
   handleCompleteRef.current = handleComplete;
 
-  // Группировка элементов корзины по визитам
-  const groupCartItemsByVisit = (): unknown[] => {
-    const visits: Record<string, {
-      doctor_id: string | number | null;
-      services: Array<{
-        service_id?: string | number;
-        quantity?: number;
-        original_queue_id?: string | number | null;
-        service_code?: string | null;
-        service_name?: string | null;
-        _source?: string | null;
-      }>;
-      visit_date?: string;
-      visit_time?: string | null;
-      department: string;
-      notes: string | null;
-    }> = {};
-
-    // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
-    const validItems = wizardData.cart.items.filter((item) => {
-      if (!(item as { service_id?: string | number }).service_id) {
-        logger.warn('⚠️ Пропущен элемент корзины без service_id:', item);
-        return false;
-      }
-      return true;
-    });
-
-    if (validItems.length === 0) {
-      logger.warn('⚠️ Нет валидных элементов в корзине');
-      return [] as unknown[];
-    }
-
-    validItems.forEach((item) => {
-      // Определяем отделение для услуги
-      const department = getDepartmentByService((item as { service_id?: string | number }).service_id as string | number);
-
-      // ✅ ИСПРАВЛЕНО: Объединяем все процедуры в один визит
-      // Все процедуры (P, C, D_PROC) должны быть в одном визите с department = 'procedures'
-      let finalDepartment = department;
-      if (department === 'procedures') {
-        finalDepartment = 'procedures'; // Все процедуры в одном отделе
-      }
-
-      // Группируем по finalDepartment + doctor_id + visit_date + visit_time
-      const key = `${finalDepartment}_${(item as { doctor_id?: string | number }).doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
-
-      if (!visits[key]) {
-        visits[key] = {
-          doctor_id: (item as { doctor_id?: string | number }).doctor_id || null,
-          services: [],
-          visit_date: item.visit_date,
-          visit_time: item.visit_time || null,
-          department: finalDepartment,
-          notes: null
-        };
-      }
-
-      visits[key].services.push({
-        service_id: (item as { service_id?: string | number }).service_id,
-        quantity: item.quantity,
-        original_queue_id: item.original_queue_id || null,
-        service_code: item.service_code || null,
-        service_name: (item as { service_name?: string }).service_name || item.name || null,
-        _source: item._source || null
-      });
-    });
-
-    return Object.values(visits);
-  };
-
+  // Fix-refactor: маппинг отделения вынесен в wizardUtils (чистая функция);
+  // обёртка сохраняет существующие вызовы.
   const getDepartmentByService = (serviceId: string | number) => {
-    // ✅ ИСПРАВЛЕНО: Проверка на null/undefined перед поиском
-    if (!serviceId || serviceId === null || serviceId === undefined) {
-      logger.warn('⚠️ getDepartmentByService: serviceId is null/undefined');
-      return 'general';
-    }
-
-    const service = servicesData.find((s) => s.id === serviceId);
-
-    if (!service) {
-      logger.warn(`⚠️ Услуга ${serviceId} не найдена в servicesData`);
-      return 'general';
-    }
-
-    logger.log(`🔍 getDepartmentByService: serviceId=${serviceId}, queue_tag=${service.queue_tag}, category_code=${service.category_code}`);
-
-    // 🎯 СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЭКГ: отдельный кабинет!
-    if (service.queue_tag === 'ecg') {
-      logger.log('✅ ЭКГ обнаружено! Возвращаем department=\'echokg\'');
-      return 'echokg'; // ЭКГ в отдельном кабинете (соответствует вкладке 'echokg')
-    }
-
-    // ✅ ИСПРАВЛЕННЫЙ МАППИНГ - соответствует вкладкам RegistrarPanel
-    const mapping: Record<string, string> = {
-      'K': 'cardiology', // Кардиология → вкладка cardio (БЕЗ ЭКГ!)
-      'D': 'dermatology', // Дерматология → вкладка derma (только консультации)
-      'S': 'dentistry', // Стоматология → вкладка dental
-      'L': 'laboratory', // Лаборатория → вкладка lab
-      'P': 'procedures', // Физиотерапия → вкладка procedures
-      'C': 'procedures', // Косметология → вкладка procedures
-      'D_PROC': 'procedures', // Дерматологические процедуры → вкладка procedures
-      'O': 'procedures' // Прочие процедуры → вкладка procedures
-    };
-
-    // ✅ ИСПРАВЛЕНО Bug 2: Сначала проверяем оригинальный category_code для точного маппинга
-    // Это предотвращает неправильный маппинг дерматологии и стоматологии в кардиологию
-    if (service.category_code && mapping[service.category_code]) {
-      const result = mapping[service.category_code];
-      logger.log(`🎯 getDepartmentByService результат: serviceId=${serviceId}, category_code=${service.category_code}, department=${result} (прямой маппинг)`);
-      return result;
-    }
-
-    // ✅ Нормализация category_code как fallback
-    const normalizedCategoryCode = service.category_code ? normalizeCategoryCode(service.category_code) : '';
-
-    // ✅ ИСПРАВЛЕНИЕ: Маппинг для нормализованных кодов (только для случаев, когда нет прямого маппинга)
-    const normalizedMapping: Record<string, string> = {
-      'specialists': 'cardiology', // Консультации специалистов (только если не 'D' или 'S') -> cardiology
-      'laboratory': 'lab', // ✅ ИСПРАВЛЕНИЕ: Лаборатория -> lab (для соответствия вкладке)
-      'procedures': 'procedures', // Процедуры -> procedures
-      'other': 'general' // Прочее -> general
-    };
-
-    const result = normalizedMapping[normalizedCategoryCode] || mapping[service.category_code as string] || 'general';
-    logger.log(`🎯 getDepartmentByService результат: serviceId=${serviceId}, category_code=${normalizedCategoryCode}, department=${result}`);
-    return result;
+    return getWizardDepartmentForService(serviceId, servicesData);
   };
 
   // ===================== ДЕЙСТВИЯ ДИАЛОГА =====================
@@ -2864,7 +2975,7 @@ const AppointmentWizardV2 = ({
 
       <button
       type="button"
-      onClick={onClose}
+      onClick={requestClose}
       title={t('misc.aw_close')}
       aria-label={t('misc.aw_close')}
       style={wizardHeaderCloseStyle}
@@ -2993,7 +3104,7 @@ const AppointmentWizardV2 = ({
         {/* Кнопка закрытия */}
         <button
         type="button"
-        onClick={onClose}
+        onClick={requestClose}
         title={t('misc.aw_close')}
         aria-label="Close appointment wizard"
         style={{
@@ -3102,6 +3213,13 @@ const AppointmentWizardV2 = ({
               suggestions={patientSuggestions}
               showSuggestions={showSuggestions}
               isSearching={isSearchingPatients}
+              searchError={patientSearchError}
+              onRetrySearch={() => {
+                const query = wizardData.patient.fio;
+                if (query && query.trim().length >= 2) {
+                  void searchPatients(query);
+                }
+              }}
               onSearch={handlePatientSearch}
               onSelectPatient={selectPatient}
               onUpdate={(field: string, value: unknown) =>
@@ -3155,7 +3273,10 @@ const AppointmentWizardV2 = ({
               repeatEligibilityByItemId={repeatEligibilityByItemId}
               isRepeatEligibilityLoading={isRepeatEligibilityLoading}
               onApplyRepeatSuggestion={applyRepeatSuggestion}
-              repeatSuggestionSummary={repeatSuggestionSummary} />
+              repeatSuggestionSummary={repeatSuggestionSummary}
+              cartQuoteStatus={cartQuoteStatus}
+              cartQuoteTotal={cartQuote ? Number(cartQuote.total_amount) : null}
+              cartQuoteMessage={cartQuoteError} />
 
             }
 

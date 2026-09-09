@@ -10,9 +10,16 @@
  *   - Упрощает code review (утилиты отделены от UI-логики)
  */
 
+import { useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
+import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+// Codex R10 PR 3118 (P1): канонизация специальностей — через УСТАНОВЛЕННУЮ
+// SSOT-таблицу алиасов (doctorPanelShared), выровненную с backend
+// DOCTOR_QUEUE_SPECIALTY_VARIANTS (AGENTS.md: не допускать дрейфа SSOT между
+// маппинг-слоями doctor/queue).
+import { SPECIALTY_ALIASES } from '../../utils/doctorPanelShared';
 import { ClipboardList, FlaskConical, Stethoscope, Syringe } from 'lucide-react';
 
 // =====================================================================
@@ -38,6 +45,121 @@ export const getLocalISODate = () => {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+// =====================================================================
+// W2-PR2: КАНОНИЧЕСКАЯ ДАТА РЕДАКТИРУЕМОЙ ЗАПИСИ
+// =====================================================================
+
+/**
+ * День записи, открытой в мастере в режиме редактирования.
+ *
+ * Источник истины — read-модель: `record_date` (день очереди/визита,
+ * проставляется backend'ом в /registrar/queues/today). Fallback — дата из
+ * `queue_time` (timestamp дня очереди; и то, и другое относятся к дню
+ * записи, а не к «сегодня» на момент запроса).
+ *
+ * Раньше edit-сабмит и edit-квота шлы `targetDate: getLocalISODate()` —
+ * правка записи на будущую дату уходила в «сегодня»: визит создавался
+ * сегодня, исходная запись оставалась нетронутой (дата терялась).
+ * Backend дополнительно канонизирует день по preferred-записям
+ * (RegistrarEditDeltaService.resolve_edit_target_day) — эта функция лишь
+ * посылает корректную дату сразу, чтобы квота и команда совпадали с первого
+ * запроса (без 409-рефетча).
+ *
+ * Возвращает 'YYYY-MM-DD' или null, если день записи неизвестен
+ * (вызывающий код откатывается к getLocalISODate()).
+ */
+export const resolveEditRecordDate = (
+  initialData: Record<string, unknown> | null | undefined
+): string | null => {
+  if (!initialData) return null;
+
+  const recordDate = initialData.record_date;
+  if (typeof recordDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(recordDate.trim())) {
+    return recordDate.trim();
+  }
+
+  // Codex R9 PR 3118 (P1): адаптер рабочего списка несёт record_date
+  // (канонический день строки /registrar/queues/today) и appointment_date
+  // (день, назначенный самой записи, для appointment-строк R-22). Они
+  // предпочтительнее queue_time: adaptTimeFields подставляет created_at,
+  // когда queue_time отсутствует, — и днём записи становился день СОЗДАНИЯ,
+  // из-за чего правка будущей записи таргетила «сегодня».
+  const appointmentDate = initialData.appointment_date;
+  if (typeof appointmentDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate.trim())) {
+    return appointmentDate.trim();
+  }
+
+  // Fallback: date part of queue_time (ISO datetime of the queue day).
+  const queueTime = initialData.queue_time;
+  if (typeof queueTime === 'string') {
+    const match = queueTime.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+  }
+
+  return null;
+};
+
+// =====================================================================
+// W2-PR2: ФИЛЬТР ВРАЧЕЙ ПО ПРОФИЛЮ УСЛУГИ (ADR-001)
+// =====================================================================
+
+export interface WizardDoctorRecord {
+  id?: string | number;
+  specialty?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Врачи, допустимые для услуги по её department_key (PR-23 P0 #1).
+ *
+ * W2-PR2: fallback «нет совпадений → показать ВСЕХ врачей» удалён — врач без
+ * профильной специальности становился владельцем очереди
+ * (DailyQueue.specialist_id) и выбранный врач терялся. Пустой результат —
+ * валидный ответ: UI показывает ограничение, сабмит блокируется валидацией
+ * «для услуги требуется врач».
+ *
+ * Codex R10 PR 3118 (P1): сопоставление — через каноническую таблицу алиасов
+ * (doctorPanelShared.SPECIALTY_ALIASES, выровнена с backend
+ * DOCTOR_QUEUE_SPECIALTY_VARIANTS), а не через substring: подстрока отбрасывала
+ * валидные пары вида department_key="dental" ↔ specialty="dentistry" (обе
+ * формы живут в репо: dev_seed создаёт dental-услуги, нормализация докторов
+ * хранит dentistry) — стоматологические консультации оставались без врача.
+ * Ключ услуги сначала канонизируется ("dental" → "dentistry"), затем
+ * специальность врача сравнивается с каноном и его алиасами; пары вне
+ * таблицы сравниваются только на точное совпадение (без подстрок).
+ */
+const _specialtyAliasIndex: Record<string, Set<string>> = Object.fromEntries(
+  Object.entries(SPECIALTY_ALIASES).map(([canonical, aliases]) => [
+    canonical,
+    new Set([canonical, ...aliases.map((a) => String(a).toLowerCase())]),
+  ]),
+);
+
+const _canonicalSpecialtyOf = (rawKey: string): string =>
+  Object.keys(_specialtyAliasIndex).find(
+    (canonical) => _specialtyAliasIndex[canonical].has(rawKey),
+  ) ?? rawKey;
+
+export const filterDoctorsForService = (
+  doctors: Array<WizardDoctorRecord | null | undefined> | null | undefined,
+  serviceDepartmentKey: string | null | undefined,
+): WizardDoctorRecord[] => {
+  const all: WizardDoctorRecord[] = Array.isArray(doctors)
+    ? doctors.filter((d): d is WizardDoctorRecord => Boolean(d))
+    : [];
+  const key = String(serviceDepartmentKey || '').toLowerCase().trim();
+  if (!key) return all;
+  const canonicalKey = _canonicalSpecialtyOf(key);
+  const accepted = _specialtyAliasIndex[canonicalKey];
+  return all.filter((doctor) => {
+    const docSpecialty = String(doctor.specialty || '').toLowerCase().trim();
+    if (!docSpecialty) return true; // пустая специальность — как раньше
+    if (accepted) return accepted.has(docSpecialty);
+    // Пара вне таблицы алиасов: точное совпадение, без подстрок.
+    return docSpecialty === canonicalKey;
+  });
 };
 
 // =====================================================================
@@ -136,6 +258,20 @@ export const getRemovedQueueEntryIds = (
   return Array.from(originalQueueIds || []).filter((id) => !currentQueueIds.has(id));
 };
 
+export class QueueEntryCancelError extends Error {
+  /** ID записей очереди, отменить которые не удалось (409/сеть и т.п.). */
+  readonly failedIds: Array<string | number>;
+
+  constructor(failedIds: Array<string | number>) {
+    super(
+      `Не удалось отменить удалённые записи очереди (ID: ${failedIds.join(', ')}). ` +
+        'Изменения сохранены, но записи остались активными — отмените их вручную в очереди.'
+    );
+    this.name = 'QueueEntryCancelError';
+    this.failedIds = failedIds;
+  }
+}
+
 export const cancelRemovedQueueEntries = async (
   originalQueueIds: Array<string | number> | null | undefined,
   cartItems: CartItemLike[],
@@ -163,8 +299,12 @@ export const cancelRemovedQueueEntries = async (
       contextLabel,
       failedIds,
     });
-    toast.warning('Не удалось отменить часть удаленных записей очереди. Обновите очередь.');
-    return;
+    // Codex R14 PR 3121 (P1): неудача отмены удалённых записей — это
+    // ЧАСТИЧНОЕ сохранение (изменения уже применены backend'ом). Ошибка
+    // больше не превращается в тихий warning: вызов бросает
+    // QueueEntryCancelError, чтобы вызывающий путь НЕ сообщал успех,
+    // НЕ закрывал мастер и явно показал частичное сохранение.
+    throw new QueueEntryCancelError(failedIds);
   }
 
   logger.log(`[AppointmentWizardV2] removed queue entries cancelled (${contextLabel})`);
@@ -325,6 +465,124 @@ export const getBirthDateValidationError = (
 };
 
 // =====================================================================
+// CART QUOTE (Fix D: server-side pricing preview)
+// =====================================================================
+
+export interface CartQuoteItem {
+  service_id: number;
+  service_name: string;
+  unit_price: number;
+  quantity: number;
+  discount_percent: number;
+  final_price: number;
+}
+
+export interface CartQuote {
+  items: CartQuoteItem[];
+  total_amount: number;
+  approval_status: string; // "approved" | "pending"
+  // Codex R3 PR 3095 (P1): привязка подтверждённой квоты к команде сохранения.
+  // Заполняется ТОЛЬКО для pricing_mode='cart' (save /registrar/cart
+  // перепроверяет цены/настройки на момент подтверждения — расхождение даёт
+  // 409 «цены изменились» вместо тихого invoice на другую сумму).
+  quote_token?: string;
+}
+
+export type CartQuoteStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+interface QuoteCartSource {
+  items?: Array<{ service_id?: unknown; quantity?: unknown; custom_price?: unknown; doctor_id?: unknown }>;
+  discount_mode?: unknown;
+  all_free?: unknown;
+}
+
+// Строит запрос квоты из корзины. null — когда нет ни одной позиции
+// с разрешённым service_id (квотировать нечего).
+export interface CartQuoteRequestOptions {
+  // Fix D (Codex R1 #3095): edit-режим квотирует РОВНО edit-delta payload
+  // (pricing_mode='edit_delta' зеркалирует правила /registrar/cart/edit-delta).
+  // Codex R2 #3095 (P1): 'full_update' — правила /queue/online-entry/{id}/
+  // full-update (консультация при repeat/benefit → 0, all_free → 0, остальное
+  // — каталог-цена); выбирается по фактическому маршруту команды.
+  pricingMode?: 'cart' | 'edit_delta' | 'full_update';
+  itemsOverride?: QuoteCartSource['items'];
+  // Codex R6 #3095 (P2): edit-delta контекст — квота биллит ту же дельту,
+  // что и команда (активная запись того же дня, уже содержащая услугу,
+  // биллит max(запрошено − есть, 0)). Передаётся только для edit_delta.
+  patientId?: number | string | null;
+  targetDate?: string | null;
+  preferredEntryIds?: Array<number | string>;
+}
+
+export const buildCartQuoteRequest = (
+  cart: QuoteCartSource | null | undefined,
+  options: CartQuoteRequestOptions = {}
+): { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } | null => {
+  const rawItems = (options.itemsOverride ?? (Array.isArray(cart?.items) ? cart.items : [])) || [];
+  const items = rawItems
+    .filter((item) => item && item.service_id != null)
+    .map((item) => {
+      const quoteItem: { service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number } = {
+        service_id: Number(item.service_id),
+        quantity: Math.max(1, Number(item.quantity || 1)),
+      };
+      // Codex R1 #3095 (P2): custom_price зеркалится в квоту (cart-режим)
+      const customPrice = (item as { custom_price?: unknown }).custom_price;
+      if (customPrice != null && Number.isFinite(Number(customPrice))) {
+        quoteItem.custom_price = Number(customPrice);
+      }
+      // Codex R12 #3095 (P2): specialist_id зеркалится в квоту — маршрутизация
+      // дельты в квоте обязана совпадать с маршрутизацией команды (ADR-001).
+      // Источники: item.specialist_id у edit-delta target-item'ов (для
+      // существующих позиций — null: перенос врача запрещён), иначе
+      // doctor_id сырой корзины — ТО ЖЕ, что шлёт команда сохранения
+      // (newServices: specialist_id: item.doctor_id). Иначе edit добавляет
+      // услугу без default-врача каталога и без активной очереди дня: квота
+      // отвечает 400 "specialist_id is required", хотя команда создала бы
+      // очередь выбранного врача — завершение заблокировано навсегда.
+      // Save-ревалидация токена пере-считывает квоту по ЭТИМ ЖЕ item'ам —
+      // зеркалирование в маппере покрывает оба пути одним местом.
+      const itemRecord = item as Record<string, unknown>;
+      const specialistId = 'specialist_id' in itemRecord ? itemRecord.specialist_id : itemRecord.doctor_id;
+      if (specialistId != null && Number.isFinite(Number(specialistId)) && Number(specialistId) > 0) {
+        quoteItem.specialist_id = Number(specialistId);
+      }
+      // Codex R8 #3115 (P1): идентичность исходной записи зеркалится в квоту
+      const queueEntryId = (item as { queue_entry_id?: unknown }).queue_entry_id
+        ?? (item as { original_queue_id?: unknown }).original_queue_id;
+      if (queueEntryId != null && Number.isFinite(Number(queueEntryId)) && Number(queueEntryId) > 0) {
+        quoteItem.queue_entry_id = Number(queueEntryId);
+      }
+      return quoteItem;
+    });
+  if (items.length === 0) return null;
+  const request: { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } = {
+    items,
+    discount_mode: String(cart?.discount_mode || 'none'),
+    all_free: Boolean(cart?.all_free),
+    pricing_mode: options.pricingMode || 'cart',
+  };
+  // Codex R6 #3095 (P2): edit-delta контекст — backend биллит в квоте ту же
+  // дельту, которую реально выставит команда (см. _edit_delta_billable_quantity).
+  if (options.pricingMode === 'edit_delta') {
+    const patientIdNum = Number(options.patientId);
+    if (options.patientId != null && Number.isFinite(patientIdNum) && patientIdNum > 0) {
+      request.patient_id = patientIdNum;
+    }
+    if (options.targetDate) {
+      request.target_date = String(options.targetDate);
+    }
+    const entryIds = (options.preferredEntryIds || [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    if (entryIds.length > 0) {
+      request.preferred_entry_ids = entryIds;
+    }
+  }
+  return request;
+};
+
+// =====================================================================
 // BIRTH DATE INPUT MASK (extracted from AppointmentWizardV2)
 // =====================================================================
 
@@ -389,6 +647,220 @@ export const buildInheritedPatientClearPatch = (): Record<string, unknown> => ({
 export const isPhoneDuplicateErrorMessage = (message: unknown): boolean => {
   const normalized = String(message || '').toLowerCase();
   return normalized.includes('уже существует') && normalized.includes('телефон');
+};
+
+// IDEMPOTENCY KEY (Fix C: duplicate submit / lost-response retry)
+// =====================================================================
+
+// Один логический сабмит корзины = один Idempotency-Key. При потере ответа
+// и повторной отправке с тем же ключом backend вернёт кэшированный ответ
+// (IdempotencyMiddleware), а не создаст вторую корзину.
+export const createIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `cart-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+// Codex R2 PR 3092 (P1): ключ привязан к снимку payload первой попытки.
+// Чистая гвардия: 'bind' — первая попытка (ключ + снимок), 'proceed' —
+// повтор с теми же данными (кэш backend вернёт сохранённый ответ),
+// 'block' — повтор с ИЗМЕНЁННЫМИ данными и старым ключом (backend вернёт 409,
+// оригинальный успех нельзя натянуть на новые данные).
+export type CartIdempotencyGuardAction = 'bind' | 'proceed' | 'block';
+export interface CartIdempotencyGuardArgs {
+  existingKey: string | null;
+  existingPayload: string | null;
+  payload: string;
+  newKey: string;
+}
+export interface CartIdempotencyGuardResult {
+  action: CartIdempotencyGuardAction;
+  key: string | null;
+  payload: string | null;
+}
+export const cartIdempotencyGuard = (args: CartIdempotencyGuardArgs): CartIdempotencyGuardResult => {
+  if (!args.existingKey) {
+    return { action: 'bind', key: args.newKey, payload: args.payload };
+  }
+  if (args.existingPayload != null && args.existingPayload !== args.payload) {
+    return { action: 'block', key: args.existingKey, payload: args.existingPayload };
+  }
+  return { action: 'proceed', key: args.existingKey, payload: args.existingPayload };
+};
+
+// Общие стили тостов Fix C (токены --mac-*; общий модуль = без дублирования).
+export const TOAST_WARNING_STYLE = {
+  backgroundColor: 'color-mix(in srgb, var(--mac-warning), transparent 84%)',
+  border: '1px solid color-mix(in srgb, var(--mac-warning), transparent 72%)',
+  color: 'var(--mac-text-primary)'
+} as const;
+
+export const TOAST_ERROR_STYLE = {
+  backgroundColor: 'color-mix(in srgb, var(--mac-error), transparent 84%)',
+  border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
+  color: 'var(--mac-text-primary)'
+} as const;
+
+// =====================================================================
+// CART GROUPING BY VISIT (вынесено из AppointmentWizardV2 без изменения логики)
+// =====================================================================
+
+export interface WizardCartItemLike {
+  service_id?: unknown;
+  doctor_id?: unknown;
+  quantity?: number;
+  original_queue_id?: string | number | null;
+  service_code?: string | null;
+  service_name?: string | null;
+  name?: string | null;
+  visit_date?: string;
+  visit_time?: string | null;
+  _source?: string | null;
+  [key: string]: unknown;
+}
+
+export interface GroupedVisitLike {
+  doctor_id: string | number | null;
+  services: Array<{
+    service_id?: string | number;
+    quantity?: number;
+    original_queue_id?: string | number | null;
+    service_code?: string | null;
+    service_name?: string | null;
+    _source?: string | null;
+  }>;
+  visit_date?: string;
+  visit_time?: string | null;
+  department: string;
+  notes: string | null;
+}
+
+export const groupCartItemsByVisit = (
+  items: WizardCartItemLike[],
+  getDepartmentByService: (serviceId: string | number) => string,
+): GroupedVisitLike[] => {
+  const visits: Record<string, GroupedVisitLike> = {};
+
+  // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
+  const validItems = items.filter((item) => {
+    if (!item.service_id) {
+      logger.warn('⚠️ Пропущен элемент корзины без service_id:', item);
+      return false;
+    }
+    return true;
+  });
+
+  if (validItems.length === 0) {
+    logger.warn('⚠️ Нет валидных элементов в корзине');
+    return [];
+  }
+
+  validItems.forEach((item) => {
+    // Определяем отделение для услуги
+    const department = getDepartmentByService(item.service_id as string | number);
+
+    // ✅ ИСПРАВЛЕНО: Объединяем все процедуры в один визит
+    // Все процедуры (P, C, D_PROC) должны быть в одном визите с department = 'procedures'
+    let finalDepartment = department;
+    if (department === 'procedures') {
+      finalDepartment = 'procedures'; // Все процедуры в одном отделе
+    }
+
+    // Группируем по finalDepartment + doctor_id + visit_date + visit_time
+    const key = `${finalDepartment}_${item.doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
+
+    if (!visits[key]) {
+      visits[key] = {
+        doctor_id: (item.doctor_id as string | number) || null,
+        services: [],
+        visit_date: item.visit_date,
+        visit_time: item.visit_time || null,
+        department: finalDepartment,
+        notes: null
+      };
+    }
+
+    visits[key].services.push({
+      service_id: item.service_id as string | number,
+      quantity: item.quantity,
+      original_queue_id: item.original_queue_id || null,
+      service_code: item.service_code || null,
+      service_name: item.service_name || item.name || null,
+      _source: item._source || null
+    });
+  });
+
+  return Object.values(visits);
+};
+
+// =====================================================================
+// DEPARTMENT RESOLUTION (extracted from AppointmentWizardV2)
+// =====================================================================
+
+interface DeptServiceLike {
+  id?: unknown;
+  queue_tag?: unknown;
+  category_code?: string;
+  service_code?: unknown;
+  name?: unknown;
+  [key: string]: unknown;
+}
+
+const DEPARTMENT_CODE_MAPPING: Record<string, string> = {
+  'K': 'cardiology', // Кардиология → вкладка cardio (БЕЗ ЭКГ!)
+  'D': 'dermatology', // Дерматология → вкладка derma (только консультации)
+  'S': 'dentistry', // Стоматология → вкладка dental
+  'L': 'laboratory', // Лаборатория → вкладка lab
+  'P': 'procedures', // Физиотерапия → вкладка procedures
+  'C': 'procedures', // Косметология → вкладка procedures
+  'D_PROC': 'procedures', // Дерматологические процедуры → вкладка procedures
+  'O': 'procedures' // Прочие процедуры → вкладка procedures
+};
+
+const DEPARTMENT_NORMALIZED_MAPPING: Record<string, string> = {
+  'specialists': 'cardiology', // Консультации специалистов (только если не 'D' или 'S') -> cardiology
+  'laboratory': 'lab', // ✅ Лаборатория -> lab (для соответствия вкладке)
+  'procedures': 'procedures', // Процедуры -> procedures
+  'other': 'general' // Прочее -> general
+};
+
+// Определяет отделение визита для услуги (ECG — отдельный кабинет).
+// Чистая функция: извлечена из AppointmentWizardV2 (PR-45 LOC ceiling).
+export const getWizardDepartmentForService = (
+  serviceId: string | number,
+  servicesData: DeptServiceLike[]
+): string => {
+  if (!serviceId || serviceId === null || serviceId === undefined) {
+    return 'general';
+  }
+
+  const service = servicesData.find((s) => s.id === serviceId);
+
+  if (!service) {
+    return 'general';
+  }
+
+  // 🎯 СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЭКГ: отдельный кабинет!
+  if (service.queue_tag === 'ecg') {
+    return 'echokg';
+  }
+
+  // Сначала точный маппинг оригинального category_code (Bug 2 fix),
+  // затем нормализованный fallback.
+  if (service.category_code && DEPARTMENT_CODE_MAPPING[service.category_code]) {
+    return DEPARTMENT_CODE_MAPPING[service.category_code];
+  }
+
+  const normalizedCategoryCode = service.category_code
+    ? normalizeCategoryCode(service.category_code)
+    : '';
+
+  return (
+    DEPARTMENT_NORMALIZED_MAPPING[normalizedCategoryCode] ||
+    DEPARTMENT_CODE_MAPPING[service.category_code as string] ||
+    'general'
+  );
 };
 
 // =====================================================================
@@ -553,12 +1025,712 @@ if (typeof document !== 'undefined' && !document.getElementById('wizard-keyframe
   document.head.appendChild(style);
 }
 
+
+// =====================================================================
+// FIX D (Codex R1 #3095): ИСХОДНЫЕ УСЛУГИ EDIT-ЗАПИСИ (identity sets)
+// =====================================================================
+
+interface WizardServiceRecord {
+  id?: string | number;
+  name?: string;
+  service_code?: string | null;
+  [k: string]: unknown;
+}
+
+export interface EditOriginalServiceIdentity {
+  hasQueueEntries: boolean;
+  serviceIds: Set<unknown>;
+  serviceCodes: Set<string>;
+  serviceNames: Set<string>;
+  queueIds: Set<string | number>;
+  entryUpdatedAtMap: Record<string, string>;
+  // W2-PR1: исходное количество позиции по service_id (из service_details —
+  // read-модель отдаёт quantity с W2-PR1). Отсутствие ключа = исходное
+  // количество неизвестно — такая позиция не включается в edit-дельту.
+  originalQuantities: Map<string, number>;
+}
+
+// Собирает множества «исходных» услуг edit-записи (service_details →
+// service_codes → services-коды → queue_numbers → services-строки) — ТОТ ЖЕ
+// порядок приоритетов и те же нормализации, что были в handleComplete.
+// Используется и сабмитом (edit-delta payload), и edit-квотой (Fix D), чтобы
+// подтверждение показывало ровно то, что edit-delta выставит в invoice.
+export const buildEditOriginalServiceIdentity = (
+  editMode: boolean,
+  initialData: Record<string, unknown> | null | undefined,
+  servicesData: WizardServiceRecord[],
+): EditOriginalServiceIdentity => {
+  const identity: EditOriginalServiceIdentity = {
+    hasQueueEntries: false,
+    serviceIds: new Set(),
+    serviceCodes: new Set<string>(),
+    serviceNames: new Set<string>(),
+    queueIds: new Set<string | number>(),
+    entryUpdatedAtMap: {},
+    originalQuantities: new Map<string, number>(),
+  };
+  if (!editMode || !initialData) return identity;
+
+  const initialRecordKind = getWizardRecordKind(initialData);
+  const initialSourceKind = getWizardSourceKind(initialData);
+  const hasQueueEntries = Boolean(initialData) && (
+    (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) ||
+    initialSourceKind === 'online' ||
+    initialSourceKind === 'desk' ||
+    initialRecordKind === 'online_queue' ||
+    initialRecordKind === 'visit' ||
+    initialRecordKind === 'appointment');
+  identity.hasQueueEntries = Boolean(hasQueueEntries);
+  if (!hasQueueEntries) return identity;
+
+  const originalServiceIds = identity.serviceIds;
+  const originalQueueIds = identity.queueIds; // PR-14: optimistic locking map lives here too
+  const entryUpdatedAtMap = identity.entryUpdatedAtMap;
+  const originalQuantities = identity.originalQuantities;
+  const originalServiceCodes = identity.serviceCodes;
+  const originalServiceNames = identity.serviceNames;
+
+    // Определяем исходные услуги из initialData
+    const serviceDetailOccurrences = new Map<string, number>();
+
+    if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
+      logger.log('📋 Извлечение исходных услуг из service_details:', initialData.service_details);
+      initialData.service_details.forEach((serviceDetail) => {
+        if (!serviceDetail) return;
+
+        const serviceId = serviceDetail.service_id || serviceDetail.id || null;
+        const serviceCode = serviceDetail.service_code || serviceDetail.code || null;
+        const serviceName = serviceDetail.service_name || serviceDetail.name || null;
+        const queueId = resolveExplicitQueueEntryId(serviceDetail, { allowLegacyId: false });
+
+        if (serviceId) originalServiceIds.add(serviceId);
+        if (queueId) originalQueueIds.add(queueId);
+        // W2-PR1: исходное количество позиции (read-модель service_details)
+        const originalQty = Number(serviceDetail.quantity ?? serviceDetail.qty);
+        if (serviceId && Number.isFinite(originalQty) && originalQty > 0) {
+          // Codex R15 #3115 (P1): ключ — (queue_entry_id, service_id): одна
+          // услуга в ДВУХ записях с разными количествами не должна
+          // перезаписывать друг друга в карте исходных количеств, иначе
+          // правка первой позиции классифицируется no-op по количеству
+          // второй. Bare-ключ услуги хранится, пока позиция одна
+          // (легаси-потоки без идентичности записи), и снимается при
+          // неоднозначности — остаются только точные ключи.
+          const bareServiceKey = String(serviceId);
+          const detailCount = (serviceDetailOccurrences.get(bareServiceKey) ?? 0) + 1;
+          serviceDetailOccurrences.set(bareServiceKey, detailCount);
+          originalQuantities.set(`${queueId ?? ''}:${bareServiceKey}`, originalQty);
+          if (detailCount === 1) {
+            originalQuantities.set(bareServiceKey, originalQty);
+          } else {
+            originalQuantities.delete(bareServiceKey);
+          }
+        }
+        // PR-14: collect updated_at for optimistic locking
+        if (queueId) {
+          const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || initialData.updated_at || initialData.last_changed_at;
+          if (ts) entryUpdatedAtMap[queueId] = ts;
+        }
+        if (serviceCode) originalServiceCodes.add(String(serviceCode).toUpperCase().trim());
+        if (serviceName) originalServiceNames.add(String(serviceName).toLowerCase().trim());
+      });
+    }
+
+    // ✅ ПРИОРИТЕТ 1: service_codes - наиболее надежный источник для записей типа visit
+    if (Array.isArray(initialData.service_codes) && initialData.service_codes.length > 0) {
+      logger.log('📋 Извлечение услуг из service_codes:', initialData.service_codes);
+      initialData.service_codes.forEach((code) => {
+        if (code) {
+          const normalizedCode = code.toUpperCase().trim();
+          originalServiceCodes.add(normalizedCode);
+          // Находим service_id по service_code
+          const service = servicesData.find((s) => {
+            if (!s.service_code) return false;
+            const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+            const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+            const codeNoZero = normalizedCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+            return serviceCodeUpper === normalizedCode || serviceCodeNoZero === codeNoZero;
+          });
+          if (service) {
+            originalServiceIds.add(service.id);
+            originalServiceNames.add(String(service.name ?? '').toLowerCase().trim());
+            logger.log(`  ✅ Найден service_id=${service.id} для кода "${code}"`);
+          } else {
+            logger.warn(`  ⚠️ Услуга с кодом "${code}" не найдена в servicesData`);
+          }
+        }
+      });
+    }
+
+    // ✅ ПРИОРИТЕТ 1.5: services (если service_codes пуст) - может быть кодами
+    // ⚠️ ВАЖНО: services может содержать коды (k01, d05) или имена
+    if (originalServiceIds.size === 0 && Array.isArray(initialData.services) && initialData.services.length > 0) {
+      logger.log('📋 service_codes пуст, используем services как коды:', initialData.services);
+      initialData.services.forEach((serviceValue) => {
+        const normalizedRawValue = normalizeServiceSelectionValue(serviceValue);
+        const normalizedRawName = normalizeServiceSelectionName(serviceValue);
+
+        if (normalizedRawValue || normalizedRawName) {
+          const normalizedValue = normalizedRawValue.toUpperCase().trim();
+
+          // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
+          // ⚠️ ВАЖНО: Коды могут быть в формате 'K01', 'k01', 'K01: Название' и т.д.
+          let service = servicesData.find((s) => {
+            if (!s.service_code) return false;
+            const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+            // Убираем ведущие нули для сравнения (k01 = k1)
+            const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+            const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+
+            // Прямое сравнение
+            if (serviceCodeUpper === normalizedValue) return true;
+            // Сравнение без ведущих нулей
+            if (serviceCodeNoZero === valueNoZero) return true;
+            // Сравнение с учетом возможного формата 'K01: Название'
+            const serviceCodeBase = serviceCodeUpper.split(':')[0].trim();
+            const valueBase = normalizedValue.split(':')[0].trim();
+            if (serviceCodeBase === valueBase) return true;
+
+            return false;
+          });
+
+          // Если не нашли по коду, пробуем по имени (fallback)
+          if (!service) {
+            const normalizedName = normalizedRawName.toLowerCase().trim();
+            service = servicesData.find((s) =>
+            s.name && s.name.toLowerCase().trim() === normalizedName
+            );
+          }
+
+          if (service) {
+            originalServiceIds.add(service.id);
+            if (service.service_code) {
+              originalServiceCodes.add(service.service_code.toUpperCase().trim());
+            }
+            originalServiceNames.add(String(service.name ?? '').toLowerCase().trim());
+            logger.log(`  ✅ Найден service_id=${service.id} для "${normalizedRawValue || normalizedRawName}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
+          } else {
+            // ✅ УЛУЧШЕНО: Показываем примеры кодов из servicesData для отладки
+            const exampleCodes = servicesData.
+            filter((s) => s.service_code).
+            slice(0, 10).
+            map((s) => `${s.service_code}: ${s.name}`).
+            join(', ');
+            logger.warn(`  ⚠️ Услуга "${normalizedRawValue || normalizedRawName || '[empty]'}" не найдена в servicesData. Примеры кодов: ${exampleCodes}`);
+          }
+        }
+      });
+    }
+
+    // ✅ ПРИОРИТЕТ 2: queue_numbers - основной источник для всех типов записей
+    if (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) {
+      logger.log('📋 Извлечение услуг из queue_numbers:', initialData.queue_numbers);
+      initialData.queue_numbers.forEach((q) => {
+        if (q && q.service_id) {
+          originalServiceIds.add(q.service_id);
+          const queueId = resolveExplicitQueueEntryId(q);
+          if (queueId) originalQueueIds.add(queueId); // ✅ Сохраняем ID записи очереди
+          // PR-14: collect updated_at for optimistic locking
+          if (queueId) {
+            const ts = q.updated_at || q.last_changed_at || initialData.updated_at || initialData.last_changed_at;
+            if (ts) entryUpdatedAtMap[queueId] = ts;
+          }
+          // Находим service_code и name по service_id
+          const service = servicesData.find((s) => s.id === q.service_id);
+          if (service) {
+            if (service.service_code) {
+              originalServiceCodes.add(service.service_code.toUpperCase().trim());
+            }
+            originalServiceNames.add(String(service.name ?? '').toLowerCase().trim());
+          }
+        }
+        if (q && q.service_code) {
+          const normalizedCode = q.service_code.toUpperCase().trim();
+          originalServiceCodes.add(normalizedCode);
+          const service = servicesData.find((s) =>
+          s.service_code && s.service_code.toUpperCase().trim() === normalizedCode
+          );
+          if (service) {
+            originalServiceIds.add(service.id);
+            originalServiceNames.add(String(service.name ?? '').toLowerCase().trim());
+          }
+        }
+        if (q && q.service_name) {
+          const normalizedName = q.service_name.toLowerCase().trim();
+          originalServiceNames.add(normalizedName);
+          const service = servicesData.find((s) =>
+          s.name && s.name.toLowerCase().trim() === normalizedName
+          );
+          if (service) {
+            originalServiceIds.add(service.id);
+            if (service.service_code) {
+              originalServiceCodes.add(service.service_code.toUpperCase().trim());
+            }
+          }
+        }
+      });
+    }
+
+    // ✅ ПРИОРИТЕТ 3: services (массив строк) - может быть кодами или именами
+    if (Array.isArray(initialData.services) && initialData.services.length > 0) {
+      logger.log('📋 Извлечение услуг из services:', initialData.services);
+      initialData.services.forEach((serviceValue) => {
+        const normalizedRawValue = normalizeServiceSelectionValue(serviceValue);
+        const normalizedRawName = normalizeServiceSelectionName(serviceValue);
+
+        if (normalizedRawValue || normalizedRawName) {
+          const normalizedValue = normalizedRawValue.toUpperCase().trim();
+          const normalizedName = normalizedRawName.toLowerCase().trim();
+
+          // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
+          let service = servicesData.find((s) => {
+            if (!s.service_code) return false;
+            const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+            // Убираем ведущие нули для сравнения (k01 = k1)
+            const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+            const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+            return serviceCodeUpper === normalizedValue || serviceCodeNoZero === valueNoZero;
+          });
+
+          // Если не нашли по коду, пробуем по имени
+          if (!service) {
+            service = servicesData.find((s) =>
+            s.name && s.name.toLowerCase().trim() === normalizedName
+            );
+          }
+
+          if (service) {
+            originalServiceIds.add(service.id);
+            if (service.service_code) {
+              originalServiceCodes.add(service.service_code.toUpperCase().trim());
+            }
+            originalServiceNames.add(String(service.name ?? '').toLowerCase().trim());
+            logger.log(`  ✅ Найден service_id=${service.id} для "${normalizedRawValue || normalizedRawName}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
+          } else {
+            logger.warn(`  ⚠️ Услуга "${normalizedRawValue || normalizedRawName || '[empty]'}" не найдена в servicesData (ни по коду, ни по имени)`);
+          }
+        }
+      });
+    }
+
+    logger.log('📋 Исходные услуги определены:', {
+      serviceIds: Array.from(originalServiceIds),
+      serviceCodes: Array.from(originalServiceCodes),
+      serviceNames: Array.from(originalServiceNames)
+    });
+
+  return identity;
+};
+
+// Предикат «новая услуга» для edit-дельты — ТОТ ЖЕ, что в сабмите
+// handleComplete (original_queue_id + serviceIds/Codes/Names).
+export const isEditDeltaNewItem = (
+  item: { original_queue_id?: unknown; service_id?: unknown },
+  service: WizardServiceRecord | undefined,
+  identity: EditOriginalServiceIdentity,
+): boolean => {
+  const hasExistingQueueIdentity = Boolean(item.original_queue_id);
+  const inIds = identity.serviceIds.has(item.service_id);
+  const inCodes = service?.service_code
+    ? identity.serviceCodes.has(String(service.service_code).toUpperCase().trim())
+    : false;
+  const inNames = service?.name
+    ? identity.serviceNames.has(String(service.name).toLowerCase().trim())
+    : false;
+  return !hasExistingQueueIdentity && !inIds && !inCodes && !inNames;
+};
+
+// =====================================================================
+// W2-PR1: ЦЕЛЕВОЕ СОСТОЯНИЕ edit-дельты (полная корзина, а не только новые)
+// =====================================================================
+
+export interface EditDeltaTargetItem {
+  service_id: string | number;
+  quantity: number;
+  specialist_id: string | number | null;
+  /** Идентичность исходной записи позиции (Codex R8 PR 3115). */
+  queue_entry_id?: number;
+}
+
+export interface EditDeltaTargetBuild {
+  items: EditDeltaTargetItem[];
+  hasNew: boolean;
+  hasQuantityChange: boolean;
+  /**
+   * Codex R9 PR 3118 (P1): изменившиеся позиции БЕЗ идентичности записи
+   * очереди (visit-only строки /registrar/queues/today — visit есть,
+   * OnlineQueueEntry отсутствует). edit-delta не может их мутировать:
+   * backend не нашёл бы активную запись и создал бы ВТОРОЙ визит с целевым
+   * количеством, оставив исходный VisitService прежним. Такие позиции
+   * НЕ попадают в payload — вызывающий код обязан громко отказать в сабмите
+   * (визит-команда — отдельный контракт), молча пропустить = ложный «успех».
+   */
+  unroutable: Array<{ service_id: string | number; name: string }>;
+}
+
+// Собирает edit-delta payload из ВСЕЙ корзины (целевое состояние позиции),
+// а не только из новых услуг. Новые услуги — как раньше (specialist_id из
+// корзины). Существующая позиция включается ТОЛЬКО когда исходное количество
+// известно (service_details после W2-PR1) и пользователь его изменил:
+// неизвестное исходное количество нельзя молча превращать в снижение —
+// backend применил бы его как negative delta (записал бы целевое количество
+// поверх реального). Позиция без изменения количества не отправляется —
+// настоящий no-op. Смена врача существующей позиции в payload не передаётся
+// (specialist_id=null): контракт переноса — отдельная операция (wave2 PR2).
+export const buildEditDeltaTargetItems = (
+  cartItems: Array<Record<string, unknown>>,
+  servicesData: WizardServiceRecord[],
+  identity: EditOriginalServiceIdentity,
+): EditDeltaTargetBuild => {
+  const build: EditDeltaTargetBuild = { items: [], hasNew: false, hasQuantityChange: false, unroutable: [] };
+  (cartItems || []).forEach((item) => {
+    if (!item || item.service_id == null) return;
+    const service = servicesData.find((s) => String(s.id) === String(item.service_id));
+    if (!service) return; // зеркало сабмита: услуга вне справочника не сабмитится
+    const quantity = Math.max(1, Number(item.quantity || 1));
+    if (isEditDeltaNewItem(item, service, identity)) {
+      build.hasNew = true;
+      build.items.push({
+        service_id: item.service_id as string | number,
+        quantity,
+        specialist_id: (item.doctor_id as string | number | undefined) ?? null,
+      });
+      return;
+    }
+    // Codex R15 #3115 (P1): сравнение по ИДЕНТИЧНОСТИ (запись, услуга) —
+    // той же, по которой записывались исходные количества из service_details;
+    // оригинальная запись берётся из самой корзинной позиции. Bare-ключ —
+    // фолбэк для однозначных легаси-потоков без идентичности записи.
+    const originalQueueId = item.original_queue_id ?? item.queue_entry_id ?? null;
+    const serviceKey = String(item.service_id);
+    const originalQty =
+      identity.originalQuantities.get(`${originalQueueId ?? ''}:${serviceKey}`) ??
+      identity.originalQuantities.get(serviceKey);
+    if (originalQty === undefined) return;
+    if (quantity === originalQty) return; // без изменений — no-op
+    // Codex R9 PR 3118 (P1): правка количества существующей позиции возможна
+    // ТОЛЬКО когда известна её запись очереди. visit-only строка (без
+    // OnlineQueueEntry) не маршрутизируется: включение в edit-delta создало
+    // бы дублирующий визит на backend. Позиция уходит в unroutable —
+    // сабмит блокируется с явной причиной. (originalQueueId вычислен выше —
+    // Codex R15: сравнение количеств идёт по той же идентичности записи.)
+    if (originalQueueId == null || !Number.isFinite(Number(originalQueueId))) {
+      build.unroutable.push({ service_id: item.service_id as string | number, name: String(service.name ?? item.service_id) });
+      return;
+    }
+    build.hasQuantityChange = true;
+    // Codex R8 PR 3115 (P1): существующая позиция сохраняет идентичность своей
+    // записи (original_queue_id из service_details). При одном service_id под
+    // разными врачами/записями правится ИМЕННО названная запись, а не
+    // ближайшая по глобальному preferred-набору.
+    build.items.push({
+      service_id: item.service_id as string | number,
+      quantity,
+      specialist_id: null,
+      queue_entry_id: Number(originalQueueId),
+    });
+  });
+  return build;
+};
+
+// Codex R9 PR 3118 (P1): громкий отказ для visit-only позиций (визит без
+// записи очереди) — изменение количества через edit-delta невозможно, пока
+// не существует визит-команда. Молчаливый пропуск позиции = ложный «успех».
+export const describeUnroutableEditDeltaRows = (
+  rows: Array<{ name: string }>,
+): string =>
+  `Изменение количества для «${rows.map((r) => r.name).join('», «')}» недоступно: у позиции нет номера очереди. ` +
+  'Используйте отмену/корректировку визита или обратитесь к администратору.';
+// =====================================================================
+// FIX F: СНИМОК СОДЕРЖИМОГО МАСТЕРА (diff «есть ли несохранённые правки»)
+// =====================================================================
+
+interface WizardContentShape {
+  patient: {
+    id: string | number | null;
+    fio: string;
+    phone: string;
+    address: string;
+    birth_date: string;
+    gender: string;
+  };
+  cart: {
+    items: Array<Record<string, unknown>>;
+    discount_mode: string;
+    all_free: boolean;
+  };
+}
+
+// Детерминированная строка-подпись содержимого мастера. Используется для
+// сравнения текущего состояния с исходным снимком (Codex R1 #3097: p.id
+// больше не считается «контентом» сам по себе — edit-запись без правок
+// закрывается без предупреждения о потере данных). Порядок ключей фиксирован,
+// строки нормализуются (trim), позиция корзины сводится к значимым полям.
+export const wizardContentSignature = (content: WizardContentShape): string => {
+  const patient = {
+    id: content.patient.id ?? null,
+    fio: String(content.patient.fio || '').trim(),
+    phone: String(content.patient.phone || '').trim(),
+    address: String(content.patient.address || '').trim(),
+    birth_date: String(content.patient.birth_date || '').trim(),
+    gender: String(content.patient.gender || '').trim(),
+  };
+  const items = Array.isArray(content.cart.items) ? content.cart.items : [];
+  const cart = {
+    items: items.map((item) => ({
+      service_id: (item as { service_id?: unknown }).service_id ?? null,
+      doctor_id: (item as { doctor_id?: unknown }).doctor_id ?? null,
+      quantity: (item as { quantity?: unknown }).quantity ?? 1,
+      // Codex R12 PR 3097 (P2): идентичность строки в снимке. Без неё
+      // позиционный патч гидрации не отличает «гидрация той же услуги»
+      // от «пользователь заменил позицию, пока шёл запрос справочника»:
+      // замена копировала service_id подмены в снимок, подписи совпадали,
+      // и закрытие молча теряло замену.
+      service_code: String((item as { service_code?: unknown }).service_code ?? '').trim() || null,
+      service_name: String((item as { service_name?: unknown }).service_name ?? '').trim() || null,
+    })),
+    discount_mode: String(content.cart.discount_mode || 'none'),
+    all_free: Boolean(content.cart.all_free),
+  };
+  return JSON.stringify({ patient, cart });
+};
+
+// Codex R3 PR 3097 (P2): парсинг JSON-снимка исходного содержимого мастера.
+// null — снимок повреждён/пуст (вызывающий код обязан оставить снимок как был).
+export const parseWizardBaseline = (baseline: string): WizardContentShape | null => {
+  try {
+    const parsed = JSON.parse(baseline) as WizardContentShape | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!parsed.patient || !parsed.cart || !Array.isArray(parsed.cart.items)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+// Codex R3 PR 3097 (P2): вносит в ИСХОДНЫЙ снимок ТОЛЬКО автогидрированные
+// service_id. Полный переснимок живого состояния копировал бы в снимок правки
+// пользователя (ФИО/телефон/врач/количество), сделанные, пока шёл запрос
+// /registrar/services, — и wizardHasUserContent() возвращал бы false, а
+// закрытие молча теряло бы эти правки. Расхождение длины (пользователь
+// добавил/удалил позицию, пока шёл запрос) оставляет снимок нетронутым —
+// закрытие в этом случае честно предупредит о несохранённых данных.
+// Codex R12 PR 3097 (P2): патч ПОЗИЦИОНЕН, поэтому обязан проверять
+// идентичность строки (код/имя): замена услуги в строке при той же длине
+// корзины больше не копирует service_id подмены в снимок — подпись
+// фиксирует замену, и закрытие предупреждает вместо молчаливой потери.
+const rowCodeTokens = (item: Record<string, unknown> | null | undefined): Set<string> => {
+  const tokens = new Set<string>();
+  if (!item) return tokens;
+  const code = String(item.service_code ?? item.code ?? '').toLowerCase().trim();
+  if (code) {
+    tokens.add(code);
+    tokens.add(code.replace(/^([a-z])0+(\d+)$/, '$1$2'));
+  }
+  return tokens;
+};
+
+const rowNameToken = (item: Record<string, unknown> | null | undefined): string =>
+  String(item?.service_name ?? item?.name ?? '').toLowerCase().trim();
+
+const rowIdentityMatches = (baselineItem: Record<string, unknown>, resolvedItem: Record<string, unknown>): boolean => {
+  // Codex R13 PR 3097 (P2): когда код есть у ОБОИХ строк — идентичность
+  // решает только код (с паритетом ведущих нулей). Совпадающее отображаемое
+  // имя идентичностью не является: Service.name не уникален
+  // (backend/app/models/service.py), две одноимённые услуги с разными кодами
+  // не должны матчиться — иначе подмена строки гидрацией копирует service_id
+  // замены в снимок, и закрытие молча теряло бы правку.
+  const baselineCodes = rowCodeTokens(baselineItem);
+  const resolvedCodes = rowCodeTokens(resolvedItem);
+  if (baselineCodes.size > 0 && resolvedCodes.size > 0) {
+    for (const token of baselineCodes) {
+      if (resolvedCodes.has(token)) return true;
+    }
+    return false;
+  }
+  // Код недоступен хотя бы у одной строки: легаси-данные несут код услуга
+  // В КАЧЕСТВЕ имени (k01), поэтому имя сравнивается с именем И кодовыми
+  // токенами другой строки — иначе гидрация легаси-строк ломается.
+  const baselineName = rowNameToken(baselineItem);
+  const resolvedName = rowNameToken(resolvedItem);
+  if (!baselineName || !resolvedName) return false;
+  if (baselineName === resolvedName) return true;
+  return resolvedCodes.has(baselineName) || baselineCodes.has(resolvedName);
+};
+
+export const patchBaselineWithResolvedServiceIds = (
+  baselineItems: Array<Record<string, unknown>>,
+  resolvedItems: Array<Record<string, unknown>>
+): Array<Record<string, unknown>> => {
+  if (!Array.isArray(baselineItems) || !Array.isArray(resolvedItems)) return baselineItems;
+  if (baselineItems.length !== resolvedItems.length) return baselineItems;
+  return baselineItems.map((item, index) => {
+    const resolved = resolvedItems[index] as Record<string, unknown> | null | undefined;
+    const resolvedId = resolved?.service_id;
+    if (resolvedId == null) return item;
+    const baselineId = (item as { service_id?: unknown }).service_id;
+    if (baselineId != null) {
+      // позиция уже была идентифицирована в снимке; имя/код синхронизируем
+      // ТОЛЬКО для той же услуги (справочник канонизировал название) —
+      // иначе подпись ошибочно считала бы замену гидрацией.
+      if (String(baselineId) !== String(resolvedId)) return item;
+      return {
+        ...item,
+        service_code: (resolved?.service_code ?? resolved?.code ?? null) as unknown,
+        service_name: (resolved?.service_name ?? resolved?.name ?? null) as unknown,
+      };
+    }
+    if (!rowIdentityMatches(item, resolved as Record<string, unknown>)) return item;
+    return {
+      ...item,
+      service_id: resolvedId,
+      service_code: (resolved?.service_code ?? resolved?.code ?? null) as unknown,
+      service_name: (resolved?.service_name ?? resolved?.name ?? null) as unknown,
+    };
+  });
+};
+
+// Готовые обновления снимка (потолок LOC PR-45): вызываются из эффектов
+// гидрации. Возвращают НОВУЮ подпись снимка или null (снимок повреждён —
+// вызывающий код обязан оставить его как был).
+export const refreshBaselineAfterServiceResolution = (
+  baseline: string,
+  resolvedItems: Array<Record<string, unknown>>
+): string | null => {
+  const parsed = parseWizardBaseline(baseline);
+  if (!parsed) return null;
+  return wizardContentSignature({
+    patient: parsed.patient,
+    cart: {
+      items: patchBaselineWithResolvedServiceIds(parsed.cart.items, resolvedItems),
+      discount_mode: parsed.cart.discount_mode,
+      all_free: parsed.cart.all_free,
+    },
+  });
+};
+
+export const refreshBaselineAfterGenderHydration = (baseline: string, gender: string): string | null => {
+  const parsed = parseWizardBaseline(baseline);
+  if (!parsed) return null;
+  return wizardContentSignature({
+    patient: { ...parsed.patient, gender },
+    cart: parsed.cart,
+  });
+};
+
+// =====================================================================
+// CART SERVICE RESOLUTION (SSOT)
+// =====================================================================
+
+export interface CartServiceResolution {
+  items: Array<Record<string, unknown>>;
+  changed: boolean;
+}
+
+// Codex R2 #3097: резолвинг ссылок на услуги корзины по справочнику (SSOT).
+// Чистая функция, вынесенная из AppointmentWizardV2 (эффект гидрации
+// edit-записи): основной файл удержан в пределах потолка LOC PR-45,
+// логика резолвинга покрыта unit-тестами напрямую.
+//
+// Возвращает null, когда делать нечего: нет элементов без service_id,
+// нет расхождений имён с SSOT, либо маппинг ничего не изменил.
+export const resolveCartServiceReferences = (
+  items: Array<Record<string, unknown>>,
+  services: Array<Record<string, unknown>>
+): CartServiceResolution | null => {
+  type _SvcView = { id?: string | number; name?: string | null; service_code?: string | null; price?: number | null };
+  type _ItemView = {
+    service_id?: string | number;
+    service_name?: string;
+    service_price?: number;
+    doctor_id?: string | number | null;
+    _temp_name?: string;
+    [k: string]: unknown;
+  };
+
+  if (!Array.isArray(items) || items.length === 0 || !Array.isArray(services) || services.length === 0) return null;
+  const svcList = services as _SvcView[];
+
+  const unresolvedCount = items.filter((i) => !(i as _ItemView).service_id).length;
+  const hasNameMismatches = items.some((item) => {
+    if (!(item as _ItemView).service_id) return false;
+    const service = svcList.find((s) => s.id === (item as _ItemView).service_id);
+    return Boolean(service && service.name && service.name !== (item as _ItemView).service_name);
+  });
+
+  // Если нет ни нерешённых услуг, ни несоответствий имён — делать нечего
+  if (unresolvedCount === 0 && !hasNameMismatches) return null;
+
+  const updatedItems = items.map((rawItem) => {
+    const item = rawItem as _ItemView;
+
+    // Сначала синхронизируем элементы, у которых уже есть service_id, с SSOT
+    if (item.service_id) {
+      const service = svcList.find((s) => s.id === item.service_id);
+      if (service) {
+        const nextName = service.name || item.service_name;
+        const nextPrice = service.price != null ? service.price : item.service_price || 0;
+        if (nextName !== item.service_name || nextPrice !== item.service_price) {
+          return { ...rawItem, service_name: nextName, service_price: nextPrice, doctor_id: item.doctor_id || null };
+        }
+      }
+      // service_id есть и изменений нет (или услуга не найдена) — без изменений
+      return { ...rawItem, doctor_id: item.doctor_id || null };
+    }
+
+    // Ищем услугу по коду (приоритет) или имени
+    const searchName = item._temp_name || item.service_name;
+    if (!searchName) {
+      logger.warn('[resolveCartServiceReferences] item has no searchable name', { item });
+      return rawItem;
+    }
+
+    // Приводим к верхнему регистру и убираем ведущие нули для сравнения (p09 = p9)
+    const searchNameUpper = String(searchName).toUpperCase().trim();
+    const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+
+    const foundService = svcList.find((s) => {
+      // Паритет с прежней логикой: услуги без service_code не участвуют в поиске
+      if (!s.service_code) return false;
+      const codeUpper = String(s.service_code).toUpperCase().trim();
+      const codeNoZero = codeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+      if (codeUpper === searchNameUpper) return true;
+      if (codeNoZero === searchNameNoZero) return true;
+      return s.name === searchName || s.name === searchNameUpper;
+    });
+
+    if (foundService) {
+      return {
+        ...rawItem,
+        service_id: foundService.id,
+        service_name: foundService.name, // SSOT: полное название из справочника
+        service_price: foundService.price || 0,
+        _temp_name: searchName, // исходный код для отладки
+        doctor_id: item.doctor_id || null
+      };
+    }
+
+    logger.warn('[resolveCartServiceReferences] service not found in catalog', { searchName });
+    return rawItem;
+  });
+
+  const changed = updatedItems.some((rawItem, index) => {
+    const item = rawItem as _ItemView;
+    const prev = items[index] as _ItemView;
+    return item.service_id !== prev.service_id ||
+      item.service_price !== prev.service_price ||
+      item.service_name !== prev.service_name;
+  });
+
+  return changed ? { items: updatedItems, changed } : null;
+};
+
 export default {
   PATIENT_NAME_PATTERN,
   MIXED_REPEAT_WARNING,
   STEP_PATIENT,
   STEP_CART,
   TOTAL_STEPS,
+  wizardContentSignature,
   getLocalISODate,
   normalizeWizardContractValue,
   getWizardRecordKind,
@@ -569,20 +1741,25 @@ export default {
   resolveOnlineQueueEntryId,
   getRemovedQueueEntryIds,
   cancelRemovedQueueEntries,
+  QueueEntryCancelError,
   normalizeServiceSelectionValue,
   normalizeServiceSelectionName,
   normalizeGenderForForm,
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
-  getBirthDateValidationError,
+  buildCartQuoteRequest,
+  buildEditDeltaTargetItems,
   formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
+  getBirthDateValidationError,
   PATIENT_SELECTED_FROM_CARD_FLAG,
   isPatientSelectedFromCard,
   buildInheritedPatientClearPatch,
   isPhoneDuplicateErrorMessage,
+  createIdempotencyKey,
+  getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
@@ -590,4 +1767,24 @@ export default {
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
   categories,
+  resolveCartServiceReferences
+};
+
+// Codex R5 PR 3097 (P2): при условном размонтировании мастера (EditPatientModal
+// снимает его с дерева сразу при закрытии) isOpen-эффект не срабатывает, и
+// активные дебаунсы уходили в сеть после исчезновения диалога. Хук гасит
+// переданные таймеры на unmount. Codex R7 (P2): clearTimeout только на unmount
+// — замыкание обновляется через ref на каждом рендере, чтобы любой ререндер
+// (загрузка услуг/врачей) не погасил валидный отложенный поиск/проверку телефона.
+export const useWizardSearchUnmountCleanup = (
+  getTimers: () => Array<ReturnType<typeof setTimeout> | null>
+): void => {
+  const getTimersRef = useRef(getTimers);
+  useEffect(() => {
+    getTimersRef.current = getTimers;
+  });
+  useEffect(
+    () => () => { getTimersRef.current().forEach((t) => { if (t) clearTimeout(t); }); },
+    [],
+  );
 };

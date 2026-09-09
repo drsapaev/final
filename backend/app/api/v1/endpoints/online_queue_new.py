@@ -296,10 +296,18 @@ def cancel_queue_entry(
 ):
     """
     Отмена записи в онлайн-очереди
+
+    W2-PR3: отмена согласована — каскад entry → visit → pending-счёт
+    выполняется атомарно в сервисе; потреблённые записи (served и т.п.)
+    и позиции с деньгами (processing/paid счёт, канонический Payment)
+    отвергаются с 409 и явной причиной вместо «тихого» флипа статуса.
     """
     service = OnlineQueueNewService(db)
     try:
-        service.cancel_entry(entry_id=entry_id)
+        service.cancel_entry(entry_id=entry_id, current_user=current_user)
     except OnlineQueueNewDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    return {"message": "Запись отменена", "status": "canceled"}
+    # Codex R14 PR 3121 (P1): payload отражает каноническое написание
+    # статуса записи («cancelled» — тот же, что пишут queue_svc/force
+    # majeure и ждёт FE-тип QueueEntryStatus), а не отдельное «canceled».
+    return {"message": "Запись отменена", "status": "cancelled"}

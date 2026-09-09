@@ -937,6 +937,165 @@ def test_d6b_refund_failure_rollback(db_session, new_session_factory, test_user)
     db_session.commit()
 
 
+
+# ─── Codex R10 PR 3118: edit-delta decrease guard serialization ────────
+
+def test_edit_delta_decrease_guard_serializes_with_payment_creation(
+    db_engine, db_session, new_session_factory
+):
+    """Codex R10 PR 3118 (P1 :467): снижение количества сериализуется с
+    созданием платежа.
+
+    Платёжные потоки (PaymentInvariantService.create_payment_for_visit /
+    create_pending_payment) сериализуются на блокировке строки Visit. Если
+    гвард снижения edit-delta читает визит ОБЫЧНЫМ чтением, кассир/провайдер
+    может взять Visit-блокировку и закоммитить платёж ПОСЛЕ проверки гварда,
+    но ДО коммита edit-delta: уменьшённая услуга и счёт сосуществуют с
+    платежом на старое количество.
+
+    Фикс: гвард читает визит SELECT ... FOR UPDATE и держит блокировку до
+    конца транзакции edit-delta.
+
+    Runtime-протокол (реальный PostgreSQL, независимые сессии):
+      1. Сессия A исполняет фиксированный гвард — блокировка Visit УДЕРЖИВАЕТСЯ.
+      2. Сессия B (касса/провайдер) пытается create_pending_payment внутри
+         «окна» (lock_timeout 800ms) — ОБЯЗАНА упереться в блокировку A.
+      3. Позитивный контроль: после завершения транзакции A создание платежа
+         проходит — блокировка была именно транзакционной, не артефактом.
+
+    Гварду нужен только ``entry.visit_id`` — строка очереди представлена
+    duck-typed заглушкой (метод не читает других полей entry).
+    """
+    from datetime import datetime as _dt
+    from types import SimpleNamespace
+
+    from sqlalchemy.exc import OperationalError
+    from sqlalchemy import text as _text
+    from app.models.payment_invoice import PaymentInvoice
+    from app.models.visit import VisitService
+    from app.services.payment_invariant_service import PaymentInvariantService
+    from app.services.registrar_edit_delta_service import RegistrarEditDeltaService
+    from app.models.service import Service as _Service
+
+    # ── Setup (committed, independent session) ──
+    setup_session = sessionmaker(bind=db_engine)()
+    try:
+        patient = Patient(
+            last_name="Guard", first_name="Serialize",
+            birth_date=date(1990, 1, 1), sex="M",
+            phone="+998900000311", created_at=_dt.now(UTC), is_deleted=False,
+        )
+        setup_session.add(patient)
+        setup_session.flush()
+        service = _Service(
+            name="R3118 Guard Service", code="R3118GUARD",
+            price=100, duration_minutes=30,
+        )
+        setup_session.add(service)
+        setup_session.flush()
+        visit = Visit(
+            patient_id=patient.id, status="open",
+            created_at=_dt.now(UTC), visit_date=date.today(),
+            discount_mode="none",
+        )
+        setup_session.add(visit)
+        setup_session.flush()
+        setup_session.add(
+            VisitService(
+                visit_id=visit.id, service_id=service.id,
+                name=service.name, price=100, qty=3,
+            )
+        )
+        invoice = PaymentInvoice(
+            patient_id=patient.id, total_amount=300, currency="UZS",
+            status="pending", payment_method="click", notes="gate-d-r3118",
+        )
+        setup_session.add(invoice)
+        setup_session.flush()
+        from app.models.payment_invoice import PaymentInvoiceVisit
+        setup_session.add(
+            PaymentInvoiceVisit(
+                invoice_id=invoice.id, visit_id=visit.id, visit_amount=300,
+            )
+        )
+        setup_session.commit()
+        visit_id = visit.id
+        invoice_id = invoice.id
+    finally:
+        setup_session.close()
+
+    # ── Session A: FIXED guard holds the Visit row lock ──
+    entry_stub = SimpleNamespace(visit_id=visit_id)
+    RegistrarEditDeltaService(db_session)._assert_decrease_allowed(entry=entry_stub)
+
+    # ── Session B: payment creation attempts to interleave into the window ──
+    session_b = new_session_factory()
+    interleave_blocked = True
+    try:
+        session_b.execute(_text("SET LOCAL lock_timeout = '800ms'"))
+        try:
+            PaymentInvariantService(session_b).create_pending_payment(
+                visit_id=visit_id,
+                amount=Decimal("300"),
+                currency="UZS",
+                method="online",
+                provider="click",
+                note="gate-d-r3118-window",
+                current_user=SimpleNamespace(id=None),
+            )
+            interleave_blocked = False  # платёж проскочил в открытое окно
+        except OperationalError:
+            interleave_blocked = True   # сериализация удержана
+    finally:
+        session_b.rollback()
+        session_b.close()
+
+    assert interleave_blocked, (
+        "create_pending_payment успешно исполнился ВНУТРИ открытой транзакции "
+        "edit-delta — гвард снижения не удерживает Visit FOR UPDATE"
+    )
+
+    # ── Позитивный контроль: после завершения транзакции A платёж проходит ──
+    db_session.rollback()
+    session_c = new_session_factory()
+    try:
+        payment = PaymentInvariantService(session_c).create_pending_payment(
+            visit_id=visit_id,
+            amount=Decimal("300"),
+            currency="UZS",
+            method="online",
+            provider="click",
+            note="gate-d-r3118-after-commit",
+            current_user=SimpleNamespace(id=None),
+        )
+        session_c.commit()
+        payment_id = payment.id
+    finally:
+        session_c.close()
+
+    fresh = new_session_factory()
+    try:
+        db_payment = fresh.query(Payment).filter(Payment.id == payment_id).first()
+        assert db_payment is not None and db_payment.status == "pending"
+    finally:
+        fresh.close()
+
+    # Cleanup
+    cleanup = sessionmaker(bind=db_engine)()
+    try:
+        cleanup.execute(
+            _text("DELETE FROM payment_invoice_visits WHERE invoice_id = :iid"),
+            {"iid": invoice_id},
+        )
+        cleanup.execute(_text("DELETE FROM payment_invoices WHERE id = :iid"), {"iid": invoice_id})
+        cleanup.execute(_text("DELETE FROM payments WHERE visit_id = :vid"), {"vid": visit_id})
+        cleanup.execute(_text("DELETE FROM visit_services WHERE visit_id = :vid"), {"vid": visit_id})
+        cleanup.execute(_text("DELETE FROM visits WHERE id = :vid"), {"vid": visit_id})
+        cleanup.commit()
+    finally:
+        cleanup.close()
+
+
 # ─── Test runner entry point ──────────────────────────────────────────
 
 if __name__ == "__main__":

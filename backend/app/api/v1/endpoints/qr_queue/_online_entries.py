@@ -126,6 +126,9 @@ class FullUpdateOnlineEntryRequest(BaseModel):
     services: list[dict]  # [{service_id, quantity}]
     all_free: bool = False
     aggregated_ids: list[int] | None = None  # ⭐ FIX: IDs of all merged entries for dedup check
+    # Codex R4 #3095 (P1): привязка подтверждённой full-update квоты к команде —
+    # пересчёт цен на текущем каталоге (правила full_update) ДО мутаций.
+    quote_token: str | None = None
 
 
 def _full_update_find_and_validate_entry(
@@ -1728,7 +1731,13 @@ def _full_update_update_current_entry_services(
                 logger.info("[full_update_online_entry] Применена скидка all_free")
                 item_price = 0  # Всё бесплатно
 
-            total_amount += item_price
+            # Codex R3/R4 #3095 (P2): per-line int() — the SAME conversion the
+            # independent-entry path uses for new services and the
+            # /registrar/cart/quote full_update mode mirrors. The former
+            # raw accumulation + single int(total) disagreed with the
+            # confirmed per-line quote for fractional catalog prices
+            # (2 × 10.99 → confirmed 20, stored 21).
+            total_amount += int(item_price)
 
             # ⭐ FIX PHASE 2: Для существующих услуг используем оригинальное queue_time
             if service_id in existing_service_queue_times:
@@ -1964,6 +1973,15 @@ def full_update_online_entry(
     - Список услуг
     - Расчет итоговой суммы с учетом скидок
     """
+    # Codex R7 #3095 (P1): нормализуем режим All Free ОДИН РАЗ до всех
+    # секций — квота резолвит эффективный режим из ПАРЫ
+    # (all_free, discount_mode), а команды ценили только по булеву флагу.
+    # Агрегированная запись мастера несёт discount_mode="all_free" без
+    # булева флага → квота подтверждала бесплатную квоту, а команда
+    # выставляла каталожные цены. После нормализации все boolean-гейты
+    # секций (visit_type, финансовые, approval) согласованы с квотой.
+    if not request.all_free and request.discount_mode == "all_free":
+        request.all_free = True
     try:
 
 
@@ -1979,6 +1997,109 @@ def full_update_online_entry(
         entry, original_entry_discount_mode = _full_update_find_and_validate_entry(
             db, entry_id, current_user
         )
+
+        # Codex R9 #3095 (P2): normalize the COMMAND itself before token
+        # revalidation. The documented full-update API accepts a loose
+        # list[dict], so a client may submit numeric quantity: 0. Previously
+        # the token check coerced 0 → 1 while the mutation read the original
+        # zero (service_item.get('quantity', 1)) — a token quoted for one unit
+        # was accepted and the row was saved with quantity zero / charged 0.
+        # Validation and mutation now read the SAME normalized values.
+        for _svc_item in request.services or []:
+            if not isinstance(_svc_item, dict) or _svc_item.get("service_id") is None:
+                continue
+            _raw_qty = _svc_item.get("quantity", 1)
+            try:
+                _qty = int(_raw_qty) if _raw_qty is not None else 1
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Некорректное количество для услуги ID "
+                        f"{_svc_item.get('service_id')}: {_raw_qty!r}"
+                    ),
+                ) from None
+            if _qty < 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Количество услуги должно быть не меньше 1 "
+                        f"(ID {_svc_item.get('service_id')})"
+                    ),
+                )
+            _svc_item["quantity"] = _qty
+
+        # Codex R13 #3095 (P2): canonicalize duplicate service rows BEFORE
+        # token revalidation and mutation. The loose full-update payload may
+        # contain the same service_id twice (e.g. quantities 1 and 2): the
+        # quote/token priced both rows (three units), but the mutation loops
+        # the duplicated id and `next(...)` matched the FIRST row each time —
+        # the command created two one-unit entries while the registrar
+        # confirmed three. Merge rows by service_id with summed quantities so
+        # the confirmed quantity and the stored quantity agree; rows that
+        # disagree on any non-quantity key are an ambiguous target state and
+        # are rejected (the mutation cannot represent two configurations of
+        # one service). The /registrar/cart/quote full_update mode merges the
+        # same way, so tokens for a split or merged payload are identical.
+        _merged_rows: dict[object, dict] = {}
+        _merged_order: list[object] = []
+        for _svc_item in request.services or []:
+            if not isinstance(_svc_item, dict) or _svc_item.get("service_id") is None:
+                continue
+            try:
+                _sid_key = int(_svc_item["service_id"])
+            except (TypeError, ValueError):
+                _sid_key = _svc_item["service_id"]
+            if _sid_key not in _merged_rows:
+                _merged_rows[_sid_key] = dict(_svc_item)
+                _merged_order.append(_sid_key)
+                continue
+            _kept = _merged_rows[_sid_key]
+            _conflicting = {
+                k: v
+                for k, v in _svc_item.items()
+                if k != "quantity" and v != _kept.get(k)
+            }
+            if _conflicting:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Услуга ID {_sid_key} указана в запросе несколько раз "
+                        f"с разными параметрами: {_conflicting}"
+                    ),
+                )
+            _kept["quantity"] = int(_kept.get("quantity", 1) or 1) + int(
+                _svc_item.get("quantity", 1) or 1
+            )
+        request.services = [_merged_rows[_k] for _k in _merged_order]
+
+        # Codex R4 #3095 (P1): bind the confirmed quote to the command —
+        # revalidate prices BEFORE any mutation. Item-level conversion mirrors
+        # the per-line int() the command stores (see total_amount accumulation).
+        if request.quote_token:
+            from app.api.v1.endpoints.registrar_wizard._cart import (
+                _assert_quote_token_matches,
+            )
+            from app.api.v1.endpoints.registrar_wizard._helpers import (
+                CartQuoteItemRequest,
+            )
+
+            _assert_quote_token_matches(
+                db,
+                items=[
+                    CartQuoteItemRequest(
+                        service_id=int(s["service_id"]),
+                        quantity=int(s.get("quantity", 1) or 1),
+                    )
+                    for s in request.services
+                    if s.get("service_id") is not None
+                ],
+                discount_mode=request.discount_mode,
+                all_free=request.all_free,
+                pricing_mode="full_update",
+                quote_token=request.quote_token,
+            )
+
         _full_update_patient_data(entry, request.patient_data)
         _full_update_visit_type(entry, request)
 

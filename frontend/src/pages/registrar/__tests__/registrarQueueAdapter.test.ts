@@ -38,6 +38,34 @@ describe('adaptQueueEntry (PR-UI-13-1)', () => {
     expect(row.status).toBe('waiting');
   });
 
+  it('Codex R9 PR 3118: record_date проходит через адаптер (день записи, не created_at)', () => {
+    const row = adaptQueueEntry(
+      {
+        id: 12,
+        patient_fio: 'Будущая Запись',
+        record_date: '2026-09-20',
+        // queue_time отсутствует: adaptTimeFields подставил бы created_at
+        created_at: '2026-09-01T08:00:00',
+      },
+      baseQueue,
+      baseData,
+      '2026-09-20',
+      FALLBACK,
+    ) as Record<string, unknown>;
+    expect(row.record_date).toBe('2026-09-20');
+  });
+
+  it('Codex R9 PR 3118: record_date читается и из вложенного entry.data', () => {
+    const row = adaptQueueEntry(
+      { data: { id: 13, patient_fio: 'X', record_date: '2026-09-25' } },
+      baseQueue,
+      baseData,
+      '2026-09-25',
+      FALLBACK,
+    ) as Record<string, unknown>;
+    expect(row.record_date).toBe('2026-09-25');
+  });
+
   it('patient display fields use fullEntry → entry fallback chain, then localized fallback label', () => {
     const row = adaptQueueEntry(
       {

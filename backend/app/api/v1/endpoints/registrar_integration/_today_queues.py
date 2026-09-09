@@ -628,6 +628,9 @@ def _build_queue_result(
                     latest_lab_report=latest_lab_report,
                     entry_department_key=entry_department_key,
                     entry_department=entry_department,
+                    # W2-PR2: канонический день строки read-модели — день,
+                    # для которого построен лист (target_date запроса).
+                    record_date=today,
                 )
             )
 
