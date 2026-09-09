@@ -2241,7 +2241,19 @@ const AppointmentWizardV2 = ({
               throw new Error(editDeltaResult?.message || 'Edit delta failed');
             }
 
-            await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'edit-delta');
+            // Codex R14 PR 3121 (P1): неудача отмены удалённых записей ПОСЛЕ
+            // успешного edit-delta — частичное сохранение. Отдельный catch
+            // (не общий R6-обработчик ниже): повторы edit-delta здесь
+            // недопустимы (правка уже применена), успех/закрытие не
+            // выполняются — пользователь видит явную ошибку и открытый
+            // мастер.
+            try {
+              await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'edit-delta');
+            } catch (cancelError: unknown) {
+              logger.error('[AppointmentWizardV2] removed-entry cancellation failed after edit-delta save (partial state)', cancelError);
+              toast.error(getErrorMessage(cancelError) || t('misc.aw_record_update_failed'));
+              return;
+            }
             toast.success(t('misc.aw_record_updated_short'));
             onComplete?.(editDeltaResult);
             onClose?.();
@@ -2445,7 +2457,6 @@ const AppointmentWizardV2 = ({
           // updatePatient() бросает Error с .message и .status при неудаче.
           await updatePatient(patientId, patientUpdateData);
           logger.log('✅ Данные пациента успешно обновлены');
-          toast.success(t('misc.aw_patient_data_updated'));
 
           // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
           const currentQueueIds = new Set(
@@ -2456,11 +2467,16 @@ const AppointmentWizardV2 = ({
 
           const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
+          // Codex R14 PR 3121 (P1): отмены выполняются ДО success-тоста и
+          // onComplete — неудача (QueueEntryCancelError) уходит в общий
+          // catch ниже: без ложного успеха, без закрытия мастера, с явным
+          // сообщением о частичном сохранении.
           if (removedQueueIds.length > 0) {
             logger.log(`🗑️ Найдены удаленные записи очереди (Update Path): ${removedQueueIds.join(', ')}`);
             await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'patient-update');
           }
 
+          toast.success(t('misc.aw_patient_data_updated'));
           onComplete?.({ success: true, message: t('misc.aw_patient_data_updated') });
           onClose?.();
           return;
@@ -2548,8 +2564,6 @@ const AppointmentWizardV2 = ({
       // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
       // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
 
-      toast.success(editMode ? t('misc.aw_record_updated_bang') : t('misc.aw_record_created_success'));
-
       // ✅ НОВОЕ: Обработка удаленных записей очереди (для cart creation path)
       const currentQueueIds = new Set(
         wizardData.cart.items.
@@ -2559,10 +2573,16 @@ const AppointmentWizardV2 = ({
 
       const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
+      // Codex R14 PR 3121 (P1): отмены выполняются ДО success-тоста и
+      // onComplete — неудача (QueueEntryCancelError) уходит в общий catch
+      // ниже: без ложного успеха, без закрытия мастера, с явным
+      // сообщением о частичном сохранении.
       if (removedQueueIds.length > 0) {
         logger.log(`🗑️ Найдены удаленные записи очереди (Cart Path): ${removedQueueIds.join(', ')}`);
         await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'cart-update');
       }
+
+      toast.success(editMode ? t('misc.aw_record_updated_bang') : t('misc.aw_record_created_success'));
 
       onComplete?.(result);
       onClose?.();

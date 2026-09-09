@@ -57,12 +57,13 @@ class TestOnlineQueueNewService:
     def test_cancel_entry_updates_status(self):
         # W2-PR3: запись без связанного визита отменяется флипом статуса
         # (легаси-поведение сохранено); коммит один, объект refreshed.
+        # R14: каноническое написание статуса записи — «cancelled».
         entry = SimpleNamespace(id=1, status="waiting", visit_id=None)
         session = _FakeSession(entry)
         service = OnlineQueueNewService(db=session)
 
         updated = service.cancel_entry(entry_id=1)
 
-        assert updated.status == "canceled"
+        assert updated.status == "cancelled"
         assert session.committed is True
         assert session.refreshed == [entry]

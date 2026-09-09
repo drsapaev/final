@@ -159,7 +159,8 @@ def test_cancel_releases_pending_invoice_for_legacy_canceled_visit(db_session):
 
     result = OnlineQueueNewService(db_session).cancel_entry(entry_id=entry.id)
 
-    assert result.status == "canceled"
+    # R14: каноническое написание статуса ЗАПИСИ — «cancelled».
+    assert result.status == "cancelled"
     db_session.expire_all()
     db_session.refresh(invoice)
     assert invoice.status == "cancelled", (
@@ -251,7 +252,9 @@ def test_cancel_rejects_completed_visit_under_lifecycle_lock(db_session):
     visit = _create_visit(db_session, patient=patient, status="completed")
     entry = _create_entry(db_session, queue=queue, patient=patient, visit=visit)
 
-    source = inspect.getsource(OnlineQueueNewService.cancel_entry)
+    source = inspect.getsource(OnlineQueueNewService.cancel_entry) + inspect.getsource(
+        OnlineQueueNewService._cascade_linked_visit_cancel
+    )
     assert "with_for_update" in source and "populate_existing" in source, (
         "the visit must be read under a row lock with forced re-population"
     )
@@ -296,7 +299,7 @@ def test_record_action_cancel_forwards_actor_and_reason(
     db_session.expire_all()
     db_session.refresh(visit)
     db_session.refresh(entry)
-    assert entry.status == "canceled"
+    assert entry.status == "cancelled"
     assert visit.status == "canceled"
     assert "Canceled: пациент передумал" in (visit.notes or ""), (
         "the record-action path must forward the reason to the visit notes"
@@ -351,4 +354,4 @@ def test_batch_cancel_rejected_record_does_not_leak_staged_cascade(
     )
     assert paid_entry.status == "waiting"
     assert ok_visit.status == "canceled"
-    assert ok_entry.status == "canceled"
+    assert ok_entry.status == "cancelled"

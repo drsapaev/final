@@ -31,6 +31,13 @@ class OnlineQueueNewDomainError(Exception):
 # а не побочный эффект редактирования корзины.
 CANCELABLE_ENTRY_STATUSES = ("waiting", "called")
 
+# Codex R14 PR 3121 (P1): терминальные написания статуса отмены. Канонические
+# писатели очереди пишут «cancelled» (queue_svc/_helpers.py, force_majeure,
+# batch-операции; его же ждёт queue position API и FE-тип QueueEntryStatus);
+# каскад отмены визита в visits.py пишет «canceled». Оба принимаются как
+# терминал; запись нормализуется к каноническому «cancelled».
+TERMINAL_CANCELED_ENTRY_STATUSES = ("canceled", "cancelled")
+
 
 class OnlineQueueNewService:
     """Orchestrates online queue entry operations for API layer."""
@@ -58,7 +65,9 @@ class OnlineQueueNewService:
         1. Запись читается под блокировкой строки (FOR UPDATE) — сериализация
            с параллельными edit-delta и повторными отменами.
         2. Гвард статуса записи: waiting/called отменяемы; повторная отмена —
-           идемпотентный no-op; потреблённая запись — явный отказ.
+           идемпотентность С ДОЗАВЕРШЕНИЕМ каскада (ремонт легаси-строк:
+           прежняя реализация меняла только entry.status, оставляя открытый
+           визит и pending-счёт); потреблённая запись — явный отказ.
         3. Связанный визит (entry.visit_id) отменяется через
            VisitLifecycleService.cancel_visit(commit=False) — стейт-машина
            визита (confirmed/open/in_progress → canceled; closed/completed
@@ -88,9 +97,22 @@ class OnlineQueueNewService:
                 status_code=404,
                 detail="Запись очереди не найдена",
             )
-        if entry.status == "canceled":
-            # Идемпотентность: повторная отмена (двойной клик, параллельные
-            # пути мастера) — успешный no-op, а не ошибка.
+        if entry.status in TERMINAL_CANCELED_ENTRY_STATUSES:
+            # Codex R14 PR 3121 (P1): идемпотентность (двойной клик,
+            # параллельные пути мастера) И ремонт легаси-строк. Ранний
+            # возврат без сверки оставлял после прежней реализации открытый
+            # визит и pending-счёт («тихий» флип статуса), а легаси-написание
+            # «cancelled» вообще падало в 409-гард ниже. Повторная отмена
+            # дозавершает каскад: отменяет ещё не отменённый визит и
+            # высвобождает долю pending-счёта (с теми же финансовыми
+            # гардами), затем запись нормализуется к «cancelled».
+            if entry.visit_id:
+                self._cascade_linked_visit_cancel(
+                    entry=entry, current_user=current_user, reason=reason
+                )
+            entry.status = "cancelled"
+            self.db.commit()
+            self.db.refresh(entry)
             return entry
         if entry.status not in CANCELABLE_ENTRY_STATUSES:
             raise OnlineQueueNewDomainError(
@@ -102,41 +124,66 @@ class OnlineQueueNewService:
             )
 
         if entry.visit_id:
-            # Codex R13 PR 3121 (P1): визит читается и инспектируется ПОД
-            # блокировкой строки жизненного цикла С ПРИНУДИТЕЛЬНЫМ
-            # перечитыванием (populate_existing): и разблокированный пре-чек,
-            # и FOR UPDATE внутри cancel_visit возвращали уже загруженную
-            # SQLAlchemy identity БЕЗ перечитывания колонок — визит,
-            # параллельно переведённый open → completed/closed, всё ещё
-            # оценивался как open и перезаписывался в canceled. Одна
-            # блокировка — одно гарантированно свежее чтение.
-            visit = (
-                self.db.query(Visit)
-                .filter(Visit.id == entry.visit_id)
-                .with_for_update()
-                .populate_existing()
-                .first()
+            self._cascade_linked_visit_cancel(
+                entry=entry, current_user=current_user, reason=reason
             )
-            if visit is not None:
-                # Codex R13 PR 3121 (P1): финансовые гарды выполняются ДО
-                # staging перехода — отказ (деньги на визите) не оставляет
-                # staged-отменённый визит в сессии, который закоммитил бы
-                # следующий успешный record batch-запроса.
-                self._assert_visit_has_no_payments(visit)
-                canceled_now = self._stage_linked_visit_cancel(
-                    visit, current_user=current_user
-                )
-                if canceled_now and reason:
-                    visit.notes = (visit.notes or "") + f"\nCanceled: {reason}"
-                # Codex R13 PR 3121 (P2): легаси-состояние «активная запись +
-                # уже отменённый визит» тоже сверяет долю счёта — отмена
-                # записи не оставляет пациента выставленным счётом.
-                self._release_pending_invoice_for_visit(visit)
 
-        entry.status = "canceled"
+        entry.status = "cancelled"
         self.db.commit()
         self.db.refresh(entry)
         return entry
+
+    def _cascade_linked_visit_cancel(
+        self, *, entry: OnlineQueueEntry, current_user: Any, reason: str | None
+    ) -> None:
+        """Каскад отмены связанного визита + финансового хвоста (staging).
+
+        Codex R13/R14 PR 3121: используется и основным путём отмены, и
+        ремонтом легаси-строк на идемпотентной ветке — семантика едина.
+
+        - Codex R13 (P1): визит читается ПОД блокировкой строки жизненного
+          цикла С ПРИНУДИТЕЛЬНЫМ перечитыванием (populate_existing):
+          и разблокированный пре-чек, и FOR UPDATE внутри cancel_visit
+          возвращали уже загруженную SQLAlchemy identity БЕЗ перечитывания
+          колонок — визит, параллельно переведённый open → completed/closed,
+          всё ещё оценивался как open и перезаписывался в canceled. Одна
+          блокировка — одно гарантированно свежее чтение.
+        - Codex R14 (P2): легаси/битая строка с visit_id чужого пациента
+          отвергается ДО любых жизненного-цикла и финансовых мутаций
+          (зеркало гарда владельца в full_update _online_entries.py):
+          visit.patient_id обязан совпадать с entry.patient_id.
+        - Codex R13 (P1): финансовые гарды выполняются ДО staging перехода —
+          отказ (деньги на визите) не оставляет staged-отменённый визит в
+          сессии, который закоммитил бы следующий успешный record
+          batch-запроса.
+        - Codex R13 (P2): легаси-состояние «активная запись + уже отменённый
+          визит» тоже сверяет долю счёта — отмена записи не оставляет
+          пациента выставленным счётом.
+        """
+        visit = (
+            self.db.query(Visit)
+            .filter(Visit.id == entry.visit_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if visit is None:
+            return
+        if visit.patient_id != entry.patient_id:
+            raise OnlineQueueNewDomainError(
+                status_code=409,
+                detail=(
+                    "Связанный визит не принадлежит пациенту записи — "
+                    "отмена недоступна, проверьте данные записи"
+                ),
+            )
+        self._assert_visit_has_no_payments(visit)
+        canceled_now = self._stage_linked_visit_cancel(
+            visit, current_user=current_user
+        )
+        if canceled_now and reason:
+            visit.notes = (visit.notes or "") + f"\nCanceled: {reason}"
+        self._release_pending_invoice_for_visit(visit)
 
     def _stage_linked_visit_cancel(
         self, visit: Visit, *, current_user: Any

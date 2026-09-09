@@ -44,12 +44,16 @@ TZ = ZoneInfo("Asia/Tashkent")
 
 
 def _create_patient(db_session) -> Patient:
+    """Codex R14 PR 3121 (P1): санкционированная synthetic-фикстура —
+    метка SYNTHETIC- в фамилии и DEV-DEMO-телефон вместо реалистичной
+    пары «имя + узбекский номер» (политика AGENTS.md Synthetic data
+    policy: только synthetic_seed.py/dev_seed.py или явная метка)."""
     patient = Patient(
-        last_name="Отмена",
+        last_name="SYNTHETIC-W2PR3-Cancel",
         first_name="Тест",
         birth_date=date(1990, 1, 1),
         sex="M",
-        phone="+998900000777",
+        phone="DEV-DEMO-W2PR3-1",
         created_at=datetime.now(TZ),
         is_deleted=False,
     )
@@ -212,7 +216,11 @@ def test_cancel_cascades_to_open_visit_and_pending_invoice(db_session, cancel_wo
     refreshed_invoice = (
         db_session.query(PaymentInvoice).filter(PaymentInvoice.id == invoice.id).one()
     )
-    assert refreshed_entry.status == "canceled"
+    # Каноническое написание статуса ЗАПИСИ — «cancelled» (тот же, что
+    # пишут queue_svc/force majeure и ждёт queue position API и FE-тип
+    # QueueEntryStatus); статус ВИЗИТА остаётся «canceled» (SSOT
+    # visit lifecycle).
+    assert refreshed_entry.status == "cancelled"
     assert refreshed_visit.status == "canceled"
     assert refreshed_invoice.status == "cancelled"
     assert (
@@ -433,7 +441,7 @@ def test_cancel_skips_already_canceled_visit(db_session, cancel_world):
 
     refreshed_entry = db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry.id).one()
     refreshed_visit = db_session.query(Visit).filter(Visit.id == visit.id).one()
-    assert refreshed_entry.status == "canceled"
+    assert refreshed_entry.status == "cancelled"
     assert refreshed_visit.status == "canceled"
 
 
@@ -453,7 +461,7 @@ def test_cancel_is_idempotent(db_session, cancel_world):
 
     db_session.expire_all()
     refreshed = db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry.id).one()
-    assert refreshed.status == "canceled"
+    assert refreshed.status == "cancelled"
 
 
 def test_cancel_entry_without_visit_keeps_legacy_behavior(db_session, cancel_world):
@@ -468,7 +476,101 @@ def test_cancel_entry_without_visit_keeps_legacy_behavior(db_session, cancel_wor
 
     db_session.expire_all()
     refreshed = db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry.id).one()
-    assert refreshed.status == "canceled"
+    assert refreshed.status == "cancelled"
+
+
+# ─── Codex R14 PR 3121: ремонт легаси-строк и владелец визита ─────────
+
+
+def test_cancel_repairs_legacy_flip_with_open_visit_and_invoice(db_session, cancel_world):
+    """R14 (P1): легаси-строка «canceled» от прежней реализации («тихий»
+    флип только entry.status) с ОТКРЫТЫМ визитом и pending-счётом.
+    Повторная отмена не просто возвращает запись — она дозавершает
+    каскад: визит отменяется, счёт аннулируется, ссылка исчезает."""
+    patient = cancel_world["patient"]
+    service = cancel_world["service"]
+    visit = _create_visit(db_session, patient=patient, service=service, status="open")
+    entry = _create_entry(
+        db_session, queue=cancel_world["queue"], patient=patient, visit=visit,
+        status="canceled",  # легаси-флип: визит и счёт НЕ тронуты
+    )
+    invoice = _create_invoice(db_session, patient=patient, visit=visit, amount=500)
+
+    OnlineQueueNewService(db_session).cancel_entry(entry_id=entry.id)
+    db_session.expire_all()
+
+    refreshed_entry = db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry.id).one()
+    refreshed_visit = db_session.query(Visit).filter(Visit.id == visit.id).one()
+    refreshed_invoice = (
+        db_session.query(PaymentInvoice).filter(PaymentInvoice.id == invoice.id).one()
+    )
+    assert refreshed_entry.status == "cancelled"
+    assert refreshed_visit.status == "canceled"
+    assert refreshed_invoice.status == "cancelled"
+    assert (
+        db_session.query(PaymentInvoiceVisit)
+        .filter(PaymentInvoiceVisit.invoice_id == invoice.id)
+        .count()
+        == 0
+    )
+
+
+def test_cancel_legacy_double_l_spelling_is_terminal_and_reconciles(db_session, cancel_world):
+    """R14 (P1): легаси-написание «cancelled» (queue_svc/force majeure/
+    batch) — терминальный статус, а НЕ 409-гард «уже в статусе …».
+    Отмена идемпотентна и так же дозавершает каскад."""
+    patient = cancel_world["patient"]
+    service = cancel_world["service"]
+    visit = _create_visit(db_session, patient=patient, service=service, status="open")
+    entry = _create_entry(
+        db_session, queue=cancel_world["queue"], patient=patient, visit=visit,
+        status="cancelled",  # легаси-писатели очереди
+    )
+    invoice = _create_invoice(db_session, patient=patient, visit=visit, amount=500)
+
+    OnlineQueueNewService(db_session).cancel_entry(entry_id=entry.id)
+    db_session.expire_all()
+
+    refreshed_entry = db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry.id).one()
+    refreshed_visit = db_session.query(Visit).filter(Visit.id == visit.id).one()
+    refreshed_invoice = (
+        db_session.query(PaymentInvoice).filter(PaymentInvoice.id == invoice.id).one()
+    )
+    assert refreshed_entry.status == "cancelled"
+    assert refreshed_visit.status == "canceled"
+    assert refreshed_invoice.status == "cancelled"
+
+
+def test_cancel_rejects_foreign_visit_owner(db_session, cancel_world):
+    """R14 (P2): легаси/битая строка с visit_id ЧУЖОГО пациента — отказ
+    под блокировкой ДО любых мутаций (зеркало гарда владельца в
+    full_update _online_entries.py). Состояние не изменено."""
+    patient = cancel_world["patient"]
+    foreign_patient = _create_patient(db_session)
+    service = cancel_world["service"]
+    foreign_visit = _create_visit(
+        db_session, patient=foreign_patient, service=service, status="open"
+    )
+    entry = _create_entry(
+        db_session, queue=cancel_world["queue"], patient=patient, visit=foreign_visit
+    )
+    invoice = _create_invoice(
+        db_session, patient=foreign_patient, visit=foreign_visit, amount=500
+    )
+
+    with pytest.raises(OnlineQueueNewDomainError) as exc:
+        OnlineQueueNewService(db_session).cancel_entry(entry_id=entry.id)
+    assert "не принадлежит пациенту записи" in getattr(exc.value, "detail", "")
+
+    db_session.expire_all()
+    refreshed_entry = db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry.id).one()
+    refreshed_visit = db_session.query(Visit).filter(Visit.id == foreign_visit.id).one()
+    refreshed_invoice = (
+        db_session.query(PaymentInvoice).filter(PaymentInvoice.id == invoice.id).one()
+    )
+    assert refreshed_entry.status == "waiting"
+    assert refreshed_visit.status == "open"
+    assert refreshed_invoice.status == "pending"
 
 
 def test_cancel_unknown_entry_raises_404(db_session):
@@ -503,7 +605,7 @@ def test_api_cancel_cascades_and_keeps_legacy_payload(
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "canceled"
+    assert body["status"] == "cancelled"
 
     db_session.expire_all()
     refreshed_visit = db_session.query(Visit).filter(Visit.id == visit.id).one()
@@ -511,7 +613,7 @@ def test_api_cancel_cascades_and_keeps_legacy_payload(
         db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry.id).one()
     )
     assert refreshed_visit.status == "canceled"
-    assert refreshed_entry.status == "canceled"
+    assert refreshed_entry.status == "cancelled"
 
 
 def test_api_cancel_consumed_entry_returns_409(
