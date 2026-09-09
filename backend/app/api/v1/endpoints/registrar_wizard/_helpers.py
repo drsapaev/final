@@ -156,6 +156,10 @@ class EditDeltaServiceItem(BaseModel):
     # Codex R13 #3095 (P2): the save-time token revalidation mirrors this
     # specialist too — see apply_registrar_cart_edit_delta.
     specialist_id: int | None = None
+    # Codex R8 #3115 (P1): идентичность исходной записи позиции — при одном
+    # service_id под разными врачами/записями правится ИМЕННО названная
+    # запись, а не ближайшая по глобальному preferred-набору.
+    queue_entry_id: int | None = None
 
 
 class EditDeltaRequest(BaseModel):
@@ -270,12 +274,17 @@ class CartQuoteItemRequest(BaseModel):
     # врачебной переопределённой цене, и подтверждение расходилось со счётом.
     # Codex R8 #3095 (P2): та же точность 2dp (см. ServiceItemRequest).
     custom_price: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
-    # Codex R11 #3095 (P2): зеркало EditDeltaServiceItem.specialist_id —
-    # edit-квота обязана зеркалить гейт создания команды: позиция без
-    # активной записи того же дня требует резолвимого специалиста, когда
-    # для queue_tag/даты нет активной очереди. Без контекста специалиста
-    # квота подтверждала цену команды, которая на сохранении возвращала 400.
+    # W2-PR1: маршрутизация edit-дельты учитывает врача (ADR-001: явный
+    # specialist_id не сливается в чужую очередь того же queue_tag) — квота
+    # маршрутизирует позицию ИДЕНТИЧНО команде; None = «врач не указан».
+    # Codex R11 #3095 (P2): тот же контекст зеркалит гейт создания команды —
+    # позиция без активной записи того же дня требует резолвимого
+    # специалиста, когда для queue_tag/даты нет активной очереди; без него
+    # квота подтверждала цену команды, возвращавшей на сохранении 400.
     specialist_id: int | None = None
+    # Codex R8 #3115 (P1): зеркало EditDeltaServiceItem.queue_entry_id —
+    # квота маршрутизирует позицию по ТЕМ ЖЕ правилам, что и команда.
+    queue_entry_id: int | None = None
 
 
 class CartQuoteRequest(BaseModel):

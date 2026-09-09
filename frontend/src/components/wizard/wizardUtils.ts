@@ -378,12 +378,12 @@ export interface CartQuoteRequestOptions {
 export const buildCartQuoteRequest = (
   cart: QuoteCartSource | null | undefined,
   options: CartQuoteRequestOptions = {}
-): { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } | null => {
+): { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } | null => {
   const rawItems = (options.itemsOverride ?? (Array.isArray(cart?.items) ? cart.items : [])) || [];
   const items = rawItems
     .filter((item) => item && item.service_id != null)
     .map((item) => {
-      const quoteItem: { service_id: number; quantity: number; custom_price?: number; specialist_id?: number } = {
+      const quoteItem: { service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number } = {
         service_id: Number(item.service_id),
         quantity: Math.max(1, Number(item.quantity || 1)),
       };
@@ -392,22 +392,32 @@ export const buildCartQuoteRequest = (
       if (customPrice != null && Number.isFinite(Number(customPrice))) {
         quoteItem.custom_price = Number(customPrice);
       }
-      // Codex R12 #3095 (P2): specialist_id зеркалится из выбранного врача
-      // корзины (doctor_id) — ТО ЖЕ, что шлёт команда сохранения
+      // Codex R12 #3095 (P2): specialist_id зеркалится в квоту — маршрутизация
+      // дельты в квоте обязана совпадать с маршрутизацией команды (ADR-001).
+      // Источники: item.specialist_id у edit-delta target-item'ов (для
+      // существующих позиций — null: перенос врача запрещён), иначе
+      // doctor_id сырой корзины — ТО ЖЕ, что шлёт команда сохранения
       // (newServices: specialist_id: item.doctor_id). Иначе edit добавляет
       // услугу без default-врача каталога и без активной очереди дня: квота
       // отвечает 400 "specialist_id is required", хотя команда создала бы
       // очередь выбранного врача — завершение заблокировано навсегда.
       // Save-ревалидация токена пере-считывает квоту по ЭТИМ ЖЕ item'ам —
       // зеркалирование в маппере покрывает оба пути одним местом.
-      const specialistId = (item as { doctor_id?: unknown }).doctor_id;
+      const itemRecord = item as Record<string, unknown>;
+      const specialistId = 'specialist_id' in itemRecord ? itemRecord.specialist_id : itemRecord.doctor_id;
       if (specialistId != null && Number.isFinite(Number(specialistId)) && Number(specialistId) > 0) {
         quoteItem.specialist_id = Number(specialistId);
+      }
+      // Codex R8 #3115 (P1): идентичность исходной записи зеркалится в квоту
+      const queueEntryId = (item as { queue_entry_id?: unknown }).queue_entry_id
+        ?? (item as { original_queue_id?: unknown }).original_queue_id;
+      if (queueEntryId != null && Number.isFinite(Number(queueEntryId)) && Number(queueEntryId) > 0) {
+        quoteItem.queue_entry_id = Number(queueEntryId);
       }
       return quoteItem;
     });
   if (items.length === 0) return null;
-  const request: { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } = {
+  const request: { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number; queue_entry_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } = {
     items,
     discount_mode: String(cart?.discount_mode || 'none'),
     all_free: Boolean(cart?.all_free),
@@ -895,6 +905,10 @@ export interface EditOriginalServiceIdentity {
   serviceNames: Set<string>;
   queueIds: Set<string | number>;
   entryUpdatedAtMap: Record<string, string>;
+  // W2-PR1: исходное количество позиции по service_id (из service_details —
+  // read-модель отдаёт quantity с W2-PR1). Отсутствие ключа = исходное
+  // количество неизвестно — такая позиция не включается в edit-дельту.
+  originalQuantities: Map<string, number>;
 }
 
 // Собирает множества «исходных» услуг edit-записи (service_details →
@@ -914,6 +928,7 @@ export const buildEditOriginalServiceIdentity = (
     serviceNames: new Set<string>(),
     queueIds: new Set<string | number>(),
     entryUpdatedAtMap: {},
+    originalQuantities: new Map<string, number>(),
   };
   if (!editMode || !initialData) return identity;
 
@@ -932,10 +947,12 @@ export const buildEditOriginalServiceIdentity = (
   const originalServiceIds = identity.serviceIds;
   const originalQueueIds = identity.queueIds; // PR-14: optimistic locking map lives here too
   const entryUpdatedAtMap = identity.entryUpdatedAtMap;
+  const originalQuantities = identity.originalQuantities;
   const originalServiceCodes = identity.serviceCodes;
   const originalServiceNames = identity.serviceNames;
 
     // Определяем исходные услуги из initialData
+    const serviceDetailOccurrences = new Map<string, number>();
 
     if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
       logger.log('📋 Извлечение исходных услуг из service_details:', initialData.service_details);
@@ -949,6 +966,26 @@ export const buildEditOriginalServiceIdentity = (
 
         if (serviceId) originalServiceIds.add(serviceId);
         if (queueId) originalQueueIds.add(queueId);
+        // W2-PR1: исходное количество позиции (read-модель service_details)
+        const originalQty = Number(serviceDetail.quantity ?? serviceDetail.qty);
+        if (serviceId && Number.isFinite(originalQty) && originalQty > 0) {
+          // Codex R15 #3115 (P1): ключ — (queue_entry_id, service_id): одна
+          // услуга в ДВУХ записях с разными количествами не должна
+          // перезаписывать друг друга в карте исходных количеств, иначе
+          // правка первой позиции классифицируется no-op по количеству
+          // второй. Bare-ключ услуги хранится, пока позиция одна
+          // (легаси-потоки без идентичности записи), и снимается при
+          // неоднозначности — остаются только точные ключи.
+          const bareServiceKey = String(serviceId);
+          const detailCount = (serviceDetailOccurrences.get(bareServiceKey) ?? 0) + 1;
+          serviceDetailOccurrences.set(bareServiceKey, detailCount);
+          originalQuantities.set(`${queueId ?? ''}:${bareServiceKey}`, originalQty);
+          if (detailCount === 1) {
+            originalQuantities.set(bareServiceKey, originalQty);
+          } else {
+            originalQuantities.delete(bareServiceKey);
+          }
+        }
         // PR-14: collect updated_at for optimistic locking
         if (queueId) {
           const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || initialData.updated_at || initialData.last_changed_at;
@@ -1163,6 +1200,79 @@ export const isEditDeltaNewItem = (
   return !hasExistingQueueIdentity && !inIds && !inCodes && !inNames;
 };
 
+// =====================================================================
+// W2-PR1: ЦЕЛЕВОЕ СОСТОЯНИЕ edit-дельты (полная корзина, а не только новые)
+// =====================================================================
+
+export interface EditDeltaTargetItem {
+  service_id: string | number;
+  quantity: number;
+  specialist_id: string | number | null;
+}
+
+export interface EditDeltaTargetBuild {
+  items: EditDeltaTargetItem[];
+  hasNew: boolean;
+  hasQuantityChange: boolean;
+}
+
+// Собирает edit-delta payload из ВСЕЙ корзины (целевое состояние позиции),
+// а не только из новых услуг. Новые услуги — как раньше (specialist_id из
+// корзины). Существующая позиция включается ТОЛЬКО когда исходное количество
+// известно (service_details после W2-PR1) и пользователь его изменил:
+// неизвестное исходное количество нельзя молча превращать в снижение —
+// backend применил бы его как negative delta (записал бы целевое количество
+// поверх реального). Позиция без изменения количества не отправляется —
+// настоящий no-op. Смена врача существующей позиции в payload не передаётся
+// (specialist_id=null): контракт переноса — отдельная операция (wave2 PR2).
+export const buildEditDeltaTargetItems = (
+  cartItems: Array<Record<string, unknown>>,
+  servicesData: WizardServiceRecord[],
+  identity: EditOriginalServiceIdentity,
+): EditDeltaTargetBuild => {
+  const build: EditDeltaTargetBuild = { items: [], hasNew: false, hasQuantityChange: false };
+  (cartItems || []).forEach((item) => {
+    if (!item || item.service_id == null) return;
+    const service = servicesData.find((s) => String(s.id) === String(item.service_id));
+    if (!service) return; // зеркало сабмита: услуга вне справочника не сабмитится
+    const quantity = Math.max(1, Number(item.quantity || 1));
+    if (isEditDeltaNewItem(item, service, identity)) {
+      build.hasNew = true;
+      build.items.push({
+        service_id: item.service_id as string | number,
+        quantity,
+        specialist_id: (item.doctor_id as string | number | undefined) ?? null,
+      });
+      return;
+    }
+    // Codex R15 #3115 (P1): сравнение по ИДЕНТИЧНОСТИ (запись, услуга) —
+    // той же, по которой записывались исходные количества из service_details;
+    // оригинальная запись берётся из самой корзинной позиции. Bare-ключ —
+    // фолбэк для однозначных легаси-потоков без идентичности записи.
+    const originalQueueId = item.original_queue_id ?? item.queue_entry_id ?? null;
+    const serviceKey = String(item.service_id);
+    const originalQty =
+      identity.originalQuantities.get(`${originalQueueId ?? ''}:${serviceKey}`) ??
+      identity.originalQuantities.get(serviceKey);
+    if (originalQty === undefined) return;
+    if (quantity === originalQty) return; // без изменений — no-op
+    build.hasQuantityChange = true;
+    // Codex R8 #3115 (P1): существующая позиция сохраняет идентичность своей
+    // записи (original_queue_id из service_details). При одном service_id под
+    // разными врачами/записями правится ИМЕННО названная запись, а не
+    // ближайшая по глобальному preferred-набору.
+    build.items.push({
+      service_id: item.service_id as string | number,
+      quantity,
+      specialist_id: null,
+      ...(originalQueueId != null && Number.isFinite(Number(originalQueueId))
+        ? { queue_entry_id: Number(originalQueueId) }
+        : {}),
+    });
+  });
+  return build;
+};
+
 export default {
   PATIENT_NAME_PATTERN,
   MIXED_REPEAT_WARNING,
@@ -1195,6 +1305,7 @@ export default {
   isPhoneDuplicateErrorMessage,
   createIdempotencyKey,
   buildCartQuoteRequest,
+  buildEditDeltaTargetItems,
   getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,

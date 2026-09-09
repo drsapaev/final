@@ -225,6 +225,7 @@ import {
   buildCartQuoteRequest,
   buildEditOriginalServiceIdentity,
   isEditDeltaNewItem,
+  buildEditDeltaTargetItems,
   getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
@@ -1209,11 +1210,15 @@ const AppointmentWizardV2 = ({
     let quotePricingMode: 'cart' | 'edit_delta' | 'full_update' = 'cart';
     if (isEditModeQuote && !fullUpdateQuoteRoute) {
       quotePricingMode = 'edit_delta';
-      quoteSourceItems = rawCartItems.filter((item) => {
-        const service = servicesData.find((s) => String(s.id) === String(item.service_id));
-        if (!service) return false; // зеркало сабмита: услуга вне справочника не сабмитится
-        return isEditDeltaNewItem(item, service, editOriginalServiceIdentity);
-      });
+      // W2-PR1: квота зеркалит сабмит 1-в-1 — та же buildEditDeltaTargetItems
+      // (новые услуги + изменившиеся количества существующих позиций).
+      // Раньше квотировались только новые услуги, и подтверждённая сумма
+      // игнорировала изменение количества существующей позиции.
+      quoteSourceItems = buildEditDeltaTargetItems(
+        rawCartItems,
+        servicesData,
+        editOriginalServiceIdentity,
+      ).items as unknown as Array<Record<string, unknown>>;
     } else if (isEditModeQuote && fullUpdateQuoteRoute) {
       quotePricingMode = 'full_update';
     }
@@ -1696,11 +1701,16 @@ const AppointmentWizardV2 = ({
     const totalAmount = Number(cartQuote.total_amount) || 0;
 
     // Itemized breakdown из квоты: услуга × количество, скидка, итог строки
+    // Codex R8 PR 3115 (P2): отрицательные значения снижения показываются СО
+    // ЗНАКОМ — «бесплатно» только для ровно нуля; otherwise the confirmation
+    // hid the invoice reduction and mispresented an adjustment as a freebie.
+    const formatQuoteAmount = (value: number) =>
+      `${new Intl.NumberFormat('ru-RU').format(value)} ${t('misc.aw_currency_sum')}`;
     const itemizedLines = cartQuote.items.map((item) => {
       const qty = Number(item.quantity ?? 1);
       const finalPrice = Number(item.final_price) || 0;
       const discountSuffix = item.discount_percent > 0 ? ` (−${item.discount_percent}%)` : '';
-      const priceStr = finalPrice > 0 ? `${new Intl.NumberFormat('ru-RU').format(finalPrice)} ${t('misc.aw_currency_sum')}` : t('misc.aw_free');
+      const priceStr = finalPrice !== 0 ? formatQuoteAmount(finalPrice) : t('misc.aw_free');
       return `• ${item.service_name}${qty > 1 ? ` ×${qty}` : ''}${discountSuffix} — ${priceStr}`;
     });
 
@@ -1710,7 +1720,7 @@ const AppointmentWizardV2 = ({
       ...itemizedLines,
       '',
       doctorCount > 1 ? t('misc.aw_summary_doctors_count', { count: doctorCount }) : null,
-      totalAmount > 0 ? t('misc.aw_summary_total', { amount: new Intl.NumberFormat('ru-RU').format(totalAmount) }) : t('misc.aw_summary_free'),
+      totalAmount !== 0 ? t('misc.aw_summary_total', { amount: formatQuoteAmount(totalAmount) }) : t('misc.aw_summary_free'),
       cartQuote.approval_status === 'pending' ? t('misc.aw_quote_pending_approval') : null,
     ].filter(Boolean);
 
@@ -2245,19 +2255,18 @@ const AppointmentWizardV2 = ({
         // ✅ ИСПРАВЛЕНИЕ: Проверяем наличие новых услуг (как с врачами, так и без)
         const hasNewServices = newServices.length > 0 || newServicesWithoutDoctor.length > 0;
 
-        if (editMode && hasNewServices) {
-          const editDeltaServices: Array<{ service_id: string | number; quantity?: unknown; specialist_id?: string | number | null }> = [
-            ...newServices.map((item) => ({
-              service_id: item.service_id as string | number,
-              quantity: item.quantity,
-              specialist_id: item.specialist_id as string | number
-            })),
-            ...newServicesWithoutDoctor.map((item) => ({
-              service_id: item.service_id as string | number,
-              quantity: item.quantity,
-              specialist_id: null as string | number | null
-            }))
-          ];
+        // W2-PR1: edit-delta отправляет ЦЕЛЕВОЕ СОСТОЯНИЕ корзины — новые
+        // услуги И изменившиеся количества существующих позиций (знаковая
+        // дельта на backend). Раньше существующие позиции не отправлялись
+        // вовсе: изменение количества/скидки без добавления новой услуги
+        // завершалось «успехом», обновляя только данные пациента.
+        const editDeltaBuild = buildEditDeltaTargetItems(
+          (wizardData.cart.items ?? []) as Array<Record<string, unknown>>,
+          servicesData,
+          editOriginalIdentity,
+        );
+
+        if (editMode && editDeltaBuild.items.length > 0) {
           const patientDataForEditDelta: Record<string, unknown> = {
             full_name: wizardData.patient.fio || wizardData.patient.name,
             phone: normalizedPhone,
@@ -2272,8 +2281,10 @@ const AppointmentWizardV2 = ({
           });
 
           try {
-            logger.log('[AppointmentWizardV2] edit mode with new services; applying edit delta', {
-              serviceCount: editDeltaServices.length,
+            logger.log('[AppointmentWizardV2] edit mode with service delta; applying edit delta', {
+              serviceCount: editDeltaBuild.items.length,
+              hasNew: editDeltaBuild.hasNew,
+              hasQuantityChange: editDeltaBuild.hasQuantityChange,
               existingQueueEntryIds: Array.from(originalQueueIds)
             });
             const editDeltaResult = await applyRegistrarEditDelta({
@@ -2283,7 +2294,7 @@ const AppointmentWizardV2 = ({
               paymentMethod: wizardData.payment.method,
               discountMode: wizardData.cart.discount_mode,
               allFree: wizardData.cart.all_free,
-              services: editDeltaServices,
+              services: editDeltaBuild.items,
               existingQueueEntryIds: Array.from(originalQueueIds),
               // PR-14: pass optimistic-locking map so backend can detect
               // concurrent edits (last-write-wins → 409 Conflict).

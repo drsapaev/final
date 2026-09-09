@@ -12,6 +12,7 @@ from app.crud.patient import normalize_patient_name
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
+from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
 from app.models.user import User
@@ -21,12 +22,30 @@ from app.services.service_mapping import get_service_code, normalize_service_cod
 
 ACTIVE_APPEND_STATUSES = ("waiting", "called", "in_service", "diagnostics")
 
+# W2-PR1: позиции визита в этих статусах нельзя изменять через edit-delta:
+# "closed" — услуга уже выполнена (потреблённый объём не корректируется
+# редактированием корзины), "canceled" — деньги прошли цепочку отмены,
+# "paid" — legacy-статус. Снижение по оплаченному счёту = возврат —
+# отдельный финансовый контракт (wave2 PR3), а не побочный эффект редактирования.
+# Codex R9 PR 3115 (P1): "expired" — терминальный статус по SSOT
+# visit_lifecycle_service (истёкшее подтверждение). Пропуск expired давал две
+# дыры: снижение мутировало терминальный визит, чья запись оставалась
+# appendable; а если запись уже не appendable, _assert_service_not_on_blocked_visit
+# тоже не находила визит — команда создавала дубликат визита для той же услуги
+# и дня.
+VISIT_POSITION_BLOCKED_STATUSES = ("closed", "canceled", "paid", "expired")
+
 
 @dataclass(frozen=True)
 class RegistrarEditDeltaItem:
     service_id: int
     quantity: int = 1
     specialist_id: int | None = None
+    # Codex R8 #3115 (P1): идентичность исходной записи позиции. При одном
+    # service_id под разными врачами/записями только она определяет, ЧЬЯ
+    # позиция правится: глобальный preferred-набор выбирал бы ближайшую
+    # запись и мог мутировать позицию врача A при правке строки врача B.
+    queue_entry_id: int | None = None
 
 
 class RegistrarEditDeltaService:
@@ -79,11 +98,27 @@ class RegistrarEditDeltaService:
                 raise ValueError(f"Service {service.id} has no queue tag")
 
             requested_qty = max(int(item.quantity or 1), 1)
+            # Codex R8 #3115 (P1): индивидуальная маршрутизация позиции —
+            # явная запись позиции имеет приоритет над глобальным набором.
+            item_preferred: set[int] = (
+                {int(item.queue_entry_id)}
+                if item.queue_entry_id is not None
+                else queue_entry_ids
+            )
             entry = self._find_active_entry(
                 patient_id=patient_id,
                 queue_tag=queue_tag,
                 target_date=target_date,
-                preferred_entry_ids=queue_entry_ids,
+                preferred_entry_ids=item_preferred,
+                specialist_id=item.specialist_id,
+                # Codex R8 #3115 (P1): мутирующая команда фиксирует выбранную
+                # запись до конца транзакции.
+                lock=True,
+                # Codex R11 #3115 (P1): явно названный ID — строгий селектор,
+                # а не мягкое предпочтение: устаревшая идентичность — 400.
+                strict_entry_id=(
+                    int(item.queue_entry_id) if item.queue_entry_id is not None else None
+                ),
             )
 
             if entry:
@@ -99,6 +134,25 @@ class RegistrarEditDeltaService:
                     current_user=current_user,
                 )
             else:
+                # W2-PR1: активной записи нет. Два громких отказа вместо
+                # ложного «добавления»:
+                # 1) услуга уже выполнена/отменена в этот день — правка
+                #    количества создала бы дубликат позиции;
+                # 2) позиция уже существует у другого врача, а запрос явно
+                #    называет иного специалиста — это перенос (wave2 PR2),
+                #    а не добавление: иначе услуга задвоилась бы.
+                self._assert_service_not_on_blocked_visit(
+                    patient_id=patient_id,
+                    service_id=service.id,
+                    target_date=target_date,
+                )
+                self._assert_not_doctor_change_of_existing_position(
+                    patient_id=patient_id,
+                    service=service,
+                    target_date=target_date,
+                    preferred_entry_ids=item_preferred,
+                    specialist_id=item.specialist_id,
+                )
                 delta = self._create_new_queue_entry(
                     patient=patient,
                     service=service,
@@ -110,12 +164,19 @@ class RegistrarEditDeltaService:
                     current_user=current_user,
                 )
 
-            if delta["delta_amount"] > 0 and delta["visit_id"]:
+            # W2-PR1: в финансовую дельту попадает ЛЮБАЯ ненулевая дельта —
+            # в том числе отрицательная (снижение). Прежний фильтр > 0
+            # выбрасывал снижение из инвойс-расчёта полностью.
+            if delta["delta_amount"] != 0 and delta["visit_id"]:
                 visit_id = int(delta["visit_id"])
                 visit_delta_amounts[visit_id] = (
                     visit_delta_amounts.get(visit_id, Decimal("0"))
                     + delta["delta_amount"]
                 )
+            # created_visits (для пост-мастерового экрана) описывает только
+            # доначисления; снижение не «создаёт» услугу.
+            if delta["delta_amount"] > 0 and delta["visit_id"]:
+                visit_id = int(delta["visit_id"])
                 created_visit_payloads.setdefault(
                     visit_id,
                     {
@@ -179,7 +240,11 @@ class RegistrarEditDeltaService:
             "message": (
                 "Запись обновлена. Добавленные услуги сохранены в существующей очереди."
                 if total_amount > 0
-                else "Запись обновлена. Новых платных услуг не добавлено."
+                else (
+                    "Запись обновлена. Сумма счёта уменьшена."
+                    if total_amount < 0
+                    else "Запись обновлена. Новых платных услуг не добавлено."
+                )
             ),
             "invoice_id": invoice.id if invoice else None,
             "visit_ids": list(visit_delta_amounts.keys()),
@@ -249,6 +314,175 @@ class RegistrarEditDeltaService:
                     "Обновите страницу, чтобы получить актуальные данные."
                 )
 
+    def _assert_service_not_on_blocked_visit(
+        self,
+        *,
+        patient_id: int,
+        service_id: int,
+        target_date: date,
+    ) -> None:
+        """W2-PR1: изменение завершённой/отменённой позиции дня — не no-op и
+        не добавление: явный отказ вместо дубликата или имитации сохранения.
+
+        Скоуп — тот же день, что и целевая дата команды: выполненная услуга
+        прошлых дней не мешает новой записи на target_date (легитимный
+        повторный визит). Перенос целевой даты на исходную дату визита —
+        контракт wave2 PR2."""
+        blocked = (
+            self.db.query(VisitService)
+            .join(Visit, Visit.id == VisitService.visit_id)
+            .filter(
+                Visit.patient_id == patient_id,
+                VisitService.service_id == service_id,
+                Visit.visit_date == target_date,
+                Visit.status.in_(VISIT_POSITION_BLOCKED_STATUSES),
+            )
+            .first()
+        )
+        if blocked:
+            raise ValueError(
+                "Услуга уже выполнена или отменена в этот день — изменение количества "
+                "недоступно. Для корректировки используйте отмену/корректировку визита"
+            )
+
+    def _assert_not_doctor_change_of_existing_position(
+        self,
+        *,
+        patient_id: int,
+        service: Service,
+        target_date: date,
+        preferred_entry_ids: set[int],
+        specialist_id: int | None,
+    ) -> None:
+        """W2-PR1: явный specialist_id при позиции, уже существующей в
+        активной записи ДРУГОГО врача того же queue_tag — это перенос
+        позиции, а не добавление. Прежний матчинг молча возвращал None и
+        команда создавала вторую позицию под новым врачом, оставляя старую —
+        двойное начисление при намерении «перенести».
+
+        Контракт переноса записи — отдельная операция (wave2 PR2): здесь
+        громкий отказ с причиной. Без явного specialist_id — прежняя
+        маршрутизация (проверка не применяется)."""
+        if specialist_id is None:
+            return
+        queue_tag = service.queue_tag or service.department_key
+        entries = (
+            self.db.query(OnlineQueueEntry)
+            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+            .filter(
+                OnlineQueueEntry.patient_id == patient_id,
+                OnlineQueueEntry.status.in_(ACTIVE_APPEND_STATUSES),
+                DailyQueue.day == target_date,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active.is_(True),
+            )
+            .all()
+        )
+        if preferred_entry_ids:
+            entries = [entry for entry in entries if entry.id in preferred_entry_ids]
+        for entry in entries:
+            payload = self._find_service_payload(
+                self._coerce_services(entry.services), service
+            )
+            if payload is None:
+                continue
+            queue_specialist = entry.queue.specialist_id if entry.queue else None
+            if queue_specialist is not None and int(queue_specialist) != int(specialist_id):
+                raise ValueError(
+                    f"Услуга «{service.name}» уже записана к другому врачу. "
+                    "Смена врача существующей услуги выполняется переносом записи — "
+                    "обратитесь к администратору"
+                )
+
+    def _assert_decrease_allowed(self, *, entry: OnlineQueueEntry) -> None:
+        """W2-PR1: снижение количества допустимо только для ещё не потреблённых
+        и не оплаченных позиций.
+
+        - визит закрыт/отменён (legacy "paid") — объём потреблён или деньги
+          прошли цепочку отмены: редактирование корзины не корректирует это;
+        - по визиту есть ОПЛАЧЕННЫЙ счёт — уменьшение = возврат, это отдельный
+          финансовый контракт (wave2 PR3), а не побочный эффект редактирования.
+        Оба случая отвергаются с явной причиной вместо имитации сохранения.
+        """
+        if not entry.visit_id:
+            return
+        # Codex R15 #3115 (P1): лок ВИЗИТА — то же плечо синхронизации, что у
+        # кассового платежа (PaymentInvariantService._load_visit_for_update).
+        # Раньше визит читался без FOR UPDATE: платёж мог залочить визит,
+        # посчитать и закоммитить оплату по старому количеству, после чего
+        # снижение продолжалось и коммитилось — пациент оплачен за большее
+        # число единиц, чем визит удерживает. FOR UPDATE + populate_existing
+        # держит блокировку до конца транзакции снижения: платёж и снижение
+        # строго сериализуются на строке визита.
+        visit = (
+            self.db.query(Visit)
+            .filter(Visit.id == entry.visit_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if visit is None:
+            return
+        if visit.status in VISIT_POSITION_BLOCKED_STATUSES:
+            raise ValueError(
+                "Услуга уже выполнена или отменена — уменьшение количества недоступно. "
+                "Для корректировки используйте отмену/корректировку визита"
+            )
+        paid = (
+            self.db.query(PaymentInvoice)
+            .join(PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id)
+            .filter(
+                PaymentInvoiceVisit.visit_id == visit.id,
+                PaymentInvoice.status == "paid",
+            )
+            .first()
+        )
+        if paid:
+            raise ValueError(
+                "По услуге есть оплаченный счёт — уменьшение количества выполняется "
+                "через возврат/корректировку оплаты"
+            )
+        # Codex R8 #3115 (P1): счёт в статусе processing — платёж уже уходит
+        # провайдеру. Снижение изменило бы очередь/визит, но редукция вычитает
+        # только PENDING-счета, поэтому processing-счёт остался бы на прежнюю
+        # сумму — пациент был бы обязан за старое количество. Корректировка —
+        # через скоординированную платёжную операцию, не через edit-delta.
+        processing = (
+            self.db.query(PaymentInvoice)
+            .join(PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id)
+            .filter(
+                PaymentInvoiceVisit.visit_id == visit.id,
+                PaymentInvoice.status == "processing",
+            )
+            .first()
+        )
+        if processing:
+            raise ValueError(
+                "По услуге идёт обработка платежа — уменьшение количества недоступно, "
+                "дождитесь завершения оплаты или обратитесь в кассу"
+            )
+        # Codex R9 PR 3115 (P1): канонические строки Payment проверяются
+        # ОТДЕЛЬНО от PaymentInvoice. Платёжные потоки (например, подтверждение
+        # кассиром) коммитят Payment со статусом paid/completed БЕЗ синхронной
+        # записи PaymentInvoice — счёт может отсутствовать или оставаться
+        # pending. Гард выше такие визиты пропускал, и edit-delta снижал
+        # услугу и даже уменьшал устаревший pending-счёт без возврата денег.
+        # Деньги получены (или уже уходят провайдеру) — снижение количества
+        # возможно только через возврат/корректировку оплаты.
+        payment_taken = (
+            self.db.query(Payment)
+            .filter(
+                Payment.visit_id == visit.id,
+                Payment.status.in_(("paid", "processing", "completed")),
+            )
+            .first()
+        )
+        if payment_taken:
+            raise ValueError(
+                "По услуге зарегистрирована оплата — уменьшение количества выполняется "
+                "через возврат/корректировку оплаты"
+            )
+
     def _apply_patient_data(self, patient: Patient, patient_data: dict[str, Any]) -> None:
         if patient_data.get("full_name"):
             names = normalize_patient_name(full_name=patient_data["full_name"])
@@ -272,24 +506,54 @@ class RegistrarEditDeltaService:
         queue_tag: str,
         target_date: date,
         preferred_entry_ids: set[int],
+        specialist_id: int | None = None,
+        lock: bool = False,
+        strict_entry_id: int | None = None,
     ) -> OnlineQueueEntry | None:
-        entries = (
-            self.db.query(OnlineQueueEntry)
-            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-            .filter(
-                OnlineQueueEntry.patient_id == patient_id,
-                OnlineQueueEntry.status.in_(ACTIVE_APPEND_STATUSES),
-                DailyQueue.day == target_date,
-                DailyQueue.queue_tag == queue_tag,
-                DailyQueue.active.is_(True),
-            )
-            .order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc())
-            .all()
+        # Codex R8 #3115 (P1): lock=True фиксирует выбранную запись до конца
+        # транзакции (SELECT ... FOR UPDATE) — отмена/смена статуса между
+        # ревалидацией квоты и применением команды не может сменить
+        # наблюдаемое состояние (READ COMMITTED).
+        query = self.db.query(OnlineQueueEntry).join(
+            DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
         )
+        if lock:
+            query = query.with_for_update()
+        entries = query.filter(
+            OnlineQueueEntry.patient_id == patient_id,
+            OnlineQueueEntry.status.in_(ACTIVE_APPEND_STATUSES),
+            DailyQueue.day == target_date,
+            DailyQueue.queue_tag == queue_tag,
+            DailyQueue.active.is_(True),
+        ).order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc()).all()
         if preferred_entry_ids:
             preferred = [entry for entry in entries if entry.id in preferred_entry_ids]
             if preferred:
-                return preferred[0]
+                entries = preferred
+            elif strict_entry_id is not None:
+                # Codex R11 #3115 (P1): явный queue_entry_id — СТРОГИЙ селектор.
+                # Прежний код при пустом preferred оставлял полный список
+                # кандидатов (entries[0] — мутировала и биллила ЧУЖУЮ строку
+                # очереди) или проваливался в создание новой записи (тихая
+                # ре-регистрация). Устаревшая идентичность — громкий отказ.
+                raise ValueError(
+                    f"Указанная запись очереди ({strict_entry_id}) больше не "
+                    "активна в этот день — обновите данные записи и повторите "
+                    "попытку"
+                )
+        if specialist_id is not None:
+            # W2-PR1 (ADR-001): очередь принадлежит врачу. Явно запрошенный
+            # специалист не может дослать позицию в чужую очередь того же
+            # queue_tag — одинаковая услуга у разных врачей не сливается
+            # только из-за одинакового service_id.
+            same_specialist = [
+                entry
+                for entry in entries
+                if entry.queue is not None
+                and entry.queue.specialist_id is not None
+                and int(entry.queue.specialist_id) == int(specialist_id)
+            ]
+            return same_specialist[0] if same_specialist else None
         return entries[0] if entries else None
 
     def _append_to_existing_entry(
@@ -308,13 +572,68 @@ class RegistrarEditDeltaService:
         services = self._coerce_services(entry.services)
         existing_payload = self._find_service_payload(services, service)
         existing_qty = self._payload_quantity(existing_payload) if existing_payload else 0
-        delta_qty = max(requested_qty - existing_qty, 0) if existing_payload else requested_qty
+
+        # W2-PR1: смена врача существующей позиции не игнорируется молча.
+        # Перенос позиции к другому врачу — операция переноса записи (own
+        # contract), а не побочный эффект редактирования корзины: отвергаем
+        # с явной причиной вместо имитации сохранения.
+        if specialist_id is not None and existing_payload is not None:
+            queue_specialist = entry.queue.specialist_id if entry.queue else None
+            if queue_specialist is not None and int(queue_specialist) != int(specialist_id):
+                raise ValueError(
+                    f"Услуга «{service.name}» уже записана к другому врачу. "
+                    "Смена врача существующей услуги выполняется переносом записи — "
+                    "обратитесь к администратору"
+                )
+
+        # W2-PR1: ЗНАКОВАЯ дельта до целевого состояния. Item несёт ПОЛНОЕ
+        # целевое количество позиции: рост биллит (target − current), снижение
+        # — отрицательный остаток. Прежний max(target − current, 0) молча
+        # проглатывал уменьшение количества (сохранение «успешно», состояние
+        # без изменений).
+        delta_qty = requested_qty - existing_qty if existing_payload else requested_qty
+        if delta_qty < 0:
+            self._assert_decrease_allowed(entry=entry)
         unit_price = Decimal("0") if all_free else Decimal(str(service.price or 0))
-        delta_amount = unit_price * Decimal(delta_qty)
+        # Снижение вычитает фактически начисленную сумму позиции (цена из
+        # payload), а не текущую цену каталога — иначе entry.total_amount
+        # разошёлся бы с тем, что реально выставлено ранее.
+        # Codex R8 #3115 (P1): снижение вычитает ФАКТИЧЕСКИ записанную цену
+        # за единицу (см. _recorded_unit_charge), а не цену каталога и не
+        # line-total из payload full-update-строки.
+        decrease_unit_price = (
+            self._recorded_unit_charge(entry=entry, payload=existing_payload, previous_qty=existing_qty)
+            if (delta_qty < 0 and existing_payload and existing_payload.get("price") is not None)
+            else unit_price
+        )
+        delta_amount = (decrease_unit_price if delta_qty < 0 else unit_price) * Decimal(delta_qty)
+
+        # Codex R10 #3115 (P1): рост ПЕРЕОЦЕНИВАЕТ позицию средневзвешенной
+        # ценой за единицу: старые единицы сохраняют фактически записанную
+        # стоимость, добавленные биллятся по текущей каталоговой (delta_amount).
+        # Иначе VisitService/entry-пейлоад переписывали бы ВСЕ единицы на новую
+        # каталоговую цену, хотя счёт выставляет только дельту: визит 1×100
+        # при росте до 2 по цене 150 давал VisitService 2×150=300 против
+        # invoice 100+150=250 — PaymentInvariantService.compute_total_cost
+        # считал бы 300 канонической стоимостью визита и собирал бы лишние 50.
+        # Средневзвешенная цена согласует representations: строка VisitService
+        # (qty × blended) == payload (qty × blended) == entry.total_amount
+        # == invoice (записанный итог + дельта).
+        row_unit_price = unit_price
+        if delta_qty > 0 and existing_payload:
+            previous_recorded_unit = self._recorded_unit_charge(
+                entry=entry, payload=existing_payload, previous_qty=existing_qty
+            )
+            blended_unit = (
+                previous_recorded_unit * Decimal(existing_qty) + delta_amount
+            ) / Decimal(requested_qty)
+            row_unit_price = blended_unit.quantize(Decimal("0.01"))
+            existing_payload["price"] = float(row_unit_price)
+            existing_payload["unit_price"] = float(row_unit_price)
 
         changed_at = queue_service.get_local_timestamp(self.db)
 
-        if delta_qty > 0:
+        if delta_qty != 0:
             if existing_payload:
                 existing_payload["quantity"] = requested_qty
                 existing_payload["qty"] = requested_qty
@@ -344,17 +663,17 @@ class RegistrarEditDeltaService:
             specialist_id=specialist_id,
             discount_mode=discount_mode,
             current_user=current_user,
-            create_only_if_needed=delta_qty > 0,
+            create_only_if_needed=delta_qty != 0,
         )
 
-        if visit and delta_qty > 0:
+        if visit and delta_qty != 0:
             visit.updated_at = changed_at
-            self._append_visit_service(
+            self._sync_visit_service_quantity(
                 visit=visit,
                 service=service,
                 requested_qty=requested_qty,
                 delta_qty=delta_qty,
-                unit_price=unit_price,
+                unit_price=row_unit_price,
             )
 
         return self._delta_result(
@@ -395,7 +714,7 @@ class RegistrarEditDeltaService:
             discount_mode=discount_mode,
             current_user=current_user,
         )
-        self._append_visit_service(
+        self._sync_visit_service_quantity(
             visit=visit,
             service=service,
             requested_qty=requested_qty,
@@ -496,7 +815,7 @@ class RegistrarEditDeltaService:
         self.db.flush()
         return visit
 
-    def _append_visit_service(
+    def _sync_visit_service_quantity(
         self,
         *,
         visit: Visit,
@@ -505,6 +824,14 @@ class RegistrarEditDeltaService:
         delta_qty: int,
         unit_price: Decimal,
     ) -> None:
+        """W2-PR1: целевое состояние позиции VisitService.
+
+        Существующая строка получает АБСОЛЮТНОЕ целевое количество — прежний
+        max(current, requested) молча проглатывал уменьшение. Рост приходит
+        со средневзвешенной ценой за единицу (Codex R10 #3115 (P1)): старые
+        единицы сохраняют записанную стоимость, добавленные биллятся по
+        каталогу — итог строки совпадает с invoice; снижение цену не трогает
+        (вычитается фактически начисленная сумма)."""
         existing = (
             self.db.query(VisitService)
             .filter(VisitService.visit_id == visit.id, VisitService.service_id == service.id)
@@ -512,11 +839,12 @@ class RegistrarEditDeltaService:
         )
         code = self._service_code(service)
         if existing:
-            existing.qty = max(existing.qty or 0, requested_qty)
-            existing.price = unit_price
-            existing.code = code
-            existing.name = service.name
-            existing.currency = service.currency or "UZS"
+            existing.qty = requested_qty
+            if delta_qty > 0:
+                existing.price = unit_price
+                existing.code = code
+                existing.name = service.name
+                existing.currency = service.currency or "UZS"
             visit.updated_at = queue_service.get_local_timestamp(self.db)
             return
         visit.updated_at = queue_service.get_local_timestamp(self.db)
@@ -526,7 +854,7 @@ class RegistrarEditDeltaService:
                 service_id=service.id,
                 code=code,
                 name=service.name,
-                qty=delta_qty,
+                qty=requested_qty,
                 price=unit_price,
                 currency=service.currency or "UZS",
             )
@@ -574,12 +902,50 @@ class RegistrarEditDeltaService:
         visit_delta_amounts: dict[int, Decimal],
         total_amount: Decimal,
     ) -> PaymentInvoice | None:
-        if total_amount <= 0:
-            return None
+        # W2-PR1: дельта стала знаковой — рост доначисляет PENDING-счёт,
+        # снижение уменьшает его. Оплаченные счета охраняются guard'ом
+        # снижения (_assert_decrease_allowed), возвраты здесь не создаются.
+        positives = {
+            visit_id: amount
+            for visit_id, amount in visit_delta_amounts.items()
+            if amount > 0
+        }
+        negatives = {
+            visit_id: amount
+            for visit_id, amount in visit_delta_amounts.items()
+            if amount < 0
+        }
+        invoice: PaymentInvoice | None = None
+        if positives:
+            invoice = self._increase_pending_invoice(
+                patient_id=patient_id,
+                payment_method=payment_method,
+                visit_delta_amounts=positives,
+            )
+        for visit_id, amount in negatives.items():
+            reduced = self._reduce_pending_invoice_for_visit(
+                patient_id=patient_id,
+                visit_id=visit_id,
+                amount=amount,
+            )
+            if invoice is None:
+                invoice = reduced
+        return invoice
+
+    def _increase_pending_invoice(
+        self,
+        *,
+        patient_id: int,
+        payment_method: str,
+        visit_delta_amounts: dict[int, Decimal],
+    ) -> PaymentInvoice | None:
+        total_amount = sum(visit_delta_amounts.values(), Decimal("0"))
         visit_ids = list(visit_delta_amounts.keys())
-        invoice = (
-            self.db.query(PaymentInvoice)
-            .join(PaymentInvoiceVisit, PaymentInvoiceVisit.invoice_id == PaymentInvoice.id)
+        # Кандидат на доначисление ищется БЕЗ блокировки (только чтобы найти
+        # id счёта); сама мутация — под FOR UPDATE (см. ниже).
+        candidate_link = (
+            self.db.query(PaymentInvoiceVisit)
+            .join(PaymentInvoice, PaymentInvoice.id == PaymentInvoiceVisit.invoice_id)
             .filter(
                 PaymentInvoice.patient_id == patient_id,
                 PaymentInvoice.status == "pending",
@@ -588,9 +954,7 @@ class RegistrarEditDeltaService:
             .order_by(PaymentInvoice.created_at.desc())
             .first()
         )
-        if invoice:
-            invoice.total_amount = Decimal(str(invoice.total_amount or 0)) + total_amount
-        else:
+        if candidate_link is None:
             invoice = PaymentInvoice(
                 patient_id=patient_id,
                 total_amount=total_amount,
@@ -601,6 +965,29 @@ class RegistrarEditDeltaService:
             )
             self.db.add(invoice)
             self.db.flush()
+        else:
+            # Codex R11 #3115 (P1, тело ревью): чтение счёта ПОД блокировкой
+            # строки + ревалидация статуса в той же транзакции — зеркало
+            # R10-фикса снижения. Без этого init_invoice_payment мог
+            # заблокировать счёт, отправить провайдеру СТАРУЮ сумму и
+            # закоммитить processing, а этот рост доначислял бы
+            # total_amount уже обрабатываемому счёту (провайдер соберёт
+            # старую сумму, визит/очередь уже содержат рост). Параллельные
+            # росты тоже сериализуются: второй видит закоммиченный итог.
+            invoice = (
+                self.db.query(PaymentInvoice)
+                .filter(PaymentInvoice.id == candidate_link.invoice_id)
+                .with_for_update()
+                .first()
+            )
+            if invoice is None:
+                raise ValueError("Счёт по визиту не найден при доначислении")
+            if invoice.status != "pending":
+                raise ValueError(
+                    f"Счёт по визиту уже обрабатывается (статус {invoice.status}) — "
+                    "увеличение количества выполняется через новую позицию или корректировку оплаты"
+                )
+            invoice.total_amount = Decimal(str(invoice.total_amount or 0)) + total_amount
 
         for visit_id, visit_amount in visit_delta_amounts.items():
             link = (
@@ -621,6 +1008,63 @@ class RegistrarEditDeltaService:
                         visit_amount=visit_amount,
                     )
                 )
+        return invoice
+
+    def _reduce_pending_invoice_for_visit(
+        self,
+        *,
+        patient_id: int,
+        visit_id: int,
+        amount: Decimal,
+    ) -> PaymentInvoice | None:
+        """W2-PR1: снижение позиции уменьшает PENDING-счёт того же визита.
+
+        amount < 0. Оплаченные счета отвергнуты guard'ом снижения; отсутствие
+        pending-счёта означает, что начисление по этой позиции ещё не
+        выставлялось — корректировать нечего. Расхождение (сумма позиции
+        меньше вычитаемой) — громкий отказ вместо тихой порчи счёта."""
+        link = (
+            self.db.query(PaymentInvoiceVisit)
+            .join(PaymentInvoice, PaymentInvoice.id == PaymentInvoiceVisit.invoice_id)
+            .filter(
+                PaymentInvoice.patient_id == patient_id,
+                PaymentInvoice.status == "pending",
+                PaymentInvoiceVisit.visit_id == visit_id,
+            )
+            .order_by(PaymentInvoice.created_at.desc())
+            .first()
+        )
+        if link is None:
+            return None
+        # Codex R10 #3115 (P1): чтение счёта ПОД блокировкой строки +
+        # повторная валидация статуса в той же транзакции. Без этого гонка
+        # с init_invoice_payment (чтение pending → запрос провайдеру на
+        # старую сумму → processing) могла пройти мимо guard'а: снижение
+        # уменьшало pending-счёт ПОСЛЕ того, как провайдеру ушла старая
+        # сумма. FOR UPDATE сериализует обе операции: кто первый взял
+        # блокировку, второй видит закоммиченное состояние.
+        invoice = (
+            self.db.query(PaymentInvoice)
+            .filter(PaymentInvoice.id == link.invoice_id)
+            .with_for_update()
+            .first()
+        )
+        if invoice is None:
+            return None
+        if invoice.status != "pending":
+            raise ValueError(
+                f"Счёт по визиту уже обрабатывается (статус {invoice.status}) — "
+                "уменьшение количества выполняется через возврат/корректировку оплаты"
+            )
+        new_visit_amount = Decimal(str(link.visit_amount or 0)) + amount
+        new_total = Decimal(str(invoice.total_amount or 0)) + amount
+        if new_visit_amount < 0 or new_total < 0:
+            raise ValueError(
+                "Нельзя уменьшить сумму позиции ниже выставленной по счёту. "
+                "Обновите данные записи и повторите попытку"
+            )
+        link.visit_amount = new_visit_amount
+        invoice.total_amount = new_total
         return invoice
 
     def _delta_result(
@@ -681,6 +1125,52 @@ class RegistrarEditDeltaService:
                 return payload
         return None
 
+    def _recorded_unit_charge(
+        self,
+        *,
+        entry: OnlineQueueEntry,
+        payload: dict[str, Any],
+        previous_qty: int,
+    ) -> Decimal:
+        """Codex R8 #3115 (P1): фактически ЗАПИСАННАЯ цена за единицу позиции.
+
+        Конвенции записчиков payload различаются: full-update сохраняет в
+        price ПОЛНУЮ сумму строки (unit × quantity), а desk/edit-delta —
+        цену за единицу. Умножение «цены из payload» на дельту для
+        full-update-строки списывало бы line-total повторно (снижение
+        3→1 при 100/усл. вычитало бы 600 вместо 200).
+
+        Правило вывода:
+        1) явный payload["unit_price"] — канонический источник (новые строки);
+        2) quantity <= 1 — конвенции совпадают, price и есть цена за единицу;
+        3) по сумме записи: total_amount == Σ price (line-total конвенция,
+           как у full-update) И != Σ price×qty → цена за единицу = price/qty;
+        4) иначе — unit-конвенция: price (desk/edit-delta строки).
+        """
+        raw_price = payload.get("price")
+        if raw_price is None:
+            return Decimal("0")
+        price = Decimal(str(raw_price))
+        if "unit_price" in payload and payload.get("unit_price") is not None:
+            return Decimal(str(payload["unit_price"]))
+        if previous_qty <= 1:
+            return price
+        services = self._coerce_services(entry.services)
+        line_sum = sum(
+            (Decimal(str(p.get("price") or 0)) for p in services), Decimal("0")
+        )
+        unit_sum = sum(
+            (
+                Decimal(str(p.get("price") or 0)) * Decimal(int(self._payload_quantity(p) or 1))
+                for p in services
+            ),
+            Decimal("0"),
+        )
+        total = Decimal(str(entry.total_amount or 0))
+        if total == line_sum and line_sum != unit_sum:
+            return price / Decimal(previous_qty)
+        return price
+
     def _payload_quantity(self, payload: dict[str, Any] | None) -> int:
         if not payload:
             return 0
@@ -707,6 +1197,10 @@ class RegistrarEditDeltaService:
             "quantity": quantity,
             "qty": quantity,
             "price": float(unit_price),
+            # Codex R8 #3115 (P1): явная цена за единицу — payload-поле price
+            # в разных записчиках означает разное (unit или line-total);
+            # это поле снимает неоднозначность для будущих правок снижения.
+            "unit_price": float(unit_price),
         }
 
     def _service_response_payload(

@@ -221,9 +221,13 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       'const cartData = {',
     );
 
-    expect(editSaveBlock).toContain('if (editMode && hasNewServices) {');
-    expect(editSaveBlock).toContain('const editDeltaServices: Array<{ service_id: string | number; quantity?: unknown; specialist_id?: string | number | null }> = [');
+    // W2-PR1: edit-delta отправляет ЦЕЛЕВОЕ СОСТОЯНИЕ (новые услуги +
+    // изменившиеся количества существующих позиций) через общий билдер,
+    // которым же строится edit-квота (зеркало 1-в-1).
+    expect(editSaveBlock).toContain('const editDeltaBuild = buildEditDeltaTargetItems(');
+    expect(editSaveBlock).toContain('if (editMode && editDeltaBuild.items.length > 0) {');
     expect(editSaveBlock).toContain('applyRegistrarEditDelta({');
+    expect(editSaveBlock).toContain('services: editDeltaBuild.items,');
     expect(editSaveBlock).toContain('existingQueueEntryIds: Array.from(originalQueueIds)');
     expect(editSaveBlock).toContain('if (editMode && !hasNewServices) {');
     expect(editSaveBlock).toContain('bypassing registrar/cart to avoid duplicate visits');

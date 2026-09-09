@@ -1245,6 +1245,8 @@ def _process_online_queue_entry(
                         "code": svc.get("code") or svc.get("service_code"),
                         "name": svc.get("name") or svc.get("service_name"),
                         "price": float(svc.get("price", 0)) if svc.get("price") else 0,
+                        # W2-PR1: исходное количество позиции из payload записи
+                        "quantity": svc.get("quantity") or svc.get("qty") or 1,
                     })
                 elif isinstance(svc, str):
                     service_details.append({
@@ -1252,6 +1254,7 @@ def _process_online_queue_entry(
                         "code": None,
                         "name": svc,
                         "price": 0,
+                        "quantity": 1,
                     })
 
     return {
@@ -1423,6 +1426,10 @@ def _process_visit_entry(
                 "code": service_code_to_use or svc.code,
                 "name": svc.name,
                 "price": float(svc.price) if svc.price else 0,
+                # W2-PR1: исходное количество позиции — без него мастер в
+                # edit-режиме считает исходное количество равным 1 и не может
+                # ни показать, ни детектировать изменение количества.
+                "quantity": vs.qty or 1,
             })
 
         if vs.price:
