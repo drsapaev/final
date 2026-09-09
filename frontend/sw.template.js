@@ -55,6 +55,7 @@ const API_CACHE_PATTERNS = [
 const NO_CACHE_PATTERNS = [
   /\/api\/v1\/auth\/login/,
   /\/api\/v1\/auth\/logout/,
+  /\/api\/v1\/auth\/me/,
   /\/api\/v1\/payments/,
   /\/api\/v1\/ai/,
   /\/api\/v1\/telegram/,
@@ -408,9 +409,10 @@ async function syncClinicData() {
   try {
     console.log('Service Worker: Syncing clinic data');
 
-    // Обновляем критические данные
+    // Только некритичные для безопасности данные. auth/me не синкаем и
+    // не кэшируем: профиль пользователя не должен лежать в Cache Storage
+    // на общем компьютере клиники (см. NO_CACHE_PATTERNS).
     const endpoints = [
-      '/api/v1/auth/me',
       '/api/v1/queue/today',
       '/api/v1/mobile/notifications'
     ];

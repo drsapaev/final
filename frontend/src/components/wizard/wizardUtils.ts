@@ -11,7 +11,6 @@
  */
 
 import { toast } from 'react-toastify';
-import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { ClipboardList, FlaskConical, Stethoscope, Syringe } from 'lucide-react';
@@ -275,102 +274,6 @@ export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
 };
 
 // =====================================================================
-// PATIENT PROFILE UPDATE (Fix B: explicit profile save + verification)
-// =====================================================================
-
-const digitsOnly = (value: unknown): string =>
-  String(value ?? '').replace(/\D/g, '');
-
-export interface PatientProfileSnapshot {
-  full_name: string;
-  phone_digits: string;
-  address: string;
-  birth_date: string;
-  sex: string;
-}
-
-// API-ориентированный снимок профиля карточки на момент выбора/инициализации.
-// Используется для diff'а «форма vs карточка», чтобы отправлять update только
-// по реально изменённым полям.
-export const buildPatientProfileSnapshot = (
-  patient: Record<string, unknown> | null | undefined
-): PatientProfileSnapshot => ({
-  full_name: String(patient?.fio ?? patient?.full_name ?? '')
-    .replace(/\s+/g, ' ')
-    .trim(),
-  phone_digits: digitsOnly(patient?.phone),
-  address: String(patient?.address ?? '').trim(),
-  birth_date: String(patient?.birth_date ?? '').trim(),
-  sex: String(
-    genderToPatientSexForApi(
-      resolvePatientGenderValue(patient as PatientGenderRecordLike)
-    ) ?? ''
-  ),
-});
-
-// Возвращает payload для updatePatient по изменившимся полям либо null,
-// если профиль не менялся (без лишних PUT-запросов).
-export const buildPatientProfileUpdate = (
-  snapshot: PatientProfileSnapshot | null | undefined,
-  form: Record<string, unknown>,
-  options: { normalizedPhone?: string | null } = {}
-): Record<string, unknown> | null => {
-  if (!snapshot) return null;
-
-  const current = buildPatientProfileSnapshot(form);
-  if (options.normalizedPhone !== undefined) {
-    current.phone_digits = digitsOnly(options.normalizedPhone);
-  }
-
-  const update: Record<string, unknown> = {};
-  if (current.full_name !== snapshot.full_name && current.full_name) {
-    update.full_name = current.full_name;
-  }
-  if (current.phone_digits !== snapshot.phone_digits) {
-    if (current.phone_digits) {
-      update.phone = options.normalizedPhone
-        ? String(options.normalizedPhone).trim()
-        : String(form.phone ?? '').trim();
-    } else {
-      // Codex R1 #3090 (P1): очистка номера в форме должна ЯВНО занулять
-      // поле. Прежний truthiness-фильтр просто выбрасывал phone из payload,
-      // и старый номер молча оставался в карточке. PatientUpdate принимает
-      // phone: null (схема str | None, exclude_unset сохраняет null), а
-      // CRUD применяет None как очистку колонки.
-      update.phone = null;
-    }
-  }
-  if (current.address !== snapshot.address) {
-    update.address = current.address;
-  }
-  if (current.birth_date !== snapshot.birth_date) {
-    // Codex R1 #3090 (P2): контракт бэкенда — date | None. Пустая строка
-    // ('') отвергается Pydantic (422) и блокировала отправку визита.
-    // Очищенная дата отправляется как null; непустое значение — как строка.
-    update.birth_date = current.birth_date ? current.birth_date : null;
-  }
-  if (current.sex !== snapshot.sex && current.sex) {
-    update.sex = current.sex;
-  }
-
-  return Object.keys(update).length > 0 ? update : null;
-};
-
-// Сверка сохранённого имени с отправленным (после PUT ответ содержит
-// перечитанную с сервера карточку). Регистронезависимо, без лишних пробелов.
-export const isSavedNameMatching = (
-  savedName: unknown,
-  requestedName: unknown
-): boolean => {
-  const normalize = (value: unknown): string =>
-    String(value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
-  const saved = normalize(savedName);
-  const requested = normalize(requestedName);
-  if (!saved || !requested) return true; // нечего сверять — не считаем ошибкой
-  return saved === requested;
-};
-
-// =====================================================================
 // BIRTH DATE INPUT MASK (extracted from AppointmentWizardV2)
 // =====================================================================
 
@@ -401,72 +304,40 @@ export const convertDateFromISO = (isoStr: string): string => {
 };
 
 // =====================================================================
-// DEPARTMENT RESOLUTION (extracted from AppointmentWizardV2)
+// PATIENT SELECTION SAFETY (Fix A: data mixing / duplicate-phone stop)
 // =====================================================================
 
-interface DeptServiceLike {
-  id?: unknown;
-  queue_tag?: unknown;
-  category_code?: string;
-  service_code?: unknown;
-  name?: unknown;
-  [key: string]: unknown;
-}
+// Marker set by the wizard when ALL patient fields were populated from an
+// explicitly selected card (selectPatient). Editing ФИО afterwards switches
+// the form to new-patient mode and must clear every inherited field,
+// otherwise a new patient is created with another person's address/phone.
+export const PATIENT_SELECTED_FROM_CARD_FLAG = '_selectedFromCard';
 
-const DEPARTMENT_CODE_MAPPING: Record<string, string> = {
-  'K': 'cardiology', // Кардиология → вкладка cardio (БЕЗ ЭКГ!)
-  'D': 'dermatology', // Дерматология → вкладка derma (только консультации)
-  'S': 'dentistry', // Стоматология → вкладка dental
-  'L': 'laboratory', // Лаборатория → вкладка lab
-  'P': 'procedures', // Физиотерапия → вкладка procedures
-  'C': 'procedures', // Косметология → вкладка procedures
-  'D_PROC': 'procedures', // Дерматологические процедуры → вкладка procedures
-  'O': 'procedures' // Прочие процедуры → вкладка procedures
-};
+export const isPatientSelectedFromCard = (
+  patient: Record<string, unknown> | null | undefined
+): boolean => Boolean(patient && patient[PATIENT_SELECTED_FROM_CARD_FLAG]);
 
-const DEPARTMENT_NORMALIZED_MAPPING: Record<string, string> = {
-  'specialists': 'cardiology', // Консультации специалистов (только если не 'D' или 'S') -> cardiology
-  'laboratory': 'lab', // ✅ Лаборатория -> lab (для соответствия вкладке)
-  'procedures': 'procedures', // Процедуры -> procedures
-  'other': 'general' // Прочее -> general
-};
+// Identity fields that must never leak from one patient card into a
+// different patient's registration. Returned as a patch for spread.
+export const buildInheritedPatientClearPatch = (): Record<string, unknown> => ({
+  birth_date: '',
+  phone: '',
+  address: '',
+  gender: '',
+  lastName: '',
+  firstName: '',
+  middleName: '',
+  [PATIENT_SELECTED_FROM_CARD_FLAG]: false,
+});
 
-// Определяет отделение визита для услуги (ECG — отдельный кабинет).
-// Чистая функция: извлечена из AppointmentWizardV2 (PR-45 LOC ceiling).
-export const getWizardDepartmentForService = (
-  serviceId: string | number,
-  servicesData: DeptServiceLike[]
-): string => {
-  if (!serviceId || serviceId === null || serviceId === undefined) {
-    return 'general';
-  }
-
-  const service = servicesData.find((s) => s.id === serviceId);
-
-  if (!service) {
-    return 'general';
-  }
-
-  // 🎯 СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЭКГ: отдельный кабинет!
-  if (service.queue_tag === 'ecg') {
-    return 'echokg';
-  }
-
-  // Сначала точный маппинг оригинального category_code (Bug 2 fix),
-  // затем нормализованный fallback.
-  if (service.category_code && DEPARTMENT_CODE_MAPPING[service.category_code]) {
-    return DEPARTMENT_CODE_MAPPING[service.category_code];
-  }
-
-  const normalizedCategoryCode = service.category_code
-    ? normalizeCategoryCode(service.category_code)
-    : '';
-
-  return (
-    DEPARTMENT_NORMALIZED_MAPPING[normalizedCategoryCode] ||
-    DEPARTMENT_CODE_MAPPING[service.category_code as string] ||
-    'general'
-  );
+// Backend currently signals "duplicate phone" with HTTP 400 + a text detail.
+// The same 400 is also used for unrelated validation problems (e.g. duplicate
+// doc_number), so only an explicit phone-duplicate message may trigger the
+// duplicate-phone UX path. Until the backend exposes a dedicated error code,
+// this is the narrowest safe discriminator.
+export const isPhoneDuplicateErrorMessage = (message: unknown): boolean => {
+  const normalized = String(message || '').toLowerCase();
+  return normalized.includes('уже существует') && normalized.includes('телефон');
 };
 
 // =====================================================================
@@ -653,13 +524,13 @@ export default {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
-  buildPatientProfileSnapshot,
-  buildPatientProfileUpdate,
-  isSavedNameMatching,
   formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
-  getWizardDepartmentForService,
+  PATIENT_SELECTED_FROM_CARD_FLAG,
+  isPatientSelectedFromCard,
+  buildInheritedPatientClearPatch,
+  isPhoneDuplicateErrorMessage,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
