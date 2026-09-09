@@ -5468,6 +5468,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/registrar/cart/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quote Cart Prices
+         * @description Fix D: read-only предварительный расчёт цены корзины (endpoint).
+         */
+        post: operations["quote_cart_prices_api_v1_registrar_cart_quote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/registrar/cart/edit-delta": {
         parameters: {
             query?: never;
@@ -24206,6 +24226,75 @@ export type components = {
             /** Updated At */
             updated_at?: string | null;
         };
+        /** CartQuoteItemRequest */
+        CartQuoteItemRequest: {
+            /** Service Id */
+            service_id: number;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number;
+            /** Custom Price */
+            custom_price?: number | string | null;
+            /** Specialist Id */
+            specialist_id?: number | null;
+        };
+        /** CartQuoteItemResponse */
+        CartQuoteItemResponse: {
+            /** Service Id */
+            service_id: number;
+            /** Service Name */
+            service_name: string;
+            /** Unit Price */
+            unit_price: string;
+            /** Quantity */
+            quantity: number;
+            /** Discount Percent */
+            discount_percent: number;
+            /** Final Price */
+            final_price: string;
+        };
+        /** CartQuoteRequest */
+        CartQuoteRequest: {
+            /** Items */
+            items?: components["schemas"]["CartQuoteItemRequest"][];
+            /**
+             * Discount Mode
+             * @default none
+             */
+            discount_mode: string;
+            /**
+             * All Free
+             * @default false
+             */
+            all_free: boolean;
+            /**
+             * Pricing Mode
+             * @default cart
+             */
+            pricing_mode: string;
+            /** Patient Id */
+            patient_id?: number | null;
+            /** Target Date */
+            target_date?: string | null;
+            /** Preferred Entry Ids */
+            preferred_entry_ids?: number[];
+        };
+        /** CartQuoteResponse */
+        CartQuoteResponse: {
+            /** Items */
+            items: components["schemas"]["CartQuoteItemResponse"][];
+            /** Total Amount */
+            total_amount: string;
+            /** Approval Status */
+            approval_status: string;
+            /**
+             * Quote Token
+             * @default
+             */
+            quote_token: string;
+        };
         /** CartRequest */
         CartRequest: {
             /** Patient Id */
@@ -24229,6 +24318,8 @@ export type components = {
             all_free: boolean;
             /** Notes */
             notes?: string | null;
+            /** Quote Token */
+            quote_token?: string | null;
         };
         /** CartResponse */
         CartResponse: {
@@ -26792,6 +26883,8 @@ export type components = {
             expected_entry_updated_at?: {
                 [key: string]: string;
             };
+            /** Quote Token */
+            quote_token?: string | null;
         };
         /** EditDeltaResponse */
         EditDeltaResponse: {
@@ -27942,6 +28035,8 @@ export type components = {
             all_free: boolean;
             /** Aggregated Ids */
             aggregated_ids?: number[] | null;
+            /** Quote Token */
+            quote_token?: string | null;
         };
         /**
          * Gender
@@ -47884,6 +47979,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quote_cart_prices_api_v1_registrar_cart_quote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CartQuoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartQuoteResponse"];
                 };
             };
             /** @description Validation Error */

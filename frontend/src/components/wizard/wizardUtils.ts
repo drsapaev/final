@@ -11,6 +11,7 @@
  */
 
 import { toast } from 'react-toastify';
+import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { ClipboardList, FlaskConical, Stethoscope, Syringe } from 'lucide-react';
@@ -325,6 +326,114 @@ export const getBirthDateValidationError = (
 };
 
 // =====================================================================
+// CART QUOTE (Fix D: server-side pricing preview)
+// =====================================================================
+
+export interface CartQuoteItem {
+  service_id: number;
+  service_name: string;
+  unit_price: number;
+  quantity: number;
+  discount_percent: number;
+  final_price: number;
+}
+
+export interface CartQuote {
+  items: CartQuoteItem[];
+  total_amount: number;
+  approval_status: string; // "approved" | "pending"
+  // Codex R3 PR 3095 (P1): привязка подтверждённой квоты к команде сохранения.
+  // Заполняется ТОЛЬКО для pricing_mode='cart' (save /registrar/cart
+  // перепроверяет цены/настройки на момент подтверждения — расхождение даёт
+  // 409 «цены изменились» вместо тихого invoice на другую сумму).
+  quote_token?: string;
+}
+
+export type CartQuoteStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+interface QuoteCartSource {
+  items?: Array<{ service_id?: unknown; quantity?: unknown; custom_price?: unknown; doctor_id?: unknown }>;
+  discount_mode?: unknown;
+  all_free?: unknown;
+}
+
+// Строит запрос квоты из корзины. null — когда нет ни одной позиции
+// с разрешённым service_id (квотировать нечего).
+export interface CartQuoteRequestOptions {
+  // Fix D (Codex R1 #3095): edit-режим квотирует РОВНО edit-delta payload
+  // (pricing_mode='edit_delta' зеркалирует правила /registrar/cart/edit-delta).
+  // Codex R2 #3095 (P1): 'full_update' — правила /queue/online-entry/{id}/
+  // full-update (консультация при repeat/benefit → 0, all_free → 0, остальное
+  // — каталог-цена); выбирается по фактическому маршруту команды.
+  pricingMode?: 'cart' | 'edit_delta' | 'full_update';
+  itemsOverride?: QuoteCartSource['items'];
+  // Codex R6 #3095 (P2): edit-delta контекст — квота биллит ту же дельту,
+  // что и команда (активная запись того же дня, уже содержащая услугу,
+  // биллит max(запрошено − есть, 0)). Передаётся только для edit_delta.
+  patientId?: number | string | null;
+  targetDate?: string | null;
+  preferredEntryIds?: Array<number | string>;
+}
+
+export const buildCartQuoteRequest = (
+  cart: QuoteCartSource | null | undefined,
+  options: CartQuoteRequestOptions = {}
+): { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } | null => {
+  const rawItems = (options.itemsOverride ?? (Array.isArray(cart?.items) ? cart.items : [])) || [];
+  const items = rawItems
+    .filter((item) => item && item.service_id != null)
+    .map((item) => {
+      const quoteItem: { service_id: number; quantity: number; custom_price?: number; specialist_id?: number } = {
+        service_id: Number(item.service_id),
+        quantity: Math.max(1, Number(item.quantity || 1)),
+      };
+      // Codex R1 #3095 (P2): custom_price зеркалится в квоту (cart-режим)
+      const customPrice = (item as { custom_price?: unknown }).custom_price;
+      if (customPrice != null && Number.isFinite(Number(customPrice))) {
+        quoteItem.custom_price = Number(customPrice);
+      }
+      // Codex R12 #3095 (P2): specialist_id зеркалится из выбранного врача
+      // корзины (doctor_id) — ТО ЖЕ, что шлёт команда сохранения
+      // (newServices: specialist_id: item.doctor_id). Иначе edit добавляет
+      // услугу без default-врача каталога и без активной очереди дня: квота
+      // отвечает 400 "specialist_id is required", хотя команда создала бы
+      // очередь выбранного врача — завершение заблокировано навсегда.
+      // Save-ревалидация токена пере-считывает квоту по ЭТИМ ЖЕ item'ам —
+      // зеркалирование в маппере покрывает оба пути одним местом.
+      const specialistId = (item as { doctor_id?: unknown }).doctor_id;
+      if (specialistId != null && Number.isFinite(Number(specialistId)) && Number(specialistId) > 0) {
+        quoteItem.specialist_id = Number(specialistId);
+      }
+      return quoteItem;
+    });
+  if (items.length === 0) return null;
+  const request: { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } = {
+    items,
+    discount_mode: String(cart?.discount_mode || 'none'),
+    all_free: Boolean(cart?.all_free),
+    pricing_mode: options.pricingMode || 'cart',
+  };
+  // Codex R6 #3095 (P2): edit-delta контекст — backend биллит в квоте ту же
+  // дельту, которую реально выставит команда (см. _edit_delta_billable_quantity).
+  if (options.pricingMode === 'edit_delta') {
+    const patientIdNum = Number(options.patientId);
+    if (options.patientId != null && Number.isFinite(patientIdNum) && patientIdNum > 0) {
+      request.patient_id = patientIdNum;
+    }
+    if (options.targetDate) {
+      request.target_date = String(options.targetDate);
+    }
+    const entryIds = (options.preferredEntryIds || [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    if (entryIds.length > 0) {
+      request.preferred_entry_ids = entryIds;
+    }
+  }
+  return request;
+};
+
+// =====================================================================
 // BIRTH DATE INPUT MASK (extracted from AppointmentWizardV2)
 // =====================================================================
 
@@ -537,6 +646,75 @@ export const groupCartItemsByVisit = (
 };
 
 // =====================================================================
+// DEPARTMENT RESOLUTION (extracted from AppointmentWizardV2)
+// =====================================================================
+
+interface DeptServiceLike {
+  id?: unknown;
+  queue_tag?: unknown;
+  category_code?: string;
+  service_code?: unknown;
+  name?: unknown;
+  [key: string]: unknown;
+}
+
+const DEPARTMENT_CODE_MAPPING: Record<string, string> = {
+  'K': 'cardiology', // Кардиология → вкладка cardio (БЕЗ ЭКГ!)
+  'D': 'dermatology', // Дерматология → вкладка derma (только консультации)
+  'S': 'dentistry', // Стоматология → вкладка dental
+  'L': 'laboratory', // Лаборатория → вкладка lab
+  'P': 'procedures', // Физиотерапия → вкладка procedures
+  'C': 'procedures', // Косметология → вкладка procedures
+  'D_PROC': 'procedures', // Дерматологические процедуры → вкладка procedures
+  'O': 'procedures' // Прочие процедуры → вкладка procedures
+};
+
+const DEPARTMENT_NORMALIZED_MAPPING: Record<string, string> = {
+  'specialists': 'cardiology', // Консультации специалистов (только если не 'D' или 'S') -> cardiology
+  'laboratory': 'lab', // ✅ Лаборатория -> lab (для соответствия вкладке)
+  'procedures': 'procedures', // Процедуры -> procedures
+  'other': 'general' // Прочее -> general
+};
+
+// Определяет отделение визита для услуги (ECG — отдельный кабинет).
+// Чистая функция: извлечена из AppointmentWizardV2 (PR-45 LOC ceiling).
+export const getWizardDepartmentForService = (
+  serviceId: string | number,
+  servicesData: DeptServiceLike[]
+): string => {
+  if (!serviceId || serviceId === null || serviceId === undefined) {
+    return 'general';
+  }
+
+  const service = servicesData.find((s) => s.id === serviceId);
+
+  if (!service) {
+    return 'general';
+  }
+
+  // 🎯 СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЭКГ: отдельный кабинет!
+  if (service.queue_tag === 'ecg') {
+    return 'echokg';
+  }
+
+  // Сначала точный маппинг оригинального category_code (Bug 2 fix),
+  // затем нормализованный fallback.
+  if (service.category_code && DEPARTMENT_CODE_MAPPING[service.category_code]) {
+    return DEPARTMENT_CODE_MAPPING[service.category_code];
+  }
+
+  const normalizedCategoryCode = service.category_code
+    ? normalizeCategoryCode(service.category_code)
+    : '';
+
+  return (
+    DEPARTMENT_NORMALIZED_MAPPING[normalizedCategoryCode] ||
+    DEPARTMENT_CODE_MAPPING[service.category_code as string] ||
+    'general'
+  );
+};
+
+// =====================================================================
 // PATIENT ID RESOLUTION
 // =====================================================================
 
@@ -698,6 +876,293 @@ if (typeof document !== 'undefined' && !document.getElementById('wizard-keyframe
   document.head.appendChild(style);
 }
 
+
+// =====================================================================
+// FIX D (Codex R1 #3095): ИСХОДНЫЕ УСЛУГИ EDIT-ЗАПИСИ (identity sets)
+// =====================================================================
+
+interface WizardServiceRecord {
+  id?: string | number;
+  name?: string;
+  service_code?: string | null;
+  [k: string]: unknown;
+}
+
+export interface EditOriginalServiceIdentity {
+  hasQueueEntries: boolean;
+  serviceIds: Set<unknown>;
+  serviceCodes: Set<string>;
+  serviceNames: Set<string>;
+  queueIds: Set<string | number>;
+  entryUpdatedAtMap: Record<string, string>;
+}
+
+// Собирает множества «исходных» услуг edit-записи (service_details →
+// service_codes → services-коды → queue_numbers → services-строки) — ТОТ ЖЕ
+// порядок приоритетов и те же нормализации, что были в handleComplete.
+// Используется и сабмитом (edit-delta payload), и edit-квотой (Fix D), чтобы
+// подтверждение показывало ровно то, что edit-delta выставит в invoice.
+export const buildEditOriginalServiceIdentity = (
+  editMode: boolean,
+  initialData: Record<string, unknown> | null | undefined,
+  servicesData: WizardServiceRecord[],
+): EditOriginalServiceIdentity => {
+  const identity: EditOriginalServiceIdentity = {
+    hasQueueEntries: false,
+    serviceIds: new Set(),
+    serviceCodes: new Set<string>(),
+    serviceNames: new Set<string>(),
+    queueIds: new Set<string | number>(),
+    entryUpdatedAtMap: {},
+  };
+  if (!editMode || !initialData) return identity;
+
+  const initialRecordKind = getWizardRecordKind(initialData);
+  const initialSourceKind = getWizardSourceKind(initialData);
+  const hasQueueEntries = Boolean(initialData) && (
+    (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) ||
+    initialSourceKind === 'online' ||
+    initialSourceKind === 'desk' ||
+    initialRecordKind === 'online_queue' ||
+    initialRecordKind === 'visit' ||
+    initialRecordKind === 'appointment');
+  identity.hasQueueEntries = Boolean(hasQueueEntries);
+  if (!hasQueueEntries) return identity;
+
+  const originalServiceIds = identity.serviceIds;
+  const originalQueueIds = identity.queueIds; // PR-14: optimistic locking map lives here too
+  const entryUpdatedAtMap = identity.entryUpdatedAtMap;
+  const originalServiceCodes = identity.serviceCodes;
+  const originalServiceNames = identity.serviceNames;
+
+    // Определяем исходные услуги из initialData
+
+    if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
+      logger.log('📋 Извлечение исходных услуг из service_details:', initialData.service_details);
+      initialData.service_details.forEach((serviceDetail) => {
+        if (!serviceDetail) return;
+
+        const serviceId = serviceDetail.service_id || serviceDetail.id || null;
+        const serviceCode = serviceDetail.service_code || serviceDetail.code || null;
+        const serviceName = serviceDetail.service_name || serviceDetail.name || null;
+        const queueId = resolveExplicitQueueEntryId(serviceDetail, { allowLegacyId: false });
+
+        if (serviceId) originalServiceIds.add(serviceId);
+        if (queueId) originalQueueIds.add(queueId);
+        // PR-14: collect updated_at for optimistic locking
+        if (queueId) {
+          const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || initialData.updated_at || initialData.last_changed_at;
+          if (ts) entryUpdatedAtMap[queueId] = ts;
+        }
+        if (serviceCode) originalServiceCodes.add(String(serviceCode).toUpperCase().trim());
+        if (serviceName) originalServiceNames.add(String(serviceName).toLowerCase().trim());
+      });
+    }
+
+    // ✅ ПРИОРИТЕТ 1: service_codes - наиболее надежный источник для записей типа visit
+    if (Array.isArray(initialData.service_codes) && initialData.service_codes.length > 0) {
+      logger.log('📋 Извлечение услуг из service_codes:', initialData.service_codes);
+      initialData.service_codes.forEach((code) => {
+        if (code) {
+          const normalizedCode = code.toUpperCase().trim();
+          originalServiceCodes.add(normalizedCode);
+          // Находим service_id по service_code
+          const service = servicesData.find((s) => {
+            if (!s.service_code) return false;
+            const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+            const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+            const codeNoZero = normalizedCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+            return serviceCodeUpper === normalizedCode || serviceCodeNoZero === codeNoZero;
+          });
+          if (service) {
+            originalServiceIds.add(service.id);
+            originalServiceNames.add(String(service.name ?? '').toLowerCase().trim());
+            logger.log(`  ✅ Найден service_id=${service.id} для кода "${code}"`);
+          } else {
+            logger.warn(`  ⚠️ Услуга с кодом "${code}" не найдена в servicesData`);
+          }
+        }
+      });
+    }
+
+    // ✅ ПРИОРИТЕТ 1.5: services (если service_codes пуст) - может быть кодами
+    // ⚠️ ВАЖНО: services может содержать коды (k01, d05) или имена
+    if (originalServiceIds.size === 0 && Array.isArray(initialData.services) && initialData.services.length > 0) {
+      logger.log('📋 service_codes пуст, используем services как коды:', initialData.services);
+      initialData.services.forEach((serviceValue) => {
+        const normalizedRawValue = normalizeServiceSelectionValue(serviceValue);
+        const normalizedRawName = normalizeServiceSelectionName(serviceValue);
+
+        if (normalizedRawValue || normalizedRawName) {
+          const normalizedValue = normalizedRawValue.toUpperCase().trim();
+
+          // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
+          // ⚠️ ВАЖНО: Коды могут быть в формате 'K01', 'k01', 'K01: Название' и т.д.
+          let service = servicesData.find((s) => {
+            if (!s.service_code) return false;
+            const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+            // Убираем ведущие нули для сравнения (k01 = k1)
+            const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+            const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+
+            // Прямое сравнение
+            if (serviceCodeUpper === normalizedValue) return true;
+            // Сравнение без ведущих нулей
+            if (serviceCodeNoZero === valueNoZero) return true;
+            // Сравнение с учетом возможного формата 'K01: Название'
+            const serviceCodeBase = serviceCodeUpper.split(':')[0].trim();
+            const valueBase = normalizedValue.split(':')[0].trim();
+            if (serviceCodeBase === valueBase) return true;
+
+            return false;
+          });
+
+          // Если не нашли по коду, пробуем по имени (fallback)
+          if (!service) {
+            const normalizedName = normalizedRawName.toLowerCase().trim();
+            service = servicesData.find((s) =>
+            s.name && s.name.toLowerCase().trim() === normalizedName
+            );
+          }
+
+          if (service) {
+            originalServiceIds.add(service.id);
+            if (service.service_code) {
+              originalServiceCodes.add(service.service_code.toUpperCase().trim());
+            }
+            originalServiceNames.add(String(service.name ?? '').toLowerCase().trim());
+            logger.log(`  ✅ Найден service_id=${service.id} для "${normalizedRawValue || normalizedRawName}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
+          } else {
+            // ✅ УЛУЧШЕНО: Показываем примеры кодов из servicesData для отладки
+            const exampleCodes = servicesData.
+            filter((s) => s.service_code).
+            slice(0, 10).
+            map((s) => `${s.service_code}: ${s.name}`).
+            join(', ');
+            logger.warn(`  ⚠️ Услуга "${normalizedRawValue || normalizedRawName || '[empty]'}" не найдена в servicesData. Примеры кодов: ${exampleCodes}`);
+          }
+        }
+      });
+    }
+
+    // ✅ ПРИОРИТЕТ 2: queue_numbers - основной источник для всех типов записей
+    if (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) {
+      logger.log('📋 Извлечение услуг из queue_numbers:', initialData.queue_numbers);
+      initialData.queue_numbers.forEach((q) => {
+        if (q && q.service_id) {
+          originalServiceIds.add(q.service_id);
+          const queueId = resolveExplicitQueueEntryId(q);
+          if (queueId) originalQueueIds.add(queueId); // ✅ Сохраняем ID записи очереди
+          // PR-14: collect updated_at for optimistic locking
+          if (queueId) {
+            const ts = q.updated_at || q.last_changed_at || initialData.updated_at || initialData.last_changed_at;
+            if (ts) entryUpdatedAtMap[queueId] = ts;
+          }
+          // Находим service_code и name по service_id
+          const service = servicesData.find((s) => s.id === q.service_id);
+          if (service) {
+            if (service.service_code) {
+              originalServiceCodes.add(service.service_code.toUpperCase().trim());
+            }
+            originalServiceNames.add(String(service.name ?? '').toLowerCase().trim());
+          }
+        }
+        if (q && q.service_code) {
+          const normalizedCode = q.service_code.toUpperCase().trim();
+          originalServiceCodes.add(normalizedCode);
+          const service = servicesData.find((s) =>
+          s.service_code && s.service_code.toUpperCase().trim() === normalizedCode
+          );
+          if (service) {
+            originalServiceIds.add(service.id);
+            originalServiceNames.add(String(service.name ?? '').toLowerCase().trim());
+          }
+        }
+        if (q && q.service_name) {
+          const normalizedName = q.service_name.toLowerCase().trim();
+          originalServiceNames.add(normalizedName);
+          const service = servicesData.find((s) =>
+          s.name && s.name.toLowerCase().trim() === normalizedName
+          );
+          if (service) {
+            originalServiceIds.add(service.id);
+            if (service.service_code) {
+              originalServiceCodes.add(service.service_code.toUpperCase().trim());
+            }
+          }
+        }
+      });
+    }
+
+    // ✅ ПРИОРИТЕТ 3: services (массив строк) - может быть кодами или именами
+    if (Array.isArray(initialData.services) && initialData.services.length > 0) {
+      logger.log('📋 Извлечение услуг из services:', initialData.services);
+      initialData.services.forEach((serviceValue) => {
+        const normalizedRawValue = normalizeServiceSelectionValue(serviceValue);
+        const normalizedRawName = normalizeServiceSelectionName(serviceValue);
+
+        if (normalizedRawValue || normalizedRawName) {
+          const normalizedValue = normalizedRawValue.toUpperCase().trim();
+          const normalizedName = normalizedRawName.toLowerCase().trim();
+
+          // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
+          let service = servicesData.find((s) => {
+            if (!s.service_code) return false;
+            const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+            // Убираем ведущие нули для сравнения (k01 = k1)
+            const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+            const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+            return serviceCodeUpper === normalizedValue || serviceCodeNoZero === valueNoZero;
+          });
+
+          // Если не нашли по коду, пробуем по имени
+          if (!service) {
+            service = servicesData.find((s) =>
+            s.name && s.name.toLowerCase().trim() === normalizedName
+            );
+          }
+
+          if (service) {
+            originalServiceIds.add(service.id);
+            if (service.service_code) {
+              originalServiceCodes.add(service.service_code.toUpperCase().trim());
+            }
+            originalServiceNames.add(String(service.name ?? '').toLowerCase().trim());
+            logger.log(`  ✅ Найден service_id=${service.id} для "${normalizedRawValue || normalizedRawName}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
+          } else {
+            logger.warn(`  ⚠️ Услуга "${normalizedRawValue || normalizedRawName || '[empty]'}" не найдена в servicesData (ни по коду, ни по имени)`);
+          }
+        }
+      });
+    }
+
+    logger.log('📋 Исходные услуги определены:', {
+      serviceIds: Array.from(originalServiceIds),
+      serviceCodes: Array.from(originalServiceCodes),
+      serviceNames: Array.from(originalServiceNames)
+    });
+
+  return identity;
+};
+
+// Предикат «новая услуга» для edit-дельты — ТОТ ЖЕ, что в сабмите
+// handleComplete (original_queue_id + serviceIds/Codes/Names).
+export const isEditDeltaNewItem = (
+  item: { original_queue_id?: unknown; service_id?: unknown },
+  service: WizardServiceRecord | undefined,
+  identity: EditOriginalServiceIdentity,
+): boolean => {
+  const hasExistingQueueIdentity = Boolean(item.original_queue_id);
+  const inIds = identity.serviceIds.has(item.service_id);
+  const inCodes = service?.service_code
+    ? identity.serviceCodes.has(String(service.service_code).toUpperCase().trim())
+    : false;
+  const inNames = service?.name
+    ? identity.serviceNames.has(String(service.name).toLowerCase().trim())
+    : false;
+  return !hasExistingQueueIdentity && !inIds && !inCodes && !inNames;
+};
+
 export default {
   PATIENT_NAME_PATTERN,
   MIXED_REPEAT_WARNING,
@@ -729,11 +1194,13 @@ export default {
   buildInheritedPatientClearPatch,
   isPhoneDuplicateErrorMessage,
   createIdempotencyKey,
+  buildCartQuoteRequest,
+  getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
-  categories,
+  categories
 };

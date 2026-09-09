@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
@@ -9,6 +11,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _load_registration_discount_settings,
     _resolve_effective_discount_mode,
 )  # noqa: F401
+from app.models.online_queue import DailyQueue
 
 
 @router.post("/registrar/cart", response_model=CartResponse)
@@ -22,6 +25,38 @@ def create_cart_appointments(
     Поддерживает: повторные/льготные визиты, All Free, динамические цены, очереди по queue_tag
     """
     effective_discount_mode = _resolve_effective_discount_mode(cart_data)
+
+    # Codex R3 #3095 (P1): revalidate the CONFIRMED quote before any write.
+    # An administrator may change a service price or a discount setting after
+    # the registrar confirmed the preview; without this check /registrar/cart
+    # silently created an invoice for a DIFFERENT amount. The token binds the
+    # save command to the exact pricing the registrar confirmed; a mismatch
+    # is a hard 409 — the registrar must re-confirm, not be over/undercharged.
+    validated_settings: dict[str, Any] | None = None
+    if cart_data.quote_token:
+        flat_items = [
+            CartQuoteItemRequest(
+                service_id=s.service_id,
+                quantity=s.quantity,
+                custom_price=s.custom_price,
+            )
+            for visit_req in cart_data.visits
+            for s in visit_req.services
+        ]
+        # Codex R6 #3095 (P2): price the save from the validated values —
+        # the snapshot returned here is the LOCKED settings state the
+        # confirmed quote was computed from; a concurrent admin INSERT of a
+        # previously-missing settings row cannot flip the invoice after the
+        # token passed.
+        validated_settings = _assert_quote_token_matches(
+            db,
+            items=flat_items,
+            discount_mode=cart_data.discount_mode,
+            all_free=cart_data.all_free,
+            pricing_mode="cart",
+            quote_token=cart_data.quote_token,
+        )
+
     logger.info(
         "REGISTRATION: Получен запрос на создание корзины. Patient ID: %s, Визитов: %d, Discount mode: %s, Effective discount mode: %s, All free: %s, Payment method: %s",
         cart_data.patient_id,
@@ -38,7 +73,11 @@ def create_cart_appointments(
 
         # Получаем настройки очереди
         queue_settings = crud_clinic.get_queue_settings(db)  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
-        registration_settings = _load_registration_discount_settings(db)
+        # Codex R6 #3095 (P2): when a quote token was validated, the settings
+        # snapshot it produced IS the pricing truth for this save — do not
+        # re-read (an unlocked reload would see settings rows inserted by the
+        # admin endpoint after revalidation, which FOR UPDATE cannot lock).
+        registration_settings = validated_settings or _load_registration_discount_settings(db)
 
         created_visits = []
         created_visit_amounts: dict[int, Decimal] = {}
@@ -347,12 +386,521 @@ def create_cart_appointments(
 # ===================== УПРАВЛЕНИЕ ИЗМЕНЕНИЯМИ ЦЕН =====================
 
 
+def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, approval_status: str, quote_req: CartQuoteRequest) -> str:
+    """Canonical binding token of a computed quote (Codex R3 #3095 P1).
+
+    sha256 over the ORDER-INSENSITIVE multiset of priced items (same items in
+    a different visit grouping produce the same token) plus the pricing
+    context. A later change of catalog prices or discount settings changes
+    the recomputed token, so a stale confirmed quote is detectable at save
+    time instead of silently invoicing a different amount.
+    """
+    canonical_items = sorted(
+        (
+            {
+                "service_id": int(item.service_id),
+                "quantity": int(item.quantity),
+                "unit_price": str(item.unit_price),
+                "discount_percent": int(item.discount_percent),
+                "final_price": str(item.final_price),
+            }
+            for item in items
+        ),
+        key=lambda d: (d["service_id"], d["quantity"], d["unit_price"], d["final_price"]),
+    )
+    # Codex R7 #3095 (P1): токен биндит РЕЗОЛВНУТЫЙ режим (SSOT-резолв
+    # пары all_free + discount_mode), а не сырые поля запроса — иначе
+    # одно и то же подтверждённое ценообразование, выраженное булевым
+    # флагом или строковым режимом, давало бы разные токены, и
+    # нормализация режима на сохранении роняла ревалидацию в 409.
+    _effective_mode = _resolve_effective_discount_mode(quote_req)
+    payload = {
+        "pricing_mode": quote_req.pricing_mode,
+        "discount_mode": _effective_mode,
+        "all_free": _effective_mode == "all_free",
+        "approval_status": approval_status,
+        "items": canonical_items,
+        "total_amount": str(total_amount),
+    }
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _edit_delta_billable_quantity(
+    db: Session,
+    *,
+    service: Service,
+    requested_qty: int,
+    patient_id: int,
+    target_date: date,
+    preferred_entry_ids: set[int],
+    specialist_id: int | None = None,
+) -> int:
+    """Codex R6 #3095 (P2): mirror the edit-delta command's billing quantity.
+
+    RegistrarEditDeltaService routes an added service to the patient's
+    active same-day entry with the same queue_tag; when that entry ALREADY
+    contains the service, _append_to_existing_entry bills only
+    max(requested − existing, 0) — never the full requested quantity. The
+    quote must validate the SAME billable amount, otherwise the confirmed
+    total exceeds the actual invoice delta. Read-only: reuses the service's
+    own routing/payload predicates instead of duplicating them (no drift).
+    """
+    edit_service = RegistrarEditDeltaService(db)
+    queue_tag = service.queue_tag or service.department_key
+    if not queue_tag:
+        # Codex R10 #3095 (P2): the command REJECTS an unroutable service
+        # (apply → ValueError "Service {id} has no queue tag" → 400). The
+        # quote mirrors that gate instead of billing the full quantity for
+        # a service the save can never accept.
+        raise HTTPException(
+            status_code=400,
+            detail=f"Service {service.id} has no queue tag",
+        )
+    entry = edit_service._find_active_entry(
+        patient_id=patient_id,
+        queue_tag=queue_tag,
+        target_date=target_date,
+        preferred_entry_ids=preferred_entry_ids,
+    )
+    if entry is None:
+        # Codex R11 #3095 (P2): the command routes a no-entry edit to
+        # _create_new_queue_entry → _resolve_daily_queue, which refuses
+        # ("No active queue exists for queue_tag=...; specialist_id is
+        # required") when neither the item nor the service supplies a
+        # specialist. Mirror that gate HERE, read-only, BEFORE the token is
+        # issued: a confirmed quote for a command the save can never accept
+        # is a false confirmation (save-time token revalidation repeats the
+        # successful quote, then the mutation returns 400). The resolution
+        # expression is IDENTICAL to _resolve_daily_queue (item specialist
+        # or the service's default doctor) — no drift.
+        resolved_specialist_id = specialist_id or service.doctor_id
+        target_queue_exists = (
+            db.query(DailyQueue.id)
+            .filter(
+                DailyQueue.day == target_date,
+                DailyQueue.queue_tag == queue_tag,
+                DailyQueue.active.is_(True),
+            )
+            .first()
+            is not None
+        )
+        if not target_queue_exists and not resolved_specialist_id:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"No active queue exists for queue_tag={queue_tag}; "
+                    "specialist_id is required"
+                ),
+            )
+        return requested_qty
+    existing_payload = edit_service._find_service_payload(
+        edit_service._coerce_services(entry.services), service
+    )
+    if not existing_payload:
+        return requested_qty
+    existing_qty = edit_service._payload_quantity(existing_payload)
+    return max(requested_qty - existing_qty, 0)
+
+
+def _quote_core(
+    db: Session,
+    quote_req: CartQuoteRequest,
+    lock_pricing_rows: bool = False,
+    registration_settings: dict[str, Any] | None = None,
+) -> CartQuoteResponse:
+    """Shared pricing core for /registrar/cart/quote AND the save-time
+    revalidation of the confirmed quote (Codex R3 #3095 P1). Raises the same
+    HTTP errors either way; returns the quote with its binding token.
+
+    Fix D: read-only предварительный расчёт цены корзины БЕЗ сохранения.
+
+    Переиспользует те же настройки и тот же хелпер скидок, что и путь
+    сохранения /registrar/cart (_load_registration_discount_settings +
+    _apply_service_discount) — frontend больше не дублирует бизнес-правила
+    скидок, и подтверждённая сумма совпадает с суммой invoice.
+
+    Отсутствие цены у услуги — это НЕ 0: endpoint отвечает 409 с указанием
+    услуги, чтобы регистратор увидел проблему до сохранения.
+    """
+    # Codex R13 #3095 (P2): canonicalize duplicate service rows for the
+    # full-update pricing mode. Pricing in this mode depends ONLY on
+    # (service_id, quantity) — catalog rules (repeat/benefit consultation → 0,
+    # all_free → 0), no custom_price / specialist input — so the same service
+    # listed twice (e.g. quantities 1 and 2) and one merged row (quantity 3)
+    # are the SAME priced command. full_update_online_entry merges duplicate
+    # rows before token revalidation and mutation; if the quote priced the
+    # unmerged rows, the confirmed token could never match the merged save —
+    # or, before that fix, the registrar confirmed three units while the
+    # command created two one-unit entries. Quote and save now share ONE
+    # canonical representation.
+    if quote_req.pricing_mode == "full_update" and len(quote_req.items) > 1:
+        _qty_by_service: dict[int, int] = {}
+        _first_by_service: dict[int, CartQuoteItemRequest] = {}
+        for item_req in quote_req.items:
+            if item_req.service_id not in _qty_by_service:
+                _qty_by_service[item_req.service_id] = item_req.quantity
+                _first_by_service[item_req.service_id] = item_req
+            else:
+                _qty_by_service[item_req.service_id] += item_req.quantity
+        if len(_qty_by_service) != len(quote_req.items):
+            quote_req.items = [
+                _first_by_service[sid].model_copy(update={"quantity": qty})
+                for sid, qty in _qty_by_service.items()
+            ]
+    effective_discount_mode = _resolve_effective_discount_mode(quote_req)
+    # Codex R6 #3095 (P2): the save-time revalidation passes ITS OWN locked
+    # settings snapshot in — quote and save are then priced from the exact
+    # same values even for settings rows that do not exist yet (FOR UPDATE
+    # cannot lock a row that is absent, so a concurrent admin INSERT of a
+    # previously-missing key must not change the invoice after the token
+    # was accepted).
+    if registration_settings is None:
+        registration_settings = _load_registration_discount_settings(db, lock_rows=lock_pricing_rows)
+
+    # Codex R2 #3095 (P2): approval_status обязан отражать контракт
+    # ВЫБРАННОЙ команды сохранения. RegistrarEditDeltaService._create_visit
+    # всегда пишет approval_status="approved" и никогда не читает
+    # all_free_auto_approve — предупреждение «требуется согласование» в
+    # edit_delta-квоте вводило в заблуждение.
+    # Codex R3 #3095 (P2): full-update ОБРАТНО пишет approval_status="pending"
+    # для all_free (_full_update_handle_all_free_visit: и существующий
+    # неоплаченный визит, и новый визит) — квота обязана предупреждать о
+    # согласовании в этом случае, а не рапортовать «approved».
+    if quote_req.pricing_mode == "edit_delta":
+        approval_status = "approved"
+    elif quote_req.pricing_mode == "full_update":
+        approval_status = (
+            "pending" if effective_discount_mode == "all_free" else "approved"
+        )
+    elif effective_discount_mode == "all_free":
+        approval_status = (
+            "pending"
+            if not registration_settings["all_free_auto_approve"]
+            else "approved"
+        )
+    else:
+        approval_status = "approved"
+
+    total_amount = Decimal("0")
+    items: list[CartQuoteItemResponse] = []
+
+    # Codex R9 #3095 (P2): the save path acquires ALL service row locks in ONE
+    # deterministic (sorted id) order BEFORE calculating items. When only the
+    # default pricing settings exist, the settings query locks no rows, so two
+    # concurrent token-bound saves could reach the per-item loop together and
+    # lock the same services in opposite orders — a classic lock-order
+    # deadlock; PostgreSQL aborts one save. Sorted bulk acquisition gives every
+    # transaction the same global order, so waits always form a chain, never a
+    # cycle. Behavior (prices, 404s, token) is unchanged — this only fixes HOW
+    # the locks are taken.
+    service_row_map: dict[int, Service] = {}
+    if lock_pricing_rows:
+        _lock_ids = sorted({int(item_req.service_id) for item_req in quote_req.items})
+        if _lock_ids:
+            # One FOR UPDATE scan in sorted id order = deterministic lock
+            # acquisition; the returned rows fill the identity map reused by
+            # the item loop (no second read, same transaction snapshot).
+            for _svc in (
+                db.query(Service)
+                .filter(Service.id.in_(_lock_ids))
+                .order_by(Service.id)
+                .with_for_update()
+                .all()
+            ):
+                service_row_map[int(_svc.id)] = _svc
+
+    # Codex R7 #3095 (P2): зеркалируем ПОСЛЕДОВАТЕЛЬНОЕ состояние команды.
+    # RegistrarEditDeltaService.apply обрабатывает строки по очереди: вторая
+    # дублирующая строка того же (service_id, specialist_id) видит позицию,
+    # созданную/пополненную первой. Квота обязана накапливать уже
+    # подтверждённые единицы внутри одного прохода — иначе токен покрывает
+    # две единицы, а команда выставит одну.
+    _edit_delta_covered: dict[int, int] = {}
+
+    for item_req in quote_req.items:
+        if int(item_req.service_id) in service_row_map:
+            service: Service | None = service_row_map[int(item_req.service_id)]
+        else:
+            # Codex R4 #3095 (P1): the save path holds the row locks to the end
+            # of its transaction, so a concurrent price change cannot slip in
+            # between token revalidation and invoice calculation. (Quote paths
+            # without lock_pricing_rows read without FOR UPDATE.)
+            service = db.query(Service).filter(Service.id == item_req.service_id).first()
+        if not service:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Услуга с ID {item_req.service_id} не найдена",
+            )
+
+        # Codex R2 #3095 (P2): отклоняем отсутствие цены только когда НЕТ
+        # ни одной эффективной цены. custom_price (врачебная переопределённая
+        # цена) входит в контракт cart-пути сохранения — create_cart_
+        # appointments использует её ПЕРЕД каталог-ценой, поэтому квота не
+        # имеет права блокировать этот вызов. Для edit_delta/full_update
+        # custom_price в контракте маршрута не участвует — там отсутствие
+        # каталог-цены остаётся проблемой (это НЕ 0).
+        if quote_req.pricing_mode == "cart":
+            if service.price is None and item_req.custom_price is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Для услуги «{service.name}» не указана цена",
+                )
+        elif service.price is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Для услуги «{service.name}» не указана цена",
+            )
+
+        # Codex R1 #3095 (P1): mode 'edit_delta' повторяет ценообразование
+        # RegistrarEditDeltaService один-в-один: только all_free→0,
+        # custom_price и repeat/benefit скидки НЕ применяются. Это гарантирует,
+        # что подтверждённая в edit-режиме сумма совпадает с тем, что
+        # edit-delta реально выставит в invoice.
+        if quote_req.pricing_mode == "edit_delta":
+            base_price = Decimal(str(service.price))
+            unit_final = Decimal("0") if effective_discount_mode == "all_free" else base_price
+            discount_percent = 0
+            # Codex R10 #3095 (P2): the command's routing gate mirrors into
+            # the quote for BOTH context paths — without the edit context the
+            # helper below is not called at all, so an unroutable service
+            # must be rejected here (same reason as the save: 400 "no queue
+            # tag"), never confirmed as a billable full quantity.
+            if not (service.queue_tag or service.department_key):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Service {service.id} has no queue tag",
+                )
+            # Codex R6 #3095 (P2): with edit context the billable quantity is
+            # the DELTA the command will actually bill (active same-day entry
+            # already holding the service → max(requested − existing, 0)),
+            # not the full requested quantity.
+            if quote_req.patient_id is not None and quote_req.target_date is not None:
+                billable_qty = _edit_delta_billable_quantity(
+                    db,
+                    service=service,
+                    requested_qty=item_req.quantity,
+                    patient_id=quote_req.patient_id,
+                    target_date=quote_req.target_date,
+                    preferred_entry_ids=set(quote_req.preferred_entry_ids),
+                    specialist_id=item_req.specialist_id,
+                )
+            else:
+                billable_qty = item_req.quantity
+            # Codex R7 #3095 (P2): вычитаем единицы, уже подтверждённые
+            # предыдущими дублирующими строками этого же прохода квоты —
+            # точное зеркало последовательного состояния команды.
+            # Codex R15 #3095 (P2): ключ — ТОЛЬКО услуга: команда маршрутизирует
+            # строку по (patient, day, queue_tag), а количество внутри записи
+            # суммируется по сервису независимо от специалиста
+            # (_find_service_payload). Специалист в ключе разрывал покрытие
+            # дубликатов с разными врачами: токен покрывал обе строки, команда
+            # выставляла только остаток.
+            _covered_key = int(item_req.service_id)
+            billable_qty = max(
+                billable_qty - _edit_delta_covered.get(_covered_key, 0), 0
+            )
+            _edit_delta_covered[_covered_key] = (
+                _edit_delta_covered.get(_covered_key, 0) + billable_qty
+            )
+        elif quote_req.pricing_mode == "full_update":
+            # Codex R2 #3095 (P1): зеркало _full_update_create_single_
+            # independent_entry: консультация при repeat/benefit → 0,
+            # all_free → 0, остальное — каталог-цена × количество.
+            base_price = Decimal(str(service.price))
+            if effective_discount_mode == "all_free":
+                unit_final = Decimal("0")
+                discount_percent = 100
+            elif service.is_consultation and effective_discount_mode in ("repeat", "benefit"):
+                unit_final = Decimal("0")
+                discount_percent = 100
+            else:
+                unit_final = base_price
+                discount_percent = 0
+        else:
+            # Mode 'cart' — зеркало пути сохранения /registrar/cart:
+            # врачебная переопределённая цена (Codex R1 #3095 P2), затем
+            # скидочный хелпер SSOT.
+            base_price = (
+                item_req.custom_price
+                if item_req.custom_price is not None
+                else Decimal(str(service.price))
+            )
+            unit_final = _apply_service_discount(
+                base_price,
+                effective_discount_mode,
+                registration_settings,
+                service.is_consultation,
+            )
+            # Процент скидки для отображения (зеркало _apply_service_discount)
+            if effective_discount_mode == "all_free":
+                discount_percent = 100
+            elif effective_discount_mode == "repeat" and service.is_consultation:
+                raw = Decimal(
+                    str(registration_settings.get("repeat_visit_discount", 0) or 0)
+                )
+                discount_percent = int(max(Decimal("0"), min(raw, Decimal("100"))))
+            elif effective_discount_mode == "benefit" and service.is_consultation:
+                discount_percent = (
+                    100 if registration_settings.get("benefit_consultation_free", True) else 0
+                )
+            else:
+                discount_percent = 0
+
+        # Codex R6 #3095 (P2): edit_delta prices the BILLABLE delta quantity;
+        # the other modes price the full requested quantity.
+        priced_qty = billable_qty if quote_req.pricing_mode == "edit_delta" else item_req.quantity
+
+        final_price = (unit_final * Decimal(priced_qty)).quantize(
+            Decimal("0.01")
+        )
+        if quote_req.pricing_mode == "full_update":
+            # Codex R3 #3095 (P2): the full-update command stores
+            # int(item_price) (unit × quantity) in BOTH the service payload
+            # and total_amount (_full_update_create_single_independent_entry),
+            # so a valid catalog price like 10.99 × 3 is saved as 32, while
+            # the quote showed 32.97. Mirror the command's exact conversion:
+            # the confirmed amount and the saved amount must be identical.
+            final_price = Decimal(int(unit_final * Decimal(item_req.quantity)))
+        total_amount += final_price
+
+        items.append(
+            CartQuoteItemResponse(
+                service_id=service.id,
+                service_name=service.name,
+                unit_price=base_price,
+                quantity=priced_qty,
+                discount_percent=discount_percent,
+                final_price=final_price,
+            )
+        )
+
+    return CartQuoteResponse(
+        items=items,
+        total_amount=total_amount,
+        approval_status=approval_status,
+        quote_token=_quote_token(items, total_amount, approval_status, quote_req),
+    )
+
+
+@router.post("/registrar/cart/quote", response_model=CartQuoteResponse)
+def quote_cart_prices(
+    quote_req: CartQuoteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+):
+    """Fix D: read-only предварительный расчёт цены корзины (endpoint)."""
+    _ = current_user
+    return _quote_core(db, quote_req)
+
+
+def _assert_quote_token_matches(
+    db: Session,
+    *,
+    items: list[CartQuoteItemRequest],
+    discount_mode: str,
+    all_free: bool,
+    pricing_mode: str,
+    quote_token: str | None,
+    patient_id: int | None = None,
+    target_date: date | None = None,
+    preferred_entry_ids: list[int] | None = None,
+) -> dict[str, Any] | None:
+    """Save-command revalidation shared by /registrar/cart, edit-delta and
+    full-update (Codex R4 #3095 P1). Recomputes the quote on the CURRENT
+    catalog/settings with row locks held to the end of the caller's
+    transaction and rejects a stale token with 409.
+
+    Codex R6 #3095 (P2): the edit-delta command MUST revalidate with the
+    SAME edit context (patient_id/target_date/preferred entries) the quote
+    used — the billable quantity is a routing-dependent delta, so a
+    context-less recompute would price the full quantity and falsely reject
+    the confirmed token with 409.
+
+    Codex R6 #3095 (P2): returns the LOCKED settings snapshot the fresh
+    quote was priced from. The caller prices the save from THIS snapshot
+    instead of re-reading settings ("price the save directly from the
+    validated values"): FOR UPDATE cannot lock settings rows that do not
+    exist yet, so a concurrent admin INSERT (admin settings endpoint) of a
+    previously-missing key between revalidation and the save's own reload
+    could otherwise flip the invoice to the newly inserted discount while
+    the token still validated the old one. With the snapshot the invoice is
+    computed from exactly the values the registrar confirmed. Returns None
+    when no token was supplied (legacy no-quote callers keep their own
+    unlocked load).
+    """
+    if not quote_token:
+        return None
+    settings_snapshot = _load_registration_discount_settings(db, lock_rows=True)
+    fresh_quote = _quote_core(
+        db,
+        CartQuoteRequest(
+            items=items,
+            discount_mode=discount_mode,
+            all_free=all_free,
+            pricing_mode=pricing_mode,
+            patient_id=patient_id,
+            target_date=target_date,
+            preferred_entry_ids=list(preferred_entry_ids or []),
+        ),
+        lock_pricing_rows=True,
+        registration_settings=settings_snapshot,
+    )
+    if fresh_quote.quote_token != quote_token:
+        logger.warning(
+            "REGISTRATION: stale quote token — pricing changed since confirmation; "
+            "current total: %s",
+            fresh_quote.total_amount,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Цены или скидки изменились после подтверждения — подтвердите новую сумму. "
+                f"Текущая сумма корзины: {fresh_quote.total_amount} сум"
+            ),
+        )
+    return settings_snapshot
+
+
 @router.post("/registrar/cart/edit-delta", response_model=EditDeltaResponse)
 def apply_registrar_cart_edit_delta(
     request: EditDeltaRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
+    # Codex R4 #3095 (P1): bind the confirmed edit quote to the command —
+    # revalidate BEFORE any mutation (the edit-delta pricing rules are
+    # mirrored by the quote's edit_delta mode; custom_price is not part of
+    # the edit-delta contract).
+    _assert_quote_token_matches(
+        db,
+        items=[
+            # Codex R13 #3095 (P2): mirror the specialist the QUOTE was
+            # computed with. The billable quantity is routing-dependent: for
+            # a service with no default doctor and no active same-day queue
+            # the quote succeeds with the browser-selected specialist, while
+            # a specialist-less revalidation hits the R11 gate
+            # ("specialist_id is required" 400) BEFORE the mutation can use
+            # request.services[*].specialist_id — the save rejected the very
+            # command the registrar had just confirmed.
+            CartQuoteItemRequest(
+                service_id=s.service_id,
+                quantity=s.quantity,
+                specialist_id=s.specialist_id,
+            )
+            for s in request.services
+        ],
+        discount_mode=request.discount_mode,
+        all_free=request.all_free,
+        pricing_mode="edit_delta",
+        quote_token=request.quote_token,
+        # Codex R6 #3095 (P2): revalidate under the SAME edit context the
+        # quote was computed with — the billable quantity is a
+        # routing-dependent delta.
+        patient_id=request.patient_id,
+        target_date=request.target_date,
+        preferred_entry_ids=request.existing_queue_entry_ids,
+    )
     try:
         result = RegistrarEditDeltaService(db).apply(
             patient_id=request.patient_id,
@@ -367,7 +915,12 @@ def apply_registrar_cart_edit_delta(
             target_date=request.target_date,
             payment_method=request.payment_method,
             discount_mode=request.discount_mode,
-            all_free=request.all_free,
+            # Codex R7 #3095 (P1): команда получает тот же РЕЗОЛВНУТЫЙ режим,
+            # что использовала квота (_resolve_effective_discount_mode):
+            # агрегированная запись несёт discount_mode="all_free" без булева
+            # флага — голый all_free=False заставил бы команду выставить
+            # каталожные цены поверх токена, подтверждённого как All Free.
+            all_free=_resolve_effective_discount_mode(request) == "all_free",
             patient_data=(
                 request.patient_data.model_dump(exclude_none=True)
                 if request.patient_data

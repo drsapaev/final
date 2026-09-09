@@ -189,6 +189,8 @@ export async function applyRegistrarEditDelta({
   existingQueueEntryIds = [],
   // R-08 fix: optimistic locking — map of entry_id → ISO updated_at string.
   expectedEntryUpdatedAt = null,
+  // Codex R4 PR 3095 (P1): привязка подтверждённой edit-квоты к команде.
+  quoteToken = null,
 }: {
   patientId: string | number;
   targetDate: string;
@@ -199,6 +201,7 @@ export async function applyRegistrarEditDelta({
   allFree?: boolean;
   existingQueueEntryIds?: Array<string | number>;
   expectedEntryUpdatedAt?: Record<string, string> | null;
+  quoteToken?: string | null;
 }): Promise<QueueActionResponse> {
   const payload: Record<string, unknown> = {
     patient_id: Number(patientId),
@@ -222,6 +225,10 @@ export async function applyRegistrarEditDelta({
   if (expectedEntryUpdatedAt && typeof expectedEntryUpdatedAt === 'object') {
     payload.expected_entry_updated_at = expectedEntryUpdatedAt;
   }
+  // Codex R4 PR 3095 (P1): привязка подтверждённой edit-квоты
+  if (quoteToken) {
+    payload.quote_token = quoteToken;
+  }
   const response = await api.post('/registrar/cart/edit-delta', payload);
   return mapQueueActionResponseDto(response.data as Record<string, unknown>);
 }
@@ -240,6 +247,7 @@ export async function updateOnlineQueueEntry({
   services,
   allFree = false,
   aggregatedIds = null,
+  quoteToken = null,
 }: {
   entryId: string | number;
   patientData: Record<string, unknown> | null;
@@ -248,6 +256,7 @@ export async function updateOnlineQueueEntry({
   services: Array<{ service_id: string | number; quantity?: unknown }>;
   allFree?: boolean;
   aggregatedIds?: Array<string | number> | null;
+  quoteToken?: string | null;
 }): Promise<QueueActionResponse> {
   const payload = {
     patient_data: patientData,
@@ -259,6 +268,8 @@ export async function updateOnlineQueueEntry({
     })),
     all_free: allFree,
     aggregated_ids: aggregatedIds,
+    // Codex R4 PR 3095 (P1): привязка подтверждённой full-update квоты
+    ...(quoteToken ? { quote_token: quoteToken } : {}),
   };
   const response = await api.put(
     `/queue/online-entry/${Number(entryId)}/full-update`,

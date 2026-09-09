@@ -115,6 +115,12 @@ export interface CartStepV2Props {
   onApplyRepeatSuggestion?: (...args: unknown[]) => void;
   /** Summary of repeat suggestions shown to the user. */
   repeatSuggestionSummary?: RepeatSuggestionSummary;
+  /** Fix D: server-side quote status. When provided, totals come from the backend quote (SSOT). */
+  cartQuoteStatus?: 'idle' | 'loading' | 'ready' | 'error';
+  /** Fix D: authoritative server-computed cart total (from /registrar/cart/quote). */
+  cartQuoteTotal?: number | null;
+  /** Fix D: server quote failure detail (e.g. «для услуги не указана цена»). */
+  cartQuoteMessage?: string;
   [key: string]: unknown;
 }
 
@@ -134,7 +140,10 @@ const CartStepV2 = ({
   repeatEligibilityByItemId,
   isRepeatEligibilityLoading,
   onApplyRepeatSuggestion,
-  repeatSuggestionSummary
+  repeatSuggestionSummary,
+  cartQuoteStatus,
+  cartQuoteTotal,
+  cartQuoteMessage
 }: CartStepV2Props) => {
   const { t: rawT } = useTranslation(); const t = rawT;
   // Local state removed - lifted to AppointmentWizardV2
@@ -215,24 +224,37 @@ const CartStepV2 = ({
     }
   };
 
-  // Общая сумма корзины
+  // Fix D: локальная сумма БЕЗ применения скидок — скидки считает backend
+  // (_apply_service_discount): repeat configurable percent / benefit / all_free.
+  // Раньше здесь repeat-консультации обнулялись и показывали неверный 0.
+  // Когда передан cartQuoteStatus, отображается серверная квота (SSOT).
   const cartTotal = useMemo(() => {
     if (!Array.isArray(cart?.items)) return 0;
     const items = cart.items as CartItem[];
     let total = 0;
     items.forEach((item) => {
-      let itemPrice = (item.service_price || 0) * (item.quantity || 1);
-      const service = servicesData?.find((s) => s.id === item.service_id);
-      if (service && service.is_consultation) {
-        if (cart.discount_mode === 'repeat' || cart.discount_mode === 'benefit') {
-          itemPrice = 0;
-        }
-      }
-      if (cart.all_free) itemPrice = 0;
-      total += itemPrice;
+      // Fix D: отсутствие цены не сворачивается в 0 — учёт через quote-error
+      total += (Number(item.service_price) || 0) * (item.quantity || 1);
     });
     return Math.round(total);
-  }, [cart?.items, cart?.discount_mode, cart?.all_free, servicesData]);
+  }, [cart?.items, servicesData]);
+
+  // Fix D: строка «Итого» — только серверный расчёт, когда статус известен
+  const totalDisplay = (() => {
+    if (cartQuoteStatus === 'loading') return t('misc.aw_quote_calculating');
+    if (cartQuoteStatus === 'ready' && cartQuoteTotal != null) {
+      return `${Number(cartQuoteTotal).toLocaleString('ru-RU')} ${t('misc.aw_currency_sum')}`;
+    }
+    if (cartQuoteStatus === 'error') return t('misc.aw_quote_error');
+    if (cartQuoteStatus === undefined || cartQuoteStatus === 'idle') {
+      // Standalone-использование (stories) без квоты: сумма без скидок.
+      if (cart?.discount_mode && cart.discount_mode !== 'none') {
+        return t('misc.aw_quote_calculating');
+      }
+      return `${cartTotal.toLocaleString('ru-RU')} ${t('misc.aw_currency_sum')}`;
+    }
+    return t('misc.aw_quote_calculating');
+  })();
 
   const normalizedDoctorsData = useMemo(() => {
     if (Array.isArray(doctorsData)) {
@@ -326,7 +348,9 @@ const CartStepV2 = ({
                     <span className="cart-step-v2__service-name">{service.name}</span>
                   </div>
                   <div className="service-price-text">
-                    {service.price?.toLocaleString()} сум
+                    {service.price != null
+                      ? `${service.price.toLocaleString('ru-RU')} ${t('misc.aw_currency_sum')}`
+                      : t('misc.aw_quote_price_not_set')}
                   </div>
                 </div>
               </label>);
@@ -346,9 +370,15 @@ const CartStepV2 = ({
         <div className="cart-step-v2__summary-row">
           <span>Выбрано: {cart?.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0} шт.</span>
           <span className="cart-step-v2__cart-total">
-            Итого: {cartTotal.toLocaleString()} сум
+            Итого: {totalDisplay}
           </span>
         </div>
+
+        {cartQuoteStatus === 'error' && Boolean(cartQuoteMessage) &&
+        <div className="cart-step-v2__discount-hint">
+            {cartQuoteMessage}
+          </div>
+        }
 
         {consultationRows.length > 0 &&
         <div className="cart-step-v2__consultation-section">
@@ -597,7 +627,7 @@ const CartStepV2 = ({
           gap: 'var(--mac-spacing-2)'
         }}>
             <AlertCircle size={14} />
-            {String(errors?.cart ?? errors?.doctors ?? errors?.repeat ?? '')}
+            {String(errors?.quote ?? errors?.cart ?? errors?.doctors ?? errors?.repeat ?? '')}
           </div>
         }
       </div>
