@@ -256,4 +256,21 @@ describe('Fix B: wizard profile-save contract', () => {
     // schema-only поле не уходит в CRUD (у ORM full_name — hybrid property)
     expect(service).toContain('update_payload.pop("full_name", None)');
   });
+
+  it('editing the FIO of a selected card keeps the visible identity (Codex R15 PR 3090 regression)', () => {
+    // Регрессия R15: handlePatientSearch сбрасывал patient.id при ЛЮБОМ
+    // вводе, поэтому PatientStepV2 помечал форму как «Новый», хотя скрытый
+    // selectedPatientCardIdRef продолжал таргетить выбранную карточку —
+    // сабмит обновлял того пациента, которого UI уже не показывал.
+    // При выбранной карточке ID остаётся видимым: правка ФИО — это правка
+    // выбранного пациента (Fix B R3), индикатор честный.
+    const searchBlock = extractSourceBlock(
+      source,
+      'const handlePatientSearch = (value: string) => {',
+      'setSearchTimeout(timeout);'
+    );
+    expect(searchBlock).toContain(
+      'id: selectedPatientCardIdRef.current ? prev.patient.id : null'
+    );
+  });
 });

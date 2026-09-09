@@ -694,12 +694,15 @@ const AppointmentWizardV2 = ({
     // Если пользователь меняет имя, это уже не тот пациент, которого выбрали ранее.
     // Fix B (Codex R3 PR 3090): выбор не теряется — ID карточки сохранён в
     // selectedPatientCardIdRef, сабмит продолжает таргетить её (правка профиля).
+    // Codex R15 PR 3090: при ВЫБРАННОЙ карточке ID остаётся и в видимом
+    // состоянии — индикатор «Существующий» соответствует скрытой цели
+    // сабмита; сброс только когда никакая карточка не выбрана.
     setWizardData((prev) => ({
       ...prev,
       patient: {
         ...prev.patient,
         fio: value,
-        id: null // ✅ Сброс ID
+        id: selectedPatientCardIdRef.current ? prev.patient.id : null // ✅ Сброс ID без выбора карточки
       }
     }));
 
