@@ -283,3 +283,33 @@ def prefer_registry_surface(
     if surface is not None:
         return surface
     return daily_queue
+
+
+def routing_specialist_ids(db: Session, daily_queue: DailyQueue) -> list[int]:
+    """Legacy Doctor ids whose specialty ROUTES to this queue's tag.
+
+    QD-2C (Codex round-17): the reverse direction of
+    ``resolve_registry_tag_queue_for_specialist`` (doctor -> queue). A
+    resource-owned queue carries ``specialist_id = NULL`` — the UI
+    surfaces that ADDRESS it by the legacy doctor identity (the
+    registrar queue-manager payload match, the admin queue-WS room
+    ``specialist_{id}::{date}``) key off the doctor the user selected,
+    and the join between the selection and the resource queue is the
+    routing tag: the synthetic's specialty IS the tag (the dual-ownership
+    bridge until stage E retires the pairs).
+
+    Exact-tag matching against ``Doctor.specialty`` (D-1 vocabulary
+    variants for the dental family); no ``active`` filter — the forward
+    routing (``resolve_registry_tag_queue_for_specialist``) doesn't
+    filter either, and a deactivated synthetic still names the surface
+    for already-connected subscribers.
+    """
+    tag = (daily_queue.queue_tag or "").strip()
+    if not tag:
+        return []
+    from app.core.specialties import specialty_variants
+    from app.models.clinic import Doctor
+
+    match_values = list(dict.fromkeys([*specialty_variants(tag), tag.lower()]))
+    rows = db.query(Doctor.id).filter(Doctor.specialty.in_(match_values)).all()
+    return [int(row[0]) for row in rows]

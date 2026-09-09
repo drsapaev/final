@@ -132,15 +132,38 @@ class QueueReorderApiService:
             number_slots = None
 
         updated_count = 0
-        for item in entry_orders:
-            entry = entry_map[item["entry_id"]]
-            if number_slots is not None:
-                new_number = number_slots[item["new_position"] - 1]
-            else:
+        if number_slots is not None:
+            # QD-2C (Codex round-17 P2): ресурсные очереди — ПЕРЕСТАНОВКА
+            # по слотам, а не точечная переприсвока: запрос может быть
+            # частичным (не все позиции), и точечная запись new_number
+            # оставляет остальные записи на старых номерах — коллизии
+            # слота и «дырки» между активными номерами (served №42 между
+            # активными 41/43). Полный порядок: запрошенные записи на
+            # своих позициях, остальные добивают свободные позиции в
+            # текущем порядке; номера переназначаются через отсортированные
+            # СУЩЕСТВУЮЩИЕ слоты — терминальный билет не дублируется и
+            # активный слот не осиротеет.
+            ordered_entries = sorted(entries, key=lambda e: e.number)
+            new_order: list = [None] * len(ordered_entries)
+            for item in entry_orders:
+                new_order[item["new_position"] - 1] = entry_map[item["entry_id"]]
+            remaining = iter(
+                [e for e in ordered_entries if e.id not in request_entry_ids]
+            )
+            for idx in range(len(new_order)):
+                if new_order[idx] is None:
+                    new_order[idx] = next(remaining)
+            for slot, ordered_entry in zip(number_slots, new_order, strict=True):
+                if ordered_entry.number != slot:
+                    ordered_entry.number = slot
+                    updated_count += 1
+        else:
+            for item in entry_orders:
+                entry = entry_map[item["entry_id"]]
                 new_number = item["new_position"]
-            if entry.number != new_number:
-                entry.number = new_number
-                updated_count += 1
+                if entry.number != new_number:
+                    entry.number = new_number
+                    updated_count += 1
 
         self.repository.commit()
         updated_entries = self.repository.list_active_entries(queue_id=queue_id)
@@ -189,23 +212,42 @@ class QueueReorderApiService:
             )
 
         updated_count = 0
-        if old_number < new_number:
-            for other_entry in all_entries:
-                if other_entry.id == entry.id:
-                    continue
-                if old_number < other_entry.number <= new_number:
-                    other_entry.number -= 1
+        if getattr(queue, "queue_resource_id", None) is not None:
+            # QD-2C (Codex round-17 P2): сдвиг ПЕРЕСТАНОВКОЙ по слотам, а
+            # не арифметикой ±1: между активными номерами могут быть
+            # терминальные (served) билеты — served №42 между активными
+            # 41/43: арифметика декремента/инкремента отдаёт «другой»
+            # активный билет номер 42 (дубликат served-билета, который
+            # by-number lookup резолвит в старую запись), вместо его
+            # слота 43. Перестановка: запись вынимается, вставляется на
+            # новую позицию, ВСЕ активные номера переназначаются через
+            # отсортированные существующие слоты — терминальные билеты
+            # неприкосновенны, дырок между активными слотами нет.
+            ordered_entries = sorted(all_entries, key=lambda e: e.number)
+            ordered_entries.remove(entry)
+            ordered_entries.insert(new_position - 1, entry)
+            for slot, ordered_entry in zip(number_slots, ordered_entries, strict=True):
+                if ordered_entry.number != slot:
+                    ordered_entry.number = slot
                     updated_count += 1
         else:
-            for other_entry in all_entries:
-                if other_entry.id == entry.id:
-                    continue
-                if new_number <= other_entry.number < old_number:
-                    other_entry.number += 1
-                    updated_count += 1
+            if old_number < new_number:
+                for other_entry in all_entries:
+                    if other_entry.id == entry.id:
+                        continue
+                    if old_number < other_entry.number <= new_number:
+                        other_entry.number -= 1
+                        updated_count += 1
+            else:
+                for other_entry in all_entries:
+                    if other_entry.id == entry.id:
+                        continue
+                    if new_number <= other_entry.number < old_number:
+                        other_entry.number += 1
+                        updated_count += 1
 
-        entry.number = new_number
-        updated_count += 1
+            entry.number = new_number
+            updated_count += 1
         self.repository.commit()
 
         updated_entries = self.repository.list_active_entries(queue_id=entry.queue_id)

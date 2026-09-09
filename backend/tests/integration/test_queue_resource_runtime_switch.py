@@ -3599,3 +3599,207 @@ def test_cabinet_sync_skips_resource_rows(db_session: Session) -> None:
         assert doc_queue.cabinet_number == "5"
     finally:
         _durable_cleanup(db_session, "lab_res_z3", "dr_z3")
+
+
+# ===================== AA. Codex round-17 pins =====================
+
+
+def test_registrar_payload_exposes_resource_routing_identity(
+    db_session: Session,
+) -> None:
+    """Codex round-17 P1: a PURE resource queue (specialist NULL) in the
+    /registrar/queues/today payload carries the stable registry identity
+    (queue_resource_id) plus the routing legacy specialists — the
+    frontend queue manager picks the queue by the SELECTED doctor id
+    (pickQueueForDoctor), and without the routing axis the lab/ECG
+    selection substituted an empty queue, hiding all waiting patients.
+    Ownership stays on the resource axis: specialist_id stays NULL."""
+    from app.api.v1.endpoints.registrar_integration._queue_ops import (
+        _build_queue_payload,
+        _process_online_queue_entries,
+    )
+
+    try:
+        user = _make_user(db_session, username="lab_res_aa1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        resource = _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=31)
+
+        queues_by_specialty: dict = {}
+        _process_online_queue_entries(
+            db_session, [entry], [], queues_by_specialty, set()
+        )
+        bucket = queues_by_specialty["laboratory"]
+        assert bucket["queue_resource_id"] == resource.id
+        assert bucket["routing_specialists"] == [synthetic.id]
+        assert bucket["doctor_id"] is None  # ownership untouched
+
+        payload = _build_queue_payload(
+            queue_data=bucket,
+            specialty="laboratory",
+            queue_number=1,
+            entries=[{"id": entry.id, "status": "waiting"}],
+        )
+        assert payload["queue_resource_id"] == resource.id
+        assert payload["routing_specialists"] == [synthetic.id]
+        assert payload["specialist_id"] is None
+        # the doctor-queue shape: no resource identity, no routing axis
+        doc_user = _make_user(db_session, username="dr_aa1b", role="Doctor")
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardiology")
+        doc_queue = _make_queue(
+            db_session, specialist_id=doctor.id, queue_tag="cardiology"
+        )
+        doc_entry = _make_waiting_entry(db_session, doc_queue, number=1)
+        doc_buckets: dict = {}
+        _process_online_queue_entries(db_session, [doc_entry], [], doc_buckets, set())
+        doc_payload = _build_queue_payload(
+            queue_data=doc_buckets["cardiology"],
+            specialty="cardiology",
+            queue_number=2,
+            entries=[{"id": doc_entry.id, "status": "waiting"}],
+        )
+        assert doc_payload["queue_resource_id"] is None
+        assert doc_payload["routing_specialists"] == []
+        assert doc_payload["specialist_id"] == doctor.id
+    finally:
+        _durable_cleanup(db_session, "lab_res_aa1", "dr_aa1b")
+
+
+def test_reorder_move_permutation_preserves_served_gap(
+    db_session: Session,
+) -> None:
+    """Codex round-17 P2: an internal gap among ACTIVE numbers (served
+    №42 between actives 41/43) — the round-16 arithmetic shift moved the
+    OTHER active ticket 41→42, duplicating the served ticket the
+    by-number lookup resolves to the old patient. Reorder and move now
+    reassign through the ordered number_slots permutation: the actives
+    always occupy exactly the existing active slots. The service
+    COMMITs — durable rows cleaned in the finally."""
+    try:
+        from app.services.queue_reorder_api_service import QueueReorderApiService
+
+        admin = _make_user(db_session, username="adm_aa2", role="Admin")
+        _make_resource(db_session, code="lab", queue_tag="lab", start_number_online=40)
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        served = _make_waiting_entry(db_session, queue, number=42)
+        served.status = "served"
+        db_session.commit()
+        e41 = _make_waiting_entry(db_session, queue, number=41)
+        e43 = _make_waiting_entry(db_session, queue, number=43)
+
+        service = QueueReorderApiService(db_session)
+        # move 43 to position 1: permutation → 43→41, 41→43 (the
+        # arithmetic shift would leave 41 as 42 — the served duplicate)
+        service.move_queue_entry(entry_id=e43.id, new_position=1, current_user=admin)
+        db_session.refresh(e41)
+        db_session.refresh(e43)
+        db_session.refresh(served)
+        assert e43.number == 41
+        assert e41.number == 43  # NOT 42
+        assert served.number == 42
+        assert served.status == "served"
+
+        # partial reorder: place the (now) №43 ticket back to position 1
+        # — the non-requested entry keeps the OTHER existing slot, no
+        # collision, no orphaned active slot
+        service.reorder_queue(
+            queue_id=queue.id,
+            entry_orders=[{"entry_id": e41.id, "new_position": 1}],
+            current_user=admin,
+        )
+        db_session.refresh(e41)
+        db_session.refresh(e43)
+        db_session.refresh(served)
+        assert e41.number == 41
+        assert e43.number == 43
+        assert served.number == 42
+        active_numbers = sorted(
+            e.number
+            for e in db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == queue.id)
+            .filter(OnlineQueueEntry.status == "waiting")
+            .all()
+        )
+        assert active_numbers == [41, 43]  # exactly the existing slots
+    finally:
+        _durable_cleanup(db_session, "adm_aa2")
+
+
+def test_restore_no_show_broadcast_routing_room(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-17 P2: restore/no-show on a resource entry broadcast
+    to the admin queue-WS room of the ROUTING specialist (the identity
+    useQueueWebSocket subscribes to), not the dead specialist_None room
+    — the connected queue manager updates instantly instead of waiting
+    for the 60-second polling fallback. The routes COMMIT — durable
+    rows cleaned in the finally."""
+    import asyncio
+
+    from app.services import display_websocket as dw
+    from app.ws import queue_ws
+
+    ws_calls: list[dict] = []
+
+    def fake_broadcast(**kwargs):
+        ws_calls.append(kwargs)
+
+    monkeypatch.setattr(queue_ws, "broadcast_queue_update", fake_broadcast)
+
+    class FakeManager:
+        connections: list = []
+
+        async def broadcast_queue_update(self, **kwargs):
+            pass
+
+    monkeypatch.setattr(dw, "get_display_manager", lambda: FakeManager())
+
+    try:
+        from app.api.v1.endpoints.qr_queue._entries import (
+            mark_entry_no_show,
+            restore_entry_to_next,
+        )
+        from app.api.v1.endpoints.qr_queue._tokens import RestoreToNextRequest
+
+        user = _make_user(db_session, username="lab_res_aa3", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=31)
+        caller = _make_user(db_session, username="reg_aa3", role="Registrar")
+
+        async def scenario():
+            no_show = await mark_entry_no_show(
+                entry.id, db=db_session, current_user=caller
+            )
+            restore = await restore_entry_to_next(
+                entry.id,
+                request=RestoreToNextRequest(reason="вернулся"),
+                db=db_session,
+                current_user=caller,
+            )
+            return no_show, restore
+
+        no_show_result, restore_result = asyncio.run(scenario())
+        assert no_show_result["success"] is True
+        assert restore_result["success"] is True
+
+        expected_room_day = _DAY.strftime("%Y-%m-%d")
+        routed = [
+            c for c in ws_calls if c.get("department") == f"specialist_{synthetic.id}"
+        ]
+        none_room = [c for c in ws_calls if c.get("department") == "specialist_None"]
+        assert routed, f"no broadcast to the routing room: {ws_calls}"
+        assert not none_room, f"dead specialist_None room still used: {ws_calls}"
+        actions = {c.get("data", {}).get("action") for c in routed}
+        assert {"no_show", "restore_next"} <= actions
+        assert all(c.get("date") == expected_room_day for c in routed)
+    finally:
+        _durable_cleanup(db_session, "lab_res_aa3", "reg_aa3")

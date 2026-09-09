@@ -113,6 +113,11 @@ export interface QueueData {
   specialist_id?: number | string;
   specialty?: string;
   queue_id?: number;
+  // QD-2C (Codex round-17 P1): resource axis — a pure registry queue
+  // (specialist_id null) carries the registry identity plus the legacy
+  // routing specialists the queue-manager selection matches against.
+  queue_resource_id?: number | string | null;
+  routing_specialists?: Array<number | string>;
 }
 
 export interface QueuePayload {

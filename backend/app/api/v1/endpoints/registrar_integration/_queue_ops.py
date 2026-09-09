@@ -7,6 +7,7 @@ from app.api.v1.endpoints.registrar_integration._helpers import (
     _normalize_registration_discount_mode,
     _serialize_registrar_datetime,
 )  # noqa: F401
+from app.crud import queue_resource_routing  # QD-2C (round-17 P1)
 from app.crud.clinic import clinic_today
 from app.services.queue_service import queue_service  # noqa: F401
 
@@ -554,6 +555,17 @@ def _process_online_queue_entries(
             bucket["resource_cabinet"] = daily_queue.cabinet_number or (
                 resource.default_cabinet if resource else None
             )
+            # QD-2C (Codex round-17 P1): стабильная идентичность ресурса
+            # (queue_resource_id) + маршрутизирующие легаси-специалисты:
+            # чистая ресурсная очередь имеет specialist_id NULL, и
+            # queue manager на фронте подбирает очередь по ID выбранного
+            # врача — routing_specialists дают ось сопоставления, не
+            # подменяя владение (specialist_id остаётся NULL)
+            bucket["queue_resource_id"] = daily_queue.queue_resource_id
+            bucket.setdefault(
+                "routing_specialists",
+                queue_resource_routing.routing_specialist_ids(db, daily_queue),
+            )
 
         entry_time = (
             online_entry.queue_time
@@ -786,6 +798,13 @@ def _build_queue_payload(
     return {
         "queue_id": queue_number,
         "specialist_id": queue_data["doctor_id"],
+        # QD-2C (Codex round-17 P1): стабильная идентичность ресурса и
+        # маршрутизирующие легаси-специалисты — фронтовый queue manager
+        # подбирает очередь по ID выбранного врача; для чистой ресурсной
+        # очереди (specialist_id NULL) сопоставление идёт по
+        # routing_specialists, владение остаётся на оси ресурса
+        "queue_resource_id": queue_data.get("queue_resource_id"),
+        "routing_specialists": list(queue_data.get("routing_specialists", [])),
         "specialist_name": (
             queue_data["doctor"].user.full_name
             if queue_data.get("doctor") and queue_data["doctor"].user
