@@ -186,6 +186,12 @@ def create_cart_appointments(
                 auto_status=False,  # Статус уже установлен выше
                 notify=False,  # Уведомления отправляются отдельно
                 log=True,
+                # Fix C (cart atomicity): все визиты корзины, invoice,
+                # invoice-visit связи и записи очереди коммитятся ОДНОЙ
+                # транзакцией ниже (db.commit() после queue assignment).
+                # Раньше create_visit() коммитил каждый визит отдельно, и
+                # сбой на позднем визите/invoice оставлял частичные данные.
+                commit=False,
             )
             logger.info("REGISTRATION: Визит %d создан через create_visit()", visit.id)
 
@@ -359,6 +365,11 @@ def create_cart_appointments(
         )
 
     except HTTPException:
+        # Fix C (cart atomicity): ветка HTTPException (404 услуга и т.п.)
+        # раньше делала raise без rollback — при внутренних коммитах
+        # create_visit это было неважно, но с единой транзакцией любой
+        # путь ошибки обязан откатить частичные данные корзины.
+        db.rollback()
         raise
     except Exception as e:
         logger.exception(

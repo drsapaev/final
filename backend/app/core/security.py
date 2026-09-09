@@ -260,6 +260,13 @@ def require_roles(*roles: Any):
 
         return current_user
 
+    # Codex R6 #3092 (P1): publish the normalized roles on the dependency
+    # callable so the idempotency middleware can evaluate the ENDPOINT's RBAC
+    # policy at replay time (role changed but still authorized → replay the
+    # committed snapshot instead of re-executing the write). SSOT stays here:
+    # the middleware only reads this attribute, never re-implements the check.
+    _dep.required_roles = _normalize_required_roles(*roles)
+
     return _dep
 
 

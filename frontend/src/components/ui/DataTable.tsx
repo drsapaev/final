@@ -962,10 +962,20 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
   const wrapWithToolbar = (node: ReactNode, toolbar: ReactNode = toolbarNode): ReactNode =>
     toolbar ? <div className="mac-table-shell">{toolbar}{node}</div> : node;
 
+  // AXE-MOB-2 (Mobile Chrome admin-users:light/dark, axe
+  // scrollable-region-focusable): .mac-table-scroll-wrapper is the
+  // horizontal scroll viewport (tokens.css: overflow-x auto). When table
+  // content overflows the viewport (narrow screens, wide column sets) the
+  // scrollable region must stay keyboard-reachable (WCAG 2.1 AA). Whether
+  // a given wrapper actually scrolls is content+viewport dependent at
+  // runtime, so the tabIndex={0} below is UNCONDITIONAL on every render
+  // path — the Deque-recommended fix; the occasional non-scrolling tab
+  // stop is the accepted trade-off.
+  //
   // Error state takes precedence over loading/empty (NEW — when `error` prop provided).
   if (error) {
     return wrapWithToolbar(
-      <div className="mac-table-scroll-wrapper" aria-busy={loading}>
+      <div className="mac-table-scroll-wrapper" aria-busy={loading} tabIndex={0}>
         <table className={className} style={tableStyle} aria-label={ariaLabel}>
           {renderHeaders()}
           <tbody>
@@ -978,7 +988,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
 
   if (loading) {
     return wrapWithToolbar(
-      <div className="mac-table-scroll-wrapper" aria-busy="true">
+      <div className="mac-table-scroll-wrapper" aria-busy="true" tabIndex={0}>
         <table className={className} style={tableStyle} aria-label={ariaLabel}>
           {renderHeaders()}
           <tbody>
@@ -995,7 +1005,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
     // apply to the MAIN data path this component renders, not to consumer
     // cells (Codex P2, PR 2885 round 4).
     return wrapWithToolbar(
-      <div className="mac-table-scroll-wrapper" aria-busy={loading}>
+      <div className="mac-table-scroll-wrapper" aria-busy={loading} tabIndex={0}>
         <table className={className} style={tableStyle} aria-label={ariaLabel}>
           {children}
         </table>
@@ -1015,7 +1025,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
 
   if (!data || data.length === 0) {
     return wrapWithToolbar(
-      <div className="mac-table-scroll-wrapper" aria-busy={loading}>
+      <div className="mac-table-scroll-wrapper" aria-busy={loading} tabIndex={0}>
         <table className={className} style={tableStyle} aria-label={ariaLabel}>
           {renderHeaders()}
           <tbody>
@@ -1101,6 +1111,7 @@ export const DataTable = <Row extends Record<string, unknown> = Record<string, u
       ref={scrollWrapperRef}
       style={scrollViewportStyle}
       aria-busy={loading}
+      tabIndex={0}
       onFocusCapture={() => {
         tableHadFocusRef.current = true;
       }}

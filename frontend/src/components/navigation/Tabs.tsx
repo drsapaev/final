@@ -1,6 +1,6 @@
 import React, { type CSSProperties } from 'react';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import {
   Heart,
   Activity,
@@ -85,6 +85,10 @@ const Tabs = ({
   const [tabs, setTabs] = useState<TabItem[]>([]);
   const [loading, setLoading] = useState(true);
   const tabsRef = useRef<HTMLDivElement | null>(null);
+  // AXE-MOB-1 (Codex P2 round 1, thread 3944915764): instance-scoped id
+  // prefix for the aria-describedby targets — document-unique even with
+  // multiple Tabs mounts (e.g. CSSTestPage).
+  const uid = useId();
 
   // ⭐ SSOT: Загрузка профилей очередей (вкладок) из БД через API
   // Tabs определяются в backend, frontend только отображает
@@ -242,13 +246,20 @@ const Tabs = ({
   const renderStatusIndicators = (tabKey: string) => {
     const stats = getStats(tabKey);
     const indicators: React.ReactNode[] = [];
-
     if (stats.hasActiveQueue) {
       indicators.push(
         <div
           key="queue"
           className="status-indicator queue"
-          title={`${t('queue.queue')}: ${String(stats.todayCount ?? '')}`}>
+          // AXE-MOB-1 (Codex P2 round 4, thread 3945043227): an active-queue
+          // phrase WITHOUT the unrelated count — todayCount is every
+          // appointment dated today (computeDepartmentStats) while
+          // hasActiveQueue is derived independently from active
+          // queue_numbers entries, so "Queue: {todayCount}" misannounced
+          // both directions ("Queue: 5" for 5 appointments + 1 queued;
+          // "Queue: 0" for an other-day active queue). The tooltip agrees
+          // with the description below.
+          title={t('final.tgs_active_queue')}>
 
           <Clock size={10} />
         </div>
@@ -260,7 +271,11 @@ const Tabs = ({
         <div
           key="pending"
           className="status-indicator pending"
-          title={t('queue.pending')}>
+          // AXE-MOB-1 (Codex P2 round 4, thread 3945043230): the
+          // payment-specific label — queue_status.pending is a generic
+          // queue-state word (and untranslated in en). registrarPanel
+          // .pending_payments resolves to "Pending payments" in en.
+          title={t('registrarPanel.pending_payments')}>
 
           <AlertCircle size={10} />
         </div>
@@ -272,7 +287,7 @@ const Tabs = ({
         <div
           key="count"
           className="status-indicator count"
-          title={`${t('queue.today')}: ${String(stats.todayCount ?? '')}`}>
+          title={`${t('registrarPanel.today')}: ${String(stats.todayCount ?? '')}`}>
 
           {String(stats.todayCount ?? '')}
         </div>
@@ -280,6 +295,54 @@ const Tabs = ({
     }
 
     return indicators;
+  };
+
+  // AXE-MOB-1 (Codex P2 round 1, thread 3944915764): the department
+  // buttons carry aria-label={tab.label}, which overrides name-from-content
+  // — without the wiring below the status indicators (active queue, pending
+  // payment, today count) would stay visible but DISAPPEAR from screen-
+  // reader output. The status text is associated as the button accessible
+  // DESCRIPTION via aria-describedby -> the in-button .status-indicators
+  // container. The container is rendered visible at EVERY width (only
+  // .tab-label collapses at <=768px), so the reference stays resolvable on
+  // mobile too; the name keeps the stable department label (WCAG 2.5.3
+  // Label-in-Name) and the description announces the operational status.
+  // AXE-MOB-1 (Codex P2 round 6, thread 3945096766): the tab key is
+  // backend-defined (queue profile key) and may contain whitespace or other
+  // characters illegal in an HTML id (e.g. "general medicine").
+  // aria-describedby is an ID-reference list — the id MUST be
+  // whitespace-free, so the key is percent-encoded (injective +
+  // deterministic, no cross-key collisions).
+  const statusIdFor = (tabKey: string) => `${uid}-status-${encodeURIComponent(tabKey)}`;
+  const hasStatusFor = (tabKey: string) => {
+    const s = getStats(tabKey);
+    return s.hasActiveQueue || s.hasPendingPayments || s.todayCount > 0;
+  };
+  // AXE-MOB-1 (Codex P2 round 2, thread 3944985044): the description target
+  // must carry REAL text. Icon-only indicators store their meaning in
+  // `title` attributes, which are not reliably concatenated into the
+  // accessible description, and boolean-only states would compute an EMPTY
+  // description (or an unexplained bare count). statusTextFor composes the
+  // localized status sentence from the same stats the visible indicators
+  // render; it is rendered as a dedicated .sr-only description target —
+  // visually invisible, announced by AT.
+  // AXE-MOB-1 (Codex P2 rounds 3-4, threads 3945016484 / 3945043227 /
+  // 3945043230): every key must be DEFINED in all five locales AND carry
+  // the right semantics:
+  //   - active queue: final.tgs_active_queue ("Активная очередь") — a
+  //     boolean phrase; todayCount is ALL appointments dated today, NOT the
+  //     queue size, so it must never ride the queue announcement;
+  //   - pending payments: registrarPanel.pending_payments ("Pending
+  //     payments") — payment-specific, not the generic queue state word;
+  //   - today count: registrarPanel.today + the count — this pairing IS
+  //     semantically correct ("Сегодня: N" = appointments dated today).
+  const statusTextFor = (tabKey: string): string => {
+    const s = getStats(tabKey);
+    const parts: string[] = [];
+    if (s.hasActiveQueue) parts.push(t('final.tgs_active_queue'));
+    if (s.hasPendingPayments) parts.push(t('registrarPanel.pending_payments'));
+    if (s.todayCount > 0) parts.push(`${t('registrarPanel.today')}: ${s.todayCount}`);
+    return parts.join(', ');
   };
 
   // Показываем заглушку пока загружаются вкладки
@@ -326,6 +389,12 @@ const Tabs = ({
         <button
           className={`tab-button all-departments ${!activeTab ? 'active' : ''}`}
           onClick={() => onTabChange?.(null)}
+          // AXE-MOB-1 (Mobile Chrome registrar:light/dark, axe button-name):
+          // Tabs.css hides .tab-label at <=768px, collapsing this control to
+          // an icon-only button with NO accessible name. Pin the name to the
+          // same source as the visible label (identical text at desktop
+          // widths keeps WCAG 2.5.3 Label-in-Name satisfied).
+          aria-label={t('queue.all_departments')}
           style={{
             color: !activeTab ? 'var(--mac-accent)' : colors.text
           }}>
@@ -368,6 +437,15 @@ const Tabs = ({
                 data-tab={tab.key}
                 className={`tab-button department ${isActive ? 'active' : ''}`}
                 onClick={() => onTabChange?.(isActive ? null : tab.key)}
+                // AXE-MOB-1: same button-name contract as the
+                // all-departments control above — the visible .tab-label is
+                // display:none at <=768px (Tabs.css), so the name must come
+                // from an attribute. Status text is NOT folded into the
+                // label: it rides the accessible description instead (see
+                // statusIdFor above) so SR users still hear the operational
+                // status this button renders visually.
+                aria-label={tab.label}
+                aria-describedby={hasStatusFor(tab.key) ? statusIdFor(tab.key) : undefined}
                 style={{
                   color: isActive ? 'var(--mac-text-primary)' : colors.text,
                   backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active), transparent 70%)' : 'transparent',
@@ -385,6 +463,16 @@ const Tabs = ({
                   <div className="status-indicators">
                     {renderStatusIndicators(tab.key)}
                   </div>
+                  {/* AXE-MOB-1 round 2 (thread 3944985044): dedicated sr-only
+                      description TARGET — the visible container would
+                      concatenate the bare count digits into the description
+                      ("4 queue.queue: 4 …"); this node carries ONLY the
+                      localized sentence, so the description is exact. */}
+                  {hasStatusFor(tab.key) && (
+                    <span id={statusIdFor(tab.key)} className="sr-only">
+                      {statusTextFor(tab.key)}
+                    </span>
+                  )}
                 </div>
 
                 {/* Эффект ripple */}

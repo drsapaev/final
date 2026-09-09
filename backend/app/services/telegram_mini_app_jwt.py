@@ -34,7 +34,6 @@ from app.models.authentication import UserSession
 from app.services.telegram_mini_app_init_data import (
     DEFAULT_MAX_AUTH_AGE_SECONDS,
     TelegramMiniAppInitDataError,
-    TelegramMiniAppSessionScope,
     TelegramMiniAppSessionScopeError,
     resolve_telegram_mini_app_session_scope,
     validate_telegram_mini_app_init_data,
@@ -239,7 +238,6 @@ def _revoke_previous_patient_sessions(db: Session, patient_id: int | None) -> in
         return 0
 
     try:
-        from datetime import UTC, datetime
 
         # Patient sessions use negative user_id (see exchange_init_data_for_jwt)
         patient_session_user_id = -int(patient_id)
@@ -250,7 +248,9 @@ def _revoke_previous_patient_sessions(db: Session, patient_id: int | None) -> in
                 UserSession.user_id == patient_session_user_id,
                 UserSession.revoked == False,
             )
-            .update({"revoked": True, "revoked_at": datetime.now(UTC)})
+            # UserSession has no revoked_at column (#2924) — see the same fix
+            # in telegram_webhook._routes and auth_svc._tokens.
+            .update({"revoked": True})
         )
         db.commit()
 
