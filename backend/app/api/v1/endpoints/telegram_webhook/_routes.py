@@ -40,12 +40,12 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
 )
 from app.api.v1.endpoints.telegram_webhook._patient_commands import *  # noqa: F401, F403
 from app.api.v1.endpoints.telegram_webhook._staff_commands import *  # noqa: F401, F403
-from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
-from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.schemas.notifications import (
     SendMessageRequest,
     TelegramWebhookUpdateRequest,
 )
+from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 
 
 def _is_duplicate_update(db, update_id: int | None) -> bool:
@@ -370,7 +370,6 @@ def list_mini_app_patient_sessions(
     """
     from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
         _resolve_mini_app_patient_scope_from_auth,
-        LEGACY_MAX_AUTH_AGE_SECONDS,
     )
     from app.models.authentication import UserSession
 
@@ -444,11 +443,11 @@ def revoke_all_mini_app_patient_sessions(
 
     Request body: { "init_data": "<Telegram.WebApp.initData>" }
     """
+
     from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
         _resolve_mini_app_patient_scope_from_auth,
     )
     from app.models.authentication import UserSession
-    from datetime import UTC, datetime
 
     try:
         body = request.json()
@@ -484,7 +483,9 @@ def revoke_all_mini_app_patient_sessions(
             UserSession.user_id == patient_session_user_id,
             UserSession.revoked == False,
         )
-        .update({"revoked": True, "revoked_at": datetime.now(UTC)})
+        # UserSession has no revoked_at column (#2924) — writing it here
+        # raises UnconsumedColumnError and the revocation silently fails.
+        .update({"revoked": True})
     )
     db.commit()
 

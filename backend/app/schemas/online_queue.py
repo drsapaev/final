@@ -114,7 +114,12 @@ class DailyQueueOut(BaseModel):
 
     id: int
     day: date
-    specialist_id: int
+    # QD-2A (dual-owner expand): specialist_id теперь nullable — у
+    # ресурсной очереди врач-владелец отсутствует, владелец живёт в
+    # queue_resource_id. Полный output-контракт (owner_kind,
+    # owner_display_name, объект queue_resource) — стадия QD-2C.
+    specialist_id: int | None = None
+    queue_resource_id: int | None = None
     active: bool
     opened_at: datetime | None = None
     created_at: datetime

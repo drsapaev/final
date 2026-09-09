@@ -123,6 +123,10 @@ services:
     image: redis:7-alpine
     container_name: clinic-redis
     restart: unless-stopped
+    # Codex R7 #3092 (P1): idempotency claims/snapshots must not be evictable
+    # (allkeys-lru could drop a live claim or its 24h snapshot under memory
+    # pressure → same-key retry re-executes the write). noeviction: if the
+    # store fills, writes fail and the backend fails closed (503).
     command:
       - "redis-server"
       - "--appendonly"
@@ -130,7 +134,7 @@ services:
       - "--maxmemory"
       - "256mb"
       - "--maxmemory-policy"
-      - "allkeys-lru"
+      - "noeviction"
       - "--requirepass"
       - "${REDIS_PASSWORD:?REDIS_PASSWORD is required (set it in .env)}"
     volumes:

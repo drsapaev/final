@@ -20,6 +20,7 @@ type SWInternals = {
     offlineFallbackUrl?: string,
   ) => Promise<{ ok: boolean }>;
   isNoCachePath: (pathname: string) => boolean;
+  syncClinicData: () => Promise<void>;
 };
 
 // vitest cwd is the frontend/ directory (see vitest.config.ts root note)
@@ -48,7 +49,7 @@ function compileSW(
     'clients',
     'console',
     'fetch',
-    `${code}\nreturn { networkFirst, isNoCachePath };`,
+    `${code}\nreturn { networkFirst, isNoCachePath, syncClinicData };`,
   );
   return factory(
     { addEventListener: vi.fn(), skipWaiting: vi.fn(), registration: {} },
@@ -69,6 +70,7 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     '/api/v1/ai/suggestions',
     '/api/v1/telegram/webhook',
     '/api/v1/print/visit/1',
+    '/api/v1/auth/me',
   ])('does not cache a successful GET of %s', async (pathname) => {
     const { put, caches } = makeCacheStubs();
     const sw = compileSW(vi.fn(async () => okResponse()), caches);
@@ -118,11 +120,32 @@ describe('sw.template.js NO_CACHE_PATTERNS enforcement', () => {
     const sw = compileSW(vi.fn(), makeCacheStubs().caches);
     expect(sw.isNoCachePath('/api/v1/auth/login')).toBe(true);
     expect(sw.isNoCachePath('/api/v1/auth/logout')).toBe(true);
+    expect(sw.isNoCachePath('/api/v1/auth/me')).toBe(true);
     expect(sw.isNoCachePath('/api/v1/payments/1')).toBe(true);
     expect(sw.isNoCachePath('/api/v1/ai/chat')).toBe(true);
     expect(sw.isNoCachePath('/api/v1/telegram/send')).toBe(true);
     expect(sw.isNoCachePath('/api/v1/print/x')).toBe(true);
     expect(sw.isNoCachePath('/api/v1/patients')).toBe(false);
     expect(sw.isNoCachePath('/api/v1/queue')).toBe(false);
+  });
+
+  it('background sync never fetches or caches the user profile (auth/me)', async () => {
+    const { put, caches } = makeCacheStubs();
+    const fetchedUrls: string[] = [];
+    const fetchImpl = vi.fn(async (input: string | { url?: string }) => {
+      const url = typeof input === 'string' ? input : (input.url ?? '');
+      fetchedUrls.push(url);
+      return okResponse();
+    });
+    const sw = compileSW(fetchImpl, caches);
+
+    await sw.syncClinicData();
+
+    expect(fetchedUrls).not.toContain('/api/v1/auth/me');
+    const putUrls = put.mock.calls.map((call) => {
+      const req = call[0] as string | { url?: string };
+      return typeof req === 'string' ? req : (req.url ?? '');
+    });
+    expect(putUrls).not.toContain('/api/v1/auth/me');
   });
 });

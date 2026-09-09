@@ -72,7 +72,7 @@ injection. "Committed write" = an HTTP 2xx response to a write request.
 | Field | Value |
 |---|---|
 | Failure injection | (a) `net stop cloudflared` (or service equivalent) for 15 minutes; (b) planned host reboot via the documented reboot procedure (CLINIC_HOST_AVAILABILITY_RUNBOOK). Both ONLY with the owner's explicit GO immediately before execution. |
-| Expected invariant | (a) direct-IP/LAN access to the API keeps working (tunnel is the edge, not the origin); finalclinic.fyi shows fast 5xx/connection errors (no hang). (b) After reboot: the autostart chain brings up cloudflared + uvicorn + nightly tasks with no manual steps. |
+| Expected invariant | (a) direct-IP/LAN access to the API keeps working (tunnel is the edge, not the origin); **api.finalclinic.fyi** (the tunnel-routed API host) fails fast — connection refused / CF 530; finalclinic.fyi keeps serving the static SPA with 200 (SPA fallback is not API availability). (b) After reboot: the autostart chain brings up cloudflared + uvicorn + nightly tasks with no manual steps. |
 | Observed behavior | (a) LAN `GET /health` during outage; public URL error class from an external probe. (b) Boot-to-health timing; autostart chain log; first nightly backup after reboot lands in R2. |
 | Recovery requirement | (a) `net start cloudflared` → public URL 200 within 60s. (b) Boot → health 200 within the documented availability budget (autostart chain); scheduled backup fires at the next 02:00 window. |
 | PASS / FAIL | (a) PASS = LAN health 200 throughout, public 200 ≤60s after start. (b) PASS = health 200 within budget, zero manual interventions, next scheduled backup verified in R2. Any violated → FAIL + incident doc. |
@@ -112,4 +112,5 @@ the product is affected.
 
 | Date | Scenario | Result | Evidence / notes |
 |---|---|---|---|
+| 2026-09-09 | S4a cloudflared stop | **PASS** | net stop at ~03:00 local (UAC elevated); service STOPPED, 0 cloudflared processes; api.finalclinic.fyi/api/v1/health unreachable externally (finalclinic.fyi kept serving the static SPA — caught a probe-URL pitfall: the public API probe must use api.finalclinic.fyi, corrected in S4a fields); LAN /api/v1/health stayed 200 the whole window (≈15 min); recovery: net start (elevated) → 4× "Registered tunnel connection" → api.finalclinic.fyi/api/v1/health 200 {"ok":true,"db":"ok"} |
 | — | — | — | no executions yet (contract PR) |

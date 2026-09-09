@@ -4,7 +4,6 @@ import {
   Search,
   Phone,
 
-
   X,
 
   Check,
@@ -16,9 +15,6 @@ import {
   FlaskConical,
   Syringe,
   ClipboardList,
-
-
-
 
   Calendar,
 
@@ -177,7 +173,6 @@ interface RepeatCandidate {
   visit_date: string;
 }
 
-
 // UX Audit Stage 3 (Wizard issue 5.1):
 // API_BASE удалён — все вызовы идут через api-клиент, который сам
 // добавляет baseURL. Раньше API_BASE использовался в 13 raw fetch().
@@ -209,6 +204,21 @@ import {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  // Fix E: календарная валидация даты рождения (31.02, високосные, будущие)
+  getBirthDateValidationError,
+  formatBirthDateInput,
+  convertDateToISO,
+  convertDateFromISO,
+  // Fix A: наследованные поля выбранной карточки не протекают в нового пациента
+  isPatientSelectedFromCard,
+  buildInheritedPatientClearPatch,
+  isPhoneDuplicateErrorMessage,
+  // Fix C (cart atomicity): ключ идемпотентности для финального сабмита корзины.
+  createIdempotencyKey,
+  cartIdempotencyGuard,
+  groupCartItemsByVisit,
+  TOAST_WARNING_STYLE,
+  TOAST_ERROR_STYLE,
   // Fix D (trusted pricing): типы квоты + построение запроса
   type CartQuote,
   type CartQuoteStatus,
@@ -217,9 +227,7 @@ import {
   buildEditDeltaTargetItems,
   describeUnroutableEditDeltaRows,
   resolveEditRecordDate,
-  formatBirthDateInput,
-  convertDateToISO,
-  convertDateFromISO,
+  isEditDeltaNewItem,
   getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
@@ -227,7 +235,7 @@ import {
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
-  categories,
+  categories
 } from './wizardUtils';
 
 const AppointmentWizardV2 = ({
@@ -477,6 +485,9 @@ const AppointmentWizardV2 = ({
       setActiveServiceCategory('specialists');
       setServiceSearchQuery('');
       setShowAllServices(false);
+      // Fix C: незавершённая попытка сабмита отменена закрытием — ключ сбрасываем
+      cartIdempotencyKeyRef.current = null;
+      cartIdempotencyPayloadRef.current = null;
     }
   }, [isOpen]);
 
@@ -520,6 +531,13 @@ const AppointmentWizardV2 = ({
   const phoneRef = useRef<HTMLInputElement>(null);
   const nextStepRef = useRef<() => void>(() => {});
   const handleCompleteRef = useRef<() => Promise<void>>(async () => {});
+  // Fix C: защита от повторной отправки (двойной Enter / Ctrl+Enter / клик).
+  const submitLockRef = useRef(false);
+  // Fix C: один сабмит = один Idempotency-Key (живёт до успеха/закрытия).
+  const cartIdempotencyKeyRef = useRef<string | null>(null);
+  // Codex R2 PR 3092 (P1): ключ привязан к payload первой попытки —
+  // изменённый payload со старым ключом не отправляется (409 от hash-проверки).
+  const cartIdempotencyPayloadRef = useRef<string | null>(null);
 
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
@@ -581,10 +599,7 @@ const AppointmentWizardV2 = ({
 
   // ===================== АВТОСОХРАНЕНИЕ =====================
 
-
-
   // Persistent draft loading is disabled to keep patient PHI out of browser storage.
-
 
   // Reset wizard to initial state. QW-08 fix: previously called clearDraft and showed
   // a misleading "Черновик очищен" toast even though no persistent draft existed.
@@ -597,8 +612,13 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(STEP_PATIENT);
+    // Fix C: очистка формы отменяет текущую попытку сабмита — ключ сбрасываем
+    cartIdempotencyKeyRef.current = null;
+    cartIdempotencyPayloadRef.current = null;
     toast.success(t('misc.aw_form_cleared'));
   };
+
+  // ===================== МАСКИ ВВОДА (маска даты — в wizardUtils) =====================
 
   // ===================== МАСКИ ВВОДА =====================
   // Fix-refactor: маска/конвертация даты рождения вынесены в wizardUtils (чистые функции).
@@ -673,14 +693,28 @@ const AppointmentWizardV2 = ({
   const handlePatientSearch = (value: string) => {
     // 🚨 FIX: Сбрасываем ID при изменении текста, чтобы не было "призраков"
     // Если пользователь меняет имя, это уже не тот пациент, которого выбрали ранее
+    //
+    // Fix A (data mixing): если текущие данные были унаследованы от выбранной
+    // карточки, переход к новому пациенту сбрасывает ВСЕ унаследованные поля.
+    // Раньше id очищался, но адрес/телефон/дата рождения/пол и разобранные
+    // части ФИО оставались — новый пациент создавался с данными другого человека.
+    // В editMode правка ФИО — это переименование той же карточки, там сброс не нужен.
+    const shouldClearInherited = !editMode && isPatientSelectedFromCard(wizardData.patient);
     setWizardData((prev) => ({
       ...prev,
       patient: {
         ...prev.patient,
         fio: value,
-        id: null // ✅ Сброс ID
+        id: null, // ✅ Сброс ID
+        ...(shouldClearInherited ? buildInheritedPatientClearPatch() : {})
       }
     }));
+
+    if (shouldClearInherited) {
+      // Производные UI-состояния унаследованной карточки тоже сбрасываем
+      setFormattedBirthDate('');
+      setPhoneError(null);
+    }
 
     // Дебаунс поиска
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -720,17 +754,22 @@ const AppointmentWizardV2 = ({
         // Отдельные поля для обратной совместимости (если нужны)
         lastName: patient.last_name || '',
         firstName: patient.first_name || '',
-        middleName: patient.middle_name || ''
+        middleName: patient.middle_name || '',
+        // Fix A: маркер «данные взяты целиком из выбранной карточки».
+        // Редактирование ФИО после выбора карточки переводит форму в режим
+        // нового пациента и обязано сбросить унаследованные поля (data mixing).
+        _selectedFromCard: true
       }
     }));
 
     // Обновляем отформатированную дату
     setFormattedBirthDate(convertDateFromISO(patient.birth_date || ''));
+    // Fix A: при явном выборе другой карточки предыдущий конфликт телефона
+    // больше не актуален.
+    setPhoneError(null);
     setShowSuggestions(false);
     setErrors((prev) => ({ ...prev, fio: null }));
   };
-
-
 
   const handleBirthDateChange = (value: string) => {
     const formatted = formatBirthDateInput(value);
@@ -1358,16 +1397,6 @@ const AppointmentWizardV2 = ({
     setFilteredServices(allServices);
   };
 
-
-
-
-
-
-
-
-
-
-
   // ===================== КОРЗИНА =====================
 
   const addToCart = (service: ServiceData) => {
@@ -1511,16 +1540,13 @@ const AppointmentWizardV2 = ({
         newErrors.gender = t('misc.aw_gender_required');
       }
       // Валидация даты рождения
+      // Fix E: календарная проверка (31.02 отклоняется, високосные ок,
+      // будущие даты — целиком), неполный ввод не проходит молча.
       if (formattedBirthDate && formattedBirthDate !== '00.00.0000') {
-        const [day, month, year] = formattedBirthDate.split('.');
-        const dayNum = parseInt(day);
-        const monthNum = parseInt(month);
-        const yearNum = parseInt(year);
-
-        if (!day || !month || !year ||
-        dayNum < 1 || dayNum > 31 ||
-        monthNum < 1 || monthNum > 12 ||
-        yearNum < 1900 || yearNum > new Date().getFullYear()) {
+        const birthCheck = getBirthDateValidationError(formattedBirthDate);
+        if (birthCheck === 'future') {
+          newErrors.birth_date = t('misc.aw_birth_date_future');
+        } else if (birthCheck !== 'ok' && birthCheck !== 'empty') {
           newErrors.birth_date = t('misc.aw_birth_date_invalid');
         }
       }
@@ -1554,18 +1580,32 @@ const AppointmentWizardV2 = ({
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-
-
-
-
-
-
   // ===================== ГОРЯЧИЕ КЛАВИШИ =====================
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
       const target = e.target as HTMLElement | null;
+
+      // Ctrl+Enter — завершить: обрабатывается ДО guard'а интерактивных
+      // целей (Codex R1 PR 3096), иначе фокус на кнопке гасил шорткат.
+      if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        handleCompleteRef.current();
+        return;
+      }
+
+      // Fix E: Enter не перехватывается на интерактивных элементах —
+      // кнопки/ссылки/селекты нажимаются штатно (раньше preventDefault
+      // глушил их, и Enter прыгал к следующему шагу).
+      const interactiveTags = ['BUTTON', 'A', 'SELECT'];
+      const isInteractiveTarget =
+        Boolean(target && interactiveTags.includes(target.tagName)) ||
+        Boolean(target?.isContentEditable);
+      if (isInteractiveTarget) return;
+      // Fix C: во время обработки повторный Enter/Ctrl+Enter игнорируется —
+      // раньше двойное нажатие дважды запускало handleComplete (две корзины).
+      if (isProcessing) return;
 
       // Enter - следующий шаг (кроме textarea)
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && target?.tagName !== 'TEXTAREA') {
@@ -1577,22 +1617,32 @@ const AppointmentWizardV2 = ({
         }
       }
 
-      // Ctrl+Enter - завершить
-      if (e.key === 'Enter' && e.ctrlKey) {
-        e.preventDefault();
-        handleCompleteRef.current();
-      }
-
       // Shift+Enter в textarea - перенос строки (по умолчанию)
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentStep, totalSteps]);
+  }, [isOpen, currentStep, totalSteps, isProcessing]);
 
   // ===================== ЗАВЕРШЕНИЕ =====================
 
   const handleComplete = async () => {
+    // Fix C: реентерабельный лок — повторный вызов во время обработки
+    // (двойной Enter, Enter + Ctrl+Enter, клик + Enter) игнорируется.
+    if (submitLockRef.current) {
+      logger.warn('[AppointmentWizardV2] handleComplete re-entered while processing; ignored');
+      return;
+    }
+    submitLockRef.current = true;
+    try {
+      await runHandleComplete();
+    } finally {
+      submitLockRef.current = false;
+    }
+  };
+  handleCompleteRef.current = handleComplete;
+
+  const runHandleComplete = async () => {
     if (!validateStep(currentStep)) return;
 
     // P-022 fix: previously used toast.warning/toast.info as blocking validation
@@ -1742,7 +1792,10 @@ const AppointmentWizardV2 = ({
       }
 
       // ✅ ИСПРАВЛЕНО: Сначала группируем услуги по визитам
-      let visits: unknown[] = groupCartItemsByVisit();
+      let visits: unknown[] = groupCartItemsByVisit(
+        wizardData.cart.items as Parameters<typeof groupCartItemsByVisit>[0],
+        getDepartmentByService,
+      );
       if (!visits || visits.length === 0) {
         toast.error(t('misc.aw_cart_empty_or_invalid'));
         return;
@@ -1775,7 +1828,6 @@ const AppointmentWizardV2 = ({
       const normalizedPhone = wizardData.patient.phone
         ? normalizeUzbekPhoneForApi(wizardData.patient.phone)
         : null;
-      const normalizedPhoneDigits = normalizedPhone ? normalizedPhone.replace(/\D/g, '') : '';
       const selectedPatientSex = genderToPatientSexForApi(wizardData.patient.gender);
 
       // === ШАГ 1: ОПРЕДЕЛЯЕМ ИЛИ НАХОДИМ patient_id ===
@@ -1790,8 +1842,6 @@ const AppointmentWizardV2 = ({
         });
 
         // Ищем пациента по телефону
-        const cleanPhone = normalizedPhoneDigits;
-
         // UX Audit Stage 3 (Wizard issue 5.1 + 5.3):
         // Заменён двойной raw fetch() (по форматированному + очищенному телефону)
         // на единый helper findPatientByPhoneVariants из api/patients.
@@ -1801,6 +1851,41 @@ const AppointmentWizardV2 = ({
         }
 
         if (foundPatient) {
+          // Fix A (safe patient selection): авто-привязка к найденной по телефону
+          // карточке допустима только при совпадении ФИО. Семейный телефон не
+          // должен молча менять пациента — при расхождении требуется явное
+          // подтверждение регистратора.
+          const foundFio = String(
+            foundPatient.full_name || foundPatient.name || foundPatient.last_name || ''
+          ).trim();
+          const formFio = String(wizardData.patient.fio || '').trim();
+          const identityMatches =
+            foundFio.length > 0 &&
+            formFio.length > 0 &&
+            foundFio.toLowerCase() === formFio.toLowerCase();
+
+          if (!identityMatches) {
+            const attachConfirmed = await confirm({
+              title: t('misc.aw_attach_found_patient_title'),
+              message: t('misc.aw_attach_found_patient_message', { fio: foundFio || '—', phone: wizardData.patient.phone }),
+              description: t('misc.aw_attach_found_patient_description'),
+              confirmLabel: t('misc.aw_attach_found_patient_confirm'),
+              cancelLabel: t('misc.cancel'),
+              intent: 'primary',
+            });
+
+            if (!attachConfirmed) {
+              logger.warn('[AppointmentWizardV2] Edit-mode phone attach declined by user; stopping for explicit choice');
+              setPhoneError({
+                message: t('misc.aw_patient_phone_conflict_stop'),
+                patient: foundPatient
+              });
+              setCurrentStep(STEP_PATIENT);
+              toast.error(t('misc.aw_patient_phone_conflict_stop'));
+              return;
+            }
+          }
+
           // Обновляем локальный patientId и wizardData
           patientId = foundPatient.id as string | number;
           setWizardData((prev) => ({
@@ -1916,36 +2001,51 @@ const AppointmentWizardV2 = ({
           }));
           logger.log('✅ Пациент создан успешно:', patient.id);
         } catch (createError: unknown) {
-          // createPatient бросает Error с .status === 400 если «пациент уже существует»
+          // Fix A (safe patient selection): произвольный HTTP 400 больше НЕ
+          // считается признаком «пациент уже существует». Прежняя логика при
+          // любом 400 с телефоном автоматически привязывала форму к найденной
+          // по телефону карточке — валидационная ошибка приводила к записи
+          // визитов чужого пациента, а семейный телефон молча менял пациента.
           const createErr = createError as Error & { status?: number; message: string };
-          if (createErr.status === 400 && wizardData.patient.phone) {
-            // Пациент уже существует — ищем по телефону
-            const cleanPhone = normalizedPhoneDigits;
-            logger.log(`⚠️ Ищем существующего пациента по номеру телефона: ${wizardData.patient.phone} (clean: ${cleanPhone})`);
+          const isPhoneDuplicate =
+            createErr.status === 400 && isPhoneDuplicateErrorMessage(createErr.message);
 
-            // UX Audit Stage 3 (issue 5.3): используем findPatientByPhoneVariants
-            const foundPatient = await findPatientByPhoneVariants(normalizedPhone as string);
-
-            if (foundPatient) {
-              patientId = foundPatient.id as string | number;
-              setWizardData((prev) => ({
-                ...prev,
-                patient: { ...prev.patient, id: foundPatient.id as string | number }
-              }));
-              logger.log('✅ Найден существующий пациент (по телефону):', foundPatient.id);
-            } else {
-              // 🚨 НЕ используем fallback - требуем точное совпадение
-              logger.error('❌ Exact phone match not found after 400');
-              throw new Error(t('misc.aw_patient_phone_exists_not_found', { phone: wizardData.patient.phone }));
+          if (isPhoneDuplicate && wizardData.patient.phone) {
+            let conflictPatient: PatientRecord | null = null;
+            try {
+              // UX Audit Stage 3 (issue 5.3): используем findPatientByPhoneVariants
+              conflictPatient = (await findPatientByPhoneVariants(
+                normalizedPhone as string
+              )) as unknown as PatientRecord | null;
+            } catch (lookupError: unknown) {
+              logger.warn('[AppointmentWizardV2] Phone lookup after duplicate-phone 400 failed', lookupError);
             }
-          } else if (createErr.status === 400) {
-            // Нет телефона и ошибка создания - это проблема валидации
-            throw new Error(t('misc.aw_patient_validation_error', { message: createErr.message }));
-          } else {
-            // Другие ошибки (5xx, network)
-            logger.error('❌ Ошибка создания пациента:', createErr.status, createErr.message);
-            throw new Error(t('misc.aw_patient_creation_error', { status: createErr.status || '', message: createErr.message }));
+
+            if (conflictPatient) {
+              // Явная остановка: пользователь обязан сам выбрать карточку
+              // (кнопка «Выбрать …» на шаге пациента) или изменить данные.
+              // patient_id автоматически НЕ меняется.
+              logger.warn('[AppointmentWizardV2] Duplicate phone on create; stopping for explicit patient choice');
+              setPhoneError({
+                message: t('misc.aw_patient_phone_conflict_stop'),
+                patient: conflictPatient
+              });
+              setCurrentStep(STEP_PATIENT);
+              toast.error(t('misc.aw_patient_phone_conflict_stop'));
+              return;
+            }
+
+            throw new Error(t('misc.aw_patient_phone_exists_not_found', { phone: wizardData.patient.phone }));
           }
+
+          if (createErr.status === 400) {
+            // Нет телефона/не дубликат телефона — это ошибка валидации
+            throw new Error(t('misc.aw_patient_validation_error', { message: createErr.message }));
+          }
+
+          // Другие ошибки (5xx, network)
+          logger.error('❌ Ошибка создания пациента:', createErr.status, createErr.message);
+          throw new Error(t('misc.aw_patient_creation_error', { status: createErr.status || '', message: createErr.message }));
         }
       }
 
@@ -2499,20 +2599,75 @@ const AppointmentWizardV2 = ({
         quote_token: cartQuote?.quote_token
       };
 
-      // Создаём корзину визитов
-      // UX Audit Stage 3 (Wizard issue 5.1):
-      // Заменён raw fetch() POST на createRegistrarCart() из api/patients.
-      // createRegistrarCart бросает Error с .status, .message, .response при неудаче.
+      // Создаём корзину визитов (createRegistrarCart бросает Error с .status).
       let result;
       try {
-        result = await createRegistrarCart(cartData);
+        // Fix C + Codex R2 PR 3092 (P1): один сабмит = один ключ + снимок
+        // payload; изменённые данные со старым ключом запрещены (409).
+        const idemGuard = cartIdempotencyGuard({
+          existingKey: cartIdempotencyKeyRef.current,
+          existingPayload: cartIdempotencyPayloadRef.current,
+          payload: JSON.stringify(cartData),
+          newKey: createIdempotencyKey(),
+        });
+        if (idemGuard.action === 'block') {
+          logger.warn('Fix C (Codex R2): payload changed after the failed attempt');
+          toast.error(t('misc.aw_cart_retry_payload_changed'), { style: TOAST_WARNING_STYLE });
+          return; // НЕ отправляем: запись могла быть уже создана
+        }
+        cartIdempotencyKeyRef.current = idemGuard.key;
+        cartIdempotencyPayloadRef.current = idemGuard.payload;
+        result = await createRegistrarCart(cartData, { idempotencyKey: idemGuard.key as string });
+        cartIdempotencyKeyRef.current = null; // успех — ключ отработал
+        cartIdempotencyPayloadRef.current = null;
       } catch (cartError: unknown) {
         // Обработка ошибок создания корзины
-        const cartErr = cartError as Error & { status?: number; message?: string };
+        const cartErr = cartError as Error & {
+          status?: number;
+          message?: string;
+          response?: { data?: { code?: string; detail?: string } };
+        };
         let errorMessage = cartErr.message || t('misc.aw_record_creation_error_status', { status: cartErr.status || 'network' });
         const isPermissionError = cartErr.status === 403;
 
         logger.error('❌ Ошибка создания корзины:', cartErr.status, errorMessage);
+
+        // Codex R11 PR 3092 (P2): 409 двух родов: IN-FLIGHT — повтор с тем же
+        // ключом вернёт закоммиченный ответ; UNCERTAIN-OUTCOME — осмысленная
+        // сверка с рабочим списком и ротация ключа только после согласия.
+        const backendCode = cartErr.response?.data?.code;
+        if (cartErr.status === 409 && backendCode === 'idempotency_uncertain_outcome') {
+          const reconciled = await confirm({
+            title: t('misc.aw_idem_uncertain_title'),
+            message: t('misc.aw_idem_uncertain_message'),
+            confirmLabel: t('misc.aw_idem_uncertain_confirm'),
+            cancelLabel: t('misc.aw_idem_uncertain_cancel'),
+            intent: 'danger',
+          });
+          if (reconciled) {
+            logger.warn('Fix C (Codex R11): reconciled — rotating the idempotency key');
+            cartIdempotencyKeyRef.current = null;
+            cartIdempotencyPayloadRef.current = null;
+            toast.info(t('misc.aw_idem_key_released'), { style: TOAST_WARNING_STYLE });
+          }
+          return; // НЕ закрываем мастер: ключ разведён, корзина сохранена
+        }
+
+        // Codex R3/R8 PR 3092 (P2): definitive 4xx (кроме 409 и 403) доказывает
+        // не-коммит — ключ освобождается для исправленного ретрая. Неоднозначные
+        // исходы (сеть/таймаут/5xx/409/403) удерживают привязку: 403 несёт
+        // ЗАКОММИЧЕННЫЙ снапшот, очистка ключа дала бы дубликат.
+        const definitiveNonCommit =
+          typeof cartErr.status === 'number' &&
+          cartErr.status >= 400 &&
+          cartErr.status < 500 &&
+          cartErr.status !== 409 &&
+          cartErr.status !== 403;
+        if (definitiveNonCommit) {
+          logger.log('Fix C (Codex R3): definitive non-commit response — releasing the bound idempotency key for a corrected retry');
+          cartIdempotencyKeyRef.current = null;
+          cartIdempotencyPayloadRef.current = null;
+        }
 
         // Codex R4 PR 3095 (P2): stale-quote 409 — invalidate the quote and
         // immediately request the current itemized pricing, so pressing
@@ -2528,15 +2683,9 @@ const AppointmentWizardV2 = ({
           if (errorMessage.includes('Not enough permissions')) {
             errorMessage = t('misc.aw_no_permissions');
           }
-          toast.error(errorMessage, {
-            style: {
-              backgroundColor: 'color-mix(in srgb, var(--mac-error), transparent 84%)',
-              border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
-              color: 'var(--mac-text-primary)'
-            }
-          });
-          // Закрываем мастер при ошибке прав доступа
-          onClose?.();
+          toast.error(errorMessage, { style: TOAST_ERROR_STYLE });
+          // Codex R12 PR 3092 (P2): НЕ закрываем мастер на 403 — close-эффект очистил бы
+          // recovery-refs; реплей после восстановления роли, новый ключ дублировал бы корзину.
         } else {
           toast.error(t('misc.aw_record_creation_error', { message: errorMessage }));
         }
@@ -2573,77 +2722,7 @@ const AppointmentWizardV2 = ({
       setIsProcessing(false);
     }
   };
-  handleCompleteRef.current = handleComplete;
-
-  // Группировка элементов корзины по визитам
-  const groupCartItemsByVisit = (): unknown[] => {
-    const visits: Record<string, {
-      doctor_id: string | number | null;
-      services: Array<{
-        service_id?: string | number;
-        quantity?: number;
-        original_queue_id?: string | number | null;
-        service_code?: string | null;
-        service_name?: string | null;
-        _source?: string | null;
-      }>;
-      visit_date?: string;
-      visit_time?: string | null;
-      department: string;
-      notes: string | null;
-    }> = {};
-
-    // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
-    const validItems = wizardData.cart.items.filter((item) => {
-      if (!(item as { service_id?: string | number }).service_id) {
-        logger.warn('⚠️ Пропущен элемент корзины без service_id:', item);
-        return false;
-      }
-      return true;
-    });
-
-    if (validItems.length === 0) {
-      logger.warn('⚠️ Нет валидных элементов в корзине');
-      return [] as unknown[];
-    }
-
-    validItems.forEach((item) => {
-      // Определяем отделение для услуги
-      const department = getDepartmentByService((item as { service_id?: string | number }).service_id as string | number);
-
-      // ✅ ИСПРАВЛЕНО: Объединяем все процедуры в один визит
-      // Все процедуры (P, C, D_PROC) должны быть в одном визите с department = 'procedures'
-      let finalDepartment = department;
-      if (department === 'procedures') {
-        finalDepartment = 'procedures'; // Все процедуры в одном отделе
-      }
-
-      // Группируем по finalDepartment + doctor_id + visit_date + visit_time
-      const key = `${finalDepartment}_${(item as { doctor_id?: string | number }).doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
-
-      if (!visits[key]) {
-        visits[key] = {
-          doctor_id: (item as { doctor_id?: string | number }).doctor_id || null,
-          services: [],
-          visit_date: item.visit_date,
-          visit_time: item.visit_time || null,
-          department: finalDepartment,
-          notes: null
-        };
-      }
-
-      visits[key].services.push({
-        service_id: (item as { service_id?: string | number }).service_id,
-        quantity: item.quantity,
-        original_queue_id: item.original_queue_id || null,
-        service_code: item.service_code || null,
-        service_name: (item as { service_name?: string }).service_name || item.name || null,
-        _source: item._source || null
-      });
-    });
-
-    return Object.values(visits);
-  };
+  // (handleCompleteRef.current назначается после обёртки Fix C выше)
 
   // Fix-refactor: маппинг отделения вынесен в wizardUtils (чистая функция);
   // обёртка сохраняет существующие вызовы.
@@ -2807,7 +2886,6 @@ const AppointmentWizardV2 = ({
       </button>
     </div>;
 
-
   // Улучшенный заголовок для Шага 2
   const Step2Header =
   <div style={wizardHeaderShellStyle}>
@@ -2953,7 +3031,6 @@ const AppointmentWizardV2 = ({
         </button>
       </div>
     </div>;
-
 
   // Проверка прав доступа перед рендерингом
   if (!hasRegistrarAccess) {
@@ -3104,7 +3181,6 @@ const AppointmentWizardV2 = ({
 };
 
 export default AppointmentWizardV2;
-
 
 // UX Audit Stage 3 (Wizard issue 5.2):
 // PatientStepV2 и CartStepV2 вынесены в отдельные файлы.

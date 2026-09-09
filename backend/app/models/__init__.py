@@ -140,7 +140,12 @@ from .notification import (
     NotificationTemplate,
 )
 from .online import OnlineDay
-from .online_queue import DailyQueue, OnlineQueueEntry, QueueToken
+from .online_queue import (  # noqa: F401  # manual-review: registry re-export
+    DailyQueue,
+    OnlineQueueEntry,
+    QueueResource,
+    QueueToken,
+)
 from .patient import Patient
 from .payment import Payment
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit

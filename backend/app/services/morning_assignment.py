@@ -140,16 +140,31 @@ class MorningAssignmentService:
 
                 if not existing:
                     # Create new DailyQueue for this tag
-                    queue_service.get_or_create_daily_queue(
-                        self.db,
-                        day=target_date,
-                        specialist_id=default_doctor.id,
-                        queue_tag=queue_tag,
-                    )
+                    # Codex R15 #3092 (P2): изоляция тега в SAVEPOINT. Полный
+                    # откат сеанса в except-ветке стирал очереди, созданные
+                    # ПРЕДЫДУЩИМИ итерациями этого вызова, а created_count их
+                    # уже учёл — отчёт «создано N» расходился с реальностью и
+                    # ломал гарантию pre-creation. SAVEPOINT откатывает только
+                    # работу сбойнувшего тега: предыдущие создания остаются в
+                    # внешней транзакции, счётчик остаётся честным.
+                    with self.db.begin_nested():
+                        queue_service.get_or_create_daily_queue(
+                            self.db,
+                            day=target_date,
+                            specialist_id=default_doctor.id,
+                            queue_tag=queue_tag,
+                        )
                     created_count += 1
                     logger.info(f"✅ Pre-created DailyQueue for queue_tag={queue_tag}")
 
             except Exception as e:
+                # Codex R3 #3092 (P1): get_or_create_daily_queue no longer
+                # rolls the session back on flush failure (the rollback erased
+                # the atomic cart's uncommitted rows in the wizard flow).
+                # Codex R15 #3092 (P2): полный rollback здесь больше не нужен
+                # И ВРЕДЕН — сбойнувший тег уже откатен своим SAVEPOINT, а
+                # полный откат стирал бы очереди предыдущих тегов этого
+                # вызова. Skip-tag-and-continue сохранён без побочных потерь.
                 logger.error(f"Error pre-creating queue for {queue_tag}: {e}")
 
         if created_count > 0:

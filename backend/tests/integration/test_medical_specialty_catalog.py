@@ -34,6 +34,22 @@ from app.services.medical_specialty_seed import (
 BASELINE_CODES = [row[0] for row in MEDICAL_SPECIALTY_BASELINE]
 
 
+def _find_openapi_spec():
+    """Walk parents to the committed spec: under mutmut the test copy lives
+    in backend/mutants/tests/... where parents[2] is backend/mutants/ and
+    openapi.json is not copied into the sandbox (nightly mutation #3103)."""
+    from pathlib import Path
+
+    return next(
+        (
+            p / "openapi.json"
+            for p in Path(__file__).resolve().parents
+            if (p / "openapi.json").is_file()
+        ),
+        None,
+    )
+
+
 @pytest.fixture
 def seeded_catalog(db_session: Session) -> Session:
     seed_medical_specialties(db_session.connection())
@@ -336,7 +352,7 @@ class TestVocabularyTypedContract:
         from pathlib import Path as _Path
 
         spec = _json.loads(
-            (_Path(__file__).resolve().parents[2] / "openapi.json").read_text(
+            _find_openapi_spec().read_text(
                 encoding="utf-8"
             )
         )
@@ -357,7 +373,7 @@ class TestVocabularyTypedContract:
         from pathlib import Path as _Path
 
         spec = _json.loads(
-            (_Path(__file__).resolve().parents[2] / "openapi.json").read_text(
+            _find_openapi_spec().read_text(
                 encoding="utf-8"
             )
         )
