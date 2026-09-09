@@ -397,10 +397,16 @@ def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, appr
         ),
         key=lambda d: (d["service_id"], d["quantity"], d["unit_price"], d["final_price"]),
     )
+    # Codex R7 #3095 (P1): токен биндит РЕЗОЛВНУТЫЙ режим (SSOT-резолв
+    # пары all_free + discount_mode), а не сырые поля запроса — иначе
+    # одно и то же подтверждённое ценообразование, выраженное булевым
+    # флагом или строковым режимом, давало бы разные токены, и
+    # нормализация режима на сохранении роняла ревалидацию в 409.
+    _effective_mode = _resolve_effective_discount_mode(quote_req)
     payload = {
         "pricing_mode": quote_req.pricing_mode,
-        "discount_mode": quote_req.discount_mode,
-        "all_free": bool(quote_req.all_free),
+        "discount_mode": _effective_mode,
+        "all_free": _effective_mode == "all_free",
         "approval_status": approval_status,
         "items": canonical_items,
         "total_amount": str(total_amount),
@@ -593,6 +599,15 @@ def _quote_core(
             ):
                 service_row_map[int(_svc.id)] = _svc
 
+    # Codex R7 #3095 (P2): зеркалируем ПОСЛЕДОВАТЕЛЬНОЕ состояние команды.
+    # RegistrarEditDeltaService.apply обрабатывает строки по очереди: вторая
+    # дублирующая строка того же (service_id, specialist_id) видит позицию,
+    # созданную/пополненную первой, и её биллинговая дельта равна
+    # max(target − уже выставленное, 0). Квота обязана накапливать уже
+    # подтверждённые единицы внутри одного прохода — иначе токен покрывает
+    # две единицы, а команда выставит одну.
+    _edit_delta_covered: dict[tuple[int, int | None], int] = {}
+
     for item_req in quote_req.items:
         if int(item_req.service_id) in service_row_map:
             service: Service | None = service_row_map[int(item_req.service_id)]
@@ -662,6 +677,16 @@ def _quote_core(
                 )
             else:
                 billable_qty = item_req.quantity
+            # Codex R7 #3095 (P2): вычитаем единицы, уже подтверждённые
+            # предыдущими дублирующими строками этого же прохода квоты —
+            # точное зеркало последовательного состояния команды.
+            _covered_key = (int(item_req.service_id), item_req.specialist_id)
+            billable_qty = max(
+                billable_qty - _edit_delta_covered.get(_covered_key, 0), 0
+            )
+            _edit_delta_covered[_covered_key] = (
+                _edit_delta_covered.get(_covered_key, 0) + billable_qty
+            )
         elif quote_req.pricing_mode == "full_update":
             # Codex R2 #3095 (P1): зеркало _full_update_create_single_
             # independent_entry: консультация при repeat/benefit → 0,
@@ -874,7 +899,12 @@ def apply_registrar_cart_edit_delta(
             target_date=request.target_date,
             payment_method=request.payment_method,
             discount_mode=request.discount_mode,
-            all_free=request.all_free,
+            # Codex R7 #3095 (P1): команда получает тот же РЕЗОЛВНУТЫЙ режим,
+            # что использовала квота (_resolve_effective_discount_mode):
+            # агрегированная запись несёт discount_mode="all_free" без булева
+            # флага — голый all_free=False заставил бы команду выставить
+            # каталожные цены поверх токена, подтверждённого как All Free.
+            all_free=_resolve_effective_discount_mode(request) == "all_free",
             patient_data=(
                 request.patient_data.model_dump(exclude_none=True)
                 if request.patient_data
