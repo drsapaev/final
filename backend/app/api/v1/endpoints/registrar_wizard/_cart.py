@@ -397,10 +397,16 @@ def _quote_token(items: list[CartQuoteItemResponse], total_amount: Decimal, appr
         ),
         key=lambda d: (d["service_id"], d["quantity"], d["unit_price"], d["final_price"]),
     )
+    # Codex R7 #3095 (P1): токен биндит РЕЗОЛВНУТЫЙ режим (SSOT-резолв
+    # пары all_free + discount_mode), а не сырые поля запроса — иначе
+    # одно и то же подтверждённое ценообразование, выраженное булевым
+    # флагом или строковым режимом, давало бы разные токены, и
+    # нормализация режима на сохранении роняла ревалидацию в 409.
+    _effective_mode = _resolve_effective_discount_mode(quote_req)
     payload = {
         "pricing_mode": quote_req.pricing_mode,
-        "discount_mode": quote_req.discount_mode,
-        "all_free": bool(quote_req.all_free),
+        "discount_mode": _effective_mode,
+        "all_free": _effective_mode == "all_free",
         "approval_status": approval_status,
         "items": canonical_items,
         "total_amount": str(total_amount),
@@ -684,6 +690,13 @@ def _quote_core(
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
+    # Codex R7 #3095 (P2): зеркалируем ПОСЛЕДОВАТЕЛЬНОЕ состояние команды.
+    # RegistrarEditDeltaService.apply обрабатывает строки по очереди: вторая
+    # дублирующая строка того же (service_id, specialist_id) видит позицию,
+    # созданную/пополненную первой. Квота накапливает уже подтверждённые
+    # дельты внутри одного прохода — иначе токен покрывает больше единиц,
+    # чем выставит команда.
+    _edit_delta_covered: dict[tuple[int, int | None], int] = {}
 
     for item_req in quote_req.items:
         if int(item_req.service_id) in service_row_map:
@@ -755,11 +768,22 @@ def _quote_core(
             # ГОТОВУЮ сумму потреблённых LIFO-слоёв (единая цена за единицу
             # при многослойном потреблении отсутствует); рост остаётся
             # каталог × дельта (при слоях это ТОЧНО сумма команды).
+            # Codex R7 #3095 (P2): зеркало последовательного состояния
+            # команды: delta_i = target_i − existing − Σ delta_j (j<i, тот же
+            # ключ). Эквивалентно строке с ПОСЛЕДОВАТЕЛЬНО-ЭФФЕКТИВНЫМ
+            # requested (target − Σ delta_j) — тогда LIFO-потребление
+            # снижения и его amount_override считаются для скорректированной
+            # дельты. W2-PR1: дельта ЗНАКОВАЯ — covered копит её без клампа
+            # (дубликат-снижение валидно и гвардится как обычное снижение).
+            _covered_key = (int(item_req.service_id), item_req.specialist_id)
+            _sequential_requested = item_req.quantity - _edit_delta_covered.get(
+                _covered_key, 0
+            )
             if quote_req.patient_id is not None and edit_target_date is not None:
                 billable_qty, decrease_amount = _edit_delta_quote_context(
                     db,
                     service=service,
-                    requested_qty=item_req.quantity,
+                    requested_qty=_sequential_requested,
                     patient_id=quote_req.patient_id,
                     # W2-PR2: канонический день (день редактируемых записей).
                     target_date=edit_target_date,
@@ -770,7 +794,10 @@ def _quote_core(
                     all_free=effective_discount_mode == "all_free",
                 )
             else:
-                billable_qty = item_req.quantity
+                billable_qty = _sequential_requested
+            _edit_delta_covered[_covered_key] = (
+                _edit_delta_covered.get(_covered_key, 0) + billable_qty
+            )
         elif quote_req.pricing_mode == "full_update":
             # Codex R2 #3095 (P1): зеркало _full_update_create_single_
             # independent_entry: консультация при repeat/benefit → 0,
@@ -991,7 +1018,12 @@ def apply_registrar_cart_edit_delta(
             target_date=request.target_date,
             payment_method=request.payment_method,
             discount_mode=request.discount_mode,
-            all_free=request.all_free,
+            # Codex R7 #3095 (P1): команда получает тот же РЕЗОЛВНУТЫЙ режим,
+            # что использовала квота (_resolve_effective_discount_mode):
+            # агрегированная запись несёт discount_mode="all_free" без булева
+            # флага — голый all_free=False заставил бы команду выставить
+            # каталожные цены поверх токена, подтверждённого как All Free.
+            all_free=_resolve_effective_discount_mode(request) == "all_free",
             patient_data=(
                 request.patient_data.model_dump(exclude_none=True)
                 if request.patient_data
