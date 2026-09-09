@@ -116,3 +116,53 @@ describe('normalizeServicesFromInitialData — top-level queue_entry_id fallback
     expect(item.original_queue_id).toBeNull();
   });
 });
+
+describe('normalizeServicesFromInitialData — per-entry dedup key (Codex R15 PR 3121)', () => {
+  it('сохраняет одну и ту же услугу из ДВУХ записей очереди', () => {
+    // Прежний ключ finalizeItems только по услуге выбрасывал вторую detail
+    // ещё на нормализации: мастер показывал одну позицию, а «неизменное»
+    // сохранение трактовало скрытую запись как удалённую и вызывало каскад
+    // отмены её визита и счёта.
+    const items = normalizeServicesFromInitialData(
+      {
+        service_details: [
+          {
+            id: 5,
+            service_id: 5,
+            code: 'K01',
+            name: 'Cardiology consult',
+            quantity: 1,
+            queue_entry_id: 9001,
+          },
+          {
+            id: 5,
+            service_id: 5,
+            code: 'K01',
+            name: 'Cardiology consult',
+            quantity: 2,
+            queue_entry_id: 9002,
+          },
+        ],
+      },
+      [{ id: 5, service_code: 'K01', name: 'Cardiology consult' }],
+    );
+
+    expect(items).toHaveLength(2);
+    expect(items.map((i) => i.original_queue_id).sort()).toEqual([9001, 9002]);
+    expect(items.map((i) => i.quantity).sort()).toEqual([1, 2]);
+  });
+
+  it('позиции без идентичности записи дедуплицируются по услуге как прежде', () => {
+    const items = normalizeServicesFromInitialData(
+      {
+        service_details: [
+          { id: 5, service_id: 5, code: 'K01', name: 'Cardiology consult', quantity: 1 },
+          { id: 5, service_id: 5, code: 'K01', name: 'Cardiology consult', quantity: 2 },
+        ],
+      },
+      [{ id: 5, service_code: 'K01', name: 'Cardiology consult' }],
+    );
+
+    expect(items).toHaveLength(1);
+  });
+});
