@@ -640,8 +640,7 @@ def _quote_core(
     # Codex R7 #3095 (P2): зеркалируем ПОСЛЕДОВАТЕЛЬНОЕ состояние команды.
     # RegistrarEditDeltaService.apply обрабатывает строки по очереди: вторая
     # дублирующая строка того же (service_id, specialist_id) видит позицию,
-    # созданную/пополненную первой, и её биллинговая дельта равна
-    # max(target − уже выставленное, 0). Квота обязана накапливать уже
+    # созданную/пополненную первой. Квота обязана накапливать уже
     # подтверждённые единицы внутри одного прохода — иначе токен покрывает
     # две единицы, а команда выставит одну.
     _edit_delta_covered: dict[tuple[int, int | None], int] = {}
@@ -707,12 +706,28 @@ def _quote_core(
             # Codex R8 #3115 (P1/P2): per-item queue_entry_id routing mirror +
             # decrease quotes price the RECORDED unit charge (full-update rows
             # store line totals), the same value the command subtracts.
+            # Codex R7/R15 #3095 (P2): ПОСЛЕДОВАТЕЛЬНОЕ зеркало команды:
+            # delta_i = target_i − existing − Σ delta_j (j<i) — эквивалентно
+            # строке с последовательно-эффективным requested (LIFO-подобные
+            # дубликат-снижения проходят через ТУ ЖЕ логику контекста).
+            # Ключ покрытия — (service_id, queue_entry_id): команда
+            # маршрутизирует по (patient, day, queue_tag), количество внутри
+            # записи суммируется по сервису независимо от специалиста
+            # (_find_service_payload), а явные queue_entry_id — независимые
+            # позиции (R11-строгий селектор).
             decrease_charge: Decimal | None = None
+            _covered_key = (
+                int(item_req.service_id),
+                item_req.queue_entry_id,
+            )
+            _sequential_requested = item_req.quantity - _edit_delta_covered.get(
+                _covered_key, 0
+            )
             if quote_req.patient_id is not None and quote_req.target_date is not None:
                 billable_qty, decrease_charge = _edit_delta_quote_context(
                     db,
                     service=service,
-                    requested_qty=item_req.quantity,
+                    requested_qty=_sequential_requested,
                     patient_id=quote_req.patient_id,
                     target_date=quote_req.target_date,
                     preferred_entry_ids=set(quote_req.preferred_entry_ids),
@@ -721,15 +736,7 @@ def _quote_core(
                     lock=lock_pricing_rows,
                 )
             else:
-                billable_qty = item_req.quantity
-            # Codex R7 #3095 (P2): вычитаем единицы, уже подтверждённые
-            # предыдущими дублирующими строками этого же прохода квоты —
-            # точное зеркало последовательного состояния команды:
-            # delta_i = target_i − existing − Σ delta_j (j<i, тот же ключ).
-            # W2-PR1: дельта ЗНАКОВАЯ, поэтому covered копит её без клампа —
-            # дубликат-снижение валиден и токенизируется через decrease_charge.
-            _covered_key = (int(item_req.service_id), item_req.specialist_id)
-            billable_qty = billable_qty - _edit_delta_covered.get(_covered_key, 0)
+                billable_qty = _sequential_requested
             _edit_delta_covered[_covered_key] = (
                 _edit_delta_covered.get(_covered_key, 0) + billable_qty
             )

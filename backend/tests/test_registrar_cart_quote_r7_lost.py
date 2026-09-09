@@ -305,3 +305,54 @@ def test_edit_delta_quote_duplicate_rows_cover_sequentially(
     assert Decimal(str(saved_body["total_amount"])) == Decimal("25000"), (
         "token parity: the save bills exactly what the quote confirmed"
     )
+
+
+def test_edit_delta_quote_duplicate_rows_different_specialists_cover_by_service(
+    client: TestClient,
+    db_session: Session,
+    registrar_auth_headers,
+    admin_user,
+    test_patient,
+    test_doctor,
+):
+    """Codex R15 #3095: покрытие по УСЛУГЕ, без специалиста в ключе. Команда
+    маршрутизирует строку по (patient, day, queue_tag), а количество внутри
+    записи суммируется по сервису независимо от врача (_find_service_payload):
+    дубликаты одного сервиса с РАЗНЫМИ врачами покрывают друг друга так же,
+    как дубликаты с одним врачом."""
+    service = _r7_service(db_session, code="R15-DUP-SPEC", price=Decimal("25000"))
+    # Дефолтный врач услуги: строка со specialist_id=None проходит R11-гейт
+    # («specialist_id is required») через service.doctor_id, как и в команде.
+    service.doctor_id = test_doctor.id
+    db_session.commit()
+
+    quoted = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [
+                {
+                    "service_id": service.id,
+                    "quantity": 1,
+                    "specialist_id": None,
+                },
+                {
+                    "service_id": service.id,
+                    "quantity": 1,
+                    "specialist_id": test_doctor.id,
+                },
+            ],
+            "discount_mode": "none",
+            "all_free": False,
+            "pricing_mode": "edit_delta",
+            "patient_id": test_patient.id,
+            "target_date": date.today().isoformat(),
+        },
+    )
+    assert quoted.status_code == 200, quoted.text
+    body = quoted.json()
+    assert float(body["total_amount"]) == 25000, (
+        "coverage is keyed by the routed entry's service identity: a second "
+        "duplicate row with a different specialist must be priced as the "
+        "sequential no-op it becomes in the command, not as a second unit"
+    )
