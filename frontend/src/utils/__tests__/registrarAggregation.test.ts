@@ -365,11 +365,13 @@ describe('aggregatePatientsForAllDepartments', () => {
     expect(result.map((row) => row.patient_id)).toEqual([101, 202]);
     expect(result[0].grouped_record_refs).toEqual([{ record_kind: 'visit', record_id: 301 }]);
     expect(result[1].grouped_record_refs).toEqual([{ record_kind: 'online_queue', record_id: 402 }]);
+    // Codex R12 PR 3118: деталь записи очереди несёт entry id СВОЕЙ записи;
+    // visit-деталь (без явного entry id у строки) остаётся без штампа.
     expect(result[0].service_details).toEqual([
       { service_id: 10, service_code: 'K01', service_name: 'Cardio consult' },
     ]);
     expect(result[1].service_details).toEqual([
-      { service_id: 20, service_code: 'L01', service_name: 'Blood test' },
+      { service_id: 20, service_code: 'L01', service_name: 'Blood test', original_queue_id: 402 },
     ]);
   });
 });
@@ -513,5 +515,74 @@ describe('adaptTimeFields (PR-11)', () => {
 
     expect(result.updated_at).toBe('2026-07-11T14:35:00+05:00');
     expect(result.last_changed_at).toBe('2026-07-11T14:35:00+05:00');
+  });
+});
+
+describe('Codex R12 PR 3118 (P1): per-detail queue entry identity through aggregation', () => {
+  it('stamps each service_detail with its own source entry id, not the first top-level one', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 1,
+        queue_entry_id: 501,
+        service_details: [{ id: 3, code: 'S01', name: 'Услуга A', quantity: 1 }],
+      }),
+      makeAppointment({
+        id: 2,
+        queue_entry_id: 502,
+        service_details: [{ id: 4, code: 'S02', name: 'Услуга B', quantity: 1 }],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    const details = result[0].service_details as Array<Record<string, unknown>>;
+    expect(details).toHaveLength(2);
+    // Раньше обе детали оставались без id и резолвер вешал ПЕРВЫЙ (501)
+    // на обе — правка второй услуги шла в чужую запись.
+    expect(details[0].original_queue_id).toBe(501);
+    expect(details[1].original_queue_id).toBe(502);
+  });
+
+  it('explicit per-detail ids win; visit-row details without explicit entry id stay unstamped', () => {
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 1,
+        queue_entry_id: 501,
+        service_details: [{ id: 3, code: 'S01', name: 'Услуга A', quantity: 1, queue_entry_id: 9001 }],
+      }),
+      makeAppointment({
+        id: 2,
+        record_type: 'visit',
+        service_details: [{ id: 4, code: 'S02', name: 'Услуга B', quantity: 1 }],
+      }),
+    ]);
+
+    const details = result[0].service_details as Array<Record<string, unknown>>;
+    expect(details[0].queue_entry_id).toBe(9001); // явный id не перезаписывается
+    expect(details[0].original_queue_id).toBeUndefined();
+    expect(details[1].original_queue_id).toBeUndefined(); // visit-строка — отказ сохранён
+  });
+
+  it('end-to-end: normalized cart item of the second entry carries ITS entry id', async () => {
+    const { normalizeServicesFromInitialData } = await import('../serviceCodeResolver');
+    const catalog = [
+      { id: 3, service_code: 'S01', name: 'Услуга A' },
+      { id: 4, service_code: 'S02', name: 'Услуга B' },
+    ];
+    const [aggregated] = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 1,
+        queue_entry_id: 501,
+        service_details: [{ id: 3, code: 'S01', name: 'Услуга A', quantity: 1 }],
+      }),
+      makeAppointment({
+        id: 2,
+        queue_entry_id: 502,
+        service_details: [{ id: 4, code: 'S02', name: 'Услуга B', quantity: 1 }],
+      }),
+    ]);
+
+    const items = normalizeServicesFromInitialData(aggregated as Record<string, unknown>, catalog);
+    expect(items.find((i) => i.service_id === 3)?.original_queue_id).toBe(501);
+    expect(items.find((i) => i.service_id === 4)?.original_queue_id).toBe(502);
   });
 });

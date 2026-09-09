@@ -1261,6 +1261,10 @@ def _process_online_queue_entry(
                         "price": 0,
                         "quantity": 1,
                     })
+        # Codex R12 PR 3118 (P1): слои LIFO одной услуги показываются как
+        # ОДНА строка read-модели (мастер edit-режима строит корзину из
+        # service_details: дубли услуги сломали бы целевое состояние).
+        service_details = _merge_service_detail_layers(service_details)
 
     return {
         "record_id": record_id,
@@ -1279,6 +1283,53 @@ def _process_online_queue_entry(
         "total_cost": total_cost,
     }
 
+
+
+def _merge_service_detail_layers(details: list) -> list:
+    """Codex R12 PR 3118 (P1): слои LIFO одной услуги — ОДНА строка read-модели.
+
+    Рост количества при изменённом каталоге добавляет слой payload/VisitService
+    (см. RegistrarEditDeltaService LIFO): строки одной услуги сливаются по
+    id/коду/имени — quantity = Σ слоёв, price = средневзвешенная цена единицы
+    (ТОЛЬКО отображение; ценовой авторитет для записи — квота). Порядок — по
+    первому появлению услуги. Без слияния мастер edit-режима строил бы из
+    service_details две корзинные позиции одной услуги и целевое состояние
+    редактирования считалось бы по каждой строке отдельно."""
+    merged: list = []
+    index_by_key: dict = {}
+    for detail in details:
+        if not isinstance(detail, dict):
+            merged.append(detail)
+            continue
+        key_id = detail.get("id") or detail.get("service_id")
+        key_code = detail.get("code") or detail.get("service_code")
+        key_name = detail.get("name") or detail.get("service_name")
+        key = (
+            f"id:{key_id}" if key_id not in (None, "")
+            else f"code:{str(key_code).upper()}" if key_code
+            else f"name:{str(key_name).lower()}" if key_name
+            else None
+        )
+        if key is None or key not in index_by_key:
+            if key is not None:
+                index_by_key[key] = len(merged)
+            merged.append(detail)
+            continue
+        existing = merged[index_by_key[key]]
+        existing_qty = int(existing.get("quantity") or existing.get("qty") or 1)
+        incoming_qty = int(detail.get("quantity") or detail.get("qty") or 1)
+        total_qty = existing_qty + incoming_qty
+        existing_price = float(existing.get("price") or 0)
+        incoming_price = float(detail.get("price") or 0)
+        weighted = (
+            (existing_price * existing_qty + incoming_price * incoming_qty) / total_qty
+            if total_qty > 0
+            else existing_price
+        )
+        existing["quantity"] = total_qty
+        existing["qty"] = total_qty
+        existing["price"] = round(weighted, 2)
+    return merged
 
 
 _VISIT_STATUS_MAPPING = {
@@ -1439,6 +1490,9 @@ def _process_visit_entry(
 
         if vs.price:
             total_cost += float(vs.price) * (vs.qty or 1)
+
+    # Codex R12 PR 3118 (P1): слои LIFO одной услуги — одна строка read-модели.
+    service_details = _merge_service_detail_layers(service_details)
 
     source = getattr(visit, 'source', None) or 'desk'
     entry_status = _VISIT_STATUS_MAPPING.get(visit.status, "waiting")

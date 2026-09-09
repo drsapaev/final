@@ -698,14 +698,14 @@ class RegistrarEditDeltaService:
         current_user: User | None,
     ) -> dict[str, Any]:
         services = self._coerce_services(entry.services)
-        existing_payload = self._find_service_payload(services, service)
-        existing_qty = self._payload_quantity(existing_payload) if existing_payload else 0
+        existing_payloads = self._find_service_payloads(services, service)
+        existing_qty = sum(int(self._payload_quantity(p)) for p in existing_payloads) if existing_payloads else 0
 
         # W2-PR1: смена врача существующей позиции не игнорируется молча.
         # Перенос позиции к другому врачу — операция переноса записи (own
         # contract), а не побочный эффект редактирования корзины: отвергаем
         # с явной причиной вместо имитации сохранения.
-        if specialist_id is not None and existing_payload is not None:
+        if specialist_id is not None and existing_payloads:
             queue_specialist = entry.queue.specialist_id if entry.queue else None
             if queue_specialist is not None and int(queue_specialist) != int(specialist_id):
                 raise ValueError(
@@ -719,60 +719,59 @@ class RegistrarEditDeltaService:
         # — отрицательный остаток. Прежний max(target − current, 0) молча
         # проглатывал уменьшение количества (сохранение «успешно», состояние
         # без изменений).
-        delta_qty = requested_qty - existing_qty if existing_payload else requested_qty
+        delta_qty = requested_qty - existing_qty if existing_payloads else requested_qty
         if delta_qty < 0:
             self._assert_decrease_allowed(entry=entry)
         unit_price = Decimal("0") if all_free else Decimal(str(service.price or 0))
-        # Снижение вычитает фактически начисленную сумму позиции (цена из
-        # payload), а не текущую цену каталога — иначе entry.total_amount
-        # разошёлся бы с тем, что реально выставлено ранее.
-        # Codex R8 #3115 (P1): снижение вычитает ФАКТИЧЕСКИ записанную цену
-        # за единицу (см. _recorded_unit_charge), а не цену каталога и не
-        # line-total из payload full-update-строки.
-        decrease_unit_price = (
-            self._recorded_unit_charge(entry=entry, payload=existing_payload, previous_qty=existing_qty)
-            if (delta_qty < 0 and existing_payload and existing_payload.get("price") is not None)
-            else unit_price
-        )
-        delta_amount = (decrease_unit_price if delta_qty < 0 else unit_price) * Decimal(delta_qty)
 
-        # Codex R10 #3115 (P1): рост ПЕРЕОЦЕНИВАЕТ позицию средневзвешенной
-        # ценой за единицу: старые единицы сохраняют фактически записанную
-        # стоимость, добавленные биллятся по текущей каталоговой (delta_amount).
-        # Иначе VisitService/entry-пейлоад переписывали бы ВСЕ единицы на новую
-        # каталоговую цену, хотя счёт выставляет только дельту: визит 1×100
-        # при росте до 2 по цене 150 давал VisitService 2×150=300 против
-        # invoice 100+150=250 — PaymentInvariantService.compute_total_cost
-        # считал бы 300 канонической стоимостью визита и собирал бы лишние 50.
-        # Средневзвешенная цена согласует representations: строка VisitService
-        # (qty × blended) == payload (qty × blended) == entry.total_amount
-        # == invoice (записанный итог + дельта).
-        row_unit_price = unit_price
-        if delta_qty > 0 and existing_payload:
-            previous_recorded_unit = self._recorded_unit_charge(
-                entry=entry, payload=existing_payload, previous_qty=existing_qty
+        # Codex R12 PR 3118 (P1): СЛОЕВОЕ (LIFO) представление позиции.
+        # Каждая единица сохраняет свою записанную цену: рост ДОБАВЛЯЕТ строку
+        # слоя (дельта × текущая каталоговая, БЕЗ округления), снижение
+        # ПОТРЕБЛЯЕТ слои с конца (последние добавленные возвращаются
+        # первыми). Прежнее смешивание переписывало строку средневзвешенной
+        # ценой за единицу: при неделимости суммы строки (2×100 + 1×101 =
+        # 301; 301/3) квант до 2 знаков рвал инвариант — VisitService
+        # (300.99) ≠ entry.total_amount (301, INTEGER) ≠ compute_total_cost,
+        # а повторные снижения накапливали расхождение. Единая строка с
+        # ценой Numeric(12,2) НЕ МОЖЕТ представить 301/3 точно — слои могут.
+        # Все представления (payload-слои, VisitService-зеркало,
+        # entry.total_amount, invoice) сходятся к одной сумме; квота роста
+        # (каталог × дельта) совпадает с командой без отдельного зеркала.
+        consumption: list[tuple[dict[str, Any], int, Decimal]] = []
+        if delta_qty < 0:
+            consumption = self._plan_lifo_consumption(
+                entry=entry,
+                payloads=existing_payloads,
+                units_to_remove=-delta_qty,
+                fallback_unit_price=unit_price,
             )
-            blended_unit = (
-                previous_recorded_unit * Decimal(existing_qty) + delta_amount
-            ) / Decimal(requested_qty)
-            row_unit_price = blended_unit.quantize(Decimal("0.01"))
-            existing_payload["price"] = float(row_unit_price)
-            existing_payload["unit_price"] = float(row_unit_price)
+            delta_amount = -sum(
+                (charge * Decimal(units) for _, units, charge in consumption), Decimal("0")
+            )
+        elif delta_qty > 0:
+            delta_amount = unit_price * Decimal(delta_qty)
+        else:
+            delta_amount = Decimal("0")
 
         changed_at = queue_service.get_local_timestamp(self.db)
 
         if delta_qty != 0:
-            if existing_payload:
-                existing_payload["quantity"] = requested_qty
-                existing_payload["qty"] = requested_qty
-            else:
+            if delta_qty > 0:
                 services.append(
                     self._entry_service_payload(
                         service=service,
-                        quantity=requested_qty,
+                        quantity=delta_qty,
                         unit_price=unit_price,
                     )
                 )
+            else:
+                for payload_row, units, _charge in consumption:
+                    remaining = int(self._payload_quantity(payload_row)) - units
+                    if remaining > 0:
+                        payload_row["quantity"] = remaining
+                        payload_row["qty"] = remaining
+                    else:
+                        services.remove(payload_row)
             entry.services = services
             # R-41 fix: flag_modified для JSON column — без этого SQLAlchemy
             # не обнаруживает изменение mutable JSON field, update не persist'ится.
@@ -796,12 +795,11 @@ class RegistrarEditDeltaService:
 
         if visit and delta_qty != 0:
             visit.updated_at = changed_at
-            self._sync_visit_service_quantity(
+            self._sync_visit_service_rows(
                 visit=visit,
                 service=service,
-                requested_qty=requested_qty,
-                delta_qty=delta_qty,
-                unit_price=row_unit_price,
+                entry=entry,
+                payload_rows=self._find_service_payloads(self._coerce_services(entry.services), service),
             )
 
         return self._delta_result(
@@ -842,12 +840,16 @@ class RegistrarEditDeltaService:
             discount_mode=discount_mode,
             current_user=current_user,
         )
-        self._sync_visit_service_quantity(
+        entry_payload = self._entry_service_payload(
+            service=service,
+            quantity=requested_qty,
+            unit_price=unit_price,
+        )
+        self._sync_visit_service_rows(
             visit=visit,
             service=service,
-            requested_qty=requested_qty,
-            delta_qty=requested_qty,
-            unit_price=unit_price,
+            entry=None,
+            payload_rows=[entry_payload],
         )
         entry = queue_service.create_queue_entry(
             self.db,
@@ -858,13 +860,7 @@ class RegistrarEditDeltaService:
             visit_id=visit.id,
             source="desk",
             status="waiting",
-            services=[
-                self._entry_service_payload(
-                    service=service,
-                    quantity=requested_qty,
-                    unit_price=unit_price,
-                )
-            ],
+            services=[entry_payload],
             service_codes=self._merged_service_codes([], service),
             total_amount=int(delta_amount),
             auto_number=True,
@@ -943,50 +939,70 @@ class RegistrarEditDeltaService:
         self.db.flush()
         return visit
 
-    def _sync_visit_service_quantity(
+    def _sync_visit_service_rows(
         self,
         *,
         visit: Visit,
         service: Service,
-        requested_qty: int,
-        delta_qty: int,
-        unit_price: Decimal,
+        entry: OnlineQueueEntry | None,
+        payload_rows: list[dict[str, Any]],
     ) -> None:
-        """W2-PR1: целевое состояние позиции VisitService.
+        """Codex R12 PR 3118 (P1): строки VisitService ЗЕРКАЛЯТ слои payload.
 
-        Существующая строка получает АБСОЛЮТНОЕ целевое количество — прежний
-        max(current, requested) молча проглатывал уменьшение. Рост приходит
-        со средневзвешенной ценой за единицу (Codex R10 #3115 (P1)): старые
-        единицы сохраняют записанную стоимость, добавленные биллятся по
-        каталогу — итог строки совпадает с invoice; снижение цену не трогает
-        (вычитается фактически начисленная сумма)."""
-        existing = (
+        Прежний sync писал АБСОЛЮТНОЕ целевое количество в ЕДИНСТВЕННУЮ
+        строку с одной ценой за единицу — такое представление не могло
+        выразить позицию с разными ценами единиц (см. LIFO-слои). Зеркало
+        по списку слоёв: строка i визита получает количество и записанную
+        цену за единицу слоя i (конвенции price/unit_price различаются по
+        записчику — снимается через _recorded_unit_charge); лишние строки
+        удаляются, недостающие создаются. Итог: Σ price×qty по VisitService
+        == Σ unit×qty по payload — PaymentInvariantService.compute_total_cost
+        согласован с entry.total_amount и invoice.
+
+        entry=None (создание новой записи): слои несут явную unit_price —
+        правила 2–4 вывода не нужны.
+        """
+        rows = (
             self.db.query(VisitService)
             .filter(VisitService.visit_id == visit.id, VisitService.service_id == service.id)
-            .first()
+            .order_by(VisitService.id.asc())
+            .all()
         )
         code = self._service_code(service)
-        if existing:
-            existing.qty = requested_qty
-            if delta_qty > 0:
-                existing.price = unit_price
-                existing.code = code
-                existing.name = service.name
-                existing.currency = service.currency or "UZS"
-            visit.updated_at = queue_service.get_local_timestamp(self.db)
-            return
-        visit.updated_at = queue_service.get_local_timestamp(self.db)
-        self.db.add(
-            VisitService(
-                visit_id=visit.id,
-                service_id=service.id,
-                code=code,
-                name=service.name,
-                qty=requested_qty,
-                price=unit_price,
-                currency=service.currency or "UZS",
+
+        def _row_unit_charge(payload_row: dict[str, Any]) -> Decimal:
+            row_qty = int(self._payload_quantity(payload_row))
+            if entry is not None:
+                return self._recorded_unit_charge(
+                    entry=entry, payload=payload_row, previous_qty=row_qty
+                )
+            if payload_row.get("unit_price") is not None:
+                return Decimal(str(payload_row["unit_price"]))
+            return Decimal(str(payload_row.get("price") or 0))
+
+        for index, row in enumerate(rows):
+            if index >= len(payload_rows):
+                self.db.delete(row)
+                continue
+            payload_row = payload_rows[index]
+            row.qty = int(self._payload_quantity(payload_row))
+            row.price = float(_row_unit_charge(payload_row))
+            row.code = code
+            row.name = service.name
+            row.currency = service.currency or "UZS"
+        for payload_row in payload_rows[len(rows):]:
+            self.db.add(
+                VisitService(
+                    visit_id=visit.id,
+                    service_id=service.id,
+                    code=code,
+                    name=service.name,
+                    qty=int(self._payload_quantity(payload_row)),
+                    price=float(_row_unit_charge(payload_row)),
+                    currency=service.currency or "UZS",
+                )
             )
-        )
+        visit.updated_at = queue_service.get_local_timestamp(self.db)
 
     def _resolve_daily_queue(
         self,
@@ -1263,10 +1279,63 @@ class RegistrarEditDeltaService:
                 return payload
         return None
 
-    def _recorded_unit_charge(
+    def _find_service_payloads(
+        self, services: list[dict[str, Any]], service: Service
+    ) -> list[dict[str, Any]]:
+        """Codex R12 PR 3118 (P1): ВСЕ слои позиции (см. LIFO-представление).
+
+        Порядок списка = порядок записи слоёв: снижение потребляет их с
+        конца (последние добавленные возвращаются первыми)."""
+        target_code = self._service_code(service)
+        matched: list[dict[str, Any]] = []
+        for payload in services:
+            payload_id = payload.get("service_id") or payload.get("id")
+            payload_code = payload.get("code") or payload.get("service_code")
+            if payload_id == service.id:
+                matched.append(payload)
+            elif target_code and payload_code and normalize_service_code(payload_code) == target_code:
+                matched.append(payload)
+        return matched
+
+    def _plan_lifo_consumption(
         self,
         *,
         entry: OnlineQueueEntry,
+        payloads: list[dict[str, Any]],
+        units_to_remove: int,
+        fallback_unit_price: Decimal,
+    ) -> list[tuple[dict[str, Any], int, Decimal]]:
+        """Codex R12 PR 3118 (P1): план LIFO-потребления слоёв позиции.
+
+        Возвращает [(payload_row, units, unit_charge)]: единицы забираются с
+        КОНЦА списка слоёв (последние добавленные возвращаются первыми);
+        цена единицы каждого слоя — фактически записанная
+        (_recorded_unit_charge); для строк без цены (легаси) — каталог
+        (паритет с прежним поведением). Сумма зарядов точно равна списанию
+        команды: квота снижения токенизирует ту же сумму (зеркало _cart).
+        """
+        plan: list[tuple[dict[str, Any], int, Decimal]] = []
+        remaining = units_to_remove
+        for payload_row in reversed(payloads):
+            if remaining <= 0:
+                break
+            row_qty = int(self._payload_quantity(payload_row))
+            if row_qty <= 0:
+                continue
+            take = min(row_qty, remaining)
+            charge = (
+                self._recorded_unit_charge(entry=entry, payload=payload_row, previous_qty=row_qty)
+                if payload_row.get("price") is not None
+                else fallback_unit_price
+            )
+            plan.append((payload_row, take, charge))
+            remaining -= take
+        return plan
+
+    def _recorded_unit_charge(
+        self,
+        *,
+        entry: OnlineQueueEntry | None,
         payload: dict[str, Any],
         previous_qty: int,
     ) -> Decimal:
@@ -1291,7 +1360,7 @@ class RegistrarEditDeltaService:
         price = Decimal(str(raw_price))
         if "unit_price" in payload and payload.get("unit_price") is not None:
             return Decimal(str(payload["unit_price"]))
-        if previous_qty <= 1:
+        if previous_qty <= 1 or entry is None:
             return price
         services = self._coerce_services(entry.services)
         line_sum = sum(

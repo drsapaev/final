@@ -324,8 +324,15 @@ def test_queue_entry_id_routes_mutation_to_named_entry(
     assert response.status_code == 200, response.text
     payload_a = _payload(db_session, entry_a.id)
     assert payload_a["quantity"] == 1  # A не тронута
-    payload_b = _payload(db_session, entry_b.id)
-    assert payload_b["quantity"] == 7  # B выросла до целевого количества
+    # Codex R12 PR 3118 (P1): рост при слоях добавляет слой payload — целевое
+    # количество = Σ слоёв (базовый слой B не переписывается).
+    layers_b = [
+        p for p in (
+            db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_b.id).first()
+        ).services
+        if p.get("service_id") == service.id
+    ]
+    assert sum(int(p.get("quantity") or p.get("qty") or 1) for p in layers_b) == 7  # B выросла до целевого количества
 
 
 @pytest.mark.integration

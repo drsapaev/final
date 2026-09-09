@@ -80,6 +80,38 @@ const pickCanonicalAppointmentId = (appointment: Record<string, unknown>): unkno
 
 const hasQueueIdentityValue = (value: unknown) => value !== null && value !== undefined && value !== '';
 
+// Codex R12 PR 3118 (P1): ЯВНАЯ identity записи-источника. Без
+// queue_numbers-фолбэка: сгенерированные номера не являются entry id
+// (паритет с резолвером: queue_id — DailyQueue.id, а не запись).
+const pickExplicitSourceQueueEntryId = (appointment: Record<string, unknown>): string | number | null => {
+  const explicit = appointment?.queue_entry_id ??
+    appointment?.original_queue_id ??
+    appointment?.doctor_queue_entry_id ??
+    null;
+  return hasQueueIdentityValue(explicit) ? (explicit as string | number) : null;
+};
+
+// Codex R12 PR 3118 (P1): каждая service_detail унаследует entry id СВОЕЙ
+// записи-источника. Путь All Departments сливает несколько записей очереди
+// в одну строку пациента, сохраняя только ПЕРВЫЙ верхнеуровневый
+// queue_entry_id; без штампа резолвер падал в top-level фолбэк и вешал
+// ПЕРВЫЙ id на ВСЕ услуги: правка услуги из другой записи отправляла чужой
+// строгий queue_entry_id — 400 при разных тегах или мутация чужой записи
+// при совпадающих. Явный per-detail id (если появится в read-модели)
+// приоритетен; visit-строки без явного id не штампуются (отказ сохранён).
+const stampServiceDetailEntryId = (
+  serviceDetail: Record<string, unknown>,
+  appointment: Record<string, unknown>
+): Record<string, unknown> => {
+  if (!serviceDetail || typeof serviceDetail !== 'object') return serviceDetail;
+  if (hasQueueIdentityValue(serviceDetail.original_queue_id) || hasQueueIdentityValue(serviceDetail.queue_entry_id)) {
+    return serviceDetail;
+  }
+  const sourceEntryId = pickExplicitSourceQueueEntryId(appointment);
+  if (!hasQueueIdentityValue(sourceEntryId)) return serviceDetail;
+  return { ...serviceDetail, original_queue_id: sourceEntryId };
+};
+
 const pickQueueNumberEntryId = (queueNumber: unknown): string | number | null => {
   if (!queueNumber || typeof queueNumber !== 'object') return null;
   const qn = queueNumber as Record<string, unknown>;
@@ -262,7 +294,10 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
         display_time_kind: appointment.display_time_kind || (appointment.queue_time ? 'queue_time' : 'created_at'),
         timezone: appointment.timezone || 'Asia/Tashkent',
         services: [],
-        service_details: Array.isArray(appointment.service_details) ? [...appointment.service_details] : [],
+        // Codex R12 PR 3118 (P1): детали первой записи-источника тоже несут её entry id.
+        service_details: Array.isArray(appointment.service_details)
+          ? appointment.service_details.map((serviceDetail: Record<string, unknown>) => stampServiceDetailEntryId(serviceDetail, appointment))
+          : [],
         departments: new Set(),
         doctors: new Set(),
         department: appointment.department,
@@ -447,7 +482,8 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
         if (serviceDetailKey === null || serviceDetailKey === undefined || existingServiceDetailKeys.has(String(serviceDetailKey))) {
           return;
         }
-        patientGroups[patientKey].service_details.push(serviceDetail);
+        // Codex R12 PR 3118 (P1): id записи-источника этой детали.
+        patientGroups[patientKey].service_details.push(stampServiceDetailEntryId(serviceDetail, appointment));
         existingServiceDetailKeys.add(String(serviceDetailKey));
       });
     }

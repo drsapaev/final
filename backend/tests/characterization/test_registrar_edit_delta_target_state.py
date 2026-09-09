@@ -319,9 +319,17 @@ def test_edit_delta_quantity_increase_1_to_3_persists_everywhere(
     db_session.refresh(entry)
     db_session.refresh(vs)
     db_session.refresh(invoice)
-    payload = next(p for p in entry.services if p.get("service_id") == service.id)
-    assert payload["quantity"] == 3
-    assert vs.qty == 3
+    # Codex R12 PR 3118 (P1): рост при слоях добавляет слой payload — целевое
+    # количество представлено СУММОЙ слоёв (базовый слой не переписывается).
+    layers = [p for p in entry.services if p.get("service_id") == service.id]
+    assert sum(int(p.get("quantity") or p.get("qty") or 1) for p in layers) == 3
+    visit_qty = (
+        db_session.query(VisitService)
+        .filter(VisitService.visit_id == visit.id, VisitService.service_id == service.id)
+        .with_entities(VisitService.qty)
+        .all()
+    )
+    assert sum(qty for (qty,) in visit_qty) == 3
     assert Decimal(str(entry.total_amount)) == PRICE * 3
     assert Decimal(str(invoice.total_amount)) == PRICE * 3
 
@@ -702,11 +710,18 @@ def test_edit_delta_modify_existing_and_add_new_in_one_command(
 
     db_session.refresh(entry)
     db_session.refresh(vs)
-    payload_old = next(p for p in entry.services if p.get("service_id") == service.id)
-    payload_new = next(p for p in entry.services if p.get("service_id") == added.id)
-    assert payload_old["quantity"] == 4
-    assert payload_new["quantity"] == 2
-    assert vs.qty == 4
+    # Codex R12 PR 3118 (P1): целевое количество = Σ слоёв по услуге.
+    layers_old = [p for p in entry.services if p.get("service_id") == service.id]
+    layers_new = [p for p in entry.services if p.get("service_id") == added.id]
+    assert sum(int(p.get("quantity") or p.get("qty") or 1) for p in layers_old) == 4
+    assert sum(int(p.get("quantity") or p.get("qty") or 1) for p in layers_new) == 2
+    visit_qty = (
+        db_session.query(VisitService)
+        .filter(VisitService.visit_id == visit.id, VisitService.service_id == service.id)
+        .with_entities(VisitService.qty)
+        .all()
+    )
+    assert sum(qty for (qty,) in visit_qty) == 4
     assert Decimal(str(entry.total_amount)) == PRICE * (4 + 2)
 
 
