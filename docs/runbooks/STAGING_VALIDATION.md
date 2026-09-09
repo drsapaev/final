@@ -333,6 +333,14 @@ retention doesn't run, scheduled reports don't generate.
 
 ### Run
 
+**Automated pipeline proof (no real reminders sent):** with `ARQ_TEST_REDIS_URL`
+or `REDIS_URL` set, the smoke script runs
+`python -m app.scripts.arq_enqueue_process_check` — it enqueues a throwaway
+`smoke_echo` job on a dedicated scratch queue (`arq:smoke-check`), processes it
+with an in-process worker, verifies the result, and cleans up its keys. This
+proves enqueue+process plumbing without touching real jobs or patient data.
+The reminder-delivery proof below remains manual.
+
 ```bash
 # Terminal 1: start worker
 cd backend

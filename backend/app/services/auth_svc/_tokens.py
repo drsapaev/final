@@ -577,10 +577,13 @@ class TokensMixin(AuthenticationServiceMixinBase):
                     token_obj.revoked_at = datetime.now(UTC)
 
                     # Деактивируем ТОЛЬКО связанную сессию (не все сессии пользователя).
+                    # UserSession не имеет колонки revoked_at (#2924): запись
+                    # revoked_at здесь поднимала UnconsumedColumnError, весь
+                    # logout откатывался и сессия оставалась активной.
                     db.query(UserSession).filter(
                         UserSession.user_id == token_obj.user_id,
                         UserSession.refresh_token == refresh_token,
-                    ).update({"revoked": True, "revoked_at": datetime.now(UTC)})
+                    ).update({"revoked": True})
 
                     db.commit()
 

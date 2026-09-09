@@ -274,6 +274,123 @@ export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
 };
 
 // =====================================================================
+// BIRTH DATE CALENDAR VALIDATION (Fix E)
+// ==============================================================
+export type BirthDateValidation = 'empty' | 'incomplete' | 'invalid' | 'future' | 'ok';
+
+// Календарная валидация даты рождения в формате ДД.ММ.ГГГГ.
+// Раньше проверялись только диапазоны 1..31 / 1..12 / год 1900..текущий —
+// несуществующие даты (31.02.2020) и будущие даты в текущем году проходили.
+// Неполный ввод ('31.02', '3102') не считается валидным — он не должен
+// молча превращаться в пустую дату.
+export const getBirthDateValidationError = (
+  value: string,
+  now: Date = new Date()
+): BirthDateValidation => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed || trimmed === '00.00.0000') return 'empty';
+
+  const parts = trimmed.split('.');
+  if (parts.length !== 3 || parts.some((part) => part.length === 0)) {
+    return 'incomplete';
+  }
+  const day = Number(parts[0]);
+  const month = Number(parts[1]);
+  const year = Number(parts[2]);
+  if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) {
+    return 'incomplete';
+  }
+  if (parts[2].length !== 4) return 'incomplete';
+
+  if (month < 1 || month > 12) return 'invalid';
+  if (day < 1 || day > 31) return 'invalid';
+  if (year < 1900) return 'invalid';
+
+  // Календарная существованность: Date нормализует переполнения
+  // (31.02 → 3 марта), поэтому сверяем компоненты обратно.
+  const probe = new Date(year, month - 1, day);
+  if (
+    probe.getFullYear() !== year ||
+    probe.getMonth() !== month - 1 ||
+    probe.getDate() !== day
+  ) {
+    return 'invalid';
+  }
+
+  // Будущая дата (полная дата, а не только год)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (probe > today) return 'future';
+
+  return 'ok';
+};
+
+// =====================================================================
+// BIRTH DATE INPUT MASK (extracted from AppointmentWizardV2)
+// =====================================================================
+
+// Маска ввода: только цифры, максимум 8, формат ДД.ММ.ГГГГ
+export const formatBirthDateInput = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  const limitedDigits = digits.slice(0, 8);
+  if (limitedDigits.length === 0) return '';
+  if (limitedDigits.length <= 2) return limitedDigits;
+  if (limitedDigits.length <= 4) return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2)}`;
+  return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2, 4)}.${limitedDigits.slice(4)}`;
+};
+
+// Конвертация ДД.ММ.ГГГГ → ГГГГ-ММ-ДД
+export const convertDateToISO = (dateStr: string): string => {
+  if (!dateStr || dateStr.length !== 10) return '';
+  const [day, month, year] = dateStr.split('.');
+  if (!day || !month || !year || year.length !== 4) return '';
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+};
+
+// Конвертация ГГГГ-ММ-ДД → ДД.ММ.ГГГГ
+export const convertDateFromISO = (isoStr: string): string => {
+  if (!isoStr) return '';
+  const [year, month, day] = isoStr.split('-');
+  if (!year || !month || !day) return '';
+  return `${day}.${month}.${year}`;
+};
+
+// =====================================================================
+// PATIENT SELECTION SAFETY (Fix A: data mixing / duplicate-phone stop)
+// =====================================================================
+
+// Marker set by the wizard when ALL patient fields were populated from an
+// explicitly selected card (selectPatient). Editing ФИО afterwards switches
+// the form to new-patient mode and must clear every inherited field,
+// otherwise a new patient is created with another person's address/phone.
+export const PATIENT_SELECTED_FROM_CARD_FLAG = '_selectedFromCard';
+
+export const isPatientSelectedFromCard = (
+  patient: Record<string, unknown> | null | undefined
+): boolean => Boolean(patient && patient[PATIENT_SELECTED_FROM_CARD_FLAG]);
+
+// Identity fields that must never leak from one patient card into a
+// different patient's registration. Returned as a patch for spread.
+export const buildInheritedPatientClearPatch = (): Record<string, unknown> => ({
+  birth_date: '',
+  phone: '',
+  address: '',
+  gender: '',
+  lastName: '',
+  firstName: '',
+  middleName: '',
+  [PATIENT_SELECTED_FROM_CARD_FLAG]: false,
+});
+
+// Backend currently signals "duplicate phone" with HTTP 400 + a text detail.
+// The same 400 is also used for unrelated validation problems (e.g. duplicate
+// doc_number), so only an explicit phone-duplicate message may trigger the
+// duplicate-phone UX path. Until the backend exposes a dedicated error code,
+// this is the narrowest safe discriminator.
+export const isPhoneDuplicateErrorMessage = (message: unknown): boolean => {
+  const normalized = String(message || '').toLowerCase();
+  return normalized.includes('уже существует') && normalized.includes('телефон');
+};
+
 // IDEMPOTENCY KEY (Fix C: duplicate submit / lost-response retry)
 // =====================================================================
 
@@ -603,6 +720,14 @@ export default {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  getBirthDateValidationError,
+  formatBirthDateInput,
+  convertDateToISO,
+  convertDateFromISO,
+  PATIENT_SELECTED_FROM_CARD_FLAG,
+  isPatientSelectedFromCard,
+  buildInheritedPatientClearPatch,
+  isPhoneDuplicateErrorMessage,
   createIdempotencyKey,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,

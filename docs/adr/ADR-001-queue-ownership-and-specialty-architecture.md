@@ -1,6 +1,6 @@
 # ADR-001: Queue Ownership & Specialty Architecture
 
-**Status:** Accepted
+**Status:** Accepted — amended 2026-09-07 (QD-2A: dual-owner axis for doctorless queues, see Addendum)
 **Date:** 2026-07-12
 **Deciders:** Backend team, Frontend team
 **Supersedes:** SSOT queue_tag-based shared queue (removed in PR-26)
@@ -162,6 +162,89 @@ They must derive specialty information from `QueueProfile` or `Doctor.specialty`
 - **Rollback:** reverting PR-26 restores shared-queue behavior (all
   doctors of same specialty share one queue). This is safe but loses
   per-doctor isolation.
+
+---
+
+## Addendum (2026-09-07, QD-2A): Dual-Owner Axis for Doctorless Queues
+
+**Status of this addendum:** Accepted (staged rollout in progress — stage A)
+**Supersedes (partially):** the implicit assumption that EVERY `DailyQueue`
+belongs to a doctor. The doctor-ownership decision itself is UNCHANGED.
+
+### Context
+
+Since ADR-001, doctorless queues (`lab`, `ecg`, the general fallback) were
+served by **synthetic User+Doctor pairs** (`lab_resource` / `ecg_resource` /
+`general_resource`, provisioned by migration 0055 and sandboxed by
+QD-1.1/QD-1.2 role guards) — a workaround that kept `specialist_id` NOT NULL
+at the cost of fake identities leaking into RBAC, user-management and
+booking surfaces (the cleanup effort those guards required is exactly the
+debt this design retires).
+
+### Decision
+
+`DailyQueue` gains a second nullable ownership axis, `queue_resource_id`
+(FK → `queue_resources`), where `queue_resources` is a **reference registry,
+not an account**: no User, no role, no login. The terminal state is an XOR —
+**exactly one owner** per queue: a doctor (`specialist_id`, ADR-001 semantics
+unchanged, including same-specialty collaboration) or a resource
+(`queue_resource_id`).
+
+The rollout is staged, one PR per stage:
+
+| Stage | Scope |
+|---|---|
+| **A (this change)** | Schema EXPAND: `queue_resources` table + nullable `queue_resource_id` + `specialist_id` NULLABLE. No XOR, no uniqueness, no seeds, no runtime switch. Migration `0058`. |
+| B | Seed `lab`/`ecg` registry rows + exact-tag-wins duplicate resolution (inventory-before-mutation, loud abort). |
+| C | Runtime switch: resolvers, morning pre-create, queue API identity (`DailyQueue.id`), output contract (`owner_kind`), GQL nullable. |
+| D | CONTRACT: XOR CHECK + partial active uniqueness (`UNIQUE(day, queue_resource_id) WHERE active AND queue_resource_id IS NOT NULL`). |
+| E | Retire the synthetic User+Doctor pairs (paired deletion), remove the bridge vocabulary. |
+
+**The `general` resource is deliberately conditional, not forgotten.** Stage B
+seeds `lab` and `ecg` only — the `general` tag becomes a registry row ONLY if
+the QD-2B inventory proves it is a real standalone routing tag rather than a
+mixed bucket. Its destination is an explicit operator decision (registry row
+in a stage-B follow-up, or retirement of general-queue routing with the load
+moved to explicit tags) that must land BEFORE stage E can retire
+`general_resource` — stage E is gated on zero live references for all three
+synthetic pairs, so general queues can never be left without an owner.
+
+### Stage B landing note (2026-09-07, QD-2B — migration 0059)
+
+Stage B landed the seeds from LIVE catalog proof (a tag seeds only when its
+active services are homogeneous `requires_doctor = false`) and the
+deterministic backfill. Three clarifications the landing made explicit:
+
+- "duplicate resolution" in the table above is **loud abort, never dedup**:
+  more than one ACTIVE queue for one `(day, resource tag)` stops the
+  migration with a full per-row inventory, and the repair (deactivate or
+  reassign) is an explicit operator decision. No QueueEntry merge ever
+  happens in stage B — the partial active uniqueness arrives in stage D.
+- The backfill is the **dual-ownership bridge**: `specialist_id` keeps
+  pointing at the old synthetic Doctor while `queue_resource_id` is set. The
+  destination follows `queue_tag` (exact-tag-wins), never the owner username
+  — a `general_resource`-owned `lab` queue bridges onto the lab resource.
+- Seed configuration **transfers the live synthetic Doctor numbering** (the
+  values the queue machinery reads today, not the 0055 constants) with
+  display names from the canonical 0055 vocabulary; `default_cabinet` stays
+  NULL because no canonical cabinet source exists.
+
+### Guidance for readers of this ADR
+
+Anything that routes, authorizes, or reports on queues must treat ownership
+as **doctor XOR resource** from stage C onward. "Every `DailyQueue` belongs to
+a doctor" in the sections above now reads "every **doctor** queue belongs to
+a doctor; **doctorless** queues belong to a `queue_resources` row." During
+stages A–B both axes coexist at the schema level and no production path
+writes a resource-owned row; stage D enforces the XOR at the DB level.
+
+### Migration Path
+
+- `0058_queue_resource_expand` (stage A): additive DDL; strict downgrade
+  (re-tightening `specialist_id` NOT NULL fails loudly if resource-owned
+  rows exist — history preservation first).
+- Existing doctor-owned rows: byte-compatible, untouched at every stage.
+- Synthetic identities: removed only in stage E, after zero references.
 
 ---
 
