@@ -55,7 +55,7 @@ describe('Fix A: isPhoneDuplicateErrorMessage', () => {
 describe('Fix A: selected-card marker and inherited-field clear patch', () => {
   it('marks only explicitly selected cards', () => {
     expect(isPatientSelectedFromCard({ [PATIENT_SELECTED_FROM_CARD_FLAG]: true })).toBe(true);
-    expect(isPatientSelectedFromCard({ fio: 'Иванов Иван' })).toBe(false);
+    expect(isPatientSelectedFromCard({ fio: 'SYNTHETIC-Patient-Card' })).toBe(false);
     expect(isPatientSelectedFromCard(null)).toBe(false);
   });
 
@@ -74,14 +74,14 @@ describe('Fix A: selected-card marker and inherited-field clear patch', () => {
   it('clear patch applied over a selected card leaves no inherited values', () => {
     const selectedCard = {
       id: 42,
-      fio: 'Иванов Иван Иванович',
+      fio: 'SYNTHETIC-Fixture-Two',
       birth_date: '1990-05-01',
-      phone: '+998 90 123 45 67',
-      address: 'ул. Навои, 1',
+      phone: 'DEV-DEMO-0000',
+      address: 'SYNTHETIC-Address-1',
       gender: 'male',
-      lastName: 'Иванов',
-      firstName: 'Иван',
-      middleName: 'Иванович',
+      lastName: 'SYNTHETIC',
+      firstName: 'Fixture',
+      middleName: 'Two',
       [PATIENT_SELECTED_FROM_CARD_FLAG]: true,
     };
     const patch = buildInheritedPatientClearPatch() as Record<string, unknown>;
