@@ -953,7 +953,16 @@ def _run_single_registrar_record_action(
                 db.refresh(visit)
                 result = {"id": visit.id, "status": visit.status}
             elif record_kind == "online_queue":
-                entry = OnlineQueueNewService(db).cancel_entry(entry_id=record_id)
+                # Codex R13 PR 3121 (P2): каскад получает актёра и причину —
+                # VisitLifecycleService логирует отмену с user_id и дописывает
+                # причину в notes визита. Раньше обе поверхности теряли
+                # контекст: без user_id в аудите и с молча выброшенной
+                # причиной.
+                entry = OnlineQueueNewService(db).cancel_entry(
+                    entry_id=record_id,
+                    current_user=current_user,
+                    reason=request.reason,
+                )
                 result = {"id": entry.id, "status": entry.status}
             else:
                 appointment = crud_appointment.cancel_appointment(
@@ -1033,6 +1042,11 @@ def _run_single_registrar_record_action(
             )
 
     except OnlineQueueNewDomainError as exc:
+        # Codex R13 PR 3121 (P1): отклонённый record НЕ оставляет staged-
+        # изменений в сессии — иначе следующий успешный record этого же
+        # batch-запроса закоммитил бы и чужой каскад (визит, staged как
+        # canceled до отказа финансовых гардов, коммитился вместе с ним).
+        db.rollback()
         return _registrar_command_item(
             record_kind=record_kind,
             record_id=record_id,
@@ -1053,6 +1067,9 @@ def _run_single_registrar_record_action(
         # VisitLifecycleService introduced VisitNotFoundError which is not.
         #
         # Fix: catch it here → per-record failure (batch isolation).
+        # Codex R13 PR 3121 (P1): изоляция batch — отклонённый record
+        # откатывается, staged-изменения не утекают в следующий commit.
+        db.rollback()
         return _registrar_command_item(
             record_kind=record_kind,
             record_id=record_id,
@@ -1060,6 +1077,9 @@ def _run_single_registrar_record_action(
             error="Visit not found",
         )
     except HTTPException as exc:
+        # Codex R13 PR 3121 (P1): изоляция batch — rollback отклонённого
+        # record до ответа, следующий record стартует с чистой сессией.
+        db.rollback()
         return _registrar_command_item(
             record_kind=record_kind,
             record_id=record_id,

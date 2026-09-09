@@ -102,12 +102,35 @@ class OnlineQueueNewService:
             )
 
         if entry.visit_id:
-            visit = self._cancel_linked_visit(
-                entry.visit_id, current_user=current_user
+            # Codex R13 PR 3121 (P1): визит читается и инспектируется ПОД
+            # блокировкой строки жизненного цикла С ПРИНУДИТЕЛЬНЫМ
+            # перечитыванием (populate_existing): и разблокированный пре-чек,
+            # и FOR UPDATE внутри cancel_visit возвращали уже загруженную
+            # SQLAlchemy identity БЕЗ перечитывания колонок — визит,
+            # параллельно переведённый open → completed/closed, всё ещё
+            # оценивался как open и перезаписывался в canceled. Одна
+            # блокировка — одно гарантированно свежее чтение.
+            visit = (
+                self.db.query(Visit)
+                .filter(Visit.id == entry.visit_id)
+                .with_for_update()
+                .populate_existing()
+                .first()
             )
             if visit is not None:
-                if reason:
+                # Codex R13 PR 3121 (P1): финансовые гарды выполняются ДО
+                # staging перехода — отказ (деньги на визите) не оставляет
+                # staged-отменённый визит в сессии, который закоммитил бы
+                # следующий успешный record batch-запроса.
+                self._assert_visit_has_no_payments(visit)
+                canceled_now = self._stage_linked_visit_cancel(
+                    visit, current_user=current_user
+                )
+                if canceled_now and reason:
                     visit.notes = (visit.notes or "") + f"\nCanceled: {reason}"
+                # Codex R13 PR 3121 (P2): легаси-состояние «активная запись +
+                # уже отменённый визит» тоже сверяет долю счёта — отмена
+                # записи не оставляет пациента выставленным счётом.
                 self._release_pending_invoice_for_visit(visit)
 
         entry.status = "canceled"
@@ -115,26 +138,30 @@ class OnlineQueueNewService:
         self.db.refresh(entry)
         return entry
 
-    def _cancel_linked_visit(
-        self, visit_id: int, *, current_user: Any
-    ) -> Visit | None:
+    def _stage_linked_visit_cancel(
+        self, visit: Visit, *, current_user: Any
+    ) -> bool:
         """Отмена связанного визита через SSOT стейт-машину (commit=False).
 
-        Возвращает None, если визит уже canceled (легаси-состояние
-        «запись активна, визит отменён» — каскадировать нечего, отмена
-        записи легитимна). Иные отказы стейт-машины (closed/completed)
-        конвертируются в доменную ошибку сервиса — транзакция откатывается
-        вызывающим контекстом целиком.
+        Строка визита УЖЕ заблокирована вызывающим (cancel_entry читает её
+        под FOR UPDATE) — стейт-машина переиспользует ту же блокировку и
+        тот же свежий identity-map объект (перезаблокировка no-op).
+
+        Возвращает True, если переход выполнен ЭТИМ вызовом; False —
+        легаси-состояние «визит уже canceled» (переход не нужен, отмена
+        записи легитимна, notes не дополняются). Иные отказы стейт-машины
+        (closed/completed) конвертируются в доменную ошибку сервиса;
+        вызов выполняется ПОСЛЕ финансовых гардов — staged-изменений нет.
         """
-        visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
-        if visit is not None and visit.status == "canceled":
-            return None
+        if visit.status == "canceled":
+            return False
         try:
-            return VisitLifecycleService(self.db).cancel_visit(
-                visit_id=visit_id,
+            VisitLifecycleService(self.db).cancel_visit(
+                visit_id=visit.id,
                 current_user=current_user,
                 commit=False,
             )
+            return True
         except HTTPException as exc:
             detail = exc.detail
             message = (
