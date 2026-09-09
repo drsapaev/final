@@ -18,7 +18,7 @@ import { normalizeGenderForForm } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './PatientStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React, { useRef } from "react";
 
 interface PatientStepV2Props {
   data?: Record<string, unknown>;
@@ -61,6 +61,7 @@ const PatientStepV2 = ({
   onUpdateCart,
   phoneError
 }: PatientStepV2Props) => {
+  const genderRadioRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const { t: rawT } = useTranslation(); const t = rawT;
   const safeData = (data || {}) as Record<string, any>;
   const selectedGender = normalizeGenderForForm(safeData.gender);
@@ -164,19 +165,40 @@ const PatientStepV2 = ({
             onKeyDown={(e) => {
               // UX Audit R-2.4: ARIA radiogroup keyboard navigation.
               // Arrow keys move between options, Tab moves out.
+              // Codex R2 PR 3096: следующий вариант вычисляется из ФОКУСНОГО
+              // radio + направления, фокус перемещается вместе со значением —
+              // иначе фокус оставался на кнопке, чей tabIndex стал -1, и
+              // группа теряла клавиатурную навигацию.
               if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
               e.preventDefault();
-              const next = selectedGender === 'male' ? 'female' : 'male';
-              onUpdate('gender', next);
+              const options: Array<'male' | 'female'> = ['male', 'female'];
+              const focusedGender = (document.activeElement as HTMLElement | null)?.getAttribute('data-gender');
+              const focusedIdx = options.indexOf(focusedGender as 'male' | 'female');
+              const selectedIdx = selectedGender ? options.indexOf(selectedGender as 'male' | 'female') : -1;
+              // Codex R15 PR 3096: ФОКУСНЫЙ вариант главнее выбранного, когда
+              // он валиден — после асинхронной гидрации фокус мог остаться на
+              // male при выбранной female; прежний приоритет selectedIdx
+              // превращал ArrowRight в «повторный выбор», не двигая значение.
+              const startIdx = focusedIdx >= 0 ? focusedIdx : (selectedIdx >= 0 ? selectedIdx : 0);
+              const delta = e.key === 'ArrowRight' ? 1 : -1;
+              const nextIdx = (startIdx + delta + options.length) % options.length;
+              onUpdate('gender', options[nextIdx]);
+              // Рoving tabindex: DOM-фокус следует за выбором
+              genderRadioRefs.current[nextIdx]?.focus();
             }}
             className="patient-step-v2__gender-radiogroup">
-            {['male', 'female'].map((gender) =>
+            {['male', 'female'].map((gender, genderIdx) =>
             <button
               key={gender}
+              ref={(el) => { genderRadioRefs.current[genderIdx] = el; }}
+              data-gender={gender}
               type="button"
               role="radio"
               aria-checked={selectedGender === gender}
-              tabIndex={selectedGender === gender ? 0 : -1}
+              // Fix E: roving tabindex — при невыбранном поле первый вариант
+              // доступен по Tab. Раньше оба варианта были tabIndex=-1 и
+              // группа была недостижима с клавиатуры.
+              tabIndex={selectedGender === gender || (!selectedGender && gender === 'male') ? 0 : -1}
               onClick={() => onUpdate('gender', gender)}
               className={`patient-step-v2__gender-radio ${selectedGender === gender ? 'patient-step-v2__gender-radio--selected' : 'patient-step-v2__gender-radio--unselected'}`}>
 

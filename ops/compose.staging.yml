@@ -58,6 +58,13 @@ services:
       ENABLE_DEV_AUTH: false
       LOG_LEVEL: INFO
       LOG_STRUCTURED: 1
+      # Codex R2 #3092 (P1): the backend itself must reach Redis for the
+      # distributed idempotency claim. Without these vars the backend falls
+      # back to redis://localhost:6379/0 inside its own container, the ping
+      # fails, and a lost-response retry landing on the other Uvicorn worker
+      # can create duplicate visits/invoices/queue entries.
+      IDEMPOTENCY_REDIS_URL: ${IDEMPOTENCY_REDIS_URL:-redis://redis:6379/0}
+      ARQ_REDIS_URL: ${ARQ_REDIS_URL:-redis://redis:6379/0}
     volumes:
       - ../backend:/app:rw
       - ../backend/backups:/app/backups
@@ -68,6 +75,8 @@ services:
       - "${STAGING_BACKEND_PORT:-18000}:18000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18000/api/v1/health', timeout=5)"]
@@ -103,7 +112,14 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    # Codex R7 #3092 (P1): idempotency claims and completed-response
+    # snapshots live here — allkeys-lru may EVICT either under memory
+    # pressure, a same-key retry on the other worker then re-executes the
+    # cart and duplicates billing/queue records. noeviction + AOF keeps
+    # the idempotency state durable; if the store fills up, writes fail
+    # and the backend fails CLOSED (503 idempotency_unavailable) instead
+    # of executing uncoordinated keyed writes.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
     volumes:
       - staging_redis_data:/data
     healthcheck:

@@ -141,6 +141,15 @@ class Settings(BaseSettings):
     # FastAPI stack. See app/tasks/worker.py for the worker entry point.
     ARQ_REDIS_URL: str = Field(default="redis://localhost:6379/0")
 
+    # --- Idempotency middleware (Codex R1 #3092 P1) ---
+    # Per-process in-memory idempotency cache cannot protect against duplicate
+    # submissions when staging/production runs several backend workers
+    # (ops/compose.staging.yml) — a retry can land on a different worker.
+    # When set (falls back to ARQ_REDIS_URL), the middleware claims the key
+    # atomically in Redis (SET NX) and replays the stored response across
+    # workers. None/Redis-down → per-process in-memory fallback.
+    IDEMPOTENCY_REDIS_URL: str | None = Field(default=None)
+
     # --- Payment providers ---
     CLICK_ENABLED: bool = Field(default=False, description="Enable Click payments")
     CLICK_SERVICE_ID: str | None = Field(default=None, description="Click service id")

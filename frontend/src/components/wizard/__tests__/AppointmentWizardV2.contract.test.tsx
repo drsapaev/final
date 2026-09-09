@@ -58,10 +58,11 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
 
   it('preserves existing queue identity when grouping edit-mode cart items', () => {
     const source = readCombinedWizardSource();
+    // Grouping moved to wizardUtils.ts (PR-45 LOC ceiling) — combined source still covers it
     const groupingBlock = extractSourceBlock(
       source,
-      'const groupCartItemsByVisit = (): unknown[] => {',
-      'const getDepartmentByService = (serviceId: string | number) => {',
+      'export const groupCartItemsByVisit = (',
+      'return Object.values(visits);',
     );
     const newServiceBlock = extractSourceBlock(
       source,

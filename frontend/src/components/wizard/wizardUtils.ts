@@ -275,6 +275,57 @@ export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
 };
 
 // =====================================================================
+// BIRTH DATE CALENDAR VALIDATION (Fix E)
+// ==============================================================
+export type BirthDateValidation = 'empty' | 'incomplete' | 'invalid' | 'future' | 'ok';
+
+// Календарная валидация даты рождения в формате ДД.ММ.ГГГГ.
+// Раньше проверялись только диапазоны 1..31 / 1..12 / год 1900..текущий —
+// несуществующие даты (31.02.2020) и будущие даты в текущем году проходили.
+// Неполный ввод ('31.02', '3102') не считается валидным — он не должен
+// молча превращаться в пустую дату.
+export const getBirthDateValidationError = (
+  value: string,
+  now: Date = new Date()
+): BirthDateValidation => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed || trimmed === '00.00.0000') return 'empty';
+
+  const parts = trimmed.split('.');
+  if (parts.length !== 3 || parts.some((part) => part.length === 0)) {
+    return 'incomplete';
+  }
+  const day = Number(parts[0]);
+  const month = Number(parts[1]);
+  const year = Number(parts[2]);
+  if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) {
+    return 'incomplete';
+  }
+  if (parts[2].length !== 4) return 'incomplete';
+
+  if (month < 1 || month > 12) return 'invalid';
+  if (day < 1 || day > 31) return 'invalid';
+  if (year < 1900) return 'invalid';
+
+  // Календарная существованность: Date нормализует переполнения
+  // (31.02 → 3 марта), поэтому сверяем компоненты обратно.
+  const probe = new Date(year, month - 1, day);
+  if (
+    probe.getFullYear() !== year ||
+    probe.getMonth() !== month - 1 ||
+    probe.getDate() !== day
+  ) {
+    return 'invalid';
+  }
+
+  // Будущая дата (полная дата, а не только год)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (probe > today) return 'future';
+
+  return 'ok';
+};
+
+// =====================================================================
 // CART QUOTE (Fix D: server-side pricing preview)
 // =====================================================================
 
@@ -420,6 +471,188 @@ export const convertDateFromISO = (isoStr: string): string => {
   const [year, month, day] = isoStr.split('-');
   if (!year || !month || !day) return '';
   return `${day}.${month}.${year}`;
+};
+
+// =====================================================================
+// PATIENT SELECTION SAFETY (Fix A: data mixing / duplicate-phone stop)
+// =====================================================================
+
+// Marker set by the wizard when ALL patient fields were populated from an
+// explicitly selected card (selectPatient). Editing ФИО afterwards switches
+// the form to new-patient mode and must clear every inherited field,
+// otherwise a new patient is created with another person's address/phone.
+export const PATIENT_SELECTED_FROM_CARD_FLAG = '_selectedFromCard';
+
+export const isPatientSelectedFromCard = (
+  patient: Record<string, unknown> | null | undefined
+): boolean => Boolean(patient && patient[PATIENT_SELECTED_FROM_CARD_FLAG]);
+
+// Identity fields that must never leak from one patient card into a
+// different patient's registration. Returned as a patch for spread.
+export const buildInheritedPatientClearPatch = (): Record<string, unknown> => ({
+  birth_date: '',
+  phone: '',
+  address: '',
+  gender: '',
+  lastName: '',
+  firstName: '',
+  middleName: '',
+  [PATIENT_SELECTED_FROM_CARD_FLAG]: false,
+});
+
+// Backend currently signals "duplicate phone" with HTTP 400 + a text detail.
+// The same 400 is also used for unrelated validation problems (e.g. duplicate
+// doc_number), so only an explicit phone-duplicate message may trigger the
+// duplicate-phone UX path. Until the backend exposes a dedicated error code,
+// this is the narrowest safe discriminator.
+export const isPhoneDuplicateErrorMessage = (message: unknown): boolean => {
+  const normalized = String(message || '').toLowerCase();
+  return normalized.includes('уже существует') && normalized.includes('телефон');
+};
+
+// IDEMPOTENCY KEY (Fix C: duplicate submit / lost-response retry)
+// =====================================================================
+
+// Один логический сабмит корзины = один Idempotency-Key. При потере ответа
+// и повторной отправке с тем же ключом backend вернёт кэшированный ответ
+// (IdempotencyMiddleware), а не создаст вторую корзину.
+export const createIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `cart-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+// Codex R2 PR 3092 (P1): ключ привязан к снимку payload первой попытки.
+// Чистая гвардия: 'bind' — первая попытка (ключ + снимок), 'proceed' —
+// повтор с теми же данными (кэш backend вернёт сохранённый ответ),
+// 'block' — повтор с ИЗМЕНЁННЫМИ данными и старым ключом (backend вернёт 409,
+// оригинальный успех нельзя натянуть на новые данные).
+export type CartIdempotencyGuardAction = 'bind' | 'proceed' | 'block';
+export interface CartIdempotencyGuardArgs {
+  existingKey: string | null;
+  existingPayload: string | null;
+  payload: string;
+  newKey: string;
+}
+export interface CartIdempotencyGuardResult {
+  action: CartIdempotencyGuardAction;
+  key: string | null;
+  payload: string | null;
+}
+export const cartIdempotencyGuard = (args: CartIdempotencyGuardArgs): CartIdempotencyGuardResult => {
+  if (!args.existingKey) {
+    return { action: 'bind', key: args.newKey, payload: args.payload };
+  }
+  if (args.existingPayload != null && args.existingPayload !== args.payload) {
+    return { action: 'block', key: args.existingKey, payload: args.existingPayload };
+  }
+  return { action: 'proceed', key: args.existingKey, payload: args.existingPayload };
+};
+
+// Общие стили тостов Fix C (токены --mac-*; общий модуль = без дублирования).
+export const TOAST_WARNING_STYLE = {
+  backgroundColor: 'color-mix(in srgb, var(--mac-warning), transparent 84%)',
+  border: '1px solid color-mix(in srgb, var(--mac-warning), transparent 72%)',
+  color: 'var(--mac-text-primary)'
+} as const;
+
+export const TOAST_ERROR_STYLE = {
+  backgroundColor: 'color-mix(in srgb, var(--mac-error), transparent 84%)',
+  border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
+  color: 'var(--mac-text-primary)'
+} as const;
+
+// =====================================================================
+// CART GROUPING BY VISIT (вынесено из AppointmentWizardV2 без изменения логики)
+// =====================================================================
+
+export interface WizardCartItemLike {
+  service_id?: unknown;
+  doctor_id?: unknown;
+  quantity?: number;
+  original_queue_id?: string | number | null;
+  service_code?: string | null;
+  service_name?: string | null;
+  name?: string | null;
+  visit_date?: string;
+  visit_time?: string | null;
+  _source?: string | null;
+  [key: string]: unknown;
+}
+
+export interface GroupedVisitLike {
+  doctor_id: string | number | null;
+  services: Array<{
+    service_id?: string | number;
+    quantity?: number;
+    original_queue_id?: string | number | null;
+    service_code?: string | null;
+    service_name?: string | null;
+    _source?: string | null;
+  }>;
+  visit_date?: string;
+  visit_time?: string | null;
+  department: string;
+  notes: string | null;
+}
+
+export const groupCartItemsByVisit = (
+  items: WizardCartItemLike[],
+  getDepartmentByService: (serviceId: string | number) => string,
+): GroupedVisitLike[] => {
+  const visits: Record<string, GroupedVisitLike> = {};
+
+  // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
+  const validItems = items.filter((item) => {
+    if (!item.service_id) {
+      logger.warn('⚠️ Пропущен элемент корзины без service_id:', item);
+      return false;
+    }
+    return true;
+  });
+
+  if (validItems.length === 0) {
+    logger.warn('⚠️ Нет валидных элементов в корзине');
+    return [];
+  }
+
+  validItems.forEach((item) => {
+    // Определяем отделение для услуги
+    const department = getDepartmentByService(item.service_id as string | number);
+
+    // ✅ ИСПРАВЛЕНО: Объединяем все процедуры в один визит
+    // Все процедуры (P, C, D_PROC) должны быть в одном визите с department = 'procedures'
+    let finalDepartment = department;
+    if (department === 'procedures') {
+      finalDepartment = 'procedures'; // Все процедуры в одном отделе
+    }
+
+    // Группируем по finalDepartment + doctor_id + visit_date + visit_time
+    const key = `${finalDepartment}_${item.doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
+
+    if (!visits[key]) {
+      visits[key] = {
+        doctor_id: (item.doctor_id as string | number) || null,
+        services: [],
+        visit_date: item.visit_date,
+        visit_time: item.visit_time || null,
+        department: finalDepartment,
+        notes: null
+      };
+    }
+
+    visits[key].services.push({
+      service_id: item.service_id as string | number,
+      quantity: item.quantity,
+      original_queue_id: item.original_queue_id || null,
+      service_code: item.service_code || null,
+      service_name: item.service_name || item.name || null,
+      _source: item._source || null
+    });
+  });
+
+  return Object.values(visits);
 };
 
 // =====================================================================
@@ -1062,11 +1295,17 @@ export default {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
-  buildCartQuoteRequest,
-  buildEditDeltaTargetItems,
+  getBirthDateValidationError,
   formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
+  PATIENT_SELECTED_FROM_CARD_FLAG,
+  isPatientSelectedFromCard,
+  buildInheritedPatientClearPatch,
+  isPhoneDuplicateErrorMessage,
+  createIdempotencyKey,
+  buildCartQuoteRequest,
+  buildEditDeltaTargetItems,
   getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
@@ -1074,5 +1313,5 @@ export default {
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
-  categories,
+  categories
 };

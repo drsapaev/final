@@ -149,9 +149,20 @@ export async function checkAuthProbe(): Promise<boolean> {
  * @param cartData - { patient_id, visits, discount_mode, payment_method, all_free, notes }
  * @returns {Promise<Record<string, unknown>>} Created cart result
  */
-export async function createRegistrarCart(cartData: Record<string, unknown>): Promise<Record<string, unknown>> {
+export async function createRegistrarCart(
+  cartData: Record<string, unknown>,
+  options: { idempotencyKey?: string } = {}
+): Promise<Record<string, unknown>> {
   try {
-    const response = await api.post('/registrar/cart', cartData);
+    // Fix C: Idempotency-Key делает повторную отправку (потерянный ответ,
+    // двойной сабмит) безопасной — backend вернёт кэшированный ответ.
+    const response = await api.post(
+      '/registrar/cart',
+      cartData,
+      options.idempotencyKey
+        ? { headers: { 'Idempotency-Key': options.idempotencyKey } }
+        : undefined
+    );
     return response.data;
   } catch (error) {
     const status = (error as HttpApiError)?.response?.status;
