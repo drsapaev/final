@@ -275,8 +275,7 @@ export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
 
 // =====================================================================
 // BIRTH DATE CALENDAR VALIDATION (Fix E)
-// =====================================================================
-
+// ==============================================================
 export type BirthDateValidation = 'empty' | 'incomplete' | 'invalid' | 'future' | 'ok';
 
 // Календарная валидация даты рождения в формате ДД.ММ.ГГГГ.
@@ -323,6 +322,73 @@ export const getBirthDateValidationError = (
   if (probe > today) return 'future';
 
   return 'ok';
+};
+
+// =====================================================================
+// BIRTH DATE INPUT MASK (extracted from AppointmentWizardV2)
+// =====================================================================
+
+// Маска ввода: только цифры, максимум 8, формат ДД.ММ.ГГГГ
+export const formatBirthDateInput = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  const limitedDigits = digits.slice(0, 8);
+  if (limitedDigits.length === 0) return '';
+  if (limitedDigits.length <= 2) return limitedDigits;
+  if (limitedDigits.length <= 4) return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2)}`;
+  return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2, 4)}.${limitedDigits.slice(4)}`;
+};
+
+// Конвертация ДД.ММ.ГГГГ → ГГГГ-ММ-ДД
+export const convertDateToISO = (dateStr: string): string => {
+  if (!dateStr || dateStr.length !== 10) return '';
+  const [day, month, year] = dateStr.split('.');
+  if (!day || !month || !year || year.length !== 4) return '';
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+};
+
+// Конвертация ГГГГ-ММ-ДД → ДД.ММ.ГГГГ
+export const convertDateFromISO = (isoStr: string): string => {
+  if (!isoStr) return '';
+  const [year, month, day] = isoStr.split('-');
+  if (!year || !month || !day) return '';
+  return `${day}.${month}.${year}`;
+};
+
+// =====================================================================
+// PATIENT SELECTION SAFETY (Fix A: data mixing / duplicate-phone stop)
+// =====================================================================
+
+// Marker set by the wizard when ALL patient fields were populated from an
+// explicitly selected card (selectPatient). Editing ФИО afterwards switches
+// the form to new-patient mode and must clear every inherited field,
+// otherwise a new patient is created with another person's address/phone.
+export const PATIENT_SELECTED_FROM_CARD_FLAG = '_selectedFromCard';
+
+export const isPatientSelectedFromCard = (
+  patient: Record<string, unknown> | null | undefined
+): boolean => Boolean(patient && patient[PATIENT_SELECTED_FROM_CARD_FLAG]);
+
+// Identity fields that must never leak from one patient card into a
+// different patient's registration. Returned as a patch for spread.
+export const buildInheritedPatientClearPatch = (): Record<string, unknown> => ({
+  birth_date: '',
+  phone: '',
+  address: '',
+  gender: '',
+  lastName: '',
+  firstName: '',
+  middleName: '',
+  [PATIENT_SELECTED_FROM_CARD_FLAG]: false,
+});
+
+// Backend currently signals "duplicate phone" with HTTP 400 + a text detail.
+// The same 400 is also used for unrelated validation problems (e.g. duplicate
+// doc_number), so only an explicit phone-duplicate message may trigger the
+// duplicate-phone UX path. Until the backend exposes a dedicated error code,
+// this is the narrowest safe discriminator.
+export const isPhoneDuplicateErrorMessage = (message: unknown): boolean => {
+  const normalized = String(message || '').toLowerCase();
+  return normalized.includes('уже существует') && normalized.includes('телефон');
 };
 
 // =====================================================================
@@ -510,6 +576,13 @@ export default {
   resolvePatientGenderValue,
   genderToPatientSexForApi,
   getBirthDateValidationError,
+  formatBirthDateInput,
+  convertDateToISO,
+  convertDateFromISO,
+  PATIENT_SELECTED_FROM_CARD_FLAG,
+  isPatientSelectedFromCard,
+  buildInheritedPatientClearPatch,
+  isPhoneDuplicateErrorMessage,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,

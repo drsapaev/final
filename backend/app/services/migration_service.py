@@ -345,6 +345,10 @@ class MigrationService:
                     "id": queue.id,
                     "day": queue.day.isoformat(),
                     "specialist_id": queue.specialist_id,
+                    # QD-2A (Codex round-1 P1): serialize the resource
+                    # owner too — a resource-owned queue restored without
+                    # it would come back with BOTH owners NULL.
+                    "queue_resource_id": queue.queue_resource_id,
                     "queue_tag": queue.queue_tag,
                     "active": queue.active,
                     "opened_at": (
@@ -448,6 +452,9 @@ class MigrationService:
                     id=queue_data["id"],
                     day=datetime.fromisoformat(queue_data["day"]).date(),
                     specialist_id=queue_data["specialist_id"],
+                    # QD-2A (Codex round-1 P1): restore the resource owner;
+                    # .get() so pre-QD-2 backups (no key) stay restorable.
+                    queue_resource_id=queue_data.get("queue_resource_id"),
                     queue_tag=queue_data["queue_tag"],
                     active=queue_data["active"],
                     opened_at=(

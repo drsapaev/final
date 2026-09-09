@@ -82,3 +82,18 @@ python -m app.scripts.telegram_polling_worker --once --max-updates 1 --keep-webh
 Do not put the Telegram bot token in the scheduled task command. The worker reads
 the token from the application configuration/database. When a public HTTPS domain
 and server are ready, stop this task before switching the bot to webhook mode.
+
+
+## Scheduled task: ClinicRuntimeWatchdog (hidden launch)
+
+The runtime watchdog runs every minute via Task Scheduler
+(`ClinicRuntimeWatchdog` → `watchdog_runtime.ps1`, runtime health only —
+never deploys). Its action must go through the hidden launcher:
+
+```
+wscript.exe "C:inal\ops\windowsun_watchdog_hidden.vbs"
+```
+
+Running `powershell.exe` directly as the task action flashes a console
+window on the operator's desktop every minute. If the task is ever
+re-registered, use the wscript action above.

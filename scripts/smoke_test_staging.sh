@@ -88,16 +88,25 @@ sentry_backend_check() {
         cd backend || exit 1
         python -c "
 import os
-from app.core.sentry import init_sentry, capture_exception
+import sentry_sdk
+from app.core.sentry import init_sentry
 init_sentry()
 try:
     raise RuntimeError('staging validation smoke test - backend')
 except RuntimeError as e:
-    capture_exception(e)
-print('    Backend event sent to Sentry.')
+    event_id = sentry_sdk.capture_exception(e)
+if not event_id:
+    print('    ERROR: event was not captured (Sentry client disabled?)')
+    raise SystemExit(1)
+print(f'    Backend event id: {event_id}')
+client = sentry_sdk.get_client()
+client.flush(timeout=15)
+print('    Transport flushed — event handed to Sentry ingest.')
+print('    Cross-check delivery in the Sentry dashboard (Issues), then resolve the smoke issue.')
 " 2>&1
-        echo "    NOTE: proves event submission only — delivery is not verified here."
-        echo "    Frontend event smoke is manual (browser console, runbook Check 1)."
+        echo "    NOTE: proves submission from this host + transport flush."
+        echo "    Dashboard delivery and frontend event smoke are manual"
+        echo "    (runbook Check 1 / SENTRY_SETUP.md §9)."
     )
 }
 
@@ -192,13 +201,19 @@ arq_check() {
 from app.tasks.worker import WorkerSettings, send_visit_reminder, run_data_retention
 print(f'    Worker functions: {len(WorkerSettings.functions)} defined')
 print(f'    Cron jobs: {len(WorkerSettings.cron_jobs)} defined')
-" 2>&1
-        echo "    NOTE: proves module wiring only."
-        echo "    enqueue+process needs live Redis+worker — manual (runbook Check 5)."
+" 2>&1 || exit 1
+        if [ -n "${ARQ_TEST_REDIS_URL:-}${REDIS_URL:-}" ]; then
+            echo "    Live enqueue+process proof on scratch queue..."
+            python -m app.scripts.arq_enqueue_process_check 2>&1
+        else
+            echo "    NOTE: proves module wiring only."
+            echo "    Set ARQ_TEST_REDIS_URL (or REDIS_URL) to run the live"
+            echo "    enqueue+process proof; otherwise it stays manual (runbook Check 5)."
+        fi
     )
 }
 
-run_check 5 "arq worker module wiring" arq_check
+run_check 5 "arq worker wiring (+ live enqueue/process when Redis URL set)" arq_check
 
 # ---------------------------------------------------------------------------
 # Check 6: PII scrubbing
