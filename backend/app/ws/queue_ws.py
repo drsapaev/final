@@ -150,6 +150,32 @@ log.info("WSManager: создан глобальный экземпляр %d", i
 # но broadcast происходит асинхронно через asyncio.create_task().
 # Это не блокирует HTTP-ответ.
 # -----------------------------------------------------------------------------
+def queue_update_departments(db, queue) -> list[str]:
+    """Admin queue-WS room identities for a queue (QD-2C, round-17/18).
+
+    The queue manager subscribes to ``specialist_{selectedId}::{date}`` —
+    the legacy doctor identity. A resource-owned queue carries
+    ``specialist_id = NULL``: the literal ``specialist_None`` room has no
+    subscribers, so mutation broadcasts (join/restore/no-show) would only
+    reach the connected manager through the 60-second polling fallback.
+    The room therefore follows the ROUTING identity: the legacy
+    specialists whose specialty routes to the queue's tag (the
+    dual-ownership bridge, same join the registrar payload match uses).
+    Doctor/bridged queues keep the legacy room byte-identically; a
+    resource queue without routing doctors keeps the old dead-room form
+    (no subscriber either way).
+    """
+    if queue is None:
+        return ["unknown"]
+    if queue.specialist_id is not None:
+        return [f"specialist_{queue.specialist_id}"]
+    if getattr(queue, "queue_resource_id", None) is not None:
+        from app.crud.queue_resource_routing import routing_specialist_ids
+
+        return [f"specialist_{rid}" for rid in routing_specialist_ids(db, queue)]
+    return [f"specialist_{queue.specialist_id}"]
+
+
 def broadcast_queue_update(
     department: str,
     date: str,

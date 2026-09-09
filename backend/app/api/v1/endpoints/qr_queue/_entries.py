@@ -13,33 +13,6 @@ from app.api.v1.endpoints.qr_queue._tokens import (
 )
 
 
-def _queue_ws_departments(db: Session, entry) -> list[str]:
-    """Admin queue-WS room identities for the entry's queue (QD-2C).
-
-    Codex round-17 P2: the queue manager subscribes to
-    ``specialist_{selectedId}::{date}`` — the legacy doctor identity.
-    A resource-owned queue carries ``specialist_id = NULL``: the literal
-    ``specialist_None`` room has no subscribers, and restore/no-show
-    updates would only reach the connected manager through the 60-second
-    polling fallback. The room therefore follows the ROUTING identity:
-    the legacy specialists whose specialty routes to the queue's tag
-    (the dual-ownership bridge, same join the registrar payload match
-    uses). Doctor/bridged queues keep the legacy room byte-identically;
-    a resource queue without routing doctors keeps the old dead-room
-    form (no subscriber either way).
-    """
-    queue = getattr(entry, "queue", None)
-    if queue is None:
-        return ["unknown"]
-    if queue.specialist_id is not None:
-        return [f"specialist_{queue.specialist_id}"]
-    if getattr(queue, "queue_resource_id", None) is not None:
-        from app.crud.queue_resource_routing import routing_specialist_ids
-
-        return [f"specialist_{rid}" for rid in routing_specialist_ids(db, queue)]
-    return [f"specialist_{queue.specialist_id}"]
-
-
 @router.post("/entry/{entry_id}/restore-next", response_model=dict[str, Any])
 async def restore_entry_to_next(
     entry_id: int,
@@ -95,11 +68,11 @@ async def restore_entry_to_next(
     try:
         from datetime import date as _date
 
-        from app.ws.queue_ws import broadcast_queue_update
+        from app.ws.queue_ws import broadcast_queue_update, queue_update_departments
         _date_str = entry.queue.day.strftime("%Y-%m-%d") if hasattr(entry.queue, "day") and entry.queue.day else _date.today().strftime("%Y-%m-%d")
-        # QD-2C (Codex round-17 P2): комната — маршрутизирующая
+        # QD-2C (Codex round-17/18 P2): комната — маршрутизирующая
         # идентичность (specialist_None не слушает никто)
-        for _dept in _queue_ws_departments(db, entry):
+        for _dept in queue_update_departments(db, getattr(entry, "queue", None)):
             broadcast_queue_update(
                 department=_dept,
                 date=_date_str,
@@ -171,11 +144,11 @@ async def mark_entry_no_show(
     try:
         from datetime import date as _date
 
-        from app.ws.queue_ws import broadcast_queue_update
+        from app.ws.queue_ws import broadcast_queue_update, queue_update_departments
         _date_str = entry.queue.day.strftime("%Y-%m-%d") if hasattr(entry.queue, "day") and entry.queue.day else _date.today().strftime("%Y-%m-%d")
-        # QD-2C (Codex round-17 P2): комната — маршрутизирующая
+        # QD-2C (Codex round-17/18 P2): комната — маршрутизирующая
         # идентичность (specialist_None не слушает никто)
-        for _dept in _queue_ws_departments(db, entry):
+        for _dept in queue_update_departments(db, getattr(entry, "queue", None)):
             broadcast_queue_update(
                 department=_dept,
                 date=_date_str,

@@ -818,6 +818,29 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     "Очередь ещё не создана для выбранного специалиста"
                 )
 
+        # QD-2C (Codex round-18 P2): токен резолвится в ресурсную очередь —
+        # владелец/кабинет join-метаданных с оси ресурса (реестр): публичный
+        # экран QueueJoin и join-ответы показывают registry-назначение, а не
+        # «Врач ID ...» синтетика 0055 (без full_name) с null-кабинетом;
+        # врач-токены байт-идентичны (cabinet в метаданных отсутствовал и
+        # раньше — get() отдавал None)
+        specialist_name = (
+            queue_token.specialist.user.full_name
+            if queue_token.specialist
+            and queue_token.specialist.user
+            and queue_token.specialist.user.full_name
+            else None
+        )
+        cabinet = None
+        if daily_queue is not None and daily_queue.queue_resource_id is not None:
+            resource = daily_queue.queue_resource
+            specialist_name = (
+                resource.display_name if resource is not None else "Ресурс очереди"
+            )
+            cabinet = daily_queue.cabinet_number or (
+                resource.default_cabinet if resource is not None else None
+            )
+
         metadata = {
             "day": queue_token.day,
             "expires_at": expires_cmp,
@@ -825,13 +848,8 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             "daily_queue": daily_queue,
             "is_clinic_wide": queue_token.is_clinic_wide,
             "department": queue_token.department,
-            "specialist_name": (
-                queue_token.specialist.user.full_name
-                if queue_token.specialist
-                and queue_token.specialist.user
-                and queue_token.specialist.user.full_name
-                else None
-            ),
+            "specialist_name": specialist_name,
+            "cabinet": cabinet,
         }
         return queue_token, metadata
 

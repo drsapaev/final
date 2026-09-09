@@ -107,6 +107,20 @@ class QueueReorderApiService:
                 f"Записи с ID {missing_ids} не найдены в очереди",
             )
 
+        # QD-2C (Codex round-18 P2): дубли entry_id в запросе (один билет
+        # на две позиции — pydantic валидирует только уникальность ПОЗИЦИЙ)
+        # прошли бы в перестановку: один ORM-объект в двух слотах, а
+        # реальная запись осталась бы на старом номере — коммит дубликата
+        # активных номеров. Отвергаем ДО построения перестановки (doctor-
+        # очереди защищены тем же гардом — семантика «ровно одна позиция
+        # на запись» всегда подразумевалась контрактом).
+        request_entry_ids_list = [item["entry_id"] for item in entry_orders]
+        if len(request_entry_ids_list) != len(set(request_entry_ids_list)):
+            raise QueueReorderApiDomainError(
+                400,
+                "ID записей должны быть уникальными — каждая запись перемещается ровно в одну позицию",
+            )
+
         max_position = len(entries)
         for item in entry_orders:
             if item["new_position"] > max_position:

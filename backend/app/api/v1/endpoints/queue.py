@@ -274,20 +274,25 @@ def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
 
         # UX Audit Stage 3 (Queue WebSocket): broadcast to /ws/queue admin panel.
         try:
-            from app.ws.queue_ws import broadcast_queue_update
-            # Resolve specialist_id from the daily_queue (or queue_entry fallback)
-            # to avoid F821 undefined name in this join_queue scope.
-            _specialist_id = (
-                daily_queue.specialist_id
+            from app.ws.queue_ws import broadcast_queue_update, queue_update_departments
+            # QD-2C (Codex round-18 P2): комната — маршрутизирующая
+            # идентичность: legacy-join на ресурсной очереди (specialist
+            # NULL — конструктор/резолвер ресурсной оси) broadcast'ил бы
+            # в мёртвую specialist_None-комнату; routing-специалисты тега —
+            # та же ось, что restore/no-show (round-17) и подбор очереди в
+            # queue manager'е. Врач-очереди — легаси-комната байт-идентично.
+            _join_queue = (
+                daily_queue
                 if daily_queue
-                else getattr(getattr(queue_entry, "queue", None), "specialist_id", None)
+                else getattr(queue_entry, "queue", None)
             )
-            broadcast_queue_update(
-                department=f"specialist_{_specialist_id}",
-                date=queue_day.strftime("%Y-%m-%d") if hasattr(queue_day, "strftime") else str(queue_day),
-                event_type="queue_update",
-                data={"action": "entry_added", "entry_id": queue_entry.id, "number": queue_entry.number},
-            )
+            for _dept in queue_update_departments(db, _join_queue):
+                broadcast_queue_update(
+                    department=_dept,
+                    date=queue_day.strftime("%Y-%m-%d") if hasattr(queue_day, "strftime") else str(queue_day),
+                    event_type="queue_update",
+                    data={"action": "entry_added", "entry_id": queue_entry.id, "number": queue_entry.number},
+                )
         except Exception as ws_error:
             logger.warning("Queue WS broadcast failed: %s", ws_error, exc_info=True)
 

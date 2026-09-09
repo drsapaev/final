@@ -391,6 +391,21 @@ class TokensMixin(QRQueueServiceMixinBase):
                 else:
                     specialist_name = f"Врач ID {qr_token.specialist_id}"
 
+            # QD-2C (Codex round-18 P2): токен резолвится в ресурсную
+            # очередь — имя с оси ресурса (реестр): публичный экран
+            # QueueJoin показывает registry-назначение, а не «Врач ID ...»
+            # синтетика 0055 (без full_name); врач/clinic-wide токены
+            # байт-идентичны
+            if (
+                not (qr_token.is_clinic_wide or qr_token.specialist_id is None)
+                and daily_queue is not None
+                and daily_queue.queue_resource_id is not None
+            ):
+                resource = daily_queue.queue_resource
+                specialist_name = (
+                    resource.display_name if resource is not None else "Ресурс очереди"
+                )
+
             # Определяем target_date из токена
             target_date = qr_token.day
 

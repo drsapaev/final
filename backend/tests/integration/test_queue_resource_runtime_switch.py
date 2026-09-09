@@ -3803,3 +3803,197 @@ def test_restore_no_show_broadcast_routing_room(
         assert all(c.get("date") == expected_room_day for c in routed)
     finally:
         _durable_cleanup(db_session, "lab_res_aa3", "reg_aa3")
+
+
+# ===================== BB. Codex round-18 pins =====================
+
+
+def test_join_token_metadata_uses_resource_owner(db_session: Session) -> None:
+    """Codex round-18 P2: a dedicated lab/ECG token that resolves to the
+    resource surface advertises the REGISTRY owner and cabinet in the
+    join metadata (validate_queue_token) and on the public token-info
+    screen (get_qr_token_info) — not the 0055 synthetic's «Врач ID ...»
+    with a null cabinet. Doctor tokens stay byte-identical (no cabinet
+    key behavior change). The writers COMMIT — durable rows cleaned in
+    the finally."""
+    from app.services.qr_queue import QRQueueService
+
+    future_day = date.today() + timedelta(days=2)
+    try:
+        user = _make_user(db_session, username="lab_res_bb1", role="Resource")
+        # no full_name — the 0055 synthetic shape
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        synthetic.cabinet = None
+        db_session.commit()
+        resource = _make_resource(db_session, code="lab", queue_tag="lab")
+        resource.default_cabinet = "7"
+        db_session.commit()
+
+        token_value, _gen_meta = queue_service.assign_queue_token(
+            db_session,
+            specialist_id=synthetic.id,
+            department="lab",
+            generated_by_user_id=None,
+            target_date=future_day,
+            queue_tag="lab",
+        )
+
+        _token_obj, meta = queue_service.validate_queue_token(db_session, token_value)
+        assert meta["daily_queue"] is not None
+        assert meta["daily_queue"].queue_resource_id == resource.id
+        assert meta["specialist_name"] == "Ресурс очереди"  # NOT «Врач ID ...»
+        assert meta["cabinet"] == "7"  # the registry destination, not null
+
+        info = QRQueueService(db_session).get_qr_token_info(token_value)
+        assert info is not None
+        assert info["specialist_name"] == "Ресурс очереди"
+        assert info["queue_active"] is True
+
+        # doctor-token counter-shape: the name from the doctor's user,
+        # cabinet stays absent-behavior (None) — byte-identical
+        doc_user = _make_user(db_session, username="dr_bb1", role="Doctor")
+        doc_user.full_name = "Иванов Иван"
+        db_session.commit()
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardiology")
+        doctor.cabinet = "3"
+        db_session.commit()
+        doc_token, _ = queue_service.assign_queue_token(
+            db_session,
+            specialist_id=doctor.id,
+            department="cardiology",
+            generated_by_user_id=None,
+            target_date=future_day,
+        )
+        _doc_obj, doc_meta = queue_service.validate_queue_token(db_session, doc_token)
+        assert doc_meta["specialist_name"] == "Иванов Иван"
+        assert doc_meta["cabinet"] is None  # unchanged doctor-token behavior
+    finally:
+        _durable_cleanup(db_session, "lab_res_bb1", "dr_bb1")
+
+
+def test_legacy_join_broadcasts_routing_room(db_session: Session, monkeypatch) -> None:
+    """Codex round-18 P2: the still-mounted POST /api/v1/queue/legacy/join
+    broadcasts entry_added to the ROUTING room when the join lands on a
+    pure resource queue (specialist NULL) — the literal specialist_None
+    room has no subscribers, so the connected queue manager would learn
+    about the new patient only through the 60-second polling fallback.
+    The routes COMMIT — durable rows cleaned in the finally."""
+    from app.ws import queue_ws
+
+    ws_calls: list[dict] = []
+
+    def fake_broadcast(**kwargs):
+        ws_calls.append(kwargs)
+
+    monkeypatch.setattr(queue_ws, "broadcast_queue_update", fake_broadcast)
+
+    future_day = date.today() + timedelta(days=2)
+    try:
+        from app.api.v1.endpoints.queue import QueueJoinRequest, join_queue
+
+        user = _make_user(db_session, username="lab_res_bb2", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        resource = _make_resource(db_session, code="lab", queue_tag="lab")
+        resource.default_cabinet = "7"
+        db_session.commit()
+
+        token_value, _meta = queue_service.assign_queue_token(
+            db_session,
+            specialist_id=synthetic.id,
+            department="lab",
+            generated_by_user_id=None,
+            target_date=future_day,
+            queue_tag="lab",
+        )
+
+        response = join_queue(
+            request=QueueJoinRequest(
+                token=token_value,
+                patient_name="Пациент Лаборатории",
+                phone="+998901234567",
+            ),
+            db=db_session,
+        )
+        assert response.success is True
+        assert response.number is not None
+
+        routed = [
+            c
+            for c in ws_calls
+            if c.get("department") == f"specialist_{synthetic.id}"
+            and c.get("data", {}).get("action") == "entry_added"
+        ]
+        none_room = [c for c in ws_calls if c.get("department") == "specialist_None"]
+        assert routed, f"no entry_added broadcast to the routing room: {ws_calls}"
+        assert not none_room, f"dead specialist_None room still used: {ws_calls}"
+        assert all(c.get("date") == future_day.isoformat() for c in routed)
+    finally:
+        _durable_cleanup(db_session, "lab_res_bb2")
+        from app.models.online_queue import QueueToken as _QueueToken
+
+        for row in (
+            db_session.query(_QueueToken)
+            .filter(_QueueToken.token.in_([token_value]))
+            .all()
+        ):
+            db_session.delete(row)
+        db_session.commit()
+
+
+def test_reorder_rejects_duplicate_entry_ids(db_session: Session) -> None:
+    """Codex round-18 P2: a reorder request listing the SAME entry at two
+    positions (pydantic validates only position uniqueness) is rejected
+    BEFORE the permutation — the same ORM object in two slots leaves a
+    real entry on its old number and commits duplicate active numbers.
+    The service COMMITs on the happy path — durable rows cleaned in the
+    finally."""
+    try:
+        from app.services.queue_reorder_api_service import (
+            QueueReorderApiDomainError,
+            QueueReorderApiService,
+        )
+
+        admin = _make_user(db_session, username="adm_bb3", role="Admin")
+        _make_resource(db_session, code="lab", queue_tag="lab", start_number_online=40)
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        first = _make_waiting_entry(db_session, queue, number=41)
+        second = _make_waiting_entry(db_session, queue, number=42)
+
+        service = QueueReorderApiService(db_session)
+        try:
+            service.reorder_queue(
+                queue_id=queue.id,
+                entry_orders=[
+                    {"entry_id": first.id, "new_position": 1},
+                    {"entry_id": first.id, "new_position": 2},
+                ],
+                current_user=admin,
+            )
+            raise AssertionError("duplicate entry ids must be rejected")
+        except QueueReorderApiDomainError as exc:
+            assert exc.status_code == 400
+
+        # nothing was permuted or committed by the rejected request
+        db_session.refresh(first)
+        db_session.refresh(second)
+        assert first.number == 41
+        assert second.number == 42
+
+        # a valid unique-id reorder still permutes normally
+        _, info = service.reorder_queue(
+            queue_id=queue.id,
+            entry_orders=[
+                {"entry_id": second.id, "new_position": 1},
+                {"entry_id": first.id, "new_position": 2},
+            ],
+            current_user=admin,
+        )
+        db_session.refresh(first)
+        db_session.refresh(second)
+        assert second.number == 41
+        assert first.number == 42
+        assert info["queue_resource_id"] is not None
+    finally:
+        _durable_cleanup(db_session, "adm_bb3")
