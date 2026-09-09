@@ -1368,16 +1368,18 @@ def _full_update_create_single_independent_entry(
     """
     import json
 
-    from sqlalchemy import text
-
-    from app.models.online_queue import OnlineQueueEntry
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
     target_queue_id = _full_update_resolve_target_queue_id(db, entry, service)
 
-    next_number = db.execute(
-        text("SELECT COALESCE(MAX(number), 0) + 1 FROM queue_entries WHERE queue_id = :qid"),
-        {"qid": target_queue_id},
-    ).scalar()
+    # QD-2C (Codex round-16 P2): SSOT нумерации — ресурсная очередь
+    # стартует с floor реестра (get_next_queue_number →
+    # max(per-queue MAX+1, QueueResource.start_number_online)), а не с
+    # сырого MAX+1: пустая очередь выдавала билет 1 вместо
+    # сконфигурированных 40. Врач-очереди — байт-идентично
+    # (per-queue MAX+1, floor=1).
+    target_queue = db.get(DailyQueue, target_queue_id)
+    next_number = queue_service.get_next_queue_number(db, daily_queue=target_queue)
 
     quantity = service_item_data.get("quantity", 1) if service_item_data else 1
     item_price = service.price * quantity

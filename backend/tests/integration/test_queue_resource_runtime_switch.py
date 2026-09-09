@@ -3431,3 +3431,171 @@ def test_morning_summary_labels_resource_rows(db_session: Session) -> None:
         assert doctor_row["queue_resource_id"] is None
     finally:
         _durable_cleanup(db_session, "dr_y3_axis")
+
+
+# ===================== Z. Codex round-16 pins =====================
+
+
+def test_reorder_slots_preserve_served_numbers(db_session: Session) -> None:
+    """Codex round-16 P2: reorder/move map positions onto the EXISTING
+    active number slots — a served (terminal) ticket 40 is neither
+    duplicated nor reused: the by-number lookup accepts served rows,
+    so a rebuilt 40 would resolve a fresh patient to the old entry.
+    The service COMMITs — durable rows cleaned in the finally."""
+    try:
+        from app.services.queue_reorder_api_service import QueueReorderApiService
+
+        admin = _make_user(db_session, username="adm_z1", role="Admin")
+        _make_resource(db_session, code="lab", queue_tag="lab", start_number_online=40)
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        served = _make_waiting_entry(db_session, queue, number=40)
+        served.status = "served"
+        db_session.commit()
+        first = _make_waiting_entry(db_session, queue, number=41)
+        second = _make_waiting_entry(db_session, queue, number=42)
+
+        service = QueueReorderApiService(db_session)
+        _, info = service.reorder_queue(
+            queue_id=queue.id,
+            entry_orders=[
+                {"entry_id": second.id, "new_position": 1},
+                {"entry_id": first.id, "new_position": 2},
+            ],
+            current_user=admin,
+        )
+        db_session.refresh(first)
+        db_session.refresh(second)
+        db_session.refresh(served)
+        # the ACTIVE numbers stay 41/42 — the served 40 is untouched
+        assert {first.number, second.number} == {41, 42}
+        assert served.number == 40
+        assert served.status == "served"
+        assert info["queue_resource_id"] is not None
+
+        # move: position 1 maps onto the smallest ACTIVE slot (41),
+        # not the served 40 and not a floor rebuild
+        third = _make_waiting_entry(db_session, queue, number=43)
+        service.move_queue_entry(entry_id=third.id, new_position=1, current_user=admin)
+        db_session.refresh(third)
+        assert third.number == 41
+    finally:
+        _durable_cleanup(db_session, "adm_z1")
+
+
+def test_full_update_independent_entry_uses_resource_floor(
+    db_session: Session,
+) -> None:
+    """Codex round-16 P2: the independent-entry allocator (registrar
+    full-update, additional lab/ECG service) routes through the
+    numbering SSOT — an empty resource queue issues the registry floor
+    (40), not the raw MAX+1 = 1. Doctor queues keep MAX+1."""
+    from types import SimpleNamespace
+
+    from app.api.v1.endpoints.qr_queue._online_entries import (
+        _full_update_create_single_independent_entry,
+    )
+
+    doc_user = _make_user(db_session, username="dr_z2", role="Doctor")
+    doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardiology")
+    source_queue = _make_queue(
+        db_session, specialist_id=doctor.id, queue_tag="cardiology"
+    )
+    source = _make_waiting_entry(db_session, source_queue, number=5)
+
+    resource = _make_resource(
+        db_session, code="lab", queue_tag="lab", start_number_online=40
+    )
+    target_queue = _make_queue(
+        db_session,
+        specialist_id=None,
+        queue_tag="lab",
+        queue_resource_id=resource.id,
+    )
+    assert target_queue.id != source_queue.id
+
+    from datetime import datetime as _dt
+
+    queue_time = _dt(2026, 9, 7, 8, 0)
+    request = SimpleNamespace(discount_mode=None, all_free=False)
+    service_stub = SimpleNamespace(
+        id=1,
+        name="Лабораторная панель",
+        queue_tag="lab",
+        price=1000,
+        is_consultation=False,
+        service_code="LAB1",
+    )
+    created = _full_update_create_single_independent_entry(
+        db_session, source, request, service_stub, None, queue_time
+    )
+    assert created.queue_id == target_queue.id
+    assert created.number == 40  # the registry floor, not MAX+1 = 1
+    assert created.status == "waiting"
+
+    # a doctor-target queue keeps the raw MAX+1 sequence
+    doctor_target = _make_queue(db_session, specialist_id=doctor.id, queue_tag="cardio")
+    service_stub_cardio = SimpleNamespace(
+        id=2,
+        name="Консультация",
+        queue_tag="cardio",
+        price=500,
+        is_consultation=True,
+        service_code="CARD1",
+    )
+    created_doctor = _full_update_create_single_independent_entry(
+        db_session, source, request, service_stub_cardio, None, queue_time
+    )
+    assert created_doctor.queue_id == doctor_target.id
+    assert created_doctor.number == 1  # empty doctor queue: MAX+1
+
+
+def test_cabinet_sync_skips_resource_rows(db_session: Session) -> None:
+    """Codex round-16 P2: POST /admin/queues/sync-cabinet-info does not
+    overwrite a bridged (0059) queue's registry-sourced cabinet with
+    the synthetic doctor's stale one; doctor queues still sync. The
+    service COMMITs — durable rows cleaned in the finally."""
+    try:
+        from app.services.queue_cabinet_management_api_service import (
+            QueueCabinetManagementApiService,
+        )
+
+        user = _make_user(db_session, username="lab_res_z3", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        synthetic.cabinet = "42"  # the STALE synthetic cabinet
+        db_session.commit()
+        resource = _make_resource(db_session, code="lab", queue_tag="lab")
+        bridged = _make_queue(
+            db_session,
+            specialist_id=synthetic.id,
+            queue_tag="lab",
+            queue_resource_id=resource.id,
+        )
+        bridged.cabinet_number = "7"  # the resource destination in use
+        db_session.commit()
+
+        doc_user = _make_user(db_session, username="dr_z3", role="Doctor")
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardiology")
+        doctor.cabinet = "5"
+        db_session.commit()
+        doc_queue = _make_queue(
+            db_session, specialist_id=doctor.id, queue_tag="cardiology"
+        )
+        doc_queue.cabinet_number = None
+        db_session.commit()
+
+        result = QueueCabinetManagementApiService(
+            db_session
+        ).sync_cabinet_info_from_doctors(
+            day=_DAY.isoformat(), specialist_id=None, synced_by="admin"
+        )
+        db_session.refresh(bridged)
+        db_session.refresh(doc_queue)
+        assert result["success"] is True
+        # the bridged resource destination survives the sync
+        assert bridged.cabinet_number == "7"  # NOT the synthetic's 42
+        # the doctor queue still syncs from its doctor
+        assert doc_queue.cabinet_number == "5"
+    finally:
+        _durable_cleanup(db_session, "lab_res_z3", "dr_z3")

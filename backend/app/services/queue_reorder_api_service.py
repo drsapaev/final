@@ -7,7 +7,6 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from app.crud.queue_resource_routing import resource_start_number
 from app.repositories.queue_reorder_api_repository import QueueReorderApiRepository
 from app.services.queue_domain_service import QueueDomainReadError, QueueDomainService
 
@@ -38,19 +37,6 @@ class QueueReorderApiService:
         doctor = self.repository.get_active_doctor_by_user_id(current_user.id)
         if not doctor or queue.specialist_id != doctor.id:
             raise QueueReorderApiDomainError(403, "Нет прав для изменения этой очереди")
-
-    def _registry_floor(self, queue) -> int:
-        """Стартовый номер реестра для нумерации очереди (1 = без floor).
-
-        getattr/isinstance: юнит-стабы могут передавать SimpleNamespace-
-        очереди и не-Session db (конвенция round-8/10) — для них
-        легаси-нумерация позиций без смещения.
-        """
-        if getattr(queue, "queue_resource_id", None) is None:
-            return 1
-        if not isinstance(self.db, Session):
-            return 1
-        return resource_start_number(self.db, queue) or 1
 
     @staticmethod
     def _queue_info(queue, entries: list) -> dict:
@@ -132,18 +118,26 @@ class QueueReorderApiService:
                     ),
                 )
 
-        # QD-2C (Codex round-15 P2): ресурсная очередь нумеруется от
-        # стартового номера реестра (start_number_online, сиды 0059):
-        # позиции запроса (1..N) — это ПОЗИЦИИ, а записи хранят НОМЕРА
-        # (floor..floor+N-1). Без смещения реордер 40/41 давал бы 1/2,
-        # и следующая аллокация переиспользовала бы напечатанный №40.
-        # Врач-очереди (floor отсутствует) — байт-идентично.
-        base = self._registry_floor(queue)
+        # QD-2C (Codex round-16 P2): позиции запроса мапятся на
+        # СУЩЕСТВУЮЩИЕ слоты активных номеров (sorted), НЕ на
+        # floor-диапазон: терминальный (served) №40 вне active-набора, и
+        # rebuild от floor переиздал бы его — дубликат исторического
+        # билета, который by-number lookup (принимает served-строки)
+        # резолвит в старую запись. Свежая очередь без истории даёт тот
+        # же результат (слоты = floor..floor+N-1). Врач-очереди —
+        # легаси (позиция = номер), байт-идентично.
+        if getattr(queue, "queue_resource_id", None) is not None:
+            number_slots = sorted(entry.number for entry in entries)
+        else:
+            number_slots = None
 
         updated_count = 0
         for item in entry_orders:
             entry = entry_map[item["entry_id"]]
-            new_number = item["new_position"] + (base - 1)
+            if number_slots is not None:
+                new_number = number_slots[item["new_position"] - 1]
+            else:
+                new_number = item["new_position"]
             if entry.number != new_number:
                 entry.number = new_number
                 updated_count += 1
@@ -177,12 +171,14 @@ class QueueReorderApiService:
                 f"Позиция {new_position} превышает размер очереди ({len(all_entries)})",
             )
 
-        # QD-2C (Codex round-15 P2): запрос оперирует ПОЗИЦИЯМИ (1..N),
-        # записи ресурсной очереди хранят НОМЕРА от floor реестра —
-        # переводим позицию в номер-пространство, чтобы сдвиги ±1
-        # считались в одной шкале (иначе смешение 40/41 с 1/2).
-        base = self._registry_floor(queue)
-        new_number = new_position + (base - 1)
+        # QD-2C (Codex round-16 P2): позиция → СУЩЕСТВУЮЩИЙ слот активных
+        # номеров (см. reorder_queue): rebuild от floor переиздал бы
+        # терминальный №40. Врач-очереди — легаси (позиция = номер).
+        if getattr(queue, "queue_resource_id", None) is not None:
+            number_slots = sorted(e.number for e in all_entries)
+            new_number = number_slots[new_position - 1]
+        else:
+            new_number = new_position
 
         old_number = entry.number
         if old_number == new_number:
