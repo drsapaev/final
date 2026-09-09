@@ -147,13 +147,14 @@ class EditDeltaPatientData(BaseModel):
 class EditDeltaServiceItem(BaseModel):
     service_id: int
     quantity: int = Field(default=1, ge=1)
-    specialist_id: int | None = None
     # Codex R11 #3095 (P2): the edit-delta QUOTE must mirror the command's
     # create-path gate — an item that would create a new queue entry needs a
     # resolvable specialist when no active queue exists for the tag/date.
     # Without the specialist context on the quote item the gate cannot
     # distinguish a command the save accepts from one it rejects with 400
     # AFTER the registrar confirmed the price.
+    # Codex R13 #3095 (P2): the save-time token revalidation mirrors this
+    # specialist too — see apply_registrar_cart_edit_delta.
     specialist_id: int | None = None
 
 

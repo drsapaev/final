@@ -506,6 +506,31 @@ def _quote_core(
     Отсутствие цены у услуги — это НЕ 0: endpoint отвечает 409 с указанием
     услуги, чтобы регистратор увидел проблему до сохранения.
     """
+    # Codex R13 #3095 (P2): canonicalize duplicate service rows for the
+    # full-update pricing mode. Pricing in this mode depends ONLY on
+    # (service_id, quantity) — catalog rules (repeat/benefit consultation → 0,
+    # all_free → 0), no custom_price / specialist input — so the same service
+    # listed twice (e.g. quantities 1 and 2) and one merged row (quantity 3)
+    # are the SAME priced command. full_update_online_entry merges duplicate
+    # rows before token revalidation and mutation; if the quote priced the
+    # unmerged rows, the confirmed token could never match the merged save —
+    # or, before that fix, the registrar confirmed three units while the
+    # command created two one-unit entries. Quote and save now share ONE
+    # canonical representation.
+    if quote_req.pricing_mode == "full_update" and len(quote_req.items) > 1:
+        _qty_by_service: dict[int, int] = {}
+        _first_by_service: dict[int, CartQuoteItemRequest] = {}
+        for item_req in quote_req.items:
+            if item_req.service_id not in _qty_by_service:
+                _qty_by_service[item_req.service_id] = item_req.quantity
+                _first_by_service[item_req.service_id] = item_req
+            else:
+                _qty_by_service[item_req.service_id] += item_req.quantity
+        if len(_qty_by_service) != len(quote_req.items):
+            quote_req.items = [
+                _first_by_service[sid].model_copy(update={"quantity": qty})
+                for sid, qty in _qty_by_service.items()
+            ]
     effective_discount_mode = _resolve_effective_discount_mode(quote_req)
     # Codex R6 #3095 (P2): the save-time revalidation passes ITS OWN locked
     # settings snapshot in — quote and save are then priced from the exact
@@ -809,7 +834,19 @@ def apply_registrar_cart_edit_delta(
     _assert_quote_token_matches(
         db,
         items=[
-            CartQuoteItemRequest(service_id=s.service_id, quantity=s.quantity)
+            # Codex R13 #3095 (P2): mirror the specialist the QUOTE was
+            # computed with. The billable quantity is routing-dependent: for
+            # a service with no default doctor and no active same-day queue
+            # the quote succeeds with the browser-selected specialist, while
+            # a specialist-less revalidation hits the R11 gate
+            # ("specialist_id is required" 400) BEFORE the mutation can use
+            # request.services[*].specialist_id — the save rejected the very
+            # command the registrar had just confirmed.
+            CartQuoteItemRequest(
+                service_id=s.service_id,
+                quantity=s.quantity,
+                specialist_id=s.specialist_id,
+            )
             for s in request.services
         ],
         discount_mode=request.discount_mode,

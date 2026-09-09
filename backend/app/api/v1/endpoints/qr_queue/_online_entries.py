@@ -2018,6 +2018,50 @@ def full_update_online_entry(
                 )
             _svc_item["quantity"] = _qty
 
+        # Codex R13 #3095 (P2): canonicalize duplicate service rows BEFORE
+        # token revalidation and mutation. The loose full-update payload may
+        # contain the same service_id twice (e.g. quantities 1 and 2): the
+        # quote/token priced both rows (three units), but the mutation loops
+        # the duplicated id and `next(...)` matched the FIRST row each time —
+        # the command created two one-unit entries while the registrar
+        # confirmed three. Merge rows by service_id with summed quantities so
+        # the confirmed quantity and the stored quantity agree; rows that
+        # disagree on any non-quantity key are an ambiguous target state and
+        # are rejected (the mutation cannot represent two configurations of
+        # one service). The /registrar/cart/quote full_update mode merges the
+        # same way, so tokens for a split or merged payload are identical.
+        _merged_rows: dict[object, dict] = {}
+        _merged_order: list[object] = []
+        for _svc_item in request.services or []:
+            if not isinstance(_svc_item, dict) or _svc_item.get("service_id") is None:
+                continue
+            try:
+                _sid_key = int(_svc_item["service_id"])
+            except (TypeError, ValueError):
+                _sid_key = _svc_item["service_id"]
+            if _sid_key not in _merged_rows:
+                _merged_rows[_sid_key] = dict(_svc_item)
+                _merged_order.append(_sid_key)
+                continue
+            _kept = _merged_rows[_sid_key]
+            _conflicting = {
+                k: v
+                for k, v in _svc_item.items()
+                if k != "quantity" and v != _kept.get(k)
+            }
+            if _conflicting:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Услуга ID {_sid_key} указана в запросе несколько раз "
+                        f"с разными параметрами: {_conflicting}"
+                    ),
+                )
+            _kept["quantity"] = int(_kept.get("quantity", 1) or 1) + int(
+                _svc_item.get("quantity", 1) or 1
+            )
+        request.services = [_merged_rows[_k] for _k in _merged_order]
+
         # Codex R4 #3095 (P1): bind the confirmed quote to the command —
         # revalidate prices BEFORE any mutation. Item-level conversion mirrors
         # the per-line int() the command stores (see total_amount accumulation).
