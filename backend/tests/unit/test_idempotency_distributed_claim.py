@@ -1224,7 +1224,7 @@ def test_replay_authorizes_by_username_claim_like_get_current_user(two_workers, 
 
     captured: dict[str, Any] = {}
 
-    def _spy(request, user_id, username, jti):
+    def _spy(request, user_id, username, jti, require_active_doctor_profile=False):
         captured["user_id"] = user_id
         captured["username"] = username
         return True, "Registrar", False
@@ -1291,7 +1291,7 @@ def _make_username_checker(existing: set[str], renamed_to: str):
     """Stub of the DB authorization query with get_current_user's subject
     semantics: numeric subject → by id; text subject → by username."""
 
-    def _checker(request, user_id, username, jti):
+    def _checker(request, user_id, username, jti, require_active_doctor_profile=False):
         if user_id is not None:
             # Numeric subjects resolve by id in get_current_user's primary
             # lookup — but a canonical token with a username claim NEVER
@@ -1439,3 +1439,96 @@ def test_compose_files_never_evict_idempotency_state():
         assert "allkeys-lru" not in effective, (
             f"{compose} must not evict idempotency claims/snapshots"
         )
+
+
+def test_required_intent_write_must_be_confirmed_before_execution(monkeypatch):
+    """Codex R15 #3092 (P1): Redis падает после раннего гейта (или SET маркера
+    не удался) — keyed write ОТКЛОНЯЕТСЯ 503, хендлер не запускается. Прежний
+    best-effort маркер существовал только локально: второй воркер его не видел,
+    потерянный ответ после истечения lease приводил к повторному исполнению."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+
+    class _PingOkSetFailRedis(FakeRedis):
+        def set(self, key, value, nx=False, xx=False, ex=None):
+            # ломается ТОЛЬКО запись intent-маркера: claim-SET (nx=True)
+            # проходит, чтобы воспроизвести именно окно "маркер не записан"
+            if key.endswith(":intent"):
+                raise ConnectionError("simulated intent SET failure")
+            return super().set(key, value, nx=nx, xx=xx, ex=ex)
+
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    claim = object.__new__(DistributedIdempotencyClaim)
+    claim._ttl = 24 * 60 * 60
+    claim._prefix = "idem"
+    claim._lease_seconds = 90
+    claim._required = True
+    claim._client = _PingOkSetFailRedis()
+    claim._available = True
+    claim._failed_at = 0.0
+    idem_module._distributed_claim = claim
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9010
+    )
+    try:
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+        h1 = auth_headers("1")
+        r1 = client.post("/echo", headers={**h1, "Idempotency-Key": "intent-key"})
+        assert r1.status_code == 503, r1.text
+        assert r1.json()["code"] == "idempotency_unavailable"
+        assert counter["calls"] == 0, (
+            "unconfirmed intent must not reach the handler"
+        )
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+
+
+def test_replay_rechecks_resource_authorization_for_same_role(monkeypatch):
+    """Codex R15 #3092 (P1): replay при НЕИЗМЕННОЙ роли обязан заново
+    прогнать ресурсную авторизацию принципала (активный профиль Doctor —
+    зеркало inline-политики queue.py): дезактивация профиля между исполнением
+    и ретраем больше не отдаёт PHI-снапшот."""
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+
+    calls: list[bool] = []
+
+    def _auth_stub(request, user_id, username, jti, require_active_doctor_profile=False):
+        calls.append(bool(require_active_doctor_profile))
+        if require_active_doctor_profile:
+            # второй вызок — replay: профиль Doctor дезактивирован
+            return False, "Doctor", False
+        return True, "Doctor", False
+
+    idem_module._distributed_claim = _make_claim(FakeRedis())
+    idem_module._check_principal_authorized_sync = _auth_stub
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9011
+    )
+    try:
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+        h1 = auth_headers("1")
+        r1 = client.post("/echo", headers={**h1, "Idempotency-Key": "doc-key"})
+        assert r1.status_code == 200, r1.text
+        r2 = client.post("/echo", headers={**h1, "Idempotency-Key": "doc-key"})
+        assert r2.status_code == 403, (
+            f"same-role replay with a deactivated Doctor profile must be "
+            f"refused non-executing, got {r2.status_code}"
+        )
+        assert counter["calls"] == 1
+        assert any(calls), "the replay path must run the principal authorization"
+        assert calls[-1] is True, (
+            "the REPLAY authorization must request the active-Doctor-profile "
+            "resource check (require_active_doctor_profile=True)"
+        )
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve

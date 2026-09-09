@@ -57,7 +57,6 @@ from urllib.parse import urlsplit, urlunsplit
 
 import jwt
 import redis as redis_lib
-
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -127,7 +126,11 @@ def payload_hash(body: bytes | None) -> str:
 
 
 def _user_authorized_in_db(
-    db: Any, user_id: int | None, username: str | None, jti: Any
+    db: Any,
+    user_id: int | None,
+    username: str | None,
+    jti: Any,
+    require_active_doctor_profile: bool = False,
 ) -> tuple[bool, str | None, bool]:
     """Pure DB-backed authorization query — fails CLOSED (Codex R3/R4 #3092).
 
@@ -138,6 +141,17 @@ def _user_authorized_in_db(
     responses to the RBAC policy they were produced under (Codex R4 #3092
     P1); is_superuser lets the replay evaluate require_roles' superuser
     bypass exactly as the endpoint would (Codex R6 #3092 P1).
+
+    Codex R15 #3092 (P1): ``require_active_doctor_profile=True`` (REPLAY
+    paths) additionally verifies an ACTIVE Doctor profile for the
+    principal. Inline-auth routes (queue.py) re-run this resource
+    authorization on every fresh request, but the replay path previously
+    trusted the role label alone: a deactivated Doctor profile left the
+    role label unchanged and the middleware replayed the PHI-bearing
+    snapshot the endpoint would now refuse. The profile check mirrors
+    queue.py:69-79 (Doctor.user_id + Doctor.active); per-entry queue
+    ownership stays endpoint-level — the middleware cannot resolve the
+    request's resource.
     """
     if db is None or (user_id is None and not username):
         return False, None, False
@@ -175,9 +189,27 @@ def _user_authorized_in_db(
         row = db.execute(stmt).first()
         if row is None:
             return False, None, False
-        _, is_active, role, is_superuser, jti_hit, sentinel_hit = row
+        subject_id, is_active, role, is_superuser, jti_hit, sentinel_hit = row
         role_label = str(role) if role is not None else None
-        return (bool(is_active) and not (jti_hit or sentinel_hit)), role_label, bool(is_superuser)
+        authorized = bool(is_active) and not (jti_hit or sentinel_hit)
+        if authorized and require_active_doctor_profile and role_label == "Doctor":
+            from app.models.clinic import Doctor
+
+            has_active_profile = (
+                db.query(Doctor.id)
+                .filter(
+                    Doctor.user_id == int(subject_id),
+                    Doctor.active.is_(True),
+                )
+                .first()
+            ) is not None
+            if not has_active_profile:
+                logger.warning(
+                    "Idempotency replay refused (Doctor profile inactive): user=%s",
+                    subject_id,
+                )
+                return False, role_label, bool(is_superuser)
+        return authorized, role_label, bool(is_superuser)
     except Exception:
         logger.warning(
             "Idempotency principal authorization query failed; refusing replay",
@@ -300,7 +332,11 @@ def _resolve_request_db(request: Any):
 
 
 def _check_principal_authorized_sync(
-    request: Any, user_id: int | None, username: str | None, jti: Any
+    request: Any,
+    user_id: int | None,
+    username: str | None,
+    jti: Any,
+    require_active_doctor_profile: bool = False,
 ) -> tuple[bool, str | None, bool]:
     """DB-backed principal authorization for the replay path (Codex R3/R4 #3092).
 
@@ -313,7 +349,10 @@ def _check_principal_authorized_sync(
         generator = _resolve_request_db(request)
         try:
             db = next(generator)
-            return _user_authorized_in_db(db, user_id, username, jti)
+            return _user_authorized_in_db(
+                db, user_id, username, jti,
+                require_active_doctor_profile=require_active_doctor_profile,
+            )
         finally:
             try:
                 next(generator)
@@ -677,20 +716,29 @@ class DistributedIdempotencyClaim:
     def _intent_key(user_id: int | str, key: str) -> str:
         return f"idem:{user_id}:{key}:intent"
 
-    def mark_execution_intent(self, user_id: int | str, key: str) -> None:
-        """Best-effort durable marker: 'this key reached execution'."""
-        if not self._ensure_available() or self._client is None:
-            _mark_local_execution_intent(user_id, key)
-            return
-        self._run(
-            self._client.set,
-            self._intent_key(user_id, key),
-            "1",
-            ex=self._ttl,
-        )
+    def mark_execution_intent(self, user_id: int | str, key: str) -> bool:
+        """Durable marker: 'this key reached execution'.
+
+        Codex R15 #3092 (P1): returns True iff the DISTRIBUTED marker write
+        was CONFIRMED. Callers with required coordination must treat False
+        as refusal (503) — a silently-missing marker let a lost-response
+        retry re-execute the write after the lease expired. The local mirror
+        is always written as a belt-and-suspenders fallback for THIS worker.
+        """
+        confirmed = False
+        if self._ensure_available() and self._client is not None:
+            confirmed = bool(
+                self._run(
+                    self._client.set,
+                    self._intent_key(user_id, key),
+                    "1",
+                    ex=self._ttl,
+                )
+            )
         # Mirror locally too: Redis degradation after marking must not turn a
         # later retry into a blind re-execution on THIS worker.
         _mark_local_execution_intent(user_id, key)
+        return confirmed
 
     def clear_execution_intent(self, user_id: int | str, key: str) -> None:
         """Outcome is KNOWN (response stored, or the endpoint returned a
@@ -882,7 +930,13 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             # Registrar both pass /registrar/cart, so a role change between
             # two authorized roles must REPLAY the committed snapshot, not
             # evict it and re-execute the write (duplicate visits/invoices).
-            authorized, current_role, current_superuser = await self._principal_authorized(request, principal_payload)
+            # Codex R15 #3092 (P1): the replay re-runs the principal-level
+            # RESOURCE authorization (active Doctor profile) even when the
+            # role label is unchanged — an inline-auth route's policy can
+            # start refusing while the label stays the same.
+            authorized, current_role, current_superuser = await self._principal_authorized(
+                request, principal_payload, require_active_doctor_profile=True
+            )
             if not authorized:
                 logger.warning(
                     "Idempotency replay refused (principal not authorized): user=%s key=%s path=%s",
@@ -940,7 +994,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # Codex R3/R4 #3092: authorization + role binding before
                 # cross-worker replay. Codex R6: the endpoint policy decides
                 # on role change (same as the local-cache branch above).
-                authorized, current_role, current_superuser = await self._principal_authorized(request, principal_payload)
+                # Codex R15 #3092 (P1): active-Doctor-profile resource fact
+                # re-checked on replays (same-role included).
+                authorized, current_role, current_superuser = await self._principal_authorized(
+                    request, principal_payload, require_active_doctor_profile=True
+                )
                 if not authorized:
                     logger.warning(
                         "Idempotency distributed replay refused (principal not authorized): user=%s key=%s path=%s",
@@ -992,7 +1050,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # the cached response here either. Codex R6: the endpoint
                     # policy decides on role change (snapshot KEPT on refusal).
                     # Codex R8 #3092 (P1): principal refusal is NON-EXECUTING.
-                    authorized, current_role, current_superuser = await self._principal_authorized(request, principal_payload)
+                    # Codex R15 #3092 (P1): active-Doctor-profile resource fact
+                    # re-checked on replays (same-role included).
+                    authorized, current_role, current_superuser = await self._principal_authorized(
+                        request, principal_payload, require_active_doctor_profile=True
+                    )
                     if not authorized:
                         logger.warning(
                             "Idempotency post-inflight replay refused (principal not authorized): user=%s key=%s path=%s",
@@ -1076,7 +1138,53 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 claim.release(user_id, idempotency_key, claim_token)
             return self._uncertain_outcome_response()
         if claim is not None and claim.try_available():
-            claim.mark_execution_intent(user_id, idempotency_key)
+            # Codex R15 #3092 (P1): для required-координации маркер обязан быть
+            # ПОДТВЕРЖДЁННО распределённым непосредственно перед call_next.
+            # Прежний best-effort SET допускал окно: Redis падает после
+            # предыдущих проверок (или SET не удался) — маркер существует
+            # только локально, второй воркер его не видит, и потерянный ответ
+            # после истечения lease приводил к повторному исполнению записи
+            # (дубликаты визитов/счетов/очереди).
+            intent_confirmed = claim.mark_execution_intent(user_id, idempotency_key)
+            if claim.required and not intent_confirmed:
+                logger.warning(
+                    "Idempotency execution intent NOT confirmed in distributed store: "
+                    "user=%s key=%s path=%s — refusing keyed write",
+                    user_id, idempotency_key, request.url.path,
+                )
+                if claim_acquired and claim_token is not None:
+                    claim.release(user_id, idempotency_key, claim_token)
+                return Response(
+                    status_code=503,
+                    headers={"Retry-After": "2", "Cache-Control": "no-store"},
+                    content=(
+                        '{"code": "idempotency_unavailable", "detail": "Идемпотентность '
+                        'временно недоступна: распределённая координация не отвечает. '
+                        'Повторите запрос с тем же Idempotency-Key."}'
+                    ),
+                    media_type="application/json",
+                )
+        elif claim is not None and claim.required:
+            # Codex R15 #3092 (P1): Redis упал между ранним гейтом и точкой
+            # исполнения — координация не может быть подтверждена прямо перед
+            # call_next: fail closed, ничего не исполняем.
+            logger.warning(
+                "Idempotency coordination lost before execution: "
+                "user=%s key=%s path=%s — refusing keyed write",
+                user_id, idempotency_key, request.url.path,
+            )
+            if claim_acquired and claim_token is not None:
+                claim.release(user_id, idempotency_key, claim_token)
+            return Response(
+                status_code=503,
+                headers={"Retry-After": "2", "Cache-Control": "no-store"},
+                content=(
+                    '{"code": "idempotency_unavailable", "detail": "Идемпотентность '
+                    'временно недоступна: распределённая координация не отвечает. '
+                    'Повторите запрос с тем же Idempotency-Key."}'
+                ),
+                media_type="application/json",
+            )
         else:
             _mark_local_execution_intent(user_id, idempotency_key)
 
@@ -1251,7 +1359,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         subject = f"user:{int(canonical_user_id)}"
         return hashlib.sha256(subject.encode("utf-8")).hexdigest()[:32]
 
-    async def _principal_authorized(self, request: Request, principal_payload: dict[str, Any]) -> tuple[bool, str | None, bool]:
+    async def _principal_authorized(
+        self,
+        request: Request,
+        principal_payload: dict[str, Any],
+        require_active_doctor_profile: bool = False,
+    ) -> tuple[bool, str | None, bool]:
         """DB-backed authorization before any replay (Codex R3/R4/R6 #3092).
 
         Mirrors get_current_user's semantics: the user must exist, be active,
@@ -1279,7 +1392,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         jti = principal_payload.get("jti")
         try:
             return await asyncio.to_thread(
-                _check_principal_authorized_sync, request, user_id, username, jti
+                _check_principal_authorized_sync,
+                request,
+                user_id,
+                username,
+                jti,
+                require_active_doctor_profile,
             )
         except Exception:  # pragma: no cover - to_thread failure is fail-closed
             logger.warning("Idempotency principal check crashed; refusing replay", exc_info=True)
