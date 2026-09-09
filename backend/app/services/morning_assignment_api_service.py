@@ -257,18 +257,30 @@ class MorningAssignmentApiService:
 
         for queue in queues:
             entries_count = self.repository.count_queue_entries(queue_id=queue.id)
-            doctor = self.repository.get_doctor(queue.specialist_id)
-            doctor_name = (
-                doctor.user.full_name
-                if doctor and doctor.user
-                else f"ID:{queue.specialist_id}"
-            )
+            # QD-2C (Codex round-15 P2): resource-очередь (specialist
+            # NULL) — владелец из реестра (display_name), не «ID:None»
+            # в админ-сводке; врач-очереди байт-идентичны. getattr:
+            # юнит-стабы (SimpleNamespace) — round-8/10 конвенция.
+            resource_id = getattr(queue, "queue_resource_id", None)
+            if resource_id is not None:
+                resource = getattr(queue, "queue_resource", None)
+                doctor_name = (
+                    resource.display_name if resource is not None else "Ресурс очереди"
+                )
+            else:
+                doctor = self.repository.get_doctor(queue.specialist_id)
+                doctor_name = (
+                    doctor.user.full_name
+                    if doctor and doctor.user
+                    else f"ID:{queue.specialist_id}"
+                )
             queue_summary.append(
                 {
                     "queue_id": queue.id,
                     "queue_tag": queue.queue_tag or "general",
                     "doctor_name": doctor_name,
                     "doctor_id": queue.specialist_id,
+                    "queue_resource_id": resource_id,
                     "entries_count": entries_count,
                     "active": queue.active,
                     "opened_at": (

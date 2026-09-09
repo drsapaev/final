@@ -7,6 +7,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.crud.queue_resource_routing import resource_start_number
 from app.repositories.queue_reorder_api_repository import QueueReorderApiRepository
 from app.services.queue_domain_service import QueueDomainReadError, QueueDomainService
 
@@ -26,6 +27,7 @@ class QueueReorderApiService:
         repository: QueueReorderApiRepository | None = None,
         domain_service: QueueDomainService | None = None,
     ):
+        self.db = db
         self.repository = repository or QueueReorderApiRepository(db)
         self.domain_service = domain_service or QueueDomainService(db)
 
@@ -37,17 +39,41 @@ class QueueReorderApiService:
         if not doctor or queue.specialist_id != doctor.id:
             raise QueueReorderApiDomainError(403, "Нет прав для изменения этой очереди")
 
+    def _registry_floor(self, queue) -> int:
+        """Стартовый номер реестра для нумерации очереди (1 = без floor).
+
+        getattr/isinstance: юнит-стабы могут передавать SimpleNamespace-
+        очереди и не-Session db (конвенция round-8/10) — для них
+        легаси-нумерация позиций без смещения.
+        """
+        if getattr(queue, "queue_resource_id", None) is None:
+            return 1
+        if not isinstance(self.db, Session):
+            return 1
+        return resource_start_number(self.db, queue) or 1
+
     @staticmethod
     def _queue_info(queue, entries: list) -> dict:
+        # QD-2C (Codex round-15 P2): resource-ось — владелец из реестра
+        # (display_name + queue_resource_id), не «Неизвестно»/null при
+        # живом реестровом владельце; врач-очереди байт-идентичны.
+        # getattr: юнит-стабы (SimpleNamespace) — round-8/10 конвенция.
+        resource_id = getattr(queue, "queue_resource_id", None)
+        if resource_id is not None:
+            resource = getattr(queue, "queue_resource", None)
+            specialist_name = (
+                resource.display_name if resource is not None else "Ресурс очереди"
+            )
+        elif queue.specialist and queue.specialist.user:
+            specialist_name = queue.specialist.user.full_name
+        else:
+            specialist_name = "Неизвестно"
         return {
             "queue_id": queue.id,
             "day": queue.day.isoformat(),
-            "specialist_name": (
-                queue.specialist.user.full_name
-                if (queue.specialist and queue.specialist.user)
-                else "Неизвестно"
-            ),
+            "specialist_name": specialist_name,
             "specialist_id": queue.specialist_id,
+            "queue_resource_id": resource_id,
             "is_active": queue.active,
             "opened_at": queue.opened_at.isoformat() if queue.opened_at else None,
             "total_entries": len(entries),
@@ -106,12 +132,20 @@ class QueueReorderApiService:
                     ),
                 )
 
+        # QD-2C (Codex round-15 P2): ресурсная очередь нумеруется от
+        # стартового номера реестра (start_number_online, сиды 0059):
+        # позиции запроса (1..N) — это ПОЗИЦИИ, а записи хранят НОМЕРА
+        # (floor..floor+N-1). Без смещения реордер 40/41 давал бы 1/2,
+        # и следующая аллокация переиспользовала бы напечатанный №40.
+        # Врач-очереди (floor отсутствует) — байт-идентично.
+        base = self._registry_floor(queue)
+
         updated_count = 0
         for item in entry_orders:
             entry = entry_map[item["entry_id"]]
-            new_position = item["new_position"]
-            if entry.number != new_position:
-                entry.number = new_position
+            new_number = item["new_position"] + (base - 1)
+            if entry.number != new_number:
+                entry.number = new_number
                 updated_count += 1
 
         self.repository.commit()
@@ -143,8 +177,15 @@ class QueueReorderApiService:
                 f"Позиция {new_position} превышает размер очереди ({len(all_entries)})",
             )
 
-        old_position = entry.number
-        if old_position == new_position:
+        # QD-2C (Codex round-15 P2): запрос оперирует ПОЗИЦИЯМИ (1..N),
+        # записи ресурсной очереди хранят НОМЕРА от floor реестра —
+        # переводим позицию в номер-пространство, чтобы сдвиги ±1
+        # считались в одной шкале (иначе смешение 40/41 с 1/2).
+        base = self._registry_floor(queue)
+        new_number = new_position + (base - 1)
+
+        old_number = entry.number
+        if old_number == new_number:
             return (
                 "Позиция не изменилась",
                 0,
@@ -152,29 +193,29 @@ class QueueReorderApiService:
             )
 
         updated_count = 0
-        if old_position < new_position:
+        if old_number < new_number:
             for other_entry in all_entries:
                 if other_entry.id == entry.id:
                     continue
-                if old_position < other_entry.number <= new_position:
+                if old_number < other_entry.number <= new_number:
                     other_entry.number -= 1
                     updated_count += 1
         else:
             for other_entry in all_entries:
                 if other_entry.id == entry.id:
                     continue
-                if new_position <= other_entry.number < old_position:
+                if new_number <= other_entry.number < old_number:
                     other_entry.number += 1
                     updated_count += 1
 
-        entry.number = new_position
+        entry.number = new_number
         updated_count += 1
         self.repository.commit()
 
         updated_entries = self.repository.list_active_entries(queue_id=entry.queue_id)
         queue_info = self._queue_info(queue, updated_entries)
         return (
-            f"Запись перемещена с позиции {old_position} на позицию {new_position}",
+            f"Запись перемещена с позиции {old_number} на позицию {new_number}",
             updated_count,
             queue_info,
         )

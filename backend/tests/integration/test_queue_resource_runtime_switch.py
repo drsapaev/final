@@ -3280,3 +3280,154 @@ def test_display_state_snapshots_use_resource_owner(
     assert all(e["specialist_name"] == "Лаборатория (X4)" for e in resource_rows)
     target = next(e for e in resource_rows if e["id"] == entry.id)
     assert target["number"] == 4
+
+
+# ===================== Y. Codex round-15 pins =====================
+
+
+def test_reorder_preserves_resource_number_floor(db_session: Session) -> None:
+    """Codex round-15 P2: reorder/move operate on POSITIONS (1..N) but
+    a resource queue stores NUMBERS from the registry floor — tickets
+    40/41 must not become 1/2 (the next allocation would reprint №40).
+    Doctor queues without a floor keep the legacy numbering. The
+    service COMMITs — durable rows cleaned in the finally."""
+    try:
+        from app.services.queue_reorder_api_service import QueueReorderApiService
+
+        admin = _make_user(db_session, username="adm_y1", role="Admin")
+        _make_resource(db_session, code="lab", queue_tag="lab", start_number_online=40)
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        first = _make_waiting_entry(db_session, queue, number=40)
+        second = _make_waiting_entry(db_session, queue, number=41)
+
+        service = QueueReorderApiService(db_session)
+        # swap the two tickets by position: 41→pos1, 40→pos2
+        updated, info = service.reorder_queue(
+            queue_id=queue.id,
+            entry_orders=[
+                {"entry_id": second.id, "new_position": 1},
+                {"entry_id": first.id, "new_position": 2},
+            ],
+            current_user=admin,
+        )
+        assert updated == 2
+        db_session.refresh(first)
+        db_session.refresh(second)
+        # numbers stay in the registry floor space — no 1/2
+        assert {first.number, second.number} == {40, 41}
+        assert first.number == 41
+        assert second.number == 40
+        assert info["specialist_name"] == "Ресурс очереди"
+        assert info["queue_resource_id"] is not None
+
+        # move: the ticket now at number 40 back to position 2
+        moved = _make_waiting_entry(db_session, queue, number=42)
+        message, count, _ = service.move_queue_entry(
+            entry_id=moved.id, new_position=1, current_user=admin
+        )
+        assert count >= 1
+        db_session.refresh(moved)
+        assert moved.number == 40  # position 1 → the floor, not 1
+
+        # doctor-queue regression: no floor → positions are the numbers
+        doc_user = _make_user(db_session, username="dr_y1_axis", role="Doctor")
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardiology")
+        doc_queue = _make_queue(db_session, specialist_id=doctor.id, queue_tag=None)
+        doc_first = _make_waiting_entry(db_session, doc_queue, number=1)
+        doc_second = _make_waiting_entry(db_session, doc_queue, number=2)
+        _, doc_info = service.reorder_queue(
+            queue_id=doc_queue.id,
+            entry_orders=[
+                {"entry_id": doc_second.id, "new_position": 1},
+                {"entry_id": doc_first.id, "new_position": 2},
+            ],
+            current_user=admin,
+        )
+        db_session.refresh(doc_first)
+        db_session.refresh(doc_second)
+        assert (doc_first.number, doc_second.number) == (2, 1)  # legacy semantics
+        assert doc_info["specialist_name"] == "dr_y1_axis"
+        assert doc_info["queue_resource_id"] is None
+    finally:
+        _durable_cleanup(db_session, "adm_y1", "dr_y1_axis")
+
+
+def test_reorder_status_serializes_resource_owner(db_session: Session) -> None:
+    """Codex round-15 P2: /queue/reorder/status/by-specialist for a
+    registry-tag specialist serializes the registry owner — the
+    display_name and the resource identity, not «Неизвестно» with a
+    null doctor."""
+    from app.services.queue_reorder_api_service import QueueReorderApiService
+
+    user = _make_user(db_session, username="lab_res_y2", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    resource = _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = _make_queue(
+        db_session,
+        specialist_id=None,
+        queue_tag="lab",
+        queue_resource_id=resource.id,
+    )
+    _make_waiting_entry(db_session, queue, number=40)
+
+    info = QueueReorderApiService(db_session).get_queue_status_by_specialist(
+        specialist_id=synthetic.id, day=_DAY
+    )
+    assert info["queue_id"] == queue.id  # the round-13 surface resolve
+    assert info["specialist_name"] == "Ресурс очереди"
+    assert info["specialist_id"] is None
+    assert info["queue_resource_id"] == resource.id
+    assert info["total_entries"] == 1
+
+
+def test_morning_summary_labels_resource_rows(db_session: Session) -> None:
+    """Codex round-15 P2: /admin/morning-assignment/queue-summary labels
+    resource queues with the registry display_name (and the resource
+    identity), not «ID:None» with a null doctor; doctor rows are
+    unchanged. Commits (get_or_create) — cleaned in the finally."""
+    from datetime import datetime
+
+    from app.services.morning_assignment_api_service import (
+        MorningAssignmentApiService,
+    )
+
+    today = datetime.now().date()
+    try:
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        resource = (
+            db_session.query(QueueResource)
+            .filter(QueueResource.queue_tag == "lab")
+            .first()
+        )
+        resource.display_name = "Лаборатория (Y3)"
+        db_session.commit()
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=today, specialist_id=None, queue_tag="lab"
+        )
+        _make_waiting_entry(db_session, queue, number=40)
+
+        doc_user = _make_user(db_session, username="dr_y3_axis", role="Doctor")
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardiology")
+        doc_queue = _make_queue(
+            db_session, day=today, specialist_id=doctor.id, queue_tag="cardiology"
+        )
+        _make_waiting_entry(db_session, doc_queue, number=1)
+
+        payload = MorningAssignmentApiService(db_session).get_queue_summary_payload(
+            target_date=today
+        )
+        rows = {row["queue_id"]: row for row in payload["queues"]}
+        resource_row = rows[queue.id]
+        assert resource_row["doctor_name"] == "Лаборатория (Y3)"
+        assert resource_row["doctor_id"] is None
+        assert resource_row["queue_resource_id"] == resource.id
+        assert resource_row["entries_count"] == 1
+
+        doctor_row = rows[doc_queue.id]
+        assert doctor_row["doctor_name"] == "dr_y3_axis"
+        assert doctor_row["doctor_id"] == doctor.id
+        assert doctor_row["queue_resource_id"] is None
+    finally:
+        _durable_cleanup(db_session, "dr_y3_axis")
