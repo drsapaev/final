@@ -3044,3 +3044,239 @@ def test_department_overview_counts_resource_entries(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== X. Codex round-14 pins =====================
+
+
+def test_call_next_prefers_surface_over_untagged_shadow(db_session: Session) -> None:
+    """Codex round-14 P1: the canonical call-next selector prefers the
+    registry surface BEFORE accepting doctor-keyed candidates — an
+    active untagged synthetic-doctor shadow must not win the selection
+    while patients wait on the live resource queue. The service COMMITs
+    — durable rows cleaned in the finally."""
+    try:
+        from app.services.qr_queue import QRQueueService
+
+        user = _make_user(db_session, username="lab_res_x1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        assert queue.specialist_id is None
+        surface_entry = _make_waiting_entry(db_session, queue, number=5)
+
+        # the ACTIVE UNTAGGED doctor-keyed shadow with its own waiting
+        # patient — the legacy-writer artifact (round-6 shape)
+        shadow = _make_queue(db_session, specialist_id=synthetic.id, queue_tag=None)
+        assert shadow.queue_tag is None
+        shadow_entry = _make_waiting_entry(db_session, shadow, number=99)
+
+        service = QRQueueService(db_session)
+        result = service.call_next_patient(synthetic.id, None, target_date=_DAY)
+        assert result["success"] is True
+        db_session.refresh(surface_entry)
+        db_session.refresh(shadow_entry)
+        # the SURFACE patient advances; the shadow patient stays waiting
+        assert surface_entry.status == "called"
+        assert shadow_entry.status == "waiting"
+    finally:
+        _durable_cleanup(db_session, "lab_res_x1")
+
+
+def test_qr_time_restrictions_prefer_surface_over_shadow(
+    db_session: Session,
+) -> None:
+    """Codex round-14 P2: _check_online_time_restrictions prefers the
+    registry surface (prefer_registry_surface) — an active doctor-keyed
+    shadow with opened_at set must not close the reception while the
+    live resource surface is still accepting. Future-day token keeps
+    the verdict deterministic. The service COMMITs — durable rows
+    cleaned in the finally."""
+    try:
+        from datetime import datetime, timedelta
+
+        from app.models.online_queue import QueueToken
+        from app.services.qr_queue import QRQueueService
+
+        future_day = datetime.now().date() + timedelta(days=30)
+        user = _make_user(db_session, username="lab_res_x2", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        surface = _make_queue(
+            db_session,
+            day=future_day,
+            specialist_id=None,
+            queue_tag="lab",
+            active=True,
+        )
+        surface.queue_resource_id = (
+            db_session.query(QueueResource)
+            .filter(QueueResource.queue_tag == "lab")
+            .first()
+            .id
+        )
+        db_session.commit()
+
+        # the shadow: opened reception on the same future day
+        shadow = _make_queue(
+            db_session,
+            day=future_day,
+            specialist_id=synthetic.id,
+            queue_tag=None,
+            active=True,
+        )
+        shadow.opened_at = datetime.now()
+        db_session.commit()
+
+        token = QueueToken(
+            token="tok-x2",
+            day=future_day,
+            specialist_id=synthetic.id,
+            department="lab",
+            is_clinic_wide=False,
+            expires_at=datetime.now() + timedelta(days=60),
+        )
+        db_session.add(token)
+        db_session.commit()
+
+        service = QRQueueService(db_session)
+        result = service._check_online_time_restrictions("tok-x2")
+        # the SURFACE is evaluated (not opened, future date → allowed),
+        # not the shadow (which would say closed_reception_opened)
+        assert result["allowed"] is True, result
+        assert result["status"] != "closed_reception_opened"
+    finally:
+        _durable_cleanup(db_session, "lab_res_x2")
+        db_session.query(QueueToken).filter(QueueToken.token == "tok-x2").delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_position_info_reports_resource_owner(db_session: Session) -> None:
+    """Codex round-14 P2: get_queue_position_info builds queue_info
+    from the ownership axis — a resource ticket reachable through the
+    by-number fallback reports the registry display_name (and the
+    default_cabinet when the queue row carries none), not a position
+    with no destination name."""
+    from app.services.queue_position_notifications import (
+        get_queue_position_service,
+    )
+
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    resource = (
+        db_session.query(QueueResource).filter(QueueResource.queue_tag == "lab").first()
+    )
+    resource.default_cabinet = "7"
+    db_session.commit()
+    queue = _make_queue(
+        db_session,
+        specialist_id=None,
+        queue_tag="lab",
+        queue_resource_id=resource.id,
+    )
+    assert queue.cabinet_number is None  # exercise the registry fallback
+    entry = _make_waiting_entry(db_session, queue, number=12)
+    entry.queue_time = datetime(2026, 9, 7, 8, 0)  # _count_people_ahead needs it
+    db_session.commit()
+
+    info = get_queue_position_service(db_session).get_queue_position_info(entry)
+    assert info["queue_info"]["specialist_name"] == "Ресурс очереди"
+    assert info["queue_info"]["cabinet_number"] == "7"  # default_cabinet fallback
+    assert info["queue_number"] == 12
+
+    # doctor-queue regression: the specialist axis is unchanged
+    doc_user = _make_user(db_session, username="dr_x3_axis", role="Doctor")
+    doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardiology")
+    doc_queue = _make_queue(db_session, specialist_id=doctor.id, queue_tag="cardiology")
+    doc_entry = _make_waiting_entry(db_session, doc_queue, number=3)
+    doc_entry.queue_time = datetime(2026, 9, 7, 8, 30)
+    db_session.commit()
+    doc_info = get_queue_position_service(db_session).get_queue_position_info(doc_entry)
+    assert doc_info["queue_info"]["specialist_name"] == "dr_x3_axis"
+
+
+def _shared_session(inner: Session):
+    """Delegates to the test session; close() is a no-op (the fixture
+    owns the lifecycle) — for manager code that opens SessionLocal()."""
+
+    class _Shared:
+        def __getattr__(self, name):
+            return getattr(inner, name)
+
+        def close(self) -> None:  # noqa: D102 — see docstring
+            pass
+
+    return _Shared()
+
+
+def test_display_state_snapshots_use_resource_owner(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-14 P2: the display state snapshots carry the registry
+    owner — broadcast_daily_queue_state reports display_name + the
+    registry-sourced cabinet, and _send_current_state labels the
+    resource queue entries with display_name instead of «Врач #None»."""
+    import asyncio
+    import json
+    from datetime import datetime
+
+    from app.services import display_websocket as dw
+
+    today = datetime.now().date()
+    monkeypatch.setattr(dw, "SessionLocal", lambda: _shared_session(db_session))
+
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    resource = (
+        db_session.query(QueueResource).filter(QueueResource.queue_tag == "lab").first()
+    )
+    resource.display_name = "Лаборатория (X4)"
+    resource.default_cabinet = "7"
+    db_session.commit()
+    queue = _make_queue(
+        db_session,
+        day=today,
+        specialist_id=None,
+        queue_tag="lab",
+        queue_resource_id=resource.id,
+    )
+    db_session.refresh(queue)
+    entry = _make_waiting_entry(db_session, queue, number=4)
+
+    manager = dw.DisplayWebSocketManager.__new__(dw.DisplayWebSocketManager)
+    manager.connections = {}
+    manager.board_states = {}
+
+    captured: dict = {}
+
+    async def record_board(board_id: str, message: dict) -> None:
+        captured.setdefault("broadcasts", []).append(message)
+
+    manager.broadcast_to_board = record_board  # type: ignore[method-assign]
+
+    asyncio.run(manager.broadcast_daily_queue_state(queue, board_ids=["board-x"]))
+    message = captured["broadcasts"][0]
+    assert message["type"] == "queue_update"
+    assert message["data"]["doctor_name"] == "Лаборатория (X4)"
+    assert message["data"]["cabinet"] == "7"
+    assert message["data"]["specialty"] == "lab"
+
+    # the reconnect snapshot (initial_state) labels the resource queue
+    # entries with the registry owner, not «Врач #None»
+    sent: dict = {}
+
+    class FakeWebSocket:
+        async def send_text(self, payload: str) -> None:
+            sent["payload"] = payload
+
+    asyncio.run(manager._send_current_state(FakeWebSocket(), "board-x"))
+    state = json.loads(sent["payload"])
+    resource_rows = [
+        e for e in state["data"]["queue_entries"] if e["specialist_id"] is None
+    ]
+    assert resource_rows, "resource entry expected in the initial state"
+    assert all(e["specialist_name"] == "Лаборатория (X4)" for e in resource_rows)
+    target = next(e for e in resource_rows if e["id"] == entry.id)
+    assert target["number"] == 4

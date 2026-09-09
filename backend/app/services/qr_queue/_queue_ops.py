@@ -150,6 +150,30 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             if tag_queue is not None:
                 candidate_queues = [tag_queue]
 
+        # Codex P1 (round-14): поверхность реестра предпочитается ДО
+        # принятия doctor-keyed кандидатов — fallback выше срабатывал
+        # только на ПУСТОМ списке. На upgraded-клинике рядом с живой
+        # resource-очередью может остаться АКТИВНЫЙ untagged
+        # synthetic-shadow (легаси-писатели ещё смонтированы, round-6):
+        # выбор уходил shadow'у → «нет пациентов», пока пациенты ждут
+        # на поверхности. Поверхность возглавляет кандидатов; untagged
+        # строки (не на оси тега) выпадают; tagged doctor-строки
+        # (мост 0059) остаются сканируемыми. Doctor-теги без поверхности
+        # (surface is None) не тронуты — байт-идентично.
+        if candidate_queues:
+            surface = resolve_registry_tag_queue_for_specialist(
+                self.db, queue_date, specialist_id, queue_tag
+            )
+            if surface is not None:
+                surface_ids = {surface.id}
+                candidate_queues = [
+                    q
+                    for q in candidate_queues
+                    if q.queue_tag is not None or q.id in surface_ids
+                ]
+                if surface.id not in {q.id for q in candidate_queues}:
+                    candidate_queues = [surface] + candidate_queues
+
         # Codex P1 (round-12): без queue_tag у врача с несколькими активными
         # tagged-очередями неупорядоченный .first() выбирал произвольную —
         # «нет пациентов» при waiting в соседней очереди / вызов не из того
@@ -475,12 +499,17 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 )
                 .first()
             )
-            # QD-2C (Codex round-2 P1): resource-owned очередь тега
-            # реестра — тот же fallback, что и call_next_patient
-            if not daily_queue:
-                daily_queue = resolve_registry_tag_queue_for_specialist(
-                    self.db, target_date, qr_token.specialist_id, None
-                )
+            # QD-2C (Codex round-2 P1): resource-owned очередь тега реестра
+            # видна через fallback реестра — не только doctor-keyed lookup.
+            # Codex P2 (round-14): PREFER, а не только empty-fallback —
+            # активный doctor-keyed shadow (opened_at/capacity/window
+            # расходятся с поверхностью) не должен затенять живую
+            # поверхность в QR-проверках: скан QR может отклонить живую
+            # очередь или открыть сессию, которую аллокация затем
+            # отклонит. Врач-теги без поверхности не тронуты.
+            daily_queue = prefer_registry_surface(
+                self.db, daily_queue, target_date, qr_token.specialist_id
+            )
 
             logger.debug(f"  daily_queue найдена: {daily_queue is not None}")
             if daily_queue:
