@@ -10,6 +10,7 @@
  *   - Упрощает code review (утилиты отделены от UI-логики)
  */
 
+import { useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { api } from '../../api/client';
@@ -1439,6 +1440,289 @@ export const describeUnroutableEditDeltaRows = (
 ): string =>
   `Изменение количества для «${rows.map((r) => r.name).join('», «')}» недоступно: у позиции нет номера очереди. ` +
   'Используйте отмену/корректировку визита или обратитесь к администратору.';
+// =====================================================================
+// FIX F: СНИМОК СОДЕРЖИМОГО МАСТЕРА (diff «есть ли несохранённые правки»)
+// =====================================================================
+
+interface WizardContentShape {
+  patient: {
+    id: string | number | null;
+    fio: string;
+    phone: string;
+    address: string;
+    birth_date: string;
+    gender: string;
+  };
+  cart: {
+    items: Array<Record<string, unknown>>;
+    discount_mode: string;
+    all_free: boolean;
+  };
+}
+
+// Детерминированная строка-подпись содержимого мастера. Используется для
+// сравнения текущего состояния с исходным снимком (Codex R1 #3097: p.id
+// больше не считается «контентом» сам по себе — edit-запись без правок
+// закрывается без предупреждения о потере данных). Порядок ключей фиксирован,
+// строки нормализуются (trim), позиция корзины сводится к значимым полям.
+export const wizardContentSignature = (content: WizardContentShape): string => {
+  const patient = {
+    id: content.patient.id ?? null,
+    fio: String(content.patient.fio || '').trim(),
+    phone: String(content.patient.phone || '').trim(),
+    address: String(content.patient.address || '').trim(),
+    birth_date: String(content.patient.birth_date || '').trim(),
+    gender: String(content.patient.gender || '').trim(),
+  };
+  const items = Array.isArray(content.cart.items) ? content.cart.items : [];
+  const cart = {
+    items: items.map((item) => ({
+      service_id: (item as { service_id?: unknown }).service_id ?? null,
+      doctor_id: (item as { doctor_id?: unknown }).doctor_id ?? null,
+      quantity: (item as { quantity?: unknown }).quantity ?? 1,
+      // Codex R12 PR 3097 (P2): идентичность строки в снимке. Без неё
+      // позиционный патч гидрации не отличает «гидрация той же услуги»
+      // от «пользователь заменил позицию, пока шёл запрос справочника»:
+      // замена копировала service_id подмены в снимок, подписи совпадали,
+      // и закрытие молча теряло замену.
+      service_code: String((item as { service_code?: unknown }).service_code ?? '').trim() || null,
+      service_name: String((item as { service_name?: unknown }).service_name ?? '').trim() || null,
+    })),
+    discount_mode: String(content.cart.discount_mode || 'none'),
+    all_free: Boolean(content.cart.all_free),
+  };
+  return JSON.stringify({ patient, cart });
+};
+
+// Codex R3 PR 3097 (P2): парсинг JSON-снимка исходного содержимого мастера.
+// null — снимок повреждён/пуст (вызывающий код обязан оставить снимок как был).
+export const parseWizardBaseline = (baseline: string): WizardContentShape | null => {
+  try {
+    const parsed = JSON.parse(baseline) as WizardContentShape | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!parsed.patient || !parsed.cart || !Array.isArray(parsed.cart.items)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+// Codex R3 PR 3097 (P2): вносит в ИСХОДНЫЙ снимок ТОЛЬКО автогидрированные
+// service_id. Полный переснимок живого состояния копировал бы в снимок правки
+// пользователя (ФИО/телефон/врач/количество), сделанные, пока шёл запрос
+// /registrar/services, — и wizardHasUserContent() возвращал бы false, а
+// закрытие молча теряло бы эти правки. Расхождение длины (пользователь
+// добавил/удалил позицию, пока шёл запрос) оставляет снимок нетронутым —
+// закрытие в этом случае честно предупредит о несохранённых данных.
+// Codex R12 PR 3097 (P2): патч ПОЗИЦИОНЕН, поэтому обязан проверять
+// идентичность строки (код/имя): замена услуги в строке при той же длине
+// корзины больше не копирует service_id подмены в снимок — подпись
+// фиксирует замену, и закрытие предупреждает вместо молчаливой потери.
+const rowCodeTokens = (item: Record<string, unknown> | null | undefined): Set<string> => {
+  const tokens = new Set<string>();
+  if (!item) return tokens;
+  const code = String(item.service_code ?? item.code ?? '').toLowerCase().trim();
+  if (code) {
+    tokens.add(code);
+    tokens.add(code.replace(/^([a-z])0+(\d+)$/, '$1$2'));
+  }
+  return tokens;
+};
+
+const rowNameToken = (item: Record<string, unknown> | null | undefined): string =>
+  String(item?.service_name ?? item?.name ?? '').toLowerCase().trim();
+
+const rowIdentityMatches = (baselineItem: Record<string, unknown>, resolvedItem: Record<string, unknown>): boolean => {
+  // Codex R13 PR 3097 (P2): когда код есть у ОБОИХ строк — идентичность
+  // решает только код (с паритетом ведущих нулей). Совпадающее отображаемое
+  // имя идентичностью не является: Service.name не уникален
+  // (backend/app/models/service.py), две одноимённые услуги с разными кодами
+  // не должны матчиться — иначе подмена строки гидрацией копирует service_id
+  // замены в снимок, и закрытие молча теряло бы правку.
+  const baselineCodes = rowCodeTokens(baselineItem);
+  const resolvedCodes = rowCodeTokens(resolvedItem);
+  if (baselineCodes.size > 0 && resolvedCodes.size > 0) {
+    for (const token of baselineCodes) {
+      if (resolvedCodes.has(token)) return true;
+    }
+    return false;
+  }
+  // Код недоступен хотя бы у одной строки: легаси-данные несут код услуга
+  // В КАЧЕСТВЕ имени (k01), поэтому имя сравнивается с именем И кодовыми
+  // токенами другой строки — иначе гидрация легаси-строк ломается.
+  const baselineName = rowNameToken(baselineItem);
+  const resolvedName = rowNameToken(resolvedItem);
+  if (!baselineName || !resolvedName) return false;
+  if (baselineName === resolvedName) return true;
+  return resolvedCodes.has(baselineName) || baselineCodes.has(resolvedName);
+};
+
+export const patchBaselineWithResolvedServiceIds = (
+  baselineItems: Array<Record<string, unknown>>,
+  resolvedItems: Array<Record<string, unknown>>
+): Array<Record<string, unknown>> => {
+  if (!Array.isArray(baselineItems) || !Array.isArray(resolvedItems)) return baselineItems;
+  if (baselineItems.length !== resolvedItems.length) return baselineItems;
+  return baselineItems.map((item, index) => {
+    const resolved = resolvedItems[index] as Record<string, unknown> | null | undefined;
+    const resolvedId = resolved?.service_id;
+    if (resolvedId == null) return item;
+    const baselineId = (item as { service_id?: unknown }).service_id;
+    if (baselineId != null) {
+      // позиция уже была идентифицирована в снимке; имя/код синхронизируем
+      // ТОЛЬКО для той же услуги (справочник канонизировал название) —
+      // иначе подпись ошибочно считала бы замену гидрацией.
+      if (String(baselineId) !== String(resolvedId)) return item;
+      return {
+        ...item,
+        service_code: (resolved?.service_code ?? resolved?.code ?? null) as unknown,
+        service_name: (resolved?.service_name ?? resolved?.name ?? null) as unknown,
+      };
+    }
+    if (!rowIdentityMatches(item, resolved as Record<string, unknown>)) return item;
+    return {
+      ...item,
+      service_id: resolvedId,
+      service_code: (resolved?.service_code ?? resolved?.code ?? null) as unknown,
+      service_name: (resolved?.service_name ?? resolved?.name ?? null) as unknown,
+    };
+  });
+};
+
+// Готовые обновления снимка (потолок LOC PR-45): вызываются из эффектов
+// гидрации. Возвращают НОВУЮ подпись снимка или null (снимок повреждён —
+// вызывающий код обязан оставить его как был).
+export const refreshBaselineAfterServiceResolution = (
+  baseline: string,
+  resolvedItems: Array<Record<string, unknown>>
+): string | null => {
+  const parsed = parseWizardBaseline(baseline);
+  if (!parsed) return null;
+  return wizardContentSignature({
+    patient: parsed.patient,
+    cart: {
+      items: patchBaselineWithResolvedServiceIds(parsed.cart.items, resolvedItems),
+      discount_mode: parsed.cart.discount_mode,
+      all_free: parsed.cart.all_free,
+    },
+  });
+};
+
+export const refreshBaselineAfterGenderHydration = (baseline: string, gender: string): string | null => {
+  const parsed = parseWizardBaseline(baseline);
+  if (!parsed) return null;
+  return wizardContentSignature({
+    patient: { ...parsed.patient, gender },
+    cart: parsed.cart,
+  });
+};
+
+// =====================================================================
+// CART SERVICE RESOLUTION (SSOT)
+// =====================================================================
+
+export interface CartServiceResolution {
+  items: Array<Record<string, unknown>>;
+  changed: boolean;
+}
+
+// Codex R2 #3097: резолвинг ссылок на услуги корзины по справочнику (SSOT).
+// Чистая функция, вынесенная из AppointmentWizardV2 (эффект гидрации
+// edit-записи): основной файл удержан в пределах потолка LOC PR-45,
+// логика резолвинга покрыта unit-тестами напрямую.
+//
+// Возвращает null, когда делать нечего: нет элементов без service_id,
+// нет расхождений имён с SSOT, либо маппинг ничего не изменил.
+export const resolveCartServiceReferences = (
+  items: Array<Record<string, unknown>>,
+  services: Array<Record<string, unknown>>
+): CartServiceResolution | null => {
+  type _SvcView = { id?: string | number; name?: string | null; service_code?: string | null; price?: number | null };
+  type _ItemView = {
+    service_id?: string | number;
+    service_name?: string;
+    service_price?: number;
+    doctor_id?: string | number | null;
+    _temp_name?: string;
+    [k: string]: unknown;
+  };
+
+  if (!Array.isArray(items) || items.length === 0 || !Array.isArray(services) || services.length === 0) return null;
+  const svcList = services as _SvcView[];
+
+  const unresolvedCount = items.filter((i) => !(i as _ItemView).service_id).length;
+  const hasNameMismatches = items.some((item) => {
+    if (!(item as _ItemView).service_id) return false;
+    const service = svcList.find((s) => s.id === (item as _ItemView).service_id);
+    return Boolean(service && service.name && service.name !== (item as _ItemView).service_name);
+  });
+
+  // Если нет ни нерешённых услуг, ни несоответствий имён — делать нечего
+  if (unresolvedCount === 0 && !hasNameMismatches) return null;
+
+  const updatedItems = items.map((rawItem) => {
+    const item = rawItem as _ItemView;
+
+    // Сначала синхронизируем элементы, у которых уже есть service_id, с SSOT
+    if (item.service_id) {
+      const service = svcList.find((s) => s.id === item.service_id);
+      if (service) {
+        const nextName = service.name || item.service_name;
+        const nextPrice = service.price != null ? service.price : item.service_price || 0;
+        if (nextName !== item.service_name || nextPrice !== item.service_price) {
+          return { ...rawItem, service_name: nextName, service_price: nextPrice, doctor_id: item.doctor_id || null };
+        }
+      }
+      // service_id есть и изменений нет (или услуга не найдена) — без изменений
+      return { ...rawItem, doctor_id: item.doctor_id || null };
+    }
+
+    // Ищем услугу по коду (приоритет) или имени
+    const searchName = item._temp_name || item.service_name;
+    if (!searchName) {
+      logger.warn('[resolveCartServiceReferences] item has no searchable name', { item });
+      return rawItem;
+    }
+
+    // Приводим к верхнему регистру и убираем ведущие нули для сравнения (p09 = p9)
+    const searchNameUpper = String(searchName).toUpperCase().trim();
+    const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+
+    const foundService = svcList.find((s) => {
+      // Паритет с прежней логикой: услуги без service_code не участвуют в поиске
+      if (!s.service_code) return false;
+      const codeUpper = String(s.service_code).toUpperCase().trim();
+      const codeNoZero = codeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+      if (codeUpper === searchNameUpper) return true;
+      if (codeNoZero === searchNameNoZero) return true;
+      return s.name === searchName || s.name === searchNameUpper;
+    });
+
+    if (foundService) {
+      return {
+        ...rawItem,
+        service_id: foundService.id,
+        service_name: foundService.name, // SSOT: полное название из справочника
+        service_price: foundService.price || 0,
+        _temp_name: searchName, // исходный код для отладки
+        doctor_id: item.doctor_id || null
+      };
+    }
+
+    logger.warn('[resolveCartServiceReferences] service not found in catalog', { searchName });
+    return rawItem;
+  });
+
+  const changed = updatedItems.some((rawItem, index) => {
+    const item = rawItem as _ItemView;
+    const prev = items[index] as _ItemView;
+    return item.service_id !== prev.service_id ||
+      item.service_price !== prev.service_price ||
+      item.service_name !== prev.service_name;
+  });
+
+  return changed ? { items: updatedItems, changed } : null;
+};
 
 export default {
   PATIENT_NAME_PATTERN,
@@ -1446,6 +1730,7 @@ export default {
   STEP_PATIENT,
   STEP_CART,
   TOTAL_STEPS,
+  wizardContentSignature,
   getLocalISODate,
   normalizeWizardContractValue,
   getWizardRecordKind,
@@ -1481,5 +1766,25 @@ export default {
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
-  categories
+  categories,
+  resolveCartServiceReferences
+};
+
+// Codex R5 PR 3097 (P2): при условном размонтировании мастера (EditPatientModal
+// снимает его с дерева сразу при закрытии) isOpen-эффект не срабатывает, и
+// активные дебаунсы уходили в сеть после исчезновения диалога. Хук гасит
+// переданные таймеры на unmount. Codex R7 (P2): clearTimeout только на unmount
+// — замыкание обновляется через ref на каждом рендере, чтобы любой ререндер
+// (загрузка услуг/врачей) не погасил валидный отложенный поиск/проверку телефона.
+export const useWizardSearchUnmountCleanup = (
+  getTimers: () => Array<ReturnType<typeof setTimeout> | null>
+): void => {
+  const getTimersRef = useRef(getTimers);
+  useEffect(() => {
+    getTimersRef.current = getTimers;
+  });
+  useEffect(
+    () => () => { getTimersRef.current().forEach((t) => { if (t) clearTimeout(t); }); },
+    [],
+  );
 };
