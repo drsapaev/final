@@ -768,14 +768,22 @@ def _quote_core(
             # ГОТОВУЮ сумму потреблённых LIFO-слоёв (единая цена за единицу
             # при многослойном потреблении отсутствует); рост остаётся
             # каталог × дельта (при слоях это ТОЧНО сумма команды).
-            # Codex R7 #3095 (P2): зеркало последовательного состояния
-            # команды: delta_i = target_i − existing − Σ delta_j (j<i, тот же
-            # ключ). Эквивалентно строке с ПОСЛЕДОВАТЕЛЬНО-ЭФФЕКТИВНЫМ
-            # requested (target − Σ delta_j) — тогда LIFO-потребление
-            # снижения и его amount_override считаются для скорректированной
-            # дельты. W2-PR1: дельта ЗНАКОВАЯ — covered копит её без клампа
-            # (дубликат-снижение валидно и гвардится как обычное снижение).
-            _covered_key = (int(item_req.service_id), item_req.specialist_id)
+            # Codex R7/R15 #3095 (P2): ПОСЛЕДОВАТЕЛЬНОЕ зеркало команды:
+            # delta_i = target_i − existing − Σ delta_j (j<i) — эквивалентно
+            # строке с последовательно-эффективным requested (target −
+            # Σ delta_j): LIFO-потребление снижения и его amount_override
+            # считаются для скорректированной дельты. Дельта ЗНАКОВАЯ —
+            # covered копит её без клампа (дубликат-снижение валидно и
+            # гвардится как обычное снижение).
+            # Codex R15 #3118 (P1): ключ покрытия — (service_id,
+            # queue_entry_id): команда маршрутизирует по (patient, day,
+            # queue_tag), количество внутри записи суммируется по сервису
+            # независимо от специалиста (_find_service_payload), а явные
+            # queue_entry_id — независимые позиции (строгий селектор R11).
+            _covered_key = (
+                int(item_req.service_id),
+                item_req.queue_entry_id,
+            )
             _sequential_requested = item_req.quantity - _edit_delta_covered.get(
                 _covered_key, 0
             )

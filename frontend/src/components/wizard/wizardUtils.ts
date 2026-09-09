@@ -839,6 +839,7 @@ export const buildEditOriginalServiceIdentity = (
   const originalServiceNames = identity.serviceNames;
 
     // Определяем исходные услуги из initialData
+    const serviceDetailOccurrences = new Map<string, number>();
 
     if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
       logger.log('📋 Извлечение исходных услуг из service_details:', initialData.service_details);
@@ -855,7 +856,22 @@ export const buildEditOriginalServiceIdentity = (
         // W2-PR1: исходное количество позиции (read-модель service_details)
         const originalQty = Number(serviceDetail.quantity ?? serviceDetail.qty);
         if (serviceId && Number.isFinite(originalQty) && originalQty > 0) {
-          originalQuantities.set(String(serviceId), originalQty);
+          // Codex R15 #3115 (P1): ключ — (queue_entry_id, service_id): одна
+          // услуга в ДВУХ записях с разными количествами не должна
+          // перезаписывать друг друга в карте исходных количеств, иначе
+          // правка первой позиции классифицируется no-op по количеству
+          // второй. Bare-ключ услуги хранится, пока позиция одна
+          // (легаси-потоки без идентичности записи), и снимается при
+          // неоднозначности — остаются только точные ключи.
+          const bareServiceKey = String(serviceId);
+          const detailCount = (serviceDetailOccurrences.get(bareServiceKey) ?? 0) + 1;
+          serviceDetailOccurrences.set(bareServiceKey, detailCount);
+          originalQuantities.set(`${queueId ?? ''}:${bareServiceKey}`, originalQty);
+          if (detailCount === 1) {
+            originalQuantities.set(bareServiceKey, originalQty);
+          } else {
+            originalQuantities.delete(bareServiceKey);
+          }
         }
         // PR-14: collect updated_at for optimistic locking
         if (queueId) {
@@ -1128,15 +1144,23 @@ export const buildEditDeltaTargetItems = (
       });
       return;
     }
-    const originalQty = identity.originalQuantities.get(String(item.service_id));
+    // Codex R15 #3115 (P1): сравнение по ИДЕНТИЧНОСТИ (запись, услуга) —
+    // той же, по которой записывались исходные количества из service_details;
+    // оригинальная запись берётся из самой корзинной позиции. Bare-ключ —
+    // фолбэк для однозначных легаси-потоков без идентичности записи.
+    const originalQueueId = item.original_queue_id ?? item.queue_entry_id ?? null;
+    const serviceKey = String(item.service_id);
+    const originalQty =
+      identity.originalQuantities.get(`${originalQueueId ?? ''}:${serviceKey}`) ??
+      identity.originalQuantities.get(serviceKey);
     if (originalQty === undefined) return;
     if (quantity === originalQty) return; // без изменений — no-op
     // Codex R9 PR 3118 (P1): правка количества существующей позиции возможна
     // ТОЛЬКО когда известна её запись очереди. visit-only строка (без
     // OnlineQueueEntry) не маршрутизируется: включение в edit-delta создало
     // бы дублирующий визит на backend. Позиция уходит в unroutable —
-    // сабмит блокируется с явной причиной.
-    const originalQueueId = item.original_queue_id ?? item.queue_entry_id ?? null;
+    // сабмит блокируется с явной причиной. (originalQueueId вычислен выше —
+    // Codex R15: сравнение количеств идёт по той же идентичности записи.)
     if (originalQueueId == null || !Number.isFinite(Number(originalQueueId))) {
       build.unroutable.push({ service_id: item.service_id as string | number, name: String(service.name ?? item.service_id) });
       return;
