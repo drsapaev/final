@@ -112,7 +112,14 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    # Codex R7 #3092 (P1): idempotency claims and completed-response
+    # snapshots live here — allkeys-lru may EVICT either under memory
+    # pressure, a same-key retry on the other worker then re-executes the
+    # cart and duplicates billing/queue records. noeviction + AOF keeps
+    # the idempotency state durable; if the store fills up, writes fail
+    # and the backend fails CLOSED (503 idempotency_unavailable) instead
+    # of executing uncoordinated keyed writes.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
     volumes:
       - staging_redis_data:/data
     healthcheck:

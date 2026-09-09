@@ -36,8 +36,6 @@ Codex R3 #3092 additions:
 """
 from __future__ import annotations
 
-import base64
-import json
 import uuid
 from typing import Any
 
@@ -766,9 +764,11 @@ def test_login_and_refresh_token_shapes_share_one_namespace(two_workers, monkeyp
     key = "refresh-storm-key"
 
     # Attempt 1: login-shape token (sub=username, no username claim)
-    from app.core.config import settings
+    from datetime import UTC, datetime, timedelta
+
     import jwt as pyjwt
-    from datetime import datetime, timedelta, UTC
+
+    from app.core.config import settings
 
     login_payload = {
         "sub": "alice.smith",  # username shape — the harness stub must map it
@@ -1304,3 +1304,138 @@ def _make_username_checker(existing: set[str], renamed_to: str):
         return (True, "Registrar", False) if username in existing else (False, None, False)
 
     return _checker
+
+
+# ===================== Codex R7 #3092 (P1×2): fail-closed coordination =====================
+
+def _down_claim(required: bool) -> DistributedIdempotencyClaim:
+    """Claim instance marked REQUIRED whose Redis is unreachable (bypasses
+    from_url/ping). Cooldown is zeroed so the first try_available() probes."""
+    claim = object.__new__(DistributedIdempotencyClaim)
+    claim._ttl = 24 * 60 * 60
+    claim._prefix = "idem"
+    claim._lease_seconds = 90
+    claim._required = required
+    claim._client = FakeRedis()  # ping() raises -> unavailable
+    claim._client.fail_next_ops = 10_000
+    claim._available = False
+    claim._failed_at = 0.0
+    return claim
+
+
+def test_acquire_fails_closed_no_synthetic_local_token(monkeypatch):
+    """Codex R7 #3092 (P1): with Redis unavailable acquire() returns None —
+    the caller REFUSES (409/503 upstream) instead of receiving the old
+    synthetic "local-*" token that let two staging workers execute the same
+    keyed write concurrently during an outage."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+    claim = _down_claim(required=False)
+    token = claim.acquire("u1", "outage-key")
+    assert token is None, (
+        "degraded acquire must NOT fabricate a local execution token"
+    )
+
+
+def test_required_redis_down_refuses_keyed_write_then_recovers(monkeypatch):
+    """Explicit IDEMPOTENCY_REDIS_URL + Redis outage → keyed write is
+    refused 503 (idempotency_unavailable) WITHOUT reaching the handler;
+    once Redis recovers the same key executes normally."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    claim = _down_claim(required=True)
+    idem_module._distributed_claim = claim
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9002
+    )
+    try:
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+        h1 = auth_headers("1")
+        r1 = client.post("/echo", headers={**h1, "Idempotency-Key": "r7-key"})
+        assert r1.status_code == 503, r1.text
+        assert r1.json()["code"] == "idempotency_unavailable"
+        assert counter["calls"] == 0, "uncoordinated execution must not happen"
+
+        # Redis recovers → the same key proceeds exactly once
+        claim._client.fail_next_ops = 0
+        r2 = client.post("/echo", headers={**h1, "Idempotency-Key": "r7-key"})
+        assert r2.status_code == 200, r2.text
+        assert counter["calls"] == 1
+        r3 = client.post("/echo", headers={**h1, "Idempotency-Key": "r7-key"})
+        assert r3.status_code == 200
+        assert counter["calls"] == 1, "retry replays after recovery, no re-execution"
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+
+
+def test_optional_redis_down_keeps_in_memory_degrade(monkeypatch):
+    """ARQ-fallback (NOT required) claim + outage → original R2 contract:
+    traffic degrades to the per-process cache instead of failing."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    claim = _down_claim(required=False)
+    idem_module._distributed_claim = claim
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9003
+    )
+    try:
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+        h1 = auth_headers("1")
+        r1 = client.post("/echo", headers={**h1, "Idempotency-Key": "opt-key"})
+        assert r1.status_code == 200, r1.text
+        r2 = client.post("/echo", headers={**h1, "Idempotency-Key": "opt-key"})
+        assert r2.status_code == 200
+        assert counter["calls"] == 1, "in-memory dedup still dedups one worker"
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+
+
+def test_explicit_idempotency_url_marks_claim_required(monkeypatch):
+    """Codex R7 #3092 (P1): explicit IDEMPOTENCY_REDIS_URL → required claim
+    (fail-closed on outage); the implicit ARQ_REDIS_URL fallback stays
+    optional (best-effort degrade)."""
+    from app.core.config import settings
+
+    saved = idem_module._distributed_claim
+    try:
+        monkeypatch.setattr(settings, "IDEMPOTENCY_REDIS_URL", "redis://127.0.0.1:1/0")
+        monkeypatch.setattr(settings, "ARQ_REDIS_URL", "redis://127.0.0.1:2/0")
+        idem_module._distributed_claim = None
+        assert idem_module.get_distributed_claim().required is True
+
+        monkeypatch.setattr(settings, "IDEMPOTENCY_REDIS_URL", None)
+        idem_module._distributed_claim = None
+        assert idem_module.get_distributed_claim().required is False
+    finally:
+        idem_module._distributed_claim = saved
+
+
+def test_compose_files_never_evict_idempotency_state():
+    """Codex R7 #3092 (P1): staging and production Redis must not run an
+    evicting maxmemory policy — an evicted claim/snapshot lets a same-key
+    retry on the other worker duplicate billing and queue records."""
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    for compose in ("ops/compose.staging.yml", "ops/docker-compose.yml"):
+        text = (repo_root / compose).read_text(encoding="utf-8")
+        effective = "\n".join(
+            line for line in text.splitlines() if not line.lstrip().startswith("#")
+        )
+        assert "noeviction" in effective, (
+            f"{compose} must use --maxmemory-policy noeviction"
+        )
+        assert "allkeys-lru" not in effective, (
+            f"{compose} must not evict idempotency claims/snapshots"
+        )

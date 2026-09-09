@@ -428,19 +428,29 @@ class DistributedIdempotencyClaim:
         completion, success or failure).
       - renew(user_id, key): extend the short in-flight lease while the
         handler is still running (Codex R2 #3092 P2).
-      - Every operation is best-effort: a Redis failure never breaks traffic;
-        it only degrades to the per-process in-memory cache — and after a
-        transient failure the connection is re-probed (Codex R2 #3092 P1),
-        so coordination resumes instead of staying disabled.
+      - Codex R7 #3092 (P1): best-effort degraded to FAIL-CLOSED for keyed
+        writes. When the deployment explicitly requires coordination
+        (IDEMPOTENCY_REDIS_URL) and Redis is unreachable, keyed writes are
+        refused (503 idempotency_unavailable) instead of executing on the
+        per-process cache — a duplicate visit/invoice is worse than a retry.
+        Deployments WITHOUT an explicit idempotency URL keep the original
+        in-memory degrade (dev, tests, single-worker installs).
     """
 
     # Class-level defaults keep object.__new__-built instances (tests) valid.
     _lease_seconds: int = _IN_FLIGHT_LEASE_SECONDS
     _failed_at: float = 0.0
+    # Codex R7 #3092 (P1): True when the deployment EXPLICITLY configured
+    # idempotency coordination (IDEMPOTENCY_REDIS_URL) — then a Redis outage
+    # must fail closed (503) instead of silently degrading to per-process
+    # memory, because two staging workers would execute the same keyed write
+    # concurrently and duplicate visits/invoices/queue entries.
+    _required: bool = False
 
-    def __init__(self, redis_url: str, ttl: int = _CACHE_TTL_SECONDS, lease_seconds: int = _IN_FLIGHT_LEASE_SECONDS) -> None:
+    def __init__(self, redis_url: str, ttl: int = _CACHE_TTL_SECONDS, lease_seconds: int = _IN_FLIGHT_LEASE_SECONDS, required: bool = False) -> None:
         self._ttl = ttl
         self._lease_seconds = lease_seconds
+        self._required = required
         self._prefix = "idem"
         self._client: redis_lib.Redis | None = None
         self._available = False
@@ -473,6 +483,11 @@ class DistributedIdempotencyClaim:
     @property
     def available(self) -> bool:
         return self._available
+
+    @property
+    def required(self) -> bool:
+        """Codex R7 #3092 (P1): coordination is REQUIRED by deployment config."""
+        return self._required
 
     def try_available(self) -> bool:
         """Dispatch-time availability check (Codex R2 #3092 P1).
@@ -541,13 +556,16 @@ class DistributedIdempotencyClaim:
         a stale worker cannot renew or delete a replacement claim.
         Returns:
           - a non-empty token string: the caller owns the claim and may execute;
-          - None: the claim is held elsewhere (409 to the client) or the Redis
-            op failed (conservative: refuse execution, same as before R3).
-          Degraded mode (Redis unavailable before the claim attempt) returns a
-          synthetic token so the request proceeds on the in-memory path.
+          - None: the claim is held elsewhere (409 to the client), the Redis
+            op failed, or coordination is unavailable — every None outcome is
+            FAIL-CLOSED (Codex R7 #3092 (P1): the previous synthetic
+            "local-*" token let two workers execute the same keyed write
+            concurrently during a Redis outage, duplicating visits/invoices;
+            refusal is the safe answer — the client retries with the same
+            key once coordination recovers).
         """
         if not self._ensure_available() or self._client is None:
-            return f"local-{uuid.uuid4().hex}"  # degrade: caller proceeds (in-memory path)
+            return None  # Codex R7 #3092 (P1): fail closed, never "proceed locally"
         token = uuid.uuid4().hex
         ok = self._run(
             self._client.set,
@@ -718,6 +736,13 @@ def get_distributed_claim() -> DistributedIdempotencyClaim | None:
     IDEMPOTENCY_REDIS_URL takes precedence; None falls back to ARQ_REDIS_URL
     (the same Redis the arq worker already uses) so existing deployments gain
     the distributed guarantee without extra configuration.
+
+    Codex R7 #3092 (P1): an EXPLICIT IDEMPOTENCY_REDIS_URL is the
+    deployment's contract that keyed writes MUST be cross-worker
+    coordinated — the claim is then marked REQUIRED and the middleware
+    refuses keyed writes (503) while Redis is unreachable. The implicit
+    ARQ fallback stays best-effort (in-memory degrade) so single-worker
+    deployments and the test suite keep working without Redis.
     """
     global _distributed_claim
     if _distributed_claim is not None:
@@ -725,12 +750,15 @@ def get_distributed_claim() -> DistributedIdempotencyClaim | None:
     try:
         from app.core.config import settings
 
-        redis_url = settings.IDEMPOTENCY_REDIS_URL or settings.ARQ_REDIS_URL
+        redis_url = settings.IDEMPOTENCY_REDIS_URL
+        required = bool(redis_url)
+        if not redis_url:
+            redis_url = settings.ARQ_REDIS_URL
     except Exception:  # pragma: no cover - settings not initialized (tests)
         return None
     if not redis_url:
         return None
-    _distributed_claim = DistributedIdempotencyClaim(redis_url)
+    _distributed_claim = DistributedIdempotencyClaim(redis_url, required=required)
     return _distributed_claim
 
 
@@ -808,6 +836,32 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         claim = get_distributed_claim()
         claim_acquired = True
         claim_token: str | None = None
+
+        # Codex R7 #3092 (P1): fail closed when coordination is REQUIRED
+        # (explicit IDEMPOTENCY_REDIS_URL) but unavailable. Degrading to the
+        # per-process cache here let two staging workers execute the same
+        # keyed /registrar/cart request concurrently during a Redis
+        # timeout/restart — exactly the window when the previous R2 cooldown
+        # kept the layer disabled — and recreated duplicate visits, invoices
+        # and queue positions. Refusal (503) is non-executing: the client
+        # retries with the SAME key once coordination recovers, replays the
+        # stored snapshot, or reconciles via the execution intent.
+        if claim is not None and claim.required and not claim.try_available():
+            logger.warning(
+                "Idempotency coordination unavailable (required Redis down): "
+                "user=%s key=%s path=%s — refusing keyed write",
+                user_id, idempotency_key, request.url.path,
+            )
+            return Response(
+                status_code=503,
+                headers={"Retry-After": "2", "Cache-Control": "no-store"},
+                content=(
+                    '{"code": "idempotency_unavailable", "detail": "Идемпотентность '
+                    'временно недоступна: распределённая координация не отвечает. '
+                    'Повторите запрос с тем же Idempotency-Key."}'
+                ),
+                media_type="application/json",
+            )
 
         # Check local (per-process) cache first — fastest path
         cached, local_mismatch, cached_role = _idempotency_cache.get(user_id, idempotency_key, incoming_hash)
