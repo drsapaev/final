@@ -41,6 +41,10 @@ _TEMP_ALLOWED_CROSS_CONTEXT_IMPORTS: set[tuple[str, str]] = {
     # to VisitLifecycleService instead of direct mutation.
     ("app.services.morning_assignment_api_service", "app.services.visit_lifecycle_service"),
     ("app.services.registrar_wizard_queue_assignment_service", "app.services.visit_lifecycle_service"),
+    # W2-PR3: consistent queue-entry cancellation delegates the linked visit
+    # transition to VisitLifecycleService (SSOT state machine) instead of
+    # duplicating it in the queue context — same rationale as Gate C fix.
+    ("app.services.online_queue_new_service", "app.services.visit_lifecycle_service"),
 }
 
 

@@ -5066,6 +5066,11 @@ export type paths = {
         /**
          * Cancel Queue Entry
          * @description Отмена записи в онлайн-очереди
+         *
+         *     W2-PR3: отмена согласована — каскад entry → visit → pending-счёт
+         *     выполняется атомарно в сервисе; потреблённые записи (served и т.п.)
+         *     и позиции с деньгами (processing/paid счёт, канонический Payment)
+         *     отвергаются с 409 и явной причиной вместо «тихого» флипа статуса.
          */
         post: operations["cancel_queue_entry_api_v1_online_queue_entries__entry_id__cancel_post"];
         delete?: never;

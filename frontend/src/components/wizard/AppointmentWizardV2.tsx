@@ -2080,9 +2080,7 @@ const AppointmentWizardV2 = ({
         }
       }
 
-      // ✅ НОВОЕ: Проверяем, редактируется ли запись в очереди (QR или desk) и есть ли новые услуги
-      // Расширено для поддержки всех типов записей: online, desk, visit, appointment
-      // ✅ ИСПРАВЛЕНО Bug 1: Добавлены явные скобки для правильного приоритета операторов
+      // Проверяем, редактируется ли запись в очереди (QR/desk/visit/appointment)
       const initialRecordKind = getWizardRecordKind(initialData);
       const initialSourceKind = getWizardSourceKind(initialData);
       const hasQueueEntries = editMode && initialData && (
@@ -2092,7 +2090,6 @@ const AppointmentWizardV2 = ({
       initialRecordKind === 'online_queue' ||
       initialRecordKind === 'visit' ||
       initialRecordKind === 'appointment');
-
 
       // Fix D (Codex R1 PR 3095): identity множеств считаются ОДИН раз через
       // useMemo (buildEditOriginalServiceIdentity) и шарятся сабмитом и
@@ -2107,17 +2104,10 @@ const AppointmentWizardV2 = ({
         const effectiveSource = initialSourceKind || (
         initialRecordKind === 'visit' || initialRecordKind === 'appointment' ? 'desk' : 'online');
 
-        // ✅ Сценарий 3: Редактирование записи в очереди (QR или desk) с добавлением новых услуг
         const recordType = effectiveSource === 'online' ? 'QR-запись' : 'ручная запись';
-        logger.log(`📝 Редактирование ${recordType}, проверяем новые услуги...`, {
+        logger.log(`📝 Редактирование ${recordType}: проверяем новые услуги`, {
           source: initialData.source,
-          source_kind: initialData.source_kind,
           effectiveSource,
-          record_type: initialData.record_type,
-          record_kind: initialData.record_kind,
-          queue_numbers: Array.isArray(initialData.queue_numbers) ? initialData.queue_numbers.length :
-          initialData.queue_numbers ? 1 : 0,
-          service_codes: Array.isArray(initialData.service_codes) ? initialData.service_codes.length : 0,
           services: Array.isArray(initialData.services) ? initialData.services.length : 0
         });
 
@@ -2341,7 +2331,19 @@ const AppointmentWizardV2 = ({
               throw new Error(editDeltaResult?.message || 'Edit delta failed');
             }
 
-            await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'edit-delta');
+            // Codex R14 PR 3121 (P1): неудача отмены удалённых записей ПОСЛЕ
+            // успешного edit-delta — частичное сохранение. Отдельный catch
+            // (не общий R6-обработчик ниже): повторы edit-delta здесь
+            // недопустимы (правка уже применена), успех/закрытие не
+            // выполняются — пользователь видит явную ошибку и открытый
+            // мастер.
+            try {
+              await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'edit-delta');
+            } catch (cancelError: unknown) {
+              logger.error('[AppointmentWizardV2] removed-entry cancellation failed after edit-delta save (partial state)', cancelError);
+              toast.error(getErrorMessage(cancelError) || t('misc.aw_record_update_failed'));
+              return;
+            }
             toast.success(t('misc.aw_record_updated_short'));
             onComplete?.(editDeltaResult);
             onClose?.();
@@ -2545,7 +2547,6 @@ const AppointmentWizardV2 = ({
           // updatePatient() бросает Error с .message и .status при неудаче.
           await updatePatient(patientId, patientUpdateData);
           logger.log('✅ Данные пациента успешно обновлены');
-          toast.success(t('misc.aw_patient_data_updated'));
 
           // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
           const currentQueueIds = new Set(
@@ -2556,11 +2557,16 @@ const AppointmentWizardV2 = ({
 
           const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
+          // Codex R14 PR 3121 (P1): отмены выполняются ДО success-тоста и
+          // onComplete — неудача (QueueEntryCancelError) уходит в общий
+          // catch ниже: без ложного успеха, без закрытия мастера, с явным
+          // сообщением о частичном сохранении.
           if (removedQueueIds.length > 0) {
             logger.log(`🗑️ Найдены удаленные записи очереди (Update Path): ${removedQueueIds.join(', ')}`);
             await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'patient-update');
           }
 
+          toast.success(t('misc.aw_patient_data_updated'));
           onComplete?.({ success: true, message: t('misc.aw_patient_data_updated') });
           onClose?.();
           return;
@@ -2632,9 +2638,8 @@ const AppointmentWizardV2 = ({
 
         logger.error('❌ Ошибка создания корзины:', cartErr.status, errorMessage);
 
-        // Codex R11 PR 3092 (P2): 409 двух родов: IN-FLIGHT — повтор с тем же
-        // ключом вернёт закоммиченный ответ; UNCERTAIN-OUTCOME — осмысленная
-        // сверка с рабочим списком и ротация ключа только после согласия.
+        // Codex R11 PR 3092 (P2): IN-FLIGHT 409 — повтор вернёт закоммиченный
+        // ответ; UNCERTAIN-OUTCOME — сверка с рабочим списком + ротация ключа.
         const backendCode = cartErr.response?.data?.code;
         if (cartErr.status === 409 && backendCode === 'idempotency_uncertain_outcome') {
           const reconciled = await confirm({
@@ -2653,10 +2658,9 @@ const AppointmentWizardV2 = ({
           return; // НЕ закрываем мастер: ключ разведён, корзина сохранена
         }
 
-        // Codex R3/R8 PR 3092 (P2): definitive 4xx (кроме 409 и 403) доказывает
-        // не-коммит — ключ освобождается для исправленного ретрая. Неоднозначные
-        // исходы (сеть/таймаут/5xx/409/403) удерживают привязку: 403 несёт
-        // ЗАКОММИЧЕННЫЙ снапшот, очистка ключа дала бы дубликат.
+        // Codex R3/R8 PR 3092 (P2): definitive 4xx (кроме 409/403) доказывает
+        // не-коммит — ключ освобождается; неоднозначные исходы удерживают
+        // привязку (403 несёт ЗАКОММИЧЕННЫЙ снапшот — очистка дала бы дубликат).
         const definitiveNonCommit =
           typeof cartErr.status === 'number' &&
           cartErr.status >= 400 &&
@@ -2697,9 +2701,7 @@ const AppointmentWizardV2 = ({
       // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
       // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
 
-      toast.success(editMode ? t('misc.aw_record_updated_bang') : t('misc.aw_record_created_success'));
-
-      // ✅ НОВОЕ: Обработка удаленных записей очереди (для cart creation path)
+      // Обработка удалённых записей очереди (cart path)
       const currentQueueIds = new Set(
         wizardData.cart.items.
           map((item) => item.original_queue_id).
@@ -2708,10 +2710,16 @@ const AppointmentWizardV2 = ({
 
       const removedQueueIds = Array.from(originalQueueIds).filter((id) => !currentQueueIds.has(id));
 
+      // Codex R14 PR 3121 (P1): отмены выполняются ДО success-тоста и
+      // onComplete — неудача (QueueEntryCancelError) уходит в общий catch
+      // ниже: без ложного успеха, без закрытия мастера, с явным
+      // сообщением о частичном сохранении.
       if (removedQueueIds.length > 0) {
         logger.log(`🗑️ Найдены удаленные записи очереди (Cart Path): ${removedQueueIds.join(', ')}`);
         await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'cart-update');
       }
+
+      toast.success(editMode ? t('misc.aw_record_updated_bang') : t('misc.aw_record_created_success'));
 
       onComplete?.(result);
       onClose?.();

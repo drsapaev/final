@@ -464,6 +464,18 @@ export function normalizeServicesFromInitialData(initialData: Record<string, unk
                 return; // Пропускаем пустые
             }
 
+            // Codex R15 #3121 (P1): одна и та же услуга в ДВУХ записях очереди —
+            // две независимые позиции корзины. Ключ только по услуге выбрасывал
+            // вторую запись ещё на нормализации: мастер показывал одну позицию,
+            // а «неизменное» сохранение трактовало скрытую как удалённую и
+            // вызывало каскад отмены её визита и счёта. Ключ несёт идентичность
+            // записи (original_queue_id/queue_entry_id); позиции без
+            // идентичности дедуплицируются как прежде — по услуге.
+            const entryIdentity = item.original_queue_id ?? item.queue_entry_id ?? null;
+            if (entryIdentity !== null && entryIdentity !== undefined && entryIdentity !== '') {
+                key = `${String(entryIdentity)}:${key}`;
+            }
+
             if (!seenKeys.has(key)) {
                 seenKeys.add(key);
                 uniqueItems.push(item);

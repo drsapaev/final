@@ -257,6 +257,20 @@ export const getRemovedQueueEntryIds = (
   return Array.from(originalQueueIds || []).filter((id) => !currentQueueIds.has(id));
 };
 
+export class QueueEntryCancelError extends Error {
+  /** ID записей очереди, отменить которые не удалось (409/сеть и т.п.). */
+  readonly failedIds: Array<string | number>;
+
+  constructor(failedIds: Array<string | number>) {
+    super(
+      `Не удалось отменить удалённые записи очереди (ID: ${failedIds.join(', ')}). ` +
+        'Изменения сохранены, но записи остались активными — отмените их вручную в очереди.'
+    );
+    this.name = 'QueueEntryCancelError';
+    this.failedIds = failedIds;
+  }
+}
+
 export const cancelRemovedQueueEntries = async (
   originalQueueIds: Array<string | number> | null | undefined,
   cartItems: CartItemLike[],
@@ -284,8 +298,12 @@ export const cancelRemovedQueueEntries = async (
       contextLabel,
       failedIds,
     });
-    toast.warning('Не удалось отменить часть удаленных записей очереди. Обновите очередь.');
-    return;
+    // Codex R14 PR 3121 (P1): неудача отмены удалённых записей — это
+    // ЧАСТИЧНОЕ сохранение (изменения уже применены backend'ом). Ошибка
+    // больше не превращается в тихий warning: вызов бросает
+    // QueueEntryCancelError, чтобы вызывающий путь НЕ сообщал успех,
+    // НЕ закрывал мастер и явно показал частичное сохранение.
+    throw new QueueEntryCancelError(failedIds);
   }
 
   logger.log(`[AppointmentWizardV2] removed queue entries cancelled (${contextLabel})`);
@@ -1438,6 +1456,7 @@ export default {
   resolveOnlineQueueEntryId,
   getRemovedQueueEntryIds,
   cancelRemovedQueueEntries,
+  QueueEntryCancelError,
   normalizeServiceSelectionValue,
   normalizeServiceSelectionName,
   normalizeGenderForForm,
