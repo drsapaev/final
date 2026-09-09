@@ -4,7 +4,6 @@ import {
   Search,
   Phone,
 
-
   X,
 
   Check,
@@ -16,9 +15,6 @@ import {
   FlaskConical,
   Syringe,
   ClipboardList,
-
-
-
 
   Calendar,
 
@@ -177,7 +173,6 @@ interface RepeatCandidate {
   visit_date: string;
 }
 
-
 // UX Audit Stage 3 (Wizard issue 5.1):
 // API_BASE удалён — все вызовы идут через api-клиент, который сам
 // добавляет baseURL. Раньше API_BASE использовался в 13 raw fetch().
@@ -209,6 +204,8 @@ import {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  // Fix E: календарная валидация даты рождения (31.02, високосные, будущие)
+  getBirthDateValidationError,
   formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
@@ -565,10 +562,7 @@ const AppointmentWizardV2 = ({
 
   // ===================== АВТОСОХРАНЕНИЕ =====================
 
-
-
   // Persistent draft loading is disabled to keep patient PHI out of browser storage.
-
 
   // Reset wizard to initial state. QW-08 fix: previously called clearDraft and showed
   // a misleading "Черновик очищен" toast even though no persistent draft existed.
@@ -733,8 +727,6 @@ const AppointmentWizardV2 = ({
     setShowSuggestions(false);
     setErrors((prev) => ({ ...prev, fio: null }));
   };
-
-
 
   const handleBirthDateChange = (value: string) => {
     const formatted = formatBirthDateInput(value);
@@ -1219,16 +1211,6 @@ const AppointmentWizardV2 = ({
     setFilteredServices(allServices);
   };
 
-
-
-
-
-
-
-
-
-
-
   // ===================== КОРЗИНА =====================
 
   const addToCart = (service: ServiceData) => {
@@ -1372,16 +1354,13 @@ const AppointmentWizardV2 = ({
         newErrors.gender = t('misc.aw_gender_required');
       }
       // Валидация даты рождения
+      // Fix E: календарная проверка (31.02 отклоняется, високосные ок,
+      // будущие даты — целиком), неполный ввод не проходит молча.
       if (formattedBirthDate && formattedBirthDate !== '00.00.0000') {
-        const [day, month, year] = formattedBirthDate.split('.');
-        const dayNum = parseInt(day);
-        const monthNum = parseInt(month);
-        const yearNum = parseInt(year);
-
-        if (!day || !month || !year ||
-        dayNum < 1 || dayNum > 31 ||
-        monthNum < 1 || monthNum > 12 ||
-        yearNum < 1900 || yearNum > new Date().getFullYear()) {
+        const birthCheck = getBirthDateValidationError(formattedBirthDate);
+        if (birthCheck === 'future') {
+          newErrors.birth_date = t('misc.aw_birth_date_future');
+        } else if (birthCheck !== 'ok' && birthCheck !== 'empty') {
           newErrors.birth_date = t('misc.aw_birth_date_invalid');
         }
       }
@@ -1415,18 +1394,29 @@ const AppointmentWizardV2 = ({
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-
-
-
-
-
-
   // ===================== ГОРЯЧИЕ КЛАВИШИ =====================
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
       const target = e.target as HTMLElement | null;
+
+      // Ctrl+Enter — завершить: обрабатывается ДО guard'а интерактивных
+      // целей (Codex R1 PR 3096), иначе фокус на кнопке гасил шорткат.
+      if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        handleCompleteRef.current();
+        return;
+      }
+
+      // Fix E: Enter не перехватывается на интерактивных элементах —
+      // кнопки/ссылки/селекты нажимаются штатно (раньше preventDefault
+      // глушил их, и Enter прыгал к следующему шагу).
+      const interactiveTags = ['BUTTON', 'A', 'SELECT'];
+      const isInteractiveTarget =
+        Boolean(target && interactiveTags.includes(target.tagName)) ||
+        Boolean(target?.isContentEditable);
+      if (isInteractiveTarget) return;
 
       // Enter - следующий шаг (кроме textarea)
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && target?.tagName !== 'TEXTAREA') {
@@ -1436,12 +1426,6 @@ const AppointmentWizardV2 = ({
         } else {
           handleCompleteRef.current();
         }
-      }
-
-      // Ctrl+Enter - завершить
-      if (e.key === 'Enter' && e.ctrlKey) {
-        e.preventDefault();
-        handleCompleteRef.current();
       }
 
       // Shift+Enter в textarea - перенос строки (по умолчанию)
@@ -1875,7 +1859,6 @@ const AppointmentWizardV2 = ({
       initialRecordKind === 'online_queue' ||
       initialRecordKind === 'visit' ||
       initialRecordKind === 'appointment');
-
 
       const originalServiceIds = new Set();
       const originalQueueIds = new Set<string | number>(); // ✅ Moved here for availability in handleComplete
@@ -2897,7 +2880,6 @@ const AppointmentWizardV2 = ({
       </button>
     </div>;
 
-
   // Улучшенный заголовок для Шага 2
   const Step2Header =
   <div style={wizardHeaderShellStyle}>
@@ -3043,7 +3025,6 @@ const AppointmentWizardV2 = ({
         </button>
       </div>
     </div>;
-
 
   // Проверка прав доступа перед рендерингом
   if (!hasRegistrarAccess) {
@@ -3191,7 +3172,6 @@ const AppointmentWizardV2 = ({
 };
 
 export default AppointmentWizardV2;
-
 
 // UX Audit Stage 3 (Wizard issue 5.2):
 // PatientStepV2 и CartStepV2 вынесены в отдельные файлы.
