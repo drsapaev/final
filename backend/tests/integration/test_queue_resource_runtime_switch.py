@@ -438,10 +438,33 @@ def test_morning_precreate_registry_tags_go_resource_axis(
 
 def test_morning_precreate_general_tag_keeps_synthetic_path(
     db_session: Session,
+    monkeypatch,
 ) -> None:
     """Non-registry tags keep the legacy path: the general queue is
     pre-created on the general_resource synthetic doctor."""
     from app.services.morning_assignment import MorningAssignmentService
+
+    # QD-2C (round-18 CI root-cause, main #3092 interplay): the doctor-path
+    # pre-create is wrapped in session.begin_nested() (bb01d3a0f). On the
+    # sqlite test DB that desyncs the db_session fixture's savepoint-restart
+    # listener: the session-level savepoint ends, the listener re-arms a
+    # connection savepoint the session no longer tracks, teardown rolls
+    # back to a dead savepoint and the leaked connection LOCKS the shared
+    # file DB — every later test fails with "database is locked" (the CI
+    # 20-minute timeout cascade). The #3092 authors documented the exact
+    # class in queue_svc/_operations.py ("a session-level savepoint
+    # (begin_nested) breaks the savepoint-isolated test fixture — P2-1b
+    # warned exactly this") and their own pin skips sqlite; this suite
+    # asserts routing/ownership, not tag-failure isolation — neutralize
+    # the nested block for the fixture's sake.
+    class _FlatNested:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(db_session, "begin_nested", lambda *a, **k: _FlatNested())
 
     _scope_morning_world(db_session, "general")
     gen_user = _make_user(db_session, username="general_resource", role="Resource")
