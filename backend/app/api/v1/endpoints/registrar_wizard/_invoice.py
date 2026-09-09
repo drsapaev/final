@@ -20,9 +20,16 @@ def init_invoice_payment(
     """
     try:
         # Получаем invoice
+        # Codex R10 #3115 (P1): чтение ПОД блокировкой строки — координация
+        # с edit-delta снижением (_reduce_pending_invoice_for_visit тоже
+        # держит FOR UPDATE + валидацию статуса в своей транзакции). Кто
+        # первый взял блокировку, второй видит закоммиченное состояние:
+        # провайдер больше не получает сумму, списанную снижением (или
+        # снижению отказывает 400 по уже processing-счёту).
         invoice = (
             db.query(PaymentInvoice)
             .filter(PaymentInvoice.id == payment_req.invoice_id)
+            .with_for_update()
             .first()
         )
         if not invoice:

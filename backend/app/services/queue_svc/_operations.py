@@ -447,7 +447,20 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             )
             return daily_queue
         except Exception as e:
-            db.rollback()
+            # Codex R3 #3092 (P1): a full db.rollback() here erased the
+            # CALLER's uncommitted rows in the same transaction (the atomic
+            # registrar cart stages visits/invoice flush-but-uncommitted),
+            # so the wizard endpoint could commit "success" for rows that no
+            # longer existed — phantom 200 with dead IDs. The two available
+            # isolation mechanisms both fail their constraints: a session-
+            # level savepoint (begin_nested) breaks the savepoint-isolated
+            # test fixture (P2-1b warned exactly this — verified A/B), and a
+            # rollback is the poison itself. The failure therefore simply
+            # PROPAGATES: the session is unusable for further writes, no
+            # caller can commit a half-dead transaction, and the client
+            # retries with the idempotency key. Catch-and-continue callers
+            # (morning-assignment pre-create loop) clean their own session
+            # where a rollback is safe.
             logger.error(
                 f"Failed to create DailyQueue: day={day}, specialist_id={actual_specialist_id}, "
                 f"queue_tag={queue_tag}, error={e}"

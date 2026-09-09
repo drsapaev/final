@@ -58,10 +58,11 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
 
   it('preserves existing queue identity when grouping edit-mode cart items', () => {
     const source = readCombinedWizardSource();
+    // Grouping moved to wizardUtils.ts (PR-45 LOC ceiling) — combined source still covers it
     const groupingBlock = extractSourceBlock(
       source,
-      'const groupCartItemsByVisit = (): unknown[] => {',
-      'const getDepartmentByService = (serviceId: string | number) => {',
+      'export const groupCartItemsByVisit = (',
+      'return Object.values(visits);',
     );
     const newServiceBlock = extractSourceBlock(
       source,
@@ -194,9 +195,11 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
 
   it('treats service_details as existing services in edit mode to avoid duplicate queues', () => {
     const source = readCombinedWizardSource();
+    // Codex R1 PR 3095: identity-множества вынесены в
+    // buildEditOriginalServiceIdentity (wizardUtils), поэтому блок ищется там
     const existingServicesBlock = extractSourceBlock(
       source,
-      'const originalServiceCodes = new Set();',
+      'export const buildEditOriginalServiceIdentity = (',
       'logger.log(\'📋 Исходные услуги определены:\'',
     );
 
@@ -218,9 +221,13 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       'const cartData = {',
     );
 
-    expect(editSaveBlock).toContain('if (editMode && hasNewServices) {');
-    expect(editSaveBlock).toContain('const editDeltaServices: Array<{ service_id: string | number; quantity?: unknown; specialist_id?: string | number | null }> = [');
+    // W2-PR1: edit-delta отправляет ЦЕЛЕВОЕ СОСТОЯНИЕ (новые услуги +
+    // изменившиеся количества существующих позиций) через общий билдер,
+    // которым же строится edit-квота (зеркало 1-в-1).
+    expect(editSaveBlock).toContain('const editDeltaBuild = buildEditDeltaTargetItems(');
+    expect(editSaveBlock).toContain('if (editMode && editDeltaBuild.items.length > 0) {');
     expect(editSaveBlock).toContain('applyRegistrarEditDelta({');
+    expect(editSaveBlock).toContain('services: editDeltaBuild.items,');
     expect(editSaveBlock).toContain('existingQueueEntryIds: Array.from(originalQueueIds)');
     expect(editSaveBlock).toContain('if (editMode && !hasNewServices) {');
     expect(editSaveBlock).toContain('bypassing registrar/cart to avoid duplicate visits');

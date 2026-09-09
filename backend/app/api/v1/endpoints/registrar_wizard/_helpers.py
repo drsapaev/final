@@ -90,7 +90,12 @@ def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user: User) -
 class ServiceItemRequest(BaseModel):
     service_id: int
     quantity: int = Field(default=1, ge=1)
-    custom_price: Decimal | None = None  # Для врачебного переопределения цены
+    # Codex R8 #3095 (P2): 2 десятичных знака — та же точность, что и у
+    # PostgreSQL Numeric(12,2) при сохранении. Раньше quote округлял строку
+    # до 2dp ПЕРЕД токеном, а путь сохранения аккумулировал сырое значение
+    # (1.005 → подтверждено 1.00, счёт 1.01); ограничение DTO делает обе
+    # стороны согласованными на единой точности.
+    custom_price: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
 
 
 class VisitRequest(BaseModel):
@@ -109,6 +114,11 @@ class CartRequest(BaseModel):
     payment_method: str = Field(default="cash")  # cash|card|online|click|payme
     all_free: bool = Field(default=False)  # Чекбокс "All Free"
     notes: str | None = None
+    # Codex R3 #3095 (P1): токен подтверждённой квоты. Если передан — save
+    # перепроверяет цены/настройки на момент подтверждения; расхождение =
+    # 409 (прайс изменился после подтверждения). None = обратная
+    # совместимость для внешних API-вызовов (мастер всегда передаёт токен).
+    quote_token: str | None = None
 
 
 class CartResponse(BaseModel):
@@ -137,7 +147,19 @@ class EditDeltaPatientData(BaseModel):
 class EditDeltaServiceItem(BaseModel):
     service_id: int
     quantity: int = Field(default=1, ge=1)
+    # Codex R11 #3095 (P2): the edit-delta QUOTE must mirror the command's
+    # create-path gate — an item that would create a new queue entry needs a
+    # resolvable specialist when no active queue exists for the tag/date.
+    # Without the specialist context on the quote item the gate cannot
+    # distinguish a command the save accepts from one it rejects with 400
+    # AFTER the registrar confirmed the price.
+    # Codex R13 #3095 (P2): the save-time token revalidation mirrors this
+    # specialist too — see apply_registrar_cart_edit_delta.
     specialist_id: int | None = None
+    # Codex R8 #3115 (P1): идентичность исходной записи позиции — при одном
+    # service_id под разными врачами/записями правится ИМЕННО названная
+    # запись, а не ближайшая по глобальному preferred-набору.
+    queue_entry_id: int | None = None
 
 
 class EditDeltaRequest(BaseModel):
@@ -153,7 +175,11 @@ class EditDeltaRequest(BaseModel):
     # Frontend передаёт updated_at каждой existing entry при последнем чтении.
     # Если какая-либо entry была изменена другим пользователем — 409 Conflict.
     expected_entry_updated_at: dict[int, str] = Field(default_factory=dict)
-
+    # Codex R4 #3095 (P1): привязка подтверждённой edit-квоты к команде.
+    # apply_registrar_cart_edit_delta пересчитывает цены на текущем каталоге
+    # (правила edit_delta) и отклоняет устаревший токен с 409 — подтверждённая
+    # сумма не может «тихо» разойтись с фактическим начислением.
+    quote_token: str | None = None
 
 class EditDeltaResponse(BaseModel):
     success: bool
@@ -165,6 +191,9 @@ class EditDeltaResponse(BaseModel):
     print_tickets: list[dict[str, Any]] = Field(default_factory=list)
     created_visits: list[dict[str, Any]] = Field(default_factory=list)
     updated_queue_entries: list[dict[str, Any]] = Field(default_factory=list)
+    # W2-PR2: фактическая (каноническая) дата, в которую легли правки —
+    # день редактируемых записей; может отличаться от запрошенной.
+    target_date: str | None = None
 
 
 class MarkPaidRequest(BaseModel):
@@ -237,6 +266,77 @@ class RepeatEligibilityPreviewResponse(BaseModel):
     items: list[RepeatEligibilityPreviewItem]
 
 
+# ===================== FIX D: КВОТА ЦЕН КОРЗИНЫ (read-only preview) =====================
+
+
+class CartQuoteItemRequest(BaseModel):
+    service_id: int
+    quantity: int = Field(default=1, ge=1)
+    # Codex R1 #3095 (P2): зеркало ServiceItemRequest.custom_price — иначе
+    # квота считала каталоговую цену, а /registrar/cart считал инвойс по
+    # врачебной переопределённой цене, и подтверждение расходилось со счётом.
+    # Codex R8 #3095 (P2): та же точность 2dp (см. ServiceItemRequest).
+    custom_price: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
+    # W2-PR1: маршрутизация edit-дельты учитывает врача (ADR-001: явный
+    # specialist_id не сливается в чужую очередь того же queue_tag) — квота
+    # маршрутизирует позицию ИДЕНТИЧНО команде; None = «врач не указан».
+    # Codex R11 #3095 (P2): тот же контекст зеркалит гейт создания команды —
+    # позиция без активной записи того же дня требует резолвимого
+    # специалиста, когда для queue_tag/даты нет активной очереди; без него
+    # квота подтверждала цену команды, возвращавшей на сохранении 400.
+    specialist_id: int | None = None
+    # Codex R8 #3115 (P1): зеркало EditDeltaServiceItem.queue_entry_id —
+    # квота маршрутизирует позицию по ТЕМ ЖЕ правилам, что и команда.
+    queue_entry_id: int | None = None
+
+
+class CartQuoteRequest(BaseModel):
+    items: list[CartQuoteItemRequest] = Field(default_factory=list)
+    discount_mode: str = Field(default="none")  # none|repeat|benefit
+    all_free: bool = Field(default=False)
+    # Codex R1 #3095 (P1): 'cart' — правила пути сохранения /registrar/cart
+    # (_apply_service_discount), 'edit_delta' — точные правила
+    # /registrar/cart/edit-delta (RegistrarEditDeltaService: только
+    # all_free→0, repeat/benefit скидки НЕ применяются).
+    # Codex R2 #3095 (P1): 'full_update' — правила
+    # /queue/online-entry/{id}/full-update
+    # (_full_update_create_single_independent_entry: консультация при
+    # repeat/benefit → 0, all_free → 0, остальное — каталог-цена;
+    # custom_price в контракте маршрута не участвует). Квота обязана
+    # выбирать контракт по фактическому маршруту команды, а не по editMode.
+    pricing_mode: str = Field(default="cart", pattern="^(cart|edit_delta|full_update)$")
+    # Codex R6 #3095 (P2): контекст edit-delta — квота обязана биллить ту же
+    # дельту, что и команда: если добавляемая услуга направляется в активную
+    # запись того же дня, УЖЕ содержащую услугу,
+    # RegistrarEditDeltaService._append_to_existing_entry биллит только
+    # max(запрошено − уже есть, 0), а не полное количество. cart/full_update
+    # и legacy-вызовы оставляют поля пустыми — квота считается по полному
+    # количеству, как раньше.
+    patient_id: int | None = None
+    target_date: date | None = None
+    preferred_entry_ids: list[int] = Field(default_factory=list)
+
+
+class CartQuoteItemResponse(BaseModel):
+    service_id: int
+    service_name: str
+    unit_price: Decimal  # базовая цена услуги (до скидки)
+    quantity: int
+    discount_percent: int  # применённая скидка (для отображения)
+    final_price: Decimal  # unit_price × quantity со скидкой
+
+
+class CartQuoteResponse(BaseModel):
+    items: list[CartQuoteItemResponse]
+    total_amount: Decimal
+    approval_status: str  # "approved" | "pending" (all_free без автоодобрения)
+    # Codex R3 #3095 (P1): привязка подтверждённой квоты к команде сохранения.
+    # /registrar/cart пересчитывает квоту на текущих ценах/настройках и
+    # отклоняет устаревший токен с 409 — подтверждённая сумма не может
+    # «тихо» разойтись с invoice после изменения цены администратором.
+    quote_token: str = ""
+
+
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 
@@ -277,15 +377,28 @@ def _check_repeat_visit_eligibility(
     return len(consultation_services) > 0
 
 
-def _resolve_effective_discount_mode(cart_data: CartRequest) -> str:
-    """All Free checkbox wins over the legacy discount_mode radio."""
+def _resolve_effective_discount_mode(cart_data: Any) -> str:
+    """All Free checkbox wins over the legacy discount_mode radio.
+
+    Codex R7 #3095 (P1): единый SSOT-резолв и для CartRequest, и для
+    EditDeltaRequest/full-update-запроса — оба несут пару
+    (all_free: bool, discount_mode: str). Команды сохранения обязаны
+    получать РЕЗОЛВНУТЫЙ режим, а не голый булеан: агрегированная запись
+    мастера несёт discount_mode="all_free" без булева флага.
+    """
     if cart_data.all_free or cart_data.discount_mode == "all_free":
         return "all_free"
     return cart_data.discount_mode or "none"
 
 
-def _load_registration_discount_settings(db: Session) -> dict[str, Any]:
-    """Load repeat/benefit settings with safe defaults."""
+def _load_registration_discount_settings(db: Session, lock_rows: bool = False) -> dict[str, Any]:
+    """Load repeat/benefit settings with safe defaults.
+
+    Codex R4 #3095 (P1): lock_rows=True (save-time revalidation) takes row
+    locks on the settings so a concurrent admin change cannot land between
+    the quote revalidation and the invoice calculation under READ COMMITTED.
+    (FOR UPDATE is a no-op on SQLite — test harness unaffected.)
+    """
     defaults = {
         "repeat_visit_days": 21,
         "repeat_visit_discount": 0,
@@ -294,20 +407,19 @@ def _load_registration_discount_settings(db: Session) -> dict[str, Any]:
     }
     settings = defaults.copy()
 
-    rows = (
-        db.query(ClinicSettings)
-        .filter(
-            ClinicSettings.key.in_(
-                [
-                    "repeat_visit_days",
-                    "repeat_visit_discount",
-                    "benefit_consultation_free",
-                    "all_free_auto_approve",
-                ]
-            )
+    settings_query = db.query(ClinicSettings).filter(
+        ClinicSettings.key.in_(
+            [
+                "repeat_visit_days",
+                "repeat_visit_discount",
+                "benefit_consultation_free",
+                "all_free_auto_approve",
+            ]
         )
-        .all()
     )
+    if lock_rows:
+        settings_query = settings_query.with_for_update()
+    rows = settings_query.all()
 
     for row in rows:
         if row.key in {"repeat_visit_days", "repeat_visit_discount"}:
@@ -316,7 +428,12 @@ def _load_registration_discount_settings(db: Session) -> dict[str, Any]:
             except (TypeError, ValueError):
                 pass
         elif row.key in {"benefit_consultation_free", "all_free_auto_approve"}:
-            settings[row.key] = bool(row.value)
+            # Codex R2 #3095 (P2): значения настроек приходят строками, а
+            # bool("False")/bool("0") в Python — True: любая непустая строка
+            # молча включала настройку (например, all_free_auto_approve),
+            # и квота/invoice расходились в approval-статусе. Детерминированный
+            # список truthy-значений.
+            settings[row.key] = str(row.value).strip().lower() in {"1", "true", "yes", "on"}
 
     return settings
 

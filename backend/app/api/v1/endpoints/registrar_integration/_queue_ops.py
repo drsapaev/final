@@ -693,6 +693,7 @@ def _serialize_queue_entry(
     latest_lab_report: dict | None,
     entry_department_key: str | None,
     entry_department: str | None,
+    record_date: Any = None,
 ) -> dict:
     """R-22 Phase 4: Serialize a single queue entry into the API response dict."""
     can_mark_paid = "mark_paid" in available_actions
@@ -751,6 +752,10 @@ def _serialize_queue_entry(
         "type": entry_type,
         "record_type": entry_type,
         "queue_entry_id": entry_wrapper.get("queue_entry_id"),
+        # W2-PR2: канонический день записи (день очереди/визита, для которого
+        # построен лист) — редактирование должно целился в этот день, а не в
+        # «сегодня» на момент запроса (см. AppointmentWizardV2 targetDate).
+        "record_date": record_date.isoformat() if record_date else None,
         "department_key": entry_department_key,
         "department": entry_department,
         "session_id": getattr(entry_data, 'session_id', None),
@@ -1245,6 +1250,8 @@ def _process_online_queue_entry(
                         "code": svc.get("code") or svc.get("service_code"),
                         "name": svc.get("name") or svc.get("service_name"),
                         "price": float(svc.get("price", 0)) if svc.get("price") else 0,
+                        # W2-PR1: исходное количество позиции из payload записи
+                        "quantity": svc.get("quantity") or svc.get("qty") or 1,
                     })
                 elif isinstance(svc, str):
                     service_details.append({
@@ -1252,7 +1259,12 @@ def _process_online_queue_entry(
                         "code": None,
                         "name": svc,
                         "price": 0,
+                        "quantity": 1,
                     })
+        # Codex R12 PR 3118 (P1): слои LIFO одной услуги показываются как
+        # ОДНА строка read-модели (мастер edit-режима строит корзину из
+        # service_details: дубли услуги сломали бы целевое состояние).
+        service_details = _merge_service_detail_layers(service_details)
 
     return {
         "record_id": record_id,
@@ -1271,6 +1283,53 @@ def _process_online_queue_entry(
         "total_cost": total_cost,
     }
 
+
+
+def _merge_service_detail_layers(details: list) -> list:
+    """Codex R12 PR 3118 (P1): слои LIFO одной услуги — ОДНА строка read-модели.
+
+    Рост количества при изменённом каталоге добавляет слой payload/VisitService
+    (см. RegistrarEditDeltaService LIFO): строки одной услуги сливаются по
+    id/коду/имени — quantity = Σ слоёв, price = средневзвешенная цена единицы
+    (ТОЛЬКО отображение; ценовой авторитет для записи — квота). Порядок — по
+    первому появлению услуги. Без слияния мастер edit-режима строил бы из
+    service_details две корзинные позиции одной услуги и целевое состояние
+    редактирования считалось бы по каждой строке отдельно."""
+    merged: list = []
+    index_by_key: dict = {}
+    for detail in details:
+        if not isinstance(detail, dict):
+            merged.append(detail)
+            continue
+        key_id = detail.get("id") or detail.get("service_id")
+        key_code = detail.get("code") or detail.get("service_code")
+        key_name = detail.get("name") or detail.get("service_name")
+        key = (
+            f"id:{key_id}" if key_id not in (None, "")
+            else f"code:{str(key_code).upper()}" if key_code
+            else f"name:{str(key_name).lower()}" if key_name
+            else None
+        )
+        if key is None or key not in index_by_key:
+            if key is not None:
+                index_by_key[key] = len(merged)
+            merged.append(detail)
+            continue
+        existing = merged[index_by_key[key]]
+        existing_qty = int(existing.get("quantity") or existing.get("qty") or 1)
+        incoming_qty = int(detail.get("quantity") or detail.get("qty") or 1)
+        total_qty = existing_qty + incoming_qty
+        existing_price = float(existing.get("price") or 0)
+        incoming_price = float(detail.get("price") or 0)
+        weighted = (
+            (existing_price * existing_qty + incoming_price * incoming_qty) / total_qty
+            if total_qty > 0
+            else existing_price
+        )
+        existing["quantity"] = total_qty
+        existing["qty"] = total_qty
+        existing["price"] = round(weighted, 2)
+    return merged
 
 
 _VISIT_STATUS_MAPPING = {
@@ -1423,10 +1482,17 @@ def _process_visit_entry(
                 "code": service_code_to_use or svc.code,
                 "name": svc.name,
                 "price": float(svc.price) if svc.price else 0,
+                # W2-PR1: исходное количество позиции — без него мастер в
+                # edit-режиме считает исходное количество равным 1 и не может
+                # ни показать, ни детектировать изменение количества.
+                "quantity": vs.qty or 1,
             })
 
         if vs.price:
             total_cost += float(vs.price) * (vs.qty or 1)
+
+    # Codex R12 PR 3118 (P1): слои LIFO одной услуги — одна строка read-модели.
+    service_details = _merge_service_detail_layers(service_details)
 
     source = getattr(visit, 'source', None) or 'desk'
     entry_status = _VISIT_STATUS_MAPPING.get(visit.status, "waiting")
