@@ -602,11 +602,10 @@ def _quote_core(
     # Codex R7 #3095 (P2): зеркалируем ПОСЛЕДОВАТЕЛЬНОЕ состояние команды.
     # RegistrarEditDeltaService.apply обрабатывает строки по очереди: вторая
     # дублирующая строка того же (service_id, specialist_id) видит позицию,
-    # созданную/пополненную первой, и её биллинговая дельта равна
-    # max(target − уже выставленное, 0). Квота обязана накапливать уже
+    # созданную/пополненную первой. Квота обязана накапливать уже
     # подтверждённые единицы внутри одного прохода — иначе токен покрывает
     # две единицы, а команда выставит одну.
-    _edit_delta_covered: dict[tuple[int, int | None], int] = {}
+    _edit_delta_covered: dict[int, int] = {}
 
     for item_req in quote_req.items:
         if int(item_req.service_id) in service_row_map:
@@ -680,7 +679,13 @@ def _quote_core(
             # Codex R7 #3095 (P2): вычитаем единицы, уже подтверждённые
             # предыдущими дублирующими строками этого же прохода квоты —
             # точное зеркало последовательного состояния команды.
-            _covered_key = (int(item_req.service_id), item_req.specialist_id)
+            # Codex R15 #3095 (P2): ключ — ТОЛЬКО услуга: команда маршрутизирует
+            # строку по (patient, day, queue_tag), а количество внутри записи
+            # суммируется по сервису независимо от специалиста
+            # (_find_service_payload). Специалист в ключе разрывал покрытие
+            # дубликатов с разными врачами: токен покрывал обе строки, команда
+            # выставляла только остаток.
+            _covered_key = int(item_req.service_id)
             billable_qty = max(
                 billable_qty - _edit_delta_covered.get(_covered_key, 0), 0
             )
