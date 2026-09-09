@@ -31239,6 +31239,8 @@ export type components = {
         };
         /** PatientUpdate */
         PatientUpdate: {
+            /** Full Name */
+            full_name?: string | null;
             /** Last Name */
             last_name?: string | null;
             /** First Name */

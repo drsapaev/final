@@ -4,7 +4,6 @@ import {
   Search,
   Phone,
 
-
   X,
 
   Check,
@@ -16,9 +15,6 @@ import {
   FlaskConical,
   Syringe,
   ClipboardList,
-
-
-
 
   Calendar,
 
@@ -177,7 +173,6 @@ interface RepeatCandidate {
   visit_date: string;
 }
 
-
 // UX Audit Stage 3 (Wizard issue 5.1):
 // API_BASE удалён — все вызовы идут через api-клиент, который сам
 // добавляет baseURL. Раньше API_BASE использовался в 13 raw fetch().
@@ -209,6 +204,15 @@ import {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
+  // Fix E: календарная валидация даты рождения (31.02, високосные, будущие)
+  getBirthDateValidationError,
+  formatBirthDateInput,
+  convertDateToISO,
+  convertDateFromISO,
+  // Fix A: наследованные поля выбранной карточки не протекают в нового пациента
+  isPatientSelectedFromCard,
+  buildInheritedPatientClearPatch,
+  isPhoneDuplicateErrorMessage,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
@@ -558,10 +562,7 @@ const AppointmentWizardV2 = ({
 
   // ===================== АВТОСОХРАНЕНИЕ =====================
 
-
-
   // Persistent draft loading is disabled to keep patient PHI out of browser storage.
-
 
   // Reset wizard to initial state. QW-08 fix: previously called clearDraft and showed
   // a misleading "Черновик очищен" toast even though no persistent draft existed.
@@ -577,37 +578,7 @@ const AppointmentWizardV2 = ({
     toast.success(t('misc.aw_form_cleared'));
   };
 
-  // ===================== МАСКИ ВВОДА =====================
-
-  const formatBirthDate = (value: string) => {
-    // Убираем все символы кроме цифр
-    const digits = value.replace(/\D/g, '');
-
-    // Ограничиваем до 8 цифр (ДДММГГГГ)
-    const limitedDigits = digits.slice(0, 8);
-
-    // Форматируем как ДД.ММ.ГГГГ
-    if (limitedDigits.length === 0) return '';
-    if (limitedDigits.length <= 2) return limitedDigits;
-    if (limitedDigits.length <= 4) return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2)}`;
-    return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2, 4)}.${limitedDigits.slice(4)}`;
-  };
-
-  const convertDateToISO = (dateStr: string) => {
-    // Конвертируем ДД.ММ.ГГГГ в ГГГГ-ММ-ДД
-    if (!dateStr || dateStr.length !== 10) return '';
-    const [day, month, year] = dateStr.split('.');
-    if (!day || !month || !year || year.length !== 4) return '';
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  };
-
-  const convertDateFromISO = (isoStr: string) => {
-    // Конвертируем ГГГГ-ММ-ДД в ДД.ММ.ГГГГ
-    if (!isoStr) return '';
-    const [year, month, day] = isoStr.split('-');
-    if (!year || !month || !day) return '';
-    return `${day}.${month}.${year}`;
-  };
+  // ===================== МАСКИ ВВОДА (маска даты — в wizardUtils) =====================
 
   // ===================== ПОИСК ПАЦИЕНТОВ =====================
 
@@ -679,14 +650,28 @@ const AppointmentWizardV2 = ({
   const handlePatientSearch = (value: string) => {
     // 🚨 FIX: Сбрасываем ID при изменении текста, чтобы не было "призраков"
     // Если пользователь меняет имя, это уже не тот пациент, которого выбрали ранее
+    //
+    // Fix A (data mixing): если текущие данные были унаследованы от выбранной
+    // карточки, переход к новому пациенту сбрасывает ВСЕ унаследованные поля.
+    // Раньше id очищался, но адрес/телефон/дата рождения/пол и разобранные
+    // части ФИО оставались — новый пациент создавался с данными другого человека.
+    // В editMode правка ФИО — это переименование той же карточки, там сброс не нужен.
+    const shouldClearInherited = !editMode && isPatientSelectedFromCard(wizardData.patient);
     setWizardData((prev) => ({
       ...prev,
       patient: {
         ...prev.patient,
         fio: value,
-        id: null // ✅ Сброс ID
+        id: null, // ✅ Сброс ID
+        ...(shouldClearInherited ? buildInheritedPatientClearPatch() : {})
       }
     }));
+
+    if (shouldClearInherited) {
+      // Производные UI-состояния унаследованной карточки тоже сбрасываем
+      setFormattedBirthDate('');
+      setPhoneError(null);
+    }
 
     // Дебаунс поиска
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -726,20 +711,25 @@ const AppointmentWizardV2 = ({
         // Отдельные поля для обратной совместимости (если нужны)
         lastName: patient.last_name || '',
         firstName: patient.first_name || '',
-        middleName: patient.middle_name || ''
+        middleName: patient.middle_name || '',
+        // Fix A: маркер «данные взяты целиком из выбранной карточки».
+        // Редактирование ФИО после выбора карточки переводит форму в режим
+        // нового пациента и обязано сбросить унаследованные поля (data mixing).
+        _selectedFromCard: true
       }
     }));
 
     // Обновляем отформатированную дату
     setFormattedBirthDate(convertDateFromISO(patient.birth_date || ''));
+    // Fix A: при явном выборе другой карточки предыдущий конфликт телефона
+    // больше не актуален.
+    setPhoneError(null);
     setShowSuggestions(false);
     setErrors((prev) => ({ ...prev, fio: null }));
   };
 
-
-
   const handleBirthDateChange = (value: string) => {
-    const formatted = formatBirthDate(value);
+    const formatted = formatBirthDateInput(value);
     setFormattedBirthDate(formatted);
 
     // Конвертируем в ISO формат для сохранения
@@ -1221,16 +1211,6 @@ const AppointmentWizardV2 = ({
     setFilteredServices(allServices);
   };
 
-
-
-
-
-
-
-
-
-
-
   // ===================== КОРЗИНА =====================
 
   const addToCart = (service: ServiceData) => {
@@ -1374,16 +1354,13 @@ const AppointmentWizardV2 = ({
         newErrors.gender = t('misc.aw_gender_required');
       }
       // Валидация даты рождения
+      // Fix E: календарная проверка (31.02 отклоняется, високосные ок,
+      // будущие даты — целиком), неполный ввод не проходит молча.
       if (formattedBirthDate && formattedBirthDate !== '00.00.0000') {
-        const [day, month, year] = formattedBirthDate.split('.');
-        const dayNum = parseInt(day);
-        const monthNum = parseInt(month);
-        const yearNum = parseInt(year);
-
-        if (!day || !month || !year ||
-        dayNum < 1 || dayNum > 31 ||
-        monthNum < 1 || monthNum > 12 ||
-        yearNum < 1900 || yearNum > new Date().getFullYear()) {
+        const birthCheck = getBirthDateValidationError(formattedBirthDate);
+        if (birthCheck === 'future') {
+          newErrors.birth_date = t('misc.aw_birth_date_future');
+        } else if (birthCheck !== 'ok' && birthCheck !== 'empty') {
           newErrors.birth_date = t('misc.aw_birth_date_invalid');
         }
       }
@@ -1417,18 +1394,29 @@ const AppointmentWizardV2 = ({
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-
-
-
-
-
-
   // ===================== ГОРЯЧИЕ КЛАВИШИ =====================
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
       const target = e.target as HTMLElement | null;
+
+      // Ctrl+Enter — завершить: обрабатывается ДО guard'а интерактивных
+      // целей (Codex R1 PR 3096), иначе фокус на кнопке гасил шорткат.
+      if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        handleCompleteRef.current();
+        return;
+      }
+
+      // Fix E: Enter не перехватывается на интерактивных элементах —
+      // кнопки/ссылки/селекты нажимаются штатно (раньше preventDefault
+      // глушил их, и Enter прыгал к следующему шагу).
+      const interactiveTags = ['BUTTON', 'A', 'SELECT'];
+      const isInteractiveTarget =
+        Boolean(target && interactiveTags.includes(target.tagName)) ||
+        Boolean(target?.isContentEditable);
+      if (isInteractiveTarget) return;
 
       // Enter - следующий шаг (кроме textarea)
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && target?.tagName !== 'TEXTAREA') {
@@ -1438,12 +1426,6 @@ const AppointmentWizardV2 = ({
         } else {
           handleCompleteRef.current();
         }
-      }
-
-      // Ctrl+Enter - завершить
-      if (e.key === 'Enter' && e.ctrlKey) {
-        e.preventDefault();
-        handleCompleteRef.current();
       }
 
       // Shift+Enter в textarea - перенос строки (по умолчанию)
@@ -1613,7 +1595,6 @@ const AppointmentWizardV2 = ({
       const normalizedPhone = wizardData.patient.phone
         ? normalizeUzbekPhoneForApi(wizardData.patient.phone)
         : null;
-      const normalizedPhoneDigits = normalizedPhone ? normalizedPhone.replace(/\D/g, '') : '';
       const selectedPatientSex = genderToPatientSexForApi(wizardData.patient.gender);
 
       // === ШАГ 1: ОПРЕДЕЛЯЕМ ИЛИ НАХОДИМ patient_id ===
@@ -1628,8 +1609,6 @@ const AppointmentWizardV2 = ({
         });
 
         // Ищем пациента по телефону
-        const cleanPhone = normalizedPhoneDigits;
-
         // UX Audit Stage 3 (Wizard issue 5.1 + 5.3):
         // Заменён двойной raw fetch() (по форматированному + очищенному телефону)
         // на единый helper findPatientByPhoneVariants из api/patients.
@@ -1639,6 +1618,41 @@ const AppointmentWizardV2 = ({
         }
 
         if (foundPatient) {
+          // Fix A (safe patient selection): авто-привязка к найденной по телефону
+          // карточке допустима только при совпадении ФИО. Семейный телефон не
+          // должен молча менять пациента — при расхождении требуется явное
+          // подтверждение регистратора.
+          const foundFio = String(
+            foundPatient.full_name || foundPatient.name || foundPatient.last_name || ''
+          ).trim();
+          const formFio = String(wizardData.patient.fio || '').trim();
+          const identityMatches =
+            foundFio.length > 0 &&
+            formFio.length > 0 &&
+            foundFio.toLowerCase() === formFio.toLowerCase();
+
+          if (!identityMatches) {
+            const attachConfirmed = await confirm({
+              title: t('misc.aw_attach_found_patient_title'),
+              message: t('misc.aw_attach_found_patient_message', { fio: foundFio || '—', phone: wizardData.patient.phone }),
+              description: t('misc.aw_attach_found_patient_description'),
+              confirmLabel: t('misc.aw_attach_found_patient_confirm'),
+              cancelLabel: t('misc.cancel'),
+              intent: 'primary',
+            });
+
+            if (!attachConfirmed) {
+              logger.warn('[AppointmentWizardV2] Edit-mode phone attach declined by user; stopping for explicit choice');
+              setPhoneError({
+                message: t('misc.aw_patient_phone_conflict_stop'),
+                patient: foundPatient
+              });
+              setCurrentStep(STEP_PATIENT);
+              toast.error(t('misc.aw_patient_phone_conflict_stop'));
+              return;
+            }
+          }
+
           // Обновляем локальный patientId и wizardData
           patientId = foundPatient.id as string | number;
           setWizardData((prev) => ({
@@ -1754,36 +1768,51 @@ const AppointmentWizardV2 = ({
           }));
           logger.log('✅ Пациент создан успешно:', patient.id);
         } catch (createError: unknown) {
-          // createPatient бросает Error с .status === 400 если «пациент уже существует»
+          // Fix A (safe patient selection): произвольный HTTP 400 больше НЕ
+          // считается признаком «пациент уже существует». Прежняя логика при
+          // любом 400 с телефоном автоматически привязывала форму к найденной
+          // по телефону карточке — валидационная ошибка приводила к записи
+          // визитов чужого пациента, а семейный телефон молча менял пациента.
           const createErr = createError as Error & { status?: number; message: string };
-          if (createErr.status === 400 && wizardData.patient.phone) {
-            // Пациент уже существует — ищем по телефону
-            const cleanPhone = normalizedPhoneDigits;
-            logger.log(`⚠️ Ищем существующего пациента по номеру телефона: ${wizardData.patient.phone} (clean: ${cleanPhone})`);
+          const isPhoneDuplicate =
+            createErr.status === 400 && isPhoneDuplicateErrorMessage(createErr.message);
 
-            // UX Audit Stage 3 (issue 5.3): используем findPatientByPhoneVariants
-            const foundPatient = await findPatientByPhoneVariants(normalizedPhone as string);
-
-            if (foundPatient) {
-              patientId = foundPatient.id as string | number;
-              setWizardData((prev) => ({
-                ...prev,
-                patient: { ...prev.patient, id: foundPatient.id as string | number }
-              }));
-              logger.log('✅ Найден существующий пациент (по телефону):', foundPatient.id);
-            } else {
-              // 🚨 НЕ используем fallback - требуем точное совпадение
-              logger.error('❌ Exact phone match not found after 400');
-              throw new Error(t('misc.aw_patient_phone_exists_not_found', { phone: wizardData.patient.phone }));
+          if (isPhoneDuplicate && wizardData.patient.phone) {
+            let conflictPatient: PatientRecord | null = null;
+            try {
+              // UX Audit Stage 3 (issue 5.3): используем findPatientByPhoneVariants
+              conflictPatient = (await findPatientByPhoneVariants(
+                normalizedPhone as string
+              )) as unknown as PatientRecord | null;
+            } catch (lookupError: unknown) {
+              logger.warn('[AppointmentWizardV2] Phone lookup after duplicate-phone 400 failed', lookupError);
             }
-          } else if (createErr.status === 400) {
-            // Нет телефона и ошибка создания - это проблема валидации
-            throw new Error(t('misc.aw_patient_validation_error', { message: createErr.message }));
-          } else {
-            // Другие ошибки (5xx, network)
-            logger.error('❌ Ошибка создания пациента:', createErr.status, createErr.message);
-            throw new Error(t('misc.aw_patient_creation_error', { status: createErr.status || '', message: createErr.message }));
+
+            if (conflictPatient) {
+              // Явная остановка: пользователь обязан сам выбрать карточку
+              // (кнопка «Выбрать …» на шаге пациента) или изменить данные.
+              // patient_id автоматически НЕ меняется.
+              logger.warn('[AppointmentWizardV2] Duplicate phone on create; stopping for explicit patient choice');
+              setPhoneError({
+                message: t('misc.aw_patient_phone_conflict_stop'),
+                patient: conflictPatient
+              });
+              setCurrentStep(STEP_PATIENT);
+              toast.error(t('misc.aw_patient_phone_conflict_stop'));
+              return;
+            }
+
+            throw new Error(t('misc.aw_patient_phone_exists_not_found', { phone: wizardData.patient.phone }));
           }
+
+          if (createErr.status === 400) {
+            // Нет телефона/не дубликат телефона — это ошибка валидации
+            throw new Error(t('misc.aw_patient_validation_error', { message: createErr.message }));
+          }
+
+          // Другие ошибки (5xx, network)
+          logger.error('❌ Ошибка создания пациента:', createErr.status, createErr.message);
+          throw new Error(t('misc.aw_patient_creation_error', { status: createErr.status || '', message: createErr.message }));
         }
       }
 
@@ -1830,7 +1859,6 @@ const AppointmentWizardV2 = ({
       initialRecordKind === 'online_queue' ||
       initialRecordKind === 'visit' ||
       initialRecordKind === 'appointment');
-
 
       const originalServiceIds = new Set();
       const originalQueueIds = new Set<string | number>(); // ✅ Moved here for availability in handleComplete
@@ -2852,7 +2880,6 @@ const AppointmentWizardV2 = ({
       </button>
     </div>;
 
-
   // Улучшенный заголовок для Шага 2
   const Step2Header =
   <div style={wizardHeaderShellStyle}>
@@ -2998,7 +3025,6 @@ const AppointmentWizardV2 = ({
         </button>
       </div>
     </div>;
-
 
   // Проверка прав доступа перед рендерингом
   if (!hasRegistrarAccess) {
@@ -3146,7 +3172,6 @@ const AppointmentWizardV2 = ({
 };
 
 export default AppointmentWizardV2;
-
 
 // UX Audit Stage 3 (Wizard issue 5.2):
 // PatientStepV2 и CartStepV2 вынесены в отдельные файлы.
