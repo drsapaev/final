@@ -481,6 +481,7 @@ class RegistrarEditDeltaService:
             self.db.query(Visit)
             .filter(Visit.id == entry.visit_id)
             .with_for_update()
+            .populate_existing()
             .first()
         )
         if visit is None:
