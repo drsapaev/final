@@ -614,27 +614,43 @@ export const parseWizardBaseline = (baseline: string): WizardContentShape | null
 // идентичность строки (код/имя): замена услуги в строке при той же длине
 // корзины больше не копирует service_id подмены в снимок — подпись
 // фиксирует замену, и закрытие предупреждает вместо молчаливой потери.
-const rowIdentityTokens = (item: Record<string, unknown> | null | undefined): Set<string> => {
+const rowCodeTokens = (item: Record<string, unknown> | null | undefined): Set<string> => {
   const tokens = new Set<string>();
   if (!item) return tokens;
   const code = String(item.service_code ?? item.code ?? '').toLowerCase().trim();
-  const name = String(item.service_name ?? item.name ?? '').toLowerCase().trim();
   if (code) {
     tokens.add(code);
     tokens.add(code.replace(/^([a-z])0+(\d+)$/, '$1$2'));
   }
-  if (name) tokens.add(name);
   return tokens;
 };
 
+const rowNameToken = (item: Record<string, unknown> | null | undefined): string =>
+  String(item?.service_name ?? item?.name ?? '').toLowerCase().trim();
+
 const rowIdentityMatches = (baselineItem: Record<string, unknown>, resolvedItem: Record<string, unknown>): boolean => {
-  const baselineTokens = rowIdentityTokens(baselineItem);
-  const resolvedTokens = rowIdentityTokens(resolvedItem);
-  if (baselineTokens.size === 0 || resolvedTokens.size === 0) return false;
-  for (const token of baselineTokens) {
-    if (resolvedTokens.has(token)) return true;
+  // Codex R13 PR 3097 (P2): когда код есть у ОБОИХ строк — идентичность
+  // решает только код (с паритетом ведущих нулей). Совпадающее отображаемое
+  // имя идентичностью не является: Service.name не уникален
+  // (backend/app/models/service.py), две одноимённые услуги с разными кодами
+  // не должны матчиться — иначе подмена строки гидрацией копирует service_id
+  // замены в снимок, и закрытие молча теряло бы правку.
+  const baselineCodes = rowCodeTokens(baselineItem);
+  const resolvedCodes = rowCodeTokens(resolvedItem);
+  if (baselineCodes.size > 0 && resolvedCodes.size > 0) {
+    for (const token of baselineCodes) {
+      if (resolvedCodes.has(token)) return true;
+    }
+    return false;
   }
-  return false;
+  // Код недоступен хотя бы у одной строки: легаси-данные несут код услуга
+  // В КАЧЕСТВЕ имени (k01), поэтому имя сравнивается с именем И кодовыми
+  // токенами другой строки — иначе гидрация легаси-строк ломается.
+  const baselineName = rowNameToken(baselineItem);
+  const resolvedName = rowNameToken(resolvedItem);
+  if (!baselineName || !resolvedName) return false;
+  if (baselineName === resolvedName) return true;
+  return resolvedCodes.has(baselineName) || baselineCodes.has(resolvedName);
 };
 
 export const patchBaselineWithResolvedServiceIds = (

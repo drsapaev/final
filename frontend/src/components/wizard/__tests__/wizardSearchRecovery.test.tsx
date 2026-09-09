@@ -493,6 +493,51 @@ describe('Fix F (Codex R3 #3097): baseline patch helpers', () => {
     expect((patched[1] as { service_id: number }).service_id).toBe(9);
   });
 
+  it('Codex R13 PR 3097 (P2): same display name with DIFFERENT codes is NOT identity — no patch', () => {
+    // Service.name не уникален: две услуги с одинаковым отображаемым именем,
+    // но разными кодами — РАЗНЫЕ услуги. Ранее общий name-токен давал матч
+    // при расходящихся кодах → service_id подмены копировался в снимок и
+    // закрытие молча теряло замену. Теперь при кодах у ОБОИХ строк решает
+    // только код.
+    const codedBaseline = wizardContentSignature({
+      patient: { id: 7, fio: 'SYNTHETIC-Тестов Тест', phone: '+998000000001', address: '', birth_date: '1990-01-01', gender: '' },
+      cart: { items: [{ service_id: null, doctor_id: 3, quantity: 1, service_name: 'Консультация', service_code: 'K01' }], discount_mode: 'none', all_free: false },
+    });
+    const parsed = parseWizardBaseline(codedBaseline);
+    const sameNamed = [
+      { service_id: 555, service_name: 'Консультация', service_code: 'KC-77', service_price: 100, doctor_id: 3, quantity: 1 },
+    ];
+    const patched = patchBaselineWithResolvedServiceIds(parsed!.cart.items, sameNamed as unknown as Array<Record<string, unknown>>);
+    expect((patched[0] as { service_id: number | null }).service_id).toBeNull();
+    expect((patched[0] as { service_code: string }).service_code).toBe('K01'); // снимок нетронут
+  });
+
+  it('Codex R13 PR 3097 (P2): code parity (leading zeros) and name-only legacy rows still hydrate', () => {
+    // паритет ведущих нулей кода сохранён: a0123 ↔ A123 — гидрация работает
+    const parityBaseline = wizardContentSignature({
+      patient: { id: 7, fio: 'SYNTHETIC-Тестов Тест', phone: '+998000000001', address: '', birth_date: '1990-01-01', gender: '' },
+      cart: { items: [{ service_id: null, doctor_id: 3, quantity: 1, service_name: 'УЗИ', service_code: 'a0123' }], discount_mode: 'none', all_free: false },
+    });
+    const parityParsed = parseWizardBaseline(parityBaseline);
+    const parityResolved = [
+      { service_id: 71, service_name: 'УЗИ', service_code: 'A123', service_price: 100, doctor_id: 3, quantity: 1 },
+    ];
+    const parityPatched = patchBaselineWithResolvedServiceIds(parityParsed!.cart.items, parityResolved as unknown as Array<Record<string, unknown>>);
+    expect((parityPatched[0] as { service_id: number }).service_id).toBe(71);
+
+    // код недоступен у снимка — легаси имя-как-код и чистое имя решают
+    const legacyBaseline = wizardContentSignature({
+      patient: { id: 7, fio: 'SYNTHETIC-Тестов Тест', phone: '+998000000001', address: '', birth_date: '1990-01-01', gender: '' },
+      cart: { items: [{ service_id: null, doctor_id: 3, quantity: 1, service_name: 'k02' }], discount_mode: 'none', all_free: false },
+    });
+    const legacyParsed = parseWizardBaseline(legacyBaseline);
+    const legacyResolved = [
+      { service_id: 72, service_name: 'Новое имя', service_code: 'K02', service_price: 100, doctor_id: 3, quantity: 1 },
+    ];
+    const legacyPatched = patchBaselineWithResolvedServiceIds(legacyParsed!.cart.items, legacyResolved as unknown as Array<Record<string, unknown>>);
+    expect((legacyPatched[0] as { service_id: number }).service_id).toBe(72);
+  });
+
   it('length mismatch (user added/removed items mid-flight) leaves the baseline untouched', () => {
     const parsed = parseWizardBaseline(baseline);
     const shorter = [{ service_id: 12 }];
