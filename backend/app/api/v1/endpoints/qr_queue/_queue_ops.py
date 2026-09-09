@@ -127,10 +127,23 @@ async def call_next_patient(
 
                 if entry:
                     # Determine cabinet (optional)
+                    # QD-2C (Codex round-13 P2): resource/bridged очередь —
+                    # кабинет уведомления с оси ресурса (реестр), как в
+                    # QR-метаданных (round-12): queue.cabinet_number, затем
+                    # default_cabinet реестра, НЕ кабинет отсутствующего
+                    # специалиста
                     cabinet = None
                     if entry.queue and entry.queue.cabinet_number:
                         cabinet = entry.queue.cabinet_number
-                    elif entry.queue and entry.queue.specialist: # Fallback to doctor's cabinet
+                    elif (
+                        entry.queue
+                        and entry.queue.queue_resource_id is not None
+                        and entry.queue.queue_resource is not None
+                    ):
+                        cabinet = entry.queue.queue_resource.default_cabinet
+                    elif (
+                        entry.queue and entry.queue.specialist
+                    ):  # Fallback to doctor's cabinet
                         cabinet = entry.queue.specialist.cabinet
 
                     await notify_service.notify_patient_called(entry, cabinet_number=cabinet)
@@ -148,16 +161,36 @@ async def call_next_patient(
                      entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
 
                 if entry:
-                    specialist_name = (
-                        entry.queue.specialist.user.full_name
-                        if entry.queue.specialist and entry.queue.specialist.user
-                        else "Врач"
-                    )
+                    # QD-2C (Codex round-13 P2): resource/bridged очередь —
+                    # владелец объявления с оси ресурса (реестр), как
+                    # display и legacy call пути (round-11/12); иначе табло
+                    # говорит «Врач» без кабинета при живом реестровом
+                    # назначении
+                    queue = entry.queue
+                    if queue.queue_resource_id is not None:
+                        resource = queue.queue_resource
+                        specialist_name = (
+                            resource.display_name
+                            if resource is not None
+                            else "Ресурс очереди"
+                        )
+                        broadcast_cabinet = queue.cabinet_number or (
+                            resource.default_cabinet if resource is not None else None
+                        )
+                    else:
+                        specialist_name = (
+                            queue.specialist.user.full_name
+                            if queue.specialist and queue.specialist.user
+                            else "Врач"
+                        )
+                        broadcast_cabinet = (
+                            queue.cabinet_number
+                        )  # Pass cabinet if available
 
                     await manager.broadcast_patient_call(
                         queue_entry=entry,
                         doctor_name=specialist_name,
-                        cabinet=entry.queue.cabinet_number  # Pass cabinet if available
+                        cabinet=broadcast_cabinet,
                     )
             except Exception as e:
                 logger.warning(f"Failed to update display for entry {entry_id}: {e}")

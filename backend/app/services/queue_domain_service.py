@@ -64,6 +64,19 @@ class QueueDomainService:
             specialist_id=specialist_id,
             day=day,
         )
+        # QD-2C (Codex round-13 P2): реестр-тег специалист — (day, tag)-
+        # поверхность может быть resource-owned (specialist NULL):
+        # doctor-keyed lookup её не видит, и reorder-status отвечает 404
+        # при живой очереди (утренний пре-креат / пост-свитч писатель).
+        # Тот же резолв, что и limit-status выше: поверхность реестра
+        # предпочитается легаси-строке (prefer_registry_surface —
+        # deactivation-proof, round-5/6 семантика), врач-теги без
+        # поверхности неизменны. isinstance: unit-стабы могут передавать
+        # не-Session db — для них легаси-путь.
+        if isinstance(self.db, Session):
+            queue = queue_resource_routing.prefer_registry_surface(
+                self.db, queue, day, specialist_id
+            )
         if not queue:
             raise QueueDomainReadError(404, "Очередь не найдена")
 

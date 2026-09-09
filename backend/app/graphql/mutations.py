@@ -1434,11 +1434,24 @@ class Mutation:
                                 trail_exc,
                             )
                     if entry.queue:
-                        payload["cabinet"] = entry.queue.cabinet_number or (
-                            entry.queue.specialist.cabinet
-                            if entry.queue.specialist
-                            else None
-                        )
+                        # QD-2C (Codex round-13 P2): resource/bridged
+                        # очередь — кабинет с оси ресурса (реестр), как в
+                        # QR-метаданных (round-12): queue.cabinet_number,
+                        # затем default_cabinet, НЕ кабинет отсутствующего
+                        # специалиста
+                        if entry.queue.queue_resource_id is not None:
+                            _resource = entry.queue.queue_resource
+                            payload["cabinet"] = entry.queue.cabinet_number or (
+                                _resource.default_cabinet
+                                if _resource is not None
+                                else None
+                            )
+                        else:
+                            payload["cabinet"] = entry.queue.cabinet_number or (
+                                entry.queue.specialist.cabinet
+                                if entry.queue.specialist
+                                else None
+                            )
                         # Codex P1 (round-9): день вызова — из ВЫБРАННОЙ очереди
                         # (загружен при снапшоте), не host date.today().
                         payload["broadcast_day"] = entry.queue.day
@@ -1459,13 +1472,26 @@ class Mutation:
                     # 2) TV-табло — payload собирается при открытой сессии
                     # (lazy queue/specialist), отправка — на event loop.
                     try:
-                        specialist_name = (
-                            entry.queue.specialist.user.full_name
-                            if entry.queue
-                            and entry.queue.specialist
-                            and entry.queue.specialist.user
-                            else "Врач"
-                        )
+                        # QD-2C (Codex round-13 P2): resource/bridged очередь
+                        # — владелец объявления с оси ресурса (реестр), как
+                        # display и legacy call пути (round-11/12); иначе
+                        # табло говорит «Врач» при живом реестровом
+                        # назначении
+                        if entry.queue and entry.queue.queue_resource_id is not None:
+                            _resource = entry.queue.queue_resource
+                            specialist_name = (
+                                _resource.display_name
+                                if _resource is not None
+                                else "Ресурс очереди"
+                            )
+                        else:
+                            specialist_name = (
+                                entry.queue.specialist.user.full_name
+                                if entry.queue
+                                and entry.queue.specialist
+                                and entry.queue.specialist.user
+                                else "Врач"
+                            )
                         payload[
                             "display_message"
                         ] = get_display_manager().build_patient_call_message(

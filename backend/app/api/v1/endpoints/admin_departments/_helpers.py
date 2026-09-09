@@ -9,7 +9,7 @@ from typing import Any  # noqa: F401
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
 from pydantic import BaseModel, ConfigDict, Field  # noqa: F401
-from sqlalchemy import func  # noqa: F401
+from sqlalchemy import and_, func, or_  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.api.deps import get_db, require_roles  # noqa: F401
@@ -390,6 +390,30 @@ def _ensure_department_integrations(
     return integration_result
 
 
+def _department_resource_tags(db: Session, department: Department) -> set[str]:
+    """Теги resource-оси для отделения (QD-2C, Codex round-13 P2).
+
+    Department.key НЕ равен тегу реестра ('laboratory' vs 'lab',
+    'echokg' vs 'ecg') — словарь соответствия живёт в QueueProfile:
+    profile.department_key == department.key перечисляет queue_tags
+    отделения (сиды 0055). Профиль мог быть удалён админом — прямые
+    D-1 variants самого ключа как страховочная сеть (только теги, где
+    отдел и тег совпадают семейством).
+    """
+    tags: set[str] = set()
+    profiles = (
+        db.query(QueueProfile)
+        .filter(QueueProfile.department_key == department.key)
+        .all()
+    )
+    for profile in profiles:
+        for tag in profile.queue_tags or []:
+            if tag:
+                tags.add(tag)
+    tags.update(expand_queue_tags([department.key]))
+    return tags
+
+
 def _collect_department_overview(db: Session) -> dict[str, Any]:
     """Формирует реальные показатели по отделениям."""
     today = date.today()
@@ -446,11 +470,25 @@ def _collect_department_overview(db: Session) -> dict[str, Any]:
         stats["queue_entries_today"] = (
             db.query(func.count(OnlineQueueEntry.id))
             .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-            .join(Doctor, DailyQueue.specialist_id == Doctor.id)
+            # QD-2C (Codex round-13 P2): resource-очереди (specialist
+            # NULL — утренний пре-креат / пост-свитч писатель) inner-join
+            # по Doctor выпадал из queue_entries_today и тотала отдела.
+            # Ось тега/профиля: QueueProfile.department_key == department.key
+            # даёт теги отделения (0055: 'laboratory' → ["lab","laboratory"],
+            # 'echokg' → ["ecg"]), плюс прямые variants ключа (отдел без
+            # профиля). Тег-ветка — только строки на resource-оси; врач-ось
+            # неизменна (outerjoin: тот же предикат department_id).
+            .outerjoin(Doctor, DailyQueue.specialist_id == Doctor.id)
             .filter(
-                Doctor.department_id == department.id,
                 DailyQueue.day == today,
                 OnlineQueueEntry.status.in_(["waiting", "called"]),
+                or_(
+                    Doctor.department_id == department.id,
+                    and_(
+                        DailyQueue.queue_resource_id.isnot(None),
+                        DailyQueue.queue_tag.in_(_department_resource_tags(db, department)),
+                    ),
+                ),
             )
             .scalar()
             or 0

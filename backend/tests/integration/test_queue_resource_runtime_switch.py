@@ -2718,3 +2718,329 @@ def _test_qr_metadata_body(db_session: Session) -> None:
     assert metadata["cabinet"] == "7"  # NOT the synthetic's stale "42"
     assert metadata["specialist_name"] == "Ресурс очереди"
     assert metadata["queue_id"] is not None
+
+
+# ===================== W. Codex round-13 pins =====================
+
+
+def test_gql_queue_entries_filter_sees_resource_axis(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-13 P2: queueEntries(filter: {doctorId}) for the
+    selected registry-tag specialist returns the entries joinQueue
+    placed onto the pure resource queue — the doctor-keyed predicate
+    alone saw NULL specialist rows as invisible."""
+    import asyncio
+    import contextlib
+    from types import SimpleNamespace
+
+    from app.graphql import resolvers as gql_resolvers
+    from app.graphql.types import QueueFilter
+
+    monkeypatch.setattr(
+        gql_resolvers,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+
+    try:
+        user = _make_user(db_session, username="lab_res_w1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        resource = _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        assert queue.specialist_id is None  # the invisible shape
+        entry = _make_waiting_entry(db_session, queue, number=41)
+
+        # a doctor-queue entry (regression: the doctor axis stays)
+        doc_user = _make_user(db_session, username="dr_w1_axis", role="Doctor")
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardiology")
+        doc_queue = _make_queue(
+            db_session, specialist_id=doctor.id, queue_tag="cardiology"
+        )
+        doc_entry = _make_waiting_entry(db_session, doc_queue, number=7)
+
+        info = SimpleNamespace(context=None)  # direct schema test: no audit ctx
+        result = asyncio.run(
+            gql_resolvers.Query().queue_entries(
+                info, QueueFilter(doctor_id=synthetic.id, queue_date=_DAY)
+            )
+        )
+        ids = [e.id for e in result.items]
+        assert entry.id in ids  # the resource-axis entry is now visible
+        joined = next(e for e in result.items if e.id == entry.id)
+        assert joined.queue is not None
+        assert joined.queue.queue_resource_id == resource.id
+        # the doctor-tag filter keeps its per-doctor contract
+        result_doc = asyncio.run(
+            gql_resolvers.Query().queue_entries(
+                info, QueueFilter(doctor_id=doctor.id, queue_date=_DAY)
+            )
+        )
+        assert [e.id for e in result_doc.items] == [doc_entry.id]
+    finally:
+        _durable_cleanup(db_session, "lab_res_w1", "dr_w1_axis")
+
+
+def test_gql_queue_entries_filter_tag_axis_doctor_without_resource_rows(
+    db_session: Session, monkeypatch
+) -> None:
+    """Negative: a doctor whose specialty has NO resource rows — the
+    tag-axis predicate matches nothing, the filter is the plain
+    doctor predicate (self-gated by the data invariant)."""
+    import asyncio
+    import contextlib
+    from types import SimpleNamespace
+
+    from app.graphql import resolvers as gql_resolvers
+    from app.graphql.types import QueueFilter
+
+    monkeypatch.setattr(
+        gql_resolvers,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+
+    user = _make_user(db_session, username="dr_w1_neg", role="Doctor")
+    doctor = _make_doctor(db_session, user_id=user.id, specialty="cardiology")
+    queue = _make_queue(db_session, specialist_id=doctor.id, queue_tag="cardiology")
+    entry = _make_waiting_entry(db_session, queue, number=9)
+
+    try:
+        info = SimpleNamespace(context=None)
+        result = asyncio.run(
+            gql_resolvers.Query().queue_entries(info, QueueFilter(doctor_id=doctor.id))
+        )
+        assert [e.id for e in result.items] == [entry.id]
+    finally:
+        _durable_cleanup(db_session, "dr_w1_neg")
+
+
+def test_reorder_snapshot_resolves_registry_surface(db_session: Session) -> None:
+    """Codex round-13 P2: get_queue_snapshot_by_specialist_day for a
+    registry-tag specialist resolves the (day, tag) surface — a pure
+    resource queue is no longer a 404, and the surface wins over a
+    doctor-keyed legacy shadow. Doctor tags without a surface keep
+    the 404 contract."""
+    from app.services.queue_domain_service import (
+        QueueDomainReadError,
+        QueueDomainService,
+    )
+
+    try:
+        user = _make_user(db_session, username="lab_res_w2", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        assert queue.specialist_id is None
+        entry = _make_waiting_entry(db_session, queue, number=3)
+
+        service = QueueDomainService(db_session)
+        snapshot = service.get_queue_snapshot_by_specialist_day(
+            specialist_id=synthetic.id, day=_DAY
+        )
+        assert snapshot.queue.id == queue.id  # was a 404 before the fix
+        assert [e.id for e in snapshot.entries] == [entry.id]
+
+        # a doctor-keyed legacy shadow (created AFTER the surface) loses
+        # to the registry surface — the same prefer-registry semantics
+        # as the limit-status read
+        shadow = _make_queue(db_session, specialist_id=synthetic.id, queue_tag="lab")
+        assert shadow.id > queue.id
+        snapshot = service.get_queue_snapshot_by_specialist_day(
+            specialist_id=synthetic.id, day=_DAY
+        )
+        assert snapshot.queue.id == queue.id
+
+        # doctor tag without a queue: the 404 contract is unchanged
+        other_user = _make_user(db_session, username="dr_w2_plain", role="Doctor")
+        other = _make_doctor(db_session, user_id=other_user.id, specialty="cardiology")
+        with pytest.raises(QueueDomainReadError) as exc_info:
+            service.get_queue_snapshot_by_specialist_day(
+                specialist_id=other.id, day=_DAY
+            )
+        assert exc_info.value.status_code == 404
+    finally:
+        _durable_cleanup(db_session, "lab_res_w2", "dr_w2_plain")
+
+
+def test_qr_call_next_rest_broadcasts_registry_owner(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-13 P2: POST /qr_queue/{specialist_id}/call-next on a
+    resource queue announces the registry owner (display_name) and the
+    registry-sourced cabinet on the TV broadcast — not «Врач» with no
+    cabinet. The service COMMITs — durable rows cleaned in the
+    finally."""
+    import asyncio
+
+    from app.services import display_websocket as dw
+
+    broadcast_calls: dict = {}
+
+    class FakeManager:
+        connections: list = []
+
+        async def broadcast_patient_call(self, **kwargs):
+            broadcast_calls.update(kwargs)
+
+    monkeypatch.setattr(dw, "get_display_manager", lambda: FakeManager())
+
+    try:
+        from app.api.v1.endpoints.qr_queue._queue_ops import call_next_patient
+
+        user = _make_user(db_session, username="lab_res_w3a", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        resource = (
+            db_session.query(QueueResource)
+            .filter(QueueResource.queue_tag == "lab")
+            .first()
+        )
+        resource.default_cabinet = "7"
+        db_session.commit()
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        db_session.refresh(queue)
+        assert queue.cabinet_number == "7"  # copied at creation (round-8)
+        entry = _make_waiting_entry(db_session, queue, number=21)
+        caller = _make_user(db_session, username="reg_w3a", role="Registrar")
+
+        async def scenario():
+            return await call_next_patient(
+                synthetic.id,
+                target_date=_DAY.isoformat(),
+                db=db_session,
+                current_user=caller,
+            )
+
+        payload = asyncio.run(scenario())
+        assert payload.success is True
+        assert broadcast_calls["doctor_name"] == "Ресурс очереди"
+        assert broadcast_calls["cabinet"] == "7"
+        db_session.refresh(entry)
+        assert entry.status == "called"
+    finally:
+        _durable_cleanup(db_session, "lab_res_w3a", "reg_w3a")
+
+
+def test_gql_call_next_announces_registry_owner(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-13 P2: the GraphQL callNextPatient wrapper derives
+    the display payload owner from the ownership axis — a resource
+    queue broadcasts the registry display_name and the registry-sourced
+    cabinet (payload.cabinet + display_message), not «Врач»/None. The
+    impl COMMITs — durable rows cleaned in the finally."""
+    import contextlib
+    from datetime import datetime
+    from types import SimpleNamespace
+    from zoneinfo import ZoneInfo
+
+    from app.graphql import mutations as gql_mutations
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+
+    try:
+        user = _make_user(db_session, username="lab_res_w3b", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        resource = (
+            db_session.query(QueueResource)
+            .filter(QueueResource.queue_tag == "lab")
+            .first()
+        )
+        resource.default_cabinet = "7"
+        db_session.commit()
+        # the impl picks the queue day from the configured TZ (round-9)
+        tz_day = datetime.now(ZoneInfo("Asia/Tashkent")).date()
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=tz_day, specialist_id=None, queue_tag="lab"
+        )
+        db_session.refresh(queue)
+        entry = _make_waiting_entry(db_session, queue, number=33)
+        actor = _make_user(db_session, username="adm_w3b", role="Admin")
+
+        info = SimpleNamespace(context=SimpleNamespace(user=actor, request=None))
+        payload = gql_mutations.Mutation._call_next_patient_impl(
+            info, synthetic.id, None
+        )
+        assert payload["success"] is True, payload
+        assert payload["cabinet"] == "7"
+        message = payload["display_message"]
+        assert message is not None
+        assert message["data"]["doctor_name"] == "Ресурс очереди"
+        db_session.refresh(entry)
+        assert entry.status == "called"
+    finally:
+        _durable_cleanup(db_session, "lab_res_w3b", "adm_w3b")
+
+
+def test_department_overview_counts_resource_entries(
+    db_session: Session,
+) -> None:
+    """Codex round-13 P2: _collect_department_overview counts entries
+    from resource-owned queues through the tag/profile department
+    axis (QueueProfile.department_key == department.key → 'lab' under
+    'laboratory') while the doctor axis keeps counting its own
+    entries. Commits (get_or_create) — cleaned in the finally."""
+    from datetime import datetime
+
+    from app.api.v1.endpoints.admin_departments._helpers import (
+        _collect_department_overview,
+    )
+    from app.models.department import Department
+    from app.models.queue_profile import QueueProfile
+
+    today = datetime.now().date()
+    department = Department(key="laboratory", name_ru="Лаборатория")
+    profile = QueueProfile(
+        key="laboratory",
+        title="Лаборатория",
+        queue_tags=["lab", "laboratory"],
+        department_key="laboratory",
+    )
+    try:
+        db_session.add(department)
+        db_session.add(profile)
+        db_session.commit()
+
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=today, specialist_id=None, queue_tag="lab"
+        )
+        assert queue.specialist_id is None
+        _make_waiting_entry(db_session, queue, number=5)
+
+        # doctor axis: a doctor of THIS department with its own queue
+        doc_user = _make_user(db_session, username="dr_w4_lab", role="Doctor")
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="biochem")
+        doctor.department_id = department.id
+        db_session.commit()
+        doc_queue = _make_queue(
+            db_session, day=today, specialist_id=doctor.id, queue_tag="biochem"
+        )
+        _make_waiting_entry(db_session, doc_queue, number=2)
+
+        overview = _collect_department_overview(db_session)
+        item = next(i for i in overview["departments"] if i["key"] == "laboratory")
+        assert item["stats"]["queue_entries_today"] == 2  # both axes
+        # the aggregate total absorbs the resource axis too
+        assert overview["totals"]["queue_entries_today"] >= 2
+    finally:
+        _durable_cleanup(db_session, "dr_w4_lab")
+        db_session.query(QueueProfile).filter(
+            QueueProfile.department_key == "laboratory"
+        ).delete(synchronize_session=False)
+        db_session.query(Department).filter(Department.key == "laboratory").delete(
+            synchronize_session=False
+        )
+        db_session.commit()
