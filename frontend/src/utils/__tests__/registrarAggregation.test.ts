@@ -305,6 +305,47 @@ describe('aggregatePatientsForAllDepartments', () => {
     ]);
   });
 
+  it('Codex R13 PR 3118 (P1): same service in two queue entries stays as TWO editable details', () => {
+    // Одна услуга в двух doctor-owned записях — две независимые позиции:
+    // дедупликация по услуге выбрасывала вторую деталь, и registrar не мог
+    // independently править вторую запись (edit-delta per-entry маршрут).
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 101,
+        service_details: [{ service_id: 10, service_code: 'K01', service_name: 'Консультация', quantity: 1, original_queue_id: 101 }],
+      }),
+      makeAppointment({
+        id: 102,
+        service_details: [{ service_id: 10, service_code: 'K01', service_name: 'Консультация', quantity: 2, original_queue_id: 102 }],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    const details = result[0].service_details as Array<Record<string, unknown>>;
+    expect(details).toHaveLength(2);
+    expect(details[0].original_queue_id).toBe(101);
+    expect(details[1].original_queue_id).toBe(102);
+    expect(details[1].quantity).toBe(2);
+  });
+
+  it('Codex R13 PR 3118 (P1): details without entry identity (visit-only) still dedup by service', () => {
+    // Отказ штампа visit-only деталей (R12) сохранён: без идентичности
+    // записи дедупликация остаётся по услуге — прежнее поведение.
+    const result = aggregatePatientsForAllDepartments([
+      makeAppointment({
+        id: 1,
+        service_details: [{ service_id: 10, service_code: 'K01', service_name: 'Консультация' }],
+      }),
+      makeAppointment({
+        id: 2,
+        service_details: [{ service_id: 10, service_code: 'K01', service_name: 'Консультация' }],
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].service_details).toHaveLength(1);
+  });
+
   it('preserves patient gender for all-departments edit mode identity', () => {
     const result = aggregatePatientsForAllDepartments([
       makeAppointment({

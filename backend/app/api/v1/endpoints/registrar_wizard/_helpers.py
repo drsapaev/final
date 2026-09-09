@@ -160,7 +160,6 @@ class EditDeltaServiceItem(BaseModel):
     # service_id под разными врачами/записями правится ИМЕННО названная
     # запись, а не ближайшая по глобальному preferred-набору.
     queue_entry_id: int | None = None
-(fix(wizard): edit-delta decrease/routing correctness (Codex R8 #3115))
 
 
 class EditDeltaRequest(BaseModel):

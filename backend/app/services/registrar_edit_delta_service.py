@@ -765,11 +765,32 @@ class RegistrarEditDeltaService:
                     )
                 )
             else:
-                for payload_row, units, _charge in consumption:
+                for payload_row, units, unit_charge in consumption:
                     remaining = int(self._payload_quantity(payload_row)) - units
+                    # Codex R13 PR 3118 (P1): ренормализация потреблённого
+                    # слоя ДО зеркала в VisitService. Легаси full-update слой
+                    # хранит price как СУММУ строки ({quantity: 3, price:
+                    # 300}); LIFO-план списывает записанную цену за ЕДИНИЦУ
+                    # (300/3 = 100) корректно, но строка оставалась с
+                    # price=300: sync читал остаток qty=1 как цену ЗА ЕДИНИЦУ
+                    # 300 — VisitService стоил 300 при entry/invoice в 100.
+                    # Записанная цена за единицу фиксируется явно
+                    # (unit_price — канонический источник), price сохраняет
+                    # КОНВЕНЦИЮ строки (line-total: остаток × цена единицы;
+                    # unit-конвенция не меняется).
+                    payload_row["unit_price"] = float(unit_charge)
+                    raw_price = payload_row.get("price")
+                    price_is_line_total = (
+                        raw_price is not None
+                        and Decimal(str(raw_price)) != unit_charge
+                    )
                     if remaining > 0:
                         payload_row["quantity"] = remaining
                         payload_row["qty"] = remaining
+                        if price_is_line_total:
+                            payload_row["price"] = float(
+                                unit_charge * Decimal(remaining)
+                            )
                     else:
                         services.remove(payload_row)
             entry.services = services
@@ -1266,11 +1287,22 @@ class RegistrarEditDeltaService:
                 return []
         return []
 
+    @staticmethod
+    def _payload_is_cancelled(payload: dict[str, Any] | None) -> bool:
+        """Codex R13 PR 3118 (P1): строка services, отменённая per-service
+        cancellation-эндпоинтом, остаётся в payload с cancelled=true — она
+        НЕ активный слой позиции (не в visit-представлении, не в
+        total_amount). Матчеры количеств/маршрутизации обязаны её
+        игнорировать."""
+        return bool(payload and payload.get("cancelled"))
+
     def _find_service_payload(
         self, services: list[dict[str, Any]], service: Service
     ) -> dict[str, Any] | None:
         target_code = self._service_code(service)
         for payload in services:
+            if self._payload_is_cancelled(payload):
+                continue
             payload_id = payload.get("service_id") or payload.get("id")
             payload_code = payload.get("code") or payload.get("service_code")
             if payload_id == service.id:
@@ -1285,10 +1317,18 @@ class RegistrarEditDeltaService:
         """Codex R12 PR 3118 (P1): ВСЕ слои позиции (см. LIFO-представление).
 
         Порядок списка = порядок записи слоёв: снижение потребляет их с
-        конца (последние добавленные возвращаются первыми)."""
+        конца (последние добавленные возвращаются первыми).
+
+        Codex R13 PR 3118 (P1): отменённые строки (cancelled=true от
+        per-service cancellation) — НЕ активные слои: повторное добавление
+        той же услуги обязано квотироваться/применяться как ПОЛНЫЙ рост,
+        а не no-op; рост не имеет права возвращать отменённые единицы в
+        visit-представление через зеркало."""
         target_code = self._service_code(service)
         matched: list[dict[str, Any]] = []
         for payload in services:
+            if self._payload_is_cancelled(payload):
+                continue
             payload_id = payload.get("service_id") or payload.get("id")
             payload_code = payload.get("code") or payload.get("service_code")
             if payload_id == service.id:

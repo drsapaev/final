@@ -459,32 +459,44 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
       if (!patientGroups[patientKey].service_details) {
         patientGroups[patientKey].service_details = [];
       }
-      const existingServiceDetailKeys = new Set(
-        patientGroups[patientKey].service_details.map((serviceDetail: Record<string, unknown>) => (
-          serviceDetail?.service_id ??
-          serviceDetail?.id ??
-          serviceDetail?.service_code ??
-          serviceDetail?.code ??
-          serviceDetail?.service_name ??
-          serviceDetail?.name
-        )).filter((value: unknown) => value !== null && value !== undefined).map(String),
-      );
-
-      appointment.service_details.forEach((serviceDetail: Record<string, unknown>) => {
-        if (!serviceDetail) return;
-        const serviceDetailKey = serviceDetail.service_id ??
+      const serviceDetailDedupKey = (serviceDetail: Record<string, unknown>): string | null => {
+        const serviceKey = serviceDetail.service_id ??
           serviceDetail.id ??
           serviceDetail.service_code ??
           serviceDetail.code ??
           serviceDetail.service_name ??
-          serviceDetail.name ??
+          serviceDetail.name;
+        if (serviceKey === null || serviceKey === undefined) return null;
+        // Codex R13 PR 3118 (P1): одна и та же услуга в ДВУХ записях врача —
+        // две независимые редактируемые позиции: ключ дедупликации несёт
+        // идентичность записи-источника. Прежний ключ только по услуге
+        // (id/код/имя) выбрасывал вторую деталь — нормализация показывала
+        // лишь первую позицию, и registrar не мог independently править
+        // вторую запись. Детали без идентичности записи (visit-only, отказ
+        // штампа R12 сохранён) дедуплицируются как прежде — по услуге.
+        const entryIdentity = serviceDetail.queue_entry_id ??
+          serviceDetail.original_queue_id ??
           null;
-        if (serviceDetailKey === null || serviceDetailKey === undefined || existingServiceDetailKeys.has(String(serviceDetailKey))) {
+        return hasQueueIdentityValue(entryIdentity)
+          ? `${String(entryIdentity)}:${String(serviceKey)}`
+          : String(serviceKey);
+      };
+      const existingServiceDetailKeys = new Set(
+        patientGroups[patientKey].service_details
+          .map((serviceDetail: Record<string, unknown>) => serviceDetailDedupKey(serviceDetail))
+          .filter((value: string | null) => value !== null),
+      );
+
+      appointment.service_details.forEach((serviceDetail: Record<string, unknown>) => {
+        if (!serviceDetail) return;
+        const stampedDetail = stampServiceDetailEntryId(serviceDetail, appointment);
+        const serviceDetailKey = serviceDetailDedupKey(stampedDetail);
+        if (serviceDetailKey === null || existingServiceDetailKeys.has(serviceDetailKey)) {
           return;
         }
         // Codex R12 PR 3118 (P1): id записи-источника этой детали.
-        patientGroups[patientKey].service_details.push(stampServiceDetailEntryId(serviceDetail, appointment));
-        existingServiceDetailKeys.add(String(serviceDetailKey));
+        patientGroups[patientKey].service_details.push(stampedDetail);
+        existingServiceDetailKeys.add(serviceDetailKey);
       });
     }
 
