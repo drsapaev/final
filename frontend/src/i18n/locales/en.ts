@@ -6333,6 +6333,8 @@ const en = {
     aw_services_unprocessable_reload: 'Некоторые услуги не могут быть обработаны. Пожалуйста, перезагрузите страницу и попробуйте снова.',
     aw_fio_required: 'ФИО пациента обязательно для заполнения',
     aw_patient_phone_exists_not_found: 'Пациент с телефоном {phone} уже существует, но не найден в базе данных.',
+    aw_patient_profile_save_failed: 'Не удалось сохранить изменения профиля пациента: {message}. Запись не создана — проверьте данные и попробуйте снова.',
+    aw_patient_profile_verify_failed: 'Сохранённые данные пациента не совпали с отправленными. Запись не создана — перечитайте карточку и попробуйте снова.',
     aw_patient_phone_conflict_stop: 'A patient with this phone number already exists. Choose the existing card or edit the details — automatic attachment is disabled.',
     aw_attach_found_patient_title: 'Attach the appointment to the existing card?',
     aw_attach_found_patient_message: 'Patient found by phone {phone}: {fio}. The appointment will be attached to that card.',

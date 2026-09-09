@@ -6334,6 +6334,8 @@ const uzLatn = {
     aw_services_unprocessable_reload: 'Baʼzi xizmatlarni qayta ishlab boʻlmadi. Iltimos, sahifani qayta yuklang va qayta urinib koʻring.',
     aw_fio_required: 'Bemorning FIOsi toʻldirilishi shart',
     aw_patient_phone_exists_not_found: '{phone} telefon raqamli bemor allaqachon mavjud, lekin bazada topilmadi.',
+    aw_patient_profile_save_failed: 'Bemor profilidagi oʻzgartirishlarni saqlab boʻlmadi: {message}. Yozuv yaratilmadi — maʼlumotlarni tekshirib qayta urinib koʻring.',
+    aw_patient_profile_verify_failed: 'Saqlangan bemor maʼlumotlari yuborilganlarga mos kelmadi. Yozuv yaratilmadi — kartani qayta oʻqib urinib koʻring.',
     aw_patient_phone_conflict_stop: 'Bu telefon raqamli bemor allaqachon mavjud. Mavjud kartani tanlang yoki maʼlumotlarni oʻzgartiring — avtomatik biriktirish oʻchirilgan.',
     aw_attach_found_patient_title: 'Yozuvni mavjud kartaga biriktirasizmi?',
     aw_attach_found_patient_message: '{phone} telefon raqami boʻyicha bemor topildi: {fio}. Yozuv shu kartaga biriktiriladi.',
