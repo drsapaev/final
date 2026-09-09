@@ -576,6 +576,13 @@ export const wizardContentSignature = (content: WizardContentShape): string => {
       service_id: (item as { service_id?: unknown }).service_id ?? null,
       doctor_id: (item as { doctor_id?: unknown }).doctor_id ?? null,
       quantity: (item as { quantity?: unknown }).quantity ?? 1,
+      // Codex R12 PR 3097 (P2): идентичность строки в снимке. Без неё
+      // позиционный патч гидрации не отличает «гидрация той же услуги»
+      // от «пользователь заменил позицию, пока шёл запрос справочника»:
+      // замена копировала service_id подмены в снимок, подписи совпадали,
+      // и закрытие молча теряло замену.
+      service_code: String((item as { service_code?: unknown }).service_code ?? '').trim() || null,
+      service_name: String((item as { service_name?: unknown }).service_name ?? '').trim() || null,
     })),
     discount_mode: String(content.cart.discount_mode || 'none'),
     all_free: Boolean(content.cart.all_free),
@@ -603,6 +610,33 @@ export const parseWizardBaseline = (baseline: string): WizardContentShape | null
 // закрытие молча теряло бы эти правки. Расхождение длины (пользователь
 // добавил/удалил позицию, пока шёл запрос) оставляет снимок нетронутым —
 // закрытие в этом случае честно предупредит о несохранённых данных.
+// Codex R12 PR 3097 (P2): патч ПОЗИЦИОНЕН, поэтому обязан проверять
+// идентичность строки (код/имя): замена услуги в строке при той же длине
+// корзины больше не копирует service_id подмены в снимок — подпись
+// фиксирует замену, и закрытие предупреждает вместо молчаливой потери.
+const rowIdentityTokens = (item: Record<string, unknown> | null | undefined): Set<string> => {
+  const tokens = new Set<string>();
+  if (!item) return tokens;
+  const code = String(item.service_code ?? item.code ?? '').toLowerCase().trim();
+  const name = String(item.service_name ?? item.name ?? '').toLowerCase().trim();
+  if (code) {
+    tokens.add(code);
+    tokens.add(code.replace(/^([a-z])0+(\d+)$/, '$1$2'));
+  }
+  if (name) tokens.add(name);
+  return tokens;
+};
+
+const rowIdentityMatches = (baselineItem: Record<string, unknown>, resolvedItem: Record<string, unknown>): boolean => {
+  const baselineTokens = rowIdentityTokens(baselineItem);
+  const resolvedTokens = rowIdentityTokens(resolvedItem);
+  if (baselineTokens.size === 0 || resolvedTokens.size === 0) return false;
+  for (const token of baselineTokens) {
+    if (resolvedTokens.has(token)) return true;
+  }
+  return false;
+};
+
 export const patchBaselineWithResolvedServiceIds = (
   baselineItems: Array<Record<string, unknown>>,
   resolvedItems: Array<Record<string, unknown>>
@@ -610,11 +644,28 @@ export const patchBaselineWithResolvedServiceIds = (
   if (!Array.isArray(baselineItems) || !Array.isArray(resolvedItems)) return baselineItems;
   if (baselineItems.length !== resolvedItems.length) return baselineItems;
   return baselineItems.map((item, index) => {
-    const resolvedId = (resolvedItems[index] as { service_id?: unknown } | null | undefined)?.service_id;
+    const resolved = resolvedItems[index] as Record<string, unknown> | null | undefined;
+    const resolvedId = resolved?.service_id;
     if (resolvedId == null) return item;
     const baselineId = (item as { service_id?: unknown }).service_id;
-    if (baselineId != null) return item; // позиция уже была идентифицирована в снимке
-    return { ...item, service_id: resolvedId };
+    if (baselineId != null) {
+      // позиция уже была идентифицирована в снимке; имя/код синхронизируем
+      // ТОЛЬКО для той же услуги (справочник канонизировал название) —
+      // иначе подпись ошибочно считала бы замену гидрацией.
+      if (String(baselineId) !== String(resolvedId)) return item;
+      return {
+        ...item,
+        service_code: (resolved?.service_code ?? resolved?.code ?? null) as unknown,
+        service_name: (resolved?.service_name ?? resolved?.name ?? null) as unknown,
+      };
+    }
+    if (!rowIdentityMatches(item, resolved as Record<string, unknown>)) return item;
+    return {
+      ...item,
+      service_id: resolvedId,
+      service_code: (resolved?.service_code ?? resolved?.code ?? null) as unknown,
+      service_name: (resolved?.service_name ?? resolved?.name ?? null) as unknown,
+    };
   });
 };
 

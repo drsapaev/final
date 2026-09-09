@@ -404,9 +404,11 @@ describe('Fix F Codex R1 regressions', () => {
 });
 
 describe('Fix F (Codex R3 #3097): baseline patch helpers', () => {
+  // Codex R12 PR 3097: снимок несёт идентичность строки (service_name) —
+  // как реальный createCartItem (fallback 'Услуга' всегда даёт имя).
   const baseline = wizardContentSignature({
     patient: { id: 7, fio: 'SYNTHETIC-Тестов Тест', phone: '+998000000001', address: '', birth_date: '1990-01-01', gender: '' },
-    cart: { items: [{ service_id: null, doctor_id: 3, quantity: 1 }, { service_id: 9, doctor_id: null, quantity: 2 }], discount_mode: 'none', all_free: false },
+    cart: { items: [{ service_id: null, doctor_id: 3, quantity: 1, service_name: 'k01' }, { service_id: 9, doctor_id: null, quantity: 2, service_name: 'Y' }], discount_mode: 'none', all_free: false },
   });
 
   it('parseWizardBaseline round-trips the signature and rejects malformed input', () => {
@@ -423,8 +425,8 @@ describe('Fix F (Codex R3 #3097): baseline patch helpers', () => {
   it('patch fills ONLY missing service_ids and keeps user-editable baseline fields', () => {
     const parsed = parseWizardBaseline(baseline);
     const resolved = [
-      { service_id: 12, service_name: 'X', service_price: 100, doctor_id: 3, quantity: 1 },
-      { service_id: 9, service_name: 'Y', service_price: 200, doctor_id: null, quantity: 2 },
+      { service_id: 12, service_name: 'X-канон', service_code: 'K01', service_price: 100, doctor_id: 3, quantity: 1 },
+      { service_id: 9, service_name: 'Y-канон', service_price: 200, doctor_id: null, quantity: 2 },
     ];
     const patched = patchBaselineWithResolvedServiceIds(parsed!.cart.items, resolved as unknown as Array<Record<string, unknown>>);
 
@@ -442,6 +444,55 @@ describe('Fix F (Codex R3 #3097): baseline patch helpers', () => {
     expect(JSON.parse(reSigned).patient.fio).toBe('SYNTHETIC-Тестов Тест');
   });
 
+  it('Codex R12 PR 3097 (P2): replacement of an unresolved row mid-flight is NOT patched into the baseline', () => {
+    // Пользователь заменил неразрешённую позицию (длина корзины прежняя),
+    // пока шёл запрос справочника: позиционный патч не имеет права
+    // копировать service_id подмены в снимок — иначе подписи совпадут и
+    // requestClose() молча потеряет замену.
+    const parsed = parseWizardBaseline(baseline);
+    const replaced = [
+      { service_id: 777, service_name: 'Другая услуга', service_code: 'Z99', service_price: 500, doctor_id: 3, quantity: 1 },
+      { service_id: 9, service_name: 'Y', service_price: 200, doctor_id: null, quantity: 2 },
+    ];
+    const patched = patchBaselineWithResolvedServiceIds(parsed!.cart.items, replaced as unknown as Array<Record<string, unknown>>);
+    expect((patched[0] as { service_id: number | null }).service_id).toBeNull(); // снимок нетронут
+    expect((patched[0] as { service_name: string }).service_name).toBe('k01');
+    // подпись снимка с заменой НЕ совпадает с подписью живой корзины →
+    // закрытие честно предупредит о несохранённых данных
+    const liveSignature = wizardContentSignature({ patient: parsed!.patient, cart: { ...parsed!.cart, items: replaced as unknown as Array<Record<string, unknown>> } });
+    const refreshed = refreshBaselineAfterServiceResolution(baseline, replaced as unknown as Array<Record<string, unknown>>);
+    expect(refreshed).not.toBe(liveSignature);
+  });
+
+  it('Codex R12 PR 3097 (P2): identity match (legacy code as name vs catalog code) still hydrates and syncs canonical name', () => {
+    const parsed = parseWizardBaseline(baseline);
+    const hydrated = [
+      { service_id: 12, service_name: 'Консультация', service_code: 'K01', service_price: 100, doctor_id: 3, quantity: 1 },
+      { service_id: 9, service_name: 'Y', service_price: 200, doctor_id: null, quantity: 2 },
+    ];
+    const patched = patchBaselineWithResolvedServiceIds(parsed!.cart.items, hydrated as unknown as Array<Record<string, unknown>>);
+    expect((patched[0] as { service_id: number }).service_id).toBe(12);
+    // канонические имя/код гидрации синхронизированы — подпись снимка
+    // совпадает с подписью живой корзины (закрытие без ложного предупреждения)
+    const liveSignature = wizardContentSignature({ patient: parsed!.patient, cart: { ...parsed!.cart, items: hydrated as unknown as Array<Record<string, unknown>> } });
+    const refreshed = refreshBaselineAfterServiceResolution(baseline, hydrated as unknown as Array<Record<string, unknown>>);
+    expect(refreshed).toBe(liveSignature);
+  });
+
+  it('Codex R12 PR 3097 (P2): same-id row gets canonical name synced; different-id row is NOT synced', () => {
+    const parsed = parseWizardBaseline(baseline);
+    // строка 1: id совпадает (9 == 9) — имя канонизируется
+    // строка 0: id остаётся null (identity не совпадает) — имя НЕ канонизируется
+    const mixed = [
+      { service_id: 777, service_name: 'Другая услуга', service_code: 'Z99', service_price: 500, doctor_id: 3, quantity: 1 },
+      { service_id: 9, service_name: 'Y-канон', service_price: 200, doctor_id: null, quantity: 2 },
+    ];
+    const patched = patchBaselineWithResolvedServiceIds(parsed!.cart.items, mixed as unknown as Array<Record<string, unknown>>);
+    expect((patched[0] as { service_name: string }).service_name).toBe('k01');
+    expect((patched[1] as { service_name: string }).service_name).toBe('Y-канон');
+    expect((patched[1] as { service_id: number }).service_id).toBe(9);
+  });
+
   it('length mismatch (user added/removed items mid-flight) leaves the baseline untouched', () => {
     const parsed = parseWizardBaseline(baseline);
     const shorter = [{ service_id: 12 }];
@@ -453,7 +504,7 @@ describe('Fix F (Codex R3 #3097): baseline patch helpers', () => {
 describe('Fix F (Codex R3 #3097): refresh helpers keep user edits out of the baseline', () => {
   const base = wizardContentSignature({
     patient: { id: 7, fio: 'SYNTHETIC-Тестов Тест', phone: '+998000000001', address: 'ул. А', birth_date: '1990-01-01', gender: '' },
-    cart: { items: [{ service_id: null, doctor_id: 3, quantity: 1 }], discount_mode: 'none', all_free: false },
+    cart: { items: [{ service_id: null, doctor_id: 3, quantity: 1, service_name: 'X' }], discount_mode: 'none', all_free: false },
   });
   const resolved = [{ service_id: 12, service_name: 'X', service_price: 100, doctor_id: 3, quantity: 1 }] as unknown as Array<Record<string, unknown>>;
 
