@@ -64,6 +64,41 @@ describe('W2-PR1: buildEditDeltaTargetItems', () => {
     expect(build.items).toEqual([{ service_id: 1, quantity: 3, specialist_id: null }]);
   });
 
+  it('Codex R15 PR 3115: одна услуга в двух записях — количества keyed по (запись, услуга)', () => {
+    // service_details с одной и той же услугой в ДВУХ записях и разными
+    // количествами: карта исходных количеств, keyed только по service_id,
+    // оставляла последнее значение — правка первой записи классифицировалась
+    // no-op и молча не отправлялась, хотя queue_entry_id адресовал её точно.
+    const identity = buildEditOriginalServiceIdentity(
+      true,
+      {
+        source: 'desk',
+        service_details: [
+          { id: 1, service_id: 1, quantity: 1, queue_entry_id: 11 },
+          { id: 1, service_id: 1, quantity: 2, queue_entry_id: 22 },
+        ],
+      },
+      servicesData,
+    );
+    const build = buildEditDeltaTargetItems(
+      [
+        { service_id: 1, quantity: 2, original_queue_id: 11 },
+        { service_id: 1, quantity: 3, original_queue_id: 22 },
+      ],
+      servicesData,
+      identity,
+    );
+    // обе правки валидны: первая (1→2) НЕ классифицируется no-op из-за
+    // перезаписи количества второй записью, вторая (2→3) адресована своей
+    // записью; Genuine no-op был бы только при совпадении с СОБСТВЕННЫМ
+    // исходным количеством записи.
+    expect(build.hasQuantityChange).toBe(true);
+    expect(build.items).toEqual([
+      { service_id: 1, quantity: 2, specialist_id: null, queue_entry_id: 11 },
+      { service_id: 1, quantity: 3, specialist_id: null, queue_entry_id: 22 },
+    ]);
+  });
+
   it('Codex R8 PR 3115: существующая позиция несёт queue_entry_id из original_queue_id', () => {
     const identity = identityWithQuantities({ '1': 2 });
     const build = buildEditDeltaTargetItems(

@@ -406,7 +406,21 @@ class RegistrarEditDeltaService:
         """
         if not entry.visit_id:
             return
-        visit = self.db.query(Visit).filter(Visit.id == entry.visit_id).first()
+        # Codex R15 #3115 (P1): лок ВИЗИТА — то же плечо синхронизации, что у
+        # кассового платежа (PaymentInvariantService._load_visit_for_update).
+        # Раньше визит читался без FOR UPDATE: платёж мог залочить визит,
+        # посчитать и закоммитить оплату по старому количеству, после чего
+        # снижение продолжалось и коммитилось — пациент оплачен за большее
+        # число единиц, чем визит удерживает. FOR UPDATE + populate_existing
+        # держит блокировку до конца транзакции снижения: платёж и снижение
+        # строго сериализуются на строке визита.
+        visit = (
+            self.db.query(Visit)
+            .filter(Visit.id == entry.visit_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
         if visit is None:
             return
         if visit.status in VISIT_POSITION_BLOCKED_STATUSES:
