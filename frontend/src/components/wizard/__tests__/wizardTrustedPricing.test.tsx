@@ -76,6 +76,25 @@ describe('Fix D: buildCartQuoteRequest', () => {
     expect(Object.prototype.hasOwnProperty.call(plain?.items[0] ?? {}, 'custom_price')).toBe(false);
   });
 
+  it('mirrors the selected doctor into quote specialist_id like the save command (Codex R12 P2)', () => {
+    // Команда сохранения шлёт specialist_id = item.doctor_id (newServices),
+    // поэтому команда создаст очередь выбранного врача, когда у услуги нет
+    // default-врача и нет активной очереди дня. Квота и save-ревалидация
+    // токена обязаны видеть ТОТ ЖЕ specialist_id — иначе квота 400
+    // "specialist_id is required" навсегда блокирует завершение.
+    const request = buildCartQuoteRequest({
+      items: [{ service_id: 11, quantity: 2, doctor_id: 45 }],
+    }, { pricingMode: 'edit_delta', patientId: 7, targetDate: '2026-09-09' });
+    expect(request?.items[0]).toEqual({ service_id: 11, quantity: 2, specialist_id: 45 });
+
+    // doctor_id отсутствует/некорректен → поле не добавляется (зеркало
+    // newServicesWithoutDoctor: specialist_id: null)
+    const noDoctor = buildCartQuoteRequest({ items: [{ service_id: 12, quantity: 1 }] });
+    expect(Object.prototype.hasOwnProperty.call(noDoctor?.items[0] ?? {}, 'specialist_id')).toBe(false);
+    const badDoctor = buildCartQuoteRequest({ items: [{ service_id: 12, quantity: 1, doctor_id: Number.NaN }] });
+    expect(Object.prototype.hasOwnProperty.call(badDoctor?.items[0] ?? {}, 'specialist_id')).toBe(false);
+  });
+
   it('edit-mode quote carries pricing_mode=edit_delta over the delta items (Codex R1 P1)', () => {
     // /registrar/cart/edit-delta выставляет ТОЛЬКО новые услуги и по своим
     // правилам (без repeat/benefit скидок). Квота edit-режима обязана

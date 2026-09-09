@@ -301,7 +301,7 @@ export interface CartQuote {
 export type CartQuoteStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 interface QuoteCartSource {
-  items?: Array<{ service_id?: unknown; quantity?: unknown; custom_price?: unknown }>;
+  items?: Array<{ service_id?: unknown; quantity?: unknown; custom_price?: unknown; doctor_id?: unknown }>;
   discount_mode?: unknown;
   all_free?: unknown;
 }
@@ -327,12 +327,12 @@ export interface CartQuoteRequestOptions {
 export const buildCartQuoteRequest = (
   cart: QuoteCartSource | null | undefined,
   options: CartQuoteRequestOptions = {}
-): { items: Array<{ service_id: number; quantity: number; custom_price?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } | null => {
+): { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } | null => {
   const rawItems = (options.itemsOverride ?? (Array.isArray(cart?.items) ? cart.items : [])) || [];
   const items = rawItems
     .filter((item) => item && item.service_id != null)
     .map((item) => {
-      const quoteItem: { service_id: number; quantity: number; custom_price?: number } = {
+      const quoteItem: { service_id: number; quantity: number; custom_price?: number; specialist_id?: number } = {
         service_id: Number(item.service_id),
         quantity: Math.max(1, Number(item.quantity || 1)),
       };
@@ -341,10 +341,22 @@ export const buildCartQuoteRequest = (
       if (customPrice != null && Number.isFinite(Number(customPrice))) {
         quoteItem.custom_price = Number(customPrice);
       }
+      // Codex R12 #3095 (P2): specialist_id зеркалится из выбранного врача
+      // корзины (doctor_id) — ТО ЖЕ, что шлёт команда сохранения
+      // (newServices: specialist_id: item.doctor_id). Иначе edit добавляет
+      // услугу без default-врача каталога и без активной очереди дня: квота
+      // отвечает 400 "specialist_id is required", хотя команда создала бы
+      // очередь выбранного врача — завершение заблокировано навсегда.
+      // Save-ревалидация токена пере-считывает квоту по ЭТИМ ЖЕ item'ам —
+      // зеркалирование в маппере покрывает оба пути одним местом.
+      const specialistId = (item as { doctor_id?: unknown }).doctor_id;
+      if (specialistId != null && Number.isFinite(Number(specialistId)) && Number(specialistId) > 0) {
+        quoteItem.specialist_id = Number(specialistId);
+      }
       return quoteItem;
     });
   if (items.length === 0) return null;
-  const request: { items: Array<{ service_id: number; quantity: number; custom_price?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } = {
+  const request: { items: Array<{ service_id: number; quantity: number; custom_price?: number; specialist_id?: number }>; discount_mode: string; all_free: boolean; pricing_mode: string; patient_id?: number; target_date?: string; preferred_entry_ids?: number[] } = {
     items,
     discount_mode: String(cart?.discount_mode || 'none'),
     all_free: Boolean(cart?.all_free),
