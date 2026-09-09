@@ -24,6 +24,7 @@ import pytest
 from sqlalchemy import inspect, text
 
 from app.core.security import get_password_hash
+from app.crud.clinic import clinic_today
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
 from app.models.user_profile import UserAuditLog
@@ -88,9 +89,19 @@ def _login_headers(client, username: str, password: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
-def _make_queue(db_session, doctor_id: int, tag: str = "procedures") -> DailyQueue:
+def _make_queue(
+    db_session, doctor_id: int, tag: str = "procedures", day: date | None = None
+) -> DailyQueue:
+    # Day convention per call surface (they differ, pinned by the QF-1
+    # suite): QRQueueService.call_next_patient (REST /queue/{id}/call-next)
+    # resolves the day as host date.today(), while queue_svc
+    # staff_call_next_patient resolves it via clinic_today (Asia/Tashkent
+    # SSOT — the two diverge in the 19:00-24:00Z window; the staff-call
+    # test hit that window in main CI red 2026-09-04 19:05Z and
+    # 2026-09-06 19:04Z). Default = host day (the REST convention);
+    # queue_svc-path tests pass clinic_today explicitly.
     queue = DailyQueue(
-        day=date.today(),
+        day=day or date.today(),
         specialist_id=doctor_id,
         queue_tag=tag,
         active=True,
@@ -296,7 +307,9 @@ def test_staff_call_next_patient_persists_caller(db_session, test_doctor):
     from app.services.queue_service import queue_service
 
     operator = _create_staff_user(db_session, "qf1_operator_d", "operator-d-pass")
-    queue = _make_queue(db_session, test_doctor.id)
+    # queue_svc resolves the day via clinic_today — the queue must be on
+    # the clinic day or the test flakes in the 19:00-24:00Z window.
+    queue = _make_queue(db_session, test_doctor.id, day=clinic_today(db_session))
     entry = _make_entry(db_session, queue.id, number=1)
 
     result = queue_service.staff_call_next_patient(
@@ -430,7 +443,7 @@ def test_registrar_batch_update_called_persists_caller(
 
     resp = client.patch(
         f"/api/v1/registrar/batch/patients/{test_patient.id}/entries/"
-        f"{date.today().isoformat()}",
+        f"{queue.day.isoformat()}",
         json={"entries": [{"id": entry.id, "action": "update", "status": "called"}]},
         headers=headers,
     )

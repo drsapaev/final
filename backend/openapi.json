@@ -89993,6 +89993,18 @@
       },
       "PatientUpdate": {
         "properties": {
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 384
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
           "last_name": {
             "anyOf": [
               {

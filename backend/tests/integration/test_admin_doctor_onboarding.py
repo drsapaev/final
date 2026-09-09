@@ -310,7 +310,21 @@ class TestConditionalCreateContract:
         doctor_profile REQUIRED via oneOf + role discriminator."""
         from pathlib import Path
 
-        spec_path = Path(__file__).resolve().parents[2] / "openapi.json"
+        # Anchor by parent traversal, not parents[2]: under mutmut the test
+        # copy lives in backend/mutants/tests/integration/, where parents[2]
+        # resolves to backend/mutants/ - and openapi.json is not copied into
+        # the mutants sandbox (nightly mutation run failed on this, #3103).
+        spec_path = next(
+            (
+                p / "openapi.json"
+                for p in Path(__file__).resolve().parents
+                if (p / "openapi.json").is_file()
+            ),
+            None,
+        )
+        assert spec_path is not None, (
+            "openapi.json not found in any parent directory of the test file"
+        )
         spec = json.loads(spec_path.read_text(encoding="utf-8"))
 
         body = spec["paths"]["/api/v1/users/users"]["post"]["requestBody"]["content"][

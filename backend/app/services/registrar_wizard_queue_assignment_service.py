@@ -139,9 +139,20 @@ class RegistrarWizardQueueAssignmentService:
         queue_assignments. The loop continued, and the visit was activated
         with stale data (non-empty queue_assignments but 0 real DB entries).
 
-        Fix: on failure, rollback restores the session, queue_assignments
-        is CLEARED to remove stale dicts, and the loop BREAKS. The visit
-        is NOT activated (queue_assignments is empty).
+        P2-1c fix: queue_assignments is CLEARED on failure and the visit is
+        NOT activated (queue_assignments is empty).
+
+        Codex R1 #3092 (P1): a full db.rollback() is incompatible with the
+        atomic cart (/registrar/cart + create_visit(commit=False)) — it
+        destroyed the flushed-but-uncommitted cart rows, after which the
+        endpoint committed an empty transaction and returned 200 with
+        phantom visit IDs.
+
+        Codex R1 follow-up (CI repair): a SAVEPOINT protected the cart but
+        conflicted with the savepoint-based db_session test fixture
+        (P2-1b warned about exactly this), so the mechanism is now a
+        COMPENSATING DELETE of this visit's queue entries in the same
+        transaction: the cart is never touched, no rollback, no savepoint.
 
         Contract (consistent with P2-1b):
             Partial queue assignment is intentionally unsupported. On any
@@ -154,6 +165,31 @@ class RegistrarWizardQueueAssignmentService:
             return []
 
         queue_assignments: list[dict[str, Any]] = []
+        # Codex R3 #3092 (P1): capture the PK while the instance is alive —
+        # after a deep full rollback the ORM instance is expired, and every
+        # attribute access below must not depend on a refresh that would
+        # raise ObjectDeletedError instead of the loud, explicit failure.
+        visit_id = visit.id
+        # Codex R1 #3092 (P1): предыдущий _rollback_session() делал ПОЛНЫЙ
+        # db.rollback() сессии. В атомарной корзине (/registrar/cart с
+        # create_visit(commit=False)) визиты/invoice лежат в той же транзакции
+        # как flush-нутые, но не закоммиченные строки — полный rollback стирал
+        # корзину, после чего endpoint делал db.commit() и возвращал 200 с ID
+        # несуществующих визитов.
+        # ИСПРАВЛЕНИЕ (CI, пост-Codex-R2): промежуточный вариант с SAVEPOINT
+        # (db.begin_nested()) защищал корзину, но несовместим с тестовой
+        # инфраструктурой — db_session-фикстура conftest сама строит
+        # savepoint-изоляцию (P2-1b прямо предупреждал: «avoids conflicts
+        # with test infrastructure that uses begin_nested()»): вложенный
+        # session-level savepoint ломал учёт savepoint-ов фикстуры, teardown
+        # падал «no such savepoint» и утекал connection — каскад ложных
+        # падений всей integration-секции в CI.
+        # Итоговый механизм — КОМПЕНСИРУЮЩАЯ зачистка без rollback и без
+        # savepoint: при сбое присвоения записи очереди ЭТОГО визита
+        # удаляются явным DELETE в той же транзакции. Корзина не затрагивается
+        # (её строки даже не перечитываются), контракт P2-1c «после сбоя в БД
+        # не остаётся ни одной записи очереди визита» выполняется, частичное
+        # присвоение по-прежнему невозможно (queue_assignments.clear() + break).
         for queue_tag in unique_queue_tags:
             try:
                 prepared_assignment = assignment_service.prepare_wizard_queue_assignment(
@@ -167,26 +203,65 @@ class RegistrarWizardQueueAssignmentService:
                     queue_assignments.append(assignment)
             except Exception as exc:
                 logger.error(
-                    "Ошибка присвоения очереди %s для визита %d: %s",
-                    queue_tag,
-                    visit.id,
+                    "Ошибка присвоения очередей для визита %d: %s",
+                    visit_id,
                     str(exc),
                     exc_info=True,
                 )
-                # P2-1c: rollback to restore the session after failure.
-                self._rollback_session()
-                # P2-1c: CLEAR stale data. The rollback destroyed all
-                # flushed entries, so any dicts in queue_assignments
-                # reference non-existent DB rows. Without clearing, the
-                # caller would see non-empty queue_assignments and
-                # activate the visit with 0 real queue entries.
+                # Codex R3 #3092 (P1): belt-and-suspenders. A deep helper that
+                # still performs a FULL session rollback (e.g. legacy
+                # get_or_create_daily_queue paths outside the savepoint fix)
+                # would erase the flushed cart rows from this transaction.
+                # The compensating cleanup below is meaningless then, and
+                # swallowing the error would let the endpoint commit a 200
+                # for phantom visit/invoice IDs. Verify the visit row still
+                # exists IN THE TRANSACTION; if not — fail loudly.
+                visit_still_in_tx = (
+                    self.db.query(Visit.id).filter(Visit.id == visit_id).first()
+                    is not None
+                )
+                if not visit_still_in_tx:
+                    raise
+                # Компенсирующая зачистка: DELETE записей очереди этого визита
+                # в той же транзакции (почему не rollback и не savepoint — см.
+                # комментарий выше). Ошибка зачистки НЕ глотается: она уйдёт в
+                # top-level assign_same_day_queue_numbers, визит не будет
+                # активирован, а endpoint атомарной корзины не закоммитит
+                # частичное состояние (P2-1c).
+                self._cleanup_visit_queue_entries(visit)
+                # P2-1c: CLEAR stale data — компенсированные записи больше не
+                # существуют в транзакции, поэтому словари в queue_assignments
+                # ссылались бы на несуществующие строки.
                 queue_assignments.clear()
-                # P2-1c: BREAK — after a full rollback, the session state
-                # is reset. Continuing the loop would re-query stale data
-                # and potentially create partial/inconsistent state.
+                # P2-1c: обработка останавливается на этом визите — частичное
+                # присвоение не поддерживается.
                 break
 
         return queue_assignments
+
+    def _cleanup_visit_queue_entries(self, visit: Visit) -> None:
+        """Удалить записи очереди ЭТОГО визита в текущей транзакции.
+
+        Компенсирующее действие вместо rollback/savepoint: rollback стёр бы
+        flush-нутые строки атомарной корзины (Codex R1 #3092), savepoint
+        несовместим с savepoint-изоляцией db_session-фикстуры в тестах
+        (P2-1b). DELETE по visit_id затрагивает только записи очереди
+        визита — корзина (визиты/invoice) не перечитывается и не меняется.
+        """
+        from app.models.online_queue import OnlineQueueEntry
+
+        entries = self.db.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.visit_id == visit.id
+        ).all()
+        for entry in entries:
+            self.db.delete(entry)
+        if entries:
+            self.db.flush()
+            logger.info(
+                "REGISTRATION: компенсирующая зачистка очереди визита %d — удалено записей: %d",
+                visit.id,
+                len(entries),
+            )
 
     def _materialize_prepared_assignment(
         self,
@@ -214,13 +289,3 @@ class RegistrarWizardQueueAssignmentService:
             allocation_mode="create_entry",
             **handoff.create_entry_kwargs,
         )
-
-    def _rollback_session(self) -> None:
-        rollback = getattr(self.db, "rollback", None)
-        if not callable(rollback):
-            return
-
-        try:
-            rollback()
-        except Exception as rollback_error:
-            logger.error("Ошибка при rollback wizard queue assignment: %s", rollback_error)

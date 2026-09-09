@@ -31,11 +31,23 @@ router = APIRouter()
 def raise_report_internal_error(
     action: str, public_detail: str, exc: Exception
 ) -> NoReturn:
-    logger.warning(
+    # 2026-09-07 observability fix: a bare warning (no traceback) left 500s
+    # invisible in Sentry - only the "request.completed" span event was
+    # captured, with no way to diagnose the failure. logger.exception records
+    # the full stack (the logging PII filter still sanitizes content before
+    # it leaves the process) and capture_exception attaches it to Sentry.
+    logger.exception(
         "Report endpoint failed action=%s error_type=%s",
         action,
         type(exc).__name__,
     )
+    try:
+        from app.core.sentry import capture_exception
+
+        capture_exception(exc)
+    except Exception:
+        # Sentry is a best-effort channel - the client-facing 500 must fire.
+        pass
     raise HTTPException(status_code=500, detail=public_detail)
 
 

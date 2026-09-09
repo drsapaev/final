@@ -161,6 +161,41 @@ async def refresh_access_token(
         raise_authentication_internal_error("refresh_access_token", e)
 
 
+def _extract_access_token_meta(
+    auth_header: str | None,
+) -> tuple[str | None, object | None]:
+    """Decode the Bearer access token from the logout request.
+
+    Returns (jti, expiry) for per-token revocation. The expiry is
+    timezone-AWARE (fromtimestamp with tz=UTC): the blacklist service
+    compares it against now(UTC), and a naive datetime raised
+    "can't compare offset-naive and offset-aware datetimes", silently
+    skipping the revocation (Sentry 3E, follow-up to #3122).
+
+    Any decode failure returns (None, None) - best effort by design.
+    """
+    if not auth_header or not auth_header.lower().startswith("bearer "):
+        return None, None
+    try:
+        import jwt as _jwt
+
+        from app.core.config import settings as _settings
+        payload = _jwt.decode(
+            auth_header.split(" ", 1)[1],
+            _settings.SECRET_KEY,
+            algorithms=[_settings.ALGORITHM],
+        )
+    except Exception:
+        return None, None
+
+    jti = payload.get("jti")
+    exp = payload.get("exp")
+    if not exp:
+        return jti, None
+    from datetime import datetime as _dt, timezone as _tz
+    return jti, _dt.fromtimestamp(exp, tz=_tz.utc)
+
+
 @router.post("/logout", response_model=LogoutResponse)
 async def logout(
     request_data: LogoutRequest,
@@ -173,27 +208,9 @@ async def logout(
         service = get_authentication_service()
 
         # Извлекаем jti + expiry из access-токена, чтобы отозвать его индивидуально.
-        access_jti: str | None = None
-        access_exp = None
-        auth_header = request.headers.get("authorization") or ""
-        if auth_header.lower().startswith("bearer "):
-            try:
-                import jwt as _jwt
-
-                from app.core.config import settings as _settings
-                _payload = _jwt.decode(
-                    auth_header.split(" ", 1)[1],
-                    _settings.SECRET_KEY,
-                    algorithms=[_settings.ALGORITHM],
-                )
-                access_jti = _payload.get("jti")
-                _exp = _payload.get("exp")
-                if _exp:
-                    from datetime import datetime as _dt
-                    access_exp = _dt.utcfromtimestamp(_exp)
-            except Exception:
-                # Non-blocking: если не удалось декодировать — просто не отзываем jti.
-                pass
+        access_jti, access_exp = _extract_access_token_meta(
+            request.headers.get("authorization")
+        )
 
         result = service.logout_user(
             db=db,
