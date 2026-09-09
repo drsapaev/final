@@ -437,6 +437,7 @@ def _edit_delta_quote_context(
     specialist_id: int | None = None,
     queue_entry_id: int | None = None,
     lock: bool = False,
+    all_free: bool = False,
 ) -> tuple[int, Decimal | None]:
     """Codex R6 #3095 (P2): mirror the edit-delta command's billing quantity.
 
@@ -454,10 +455,16 @@ def _edit_delta_quote_context(
     - per-item routing: явный queue_entry_id позиции выбирает запись, как и
       в команде (одинаковый service_id под разными врачами не мутирует
       «ближайшую» запись);
-    - возвращает ВТОРОЕ значение — записанную цену за единицу для снижения
-      (_recorded_unit_charge: full-update строки хранят line-total, а не
-      unit-цену); квота снижения обязана токенизировать ТУ ЖЕ сумму,
-      которую спишет команда (для роста это цена каталога — None);
+    - Codex R12 PR 3118 (P1): возвращает ВТОРОЕ значение — amount_override:
+      ГОТОВУЮ знаковую сумму снижения (LIFO-слои: цена единицы каждого слоя
+      × потреблённые единицы, _plan_lifo_consumption). При многослойном
+      потреблении единой цены за единицу не существует, поэтому возвращается
+      сумма, а не цена за единицу. Для роста — None (каталог × дельта);
+    - Codex R12 PR 3118 (P2): гвард НЕ-редактируемого состояния
+      (_assert_decrease_allowed) зеркалится в квоту ДО выпуска токена —
+      снижение поверх оплаченного/processing счёта, инициализированного
+      провайдерского pending-платежа или терминального визита отвечает 400
+      вместо ложного подтверждения;
     - lock=True (save-ревалидация) фиксирует выбранную запись FOR UPDATE
       до конца транзакции — отмена записи между ревалидацией и применением
       не меняет маршрутизацию/дельту.
@@ -524,21 +531,46 @@ def _edit_delta_quote_context(
                 ),
             )
         return requested_qty, None
-    existing_payload = edit_service._find_service_payload(
+    payloads = edit_service._find_service_payloads(
         edit_service._coerce_services(entry.services), service
     )
-    if not existing_payload:
+    if not payloads:
         return requested_qty, None
-    existing_qty = edit_service._payload_quantity(existing_payload)
+    existing_qty = sum(int(edit_service._payload_quantity(p)) for p in payloads)
     delta = requested_qty - existing_qty
-    decrease_charge = (
-        edit_service._recorded_unit_charge(
-            entry=entry, payload=existing_payload, previous_qty=existing_qty
+    if delta < 0:
+        # Codex R12 PR 3118 (P2): гвард НЕ-редактируемого состояния зеркалится
+        # в квоту ДО выпуска токена. Оплаченный/processing счёт,
+        # инициализированный провайдерский pending-платёж или терминальный
+        # визит делают снижение невозможным: подтверждать его в квоте нельзя —
+        # команда после успешной ревалидации отвергла бы команду (400),
+        # состояние не изменилось бы, а регистратор получил ложное
+        # подтверждение. ValueError команды конвертируется в 400 так же,
+        # как гейт маршрутизации выше.
+        try:
+            edit_service._assert_decrease_allowed(entry=entry)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # Codex R12 PR 3118 (P1): LIFO-зеркало снижения — точная сумма
+        # потреблённых слоёв (цена единицы слоя × единицы), ровно то, что
+        # спишет команда. При многослойном потреблении единой цены за единицу
+        # нет — возвращаем ГОТОВУЮ сумму (amount_override), а не единичную
+        # цену (см. вызов в _quote_core). Fallback строк без цены (легаси) —
+        # каталог/ноль при all_free, как в команде.
+        fallback_unit_price = (
+            Decimal("0") if all_free else Decimal(str(service.price or 0))
         )
-        if delta < 0
-        else None
-    )
-    return delta, decrease_charge
+        consumption = edit_service._plan_lifo_consumption(
+            entry=entry,
+            payloads=payloads,
+            units_to_remove=-delta,
+            fallback_unit_price=fallback_unit_price,
+        )
+        decrease_amount = -sum(
+            (charge * Decimal(units) for _, units, charge in consumption), Decimal("0")
+        )
+        return delta, decrease_amount
+    return delta, None
 
 
 def _quote_core(
@@ -648,12 +680,33 @@ def _quote_core(
             ):
                 service_row_map[int(_svc.id)] = _svc
 
+    # W2-PR2: канонический день edit-квоты — зеркало RegistrarEditDelta
+    # Service.apply (та же resolve_edit_target_day): день предпочтённых записей,
+    # а не запрошенная строка. Прежний контракт «фронт шлёт getLocalISODate()»
+    # квотировал и сохранял правку записи на будущую дату в «сегодня».
+    # Резолв один на запрос (не на позицию); мультидневный набор preferred —
+    # громкий 400, как в команде. Revalidation проходит через ТУ ЖЕ ветку с
+    # теми же сырыми входами → токен квоты остаётся согласованным.
+    edit_target_date = quote_req.target_date
+    if (
+        quote_req.pricing_mode == "edit_delta"
+        and quote_req.patient_id is not None
+        and quote_req.preferred_entry_ids
+    ):
+        try:
+            edit_target_date = RegistrarEditDeltaService(db).resolve_edit_target_day(
+                patient_id=quote_req.patient_id,
+                preferred_entry_ids=set(quote_req.preferred_entry_ids),
+                requested_target_date=quote_req.target_date or date.today(),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     # Codex R7 #3095 (P2): зеркалируем ПОСЛЕДОВАТЕЛЬНОЕ состояние команды.
     # RegistrarEditDeltaService.apply обрабатывает строки по очереди: вторая
     # дублирующая строка того же (service_id, specialist_id) видит позицию,
-    # созданную/пополненную первой. Квота обязана накапливать уже
-    # подтверждённые единицы внутри одного прохода — иначе токен покрывает
-    # две единицы, а команда выставит одну.
+    # созданную/пополненную первой. Квота накапливает уже подтверждённые
+    # дельты внутри одного прохода — иначе токен покрывает больше единиц,
+    # чем выставит команда.
     _edit_delta_covered: dict[tuple[int, int | None], int] = {}
 
     for item_req in quote_req.items:
@@ -695,6 +748,10 @@ def _quote_core(
         # custom_price и repeat/benefit скидки НЕ применяются. Это гарантирует,
         # что подтверждённая в edit-режиме сумма совпадает с тем, что
         # edit-delta реально выставит в invoice.
+        # Codex R12 PR 3118 (P1): amount_override снижения (готовая знаковая
+        # сумма LIFO-слоёв) — только в edit_delta; остальные режимы не имеют
+        # слоёв и считаются unit × qty.
+        decrease_amount: Decimal | None = None
         if quote_req.pricing_mode == "edit_delta":
             base_price = Decimal(str(service.price))
             unit_final = Decimal("0") if effective_discount_mode == "all_free" else base_price
@@ -717,16 +774,23 @@ def _quote_core(
             # Codex R8 #3115 (P1/P2): per-item queue_entry_id routing mirror +
             # decrease quotes price the RECORDED unit charge (full-update rows
             # store line totals), the same value the command subtracts.
+            # W2-PR2: день — канонический день редактируемых записей.
+            # Codex R12 PR 3118 (P1): снижение возвращает amount_override —
+            # ГОТОВУЮ сумму потреблённых LIFO-слоёв (единая цена за единицу
+            # при многослойном потреблении отсутствует); рост остаётся
+            # каталог × дельта (при слоях это ТОЧНО сумма команды).
             # Codex R7/R15 #3095 (P2): ПОСЛЕДОВАТЕЛЬНОЕ зеркало команды:
             # delta_i = target_i − existing − Σ delta_j (j<i) — эквивалентно
-            # строке с последовательно-эффективным requested (LIFO-подобные
-            # дубликат-снижения проходят через ТУ ЖЕ логику контекста).
-            # Ключ покрытия — (service_id, queue_entry_id): команда
-            # маршрутизирует по (patient, day, queue_tag), количество внутри
-            # записи суммируется по сервису независимо от специалиста
-            # (_find_service_payload), а явные queue_entry_id — независимые
-            # позиции (R11-строгий селектор).
-            decrease_charge: Decimal | None = None
+            # строке с последовательно-эффективным requested (target −
+            # Σ delta_j): LIFO-потребление снижения и его amount_override
+            # считаются для скорректированной дельты. Дельта ЗНАКОВАЯ —
+            # covered копит её без клампа (дубликат-снижение валидно и
+            # гвардится как обычное снижение).
+            # Codex R15 #3118 (P1): ключ покрытия — (service_id,
+            # queue_entry_id): команда маршрутизирует по (patient, day,
+            # queue_tag), количество внутри записи суммируется по сервису
+            # независимо от специалиста (_find_service_payload), а явные
+            # queue_entry_id — независимые позиции (строгий селектор R11).
             _covered_key = (
                 int(item_req.service_id),
                 item_req.queue_entry_id,
@@ -734,27 +798,25 @@ def _quote_core(
             _sequential_requested = item_req.quantity - _edit_delta_covered.get(
                 _covered_key, 0
             )
-            if quote_req.patient_id is not None and quote_req.target_date is not None:
-                billable_qty, decrease_charge = _edit_delta_quote_context(
+            if quote_req.patient_id is not None and edit_target_date is not None:
+                billable_qty, decrease_amount = _edit_delta_quote_context(
                     db,
                     service=service,
                     requested_qty=_sequential_requested,
                     patient_id=quote_req.patient_id,
-                    target_date=quote_req.target_date,
+                    # W2-PR2: канонический день (день редактируемых записей).
+                    target_date=edit_target_date,
                     preferred_entry_ids=set(quote_req.preferred_entry_ids),
                     specialist_id=item_req.specialist_id,
                     queue_entry_id=item_req.queue_entry_id,
                     lock=lock_pricing_rows,
+                    all_free=effective_discount_mode == "all_free",
                 )
             else:
                 billable_qty = _sequential_requested
             _edit_delta_covered[_covered_key] = (
                 _edit_delta_covered.get(_covered_key, 0) + billable_qty
             )
-            if billable_qty < 0 and decrease_charge is not None:
-                # Снижение: команда вычитает записанную цену (не каталог);
-                # квота токенизирует ровно ту же сумму за единицу.
-                unit_final = decrease_charge
         elif quote_req.pricing_mode == "full_update":
             # Codex R2 #3095 (P1): зеркало _full_update_create_single_
             # independent_entry: консультация при repeat/benefit → 0,
@@ -803,9 +865,13 @@ def _quote_core(
         # the other modes price the full requested quantity.
         priced_qty = billable_qty if quote_req.pricing_mode == "edit_delta" else item_req.quantity
 
-        final_price = (unit_final * Decimal(priced_qty)).quantize(
-            Decimal("0.01")
-        )
+        if decrease_amount is not None:
+            # Codex R12 PR 3118 (P1): снижение — готовая знаковая сумма слоёв.
+            final_price = decrease_amount.quantize(Decimal("0.01"))
+        else:
+            final_price = (unit_final * Decimal(priced_qty)).quantize(
+                Decimal("0.01")
+            )
         if quote_req.pricing_mode == "full_update":
             # Codex R3 #3095 (P2): the full-update command stores
             # int(item_price) (unit × quantity) in BOTH the service payload

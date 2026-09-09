@@ -224,8 +224,10 @@ import {
   type CartQuoteStatus,
   buildCartQuoteRequest,
   buildEditOriginalServiceIdentity,
-  isEditDeltaNewItem,
   buildEditDeltaTargetItems,
+  describeUnroutableEditDeltaRows,
+  resolveEditRecordDate,
+  isEditDeltaNewItem,
   getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
@@ -1169,6 +1171,14 @@ const AppointmentWizardV2 = ({
     [editMode, initialData, servicesData]
   );
 
+  // W2-PR2: день редактируемой записи — edit-квота и edit-сабмит целились в
+  // НЕГО, а не в «сегодня» (getLocalISODate терял будущую дату записи).
+  // Backend дополнительно канонизирует день по preferred-записям.
+  const editRecordDate = useMemo(
+    () => (editMode ? resolveEditRecordDate(initialData) : null),
+    [editMode, initialData]
+  );
+
   // Codex R2 PR 3095 (P1): маршрут команды edit-записи. QR-записи
   // (online_queue + source=online) сабмитятся через /queue/online-entry/
   // {id}/full-update (ПОЛНАЯ корзина, свои правила цен) — квота обязана
@@ -1214,11 +1224,22 @@ const AppointmentWizardV2 = ({
       // (новые услуги + изменившиеся количества существующих позиций).
       // Раньше квотировались только новые услуги, и подтверждённая сумма
       // игнорировала изменение количества существующей позиции.
-      quoteSourceItems = buildEditDeltaTargetItems(
+      const editDeltaBuild = buildEditDeltaTargetItems(
         rawCartItems,
         servicesData,
         editOriginalServiceIdentity,
-      ).items as unknown as Array<Record<string, unknown>>;
+      );
+      // Codex R9 PR 3118 (P1): visit-only позиции (визит без записи очереди)
+      // не маршрутизируются edit-delta — подтверждение блокируется громкой
+      // ошибкой ещё на этапе квоты, а не молча исключается из суммы.
+      if (editDeltaBuild.unroutable.length > 0) {
+        cartQuoteRequestIdRef.current += 1;
+        setCartQuote(null);
+        setCartQuoteStatus('error');
+        setCartQuoteError(describeUnroutableEditDeltaRows(editDeltaBuild.unroutable));
+        return;
+      }
+      quoteSourceItems = editDeltaBuild.items as unknown as Array<Record<string, unknown>>;
     } else if (isEditModeQuote && fullUpdateQuoteRoute) {
       quotePricingMode = 'full_update';
     }
@@ -1229,11 +1250,11 @@ const AppointmentWizardV2 = ({
       // Codex R6 PR 3095 (P2): edit-delta контекст — backend биллит в квоте
       // ту же дельту, которую реально выставит команда (активная запись того
       // же дня, уже содержащая услугу, биллит только недостающее количество).
-      // Зеркало сабмита: patientId + getLocalISODate() + originalQueueIds.
+      // W2-PR2: зеркало сабмита — день редактируемой записи (не «сегодня»).
       ...(quotePricingMode === 'edit_delta'
         ? {
             patientId: wizardData.patient?.id ?? null,
-            targetDate: getLocalISODate(),
+            targetDate: editRecordDate ?? getLocalISODate(),
             preferredEntryIds: Array.from(editOriginalServiceIdentity.queueIds),
           }
         : {}),
@@ -1284,7 +1305,7 @@ const AppointmentWizardV2 = ({
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, fullUpdateQuoteRoute, quoteRefreshNonce, wizardData.patient?.id]);
+  }, [isOpen, editMode, wizardData.cart, servicesData, editOriginalServiceIdentity, editRecordDate, fullUpdateQuoteRoute, quoteRefreshNonce, wizardData.patient?.id]);
 
   const repeatSuggestionSummary = useMemo(() => {
     if (!consultationCartItems.length) {
@@ -2072,6 +2093,7 @@ const AppointmentWizardV2 = ({
       initialRecordKind === 'visit' ||
       initialRecordKind === 'appointment');
 
+
       // Fix D (Codex R1 PR 3095): identity множеств считаются ОДИН раз через
       // useMemo (buildEditOriginalServiceIdentity) и шарятся сабмитом и
       // edit-квотой — квота строится из РОВНО того же edit-delta payload.
@@ -2266,6 +2288,15 @@ const AppointmentWizardV2 = ({
           editOriginalIdentity,
         );
 
+        // Codex R9 PR 3118 (P1): visit-only позиции (визит без записи очереди)
+        // громко блокируют сабмит — edit-delta не маршрутизирует правку без
+        // записи очереди; включение создало бы дублирующий визит на backend.
+        if (editDeltaBuild.unroutable.length > 0) {
+          setErrors((prev) => ({ ...prev, quote: describeUnroutableEditDeltaRows(editDeltaBuild.unroutable) }));
+          setCurrentStep(STEP_CART);
+          return;
+        }
+
         if (editMode && editDeltaBuild.items.length > 0) {
           const patientDataForEditDelta: Record<string, unknown> = {
             full_name: wizardData.patient.fio || wizardData.patient.name,
@@ -2289,7 +2320,10 @@ const AppointmentWizardV2 = ({
             });
             const editDeltaResult = await applyRegistrarEditDelta({
               patientId,
-              targetDate: getLocalISODate(),
+              // W2-PR2: день редактируемой записи (зеркало edit-квоты и
+              // backend-канонизации по preferred-записям) — правка будущей
+              // записи больше не переносится в «сегодня».
+              targetDate: editRecordDate ?? getLocalISODate(),
               patientData: patientDataForEditDelta,
               paymentMethod: wizardData.payment.method,
               discountMode: wizardData.cart.discount_mode,

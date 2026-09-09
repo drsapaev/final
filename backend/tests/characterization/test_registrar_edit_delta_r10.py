@@ -1,6 +1,14 @@
 """Codex R10 #3115 — исправления P1: forward queue_entry_id (адаптер —
-frontend-тест), сохранение записанной стоимости при росте (средневзвешенная
-цена), блокировка счёта при снижении.
+frontend-тест), сохранение записанной стоимости при росте, блокировка счёта
+при снижении.
+
+Codex R12 PR 3118 (P1): рост больше НЕ смешивает позицию средневзвешенной
+ценой за единицу (при неделимой сумме строки — 2×100 + 1×101 = 301 — квант
+до 2 знаков рвал инвариант VisitService ≠ entry.total_amount). Вместо
+этого — СЛОЕВОЕ (LIFO) представление: рост добавляет слой (дельта ×
+каталог), VisitService-строки зеркалят слои payload. Инвариант прежний и
+теперь ТОЧНЫЙ: Σ (price×qty) строк VisitService == Σ unit×qty слоёв payload
+== entry.total_amount == invoice.
 
 Каждый кейс проверяет СОСТОЯНИЕ (повторное чтение DB), а не только HTTP-код.
 Все данные синтетические; production DB не используется.
@@ -169,19 +177,51 @@ def _reread_visit_service(db_session, visit_id: int, service_id: int) -> VisitSe
     )
 
 
+def _visit_service_rows(db_session, visit_id: int, service_id: int) -> list[VisitService]:
+    """Codex R12 PR 3118 (P1): ВСЕ строки позиции (слои), в порядке записи."""
+    db_session.expire_all()
+    return (
+        db_session.query(VisitService)
+        .filter(VisitService.visit_id == visit_id, VisitService.service_id == service_id)
+        .order_by(VisitService.id.asc())
+        .all()
+    )
+
+
+def _layers_invariant(db_session, entry_id: int, visit_id: int, service_id: int) -> tuple[Decimal, Decimal, Decimal]:
+    """Возвращает (Σ VisitService, Σ payload-слоёв, entry.total_amount)."""
+    db_session.expire_all()
+    entry = db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    visit_total = sum(
+        (Decimal(str(r.price)) * r.qty for r in _visit_service_rows(db_session, visit_id, service_id)),
+        Decimal("0"),
+    )
+    payload_total = sum(
+        (
+            Decimal(str(p.get("unit_price") if p.get("unit_price") is not None else p.get("price") or 0))
+            * int(p.get("quantity") or p.get("qty") or 1)
+            for p in (entry.services or [])
+        ),
+        Decimal("0"),
+    )
+    return visit_total, payload_total, Decimal(str(entry.total_amount))
+
+
 # ===================== P1: РОСТ СОХРАНЯЕТ ЗАПИСАННУЮ СТОИМОСТЬ =====================
 
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_increase_with_catalog_change_blends_recorded_and_delta_cost(
+def test_increase_with_catalog_change_layers_recorded_and_delta_cost(
     client, db_session, registrar_auth_headers, test_patient, test_doctor
 ):
     """Визит записан 1×100, каталог изменился на 150, рост 1→2:
-    счёт выставляет только дельту (+150) → итог 250. VisitService-строка и
-    entry-пейлоад обязаны представлять ту же сумму (2×125=250), иначе
-    PaymentInvariantService.compute_total_cost считал бы 300 канонической
-    стоимостью и собирал бы лишние 50."""
+    счёт выставляет только дельту (+150) → итог 250. СЛОЙ (Codex R12 PR 3118
+    P1): строка базового слоя сохраняет записанную цену (1×100), дельта —
+    новый слой (1×150); VisitService-строки зеркалят слои payload.
+    Инвариант ТОЧЕН: Σ строк VisitService == Σ слоёв payload ==
+    entry.total_amount == invoice (250) — иначе compute_total_cost считал бы
+    иную каноническую стоимость и собирал бы лишние/недостающие деньги."""
     service = _create_service(db_session, code="R10-BL-01", price=100)
     queue = _create_queue(db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general", day=date.today())
     visit = _create_visit_with_row(
@@ -207,17 +247,15 @@ def test_increase_with_catalog_change_blends_recorded_and_delta_cost(
     assert response.status_code == 200, response.text
     assert Decimal(str(response.json()["total_amount"])) == Decimal("150")  # дельта по каталогу
 
-    # Повторное чтение: строка, пейлоад, entry, invoice согласованы
-    row = _reread_visit_service(db_session, visit.id, service.id)
-    assert row.qty == 2
-    assert Decimal(str(row.price)) == Decimal("125.00")  # (100 + 150) / 2
-    assert Decimal(str(row.price)) * row.qty == Decimal("250")
+    # Повторное чтение: слои согласованы, базовый слой НЕ переписан
+    rows = _visit_service_rows(db_session, visit.id, service.id)
+    assert [(r.qty, Decimal(str(r.price))) for r in rows] == [(1, Decimal("100.00")), (1, Decimal("150.00"))]
 
     db_session.expire_all()
     db_session.refresh(entry)
-    payload = entry.services[0]
-    assert payload["quantity"] == 2
-    assert Decimal(str(payload["unit_price"])) == Decimal("125.00")
+    assert len(entry.services) == 2
+    assert entry.services[0]["quantity"] == 1 and Decimal(str(entry.services[0]["unit_price"])) == Decimal("100.00")
+    assert entry.services[1]["quantity"] == 1 and Decimal(str(entry.services[1]["unit_price"])) == Decimal("150.00")
     assert entry.total_amount == 250
 
     db_session.refresh(invoice)
@@ -227,6 +265,9 @@ def test_increase_with_catalog_change_blends_recorded_and_delta_cost(
     # Каноническая стоимость визита == сумма счёта — лишнего долга нет
     invariant = PaymentInvariantService(db_session).compute_total_cost(visit)
     assert invariant == Decimal("250")
+    # Полный инвариант слоёв
+    visit_total, payload_total, entry_total = _layers_invariant(db_session, entry.id, visit.id, service.id)
+    assert visit_total == payload_total == entry_total == Decimal("250")
 
 
 @pytest.mark.integration
@@ -234,8 +275,9 @@ def test_increase_with_catalog_change_blends_recorded_and_delta_cost(
 def test_increase_without_catalog_change_keeps_catalog_price(
     client, db_session, registrar_auth_headers, test_patient, test_doctor
 ):
-    """Без изменения цены рост ведёт себя как раньше: строка/пейлоад —
-    каталоговая цена, счёт — дельта (1×100 → 2: итог 200 = 2×100)."""
+    """Без изменения цены рост ведёт себя как раньше: слой биллится по
+    каталоговой цене, счёт — дельта (1×100 → 2: итог 200 = 100 + 100).
+    Слои (Codex R12 PR 3118 P1): базовый слой не переписывается."""
     service = _create_service(db_session, code="R10-BL-02", price=100)
     queue = _create_queue(db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general", day=date.today())
     visit = _create_visit_with_row(
@@ -256,23 +298,25 @@ def test_increase_without_catalog_change_keeps_catalog_price(
     )
     assert response.status_code == 200, response.text
 
-    row = _reread_visit_service(db_session, visit.id, service.id)
-    assert row.qty == 2
-    assert Decimal(str(row.price)) == Decimal("100.00")
+    rows = _visit_service_rows(db_session, visit.id, service.id)
+    assert [(r.qty, Decimal(str(r.price))) for r in rows] == [(1, Decimal("100.00")), (1, Decimal("100.00"))]
     db_session.expire_all()
     db_session.refresh(entry)
     assert entry.total_amount == 200
+    assert len(entry.services) == 2
     assert Decimal(str(entry.services[0]["unit_price"])) == Decimal("100.00")
 
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_decrease_after_blend_subtracts_blended_unit_and_representations_agree(
+def test_decrease_after_growth_consumes_last_layer_and_representations_agree(
     client, db_session, registrar_auth_headers, test_patient, test_doctor
 ):
-    """Последующее снижение после средневзвешенного роста списывает записанную
-    (средневзвешенную) цену: строка, пейлоад, entry и счёт остаются согласованы
-    (250 → 125 при снижении 2→1)."""
+    """Последующее снижение после роста ПОТРЕБЛЯЕТ ПОСЛЕДНИЙ слой (LIFO):
+    возвращаются последние добавленные единицы. 1×100, рост до 2 (слой 1×150,
+    итог 250), снижение до 1 → слой 1×150 снимается целиком (−150),
+    остаётся базовый слой 1×100. Строка, пейлоад, entry и счёт согласованы
+    (100 = 100 = 100 = 100)."""
     service = _create_service(db_session, code="R10-BL-03", price=100)
     queue = _create_queue(db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general", day=date.today())
     visit = _create_visit_with_row(
@@ -302,15 +346,15 @@ def test_decrease_after_blend_subtracts_blended_unit_and_representations_agree(
         entry_ids=[entry.id],
     )
     assert down.status_code == 200, down.text
-    assert Decimal(str(down.json()["total_amount"])) == Decimal("-125")
+    assert Decimal(str(down.json()["total_amount"])) == Decimal("-150")  # снят слой 1×150
 
-    row = _reread_visit_service(db_session, visit.id, service.id)
-    assert row.qty == 1
-    assert Decimal(str(row.price)) == Decimal("125.00")
+    rows = _visit_service_rows(db_session, visit.id, service.id)
+    assert [(r.qty, Decimal(str(r.price))) for r in rows] == [(1, Decimal("100.00"))]
     db_session.expire_all()
     db_session.refresh(entry)
-    assert entry.total_amount == 125
-    assert Decimal(str(entry.services[0]["unit_price"])) == Decimal("125.00")
+    assert entry.total_amount == 100
+    assert len(entry.services) == 1
+    assert Decimal(str(entry.services[0]["unit_price"])) == Decimal("100.00")
 
     db_session.expire_all()
     invoice = (
@@ -319,7 +363,10 @@ def test_decrease_after_blend_subtracts_blended_unit_and_representations_agree(
         .first()
     )
     assert invoice is not None
-    assert invoice.total_amount == Decimal("125")
+    assert invoice.total_amount == Decimal("100")
+
+    visit_total, payload_total, entry_total = _layers_invariant(db_session, entry.id, visit.id, service.id)
+    assert visit_total == payload_total == entry_total == Decimal("100")
 
 
 # ===================== P1: БЛОКИРОВКА СЧЁТА ПРИ СНИЖЕНИИ =====================

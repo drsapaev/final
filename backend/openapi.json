@@ -78028,6 +78028,17 @@
             },
             "type": "array",
             "title": "Updated Queue Entries"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date"
           }
         },
         "type": "object",

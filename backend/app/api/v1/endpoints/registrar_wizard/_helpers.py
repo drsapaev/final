@@ -191,6 +191,9 @@ class EditDeltaResponse(BaseModel):
     print_tickets: list[dict[str, Any]] = Field(default_factory=list)
     created_visits: list[dict[str, Any]] = Field(default_factory=list)
     updated_queue_entries: list[dict[str, Any]] = Field(default_factory=list)
+    # W2-PR2: фактическая (каноническая) дата, в которую легли правки —
+    # день редактируемых записей; может отличаться от запрошенной.
+    target_date: str | None = None
 
 
 class MarkPaidRequest(BaseModel):

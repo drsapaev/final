@@ -15,7 +15,7 @@ import { AlertCircle, X } from 'lucide-react';
 import { Button, Tooltip,
   Checkbox } from '../ui/macos';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
-import { MIXED_REPEAT_WARNING, categories } from './wizardUtils';
+import { MIXED_REPEAT_WARNING, categories, filterDoctorsForService } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './CartStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -499,19 +499,12 @@ const CartStepV2 = ({
             const service = servicesData?.find((s) => s.id === item.service_id);
             const requiresDoctor = Boolean(service?.requires_doctor || service?.is_consultation);
 
-            // PR-23 P0 #1: filter doctors by service specialty/department_key
-            // so registrar can't assign a cardiologist to a dermatology consult
+            // PR-23 P0 #1 / W2-PR2: фильтр врачей по specialty/department_key —
+            // SSOT-хелпер без fallback «показать всех» (пустой список — валидный
+            // ответ: ADR-001, владелец очереди = выбранный врач).
             const serviceDepartmentKey = String(service?.department_key || '').toLowerCase().trim();
-            const filteredDoctors = serviceDepartmentKey
-              ? normalizedDoctorsData.filter((d) => {
-                  const docSpecialty = String(d.specialty || '').toLowerCase().trim();
-                  // Match if doctor's specialty matches service's department_key,
-                  // or if doctor has no specialty (show all as fallback)
-                  return !docSpecialty || docSpecialty === serviceDepartmentKey ||
-                    docSpecialty.includes(serviceDepartmentKey) || serviceDepartmentKey.includes(docSpecialty);
-                })
-              : normalizedDoctorsData;
-            const doctorOptions = filteredDoctors.length > 0 ? filteredDoctors : normalizedDoctorsData;
+            const filteredDoctors = filterDoctorsForService(normalizedDoctorsData, serviceDepartmentKey);
+            const doctorOptions = filteredDoctors;
 
             return (
               <div key={item.id} style={{
@@ -598,7 +591,7 @@ const CartStepV2 = ({
                       </select>
                       {filteredDoctors.length === 0 && normalizedDoctorsData.length > 0 && (
                         <span className="cart-step-v2__discount-hint">
-                          Нет врача для этого отделения — показаны все
+                          Нет врача этого профиля — услуга недоступна для записи
                         </span>
                       )}
                     </div>
@@ -614,7 +607,11 @@ const CartStepV2 = ({
         )}
 
         {/* Ошибки валидации */}
-        {Boolean(errors?.cart || errors?.doctors || errors?.repeat) &&
+        {/* Codex R10 PR 3118 (P2): errors?.quote в условии — сообщение уже
+            приоритизирует errors.quote, но блок скрывался, когда квота
+            простаивает/загружается и выставлена ТОЛЬКО quote-ошибка: кнопка
+            выглядела «нажатой в пустоту». */}
+        {Boolean(errors?.cart || errors?.doctors || errors?.repeat || errors?.quote) &&
         <div style={{
           padding: 'var(--mac-spacing-2)',
           background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',

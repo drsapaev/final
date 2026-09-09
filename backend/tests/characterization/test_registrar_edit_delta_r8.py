@@ -324,8 +324,15 @@ def test_queue_entry_id_routes_mutation_to_named_entry(
     assert response.status_code == 200, response.text
     payload_a = _payload(db_session, entry_a.id)
     assert payload_a["quantity"] == 1  # A не тронута
-    payload_b = _payload(db_session, entry_b.id)
-    assert payload_b["quantity"] == 7  # B выросла до целевого количества
+    # Codex R12 PR 3118 (P1): рост при слоях добавляет слой payload — целевое
+    # количество = Σ слоёв (базовый слой B не переписывается).
+    layers_b = [
+        p for p in (
+            db_session.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_b.id).first()
+        ).services
+        if p.get("service_id") == service.id
+    ]
+    assert sum(int(p.get("quantity") or p.get("qty") or 1) for p in layers_b) == 7  # B выросла до целевого количества
 
 
 @pytest.mark.integration
@@ -440,3 +447,99 @@ def test_decrease_blocked_by_canonical_payment_row_without_synced_invoice(
     assert "зарегистрирована оплата" in response.json()["detail"]
     payload = _payload(db_session, entry.id)
     assert payload["quantity"] == 2  # состояние не изменено
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_decrease_on_visit_only_record_rejected_not_duplicated(
+    client, db_session, registrar_auth_headers, test_patient, test_doctor
+):
+    """Codex R9 PR 3118 (P1): visit-only строка (визит есть, записи очереди
+    нет). Раньше edit-delta не находил активную запись и вызывал
+    _create_new_queue_entry — второй визит с целевым количеством при
+    нетронутом исходном VisitService. Теперь — громкий отказ: правка
+    количества позиции на активном визите дня выполняется через
+    корректировку визита, а не через редактирование корзины."""
+    from app.models.visit import VisitService
+
+    service = _create_service(
+        db_session, code="R9-VONLY-1", name="R9 VisitOnly", queue_tag="laboratory_general"
+    )
+    visit = _create_visit(db_session, patient=test_patient, doctor_id=test_doctor.id, department="laboratory_general")
+    db_session.add(
+        VisitService(
+            visit_id=visit.id,
+            service_id=service.id,
+            code=service.service_code,
+            name=service.name,
+            qty=2,
+            price=PRICE,
+            currency="UZS",
+        )
+    )
+    db_session.commit()
+
+    response = _post_edit_delta(
+        client, registrar_auth_headers,
+        patient_id=test_patient.id,
+        services=[{"service_id": service.id, "quantity": 1}],
+        entry_ids=[],
+    )
+
+    assert response.status_code == 400, response.text
+    assert "привязана к визиту" in response.json()["detail"]
+    db_session.expire_all()
+    vs = (
+        db_session.query(VisitService)
+        .filter(VisitService.visit_id == visit.id, VisitService.service_id == service.id)
+        .one()
+    )
+    assert vs.qty == 2  # исходная позиция не изменена
+    visits = (
+        db_session.query(Visit)
+        .filter(Visit.patient_id == test_patient.id)
+        .count()
+    )
+    assert visits == 1  # дублирующий визит НЕ создан
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_adding_new_service_to_visit_only_record_still_works(
+    client, db_session, registrar_auth_headers, test_patient, test_doctor
+):
+    """Легитимный путь не сломан: добавление НОВОЙ услуги (не привязанной к
+    визитам дня) в visit-only запись по-прежнему создаёт позицию."""
+    existing = _create_service(
+        db_session, code="R9-VONLY-E", name="R9 Existing", queue_tag="laboratory_general"
+    )
+    fresh = _create_service(
+        db_session, code="R9-VONLY-N", name="R9 New", queue_tag="laboratory_general"
+    )
+    _create_queue(
+        db_session, specialist_id=test_doctor.id, queue_tag="laboratory_general", day=date.today()
+    )
+    visit = _create_visit(db_session, patient=test_patient, doctor_id=test_doctor.id, department="laboratory_general")
+    from app.models.visit import VisitService
+
+    db_session.add(
+        VisitService(
+            visit_id=visit.id,
+            service_id=existing.id,
+            code=existing.service_code,
+            name=existing.name,
+            qty=1,
+            price=PRICE,
+            currency="UZS",
+        )
+    )
+    db_session.commit()
+
+    response = _post_edit_delta(
+        client, registrar_auth_headers,
+        patient_id=test_patient.id,
+        services=[{"service_id": fresh.id, "quantity": 1}],
+        entry_ids=[],
+    )
+
+    assert response.status_code == 200, response.text

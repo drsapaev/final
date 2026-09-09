@@ -45,6 +45,12 @@ export const adaptQueueEntry = (
     canonical_record_id: fullEntry.canonical_record_id ?? entry.canonical_record_id ?? entryId,
     record_kind: fullEntry.record_kind ?? entry.record_kind ?? null,
     source_kind: fullEntry.source_kind ?? entry.source_kind ?? null,
+    // Codex R9 PR 3118 (P1): canonical day of the record from the backend
+    // read-model (/registrar/queues/today). adaptTimeFields substitutes
+    // created_at for a missing queue time, so without this passthrough the
+    // wizard's edit resolver saw the record's CREATION day for future records
+    // and the edit quote/commands targeted today instead of the record's day.
+    record_date: fullEntry.record_date ?? entry.record_date ?? null,
     visit_id: fullEntry.visit_id || entry.visit_id || null,
     appointment_id: fullEntry.appointment_id || entry.appointment_id || null,
     queue_entry_id: fullEntry.queue_entry_id || entry.queue_entry_id || null,

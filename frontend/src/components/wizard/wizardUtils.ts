@@ -14,6 +14,11 @@ import { toast } from 'react-toastify';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+// Codex R10 PR 3118 (P1): канонизация специальностей — через УСТАНОВЛЕННУЮ
+// SSOT-таблицу алиасов (doctorPanelShared), выровненную с backend
+// DOCTOR_QUEUE_SPECIALTY_VARIANTS (AGENTS.md: не допускать дрейфа SSOT между
+// маппинг-слоями doctor/queue).
+import { SPECIALTY_ALIASES } from '../../utils/doctorPanelShared';
 import { ClipboardList, FlaskConical, Stethoscope, Syringe } from 'lucide-react';
 
 // =====================================================================
@@ -39,6 +44,121 @@ export const getLocalISODate = () => {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+// =====================================================================
+// W2-PR2: КАНОНИЧЕСКАЯ ДАТА РЕДАКТИРУЕМОЙ ЗАПИСИ
+// =====================================================================
+
+/**
+ * День записи, открытой в мастере в режиме редактирования.
+ *
+ * Источник истины — read-модель: `record_date` (день очереди/визита,
+ * проставляется backend'ом в /registrar/queues/today). Fallback — дата из
+ * `queue_time` (timestamp дня очереди; и то, и другое относятся к дню
+ * записи, а не к «сегодня» на момент запроса).
+ *
+ * Раньше edit-сабмит и edit-квота шлы `targetDate: getLocalISODate()` —
+ * правка записи на будущую дату уходила в «сегодня»: визит создавался
+ * сегодня, исходная запись оставалась нетронутой (дата терялась).
+ * Backend дополнительно канонизирует день по preferred-записям
+ * (RegistrarEditDeltaService.resolve_edit_target_day) — эта функция лишь
+ * посылает корректную дату сразу, чтобы квота и команда совпадали с первого
+ * запроса (без 409-рефетча).
+ *
+ * Возвращает 'YYYY-MM-DD' или null, если день записи неизвестен
+ * (вызывающий код откатывается к getLocalISODate()).
+ */
+export const resolveEditRecordDate = (
+  initialData: Record<string, unknown> | null | undefined
+): string | null => {
+  if (!initialData) return null;
+
+  const recordDate = initialData.record_date;
+  if (typeof recordDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(recordDate.trim())) {
+    return recordDate.trim();
+  }
+
+  // Codex R9 PR 3118 (P1): адаптер рабочего списка несёт record_date
+  // (канонический день строки /registrar/queues/today) и appointment_date
+  // (день, назначенный самой записи, для appointment-строк R-22). Они
+  // предпочтительнее queue_time: adaptTimeFields подставляет created_at,
+  // когда queue_time отсутствует, — и днём записи становился день СОЗДАНИЯ,
+  // из-за чего правка будущей записи таргетила «сегодня».
+  const appointmentDate = initialData.appointment_date;
+  if (typeof appointmentDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate.trim())) {
+    return appointmentDate.trim();
+  }
+
+  // Fallback: date part of queue_time (ISO datetime of the queue day).
+  const queueTime = initialData.queue_time;
+  if (typeof queueTime === 'string') {
+    const match = queueTime.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+  }
+
+  return null;
+};
+
+// =====================================================================
+// W2-PR2: ФИЛЬТР ВРАЧЕЙ ПО ПРОФИЛЮ УСЛУГИ (ADR-001)
+// =====================================================================
+
+export interface WizardDoctorRecord {
+  id?: string | number;
+  specialty?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Врачи, допустимые для услуги по её department_key (PR-23 P0 #1).
+ *
+ * W2-PR2: fallback «нет совпадений → показать ВСЕХ врачей» удалён — врач без
+ * профильной специальности становился владельцем очереди
+ * (DailyQueue.specialist_id) и выбранный врач терялся. Пустой результат —
+ * валидный ответ: UI показывает ограничение, сабмит блокируется валидацией
+ * «для услуги требуется врач».
+ *
+ * Codex R10 PR 3118 (P1): сопоставление — через каноническую таблицу алиасов
+ * (doctorPanelShared.SPECIALTY_ALIASES, выровнена с backend
+ * DOCTOR_QUEUE_SPECIALTY_VARIANTS), а не через substring: подстрока отбрасывала
+ * валидные пары вида department_key="dental" ↔ specialty="dentistry" (обе
+ * формы живут в репо: dev_seed создаёт dental-услуги, нормализация докторов
+ * хранит dentistry) — стоматологические консультации оставались без врача.
+ * Ключ услуги сначала канонизируется ("dental" → "dentistry"), затем
+ * специальность врача сравнивается с каноном и его алиасами; пары вне
+ * таблицы сравниваются только на точное совпадение (без подстрок).
+ */
+const _specialtyAliasIndex: Record<string, Set<string>> = Object.fromEntries(
+  Object.entries(SPECIALTY_ALIASES).map(([canonical, aliases]) => [
+    canonical,
+    new Set([canonical, ...aliases.map((a) => String(a).toLowerCase())]),
+  ]),
+);
+
+const _canonicalSpecialtyOf = (rawKey: string): string =>
+  Object.keys(_specialtyAliasIndex).find(
+    (canonical) => _specialtyAliasIndex[canonical].has(rawKey),
+  ) ?? rawKey;
+
+export const filterDoctorsForService = (
+  doctors: Array<WizardDoctorRecord | null | undefined> | null | undefined,
+  serviceDepartmentKey: string | null | undefined,
+): WizardDoctorRecord[] => {
+  const all: WizardDoctorRecord[] = Array.isArray(doctors)
+    ? doctors.filter((d): d is WizardDoctorRecord => Boolean(d))
+    : [];
+  const key = String(serviceDepartmentKey || '').toLowerCase().trim();
+  if (!key) return all;
+  const canonicalKey = _canonicalSpecialtyOf(key);
+  const accepted = _specialtyAliasIndex[canonicalKey];
+  return all.filter((doctor) => {
+    const docSpecialty = String(doctor.specialty || '').toLowerCase().trim();
+    if (!docSpecialty) return true; // пустая специальность — как раньше
+    if (accepted) return accepted.has(docSpecialty);
+    // Пара вне таблицы алиасов: точное совпадение, без подстрок.
+    return docSpecialty === canonicalKey;
+  });
 };
 
 // =====================================================================
@@ -1208,12 +1328,24 @@ export interface EditDeltaTargetItem {
   service_id: string | number;
   quantity: number;
   specialist_id: string | number | null;
+  /** Идентичность исходной записи позиции (Codex R8 PR 3115). */
+  queue_entry_id?: number;
 }
 
 export interface EditDeltaTargetBuild {
   items: EditDeltaTargetItem[];
   hasNew: boolean;
   hasQuantityChange: boolean;
+  /**
+   * Codex R9 PR 3118 (P1): изменившиеся позиции БЕЗ идентичности записи
+   * очереди (visit-only строки /registrar/queues/today — visit есть,
+   * OnlineQueueEntry отсутствует). edit-delta не может их мутировать:
+   * backend не нашёл бы активную запись и создал бы ВТОРОЙ визит с целевым
+   * количеством, оставив исходный VisitService прежним. Такие позиции
+   * НЕ попадают в payload — вызывающий код обязан громко отказать в сабмите
+   * (визит-команда — отдельный контракт), молча пропустить = ложный «успех».
+   */
+  unroutable: Array<{ service_id: string | number; name: string }>;
 }
 
 // Собирает edit-delta payload из ВСЕЙ корзины (целевое состояние позиции),
@@ -1230,7 +1362,7 @@ export const buildEditDeltaTargetItems = (
   servicesData: WizardServiceRecord[],
   identity: EditOriginalServiceIdentity,
 ): EditDeltaTargetBuild => {
-  const build: EditDeltaTargetBuild = { items: [], hasNew: false, hasQuantityChange: false };
+  const build: EditDeltaTargetBuild = { items: [], hasNew: false, hasQuantityChange: false, unroutable: [] };
   (cartItems || []).forEach((item) => {
     if (!item || item.service_id == null) return;
     const service = servicesData.find((s) => String(s.id) === String(item.service_id));
@@ -1256,8 +1388,18 @@ export const buildEditDeltaTargetItems = (
       identity.originalQuantities.get(serviceKey);
     if (originalQty === undefined) return;
     if (quantity === originalQty) return; // без изменений — no-op
+    // Codex R9 PR 3118 (P1): правка количества существующей позиции возможна
+    // ТОЛЬКО когда известна её запись очереди. visit-only строка (без
+    // OnlineQueueEntry) не маршрутизируется: включение в edit-delta создало
+    // бы дублирующий визит на backend. Позиция уходит в unroutable —
+    // сабмит блокируется с явной причиной. (originalQueueId вычислен выше —
+    // Codex R15: сравнение количеств идёт по той же идентичности записи.)
+    if (originalQueueId == null || !Number.isFinite(Number(originalQueueId))) {
+      build.unroutable.push({ service_id: item.service_id as string | number, name: String(service.name ?? item.service_id) });
+      return;
+    }
     build.hasQuantityChange = true;
-    // Codex R8 #3115 (P1): существующая позиция сохраняет идентичность своей
+    // Codex R8 PR 3115 (P1): существующая позиция сохраняет идентичность своей
     // записи (original_queue_id из service_details). При одном service_id под
     // разными врачами/записями правится ИМЕННО названная запись, а не
     // ближайшая по глобальному preferred-набору.
@@ -1265,13 +1407,20 @@ export const buildEditDeltaTargetItems = (
       service_id: item.service_id as string | number,
       quantity,
       specialist_id: null,
-      ...(originalQueueId != null && Number.isFinite(Number(originalQueueId))
-        ? { queue_entry_id: Number(originalQueueId) }
-        : {}),
+      queue_entry_id: Number(originalQueueId),
     });
   });
   return build;
 };
+
+// Codex R9 PR 3118 (P1): громкий отказ для visit-only позиций (визит без
+// записи очереди) — изменение количества через edit-delta невозможно, пока
+// не существует визит-команда. Молчаливый пропуск позиции = ложный «успех».
+export const describeUnroutableEditDeltaRows = (
+  rows: Array<{ name: string }>,
+): string =>
+  `Изменение количества для «${rows.map((r) => r.name).join('», «')}» недоступно: у позиции нет номера очереди. ` +
+  'Используйте отмену/корректировку визита или обратитесь к администратору.';
 
 export default {
   PATIENT_NAME_PATTERN,
@@ -1295,17 +1444,17 @@ export default {
   firstNonEmpty,
   resolvePatientGenderValue,
   genderToPatientSexForApi,
-  getBirthDateValidationError,
+  buildCartQuoteRequest,
+  buildEditDeltaTargetItems,
   formatBirthDateInput,
   convertDateToISO,
   convertDateFromISO,
+  getBirthDateValidationError,
   PATIENT_SELECTED_FROM_CARD_FLAG,
   isPatientSelectedFromCard,
   buildInheritedPatientClearPatch,
   isPhoneDuplicateErrorMessage,
   createIdempotencyKey,
-  buildCartQuoteRequest,
-  buildEditDeltaTargetItems,
   getWizardDepartmentForService,
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,

@@ -52,16 +52,19 @@ describe('W2-PR1: buildEditDeltaTargetItems', () => {
     expect(build.items).toEqual([{ service_id: 2, quantity: 2, specialist_id: 77 }]);
   });
 
-  it('изменённое количество существующей позиции уходит с specialist_id=null', () => {
+  it('изменённое количество существующей позиции с записью уходит с specialist_id=null и queue_entry_id', () => {
     const identity = identityWithQuantities({ '1': 1 });
     const build = buildEditDeltaTargetItems(
-      [{ service_id: 1, quantity: 3 }],
+      [{ service_id: 1, quantity: 3, original_queue_id: 42 }],
       servicesData,
       identity,
     );
     expect(build.hasNew).toBe(false);
     expect(build.hasQuantityChange).toBe(true);
-    expect(build.items).toEqual([{ service_id: 1, quantity: 3, specialist_id: null }]);
+    expect(build.items).toEqual([
+      { service_id: 1, quantity: 3, specialist_id: null, queue_entry_id: 42 },
+    ]);
+    expect(build.unroutable).toEqual([]);
   });
 
   it('Codex R15 PR 3115: одна услуга в двух записях — количества keyed по (запись, услуга)', () => {
@@ -111,25 +114,43 @@ describe('W2-PR1: buildEditDeltaTargetItems', () => {
     ]);
   });
 
-  it('Codex R8 PR 3115: очередь-идентичность не отправляется, если она неизвестна', () => {
+  it('Codex R9 PR 3118: visit-only позиция (без записи очереди) НЕ уходит в дельту — unroutable', () => {
+    // visit-only строка /registrar/queues/today: originalQuantities известны,
+    // но queue_entry_id нет. Раньше позиция уходила в edit-delta без
+    // идентичности — backend создавал ВТОРОЙ визит с целевым количеством.
     const identity = identityWithQuantities({ '1': 2 });
     const build = buildEditDeltaTargetItems(
       [{ service_id: 1, quantity: 4 }],
       servicesData,
       identity,
     );
-    expect(build.items).toEqual([{ service_id: 1, quantity: 4, specialist_id: null }]);
+    expect(build.items).toEqual([]);
+    expect(build.hasQuantityChange).toBe(false);
+    expect(build.unroutable).toEqual([{ service_id: 1, name: 'Услуга A' }]);
   });
 
-  it('снижение количества — такая же дельта, как и рост', () => {
+  it('снижение количества с записью очереди — такая же дельта, как и рост', () => {
+    const identity = identityWithQuantities({ '1': 3 });
+    const build = buildEditDeltaTargetItems(
+      [{ service_id: 1, quantity: 1, original_queue_id: 42 }],
+      servicesData,
+      identity,
+    );
+    expect(build.hasQuantityChange).toBe(true);
+    expect(build.items).toEqual([
+      { service_id: 1, quantity: 1, specialist_id: null, queue_entry_id: 42 },
+    ]);
+  });
+
+  it('Codex R9 PR 3118: снижение visit-only позиции тоже unroutable (не молча в payload)', () => {
     const identity = identityWithQuantities({ '1': 3 });
     const build = buildEditDeltaTargetItems(
       [{ service_id: 1, quantity: 1 }],
       servicesData,
       identity,
     );
-    expect(build.hasQuantityChange).toBe(true);
-    expect(build.items).toEqual([{ service_id: 1, quantity: 1, specialist_id: null }]);
+    expect(build.items).toEqual([]);
+    expect(build.unroutable).toEqual([{ service_id: 1, name: 'Услуга A' }]);
   });
 
   it('позиция без изменения количества не отправляется (настоящий no-op)', () => {
