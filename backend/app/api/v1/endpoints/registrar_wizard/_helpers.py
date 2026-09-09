@@ -374,8 +374,15 @@ def _check_repeat_visit_eligibility(
     return len(consultation_services) > 0
 
 
-def _resolve_effective_discount_mode(cart_data: CartRequest) -> str:
-    """All Free checkbox wins over the legacy discount_mode radio."""
+def _resolve_effective_discount_mode(cart_data: Any) -> str:
+    """All Free checkbox wins over the legacy discount_mode radio.
+
+    Codex R7 #3095 (P1): единый SSOT-резолв и для CartRequest, и для
+    EditDeltaRequest/full-update-запроса — оба несут пару
+    (all_free: bool, discount_mode: str). Команды сохранения обязаны
+    получать РЕЗОЛВНУТЫЙ режим, а не голый булеан: агрегированная запись
+    мастера несёт discount_mode="all_free" без булева флага.
+    """
     if cart_data.all_free or cart_data.discount_mode == "all_free":
         return "all_free"
     return cart_data.discount_mode or "none"
