@@ -143,4 +143,20 @@ describe('Fix E: keyboard & validation contract', () => {
     expect(patientStep).toContain('ref={(el) => { genderRadioRefs.current[genderIdx] = el; }}');
     expect(patientStep).toContain('data-gender={gender}');
   });
+
+  it('focused radio wins over the checked one when they diverge (Codex R15)', () => {
+    // Регрессия R15: после асинхронной гидрации пола DOM-фокус мог остаться
+    // на male при выбранной female. Прежний приоритет selectedIdx делал
+    // ArrowRight из фокусного male «повторным выбором» female — движение
+    // исчезало, а фокус и значение не сходились. ФОКУСНЫЙ вариант главнее,
+    // когда он валиден; selectedIdx — только фолбэк.
+    const radioBlock = extractSourceBlock(
+      patientStep,
+      'role="radiogroup"',
+      'errors.gender &&'
+    );
+    expect(radioBlock).toContain(
+      'focusedIdx >= 0 ? focusedIdx : (selectedIdx >= 0 ? selectedIdx : 0)'
+    );
+  });
 });

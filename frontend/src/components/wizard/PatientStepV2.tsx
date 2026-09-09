@@ -175,7 +175,11 @@ const PatientStepV2 = ({
               const focusedGender = (document.activeElement as HTMLElement | null)?.getAttribute('data-gender');
               const focusedIdx = options.indexOf(focusedGender as 'male' | 'female');
               const selectedIdx = selectedGender ? options.indexOf(selectedGender as 'male' | 'female') : -1;
-              const startIdx = selectedIdx >= 0 ? selectedIdx : (focusedIdx >= 0 ? focusedIdx : 0);
+              // Codex R15 PR 3096: ФОКУСНЫЙ вариант главнее выбранного, когда
+              // он валиден — после асинхронной гидрации фокус мог остаться на
+              // male при выбранной female; прежний приоритет selectedIdx
+              // превращал ArrowRight в «повторный выбор», не двигая значение.
+              const startIdx = focusedIdx >= 0 ? focusedIdx : (selectedIdx >= 0 ? selectedIdx : 0);
               const delta = e.key === 'ArrowRight' ? 1 : -1;
               const nextIdx = (startIdx + delta + options.length) % options.length;
               onUpdate('gender', options[nextIdx]);
