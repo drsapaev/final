@@ -17,6 +17,16 @@ class PaymentCancelRepository:
     def get_payment(self, payment_id: int) -> Payment | None:
         return self.db.query(Payment).filter(Payment.id == payment_id).first()
 
+    def get_payment_for_update(self, payment_id: int) -> Payment | None:
+        """Lock the payment row before the definitive status check."""
+        return (
+            self.db.query(Payment)
+            .filter(Payment.id == payment_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+
     def count_transactions_by_payment_id(self, payment_id: int) -> int:
         """Unlocked ``SELECT COUNT(*)`` of PaymentTransaction rows.
 

@@ -51,7 +51,7 @@ class TestPaymentCancelService:
             service.cancel_payment(payment_id=payment.id)
 
         assert exc_info.value.status_code == 400
-        assert "нельзя отменить" in exc_info.value.detail
+        assert "возврат" in exc_info.value.detail
 
     def test_cancel_cash_payment(self, db_session, test_visit):
         payment = Payment(

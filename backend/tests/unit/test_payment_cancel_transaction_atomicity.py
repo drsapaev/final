@@ -6,7 +6,7 @@ row-level locking on both tables.
 """
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -336,7 +336,6 @@ class TestPaymentCancelRepositoryLocking:
     ):
         """The query must call .with_for_update() to acquire row locks."""
         from app.repositories.payment_cancel_repository import PaymentCancelRepository
-        from unittest.mock import MagicMock
 
         # Build a fake query chain that records whether with_for_update
         # was called. We don't hit the real DB — we just verify the
@@ -364,3 +363,27 @@ class TestPaymentCancelRepositoryLocking:
         fake_filtered.with_for_update.assert_called_once_with()
         fake_locked.all.assert_called_once()
         assert result == []
+
+    def test_get_payment_for_update_uses_with_for_update(self):
+        """The definitive status check must read a locked Payment row."""
+        from app.repositories.payment_cancel_repository import PaymentCancelRepository
+
+        fake_db = MagicMock()
+        fake_query = MagicMock()
+        fake_filtered = MagicMock()
+        fake_locked = MagicMock()
+        fake_populated = MagicMock()
+        locked_payment = object()
+
+        fake_db.query.return_value = fake_query
+        fake_query.filter.return_value = fake_filtered
+        fake_filtered.with_for_update.return_value = fake_locked
+        fake_locked.populate_existing.return_value = fake_populated
+        fake_populated.first.return_value = locked_payment
+
+        repo = PaymentCancelRepository(fake_db)
+
+        assert repo.get_payment_for_update(payment_id=42) is locked_payment
+        fake_filtered.with_for_update.assert_called_once_with()
+        fake_locked.populate_existing.assert_called_once_with()
+        fake_populated.first.assert_called_once_with()

@@ -10,7 +10,9 @@ from app.db.transactions import transaction as transaction_ctx
 from app.models.enums import PaymentStatus
 from app.repositories.payment_cancel_repository import PaymentCancelRepository
 from app.services.billing_service import BillingService
+from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.payment_state_checks import can_transition_transaction_status
+from app.services.visit_lifecycle_service import VisitLifecycleService
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +29,17 @@ class PaymentCancelService:
     def __init__(self, db, payment_manager):  # type: ignore[no-untyped-def]
         self.repository = PaymentCancelRepository(db)
         self.billing_service = BillingService(db)
+        self.payment_invariant_service = PaymentInvariantService(db)
+        self.visit_lifecycle_service = VisitLifecycleService(db)
         self.payment_manager = payment_manager
         self.db = db
 
-    def cancel_payment(self, *, payment_id: int) -> dict[str, Any]:
+    def cancel_payment(
+        self,
+        *,
+        payment_id: int,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
         payment = self.repository.get_payment(payment_id)
         if not payment:
             raise PaymentCancelDomainError(status_code=404, detail="Платеж не найден")
@@ -39,10 +48,13 @@ class PaymentCancelService:
             PaymentStatus.PENDING.value,
             PaymentStatus.PROCESSING.value,
         ]:
-            raise PaymentCancelDomainError(
-                status_code=400,
-                detail=f"Платеж со статусом {payment.status} нельзя отменить",
+            detail = (
+                "Оплаченный платеж необходимо оформить как возврат"
+                if payment.status
+                in [PaymentStatus.PAID.value, "completed"]
+                else f"Платеж со статусом {payment.status} нельзя отменить"
             )
+            raise PaymentCancelDomainError(status_code=400, detail=detail)
 
         # PRE-CHECK: validate PaymentTransaction cardinality BEFORE
         # calling the external provider cancel. If >1 row exists, the
@@ -78,7 +90,9 @@ class PaymentCancelService:
             if result.success:
                 self._cancel_payment_and_transaction(
                     payment_id=payment.id,
+                    expected_visit_id=payment.visit_id,
                     meta={**(payment.provider_data or {}), **result.provider_data},
+                    reason=reason,
                 )
             else:
                 # PAY-REAUDIT-28 P0-6: провайдер отклонил отмену — НЕ меняем
@@ -99,6 +113,8 @@ class PaymentCancelService:
         else:
             self._cancel_payment_and_transaction(
                 payment_id=payment.id,
+                expected_visit_id=payment.visit_id,
+                reason=reason,
             )
 
         payment = self.repository.get_payment(payment_id)
@@ -118,12 +134,15 @@ class PaymentCancelService:
         self,
         *,
         payment_id: int,
+        expected_visit_id: int | None,
         meta: dict[str, Any] | None = None,
+        reason: str | None = None,
     ) -> None:
         """Atomically cancel Payment and linked PaymentTransaction.
 
-        Both updates happen inside a single ``transaction_ctx`` so that
-        if either fails, both are rolled back. The Payment status is
+        The visit projection, Payment, linked PaymentTransaction, cancellation
+        reason, and linked invoices are updated inside one ``transaction_ctx``
+        so that a failure rolls the complete local mutation back. The Payment is
         updated via ``billing_service.update_payment_status(commit=False)``
         — this internally acquires ``SELECT Payment ... FOR UPDATE``
         (see ``billing_service_pkg/_payments.py:409-414``) and flushes
@@ -139,14 +158,12 @@ class PaymentCancelService:
 
         Branching on the number of linked transactions follows an
         explicit 0 / 1 / >1 structure:
-          - 0 rows: cash payment path — Payment has no online
-            transaction; ``transaction_ctx`` commits Payment.status
-            alone.
+          - 0 rows: cash payment path — Payment has no online transaction.
           - 1 row: validate transition via shared
             ``can_transition_transaction_status``; update
             ``tx.status = 'cancelled'`` if allowed, otherwise log
-            warning and skip (terminal transactions like 'refunded'
-            must not be overwritten).
+            warning and skip (terminal transactions like 'refunded' must not be
+            overwritten).
           - >1 rows: 1:1 contract invariant violation — raise
             ``PaymentCancelDomainError(500)``. Do NOT silently pick
             first. Matches existing project pattern for invariant
@@ -154,16 +171,56 @@ class PaymentCancelService:
             ``payment_create_service.py:117``).
         """
         with transaction_ctx(self.db):
+            # Lock order is Visit -> Payment -> PaymentTransaction -> Invoice,
+            # matching the other cashier payment mutations.
+            if expected_visit_id is not None:
+                self.visit_lifecycle_service.restore_operational_status_after_payment_change(
+                    expected_visit_id,
+                    commit=False,
+                )
+
+            locked_payment = self.repository.get_payment_for_update(payment_id)
+            if not locked_payment:
+                raise PaymentCancelDomainError(
+                    status_code=404,
+                    detail="Платеж не найден",
+                )
+            if locked_payment.visit_id != expected_visit_id:
+                raise PaymentCancelDomainError(
+                    status_code=409,
+                    detail="Визит платежа изменился; повторите операцию",
+                )
+            if locked_payment.status not in [
+                PaymentStatus.PENDING.value,
+                PaymentStatus.PROCESSING.value,
+            ]:
+                raise PaymentCancelDomainError(
+                    status_code=409,
+                    detail="Статус платежа изменился; обновите данные и повторите операцию",
+                )
+
             # 1. Update Payment status (no commit yet).
             #    billing_service.update_payment_status(commit=False)
             #    acquires SELECT Payment ... FOR UPDATE internally
             #    and flushes the UPDATE without committing.
-            self.billing_service.update_payment_status(
-                payment_id=payment_id,
-                new_status=PaymentStatus.CANCELLED.value,
-                meta=meta,
-                commit=False,
-            )
+            try:
+                payment = self.billing_service.update_payment_status(
+                    payment_id=payment_id,
+                    new_status=PaymentStatus.CANCELLED.value,
+                    meta=meta,
+                    commit=False,
+                )
+            except ValueError as exc:
+                raise PaymentCancelDomainError(
+                    status_code=409,
+                    detail=f"Невозможно отменить платеж: {exc}",
+                ) from exc
+
+            if reason:
+                payment.note = f"Отменён: {reason}"
+                # Test and some batch sessions disable autoflush. Persist the
+                # note before invoice reconciliation uses populate_existing().
+                self.db.flush()
 
             # 2. Find linked PaymentTransaction by payment_id FK with
             #    row-level lock (SELECT ... FOR UPDATE).
@@ -178,11 +235,6 @@ class PaymentCancelService:
                     payment_id
                 )
             )
-
-            if len(transactions) == 0:
-                # Cash payment path — Payment has no linked transaction.
-                # transaction_ctx commits Payment.status alone.
-                return
 
             if len(transactions) == 1:
                 tx = transactions[0]
@@ -205,18 +257,22 @@ class PaymentCancelService:
                         getattr(tx, "id", None),
                         payment_id,
                     )
-                    return
+                else:
+                    tx.status = "cancelled"
+            elif len(transactions) > 1:
+                # len(transactions) > 1 — invariant violation.
+                raise PaymentCancelDomainError(
+                    status_code=500,
+                    detail=(
+                        f"Payment {payment_id} has {len(transactions)} "
+                        "PaymentTransaction rows — expected exactly 1 "
+                        "(1:1 contract). Manual data reconciliation required "
+                        "before cancellation can proceed safely."
+                    ),
+                )
 
-                tx.status = "cancelled"
-                return
-
-            # len(transactions) > 1 — invariant violation.
-            raise PaymentCancelDomainError(
-                status_code=500,
-                detail=(
-                    f"Payment {payment_id} has {len(transactions)} "
-                    "PaymentTransaction rows — expected exactly 1 "
-                    "(1:1 contract). Manual data reconciliation required "
-                    "before cancellation can proceed safely."
-                ),
-            )
+            if expected_visit_id is not None:
+                self.payment_invariant_service.synchronize_linked_invoices(
+                    visit_id=expected_visit_id,
+                    payment_method=payment.method,
+                )
