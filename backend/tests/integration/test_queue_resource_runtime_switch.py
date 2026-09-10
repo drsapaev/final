@@ -4344,3 +4344,95 @@ def test_gql_queue_entries_doctor_and_tag_filters_intersect(
         assert all(e.queue.queue_tag == "lab" for e in result_lab.items)
     finally:
         _durable_cleanup(db_session, "lab_res_dd1", "dr_dd1_cardio")
+
+
+# ===================== EE. Codex round-21 pins =====================
+
+
+def test_gql_join_queue_registry_tag_before_doctor_guard(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-21 P1: joinQueue with the seeded lab/ECG synthetic's id
+    routes onto the resource axis BEFORE the doctor-eligibility guard —
+    0056/0057 moved those owners to the internal 'Resource' role, while
+    the canonical doctor-family predicate returned DOCTOR_INACTIVE before
+    the crud registry branch could route the tag. The guard keeps
+    protecting the doctor-owned branch (a Resource-role doctor on a
+    non-registry tag is still rejected). The impl COMMITs — durable rows
+    cleaned in the finally."""
+    import contextlib
+    from types import SimpleNamespace
+
+    from app.graphql import mutations as gql_mutations
+    from app.graphql.types import QueueEntryInput
+    from app.models.patient import Patient
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+    # night-window fix (#2992 precedent): keep the online window open
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+
+    patient = Patient(
+        last_name="Синтетиков",
+        first_name="Пациент",
+        phone="+998901234596",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        # the 0055/0057 shape: the only lab owner is the internal
+        # 'Resource' synthetic — NOT a doctor-family login
+        user = _make_user(db_session, username="lab_res_ee1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        resource = _make_resource(db_session, code="lab", queue_tag="lab")
+
+        info = SimpleNamespace(context=None)  # direct schema test: no audit ctx
+        result = gql_mutations.Mutation._join_queue_impl(
+            info,
+            QueueEntryInput(
+                patient_id=patient.id,
+                doctor_id=synthetic.id,
+                queue_tag="lab",
+            ),
+        )
+        assert result.success is True, (result.message, result.errors)
+        assert result.queue_entry is not None
+        entry = result.queue_entry
+
+        queue = entry.queue  # DailyQueueType
+        assert queue is not None
+        assert queue.queue_resource_id == resource.id  # the resource axis
+        assert queue.specialist is None  # the synthetic does NOT own it
+        assert queue.queue_tag == "lab"
+        assert entry.number >= 1
+        assert entry.status == "waiting"
+
+        # the doctor-owned branch keeps the guard: a Resource-role doctor
+        # with a NON-registry tag is still rejected with DOCTOR_INACTIVE
+        gen_user = _make_user(db_session, username="gen_res_ee1", role="Resource")
+        gen_synth = _make_doctor(db_session, user_id=gen_user.id, specialty="general")
+        result_guard = gql_mutations.Mutation._join_queue_impl(
+            info,
+            QueueEntryInput(
+                patient_id=patient.id,
+                doctor_id=gen_synth.id,
+                queue_tag="general",
+            ),
+        )
+        assert result_guard.success is False
+        assert result_guard.errors == ["DOCTOR_INACTIVE"]
+    finally:
+        _durable_cleanup(db_session, "lab_res_ee1", "gen_res_ee1")
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()

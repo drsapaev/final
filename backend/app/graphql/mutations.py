@@ -43,6 +43,7 @@ from app.crud.queue_resource_routing import (
 )
 from app.crud.queue_resource_routing import (
     resource_start_number,
+    tag_routes_to_resource,
 )
 from app.crud.visit import create_visit
 from app.schemas.patient import PatientCreate, PatientUpdate
@@ -1018,28 +1019,48 @@ class Mutation:
                         errors=["DOCTOR_NOT_FOUND"],
                     )
 
-                # Codex P1 (round-8): канонический eligibility-предикат (SSOT,
-                # тот же, что в createAppointment): Doctor.active + завершённый
-                # профиль + владелец существует/активен/с doctor-ролью —
-                # legacy-ghost строки (active Doctor с неактивным владельцем)
-                # больше не принимают онлайн-запись.
-                try:
-                    ensure_doctor_eligible_for_appointment(db, input.doctor_id)
-                except HTTPException:
-                    return QueueMutationResponse(
-                        success=False,
-                        message="Врач недоступен для онлайн-записи",
-                        errors=["DOCTOR_INACTIVE"],
-                    )
-
                 # Codex P1 (round-8): день очереди — по КОНФИГУРИРУЕМОЙ
                 # таймзоне (Asia/Tashkent), а не по host-локали (UTC-контейнеры
                 # между 19:00 и полуночью UTC получали вчерашнюю очередь).
+                # QD-2C (round-21): вычисление перенесено ВЫШЕ гварда врача —
+                # тег реестра резолвится по клинической дате до проверки.
                 queue_settings = get_queue_settings(db)
                 timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
                 now_local = datetime.now(timezone)
                 today = now_local.date()
                 queue_start_hour = queue_settings.get("queue_start_hour", 7)
+
+                # QD-2C (Codex round-21 P1): joinQueue по тегу реестра
+                # роутится на resource-ось ДО гварда врача — 0056/0057
+                # перевели сиды lab/ECG на внутреннюю роль 'Resource', а
+                # канонический eligibility-предикат (врач + doctor-family
+                # роль владельца) отклонял их с DOCTOR_INACTIVE ещё ДО
+                # crud-ветки реестра. Гвард — контракт ДОКТОРСКОЙ очереди
+                # (владелец активен + doctor-family роль); resource-ось
+                # несёт свои инварианты (очередь активна/не открыта/окно
+                # часов/лимит) — они ниже не зависят от владельца.
+                # Деактивационно-устойчиво (round-3): живая resource-очередь
+                # (day, tag) маршрутизирует и при деактивированной строке
+                # реестра (tag_routes_to_resource), новая — только при
+                # АКТИВНОЙ строке (resolve_tag_resource).
+                registry_routed = bool(input.queue_tag) and (
+                    tag_routes_to_resource(db, input.queue_tag, today) is not None
+                    or _resolve_tag_resource(db, input.queue_tag) is not None
+                )
+                if not registry_routed:
+                    # Codex P1 (round-8): канонический eligibility-предикат (SSOT,
+                    # тот же, что в createAppointment): Doctor.active + завершённый
+                    # профиль + владелец существует/активен/с doctor-ролью —
+                    # legacy-ghost строки (active Doctor с неактивным владельцем)
+                    # больше не принимают онлайн-запись.
+                    try:
+                        ensure_doctor_eligible_for_appointment(db, input.doctor_id)
+                    except HTTPException:
+                        return QueueMutationResponse(
+                            success=False,
+                            message="Врач недоступен для онлайн-записи",
+                            errors=["DOCTOR_INACTIVE"],
+                        )
 
                 # P1: сериализуем СОЗДАНИЕ очереди на ключе (doctor, day, tag) —
                 # get_or_create_daily_queue это query-then-insert без
@@ -1088,27 +1109,32 @@ class Mutation:
                 # повторяем канонический eligibility-предикат; лок держится до
                 # финального коммита вставки талона (порядок локов
                 # doctor -> queue сохраняется — дедлоков нет).
-                doctor = (
-                    db.query(Doctor)
-                    .filter(Doctor.id == input.doctor_id)
-                    .with_for_update()
-                    .populate_existing()
-                    .first()
-                )
-                if not doctor:
-                    return QueueMutationResponse(
-                        success=False,
-                        message=t("doctor.not_found"),
-                        errors=["DOCTOR_NOT_FOUND"],
+                # QD-2C (Codex round-21 P1): только для ДОКТОРСКОЙ ветки —
+                # registry-routed join не гвардится врачом (см. выше); его
+                # doctor-строка используется лишь как fallback капы/старта,
+                # а ресурсная очередь несёт собственные значения реестра.
+                if not registry_routed:
+                    doctor = (
+                        db.query(Doctor)
+                        .filter(Doctor.id == input.doctor_id)
+                        .with_for_update()
+                        .populate_existing()
+                        .first()
                     )
-                try:
-                    ensure_doctor_eligible_for_appointment(db, input.doctor_id)
-                except HTTPException:
-                    return QueueMutationResponse(
-                        success=False,
-                        message="Врач недоступен для онлайн-записи",
-                        errors=["DOCTOR_INACTIVE"],
-                    )
+                    if not doctor:
+                        return QueueMutationResponse(
+                            success=False,
+                            message=t("doctor.not_found"),
+                            errors=["DOCTOR_NOT_FOUND"],
+                        )
+                    try:
+                        ensure_doctor_eligible_for_appointment(db, input.doctor_id)
+                    except HTTPException:
+                        return QueueMutationResponse(
+                            success=False,
+                            message="Врач недоступен для онлайн-записи",
+                            errors=["DOCTOR_INACTIVE"],
+                        )
 
                 # P1: лочим строку очереди ДО проверок дубликата/лимита и
                 # выдачи номера — параллельные joinQueue выстраиваются здесь
