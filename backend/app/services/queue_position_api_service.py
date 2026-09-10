@@ -7,6 +7,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import clinic_today
 from app.repositories.queue_position_api_repository import QueuePositionApiRepository
 
 
@@ -24,6 +25,8 @@ class QueuePositionApiService:
         db: Session,
         repository: QueuePositionApiRepository | None = None,
     ):
+        # Codex round-28: the day SSOT (clinic_today) needs the session
+        self.db = db
         self.repository = repository or QueuePositionApiRepository(db)
 
     def _get_entry_or_error(self, entry_id: int):
@@ -41,9 +44,18 @@ class QueuePositionApiService:
         queue_number: int,
         specialist_id: int,
     ):
+        # Codex round-28 P2: день позиции — clinic_today SSOT (таймзона
+        # настроек очередей): resource-очереди создаются на КЛИНИК-локальном
+        # дне, и host date.today() в окне 19:00-24:00Z возвращал 404 для
+        # валидного текущего тикета. isinstance — unit-стабы с не-Session db
+        # держат легаси-путь (host-день).
         queue = self.repository.get_today_queue_by_specialist(
             specialist_id=specialist_id,
-            day=date.today(),
+            day=(
+                clinic_today(self.db)
+                if isinstance(self.db, Session)
+                else date.today()
+            ),
         )
         if not queue:
             raise QueuePositionApiDomainError(404, "Очередь не найдена")

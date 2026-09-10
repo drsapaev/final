@@ -416,7 +416,13 @@ def _department_resource_tags(db: Session, department: Department) -> set[str]:
 
 def _collect_department_overview(db: Session) -> dict[str, Any]:
     """Формирует реальные показатели по отделениям."""
-    today = date.today()
+    # Codex round-28 P2: день обзора — clinic_today SSOT (таймзона настроек
+    # очередей): resource-очереди создаются на КЛИНИК-локальном дне, и host
+    # date.today() в окне 19:00-24:00Z читал ВЧЕРАШНИЕ очереди —
+    # queue_entries_today = 0 при живых ресурсных очередях.
+    from app.crud.clinic import clinic_today
+
+    today = clinic_today(db)
     departments = db.query(Department).order_by(Department.display_order).all()
     overview_items: list[dict[str, Any]] = []
 

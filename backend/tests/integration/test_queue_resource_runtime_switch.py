@@ -2437,7 +2437,8 @@ def _test_position_by_number_body(db_session: Session) -> None:
     user = _make_user(db_session, username="lab_res25", role="Resource")
     synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
     _make_resource(db_session, code="lab", queue_tag="lab")
-    today = date.today()
+    # Codex round-28: the position day is the clinic_today SSOT
+    today = _dt_now_tashkent_day()
     queue = queue_service.get_or_create_daily_queue(
         db_session, day=today, specialist_id=None, queue_tag="lab"
     )
@@ -3035,15 +3036,14 @@ def test_department_overview_counts_resource_entries(
     axis (QueueProfile.department_key == department.key → 'lab' under
     'laboratory') while the doctor axis keeps counting its own
     entries. Commits (get_or_create) — cleaned in the finally."""
-    from datetime import datetime
-
     from app.api.v1.endpoints.admin_departments._helpers import (
         _collect_department_overview,
     )
     from app.models.department import Department
     from app.models.queue_profile import QueueProfile
 
-    today = datetime.now().date()
+    # Codex round-28: the overview day is the clinic_today SSOT
+    today = _dt_now_tashkent_day()
     department = Department(key="laboratory", name_ru="Лаборатория")
     profile = QueueProfile(
         key="laboratory",
@@ -5246,3 +5246,92 @@ def test_queue_limits_aggregate_clinic_day_resource_usage(
         assert lab_row["aggregate_max_per_day"] == 25
     finally:
         _durable_cleanup(db_session, "lab_res_kk2")
+
+
+# ===================== LL. Codex round-28 pins =====================
+
+
+def test_position_by_number_defaults_to_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-28 P2: the by-number position lookup resolves the day
+    through the clinic_today SSOT — GET /queue/position/by-number/{n}
+    returned 404 for a valid current clinic-day resource ticket when
+    the host date was still the clinic's previous day. The timezone is
+    chosen dynamically so the divergence is real."""
+    from app.services import queue_position_api_service as qps
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()
+    monkeypatch.setattr(qps, "clinic_today", lambda db: clinic_day)
+
+    try:
+        user = _make_user(db_session, username="lab_res_ll1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=111)
+
+        service = qps.QueuePositionApiService(db_session)
+        result = service.get_position_entry_by_number(
+            queue_number=111, specialist_id=synthetic.id
+        )
+        assert result.id == entry.id
+    finally:
+        _durable_cleanup(db_session, "lab_res_ll1")
+
+
+def test_department_overview_counts_clinic_day_resource_queues(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-28 P2: the department overview aggregates on the
+    clinic day — the resource-axis predicate read host-today queues and
+    reported zero queue_entries_today for live resource queues in the
+    19:00-24:00Z window while the queue-limits aggregation (round-27)
+    correctly reported their clinic-day usage. The timezone is chosen
+    dynamically so the divergence is real."""
+    import app.api.v1.endpoints.admin_departments._helpers as dept_helpers
+    from app.models.department import Department
+    from app.models.queue_profile import QueueProfile
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()
+    monkeypatch.setattr(
+        "app.crud.clinic.clinic_today", lambda db: clinic_day
+    )
+
+    department = Department(key="laboratory_ll", name_ru="Лаборатория LL")
+    profile = QueueProfile(
+        key="laboratory_ll",
+        title="Лаборатория LL",
+        queue_tags=["lab"],
+        department_key="laboratory_ll",
+    )
+    try:
+        db_session.add(department)
+        db_session.add(profile)
+        db_session.commit()
+
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        _make_waiting_entry(db_session, queue, number=5)
+        _make_waiting_entry(db_session, queue, number=6)
+
+        overview = dept_helpers._collect_department_overview(db_session)
+        item = next(
+            i for i in overview["departments"] if i["key"] == "laboratory_ll"
+        )
+        assert item["stats"]["queue_entries_today"] == 2
+    finally:
+        _durable_cleanup(db_session)
+        db_session.query(QueueProfile).filter(
+            QueueProfile.key == "laboratory_ll"
+        ).delete(synchronize_session=False)
+        db_session.query(Department).filter(Department.key == "laboratory_ll").delete(
+            synchronize_session=False
+        )
+        db_session.commit()
