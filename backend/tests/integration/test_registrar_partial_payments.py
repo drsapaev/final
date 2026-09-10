@@ -107,10 +107,11 @@ def test_partial_payment_then_top_up_preserves_invoice_debt(
 def test_partial_refund_reopens_debt_and_allows_top_up(
     client,
     db_session,
+    admin_auth_headers,
     registrar_auth_headers,
     payment_visits,
 ):
-    visits, _ = payment_visits
+    visits, invoice = payment_visits
     records = records_for(visits)
     before = summary(client, registrar_auth_headers, records)
     settled_response = pay(
@@ -125,8 +126,15 @@ def test_partial_refund_reopens_debt_and_allows_top_up(
     assert settled["payment_status"] == "paid"
 
     first_payment = db_session.query(Payment).order_by(Payment.id).first()
-    first_payment.refunded_amount = Decimal("10000")
-    db_session.commit()
+    refund_response = client.post(
+        f"/api/v1/cashier/payments/{first_payment.id}/refund",
+        headers=admin_auth_headers,
+        json={"amount": 10000, "reason": "SYNTHETIC-partial-refund"},
+    )
+    assert refund_response.status_code == 200, refund_response.text
+    db_session.refresh(invoice)
+    assert invoice.status == "pending"
+    assert invoice.paid_at is None
 
     after_refund = summary(client, registrar_auth_headers, records)
     assert Decimal(after_refund["paid_amount"]) == 90000
@@ -153,6 +161,64 @@ def test_partial_refund_reopens_debt_and_allows_top_up(
     )
     assert top_up.status_code == 200, top_up.text
     assert top_up.json()["payment_summary"]["payment_status"] == "paid"
+    db_session.refresh(invoice)
+    assert invoice.status == "paid"
+
+
+def test_failed_provider_refund_rolls_back_amount_and_invoice(
+    client,
+    db_session,
+    admin_auth_headers,
+    registrar_auth_headers,
+    payment_visits,
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from app.services import payment_provider_manager_factory
+
+    visits, invoice = payment_visits
+    records = records_for(visits)
+    before = summary(client, registrar_auth_headers, records)
+    settled = pay(
+        client,
+        registrar_auth_headers,
+        records,
+        100000,
+        before["snapshot"],
+    )
+    assert settled.status_code == 200, settled.text
+
+    payment = db_session.query(Payment).order_by(Payment.id).first()
+    payment.provider = "click"
+    payment.provider_payment_id = "SYNTHETIC-provider-payment"
+    db_session.commit()
+
+    manager = SimpleNamespace(
+        refund_payment=lambda *_args, **_kwargs: SimpleNamespace(
+            success=False,
+            error_message="SYNTHETIC-provider-rejection",
+        )
+    )
+    monkeypatch.setattr(
+        payment_provider_manager_factory,
+        "get_payment_manager",
+        lambda: manager,
+    )
+
+    response = client.post(
+        f"/api/v1/cashier/payments/{payment.id}/refund",
+        headers=admin_auth_headers,
+        json={"amount": 10000, "reason": "SYNTHETIC-provider-failure"},
+    )
+    assert response.status_code == 502, response.text
+
+    db_session.expire_all()
+    persisted_payment = db_session.get(Payment, payment.id)
+    persisted_invoice = db_session.get(PaymentInvoice, invoice.id)
+    assert persisted_payment.refunded_amount in {None, Decimal("0")}
+    assert persisted_payment.status == "paid"
+    assert persisted_invoice.status == "paid"
 
 
 def test_payment_summary_loads_payment_ledger_once(db_session, payment_visits):

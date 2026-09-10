@@ -97,6 +97,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.payment import Payment
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
@@ -143,6 +144,10 @@ class PaymentInvariantService:
                 detail=f"Visit {visit_id} not found",
             )
         return visit
+
+    def lock_visit_for_payment_change(self, visit_id: int) -> Visit:
+        """Acquire the canonical visit lock before mutating its payment ledger."""
+        return self._load_visit_for_update(visit_id)
 
     # ─── Calculations (single source of truth — remove duplication) ───
 
@@ -277,6 +282,43 @@ class PaymentInvariantService:
             "snapshot": snapshot,
             "visits": rows,
         }
+
+    def synchronize_linked_invoices(
+        self,
+        *,
+        visit_id: int,
+        payment_method: str | None = None,
+    ) -> None:
+        """Keep linked invoice status consistent with receipt-backed debt."""
+        links = (
+            self.db.query(PaymentInvoiceVisit)
+            .filter(PaymentInvoiceVisit.visit_id == visit_id)
+            .all()
+        )
+        for invoice_id in sorted({link.invoice_id for link in links}):
+            invoice = (
+                self.db.query(PaymentInvoice)
+                .filter(PaymentInvoice.id == invoice_id)
+                .with_for_update()
+                .populate_existing()
+                .first()
+            )
+            if not invoice or invoice.status not in {"pending", "processing", "paid"}:
+                continue
+
+            visits = [item.visit for item in invoice.visits]
+            if not visits:
+                continue
+
+            remaining = self.summarize_visits(visits)["remaining_amount"]
+            if remaining == 0:
+                if invoice.status in {"pending", "processing"}:
+                    invoice.status = "paid"
+                    invoice.payment_method = payment_method or invoice.payment_method
+                    invoice.paid_at = datetime.now(UTC)
+            elif invoice.status == "paid":
+                invoice.status = "pending"
+                invoice.paid_at = None
 
     def receive_grouped_payment(
         self,
