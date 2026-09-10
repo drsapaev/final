@@ -183,8 +183,8 @@ class PaymentInvariantService:
     def compute_paid_amount(self, visit_id: int) -> Decimal:
         """Compute the total paid amount for a visit.
 
-        Sums all ``paid`` and ``completed`` payments. This is the
-        canonical implementation — replaces the duplicated
+        Sums the unrefunded portion of all ``paid`` and ``completed``
+        payments. This is the canonical implementation — replaces the duplicated
         ``_cashier_paid_amounts_by_visit_id`` in ``cashier/_helpers.py``.
         """
         payments = (
@@ -197,9 +197,16 @@ class PaymentInvariantService:
             .all()
         )
         return sum(
-            (Decimal(str(p.amount or 0)) for p in payments),
+            (self._net_settled_amount(payment) for payment in payments),
             Decimal("0"),
         )
+
+    @staticmethod
+    def _net_settled_amount(payment: Payment) -> Decimal:
+        """Return money still settled after partial or full refunds."""
+        amount = Decimal(str(payment.amount or 0))
+        refunded = Decimal(str(payment.refunded_amount or 0))
+        return max(amount - refunded, Decimal("0"))
 
     def summarize_visits(self, visits: list[Visit]) -> dict[str, Any]:
         """Read receipt-backed balances using the same totals as payment creation.
@@ -216,16 +223,20 @@ class PaymentInvariantService:
             .populate_existing()
             .all()
         )
+        settled_by_visit: dict[int, list[Payment]] = {}
+        for payment in payments:
+            if payment.status in {"paid", "completed"}:
+                settled_by_visit.setdefault(payment.visit_id, []).append(payment)
+
         rows = []
         for visit in visits:
             total = self.compute_total_cost(visit)
-            paid = self.compute_paid_amount(visit.id)
+            settled = settled_by_visit.get(visit.id, [])
+            paid = sum(
+                (self._net_settled_amount(payment) for payment in settled),
+                Decimal("0"),
+            )
             remaining = max(total - paid, Decimal("0"))
-            settled = [
-                p
-                for p in payments
-                if p.visit_id == visit.id and p.status in {"paid", "completed"}
-            ]
             rows.append(
                 {
                     "visit_id": visit.id,

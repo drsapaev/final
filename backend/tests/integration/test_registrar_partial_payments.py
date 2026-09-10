@@ -3,10 +3,12 @@
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import event
 
 from app.models.payment import Payment
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.visit import Visit, VisitService
+from app.services.payment_invariant_service import PaymentInvariantService
 
 
 @pytest.fixture
@@ -100,6 +102,88 @@ def test_partial_payment_then_top_up_preserves_invoice_debt(
     assert [v.status for v in visits] == ["open", "open"]
     amounts = db_session.query(Payment.amount).order_by(Payment.id).all()
     assert [row[0] for row in amounts] == [30000, 30000, 40000]
+
+
+def test_partial_refund_reopens_debt_and_allows_top_up(
+    client,
+    db_session,
+    registrar_auth_headers,
+    payment_visits,
+):
+    visits, _ = payment_visits
+    records = records_for(visits)
+    before = summary(client, registrar_auth_headers, records)
+    settled_response = pay(
+        client,
+        registrar_auth_headers,
+        records,
+        100000,
+        before["snapshot"],
+    )
+    assert settled_response.status_code == 200, settled_response.text
+    settled = settled_response.json()["payment_summary"]
+    assert settled["payment_status"] == "paid"
+
+    first_payment = db_session.query(Payment).order_by(Payment.id).first()
+    first_payment.refunded_amount = Decimal("10000")
+    db_session.commit()
+
+    after_refund = summary(client, registrar_auth_headers, records)
+    assert Decimal(after_refund["paid_amount"]) == 90000
+    assert Decimal(after_refund["remaining_amount"]) == 10000
+    assert after_refund["payment_status"] == "partial"
+    assert after_refund["can_pay"] is True
+    assert after_refund["snapshot"] != settled["snapshot"]
+
+    stale = pay(
+        client,
+        registrar_auth_headers,
+        records,
+        10000,
+        settled["snapshot"],
+    )
+    assert stale.status_code == 409, stale.text
+
+    top_up = pay(
+        client,
+        registrar_auth_headers,
+        records,
+        10000,
+        after_refund["snapshot"],
+    )
+    assert top_up.status_code == 200, top_up.text
+    assert top_up.json()["payment_summary"]["payment_status"] == "paid"
+
+
+def test_payment_summary_loads_payment_ledger_once(db_session, payment_visits):
+    visits, _ = payment_visits
+    db_session.add_all(
+        Payment(
+            visit_id=visit.id,
+            amount=10000,
+            method="cash",
+            status="paid",
+        )
+        for visit in visits
+    )
+    db_session.commit()
+
+    payment_selects: list[str] = []
+
+    def capture_payment_select(_conn, _cursor, statement, _parameters, _context, _many):
+        normalized = " ".join(statement.lower().split())
+        if normalized.startswith("select") and " from payments" in normalized:
+            payment_selects.append(normalized)
+
+    bind = db_session.get_bind()
+    event.listen(bind, "before_cursor_execute", capture_payment_select)
+    try:
+        result = PaymentInvariantService(db_session).summarize_visits(visits)
+    finally:
+        event.remove(bind, "before_cursor_execute", capture_payment_select)
+
+    assert Decimal(result["paid_amount"]) == 20000
+    assert len(payment_selects) == 1
 
 
 def test_duplicate_request_snapshot_cannot_charge_twice(
