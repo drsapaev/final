@@ -1,4 +1,4 @@
-from datetime import date, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 
 import pytest
@@ -8,7 +8,8 @@ from app.models.clinic import Schedule
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment
-from app.models.visit import Visit
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.visit import Visit, VisitService
 from app.services.telegram_staff_action_adapter_service import (
     TelegramStaffActionAdapterError,
     TelegramStaffActionAdapterService,
@@ -60,6 +61,43 @@ def _audit_actions(db_session) -> list[str]:
         row.action
         for row in db_session.query(AuditLog).order_by(AuditLog.id.asc()).all()
     ]
+
+
+def _linked_invoice(
+    db_session,
+    *,
+    visit: Visit,
+    amount: Decimal,
+    status: str,
+) -> PaymentInvoice:
+    db_session.add(
+        VisitService(
+            visit_id=visit.id,
+            service_id=910001,
+            name="Telegram payment test service",
+            qty=1,
+            price=amount,
+            currency="UZS",
+        )
+    )
+    invoice = PaymentInvoice(
+        patient_id=visit.patient_id,
+        total_amount=amount,
+        status=status,
+        payment_method="cash",
+        paid_at=datetime.now(UTC) if status == "paid" else None,
+    )
+    db_session.add(invoice)
+    db_session.flush()
+    db_session.add(
+        PaymentInvoiceVisit(
+            invoice_id=invoice.id,
+            visit_id=visit.id,
+            visit_amount=amount,
+        )
+    )
+    db_session.flush()
+    return invoice
 
 
 def test_staff_cancel_visit_adapter_mutates_visit_and_queue_with_audit(
@@ -152,19 +190,27 @@ def test_staff_move_visit_adapter_updates_date_and_preserves_queue_time(
 def test_staff_payment_status_adapter_uses_billing_transition_and_audit(
     db_session, admin_user, test_visit
 ):
+    amount = Decimal("120000")
     payment = Payment(
         visit_id=test_visit.id,
-        amount=Decimal("120000"),
+        amount=amount,
         currency="UZS",
         method="cash",
         status="pending",
     )
     db_session.add(payment)
+    invoice = _linked_invoice(
+        db_session,
+        visit=test_visit,
+        amount=amount,
+        status="pending",
+    )
+    test_visit.status = "paid"
     db_session.flush()
 
     result = TelegramStaffActionAdapterService(db_session).staff_change_payment_status(
         payment_id=payment.id,
-        new_status="paid",
+        new_status="PAID",
         actor_user_id=admin_user.id,
         telegram_chat_id=7703,
         commit=False,
@@ -176,6 +222,9 @@ def test_staff_payment_status_adapter_uses_billing_transition_and_audit(
     assert payment.provider_data["staff_action"] == (
         "telegram_confirmed_payment_status_change"
     )
+    assert invoice.status == "paid"
+    assert invoice.paid_at is not None
+    assert test_visit.status == "waiting"
     assert _audit_actions(db_session) == [
         "staff_action_confirmed",
         "staff_action_completed",
@@ -185,14 +234,22 @@ def test_staff_payment_status_adapter_uses_billing_transition_and_audit(
 def test_staff_refund_payment_adapter_enforces_refundable_status(
     db_session, admin_user, test_visit
 ):
+    amount = Decimal("90000")
     payment = Payment(
         visit_id=test_visit.id,
-        amount=Decimal("90000"),
+        amount=amount,
         currency="UZS",
         method="cash",
         status="paid",
     )
     db_session.add(payment)
+    invoice = _linked_invoice(
+        db_session,
+        visit=test_visit,
+        amount=amount,
+        status="paid",
+    )
+    test_visit.status = "paid"
     db_session.flush()
 
     result = TelegramStaffActionAdapterService(db_session).staff_refund_payment(
@@ -209,10 +266,126 @@ def test_staff_refund_payment_adapter_enforces_refundable_status(
     assert payment.status == "refunded"
     assert payment.refunded_amount == Decimal("90000")
     assert payment.refunded_by == admin_user.id
+    assert invoice.status == "pending"
+    assert invoice.paid_at is None
+    assert test_visit.status == "waiting"
     assert _audit_actions(db_session) == [
         "staff_action_confirmed",
         "staff_action_completed",
     ]
+
+
+def test_staff_partial_refund_reopens_linked_invoice_debt(
+    db_session, admin_user, test_visit
+):
+    amount = Decimal("90000")
+    payment = Payment(
+        visit_id=test_visit.id,
+        amount=amount,
+        currency="UZS",
+        method="cash",
+        status="paid",
+    )
+    db_session.add(payment)
+    invoice = _linked_invoice(
+        db_session,
+        visit=test_visit,
+        amount=amount,
+        status="paid",
+    )
+    db_session.flush()
+
+    result = TelegramStaffActionAdapterService(db_session).staff_refund_payment(
+        payment_id=payment.id,
+        amount=Decimal("30000"),
+        reason="Partial refund",
+        actor_user_id=admin_user.id,
+        telegram_chat_id=7705,
+        commit=False,
+    )
+
+    assert result["status"] == "paid"
+    assert result["refunded_amount"] == Decimal("30000")
+    assert result["remaining_amount"] == Decimal("60000")
+    assert invoice.status == "pending"
+    assert invoice.paid_at is None
+
+
+def test_staff_provider_refund_requires_cashier_and_preserves_local_state(
+    db_session, admin_user, test_visit
+):
+    amount = Decimal("90000")
+    payment = Payment(
+        visit_id=test_visit.id,
+        amount=amount,
+        currency="UZS",
+        method="click",
+        status="paid",
+        provider="click",
+        provider_payment_id="provider-payment-2",
+    )
+    db_session.add(payment)
+    invoice = _linked_invoice(
+        db_session,
+        visit=test_visit,
+        amount=amount,
+        status="paid",
+    )
+    db_session.commit()
+
+    with pytest.raises(
+        TelegramStaffActionAdapterError,
+        match="payment_provider_refund_requires_cashier",
+    ):
+        TelegramStaffActionAdapterService(db_session).staff_refund_payment(
+            payment_id=payment.id,
+            amount=Decimal("30000"),
+            reason="Provider rejection",
+            actor_user_id=admin_user.id,
+            telegram_chat_id=7706,
+            commit=False,
+        )
+
+    db_session.refresh(payment)
+    db_session.refresh(invoice)
+    assert payment.status == "paid"
+    assert payment.refunded_amount in {None, Decimal("0")}
+    assert invoice.status == "paid"
+    assert invoice.paid_at is not None
+    assert _audit_actions(db_session) == ["staff_action_failed"]
+
+
+def test_staff_payment_status_cannot_bypass_refund_action(
+    db_session, admin_user, test_visit
+):
+    payment = Payment(
+        visit_id=test_visit.id,
+        amount=Decimal("90000"),
+        currency="UZS",
+        method="click",
+        status="paid",
+        provider="click",
+        provider_payment_id="provider-payment-3",
+    )
+    db_session.add(payment)
+    db_session.commit()
+
+    with pytest.raises(
+        TelegramStaffActionAdapterError,
+        match="payment_refund_requires_refund_action",
+    ):
+        TelegramStaffActionAdapterService(db_session).staff_change_payment_status(
+            payment_id=payment.id,
+            new_status="refunded",
+            actor_user_id=admin_user.id,
+            telegram_chat_id=7707,
+            commit=False,
+        )
+
+    db_session.refresh(payment)
+    assert payment.status == "paid"
+    assert payment.refunded_amount in {None, Decimal("0")}
+    assert _audit_actions(db_session) == ["staff_action_failed"]
 
 
 def test_staff_refund_payment_adapter_records_failed_audit_on_policy_block(
