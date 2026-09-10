@@ -215,26 +215,6 @@ class TelegramStaffActionAdapterService:
         )
         self.db.flush()
 
-    @staticmethod
-    def _refund_provider_payment(payment: Payment, amount: Decimal) -> None:
-        """Require the provider to accept an online refund before commit."""
-        if not payment.provider:
-            return
-        if not payment.provider_payment_id:
-            raise TelegramStaffActionAdapterError("payment_provider_reference_missing")
-
-        from app.services.payment_provider_manager_factory import (
-            get_payment_manager,
-        )
-
-        result = get_payment_manager().refund_payment(
-            payment.provider,
-            payment.provider_payment_id,
-            amount,
-        )
-        if not result or not getattr(result, "success", False):
-            raise TelegramStaffActionAdapterError("payment_provider_refund_failed")
-
     def staff_call_next_patient(
         self,
         *,
@@ -612,6 +592,15 @@ class TelegramStaffActionAdapterService:
             payment, invariant_service = self._lock_payment_change_context(payment_id)
             if payment is None:
                 raise ValueError(f"Платеж {payment_id} не найден")
+            target_status = str(new_status).strip().lower()
+            if target_status == "refunded":
+                raise TelegramStaffActionAdapterError(
+                    "payment_refund_requires_refund_action"
+                )
+            if payment.provider and target_status in {"cancelled", "void"}:
+                raise TelegramStaffActionAdapterError(
+                    "payment_provider_terminal_status_requires_cashier"
+                )
             payment = BillingService(self.db).update_payment_status(
                 payment_id,
                 new_status,
@@ -678,6 +667,10 @@ class TelegramStaffActionAdapterService:
                 raise TelegramStaffActionAdapterError("payment_not_found")
             if payment.status not in {"paid", "completed"}:
                 raise TelegramStaffActionAdapterError("payment_status_not_refundable")
+            if payment.provider:
+                raise TelegramStaffActionAdapterError(
+                    "payment_provider_refund_requires_cashier"
+                )
 
             already_refunded = payment.refunded_amount or Decimal("0")
             available = payment.amount - already_refunded
@@ -704,7 +697,6 @@ class TelegramStaffActionAdapterService:
                 )
 
             self._synchronize_payment_change(payment, invariant_service)
-            self._refund_provider_payment(payment, refund_amount)
 
             self._completed(
                 actor_user_id=actor_user_id,

@@ -1,6 +1,5 @@
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from types import SimpleNamespace
 
 import pytest
 
@@ -277,17 +276,15 @@ def test_staff_refund_payment_adapter_enforces_refundable_status(
 
 
 def test_staff_partial_refund_reopens_linked_invoice_debt(
-    db_session, admin_user, test_visit, monkeypatch
+    db_session, admin_user, test_visit
 ):
     amount = Decimal("90000")
     payment = Payment(
         visit_id=test_visit.id,
         amount=amount,
         currency="UZS",
-        method="click",
+        method="cash",
         status="paid",
-        provider="click",
-        provider_payment_id="provider-payment-1",
     )
     db_session.add(payment)
     invoice = _linked_invoice(
@@ -297,17 +294,6 @@ def test_staff_partial_refund_reopens_linked_invoice_debt(
         status="paid",
     )
     db_session.flush()
-    provider_calls = []
-    manager = SimpleNamespace(
-        refund_payment=lambda provider, payment_id, refund_amount: (
-            provider_calls.append((provider, payment_id, refund_amount))
-            or SimpleNamespace(success=True)
-        )
-    )
-    monkeypatch.setattr(
-        "app.services.payment_provider_manager_factory.get_payment_manager",
-        lambda: manager,
-    )
 
     result = TelegramStaffActionAdapterService(db_session).staff_refund_payment(
         payment_id=payment.id,
@@ -323,11 +309,10 @@ def test_staff_partial_refund_reopens_linked_invoice_debt(
     assert result["remaining_amount"] == Decimal("60000")
     assert invoice.status == "pending"
     assert invoice.paid_at is None
-    assert provider_calls == [("click", "provider-payment-1", Decimal("30000"))]
 
 
-def test_staff_provider_refund_failure_rolls_back_local_state(
-    db_session, admin_user, test_visit, monkeypatch
+def test_staff_provider_refund_requires_cashier_and_preserves_local_state(
+    db_session, admin_user, test_visit
 ):
     amount = Decimal("90000")
     payment = Payment(
@@ -347,17 +332,10 @@ def test_staff_provider_refund_failure_rolls_back_local_state(
         status="paid",
     )
     db_session.commit()
-    manager = SimpleNamespace(
-        refund_payment=lambda *_args: SimpleNamespace(success=False)
-    )
-    monkeypatch.setattr(
-        "app.services.payment_provider_manager_factory.get_payment_manager",
-        lambda: manager,
-    )
 
     with pytest.raises(
         TelegramStaffActionAdapterError,
-        match="payment_provider_refund_failed",
+        match="payment_provider_refund_requires_cashier",
     ):
         TelegramStaffActionAdapterService(db_session).staff_refund_payment(
             payment_id=payment.id,
@@ -374,6 +352,39 @@ def test_staff_provider_refund_failure_rolls_back_local_state(
     assert payment.refunded_amount in {None, Decimal("0")}
     assert invoice.status == "paid"
     assert invoice.paid_at is not None
+    assert _audit_actions(db_session) == ["staff_action_failed"]
+
+
+def test_staff_payment_status_cannot_bypass_refund_action(
+    db_session, admin_user, test_visit
+):
+    payment = Payment(
+        visit_id=test_visit.id,
+        amount=Decimal("90000"),
+        currency="UZS",
+        method="click",
+        status="paid",
+        provider="click",
+        provider_payment_id="provider-payment-3",
+    )
+    db_session.add(payment)
+    db_session.commit()
+
+    with pytest.raises(
+        TelegramStaffActionAdapterError,
+        match="payment_refund_requires_refund_action",
+    ):
+        TelegramStaffActionAdapterService(db_session).staff_change_payment_status(
+            payment_id=payment.id,
+            new_status="refunded",
+            actor_user_id=admin_user.id,
+            telegram_chat_id=7707,
+            commit=False,
+        )
+
+    db_session.refresh(payment)
+    assert payment.status == "paid"
+    assert payment.refunded_amount in {None, Decimal("0")}
     assert _audit_actions(db_session) == ["staff_action_failed"]
 
 
