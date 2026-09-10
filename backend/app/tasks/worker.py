@@ -144,6 +144,7 @@ async def send_visit_reminder(
     from sqlalchemy import create_engine, func, or_, update
     from sqlalchemy.orm import Session
 
+    from app.models.patient import Patient
     from app.models.visit import Visit
     from app.services.notification_service import NotificationService
 
@@ -311,11 +312,9 @@ async def send_visit_reminder(
             )
             db.commit()
             logger.info(
-                "job.send_visit_reminder: visit %s appointment start %s is "
-                "in the past (or undated) — obsolete job, aborting before "
-                "send",
+                "job.send_visit_reminder: visit %s appointment start is in "
+                "the past (or undated) — obsolete job, aborting before send",
                 visit_id,
-                appointment_start,
             )
             return
         # Round 16, P1: the confirmation token is issued at booking time
@@ -345,9 +344,45 @@ async def send_visit_reminder(
                 visit_id,
             )
 
+        # Round 17, P1: honor the visit's allowed confirmation channel.
+        # The service auto-selects the best channel from the PATIENT's
+        # reach (telegram > pwa > phone) and ignores the visit's stored
+        # contract — a visit stored with channel 'phone' would receive a
+        # PWA link that confirm_by_pwa() rejects, and the delivery would
+        # still be stamped. Reuse the REAL selector (no duplicate
+        # priority logic) and refuse the dispatch when its choice is not
+        # permitted by the visit contract. A NULL/empty/'auto' channel
+        # (GraphQL-created visits) permits the auto-selected channel.
+        service = NotificationService(db)
+        patient = (
+            db.query(Patient).filter(Patient.id == claimed_visit.patient_id).first()
+        )
+        best_channel = (
+            service._determine_best_channel(patient) if patient is not None else None
+        )
+        allowed_channel = (claimed_visit.confirmation_channel or "").strip().lower()
+        if allowed_channel and allowed_channel != "auto" and best_channel != allowed_channel:
+            db.execute(
+                update(Visit)
+                .where(
+                    Visit.id == visit_id,
+                    Visit.reminder_claimed_at == our_lease,
+                )
+                .values(reminder_claimed_at=None)
+            )
+            db.commit()
+            logger.info(
+                "job.send_visit_reminder: visit %s allows channel %r but the "
+                "best reachable channel is %r — refusing to dispatch an "
+                "unusable confirmation request",
+                visit_id,
+                allowed_channel,
+                best_channel,
+            )
+            return
+
         # Dispatch OUTSIDE any transaction/lock. A reschedule during the
         # dispatch is resolved by the generation-guarded finalize below.
-        service = NotificationService(db)
         try:
             result = await service.send_confirmation_reminder(
                 db, visit_id, hours_before=REMINDER_HOURS_BEFORE

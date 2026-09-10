@@ -202,7 +202,11 @@ def make_visit(pipeline_db):
                 discount_mode="none",
                 department="cardiology",
                 confirmation_token=f"rempipe-{suffix}",
-                confirmation_channel="telegram",
+                # The fixture patient has no Telegram linkage, so the
+                # service's real best-channel selector picks PWA — the
+                # round-17 worker guard dispatches only through channels
+                # the visit contract permits.
+                confirmation_channel="pwa",
             )
             s.add(visit)
             s.commit()
@@ -2896,5 +2900,93 @@ def test_telegram_move_rejects_stale_generation(
             AuditLog.entity_id == visit_id, AuditLog.entity_type == "visit"
         ).delete()
         s.commit()
+    finally:
+        s.close()
+
+
+# ---------------------------------------------------------------------------
+# Codex round 17 — channel contract honored, CodeQL log hygiene
+# ---------------------------------------------------------------------------
+
+
+def test_worker_refuses_channel_contract_violation(
+    pipeline_db, make_visit, reminder_spy
+):
+    """Round 17, P1: the service auto-selects the best channel from the
+    PATIENT's reach and ignores the visit's stored contract — a visit
+    stored with channel 'phone' would receive a PWA link that
+    confirm_by_pwa() rejects, and the delivery would still be stamped.
+    The worker refuses such a dispatch: lease released, nothing stamped."""
+    from app.models.visit import Visit
+    from app.tasks.scheduler import build_reminder_schedule_version
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {"confirmation_channel": "phone"}
+        )
+        s.commit()
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        version = build_reminder_schedule_version(row)
+
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=visit_id,
+                channel="telegram",
+                schedule_version=version,
+            )
+        )
+
+        assert reminder_spy == [], "no dispatch through a disallowed channel"
+        fresh = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert fresh.reminder_sent_at is None, "nothing stamped"
+        assert fresh.reminder_claimed_at is None, "lease released"
+    finally:
+        s.close()
+
+
+def test_worker_allows_matching_and_null_channels(
+    pipeline_db, make_visit, reminder_spy
+):
+    """Round 17, P1: a visit whose contract matches the best channel is
+    dispatched normally, and a NULL channel (GraphQL-created visits)
+    permits the auto-selected channel."""
+    from app.models.visit import Visit
+    from app.tasks.scheduler import build_reminder_schedule_version
+    from app.tasks.worker import send_visit_reminder
+
+    matching_id = make_visit()
+    null_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        s.query(Visit).filter(Visit.id == null_id).update(
+            {"confirmation_channel": None}
+        )
+        s.commit()
+
+        for vid in (matching_id, null_id):
+            row = s.query(Visit).filter(Visit.id == vid).first()
+            version = build_reminder_schedule_version(row)
+            asyncio.run(
+                send_visit_reminder(
+                    {},
+                    visit_id=vid,
+                    channel="telegram",
+                    schedule_version=version,
+                )
+            )
+
+        got = {c["visit_id"] for c in reminder_spy}
+        assert got == {matching_id, null_id}, (
+            "matching and NULL-channel visits are dispatched: "
+            f"{sorted(got)}"
+        )
+        s.expire_all()  # the worker committed via its own session
+        for vid in (matching_id, null_id):
+            fresh = s.query(Visit).filter(Visit.id == vid).first()
+            assert fresh.reminder_sent_at is not None
     finally:
         s.close()

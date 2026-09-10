@@ -29,7 +29,7 @@ import os
 import sys
 import threading
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -174,13 +174,17 @@ def test_concurrent_reminder_jobs_send_exactly_once(
         visit = Visit(
             patient_id=patient.id,
             doctor_id=doctor.id,
-            visit_date=date.today(),
+            # Round 17, P1: the appointment must be reliably in the FUTURE —
+            # the worker's post-claim start check aborts started appointments,
+            # so a "today 10:00" fixture would fail for most of every day
+            # (10:00 clinic time = 05:00 UTC).
+            visit_date=date.today() + timedelta(days=2),
             visit_time="10:00",
             status="pending_confirmation",
             discount_mode="none",
             department="cardiology",
             confirmation_token=f"rempg-{suffix}",
-            confirmation_channel="telegram",
+            confirmation_channel="pwa",
         )
         s.add(visit)
         s.commit()
