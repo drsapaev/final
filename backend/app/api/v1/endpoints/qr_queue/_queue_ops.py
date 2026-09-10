@@ -113,6 +113,13 @@ async def call_next_patient(
                 )
                 db.rollback()
 
+            # Codex round-25 P2: entry инициализируется ДО независимых
+            # side-effect-блоков — если блок уведомлений падает ДО своего
+            # присваивания (импорт/get_queue_position_service/запрос), WS-
+            # broadcast ловил UnboundLocalError и молча пропускал обновление,
+            # включая fallback-комнату вызвавшего.
+            entry = None
+
             # 1. User Notification (Mobile/PWA)
             try:
                 from app.models.online_queue import OnlineQueueEntry

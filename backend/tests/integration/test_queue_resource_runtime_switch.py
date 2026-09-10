@@ -4934,3 +4934,130 @@ def _dt_now_tashkent_day():
     from zoneinfo import ZoneInfo
 
     return datetime.now(ZoneInfo("Asia/Tashkent")).date()
+
+
+# ===================== II. Codex round-25 pins =====================
+
+
+def _divergent_clinic_day() -> tuple[str, date]:
+    """A timezone whose LOCAL date guaranteedly differs from the host
+    date at this runtime moment (UTC+14 / UTC-12 extremes are 1-2 days
+    apart — at least one differs from any third date)."""
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+
+    ahead = _dt.now(ZoneInfo("Pacific/Kiritimati")).date()  # UTC+14
+    behind = _dt.now(ZoneInfo("Etc/GMT+12")).date()  # UTC-12
+    assert ahead != behind
+    host_today = date.today()
+    if ahead != host_today:
+        return "Pacific/Kiritimati", ahead
+    return "Etc/GMT+12", behind
+
+
+def test_rest_status_and_call_next_default_to_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-25 P2: the canonical REST service defaults an omitted
+    date to the CLINIC-local day (the clinic_today SSOT) — on the
+    documented UTC host between 19:00 and midnight the queue is stamped
+    with the NEXT local date, so /queue/status reported inactive and
+    call-next raised «Очередь не активна» despite waiting patients. The
+    timezone is chosen dynamically so the divergence is real at any
+    runtime. The service COMMITs — durable rows cleaned in the
+    finally."""
+    from app.services.qr_queue import QRQueueService
+    from app.services.qr_queue import _queue_ops as qr_ops
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()  # the divergence window is real
+    monkeypatch.setattr(qr_ops, "clinic_today", lambda db: clinic_day)
+
+    try:
+        user = _make_user(db_session, username="lab_res_ii1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=71)
+        caller = _make_user(db_session, username="reg_ii1", role="Registrar")
+
+        service = QRQueueService(db_session)
+        # omitted date: the status resolves the clinic-day surface
+        status = service.get_queue_status(synthetic.id, target_date=None)
+        assert status["active"] is True, status
+        assert status["queue_length"] >= 1
+
+        # omitted date: the call-next advances the clinic-day surface
+        result = service.call_next_patient(synthetic.id, caller.id, None, None)
+        assert result["success"] is True, result
+        db_session.refresh(entry)
+        assert entry.status == "called"
+    finally:
+        _durable_cleanup(db_session, "lab_res_ii1", "reg_ii1")
+
+
+def test_rest_call_next_survives_notification_failure(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-25 P2: entry is initialized BEFORE the independent
+    side-effect blocks — when the notification block raises BEFORE its
+    query assigns entry (get_queue_position_service failing), the WS
+    broadcast keeps working (the round-24 routing rooms and the fallback
+    room stay reachable) instead of dying on UnboundLocalError. The
+    endpoint COMMITs — durable rows cleaned in the finally."""
+    import asyncio
+
+    from app.services import queue_position_notifications as qpn
+    from app.ws import queue_ws
+
+    def broken_service_factory(db):
+        raise RuntimeError("simulated notification service failure")
+
+    monkeypatch.setattr(qpn, "get_queue_position_service", broken_service_factory)
+
+    ws_calls: list[dict] = []
+
+    def fake_broadcast(**kwargs):
+        ws_calls.append(kwargs)
+
+    monkeypatch.setattr(queue_ws, "broadcast_queue_update", fake_broadcast)
+
+    try:
+        from app.api.v1.endpoints.qr_queue._queue_ops import call_next_patient
+
+        user = _make_user(db_session, username="lab_res_ii2", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        tz_day = _dt_now_tashkent_day()
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=tz_day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=81)
+        caller = _make_user(db_session, username="reg_ii2", role="Registrar")
+
+        async def scenario():
+            return await call_next_patient(
+                synthetic.id,
+                target_date=tz_day.isoformat(),
+                db=db_session,
+                current_user=caller,
+            )
+
+        payload = asyncio.run(scenario())
+        assert payload.success is True
+
+        # the WS broadcast survived the notification failure — entry was
+        # re-fetched by the display block and the rooms are the routing
+        # rooms (no UnboundLocalError, no silently skipped update)
+        call_next_rooms = sorted(
+            c["department"]
+            for c in ws_calls
+            if c.get("data", {}).get("action") == "call_next"
+        )
+        assert call_next_rooms == [f"specialist_{synthetic.id}"], ws_calls
+        db_session.refresh(entry)
+        assert entry.status == "called"
+    finally:
+        _durable_cleanup(db_session, "lab_res_ii2", "reg_ii2")

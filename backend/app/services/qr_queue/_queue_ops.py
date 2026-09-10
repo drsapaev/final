@@ -5,6 +5,7 @@ Split from qr_queue_service.py.
 
 from __future__ import annotations
 
+from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import (
     prefer_registry_surface,
     resolve_registry_tag_queue_for_specialist,
@@ -30,7 +31,13 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             Статус очереди
         """
         if target_date is None:
-            target_date = date.today()
+            # Codex round-25 P2: день — по SSOT клиники (таймзона настроек
+            # очередей): host date.today() на UTC-хосте между 19:00 и
+            # полуночью уже «вчера» для Asia/Tashkent — живая очередь
+            # (штампованная следующим ЛОКАЛЬНЫМ днём) не находилась, и
+            # /queue/status/{specialist_id} отвечал «не активна» при
+            # ждущих пациентах.
+            target_date = clinic_today(self.db)
 
         daily_queue = (
             self.db.query(DailyQueue)
@@ -126,7 +133,11 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         Returns:
             Информация о вызванном пациенте
         """
-        queue_date = target_date if target_date else date.today()
+        # Codex round-25 P2: дефолт опущенной даты — день КЛИНИКИ по SSOT
+        # (таймзона настроек очередей), как в GQL/quick-call путях: иначе
+        # тот же ранний-вечернийUTC-хост искал вчерашнюю очередь и
+        # «Очередь не активна» при живом ресурсном пациенте.
+        queue_date = target_date if target_date else clinic_today(self.db)
         queue_query = self.db.query(DailyQueue).filter(
             DailyQueue.day == queue_date,
             DailyQueue.specialist_id == specialist_id,
