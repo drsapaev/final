@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
-from app.crud.clinic import get_queue_settings, update_queue_settings
+from app.crud.clinic import clinic_today, get_queue_settings, update_queue_settings
 from app.crud.queue_resource_routing import (
     resolve_registry_tag_queue_for_specialist,
 )
@@ -43,7 +43,17 @@ class QueueLimitsApiService:
                 specialties[doctor.specialty] = {"doctors": [], "current_usage": 0}
             specialties[doctor.specialty]["doctors"].append(doctor)
 
-        today = date.today()
+        # Codex round-27 P2: день агрегации — clinic_today SSOT (таймзона
+        # настроек очередей): ресурсные очереди создаются на КЛИНИК-
+        # локальном дне, и host date.today() в окне 19:00-24:00Z резолвил
+        # вчерашнюю поверхность — current_usage=0 и неверный агрегатный
+        # кап при живой общей очереди. isinstance — unit-стабы с не-Session
+        # db держат легаси-путь (host-день, без поверхности).
+        today = (
+            clinic_today(self.db)
+            if isinstance(self.db, Session)
+            else date.today()
+        )
         for spec_data in specialties.values():
             total_usage = 0
             aggregate_cap = 0

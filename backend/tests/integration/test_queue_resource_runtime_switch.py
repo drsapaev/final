@@ -2380,7 +2380,8 @@ def _test_queue_limits_reads_body(db_session: Session) -> None:
     user = _make_user(db_session, username="bio_res24", role="Resource")
     synthetic = _make_doctor(db_session, user_id=user.id, specialty="bio")
     _make_resource(db_session, code="bio", queue_tag="bio", max_online_per_day=15)
-    today = date.today()
+    # Codex round-27: the aggregation day is the clinic_today SSOT
+    today = _dt_now_tashkent_day()
     queue = queue_service.get_or_create_daily_queue(
         db_session, day=today, specialist_id=None, queue_tag="bio"
     )
@@ -2536,7 +2537,8 @@ def _test_limits_dedupe_body(db_session: Session) -> None:
     _make_doctor(db_session, user_id=u2.id, specialty="bio")
     _make_resource(db_session, code="bio", queue_tag="bio", max_online_per_day=15)
 
-    today = date.today()
+    # Codex round-27: the aggregation day is the clinic_today SSOT
+    today = _dt_now_tashkent_day()
     queue = queue_service.get_or_create_daily_queue(
         db_session, day=today, specialist_id=None, queue_tag="bio"
     )
@@ -5162,3 +5164,85 @@ def test_rest_call_next_broadcast_uses_resolved_queue_day(
         assert entry.status == "called"
     finally:
         _durable_cleanup(db_session, "lab_res_jj2", "reg_jj2")
+
+
+# ===================== KK. Codex round-27 pins =====================
+
+
+def test_force_majeure_entry_ids_default_to_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-27 P2: entry-id force-majeure requests resolve the
+    omitted date through the clinic_today SSOT — the repository's
+    list_pending_entries_by_ids used host date.today(), so between
+    19:00 and 24:00 UTC an omitted-date transfer/cancellation searched
+    the previous day's resource surface and returned zero affected
+    entries while the no-entry_ids path found the clinic-day queue.
+    The timezone is chosen dynamically so the divergence is real."""
+    from app.repositories.force_majeure_api_repository import (
+        ForceMajeureApiRepository,
+    )
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()
+    monkeypatch.setattr(
+        "app.repositories.force_majeure_api_repository.clinic_today",
+        lambda db: clinic_day,
+    )
+
+    try:
+        user = _make_user(db_session, username="lab_res_kk1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=101)
+
+        repo = ForceMajeureApiRepository(db_session)
+        found = repo.list_pending_entries_by_ids(
+            entry_ids=[entry.id],
+            specialist_id=synthetic.id,
+            target_date=None,
+        )
+        assert [e.id for e in found] == [entry.id]
+    finally:
+        _durable_cleanup(db_session, "lab_res_kk1")
+
+
+def test_queue_limits_aggregate_clinic_day_resource_usage(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-27 P2: GET /api/v1/admin/queue-limits aggregates on
+    the clinic day — resource queues are created clinic-local, and host
+    date.today() in the 19:00-24:00Z window fell back to obsolete
+    doctor-keyed rows or no queue, reporting current_usage=0 and the
+    wrong aggregate cap despite patients occupying the live shared
+    queue. The timezone is chosen dynamically so the divergence is
+    real."""
+    from app.services.queue_limits_api_service import QueueLimitsApiService
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()
+    monkeypatch.setattr(
+        "app.services.queue_limits_api_service.clinic_today",
+        lambda db: clinic_day,
+    )
+
+    try:
+        user = _make_user(db_session, username="lab_res_kk2", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab", max_online_per_day=25)
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        _make_waiting_entry(db_session, queue, number=1)
+        _make_waiting_entry(db_session, queue, number=2)
+
+        service = QueueLimitsApiService(db_session)
+        limits = service.get_queue_limits(specialty="lab")
+        lab_row = next(r for r in limits if r["specialty"] == "lab")
+        assert lab_row["current_usage"] == 2
+        assert lab_row["aggregate_max_per_day"] == 25
+    finally:
+        _durable_cleanup(db_session, "lab_res_kk2")

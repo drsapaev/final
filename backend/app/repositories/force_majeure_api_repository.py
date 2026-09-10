@@ -6,6 +6,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import resolve_registry_tag_queue_for_specialist
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.refund_deposit import (
@@ -33,7 +34,11 @@ class ForceMajeureApiRepository:
         specialist select entries by the tag SURFACE (the resource-owned
         queue has specialist NULL and never matches the doctor filter);
         non-registry specialists keep the doctor-keyed filter."""
-        queue_day = target_date or date.today()
+        # Codex round-27 P2: опущенная дата — clinic_today SSOT (как в
+        # сервисном get_pending_entries после round-26): entry-ids путь
+        # иначе искал ВЧЕРАШНЮЮ поверхность клиники в окне 19:00-24:00Z
+        # и возвращал ноль затронутых записей при живой очереди.
+        queue_day = target_date or clinic_today(self.db)
         surface = resolve_registry_tag_queue_for_specialist(
             self.db, queue_day, specialist_id, None
         )
