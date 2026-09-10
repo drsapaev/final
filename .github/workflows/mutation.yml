@@ -78,6 +78,20 @@ jobs:
           PY
           alembic upgrade head
 
+      - name: Copy repo artifacts into the mutmut sandbox
+        working-directory: backend
+        run: |
+          # The stats-collection suite reads repo artifacts by parents[]
+          # traversal (openapi.json, alembic/versions/*.py, scripts/*.py).
+          # mutmut copies only source_paths (app/) into backend/mutants/ -
+          # without these, artifact-reading tests abort with FileNotFoundError
+          # and fail the whole nightly (observed 2026-09-05..09: onboarding
+          # openapi anchor, doctor_user_unique_invariant alembic reader).
+          mkdir -p mutants
+          cp -r alembic mutants/alembic
+          cp openapi.json mutants/openapi.json
+          cp -r scripts mutants/scripts
+
       - name: Run mutmut on critical modules
         working-directory: backend
         run: |
