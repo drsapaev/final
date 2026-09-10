@@ -13,6 +13,10 @@ from app.models.user import User
 from app.schemas import appointment as appointment_schemas
 from app.schemas import lab as lab_schemas
 from app.schemas import patient as patient_schemas
+from app.services.patient_access_audit import (
+    log_patient_access,
+    log_patient_access_many,
+)
 from app.services.patient_portal_service import (
     PatientPortalDomainError,
     PatientPortalService,
@@ -82,6 +86,7 @@ def get_my_results(
 
 @router.get("/", response_model=list[patient_schemas.Patient])
 def list_patients(
+    request: Request,
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -97,6 +102,14 @@ def list_patients(
     """
     patients = patient_crud.get_patients(
         db, skip=skip, limit=limit, search_query=q, phone=phone
+    )
+    log_patient_access_many(
+        db,
+        actor_user=current_user,
+        subject_patient_ids=[patient.id for patient in patients],
+        resource_type="patient",
+        action="view",
+        request=request,
     )
     return patients
 
@@ -131,6 +144,7 @@ def get_deleted_patients(
 @router.get("/{patient_id}", response_model=patient_schemas.Patient)
 def get_patient(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     patient_id: int,
     current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Lab", "Cashier", "Patient")),
@@ -142,6 +156,15 @@ def get_patient(
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail=t("patient.not_found"))
+    log_patient_access(
+        db,
+        actor_user=current_user,
+        subject_patient_id=patient.id,
+        resource_type="patient",
+        resource_id=str(patient.id),
+        action="view",
+        request=request,
+    )
     return patient
 
 
@@ -180,6 +203,7 @@ def delete_patient(
 @router.get("/{patient_id}/appointments", response_model=dict[str, Any])
 def get_patient_appointments(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     patient_id: int,
     current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Patient")),
@@ -193,6 +217,16 @@ def get_patient_appointments(
         raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     appointments = patient_crud.get_patient_appointments(db, patient_id=patient_id)
+    log_patient_access(
+        db,
+        actor_user=current_user,
+        subject_patient_id=patient.id,
+        resource_type="appointment_history",
+        resource_id=str(patient.id),
+        action="view",
+        request=request,
+        extra_data={"appointment_count": len(appointments)},
+    )
     return appointments
 
 
