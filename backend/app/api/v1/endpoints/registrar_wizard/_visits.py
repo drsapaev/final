@@ -1132,6 +1132,7 @@ def get_registrar_payment_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier")),
 ):
+    """Return current receipt-backed balances and the snapshot for payment submission."""
     from app.services.payment_invariant_service import PaymentInvariantService
 
     _ensure_registrar_command_role(current_user, "mark_paid")
@@ -1233,6 +1234,7 @@ def mark_visit_as_paid(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier")),
 ):
+    """Receive the supplied amount; omitted amount pays the remaining visit debt."""
     response = _receive_registrar_payment(
         db,
         current_user,
@@ -1251,6 +1253,7 @@ def mark_queue_entry_as_paid(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier")),
 ):
+    """Receive payment for the explicitly linked visit; partial payments retain debt."""
     entry = db.get(OnlineQueueEntry, entry_id)
     if not entry:
         raise HTTPException(404, "Queue entry not found")

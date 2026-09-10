@@ -235,7 +235,7 @@ const PaymentDialog = ({
               <Input
                 id="payment-amount"
                 type="number"
-                aria-label={t('misc.pd_summa_k_oplate')}
+                aria-label={t('admin2.bill_pay_amount_label')}
                 aria-invalid={!!errors.amount}
                 aria-describedby={errors.amount ? 'payment-amount-error' : undefined}
                 value={paymentAmount}
