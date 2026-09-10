@@ -18,7 +18,7 @@ from tests.characterization.test_registrar_edit_delta_characterization import (
 def versioned_entry(db_session, test_patient, test_doctor):
     service = _create_service(
         db_session,
-        code="SYNTHETIC-VERSION",
+        code="SYNTH-V",
         name="SYNTHETIC-Versioned service",
         queue_tag="laboratory_general",
     )

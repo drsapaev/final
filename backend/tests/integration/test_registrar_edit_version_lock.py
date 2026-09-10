@@ -7,16 +7,97 @@ from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.db.base_class import Base
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
+from app.models.service import Service
 from app.services.registrar_edit_delta_service import RegistrarEditDeltaService
 
 pytestmark = pytest.mark.gate_d
+
+
+def test_quote_locks_catalog_then_all_versions_before_routing(
+    version_engine, entry_version
+):
+    from fastapi import HTTPException
+
+    from app.api.v1.endpoints.registrar_wizard._cart import (
+        apply_registrar_cart_edit_delta,
+    )
+    from app.api.v1.endpoints.registrar_wizard._helpers import EditDeltaRequest
+
+    entry_id, original = entry_version
+    with Session(version_engine) as seed:
+        patient = Patient(last_name="SYNTHETIC-Version", first_name="SYNTHETIC-Test")
+        service = Service(
+            name="SYNTHETIC-Version",
+            code="SYNTHETIC-V",
+            service_code="SYNTH-V",
+            queue_tag="SYNTH-V",
+            department_key="SYNTHETIC-version",
+            price=100,
+            active=True,
+            requires_doctor=False,
+            is_consultation=False,
+        )
+        seed.add_all([patient, service])
+        seed.flush()
+        entry = seed.get(OnlineQueueEntry, entry_id)
+        entry.patient_id = patient.id
+        entry.services = [{"service_id": service.id, "quantity": 1, "price": 100}]
+        seed.commit()
+        patient_id, service_id = patient.id, service.id
+
+    statements = []
+
+    def collect_sql(conn, cursor, statement, parameters, context, executemany):
+        if "FOR UPDATE" in statement:
+            statements.append(statement)
+
+    event.listen(version_engine, "before_cursor_execute", collect_sql)
+    try:
+        with (
+            Session(version_engine) as editing,
+            pytest.raises(HTTPException) as rejected,
+        ):
+            apply_registrar_cart_edit_delta(
+                EditDeltaRequest(
+                    patient_id=patient_id,
+                    services=[
+                        {
+                            "service_id": service_id,
+                            "quantity": 2,
+                            "queue_entry_id": entry_id,
+                        }
+                    ],
+                    existing_queue_entry_ids=[entry_id],
+                    expected_entry_updated_at={entry_id: original.isoformat()},
+                    quote_token="SYNTHETIC-stale-price-token",
+                ),
+                db=editing,
+                current_user=None,
+            )
+        assert rejected.value.status_code == 409
+    finally:
+        event.remove(version_engine, "before_cursor_execute", collect_sql)
+
+    catalog = next(i for i, sql in enumerate(statements) if "FROM services" in sql)
+    versions = next(
+        i
+        for i, sql in enumerate(statements)
+        if "FROM queue_entries" in sql and "JOIN" not in sql
+    )
+    routing = next(
+        i
+        for i, sql in enumerate(statements)
+        if "FROM queue_entries JOIN daily_queues" in sql
+    )
+    assert catalog < versions < routing
 
 
 @pytest.fixture
@@ -45,7 +126,7 @@ def version_engine():
 @pytest.fixture
 def entry_version(version_engine):
     with Session(version_engine) as session:
-        queue = DailyQueue(day=date.today(), queue_tag="SYNTHETIC-version")
+        queue = DailyQueue(day=date.today(), queue_tag="SYNTH-V")
         session.add(queue)
         session.flush()
         entry = OnlineQueueEntry(
