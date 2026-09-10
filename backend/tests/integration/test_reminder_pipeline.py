@@ -1910,6 +1910,18 @@ def test_transient_database_failure_defers(pipeline_db, make_visit, monkeypatch)
 # ---------------------------------------------------------------------------
 
 
+
+def _clinic_wall_clock(when) -> tuple:
+    """(visit_date, visit_time) for an aware UTC datetime — the sweep
+    interprets visit_date/visit_time as CLINIC wall-clock (settings.TIMEZONE),
+    so the fixture must express the target UTC moment in that timezone
+    (Codex round 15, P1)."""
+    from zoneinfo import ZoneInfo
+
+    local = when.astimezone(ZoneInfo(settings.TIMEZONE))
+    return local.date(), local.strftime("%H:%M")
+
+
 def test_sweep_is_registered_as_production_producer():
     """Round 14, P1: ``enqueue_reminder`` had NO production caller — no
     visit ever reached Redis unless an operator ran the staging snippet
@@ -1947,10 +1959,8 @@ def test_sweep_enqueues_only_window_visits(pipeline_db, make_visit, monkeypatch)
 
     now = datetime.now(UTC)
     appointment = now + timedelta(hours=24, minutes=2)
-    window_date, window_time = (
-        appointment.date(),
-        appointment.strftime("%H:%M"),
-    )
+    window_date, window_time = _clinic_wall_clock(appointment)
+    overdue_date, overdue_time = _clinic_wall_clock(now + timedelta(minutes=30))
 
     eligible_id = make_visit()
     reminded_id = make_visit()
@@ -1958,6 +1968,7 @@ def test_sweep_enqueues_only_window_visits(pipeline_db, make_visit, monkeypatch)
     past_id = make_visit()
     future_id = make_visit()
     leased_id = make_visit()
+    overdue_id = make_visit()
 
     s = sessionmaker(bind=pipeline_db)()
     try:
@@ -2003,6 +2014,16 @@ def test_sweep_enqueues_only_window_visits(pipeline_db, make_visit, monkeypatch)
                 "reminder_claimed_at": now.replace(tzinfo=None),
             }
         )
+        # Round 15, P2: an overdue reminder (moment already passed, the
+        # appointment has NOT started) stays eligible — a missed sweep is
+        # retried by the next run instead of being lost forever.
+        s.query(Visit).filter(Visit.id == overdue_id).update(
+            {
+                "visit_date": overdue_date,
+                "visit_time": overdue_time,
+                "confirmation_token": f"swp_{uuid.uuid4().hex[:8]}",
+            }
+        )
         s.commit()
 
         enqueued: list[dict] = []
@@ -2021,14 +2042,16 @@ def test_sweep_enqueues_only_window_visits(pipeline_db, make_visit, monkeypatch)
 
         asyncio.run(run_visit_reminder_sweep({}))
 
-        assert [c["visit_id"] for c in enqueued] == [eligible_id], (
-            "exactly the window visit is enqueued: "
-            f"{[c['visit_id'] for c in enqueued]} vs {[eligible_id]}"
+        got_ids = {c["visit_id"] for c in enqueued}
+        assert got_ids == {eligible_id, overdue_id}, (
+            "the window visit AND the overdue visit are enqueued, "
+            f"nothing else: {sorted(got_ids)}"
         )
         expected_version = (
             f"{window_date.isoformat()}T{window_time}#0"
         )
-        assert enqueued[0]["schedule_version"] == expected_version
+        by_id = {c["visit_id"]: c for c in enqueued}
+        assert by_id[eligible_id]["schedule_version"] == expected_version
     finally:
         s.close()
 
@@ -2049,13 +2072,14 @@ def test_sweep_enqueue_failure_is_fail_closed(
     from app.tasks.worker import run_visit_reminder_sweep
 
     appointment = datetime.now(UTC) + timedelta(hours=24, minutes=2)
+    window_date, window_time = _clinic_wall_clock(appointment)
     visit_id = make_visit()
     s = sessionmaker(bind=pipeline_db)()
     try:
         s.query(Visit).filter(Visit.id == visit_id).update(
             {
-                "visit_date": appointment.date(),
-                "visit_time": appointment.strftime("%H:%M"),
+                "visit_date": window_date,
+                "visit_time": window_time,
                 "confirmation_token": f"swp_{_uuid.uuid4().hex[:8]}",
             }
         )
@@ -2099,13 +2123,14 @@ async def test_sweep_enqueues_real_job_on_clinic_queue(
 
     monkeypatch.setattr(settings, "ARQ_REDIS_URL", REDIS_URL)
     appointment = datetime.now(UTC) + timedelta(hours=24, minutes=2)
+    window_date, window_time = _clinic_wall_clock(appointment)
     visit_id = make_visit()
     s = sessionmaker(bind=pipeline_db)()
     try:
         s.query(Visit).filter(Visit.id == visit_id).update(
             {
-                "visit_date": appointment.date(),
-                "visit_time": appointment.strftime("%H:%M"),
+                "visit_date": window_date,
+                "visit_time": window_time,
                 "confirmation_token": f"swp_{_uuid.uuid4().hex[:8]}",
             }
         )
@@ -2306,5 +2331,288 @@ def test_confirm_visit_is_lease_coordinated(pipeline_db, make_visit, monkeypatch
 
         row = s.query(Visit).filter(Visit.id == visit_id).first()
         assert row.status == "pending_confirmation"
+    finally:
+        s.close()
+
+
+# ---------------------------------------------------------------------------
+# Codex round 15 — clinic timezone, overdue eligibility, no starvation,
+# atomic lifecycle guards
+# ---------------------------------------------------------------------------
+
+
+def test_visit_reminder_moment_resolves_clinic_timezone():
+    """Round 15, P1: visit_date/visit_time are CLINIC wall-clock values
+    (settings.TIMEZONE, default Asia/Tashkent = UTC+5) — a 10:00 clinic
+    appointment must be modeled as 05:00 UTC, so its reminder moment is
+    05:00 UTC − 24h, NOT 10:00 UTC − 24h (five hours late)."""
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from zoneinfo import ZoneInfo
+
+    from app.tasks.worker import _visit_reminder_moment
+
+    visit = SimpleNamespace(visit_date=date(2026, 3, 10), visit_time="10:00")
+    moment = _visit_reminder_moment(visit)
+    tz = ZoneInfo(settings.TIMEZONE)
+    expected = (
+        datetime(2026, 3, 10, 10, 0, tzinfo=tz).astimezone(timezone.utc)
+        - timedelta(hours=24)
+    )
+    assert moment == expected
+    if str(settings.TIMEZONE) == "Asia/Tashkent":
+        # +05:00 fixed offset — the moment is exactly five hours EARLIER
+        # than the naive-UTC reading would have given.
+        assert moment == datetime(2026, 3, 9, 5, 0, tzinfo=timezone.utc)
+
+
+def test_sweep_does_not_starve_due_visits_behind_coarse_page(
+    pipeline_db, make_visit, monkeypatch
+):
+    """Round 15, P2: a candidate LIMIT before the exact due check would
+    let 200 not-yet-due coarse candidates permanently starve a due visit
+    with a higher ID. There is no limit now — the due visit must be
+    enqueued no matter how many coarse-but-not-due rows precede it."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.clinic import Doctor
+    from app.models.patient import Patient
+    from app.models.user import User
+    from app.models.visit import Visit
+    from app.tasks import scheduler as scheduler_mod
+    from app.tasks.worker import run_visit_reminder_sweep
+
+    now = datetime.now(UTC)
+    # 200 coarse candidates: pending, unreminded, inside the coarse date
+    # window, but their reminder moment is NOT due yet (+30h appointment).
+    not_due_date, not_due_time = _clinic_wall_clock(now + timedelta(hours=30))
+    due_id = make_visit()
+    due_date, due_time = _clinic_wall_clock(now + timedelta(hours=24, minutes=2))
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        user = User(
+            username=f"rempipe_bulk_{uuid.uuid4().hex[:8]}",
+            email=f"rempipe_bulk_{uuid.uuid4().hex[:8]}@test.invalid",
+            full_name="Reminder Bulk Doctor",
+            hashed_password="test-not-a-login-hash",
+            role="Doctor",
+            is_active=True,
+            is_superuser=False,
+        )
+        s.add(user)
+        s.flush()
+        doctor = Doctor(user_id=user.id, specialty="Кардиология", active=True)
+        s.add(doctor)
+        s.flush()
+        patient = Patient(
+            first_name="Синтетик",
+            last_name=f"SYNTHETIC-Bulk_{uuid.uuid4().hex[:6]}",
+            middle_name="SYNTHETIC",
+            phone="+998000000000",
+            birth_date=date(1990, 1, 1),
+            address="SYNTHETIC-REMINDER-BULK",
+        )
+        s.add(patient)
+        s.flush()
+        username = user.username
+        s.bulk_save_objects(
+            [
+                Visit(
+                    patient_id=patient.id,
+                    doctor_id=doctor.id,
+                    visit_date=not_due_date,
+                    visit_time=not_due_time,
+                    status="pending_confirmation",
+                    discount_mode="none",
+                    department="cardiology",
+                )
+                for _ in range(200)
+            ]
+        )
+        s.query(Visit).filter(Visit.id == due_id).update(
+            {
+                "visit_date": due_date,
+                "visit_time": due_time,
+                "confirmation_token": f"swp_{uuid.uuid4().hex[:8]}",
+            }
+        )
+        s.commit()
+
+        enqueued: list[dict] = []
+
+        async def _capture_enqueue(visit_id, channel="telegram", *, schedule_version):
+            enqueued.append({"visit_id": visit_id})
+            return f"job-{visit_id}"
+
+        monkeypatch.setattr(scheduler_mod, "enqueue_reminder", _capture_enqueue)
+
+        asyncio.run(run_visit_reminder_sweep({}))
+
+        assert {c["visit_id"] for c in enqueued} == {due_id}, (
+            "the due visit must be enqueued despite 200 not-yet-due "
+            f"coarse candidates preceding it: got {enqueued[:5]}..."
+        )
+    finally:
+        # FK-safe teardown of the bulk rows — the shared sqlite test DB is
+        # row-count-asserted by unrelated tests.
+        s2 = sessionmaker(bind=pipeline_db)()
+        try:
+            bulk_user = (
+                s2.query(User).filter(User.username == username).first()
+            )
+            if bulk_user is not None:
+                bulk_doctor = (
+                    s2.query(Doctor).filter(Doctor.user_id == bulk_user.id).first()
+                )
+                if bulk_doctor is not None:
+                    s2.query(Visit).filter(
+                        Visit.doctor_id == bulk_doctor.id
+                    ).delete()
+                    s2.query(Doctor).filter(Doctor.id == bulk_doctor.id).delete()
+                s2.query(Patient).filter(
+                    Patient.address == "SYNTHETIC-REMINDER-BULK"
+                ).delete()
+                s2.query(User).filter(User.id == bulk_user.id).delete()
+            s2.commit()
+        finally:
+            s2.close()
+        s.close()
+
+
+def test_set_status_loses_claim_race(
+    pipeline_db, make_visit, monkeypatch
+):
+    """Round 15, P1: the wait alone is not atomic — a reminder worker can
+    claim the visit AFTER the wait returns but BEFORE the route commits
+    the status change. The status mutation itself is bound to the
+    no-live-lease predicate: such a claim makes the route answer 409
+    instead of committing the cancel under a live dispatch."""
+    from datetime import UTC, datetime
+
+    from app.api.v1.endpoints.visits import set_status
+    from app.models.visit import Visit
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    def _claim_lands_during_wait(db, vid, **kwargs):
+        # The in-flight dispatch resolves and a NEW worker claims the visit
+        # before the wait loop returns clear — the conditional UPDATE must
+        # lose the race, not commit the cancel under a live claim.
+        _stamp_lease(pipeline_db, vid, datetime.now(UTC))
+        return True
+
+    monkeypatch.setattr(
+        lease_mod, "wait_for_reminder_lease_clear", _claim_lands_during_wait
+    )
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            set_status(
+                visit_id=visit_id,
+                status_new="canceled",
+                db=s,
+                current_user=_admin(),
+            )
+        assert exc_info.value.status_code == 409
+        assert "Reminder delivery is in progress" in exc_info.value.detail
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.status == "pending_confirmation", (
+            "the cancel must NOT commit under the claim that landed"
+        )
+    finally:
+        s.close()
+
+
+def test_transition_status_waits_before_row_lock(
+    pipeline_db, make_visit, monkeypatch
+):
+    """Round 15, P2: the lease wait must happen BEFORE the FOR UPDATE row
+    lock — waiting under the lock deadlocks the worker's finalize UPDATE
+    (it needs the lock we hold to clear the very field we poll). The wait
+    is called and resolves BEFORE the locked load; the transition then
+    commits."""
+    from datetime import UTC, datetime
+
+    from app.models.visit import Visit
+    from app.services.visit_lifecycle_service import VisitLifecycleService
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    order: list[str] = []
+
+    def _wait_then_resolve(seconds):
+        order.append("wait")
+        _stamp_lease(pipeline_db, visit_id, None)
+
+    monkeypatch.setattr(lease_mod.time, "sleep", _wait_then_resolve)
+
+    orig_load = VisitLifecycleService._load_visit_for_update
+
+    def _spy_load(self, vid):
+        order.append("lock")
+        return orig_load(self, vid)
+
+    monkeypatch.setattr(
+        VisitLifecycleService, "_load_visit_for_update", _spy_load
+    )
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        svc = VisitLifecycleService(s)
+        svc.confirm_visit(visit_id=visit_id, current_user=_admin())
+        assert order == [
+            "wait",
+            "lock",
+        ], f"wait must precede the row lock: {order}"
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.status == "confirmed"
+    finally:
+        s.close()
+
+
+def test_transition_status_revalidates_lease_after_lock(
+    pipeline_db, make_visit, monkeypatch
+):
+    """Round 15, P2: a claim that lands between the pre-lock wait and the
+    FOR UPDATE load is visible under the lock and refuses ATOMICALLY (409)
+    — the transition must never WAIT under the lock (deadlock) and must
+    never mutate under a live dispatch."""
+    from datetime import UTC, datetime
+
+    from app.models.visit import Visit
+    from app.services.visit_lifecycle_service import VisitLifecycleService
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    # The claim is ALREADY live when the call starts and the pre-lock wait
+    # is stubbed to (wrongly) report clear — the post-lock revalidation is
+    # then the ONLY guard, and it must refuse atomically WITHOUT waiting
+    # (waiting under the FOR UPDATE lock would deadlock the worker's
+    # finalize).
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    def _stub_clear(db, vid, **kwargs):
+        return True
+
+    monkeypatch.setattr(lease_mod, "wait_for_reminder_lease_clear", _stub_clear)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        svc = VisitLifecycleService(s)
+        with pytest.raises(HTTPException) as exc_info:
+            svc.confirm_visit(visit_id=visit_id, current_user=_admin())
+        assert exc_info.value.status_code == 409
+        assert "Reminder delivery is in progress" in exc_info.value.detail
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.status == "pending_confirmation", "status unchanged"
     finally:
         s.close()

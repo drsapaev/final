@@ -19,8 +19,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from arq import cron
 from arq.connections import RedisSettings
@@ -431,17 +432,21 @@ REMINDER_HOURS_BEFORE = 24
 REMINDER_SWEEP_LOOKAHEAD_SECONDS = 300.0
 
 
-def _visit_reminder_moment(visit) -> "datetime | None":
-    """The intended reminder time for a visit: appointment start − 24h.
+def _clinic_timezone() -> ZoneInfo:
+    """The clinic wall-clock timezone (Codex round 15, P1).
 
-    ``visit_date`` + ``visit_time`` are stored as UTC (the whole app writes
-    UTC timestamps); a visit with no explicit time is treated as 12:00 UTC
-    so the reminder lands at midday of the previous day rather than at a
-    midnight edge. Returns None when no moment can be derived (no date, or
-    a malformed time string) — such visits are skipped by the sweep.
+    ``visit_date``/``visit_time`` are TIMEZONE-LESS clinic wall-clock values
+    (the configured default is ``Asia/Tashkent``, settings.TIMEZONE) — the
+    sweep must convert the local appointment time to UTC before comparing
+    it with ``now``, otherwise a 10:00 appointment in UTC+5 is modeled as
+    10:00 UTC and its reminder fires five hours late.
     """
-    from datetime import datetime, time as _time, timedelta
+    return ZoneInfo(settings.TIMEZONE)
 
+
+def _appointment_start_utc(visit) -> "datetime | None":
+    """The visit's appointment start as an aware UTC datetime, or None when
+    no moment can be derived (no date, or a malformed time string)."""
     if visit.visit_date is None:
         return None
     raw = (visit.visit_time or "12:00").strip()
@@ -451,8 +456,22 @@ def _visit_reminder_moment(visit) -> "datetime | None":
             return None
     except (ValueError, TypeError):
         return None
-    visit_dt = datetime.combine(visit.visit_date, _time(hh, mm), tzinfo=UTC)
-    return visit_dt - timedelta(hours=REMINDER_HOURS_BEFORE)
+    local_start = datetime.combine(
+        visit.visit_date, time(hh, mm), tzinfo=_clinic_timezone()
+    )
+    return local_start.astimezone(UTC)
+
+
+def _visit_reminder_moment(visit) -> "datetime | None":
+    """The intended reminder time for a visit: appointment start − 24h,
+    in UTC (Codex round 15, P1 — the wall-clock appointment is resolved in
+    the CLINIC timezone first, then converted to UTC). A visit with no
+    explicit time is treated as 12:00 clinic time so the reminder lands at
+    midday of the previous day rather than at a midnight edge."""
+    start = _appointment_start_utc(visit)
+    if start is None:
+        return None
+    return start - timedelta(hours=REMINDER_HOURS_BEFORE)
 
 
 async def run_visit_reminder_sweep(ctx) -> None:
@@ -463,9 +482,10 @@ async def run_visit_reminder_sweep(ctx) -> None:
     manually, so patients never received automatic confirmation reminders
     despite the worker pipeline itself being functional. This cron sweep
     wires the producer into the scheduler: every 5 minutes it selects the
-    reminder-eligible visits whose reminder moment (appointment − 24h) has
-    arrived and enqueues their jobs onto the SAME 'clinic' queue the worker
-    consumes.
+    reminder-eligible visits whose reminder moment (appointment − 24h,
+    resolved in the CLINIC timezone) has arrived — OR is overdue (a missed
+    sweep retries the visit until the appointment starts) — and enqueues
+    their jobs onto the SAME 'clinic' queue the worker consumes.
 
     Idempotency layers (a sweep may run repeatedly over the same visit):
     - ``enqueue_reminder`` uses a deterministic job ID bound to the visit's
@@ -495,21 +515,25 @@ async def run_visit_reminder_sweep(ctx) -> None:
         now = datetime.now(UTC)
         window_end = now + timedelta(seconds=REMINDER_SWEEP_LOOKAHEAD_SECONDS)
         # Coarse SQL window on the indexed date column; the precise
-        # moment/lease checks happen in Python below. The window spans
-        # [now, window_end] for the reminder moment, i.e. appointments
-        # between now+24h and now+24h+5min — plus one calendar day of
-        # slack on both sides for the date-column comparison.
+        # moment/lease checks happen in Python below. The window covers
+        # every NOT-YET-STARTED appointment whose reminder moment has
+        # arrived (or is about to arrive within the lookahead) — Codex
+        # round 15, P2: OVERDUE reminders stay eligible until the
+        # appointment starts, so a missed sweep (Redis outage, worker down
+        # for one interval) is retried by the next run instead of being
+        # lost forever, and Codex round 15, P2: NO candidate LIMIT before
+        # the exact due check — a limit would permanently starve due
+        # visits behind a full page of not-yet-due rows.
         candidates = (
             db.query(Visit)
             .filter(
                 Visit.status == "pending_confirmation",
                 Visit.reminder_sent_at.is_(None),
                 Visit.visit_date.isnot(None),
-                Visit.visit_date >= (now - timedelta(days=1)).date(),
+                Visit.visit_date >= (now - timedelta(days=2)).date(),
                 Visit.visit_date <= (window_end + timedelta(hours=REMINDER_HOURS_BEFORE) + timedelta(days=1)).date(),
             )
             .order_by(Visit.id)
-            .limit(200)
             .all()
         )
         from app.tasks.scheduler import build_reminder_schedule_version, enqueue_reminder
@@ -518,16 +542,20 @@ async def run_visit_reminder_sweep(ctx) -> None:
         enqueued = skipped = failed = 0
         for visit in candidates:
             moment = _visit_reminder_moment(visit)
-            if moment is None or not (now <= moment <= window_end):
+            if moment is None:
                 skipped += 1
                 continue
-            if visit.visit_date is not None and datetime.combine(
-                visit.visit_date, datetime.min.time(), tzinfo=UTC
-            ) + timedelta(
-                hours=int((visit.visit_time or "12:00")[:2]),
-                minutes=int((visit.visit_time or "12:00")[3:5]),
-            ) <= now:
+            start = _appointment_start_utc(visit)
+            if start is None or start <= now:
                 # Appointment already started/past — no reminder.
+                skipped += 1
+                continue
+            if moment > window_end:
+                # Not due yet (this includes every future appointment; the
+                # coarse SQL window only narrows the scan). Overdue moments
+                # (moment < now) deliberately FALL THROUGH: the reminder
+                # stays eligible until the appointment starts, so a missed
+                # sweep is retried by the next run (round 15, P2).
                 skipped += 1
                 continue
             claimed_at = visit.reminder_claimed_at

@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import MetaData, Table, or_, select, text
+from sqlalchemy import MetaData, Table, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -352,9 +352,10 @@ def set_status(
     # retract the message). Same contract as the reschedule paths: wait
     # for the live lease to resolve, refuse with 409 when it survives the
     # whole wait budget. A stale lease (dead worker) never blocks.
-    if visit.status == "pending_confirmation" and hasattr(
+    lifecycle_guard = visit.status == "pending_confirmation" and hasattr(
         Visit, "reminder_claimed_at"
-    ):
+    )
+    if lifecycle_guard:
         from app.tasks.lease import wait_for_reminder_lease_clear
 
         if not wait_for_reminder_lease_clear(db, visit_id):
@@ -391,11 +392,46 @@ def set_status(
             },
         )
 
-    visit.status = status_new
+    # PR-1 (Codex round 15, P1): the status mutation is bound ATOMICALLY to
+    # the no-live-lease predicate — the round-14 wait alone leaves a window
+    # where a reminder worker claims the visit after the wait returns but
+    # before this request commits its status change. The conditional UPDATE
+    # (same shape as the reschedule mutations) makes such a claim lose the
+    # race: the route answers 409 and the worker's dispatch stays grounded
+    # in the state that existed when it claimed. Bound to the READ status
+    # too, so a concurrent transition cannot be double-applied.
+    status_values: dict = {"status": status_new}
     if status_new == "in_progress" and hasattr(visit, "started_at"):
-        visit.started_at = datetime.now(UTC)
+        status_values["started_at"] = datetime.now(UTC)
     if status_new in {"closed", "canceled"} and hasattr(visit, "finished_at"):
-        visit.finished_at = datetime.now(UTC)
+        status_values["finished_at"] = datetime.now(UTC)
+    status_conditions = [Visit.id == visit_id, Visit.status == visit.status]
+    if lifecycle_guard:
+        from app.tasks.lease import LEASE_TTL
+
+        status_conditions.append(
+            or_(
+                Visit.reminder_claimed_at.is_(None),
+                Visit.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
+            )
+        )
+    claimed = db.execute(
+        update(Visit)
+        .where(*status_conditions)
+        .values(**status_values)
+        # The SQLite stored values are naive while the predicate is
+        # aware — session synchronization would evaluate the criterion
+        # in Python and die on the comparison; the instance is expired
+        # below instead.
+        .execution_options(synchronize_session=False)
+    )
+    if claimed.rowcount == 0:
+        # A reminder claim landed after the wait loop's last poll — the
+        # dispatch is in flight for the still-pending visit.
+        raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
+    # Keep the ORM instance in sync with the row for the VisitOut below
+    # (the conditional UPDATE bypasses the identity map).
+    db.expire(visit)
 
     # [FIX] Также обновляем статус в очереди, если есть связанная запись
     if status_new == "canceled":
