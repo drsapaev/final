@@ -1122,21 +1122,32 @@ async def refund_payment(
                 detail=f"Невозможно выполнить возврат для платежа со статусом '{payment.status}'"
             )
 
+        from app.services.payment_invariant_service import PaymentInvariantService
+
+        invariant_service = PaymentInvariantService(db)
+        if payment.visit_id:
+            invariant_service.lock_visit_for_payment_change(payment.visit_id)
+
         # Atomic refund: use SQL UPDATE with WHERE guard to prevent race condition.
         # Two concurrent requests could both read refunded_amount=0 and both pass
         # the available_for_refund check. This atomic UPDATE ensures only one wins.
+        from sqlalchemy import DateTime, Numeric, bindparam
         from sqlalchemy import text as sql_text
 
         refund_amount_decimal = Decimal(str(refund_data.amount))
         atomic_update = sql_text("""
-            UPDATE payments
-            SET refunded_amount = COALESCE(refunded_amount, 0) + :refund_amount,
-                refund_reason = :reason,
-                refunded_at = :now,
-                refunded_by = :user_id
-            WHERE id = :payment_id
-              AND COALESCE(refunded_amount, 0) + :refund_amount <= amount
-        """)
+                UPDATE payments
+                SET refunded_amount = COALESCE(refunded_amount, 0) + :refund_amount,
+                    refund_reason = :reason,
+                    refunded_at = :now,
+                    refunded_by = :user_id
+                WHERE id = :payment_id
+                  AND status IN ('paid', 'completed')
+                  AND COALESCE(refunded_amount, 0) + :refund_amount <= amount
+            """).bindparams(
+                bindparam("refund_amount", type_=Numeric(12, 2)),
+                bindparam("now", type_=DateTime(timezone=True)),
+            )
         result = db.execute(atomic_update, {
             "refund_amount": refund_amount_decimal,
             "reason": refund_data.reason,
@@ -1146,8 +1157,14 @@ async def refund_payment(
         })
 
         if result.rowcount == 0:
-            # Either payment doesn't exist or refund would exceed amount (race lost)
+            # The payment status or refundable balance changed while waiting.
             db.rollback()
+            db.refresh(payment)
+            if payment.status not in ["paid", "completed"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Невозможно выполнить возврат для платежа со статусом '{payment.status}'",
+                )
             already_refunded = payment.refunded_amount or Decimal("0")
             available = payment.amount - already_refunded
             raise HTTPException(
@@ -1155,7 +1172,7 @@ async def refund_payment(
                 detail=f"Сумма возврата ({refund_data.amount}) превышает доступную ({available}). Возможно, возврат уже был выполнен."
             )
 
-        db.commit()
+        db.flush()
         db.refresh(payment)
 
         new_refunded_amount = payment.refunded_amount or Decimal("0")
@@ -1228,9 +1245,16 @@ async def refund_payment(
 
                 VisitLifecycleService(db).restore_operational_status_after_payment_change(
                     visit_id=payment.visit_id,
+                    commit=False,
                 )
-            db.commit()
-            db.refresh(payment)
+
+        if payment.visit_id:
+            invariant_service.synchronize_linked_invoices(
+                visit_id=payment.visit_id,
+            )
+
+        db.commit()
+        db.refresh(payment)
 
         refund_change_type = "full_refund" if payment.status == "refunded" else "partial_refund"
         refund_visit = db.query(Visit).filter(Visit.id == payment.visit_id).first() if payment.visit_id else None
