@@ -45,6 +45,15 @@ LEASE_TTL = timedelta(minutes=10)
 DISPATCH_WAIT_BUDGET_SECONDS = 20.0
 DISPATCH_WAIT_POLL_SECONDS = 0.5
 
+# Single source of truth for the HTTP refusal detail shared by every
+# lease-coordinated path (reschedule routes, the service-level reschedule,
+# and the round-14 lifecycle transitions). Previously the same literal was
+# duplicated in the endpoint and service layers; a third consumer (the
+# lifecycle service) made the duplication a drift risk.
+REMINDER_IN_PROGRESS_DETAIL = (
+    "Reminder delivery is in progress for this visit; retry in a few seconds"
+)
+
 
 def wait_for_reminder_lease_clear(
     db: Session,

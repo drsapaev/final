@@ -1903,3 +1903,408 @@ def test_transient_database_failure_defers(pipeline_db, make_visit, monkeypatch)
             )
         )
     os.remove(path)
+
+
+# ---------------------------------------------------------------------------
+# Codex round 14, P1: production sweep producer (no more orphaned producer)
+# ---------------------------------------------------------------------------
+
+
+def test_sweep_is_registered_as_production_producer():
+    """Round 14, P1: ``enqueue_reminder`` had NO production caller — no
+    visit ever reached Redis unless an operator ran the staging snippet
+    manually. The producer is now wired through a 5-minute cron sweep in
+    WorkerSettings.cron_jobs. This pin fails if the wiring is removed
+    again."""
+    from arq.cron import CronJob
+
+    from app.tasks.worker import REMINDER_HOURS_BEFORE, WorkerSettings
+    from app.tasks.worker import run_visit_reminder_sweep as sweep
+
+    cron_entries = [cj for cj in WorkerSettings.cron_jobs if isinstance(cj, CronJob)]
+    assert any(
+        cj.coroutine is sweep for cj in cron_entries
+    ), "run_visit_reminder_sweep must be registered in WorkerSettings.cron_jobs"
+    sweep_job = next(cj for cj in cron_entries if cj.coroutine is sweep)
+    assert sweep_job.minute == set(range(0, 60, 5)), "the sweep runs every 5 minutes"
+    assert (
+        REMINDER_HOURS_BEFORE == 24
+    ), "the reminder horizon matches the service contract (hours_before=24)"
+    assert sweep in WorkerSettings.functions, "the sweep is a registered job function"
+
+
+def test_sweep_enqueues_only_window_visits(pipeline_db, make_visit, monkeypatch):
+    """The sweep selects ONLY reminder-eligible visits whose reminder moment
+    (appointment − 24h) has arrived: already-reminded, canceled, past,
+    far-future and live-lease visits are skipped; exactly one enqueue with
+    the visit's current schedule version."""
+    import uuid as _uuid
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.visit import Visit
+    from app.tasks import scheduler as scheduler_mod
+    from app.tasks.worker import run_visit_reminder_sweep
+
+    now = datetime.now(UTC)
+    appointment = now + timedelta(hours=24, minutes=2)
+    window_date, window_time = (
+        appointment.date(),
+        appointment.strftime("%H:%M"),
+    )
+
+    eligible_id = make_visit()
+    reminded_id = make_visit()
+    canceled_id = make_visit()
+    past_id = make_visit()
+    future_id = make_visit()
+    leased_id = make_visit()
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        # Eligible: appointment at now+24h+2min → reminder moment = now+2min.
+        stamp = f"swp_{_uuid.uuid4().hex[:8]}"
+        s.query(Visit).filter(Visit.id == eligible_id).update(
+            {
+                "visit_date": window_date,
+                "visit_time": window_time,
+                "confirmation_token": stamp,
+            }
+        )
+        s.query(Visit).filter(Visit.id == reminded_id).update(
+            {
+                "visit_date": window_date,
+                "visit_time": window_time,
+                "reminder_sent_at": now.replace(tzinfo=None),
+            }
+        )
+        s.query(Visit).filter(Visit.id == canceled_id).update(
+            {
+                "visit_date": window_date,
+                "visit_time": window_time,
+                "status": "canceled",
+            }
+        )
+        s.query(Visit).filter(Visit.id == past_id).update(
+            {
+                "visit_date": (now - timedelta(days=1)).date(),
+                "visit_time": "10:00",
+            }
+        )
+        s.query(Visit).filter(Visit.id == future_id).update(
+            {
+                "visit_date": (now + timedelta(days=3)).date(),
+                "visit_time": "10:00",
+            }
+        )
+        s.query(Visit).filter(Visit.id == leased_id).update(
+            {
+                "visit_date": window_date,
+                "visit_time": window_time,
+                "reminder_claimed_at": now.replace(tzinfo=None),
+            }
+        )
+        s.commit()
+
+        enqueued: list[dict] = []
+
+        async def _capture_enqueue(visit_id, channel="telegram", *, schedule_version):
+            enqueued.append(
+                {
+                    "visit_id": visit_id,
+                    "channel": channel,
+                    "schedule_version": schedule_version,
+                }
+            )
+            return f"job-{visit_id}"
+
+        monkeypatch.setattr(scheduler_mod, "enqueue_reminder", _capture_enqueue)
+
+        asyncio.run(run_visit_reminder_sweep({}))
+
+        assert [c["visit_id"] for c in enqueued] == [eligible_id], (
+            "exactly the window visit is enqueued: "
+            f"{[c['visit_id'] for c in enqueued]} vs {[eligible_id]}"
+        )
+        expected_version = (
+            f"{window_date.isoformat()}T{window_time}#0"
+        )
+        assert enqueued[0]["schedule_version"] == expected_version
+    finally:
+        s.close()
+
+
+def test_sweep_enqueue_failure_is_fail_closed(
+    pipeline_db, make_visit, monkeypatch, caplog
+):
+    """Round 14, P1 (criterion 4): when the enqueue fails (Redis down) the
+    sweep does NOT report success for a job that is not on the queue — the
+    failure is logged loudly (TaskEnqueueError path) and the sweep
+    completes so the next run retries the visit."""
+    import uuid as _uuid
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.visit import Visit
+    from app.tasks import scheduler as scheduler_mod
+    from app.tasks.scheduler import TaskEnqueueError
+    from app.tasks.worker import run_visit_reminder_sweep
+
+    appointment = datetime.now(UTC) + timedelta(hours=24, minutes=2)
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {
+                "visit_date": appointment.date(),
+                "visit_time": appointment.strftime("%H:%M"),
+                "confirmation_token": f"swp_{_uuid.uuid4().hex[:8]}",
+            }
+        )
+        s.commit()
+
+        async def _failing_enqueue(visit_id, channel="telegram", *, schedule_version):
+            raise TaskEnqueueError("redis unavailable")
+
+        monkeypatch.setattr(scheduler_mod, "enqueue_reminder", _failing_enqueue)
+
+        with caplog.at_level("ERROR"):
+            asyncio.run(run_visit_reminder_sweep({}))
+
+        assert any(
+            "enqueue FAILED" in rec.getMessage() for rec in caplog.records
+        ), "the failed enqueue must be logged loudly, never swallowed"
+    finally:
+        s.close()
+
+
+@pytest.mark.redis
+@pytest.mark.asyncio
+async def test_sweep_enqueues_real_job_on_clinic_queue(
+    pipeline_db, make_visit, monkeypatch
+):
+    """Full sweep→queue wiring on a REAL Redis: the sweep enqueues an
+    actual job for the window visit — the job appears on the 'clinic'
+    queue with the deterministic, schedule-versioned ID."""
+    import uuid as _uuid
+    from datetime import UTC, datetime, timedelta
+
+    from arq import create_pool
+    from arq.connections import RedisSettings
+    from arq.constants import job_key_prefix
+
+    from app.models.visit import Visit
+    from app.tasks.worker import QUEUE_NAME, run_visit_reminder_sweep
+
+    if not _redis_reachable():
+        pytest.skip("no Redis reachable — run with a redis service container")
+
+    monkeypatch.setattr(settings, "ARQ_REDIS_URL", REDIS_URL)
+    appointment = datetime.now(UTC) + timedelta(hours=24, minutes=2)
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {
+                "visit_date": appointment.date(),
+                "visit_time": appointment.strftime("%H:%M"),
+                "confirmation_token": f"swp_{_uuid.uuid4().hex[:8]}",
+            }
+        )
+        s.commit()
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        expected_job_id = (
+            f"reminder:visit:{visit_id}:"
+            f"{row.visit_date.isoformat()}T{row.visit_time}#0:telegram"
+        )
+    finally:
+        s.close()
+
+    pool = await create_pool(RedisSettings.from_dsn(REDIS_URL))
+    try:
+        # Clear ONLY this test's keys on the disposable db 15.
+        await pool.delete(QUEUE_NAME, f"{job_key_prefix}{expected_job_id}")
+        await run_visit_reminder_sweep({})
+        assert await pool.exists(
+            f"{job_key_prefix}{expected_job_id}"
+        ), "the sweep must put the real reminder job on the 'clinic' queue"
+        await pool.delete(QUEUE_NAME, f"{job_key_prefix}{expected_job_id}")
+    finally:
+        await pool.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Codex round 14, P1: no-op reschedules never write (stale no-op race)
+# ---------------------------------------------------------------------------
+
+
+def test_reschedule_generation_guard_rejects_stale_writer(
+    pipeline_db, make_visit, monkeypatch
+):
+    """Round 14, P1: two overlapping reschedules — A reads (date=A, gen=0),
+    B commits (date=B, gen=1) while A waits on the lease, then A writes —
+    the mutation is bound to the READ generation, so A's stale write loses
+    with 409 and can no longer double-bump the generation (which would
+    strand B's already-enqueued job against a dead version)."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.api.v1.endpoints.visits import reschedule_visit
+    from app.models.visit import Visit
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    b_date = date.today() + timedelta(days=3)
+    b_ran = {"once": False}
+
+    def _b_commits_during_wait(seconds):
+        # Request B (a fresh reschedule A→B) commits while A is waiting.
+        if b_ran["once"]:
+            return
+        b_ran["once"] = True
+        s = sessionmaker(bind=pipeline_db)()
+        try:
+            s.query(Visit).filter(Visit.id == visit_id).update(
+                {
+                    "visit_date": b_date,
+                    "reminder_sent_at": None,
+                    "reminder_generation": Visit.reminder_generation + 1,
+                    "reminder_claimed_at": None,
+                }
+            )
+            s.commit()
+        finally:
+            s.close()
+
+    monkeypatch.setattr(lease_mod.time, "sleep", _b_commits_during_wait)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            reschedule_visit(
+                visit_id=visit_id,
+                new_date=date.today() + timedelta(days=5),
+                new_time=None,
+                db=s,
+            )
+        assert exc_info.value.status_code == 409
+        assert "modified concurrently" in exc_info.value.detail
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == b_date, "B's fresh schedule must survive"
+        assert row.reminder_generation == 1, (
+            "the stale writer must NOT double-bump the generation "
+            "(B's enqueued job version stays resolvable)"
+        )
+    finally:
+        s.close()
+
+
+# ---------------------------------------------------------------------------
+# Codex round 14, P2: lifecycle transitions coordinate with the live lease
+# ---------------------------------------------------------------------------
+
+
+def _admin():
+    from types import SimpleNamespace
+
+    return SimpleNamespace(id=1, role="Admin", is_superuser=True)
+
+
+def test_set_status_refuses_while_reminder_dispatch_holds_lease(
+    pipeline_db, make_visit, monkeypatch
+):
+    """Round 14, P2: a cancel/confirm committing while the provider await
+    is in flight turns the in-flight dispatch into an obsolete confirmation
+    request — the finalize predicate can only refuse to RECORD it, not
+    retract the message. The status route therefore waits for the live
+    lease (409 when it survives the wait budget), same contract as the
+    reschedule paths."""
+    from datetime import UTC, datetime
+
+    from app.api.v1.endpoints.visits import set_status
+    from app.models.visit import Visit
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    monkeypatch.setattr(lease_mod, "DISPATCH_WAIT_BUDGET_SECONDS", 0.3)
+    monkeypatch.setattr(lease_mod.time, "sleep", lambda seconds: None)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            set_status(
+                visit_id=visit_id,
+                status_new="canceled",
+                db=s,
+                current_user=_admin(),
+            )
+        assert exc_info.value.status_code == 409
+        assert "Reminder delivery is in progress" in exc_info.value.detail
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.status == "pending_confirmation", "status unchanged"
+        assert row.reminder_claimed_at is not None, "lease untouched"
+    finally:
+        s.close()
+
+
+def test_set_status_proceeds_after_lease_resolves(pipeline_db, make_visit):
+    """The inverse: once the dispatch resolves (lease released), the
+    lifecycle transition commits normally."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.api.v1.endpoints.visits import set_status
+    from app.models.visit import Visit
+    from app.tasks.worker import LEASE_TTL
+
+    visit_id = make_visit()
+    stale = datetime.now(UTC) - LEASE_TTL - timedelta(minutes=1)
+    _stamp_lease(pipeline_db, visit_id, stale)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        out = set_status(
+            visit_id=visit_id,
+            status_new="canceled",
+            db=s,
+            current_user=_admin(),
+        )
+        assert out.status == "canceled"
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.status == "canceled"
+    finally:
+        s.close()
+
+
+def test_confirm_visit_is_lease_coordinated(pipeline_db, make_visit, monkeypatch):
+    """Round 14, P2: the patient-facing confirm (pending_confirmation →
+    confirmed) waits for a live reminder lease and refuses with 409 when
+    the lease survives the wait budget — the reminder for the CURRENT
+    schedule must not be overtaken by a confirm that would make the
+    dispatch obsolete."""
+    from datetime import UTC, datetime
+
+    from app.models.visit import Visit
+    from app.services.visit_lifecycle_service import VisitLifecycleService
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    monkeypatch.setattr(lease_mod, "DISPATCH_WAIT_BUDGET_SECONDS", 0.3)
+    monkeypatch.setattr(lease_mod.time, "sleep", lambda seconds: None)
+
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        svc = VisitLifecycleService(s)
+        with pytest.raises(HTTPException) as exc_info:
+            svc.confirm_visit(visit_id=visit_id, current_user=_admin())
+        assert exc_info.value.status_code == 409
+        assert "Reminder delivery is in progress" in exc_info.value.detail
+
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.status == "pending_confirmation"
+    finally:
+        s.close()

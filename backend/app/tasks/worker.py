@@ -297,7 +297,7 @@ async def send_visit_reminder(
         service = NotificationService(db)
         try:
             result = await service.send_confirmation_reminder(
-                db, visit_id, hours_before=24
+                db, visit_id, hours_before=REMINDER_HOURS_BEFORE
             )
         except Exception as exc:
             raise _delivery_retry(
@@ -422,6 +422,161 @@ async def send_visit_reminder(
         db.close()
 
 
+# Reminder horizon shared by the sweep producer and the worker's service
+# call — the reminder goes out this many hours before the appointment.
+REMINDER_HOURS_BEFORE = 24
+
+# The sweep runs every 5 minutes; a visit whose reminder moment falls
+# within this lookahead gets its job enqueued by that sweep run.
+REMINDER_SWEEP_LOOKAHEAD_SECONDS = 300.0
+
+
+def _visit_reminder_moment(visit) -> "datetime | None":
+    """The intended reminder time for a visit: appointment start − 24h.
+
+    ``visit_date`` + ``visit_time`` are stored as UTC (the whole app writes
+    UTC timestamps); a visit with no explicit time is treated as 12:00 UTC
+    so the reminder lands at midday of the previous day rather than at a
+    midnight edge. Returns None when no moment can be derived (no date, or
+    a malformed time string) — such visits are skipped by the sweep.
+    """
+    from datetime import datetime, time as _time, timedelta
+
+    if visit.visit_date is None:
+        return None
+    raw = (visit.visit_time or "12:00").strip()
+    try:
+        hh, mm = int(raw[:2]), int(raw[3:5])
+        if not (0 <= hh <= 23 and 0 <= mm <= 59):
+            return None
+    except (ValueError, TypeError):
+        return None
+    visit_dt = datetime.combine(visit.visit_date, _time(hh, mm), tzinfo=UTC)
+    return visit_dt - timedelta(hours=REMINDER_HOURS_BEFORE)
+
+
+async def run_visit_reminder_sweep(ctx) -> None:
+    """Production reminder producer (Codex round 14, P1).
+
+    Before this job existed ``enqueue_reminder`` had NO production caller:
+    no visit ever reached Redis unless an operator ran the staging snippet
+    manually, so patients never received automatic confirmation reminders
+    despite the worker pipeline itself being functional. This cron sweep
+    wires the producer into the scheduler: every 5 minutes it selects the
+    reminder-eligible visits whose reminder moment (appointment − 24h) has
+    arrived and enqueues their jobs onto the SAME 'clinic' queue the worker
+    consumes.
+
+    Idempotency layers (a sweep may run repeatedly over the same visit):
+    - ``enqueue_reminder`` uses a deterministic job ID bound to the visit's
+      schedule version — a job already queued/running is an honest skip;
+    - a reminder already delivered (``reminder_sent_at``) is never selected;
+    - a visit holding a live lease is skipped — its in-flight delivery is
+      the reminder for this schedule;
+    - the worker's own claim predicate revalidates status, schedule version
+      and the stamp, so even a duplicate delivery cannot double-send.
+
+    Enqueue failures are FAIL-CLOSED per visit: they are logged loudly and
+    counted, the sweep never reports a phantom "job enqueued", and the next
+    sweep run retries the visit (the moment is still inside the window).
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.models.visit import Visit
+    from app.tasks.lease import LEASE_TTL as _LEASE_TTL
+
+    logger.info("job.run_visit_reminder_sweep starting")
+    engine = create_engine(str(settings.DATABASE_URL))
+    db = Session(engine)
+    try:
+        now = datetime.now(UTC)
+        window_end = now + timedelta(seconds=REMINDER_SWEEP_LOOKAHEAD_SECONDS)
+        # Coarse SQL window on the indexed date column; the precise
+        # moment/lease checks happen in Python below. The window spans
+        # [now, window_end] for the reminder moment, i.e. appointments
+        # between now+24h and now+24h+5min — plus one calendar day of
+        # slack on both sides for the date-column comparison.
+        candidates = (
+            db.query(Visit)
+            .filter(
+                Visit.status == "pending_confirmation",
+                Visit.reminder_sent_at.is_(None),
+                Visit.visit_date.isnot(None),
+                Visit.visit_date >= (now - timedelta(days=1)).date(),
+                Visit.visit_date <= (window_end + timedelta(hours=REMINDER_HOURS_BEFORE) + timedelta(days=1)).date(),
+            )
+            .order_by(Visit.id)
+            .limit(200)
+            .all()
+        )
+        from app.tasks.scheduler import build_reminder_schedule_version, enqueue_reminder
+        from app.tasks.scheduler import TaskEnqueueError
+
+        enqueued = skipped = failed = 0
+        for visit in candidates:
+            moment = _visit_reminder_moment(visit)
+            if moment is None or not (now <= moment <= window_end):
+                skipped += 1
+                continue
+            if visit.visit_date is not None and datetime.combine(
+                visit.visit_date, datetime.min.time(), tzinfo=UTC
+            ) + timedelta(
+                hours=int((visit.visit_time or "12:00")[:2]),
+                minutes=int((visit.visit_time or "12:00")[3:5]),
+            ) <= now:
+                # Appointment already started/past — no reminder.
+                skipped += 1
+                continue
+            claimed_at = visit.reminder_claimed_at
+            if claimed_at is not None:
+                if claimed_at.tzinfo is None:
+                    claimed_at = claimed_at.replace(tzinfo=UTC)
+                if now - claimed_at < _LEASE_TTL:
+                    # A live delivery IS the reminder for this schedule.
+                    skipped += 1
+                    continue
+            version = build_reminder_schedule_version(visit)
+            try:
+                job_id = await enqueue_reminder(
+                    visit_id=visit.id, channel="telegram", schedule_version=version
+                )
+            except TaskEnqueueError as exc:
+                failed += 1
+                logger.error(
+                    "job.run_visit_reminder_sweep: enqueue FAILED for visit "
+                    "%s (version %s): %s — the next sweep retries it",
+                    visit.id,
+                    version,
+                    exc,
+                )
+                continue
+            enqueued += 1
+            logger.info(
+                "job.run_visit_reminder_sweep: visit %s scheduled for "
+                "reminder (moment=%s, version=%s, job=%s)",
+                visit.id,
+                moment.isoformat(),
+                version,
+                job_id,
+            )
+        logger.info(
+            "job.run_visit_reminder_sweep complete: scanned=%s enqueued=%s "
+            "skipped=%s failed=%s",
+            len(candidates),
+            enqueued,
+            skipped,
+            failed,
+        )
+    except Exception:
+        db.rollback()
+        logger.exception("job.run_visit_reminder_sweep failed")
+    finally:
+        db.close()
+
+
 async def run_data_retention(ctx) -> None:
     """Run the daily data retention cleanup. See data_retention.run_scheduled_cleanup."""
     from sqlalchemy import create_engine
@@ -541,6 +696,7 @@ class WorkerSettings:
         run_data_retention,
         generate_scheduled_report,
         run_lab_follow_up_reminders,
+        run_visit_reminder_sweep,
     ]
 
     on_startup = startup
@@ -553,18 +709,29 @@ class WorkerSettings:
     health_check_interval = 30
     queue_name = QUEUE_NAME
 
-    # Cron jobs — run on the schedule, regardless of enqueues
+    # Cron jobs — run on the schedule, regardless of enqueues.
+    # run_visit_reminder_sweep is the PRODUCTION reminder producer (round
+    # 14, P1): it wires enqueue_reminder into the visit lifecycle — every
+    # 5 minutes it enqueues jobs for visits whose reminder moment
+    # (appointment − 24h) has arrived. Before it existed no production
+    # path ever called enqueue_reminder and patients never got reminders.
     cron_jobs = [
         cron(run_data_retention, hour=3, minute=0),  # Daily 03:00 UTC
         cron(run_lab_follow_up_reminders, hour=8, minute=0),  # Daily 08:00 UTC
+        cron(
+            run_visit_reminder_sweep,
+            minute=set(range(0, 60, 5)),  # every 5 minutes
+        ),
     ]
 
 
 # Make functions importable from app.tasks (for scheduler.py)
 __all__ = [
     "QUEUE_NAME",
+    "REMINDER_HOURS_BEFORE",
     "send_visit_reminder",
     "run_data_retention",
     "generate_scheduled_report",
     "run_lab_follow_up_reminders",
+    "run_visit_reminder_sweep",
 ]

@@ -194,6 +194,27 @@ class VisitLifecycleService:
 
         visit = self._load_visit_for_update(visit_id)
 
+        # PR-1 (Codex round 14, P2): a lifecycle transition out of
+        # ``pending_confirmation`` must not commit while a reminder
+        # delivery holds the lease — the in-flight provider dispatch would
+        # be an obsolete confirmation request the moment it lands (the
+        # worker's finalize predicate can only refuse to RECORD such a
+        # delivery, not retract the already-sent message). Same contract
+        # as the reschedule paths: wait for the live lease to resolve,
+        # refuse with 409 when it survives the whole wait budget; a stale
+        # lease (dead worker) never blocks.
+        if visit.status == "pending_confirmation" and hasattr(
+            Visit, "reminder_claimed_at"
+        ):
+            from app.tasks.lease import REMINDER_IN_PROGRESS_DETAIL
+            from app.tasks.lease import wait_for_reminder_lease_clear
+
+            if not wait_for_reminder_lease_clear(self.db, visit_id):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=REMINDER_IN_PROGRESS_DETAIL,
+                )
+
         if force:
             # Admin break-glass: bypass state machine, but require
             # non-terminal target (force-reopen to another terminal
@@ -455,6 +476,22 @@ class VisitLifecycleService:
                 ``activate_confirmed_visit()`` in one transaction.
         """
         visit = self._load_visit_for_update(visit_id)
+
+        # PR-1 (Codex round 14, P2): the patient-facing confirm is a
+        # lifecycle transition out of ``pending_confirmation`` — it waits
+        # for a live reminder lease exactly like ``transition_status``
+        # (see the coordination comment there).
+        if visit.status == "pending_confirmation" and hasattr(
+            Visit, "reminder_claimed_at"
+        ):
+            from app.tasks.lease import REMINDER_IN_PROGRESS_DETAIL
+            from app.tasks.lease import wait_for_reminder_lease_clear
+
+            if not wait_for_reminder_lease_clear(self.db, visit_id):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=REMINDER_IN_PROGRESS_DETAIL,
+                )
 
         logger.info(
             "visit.confirm visit_id=%s current_status=%s user_id=%s confirmed_by=%r",

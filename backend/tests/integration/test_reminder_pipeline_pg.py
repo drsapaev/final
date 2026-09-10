@@ -54,20 +54,48 @@ from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 import app.db.base  # noqa: F401,E402 - registers every model on Base
-from app.db.base_class import Base  # noqa: E402
 
 pytestmark = pytest.mark.gate_d
 
 
 @pytest.fixture(scope="module")
 def pg_engine():
-    """Real PostgreSQL engine; create_all is a no-op when alembic already
-    provisioned the schema (CI runs it after ``alembic upgrade head``)."""
+    """Real PostgreSQL engine — the fixture ASSERTS the expected schema and
+    never creates it (Codex round 14, P2: ``Base.metadata.create_all()``
+    could silently create missing tables outside Alembic — and without the
+    migrations' RLS setup — if the documented command was ever pointed at a
+    shared/staging/production database; that is exactly the schema drift
+    the repository guardrail forbids). The database MUST be provisioned by
+    ``alembic upgrade head`` first (the CI gate_d job runs it on its
+    disposable postgres service before this step)."""
     url = os.environ["DATABASE_URL"]
     if "postgres" not in url:
         pytest.skip("reminder PG-concurrency proof requires PostgreSQL")
+    from sqlalchemy import inspect
+
     engine = create_engine(url)
-    Base.metadata.create_all(bind=engine)
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    missing_tables = {"visits", "patients", "doctors", "users"} - tables
+    if missing_tables:
+        pytest.fail(
+            f"tables {sorted(missing_tables)} do not exist — run "
+            "`alembic upgrade head` against the gate_d database first; "
+            "this fixture must not create schema outside Alembic "
+            "(schema-drift guardrail)"
+        )
+    visit_columns = {c["name"] for c in inspector.get_columns("visits")}
+    missing_columns = {
+        "reminder_sent_at",
+        "reminder_claimed_at",
+        "reminder_generation",
+    } - visit_columns
+    if missing_columns:
+        pytest.fail(
+            f"visits is missing reminder-pipeline columns {sorted(missing_columns)} "
+            "— the gate_d database is behind alembic head; upgrade it instead "
+            "of letting the fixture mutate the schema"
+        )
     yield engine
     engine.dispose()
 

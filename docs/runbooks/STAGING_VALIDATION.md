@@ -350,15 +350,18 @@ arq app.tasks.worker.WorkerSettings
 # (Codex round 9: schedule_version is a REQUIRED producer argument — the
 # worker rejects unversioned jobs. The version is built from the visit's
 # date, time and reminder generation.
-# Codex round 12, P2: visit 1 may be confirmed, canceled, already
-# reminded or lacking a schedule — the worker would legitimately skip
-# such a visit and the check would prove nothing. Select the first
-# REMINDER-ELIGIBLE visit instead; if none exists, create a clearly
-# synthetic one (AGENTS.md synthetic-data policy: 00-operator prefix,
-# SYNTHETIC markers).
-# Codex round 13, P2: the fallback generates a UNIQUE per-run suffix —
-# re-running the check after a reminder was delivered must not collide
-# with the unique username/email of a previously created entity.)
+# Codex round 14, P2: this check ALWAYS creates its own isolated
+# SYNTHETIC validation visit — it must never select a real pending
+# visit, because that would immediately send its reminder at the
+# operator's current time and stamp it as sent, consuming a reminder
+# the visit still needs. The fixture carries a UNIQUE per-run suffix
+# (no collision with previous runs) and the cleanup below removes ONLY
+# these marked rows.
+# Codex round 14, P2 (channel honesty): patients have NO telegram_id
+# column, so _determine_best_channel() (telegram > pwa > phone) picks
+# the PWA branch for a +998 synthetic phone. The snippet computes the
+# SAME expected channel and prints it — validate the channel that will
+# actually fire, not the one the runbook used to wish for.)
 cd backend
 python -c "
 import asyncio
@@ -373,54 +376,53 @@ from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit
 
+def _expected_channel(patient) -> str:
+    # Same priority as NotificationSender._determine_best_channel
+    # (app/services/notifications_pkg/_formatting.py): telegram > pwa > phone.
+    if getattr(patient, 'telegram_id', None):
+        return 'telegram'
+    if patient.phone and patient.phone.startswith('+998'):
+        return 'pwa'
+    return 'phone'
+
 async def main():
     db = SessionLocal()
     try:
-        visit = (
-            db.query(Visit)
-            .filter(
-                Visit.status == 'pending_confirmation',
-                Visit.visit_date.isnot(None),
-                Visit.reminder_sent_at.is_(None),
-                Visit.reminder_claimed_at.is_(None),
-            )
-            .order_by(Visit.id)
-            .first()
+        suffix = uuid.uuid4().hex[:8]
+        user = User(
+            username=f'stgcheck_{suffix}',
+            email=f'stgcheck-{suffix}@synthetic.invalid',
+            full_name='SYNTHETIC staging-check doctor',
+            hashed_password='not-a-login-hash',
+            role='Doctor', is_active=True, is_superuser=False,
         )
-        if visit is None:
-            suffix = uuid.uuid4().hex[:8]
-            user = User(
-                username=f'stgcheck_{suffix}',
-                email=f'stgcheck-{suffix}@synthetic.invalid',
-                full_name='SYNTHETIC staging-check doctor',
-                hashed_password='not-a-login-hash',
-                role='Doctor', is_active=True, is_superuser=False,
-            )
-            db.add(user); db.flush()
-            doctor = Doctor(user_id=user.id, specialty='SYNTHETIC', active=True)
-            db.add(doctor); db.flush()
-            patient = Patient(
-                first_name='Синтетик', last_name='StagingCheck',
-                middle_name='SYNTHETIC',
-                phone='+998000000000',
-                birth_date=date(1990, 1, 1),
-                address='SYNTHETIC-STAGING-CHECK',
-            )
-            db.add(patient); db.flush()
-            visit = Visit(
-                patient_id=patient.id, doctor_id=doctor.id,
-                visit_date=date.today(), visit_time='10:00',
-                status='pending_confirmation', discount_mode='none',
-                department='cardiology',
-                confirmation_token=f'stgcheck-{suffix}',
-                confirmation_channel='telegram',
-            )
-            db.add(visit); db.commit()
-            print(f'Created SYNTHETIC eligible visit id={visit.id}')
+        db.add(user); db.flush()
+        doctor = Doctor(user_id=user.id, specialty='SYNTHETIC', active=True)
+        db.add(doctor); db.flush()
+        patient = Patient(
+            first_name='Синтетик', last_name='StagingCheck',
+            middle_name='SYNTHETIC',
+            phone='+998000000000',
+            birth_date=date(1990, 1, 1),
+            address='SYNTHETIC-STAGING-CHECK',
+        )
+        db.add(patient); db.flush()
+        visit = Visit(
+            patient_id=patient.id, doctor_id=doctor.id,
+            visit_date=date.today(), visit_time='10:00',
+            status='pending_confirmation', discount_mode='none',
+            department='cardiology',
+            confirmation_token=f'stgcheck-{suffix}',
+            confirmation_channel='pwa',
+        )
+        db.add(visit); db.commit()
+        channel = _expected_channel(patient)
+        print(f'Created SYNTHETIC staging-check visit id={visit.id} (suffix {suffix})')
+        print(f'Expected delivery channel for this fixture: {channel}')
         version = build_reminder_schedule_version(visit)
-        print(f'Eligible visit id={visit.id}, schedule version: {version}')
+        print(f'Schedule version: {version}')
         job_id = await enqueue_reminder(
-            visit_id=visit.id, channel='telegram', schedule_version=version
+            visit_id=visit.id, channel=channel, schedule_version=version
         )
         print(f'Enqueued job: {job_id}')
     finally:
@@ -430,17 +432,67 @@ asyncio.run(main())
 "
 
 # Watch Terminal 1 for log output (substitute the printed visit id):
-# Expected: 'job.send_visit_reminder visit_id=<visit.id> channel=telegram'
-# Then: 'job.send_visit_reminder: visit <visit.id> reminded via telegram' (if send succeeds)
-# Or: 'job.send_visit_reminder: send failed for visit <visit.id>: <error>' (if Telegram bot not configured)
+# Expected: 'job.send_visit_reminder visit_id=<visit.id> channel=<expected>'
+# Then: 'job.send_visit_reminder: visit <visit.id> reminded via <expected>'
+# Or: 'job.send_visit_reminder: send failed for visit <visit.id>: <error>'
+# (e.g. no PWA push credentials for the synthetic recipient — see Expected)
 ```
 
 ### Expected
 
-- Worker logs show `task.enqueue.ok job_id=reminder:visit:<visit.id>:telegram` (the selected or created synthetic visit id)
+- Worker logs show `task.enqueue.ok job_id=reminder:visit:<visit.id>:<expected>` (the synthetic visit id created by THIS run)
 - Worker attempts to send via `NotificationService.send_confirmation_reminder`
-- If Telegram bot is configured: reminder delivered, `visits.reminder_sent_at` set
-- If not configured: job fails + retries 3x with 10s/60s/300s backoff, then gives up
+- The delivery channel in the log MUST match the printed `_determine_best_channel` priority: the +998 synthetic phone routes to `pwa`; `telegram` fires only for patients with actual Telegram linkage (not this fixture — see Check 6 for a real bot delivery)
+- Delivered: `visits.reminder_sent_at` is set for the synthetic visit; failed: job retries 3x with 10s/60s/300s backoff, then gives up
+
+### Cleanup (run after the check)
+
+```bash
+cd backend
+python -c "
+from app.db.session import SessionLocal
+from app.models.clinic import Doctor
+from app.models.patient import Patient
+from app.models.user import User
+from app.models.visit import Visit
+
+db = SessionLocal()
+try:
+    patients = (
+        db.query(Patient)
+        .filter(Patient.address == 'SYNTHETIC-STAGING-CHECK')
+        .all()
+    )
+    patient_ids = [p.id for p in patients]
+    visits = (
+        db.query(Visit).filter(Visit.patient_id.in_(patient_ids)).all()
+        if patient_ids else []
+    )
+    doctor_ids = [v.doctor_id for v in visits]
+    doctors = (
+        db.query(Doctor).filter(Doctor.id.in_(doctor_ids)).all()
+        if doctor_ids else []
+    )
+    user_ids = [d.user_id for d in doctors if d.user_id is not None]
+    for v in visits:
+        db.delete(v)
+    for p in patients:
+        db.delete(p)
+    for d in doctors:
+        db.delete(d)
+    if user_ids:
+        for u in db.query(User).filter(User.id.in_(user_ids)).all():
+            db.delete(u)
+    db.commit()
+    print(f'Removed {len(visits)} synthetic staging-check visit(s) '
+          f'({len(patients)} patients, {len(doctors)} doctors, {len(user_ids)} users)')
+finally:
+    db.close()
+"
+# A reminder job still sitting in Redis for a deleted synthetic visit is
+# harmless: the worker logs 'visit <id> not found' and completes — the
+# pipeline's idempotency contract covers missing visits by design.
+```
 
 ### If it fails
 

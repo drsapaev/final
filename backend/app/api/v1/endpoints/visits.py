@@ -82,9 +82,17 @@ class VisitWithServices(BaseModel):
 
 # PR-1 (Codex round 11+13, P1): the lease-coordination refusal detail —
 # shared by both reschedule routes (wait-budget expiry AND the atomic
-# conditional UPDATE losing the race to a claim).
-_REMINDER_IN_PROGRESS = (
-    "Reminder delivery is in progress for this visit; retry in a few seconds"
+# conditional UPDATE losing the race to a claim). Round 14: the literal
+# moved to app/tasks/lease.py (REMINDER_IN_PROGRESS_DETAIL) so the
+# lifecycle service and the reschedule paths share one source of truth.
+from app.tasks.lease import REMINDER_IN_PROGRESS_DETAIL as _REMINDER_IN_PROGRESS
+
+# Round 14, P1: the conditional-UPDATE race guard can also lose because
+# the SCHEDULE (generation) moved on between the row read and the UPDATE
+# — a concurrent reschedule committed. That is a different condition from
+# an in-flight delivery and gets its own refusal detail.
+_SCHEDULE_MOVED_DETAIL = (
+    "Visit schedule was modified concurrently; refresh and retry"
 )
 
 
@@ -335,6 +343,23 @@ def set_status(
     visit = db.query(Visit).filter(Visit.id == visit_id).first()
     if not visit:
         raise HTTPException(404, "Visit not found")
+
+    # PR-1 (Codex round 14, P2): a lifecycle transition out of
+    # ``pending_confirmation`` (confirm/cancel) must not commit while a
+    # reminder delivery holds the lease — otherwise the in-flight provider
+    # dispatch would be an obsolete confirmation request the moment it
+    # lands (the finalize predicate can only refuse to RECORD it, not
+    # retract the message). Same contract as the reschedule paths: wait
+    # for the live lease to resolve, refuse with 409 when it survives the
+    # whole wait budget. A stale lease (dead worker) never blocks.
+    if visit.status == "pending_confirmation" and hasattr(
+        Visit, "reminder_claimed_at"
+    ):
+        from app.tasks.lease import wait_for_reminder_lease_clear
+
+        if not wait_for_reminder_lease_clear(db, visit_id):
+            raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
+
     _ensure_visit_doctor_access(db, visit, current_user)
 
     allowed, reason = is_valid_visit_transition(visit.status, status_new)
@@ -591,6 +616,19 @@ def reschedule_visit(
     schedule_changed = new_date != vrow.get("visit_date") or (
         new_time_str is not None and new_time_str != vrow.get("visit_time")
     )
+    if not schedule_changed:
+        # Round 14, P1: the no-op decision can become STALE — a concurrent
+        # reschedule may commit between the read above and the write below.
+        # A no-op therefore performs NO write at all: it re-reads the row
+        # and echoes the CURRENT committed state, so it can never restore
+        # an old schedule value over a newer commit (lost update), never
+        # clear a stamp and never touch a live lease.
+        fresh = (
+            db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
+        )
+        if not fresh:
+            raise HTTPException(404, "Visit not found")
+        return VisitOut(**fresh)  # type: ignore[arg-type]
     update_values: dict = {"visit_date": new_date}
     if schedule_changed:
         # PR-1 (Codex round 2, P1): the reminder stamp is only valid for
@@ -629,6 +667,15 @@ def reschedule_visit(
     # as the worker's claim predicate. A no-op reschedule preserves the
     # reminder state and needs no coordination.
     lease_free = None
+    race_guards = []
+    if hasattr(t.c, "reminder_generation"):
+        # Round 14, P1: bind the mutation to the generation READ above —
+        # two overlapping reschedules (A stale, B fresh) can no longer
+        # double-bump the generation (which would strand B's already-
+        # enqueued job against a version that no longer matches).
+        race_guards.append(
+            t.c.reminder_generation == (vrow.get("reminder_generation") or 0)
+        )
     if schedule_changed and hasattr(t.c, "reminder_claimed_at"):
         from datetime import datetime
 
@@ -641,18 +688,33 @@ def reschedule_visit(
             t.c.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
         )
 
-    upd = t.update().where(t.c.id == visit_id)
+    upd = t.update().where(t.c.id == visit_id, *race_guards)
     if lease_free is not None:
         upd = upd.where(lease_free)
     row = db.execute(upd.values(**update_values).returning(t)).mappings().first()
     if not row:
-        if (
-            lease_free is not None
-            and db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
-        ):
-            # The visit exists — the conditional UPDATE lost the race to
-            # a claim that landed after the wait loop's last poll.
-            raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
+        current = db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
+        if current:
+            # The visit exists — the conditional UPDATE lost the race.
+            # Distinguish the loser's cause: a claim that landed after the
+            # wait loop's last poll (in-progress delivery) vs a concurrent
+            # schedule change (the generation no longer matches the one
+            # read above). Different detail, same 409 status.
+            live_lease = lease_free is not None and current.get(
+                "reminder_claimed_at"
+            ) is not None
+            if live_lease:
+                from datetime import datetime
+
+                from app.tasks.lease import LEASE_TTL
+
+                claimed = current["reminder_claimed_at"]
+                if claimed.tzinfo is None:
+                    claimed = claimed.replace(tzinfo=UTC)
+                live_lease = datetime.now(UTC) - claimed < LEASE_TTL
+            if live_lease:
+                raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
+            raise HTTPException(status_code=409, detail=_SCHEDULE_MOVED_DETAIL)
         raise HTTPException(404, "Visit not found")
 
     # [FIX] Обновляем статус в очереди для старой даты
@@ -710,20 +772,35 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
         )
 
     tomorrow = date.today() + timedelta(days=1)
-    tomorrow_values: dict = {"visit_date": tomorrow}
     # PR-1 (Codex rounds 2+5): invalidate the reminder state only when the
     # schedule actually changes — a no-op move to the existing date must
-    # preserve it.
-    if tomorrow != vrow.get("visit_date"):
-        if hasattr(t.c, "reminder_sent_at"):
-            tomorrow_values["reminder_sent_at"] = None
-        if hasattr(t.c, "reminder_generation"):
-            tomorrow_values["reminder_generation"] = t.c.reminder_generation + 1
-        # The lease is preserved — see the /reschedule route comment
-        # (Codex round 8, P1) — and the mutation below is lease-coordinated
-        # (Codex round 11+13, P1).
+    # preserve it. Round 14, P1: a stale no-op decision must never WRITE —
+    # a concurrent reschedule may have committed between the read and the
+    # write; the no-op echoes the freshly re-read row instead of restoring
+    # an old value over it.
+    if tomorrow == vrow.get("visit_date"):
+        fresh = (
+            db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
+        )
+        if not fresh:
+            raise HTTPException(404, "Visit not found")
+        return VisitOut(**fresh)  # type: ignore[arg-type]
+    tomorrow_values: dict = {"visit_date": tomorrow}
+    if hasattr(t.c, "reminder_sent_at"):
+        tomorrow_values["reminder_sent_at"] = None
+    if hasattr(t.c, "reminder_generation"):
+        tomorrow_values["reminder_generation"] = t.c.reminder_generation + 1
+    # The lease is preserved — see the /reschedule route comment
+    # (Codex round 8, P1) — and the mutation below is lease-coordinated
+    # (Codex round 11+13, P1).
     lease_free = None
-    if tomorrow != vrow.get("visit_date") and hasattr(t.c, "reminder_claimed_at"):
+    race_guards = []
+    if hasattr(t.c, "reminder_generation"):
+        # Round 14, P1: bind the mutation to the generation read above.
+        race_guards.append(
+            t.c.reminder_generation == (vrow.get("reminder_generation") or 0)
+        )
+    if hasattr(t.c, "reminder_claimed_at"):
         from datetime import datetime
 
         from app.tasks.lease import LEASE_TTL, wait_for_reminder_lease_clear
@@ -735,16 +812,29 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
             t.c.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
         )
 
-    upd = t.update().where(t.c.id == visit_id)
+    upd = t.update().where(t.c.id == visit_id, *race_guards)
     if lease_free is not None:
         upd = upd.where(lease_free)
     row = db.execute(upd.values(**tomorrow_values).returning(t)).mappings().first()
     if not row:
-        if (
-            lease_free is not None
-            and db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
-        ):
-            raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
+        current = db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
+        if current:
+            # Same loser-cause distinction as the /reschedule route.
+            live_lease = lease_free is not None and current.get(
+                "reminder_claimed_at"
+            ) is not None
+            if live_lease:
+                from datetime import datetime
+
+                from app.tasks.lease import LEASE_TTL
+
+                claimed = current["reminder_claimed_at"]
+                if claimed.tzinfo is None:
+                    claimed = claimed.replace(tzinfo=UTC)
+                live_lease = datetime.now(UTC) - claimed < LEASE_TTL
+            if live_lease:
+                raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
+            raise HTTPException(status_code=409, detail=_SCHEDULE_MOVED_DETAIL)
         raise HTTPException(404, "Visit not found")
 
     # [FIX] Обновляем статус в очереди для старой даты
