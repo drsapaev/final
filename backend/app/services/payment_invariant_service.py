@@ -85,6 +85,8 @@ only exact amounts are accepted).
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -92,7 +94,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.payment import Payment
 from app.models.visit import Visit
@@ -132,6 +134,7 @@ class PaymentInvariantService:
             self.db.query(Visit)
             .filter(Visit.id == visit_id)
             .with_for_update()
+            .populate_existing()
             .first()
         )
         if not visit:
@@ -190,12 +193,143 @@ class PaymentInvariantService:
                 Payment.visit_id == visit_id,
                 Payment.status.in_(["paid", "completed"]),
             )
+            .populate_existing()
             .all()
         )
         return sum(
             (Decimal(str(p.amount or 0)) for p in payments),
             Decimal("0"),
         )
+
+    def summarize_visits(self, visits: list[Visit]) -> dict[str, Any]:
+        """Read receipt-backed balances using the same totals as payment creation.
+
+        A snapshot identifies the displayed ledger. Submitting it while holding
+        the visit locks prevents a retry from silently becoming another receipt.
+        It is a concurrency token, not an authorization credential.
+        """
+        visits = sorted(visits, key=lambda visit: visit.id)
+        payments = (
+            self.db.query(Payment)
+            .filter(Payment.visit_id.in_([visit.id for visit in visits]))
+            .order_by(Payment.id)
+            .populate_existing()
+            .all()
+        )
+        rows = []
+        for visit in visits:
+            total = self.compute_total_cost(visit)
+            paid = self.compute_paid_amount(visit.id)
+            remaining = max(total - paid, Decimal("0"))
+            settled = [
+                p
+                for p in payments
+                if p.visit_id == visit.id and p.status in {"paid", "completed"}
+            ]
+            rows.append(
+                {
+                    "visit_id": visit.id,
+                    "total_amount": total,
+                    "paid_amount": paid,
+                    "remaining_amount": remaining,
+                    "payment_status": "paid"
+                    if (total > 0 or paid > 0) and remaining == 0
+                    else "partial"
+                    if paid > 0
+                    else "pending",
+                    "payment_type": settled[-1].method if settled else None,
+                }
+            )
+        total = sum((row["total_amount"] for row in rows), Decimal("0"))
+        paid = sum((row["paid_amount"] for row in rows), Decimal("0"))
+        remaining = sum((row["remaining_amount"] for row in rows), Decimal("0"))
+        ledger = {
+            "visits": rows,
+            "payments": [
+                (p.id, p.visit_id, p.amount, p.status, p.refunded_amount, p.updated_at)
+                for p in payments
+            ],
+        }
+        snapshot = hashlib.sha256(
+            json.dumps(ledger, sort_keys=True, default=str).encode()
+        ).hexdigest()
+        return {
+            "total_amount": total,
+            "paid_amount": paid,
+            "remaining_amount": remaining,
+            "payment_status": "paid"
+            if (total > 0 or paid > 0) and remaining == 0
+            else "partial"
+            if paid > 0
+            else "pending",
+            "can_pay": remaining > 0,
+            "snapshot": snapshot,
+            "visits": rows,
+        }
+
+    def receive_grouped_payment(
+        self,
+        *,
+        visit_ids: list[int],
+        amount: Decimal | None,
+        method: str,
+        current_user: Any,
+        snapshot: str | None = None,
+    ) -> tuple[list[Visit], list[Payment], dict[str, Any]]:
+        """Allocate one receipt amount to existing debt; caller owns commit.
+
+        Lock the complete visit set in ID order before reading balances. The
+        allocation order is oldest visit first, matching cashier group payments.
+        """
+        visits = (
+            self.db.query(Visit)
+            .options(selectinload(Visit.services))
+            .filter(Visit.id.in_(set(visit_ids)))
+            .order_by(Visit.id)
+            .with_for_update(of=Visit)
+            .populate_existing()
+            .all()
+        )
+        if not visits or len(visits) != len(set(visit_ids)):
+            raise HTTPException(404, "Visits not found")
+        if len({visit.patient_id for visit in visits}) != 1:
+            raise HTTPException(400, "Payment requires visits from exactly one patient")
+        before = self.summarize_visits(visits)
+        if snapshot is not None and snapshot != before["snapshot"]:
+            raise HTTPException(
+                409,
+                "Суммы изменились. Обновите данные оплаты перед следующим платежом.",
+            )
+        amount = before["remaining_amount"] if amount is None else amount
+        if amount < 0 or amount > before["remaining_amount"]:
+            raise HTTPException(400, "Сумма превышает остаток долга")
+        if amount == 0:
+            return visits, [], before
+        balances = {
+            row["visit_id"]: row["remaining_amount"] for row in before["visits"]
+        }
+        payments = []
+        remaining = amount
+        for visit in sorted(
+            visits,
+            key=lambda v: (v.created_at.timestamp() if v.created_at else 0, v.id),
+        ):
+            allocation = min(remaining, balances[visit.id])
+            if allocation <= 0:
+                continue
+            payments.append(
+                self.create_payment_for_visit(
+                    visit_id=visit.id,
+                    amount=allocation,
+                    method=method,
+                    note="Registrar payment",
+                    current_user=current_user,
+                    allow_overpayment=False,
+                    commit=False,
+                )
+            )
+            remaining -= allocation
+        return visits, payments, self.summarize_visits(visits)
 
     def check_payment_allowed(
         self,
