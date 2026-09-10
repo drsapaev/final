@@ -1097,6 +1097,147 @@ def test_d6d_cashier_confirm_serializes_on_visit_lock(
         cleanup.close()
 
 
+# --- D6e: cashier confirm/cancel cross-path lock order ----------------
+
+def test_d6e_cashier_confirm_and_cancel_share_visit_first_lock_order(
+    db_session, new_session_factory, monkeypatch
+):
+    """D6e: confirm and cancel must both wait on Visit before locking Payment."""
+    from app.api.v1.endpoints.cashier import _payments as cashier_payments
+
+    async def _skip_notification(**_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        cashier_payments,
+        "_emit_payment_notification",
+        _skip_notification,
+    )
+
+    visit = create_test_visit(db_session, status="waiting")
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("10000"),
+        currency="UZS",
+        method="cash",
+        status="pending",
+        created_at=datetime.now(UTC),
+    )
+    db_session.add(payment)
+    db_session.commit()
+    payment_id = payment.id
+    visit_id = visit.id
+
+    PaymentInvariantService(db_session).lock_visit_for_payment_change(visit_id)
+
+    start = threading.Barrier(3)
+    confirm_name = f"gate_d_d6e_confirm_{payment_id}"
+    cancel_name = f"gate_d_d6e_cancel_{payment_id}"
+
+    def run_action(action: str, application_name: str):
+        session = new_session_factory()
+        try:
+            session.execute(
+                text("SELECT set_config('application_name', :name, true)"),
+                {"name": application_name},
+            )
+            session.execute(text("SET LOCAL lock_timeout = '5s'"))
+            start.wait(timeout=5)
+            if action == "confirm":
+                result = asyncio.run(
+                    cashier_payments.confirm_payment(
+                        payment_id=payment_id,
+                        db=session,
+                        current_user=None,
+                    )
+                )
+            else:
+                result = asyncio.run(
+                    cashier_payments.cancel_payment(
+                        payment_id=payment_id,
+                        cancel_data=cashier_payments.CancelPaymentRequest(
+                            reason="Gate D concurrent cancellation"
+                        ),
+                        db=session,
+                        current_user=None,
+                    )
+                )
+            return "success", result
+        except HTTPException as exc:
+            session.rollback()
+            return "http_error", exc.status_code
+        except Exception as exc:  # pragma: no cover - asserted below with detail
+            session.rollback()
+            return "unexpected_error", f"{type(exc).__name__}: {exc}"
+        finally:
+            session.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        confirm_future = executor.submit(run_action, "confirm", confirm_name)
+        cancel_future = executor.submit(run_action, "cancel", cancel_name)
+        start.wait(timeout=5)
+
+        deadline = time.monotonic() + 4
+        waiting_on_lock: set[str] = set()
+        while time.monotonic() < deadline:
+            rows = db_session.execute(
+                text(
+                    "SELECT application_name, wait_event_type "
+                    "FROM pg_stat_activity "
+                    "WHERE application_name IN (:confirm_name, :cancel_name)"
+                ),
+                {
+                    "confirm_name": confirm_name,
+                    "cancel_name": cancel_name,
+                },
+            ).all()
+            waiting_on_lock = {
+                row.application_name
+                for row in rows
+                if row.wait_event_type == "Lock"
+            }
+            if waiting_on_lock == {confirm_name, cancel_name}:
+                break
+            time.sleep(0.05)
+
+        assert waiting_on_lock == {confirm_name, cancel_name}
+
+        probe = new_session_factory()
+        try:
+            locked_payment = (
+                probe.query(Payment)
+                .filter(Payment.id == payment_id)
+                .with_for_update(nowait=True)
+                .one()
+            )
+            assert locked_payment.status == "pending"
+        finally:
+            probe.rollback()
+            probe.close()
+
+        db_session.rollback()
+        outcomes = [
+            confirm_future.result(timeout=10),
+            cancel_future.result(timeout=10),
+        ]
+
+    assert all(outcome[0] != "unexpected_error" for outcome in outcomes), outcomes
+    assert ("http_error", 500) not in outcomes
+    assert any(outcome[0] == "success" for outcome in outcomes)
+
+    cleanup = new_session_factory()
+    try:
+        persisted = cleanup.query(Payment).filter(Payment.id == payment_id).one()
+        assert persisted.status == "cancelled"
+        cleanup.execute(
+            text("DELETE FROM payments WHERE id = :pid"), {"pid": payment_id}
+        )
+        cleanup.execute(text("DELETE FROM visits WHERE id = :vid"), {"vid": visit_id})
+        cleanup.commit()
+    finally:
+        cleanup.close()
+
+
 # --- Codex R10 PR 3118: edit-delta decrease guard serialization -------
 
 def test_edit_delta_decrease_guard_serializes_with_payment_creation(

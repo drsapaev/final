@@ -965,12 +965,37 @@ async def cancel_payment(
     """
     Отменить платеж.
     """
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    from app.services.payment_invariant_service import PaymentInvariantService
 
-    if not payment:
+    invariant_service = PaymentInvariantService(db)
+    payment_reference = db.query(Payment).filter(Payment.id == payment_id).first()
+
+    if not payment_reference:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Платеж не найден"
+        )
+
+    expected_visit_id = payment_reference.visit_id
+    if expected_visit_id is not None:
+        invariant_service.lock_visit_for_payment_change(expected_visit_id)
+
+    payment = (
+        db.query(Payment)
+        .filter(Payment.id == payment_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Платеж не найден",
+        )
+    if payment.visit_id != expected_visit_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Визит платежа изменился; повторите операцию",
         )
 
     if _cashier_payment_status(payment) in {"cancelled", "refunded", "void"}:
