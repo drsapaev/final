@@ -103,14 +103,20 @@ def list_patients(
     patients = patient_crud.get_patients(
         db, skip=skip, limit=limit, search_query=q, phone=phone
     )
-    log_patient_access_many(
-        db,
-        actor_user=current_user,
-        subject_patient_ids=[patient.id for patient in patients],
-        resource_type="patient",
-        action="view",
-        request=request,
-    )
+    from app.db.session import SessionLocal
+
+    audit_db = SessionLocal()
+    try:
+        log_patient_access_many(
+            audit_db,
+            actor_user=current_user,
+            subject_patient_ids=[patient.id for patient in patients],
+            resource_type="patient",
+            action="view",
+            request=request,
+        )
+    finally:
+        audit_db.close()
     return patients
 
 
@@ -156,15 +162,21 @@ def get_patient(
     patient = patient_crud.get(db, id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail=t("patient.not_found"))
-    log_patient_access(
-        db,
-        actor_user=current_user,
-        subject_patient_id=patient.id,
-        resource_type="patient",
-        resource_id=str(patient.id),
-        action="view",
-        request=request,
-    )
+    from app.db.session import SessionLocal
+
+    audit_db = SessionLocal()
+    try:
+        log_patient_access(
+            audit_db,
+            actor_user=current_user,
+            subject_patient_id=patient.id,
+            resource_type="patient",
+            resource_id=str(patient.id),
+            action="view",
+            request=request,
+        )
+    finally:
+        audit_db.close()
     return patient
 
 
@@ -217,16 +229,22 @@ def get_patient_appointments(
         raise HTTPException(status_code=404, detail=t("patient.not_found"))
 
     appointments = patient_crud.get_patient_appointments(db, patient_id=patient_id)
-    log_patient_access(
-        db,
-        actor_user=current_user,
-        subject_patient_id=patient.id,
-        resource_type="appointment_history",
-        resource_id=str(patient.id),
-        action="view",
-        request=request,
-        extra_data={"appointment_count": len(appointments)},
-    )
+    from app.db.session import SessionLocal
+
+    audit_db = SessionLocal()
+    try:
+        log_patient_access(
+            audit_db,
+            actor_user=current_user,
+            subject_patient_id=patient.id,
+            resource_type="appointment_history",
+            resource_id=str(patient.id),
+            action="view",
+            request=request,
+            extra_data={"appointment_count": len(appointments)},
+        )
+    finally:
+        audit_db.close()
     return appointments
 
 
