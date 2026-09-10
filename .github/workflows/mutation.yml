@@ -91,7 +91,7 @@ jobs:
           cp -r alembic mutants/alembic
           cp openapi.json mutants/openapi.json
           cp -r scripts mutants/scripts
-          cp -r ../ops mutants/ops
+          cp -r ../ops ops
 
       - name: Run mutmut on critical modules
         working-directory: backend
