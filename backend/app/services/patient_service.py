@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 from app.core.audit import extract_model_changes, log_critical_change
 from app.core.i18n import t  # noqa: F401
 from app.core.pii_masker import mask_pii
+from app.core.roles import is_doctor_role_spelling
+from app.crud import clinic as clinic_crud
+from app.crud import visit as visit_crud
+from app.crud.appointment import appointment as appointment_crud
 from app.crud.patient import (
     normalize_patient_name,
     validate_birthdate,
@@ -18,11 +22,20 @@ from app.crud.patient import (
 )
 from app.models.patient import Patient
 from app.models.user import User
+from app.schemas.appointment import AppointmentHistoryItem
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.services.notifications import notification_sender_service
 from app.services.patient_validation import PatientValidationService
 
 logger = logging.getLogger(__name__)
+
+
+class PatientReadAccessDenied(Exception):
+    """Raised when a principal may not read the requested patient resource."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 def _dispatch_patient_registered_notification_async(
@@ -105,6 +118,115 @@ class PatientService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.validation_service = PatientValidationService()
+
+    def _doctor_allowed_doctor_ids(self, current_user: User) -> set[int]:
+        doctor = clinic_crud.get_doctor_by_user_id(self.db, current_user.id)
+        if doctor is None or not doctor.active:
+            raise PatientReadAccessDenied("inactive_or_missing_doctor_profile")
+
+        allowed_doctor_ids = {doctor.id}
+        # Some legacy visit writers stored User.id in doctor_id. Keep that
+        # compatibility only when the value cannot target another Doctor row.
+        if clinic_crud.get_doctor_by_id(self.db, current_user.id) is None:
+            allowed_doctor_ids.add(current_user.id)
+        return allowed_doctor_ids
+
+    def _allowed_doctor_ids_for_patient_read(
+        self,
+        *,
+        current_user: User,
+        patient_id: int,
+    ) -> set[int] | None:
+        if current_user.role == "Patient":
+            current_patient = current_user.patient
+            if current_patient is None or current_patient.id != patient_id:
+                raise PatientReadAccessDenied("patient_self_scope_mismatch")
+
+        if current_user.is_superuser or not is_doctor_role_spelling(
+            current_user.role
+        ):
+            return None
+
+        allowed_doctor_ids = self._doctor_allowed_doctor_ids(current_user)
+        if not visit_crud.patient_has_visit_with_doctors(
+            self.db,
+            patient_id=patient_id,
+            doctor_ids=allowed_doctor_ids,
+        ):
+            raise PatientReadAccessDenied("patient_not_assigned_to_doctor")
+        return allowed_doctor_ids
+
+    def list_patients_for_read(
+        self,
+        *,
+        current_user: User,
+        skip: int,
+        limit: int,
+        search_query: str | None,
+        phone: str | None,
+    ) -> list[Patient]:
+        doctor_ids = None
+        if (
+            is_doctor_role_spelling(current_user.role)
+            and not current_user.is_superuser
+        ):
+            doctor_ids = self._doctor_allowed_doctor_ids(current_user)
+        return patient_crud.get_patients(
+            self.db,
+            skip=skip,
+            limit=limit,
+            search_query=search_query,
+            phone=phone,
+            doctor_ids=doctor_ids,
+        )
+
+    def get_patient_for_read(
+        self,
+        *,
+        current_user: User,
+        patient_id: int,
+    ) -> Patient | None:
+        self._allowed_doctor_ids_for_patient_read(
+            current_user=current_user,
+            patient_id=patient_id,
+        )
+        return patient_crud.get(self.db, id=patient_id)
+
+    def get_patient_appointment_history_for_read(
+        self,
+        *,
+        current_user: User,
+        patient_id: int,
+    ) -> tuple[Patient | None, list[AppointmentHistoryItem]]:
+        doctor_ids = self._allowed_doctor_ids_for_patient_read(
+            current_user=current_user,
+            patient_id=patient_id,
+        )
+        patient = patient_crud.get(self.db, id=patient_id)
+        if patient is None:
+            return None, []
+
+        appointments = appointment_crud.get_patient_history(
+            self.db,
+            patient_id=patient_id,
+            doctor_ids=doctor_ids,
+        )
+        return patient, [
+            AppointmentHistoryItem(
+                id=appointment.id,
+                appointment_date=appointment.appointment_date,
+                appointment_time=appointment.appointment_time,
+                department=(
+                    appointment.department.key or appointment.department.name_ru
+                    if appointment.department is not None
+                    else None
+                ),
+                doctor_id=appointment.doctor_id,
+                status=appointment.status,
+                notes=appointment.notes,
+            )
+            for appointment in appointments
+        ]
 
     def create_patient(
         self,

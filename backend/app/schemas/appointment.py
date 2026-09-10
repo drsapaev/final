@@ -62,6 +62,18 @@ class AppointmentUpdate(ORMModel):
     payment_processed_at: datetime | None = None
 
 
+class AppointmentHistoryItem(ORMModel):
+    """Stable, minimal response item for patient appointment history."""
+
+    id: int
+    appointment_date: date
+    appointment_time: str | None = Field(None, max_length=8)
+    department: str | None = Field(None, max_length=200)
+    doctor_id: int | None = None
+    status: str = Field(max_length=16)
+    notes: str | None = Field(None, max_length=1000)
+
+
 class Appointment(AppointmentBase):
     id: int
     created_at: datetime
