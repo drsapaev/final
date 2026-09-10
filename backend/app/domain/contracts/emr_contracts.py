@@ -18,6 +18,14 @@ class VisitClinicalSnapshot(BaseModel):
 
 
 class EmrContract(Protocol):
+    def restore_operational_status_after_payment_change(
+        self,
+        visit_id: int,
+        *,
+        commit: bool = False,
+        request_id: str | None = None,
+    ) -> None: ...
+
     def get_visit_clinical_snapshot(
         self,
         visit_id: int,
@@ -47,6 +55,30 @@ class EmrContractFacade:
     def __init__(self, contract: EmrContract) -> None:
         self._contract = contract
         self._contract_logger = ContractMethodLogger(logger, "emr")
+
+    def restore_operational_status_after_payment_change(
+        self,
+        visit_id: int,
+        *,
+        commit: bool = False,
+        request_id: str | None = None,
+    ) -> None:
+        self._contract_logger.log_entry(
+            "restore_operational_status_after_payment_change",
+            request_id,
+            visit_id=visit_id,
+            commit=commit,
+        )
+        self._contract.restore_operational_status_after_payment_change(
+            visit_id=visit_id,
+            commit=commit,
+            request_id=request_id,
+        )
+        self._contract_logger.log_exit(
+            "restore_operational_status_after_payment_change",
+            request_id,
+            visit_id=visit_id,
+        )
 
     def get_visit_clinical_snapshot(
         self,

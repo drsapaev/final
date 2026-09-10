@@ -10,9 +10,12 @@ from app.db.transactions import transaction as transaction_ctx
 from app.models.enums import PaymentStatus
 from app.repositories.payment_cancel_repository import PaymentCancelRepository
 from app.services.billing_service import BillingService
+from app.services.context_facades.emr_facade import (
+    EmrContextFacade,
+    EmrServiceContractAdapter,
+)
 from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.payment_state_checks import can_transition_transaction_status
-from app.services.visit_lifecycle_service import VisitLifecycleService
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +33,7 @@ class PaymentCancelService:
         self.repository = PaymentCancelRepository(db)
         self.billing_service = BillingService(db)
         self.payment_invariant_service = PaymentInvariantService(db)
-        self.visit_lifecycle_service = VisitLifecycleService(db)
+        self.emr_facade = EmrContextFacade(EmrServiceContractAdapter(db))
         self.payment_manager = payment_manager
         self.db = db
 
@@ -174,7 +177,7 @@ class PaymentCancelService:
             # Lock order is Visit -> Payment -> PaymentTransaction -> Invoice,
             # matching the other cashier payment mutations.
             if expected_visit_id is not None:
-                self.visit_lifecycle_service.restore_operational_status_after_payment_change(
+                self.emr_facade.restore_operational_status_after_payment_change(
                     expected_visit_id,
                     commit=False,
                 )
