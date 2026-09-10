@@ -1171,7 +1171,7 @@ export const buildAppointmentsTableColumns = ({
             fontSize: '9px',
             fontWeight: 'var(--mac-font-weight-medium)',
           }}>
-            💰 {row.payment_status === 'paid_pending' ? t('misc.eat_pending_payment') : String(row.payment_status ?? '')}
+            💰 {row.payment_status === 'partial' ? t('admin2.bill_status_partially_paid') : row.payment_status === 'paid_pending' ? t('misc.eat_pending_payment') : String(row.payment_status ?? '')}
           </div>
         )}
       </div>

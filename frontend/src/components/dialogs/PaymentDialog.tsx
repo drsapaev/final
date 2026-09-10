@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import React from 'react';
@@ -11,12 +10,14 @@ import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import type { Appointment } from '../../types/domain/clinic';
+import { getRegistrarPaymentSummary } from '../../api/registrarPayments';
+import type { RegistrarPaymentInput, RegistrarPaymentSummary } from '../../api/registrarPayments';
 
 interface PaymentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   appointment: Appointment | null;
-  onPaymentSuccess?: (paymentData?: unknown) => Promise<void> | void;
+  onPaymentSuccess: (paymentData: RegistrarPaymentInput) => Promise<RegistrarPaymentSummary>;
   onPrintTicket?: (appointment?: unknown) => void;
 }
 
@@ -29,26 +30,47 @@ const PaymentDialog = ({
 }: PaymentDialogProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState(t('misc.pd_karta'));
+  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [summary, setSummary] = useState<RegistrarPaymentSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [reload, setReload] = useState(0);
+  const processingRef = useRef(false);
+  const sessionRef = useRef(0);
 
   // Инициализация данных при открытии
   useEffect(() => {
+    const session = ++sessionRef.current;
     if (isOpen && appointment) {
-      setPaymentAmount(String(appointment.cost ?? appointment.payment_amount ?? ''));
-      setPaymentMethod(String(appointment.payment_type ?? t('misc.pd_karta')));
+      setSummary(null);
+      setIsLoading(true);
+      setPaymentMethod('cash');
       setIsPaid(false);
       setErrors({});
       setIsProcessing(false);
+      processingRef.current = false;
+      getRegistrarPaymentSummary(appointment as Record<string, unknown>)
+        .then((data) => {
+          if (session !== sessionRef.current) return;
+          setSummary(data);
+          setPaymentAmount(String(data.remaining_amount));
+        })
+        .catch(() => {
+          if (session === sessionRef.current) setErrors({ request: 'admin2.bill_load_error' });
+        })
+        .finally(() => {
+          if (session === sessionRef.current) setIsLoading(false);
+        });
     }
-  }, [isOpen, appointment]);
+    return () => { sessionRef.current += 1; };
+  }, [isOpen, appointment, reload]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!paymentAmount || !Number.isFinite(parseFloat(paymentAmount)) || parseFloat(paymentAmount) <= 0) {
+    if (!/^\d+(\.\d{1,2})?$/.test(paymentAmount) || !Number.isFinite(Number(paymentAmount)) || Number(paymentAmount) <= 0 || (summary && Number(paymentAmount) > Number(summary.remaining_amount))) {
       newErrors.amount = t('misc.pd_ukazhite_korrektnuyu_summu');
     }
 
@@ -61,31 +83,35 @@ const PaymentDialog = ({
   };
 
   const handlePayment = async () => {
+    if (processingRef.current || !summary?.can_pay || !onPaymentSuccess) return;
     if (!validateForm()) return;
     if (!appointment) return;
 
+    processingRef.current = true;
     setIsProcessing(true);
+    const session = sessionRef.current;
 
     try {
-      // UX Audit Registrar: убрана 1.5-секундная «имитация» (setTimeout).
-      // Теперь: onPaymentSuccess callback делает РЕАЛЬНЫЙ API-запрос.
-      if (onPaymentSuccess && appointment) {
-        await onPaymentSuccess({
-          appointmentId: appointment.id,
-          amount: parseFloat(paymentAmount),
-          method: paymentMethod,
-          timestamp: new Date().toISOString(),
-        });
-      }
-
+      const result = await onPaymentSuccess({
+        amount: Number(paymentAmount), method: paymentMethod,
+        payment_snapshot: summary.snapshot,
+      });
+      if (!result?.snapshot) throw new Error('Payment receipt is missing');
+      if (session !== sessionRef.current) return;
+      setSummary(result);
       setIsPaid(true);
-      toast.success(t('misc.pd_oplata_otmechena_kak_poluche'));
-    } catch (error) {
-      logger.error('Payment error:', error);
-      const err = error as { message?: string };
-      toast.error(err?.message || t('misc.pd_oshibka_pri_obrabotke_platez'));
+      toast.success(t('admin2.bill_pay_recorded'));
+    } catch {
+      if (session !== sessionRef.current) return;
+      logger.error('Registrar payment was not confirmed');
+      setSummary(null);
+      setErrors({ request: 'admin2.bill_pay_record_error' });
+      toast.error(t('admin2.bill_pay_record_error'));
     } finally {
-      setIsProcessing(false);
+      if (session === sessionRef.current) {
+        processingRef.current = false;
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -129,13 +155,14 @@ const PaymentDialog = ({
           variant: 'success',
           icon: isProcessing ? null : <Check size={16} />,
           onClick: handlePayment,
-          disabled: isProcessing,
+          disabled: isProcessing || isLoading || !summary?.can_pay || !onPaymentSuccess,
         },
       ];
 
   // UX Audit Registrar #5: emoji в заголовке (✅/💳) заменены на text-only.
   // Иконки есть в actions (Printer/Check) и в success state (CheckCircle2).
-  const dialogTitle = isPaid ? t('misc.pd_oplata_zavershena') : t('misc.pd_oplata_uslug');
+  const dialogTitle = isPaid ? t('admin2.bill_pay_recorded') : t('misc.pd_oplata_uslug');
+  const money = (value: string | number) => new Intl.NumberFormat('ru-RU').format(Number(value));
 
   return (
     <ModernDialog
@@ -146,20 +173,31 @@ const PaymentDialog = ({
       dialogClassName="payment-dialog--styled"
       closeOnBackdrop={!isProcessing}
       closeOnEscape={!isProcessing}
+      showCloseButton={!isProcessing}
     >
+      {isLoading && <p role="status">{t('common.loading')}</p>}
+      {errors.request && <div role="alert">
+        <p>{t(errors.request)}</p>
+        <button type="button" onClick={() => setReload((value) => value + 1)}>{t('common.refresh')}</button>
+      </div>}
+      {summary && <dl className="payment-patient-card" aria-live="polite">
+        <dt>{t('admin2.bill_stat_total_amount')}</dt><dd>{money(summary.total_amount)} {t('admin2.bill_currency')}</dd>
+        <dt>{t('admin2.bill_stat_paid')}</dt><dd>{money(summary.paid_amount)} {t('admin2.bill_currency')}</dd>
+        <dt>{t('admin2.bill_balance_due')}</dt><dd>{money(summary.remaining_amount)} {t('admin2.bill_currency')}</dd>
+      </dl>}
       {isPaid ? (
         <div className="payment-success">
           <div className="payment-success-icon">
             <Check size={28} />
           </div>
           <h4 className="payment-success-title">
-            Оплата успешно завершена
+            {t(summary?.payment_status === 'paid' ? 'admin2.bill_status_paid' : 'admin2.bill_status_partially_paid')}
           </h4>
           <p className="payment-success-details">
             Сумма:{' '}
             <strong>{new Intl.NumberFormat('ru-RU').format(parseFloat(paymentAmount))} сум</strong>
             <br />
-            Способ: <strong>{paymentMethod}</strong>
+            Способ: <strong>{paymentMethods.find((method) => method.value === paymentMethod)?.label || paymentMethod}</strong>
           </p>
           <div className="payment-success-cta">
             <p className="payment-success-cta-text">
@@ -192,7 +230,7 @@ const PaymentDialog = ({
             {/* Сумма */}
             <div>
               <label htmlFor="payment-amount" className="payment-field-label">
-                Сумма к оплате *
+                {t('admin2.bill_pay_amount_label')} *
               </label>
               <Input
                 id="payment-amount"
@@ -201,10 +239,14 @@ const PaymentDialog = ({
                 aria-invalid={!!errors.amount}
                 aria-describedby={errors.amount ? 'payment-amount-error' : undefined}
                 value={paymentAmount}
+                disabled={isProcessing || isLoading || !summary?.can_pay}
+                min="0.01"
+                step="0.01"
+                max={summary ? String(summary.remaining_amount) : undefined}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                   setPaymentAmount(e.target.value);
                   if (errors.amount) {
-                    setErrors((prev) => ({ ...prev, amount: "" }));
+                    setErrors((prev) => ({ ...prev, amount: '' }));
                   }
                 }}
                 placeholder={t('misc.pd_vvedite_summu')}
@@ -231,10 +273,11 @@ const PaymentDialog = ({
                   <button
                     key={method.value}
                     type="button"
+                    disabled={isProcessing || isLoading || !summary?.can_pay}
                     onClick={() => {
                       setPaymentMethod(method.value);
                       if (errors.method) {
-                        setErrors((prev) => ({ ...prev, method: "" }));
+                        setErrors((prev) => ({ ...prev, method: '' }));
                       }
                     }}
                     className={`payment-method-btn ${paymentMethod === method.value ? 'payment-method-btn--selected' : ''}`}

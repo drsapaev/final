@@ -5,7 +5,7 @@ export const normalizeRegistrationMode = (value: unknown) => {
   return ['none', 'repeat', 'benefit', 'all_free'].includes(normalized) ? normalized : 'none';
 };
 
-export const normalizePaymentStatus = (value: unknown) => String(value || 'pending').toLowerCase() === 'paid' ? 'paid' : 'pending';
+export const normalizePaymentStatus = (value: unknown) => String(value || 'pending').toLowerCase();
 
 export const getRecordAmount = (appointment: Record<string, unknown>) => {
   const amount = Number(appointment?.cost ?? 0);

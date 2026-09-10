@@ -10,8 +10,8 @@
  * - handleStartVisit: wraps runRegistrarRecordAction for 'start_visit'.
  *   Shows success/error toast, reloads appointments.
  * - handlePayment: wraps runRegistrarRecordAction for 'mark_paid'.
- *   Handles partial success (some records already paid), shows toast,
- *   silent reload after 800ms.
+ *   Returns the confirmed server balance, propagates payment failures,
+ *   and refreshes the worklist independently after a receipt is saved.
  * - updateAppointmentStatus: maps status string to backend action,
  *   calls runRegistrarRecordAction, reloads appointments.
  *
@@ -36,6 +36,7 @@ import {
   getRegistrarActionForStatus,
 } from './registrarHelpers';
 import type { RegistrarRecordLike } from './registrarHelpers';
+import type { RegistrarPaymentInput, RegistrarPaymentSummary } from '../../api/registrarPayments';
 
 export const useRegistrarActions = ({ appointments, loadAppointments }: {
   appointments: unknown[];
@@ -44,12 +45,12 @@ export const useRegistrarActions = ({ appointments, loadAppointments }: {
   const runRegistrarRecordAction = useCallback(async (record: Record<string, unknown>, action: string, payload: Record<string, unknown> = {}) => {
     const records = getRegistrarRecordRefs(record);
     if (records.length === 0) {
-      logger.warn('RegistrarPanel: action requires backend record refs', { action, record });
+      logger.warn('RegistrarPanel: action requires backend record refs', { action });
       notify.error('Недостаточно данных для выполнения действия');
       return null;
     }
     if (!hasBackendAction(record, action)) {
-      logger.warn('RegistrarPanel: backend did not expose requested action', { action, record });
+      logger.warn('RegistrarPanel: backend did not expose requested action', { action });
       notify.error('Действие недоступно для этой записи');
       return null;
     }
@@ -81,41 +82,16 @@ export const useRegistrarActions = ({ appointments, loadAppointments }: {
     }
   }, [loadAppointments, runRegistrarRecordAction]);
 
-  const handlePayment = useCallback(async (appointment: Record<string, unknown>, paymentData: { amount?: number | null; method?: string | null } | null = null) => {
-    try {
-      const result = await runRegistrarRecordAction(appointment, 'mark_paid', {
-        amount: paymentData?.amount ?? null,
-        method: paymentData?.method ?? null,
-      });
-      if (!result) return null;
-
-      const successCount = Number(result.success_count || 0);
-      const skippedCount = Number(result.skipped_count || 0);
-      const failedCount = Number(result.failed_count || 0);
-
-      if (successCount > 0 || skippedCount > 0) {
-        const message = skippedCount > 0
-          ? 'Оплата проведена: ' + successCount + ' (уже оплачено: ' + skippedCount
-          : 'Оплата проведена: ' + successCount;
-        notify.success(failedCount > 0 ? message + '. Failed: ' + failedCount : message);
-        // UX Audit R-1.4: убран setTimeout(800ms) silent reload.
-        // Раньше: 800ms «мёртвого» времени, в течение которого строка
-        // оставалась в статусе «Ожидает оплаты» — регистратор мог
-        // повторно нажать «Оплатить» (двойной запрос на бэкенд).
-        // Теперь: silent reload вызывается сразу, без задержки.
-        loadAppointments({ silent: true, source: 'payment_success' });
-        return result.results || [];
-      }
-
-      notify.error(result.results?.find((item: Record<string, unknown>) => !item.success)?.error || 'Ошибка оплаты');
-      return result.results || [];
-    } catch (error) {
-      logger.error('RegistrarPanel: Payment error:', error);
-      notify.error(getErrorMessage(error, 'Ошибка оплаты'));
-      return null;
+  const handlePayment = useCallback(async (appointment: Record<string, unknown>, paymentData: RegistrarPaymentInput): Promise<RegistrarPaymentSummary> => {
+    const result = await runRegistrarRecordAction(appointment, 'mark_paid', paymentData as unknown as Record<string, unknown>);
+    if (!result?.success || Number(result.failed_count) > 0 || !result.payment_summary) {
+      throw new Error('Payment was not confirmed. Refresh payment details.');
     }
+    // A failed refresh must not turn a committed receipt into a retryable payment.
+    void Promise.resolve().then(() => loadAppointments({ silent: true, source: 'payment_success' }))
+      .catch(() => logger.warn('RegistrarPanel: refresh after payment failed'));
+    return result.payment_summary;
   }, [loadAppointments, runRegistrarRecordAction]);
-
   const updateAppointmentStatus = useCallback(async (recordSelectionKey: unknown, status: string, reason = '', sourceRecord: Record<string, unknown> | null = null) => {
     try {
       const record = sourceRecord || findRegistrarRecordBySelectionKey(appointments as unknown as RegistrarRecordLike[], String(recordSelectionKey ?? ''));

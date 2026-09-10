@@ -11,6 +11,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
 )  # noqa: F401
 from app.api.v1.endpoints.registrar_wizard._settings import VisitResponse  # noqa
 from app.crud.clinic import clinic_today as _clinic_today  # noqa: F401
+from app.models.online_queue import OnlineQueueEntry
 from app.services.visit_confirmation_service import _as_aware_utc  # noqa: F401
 from app.services.visit_lifecycle_service import VisitNotFoundError  # noqa: F401
 
@@ -686,36 +687,27 @@ def _sync_payment_invoices_for_paid_visit(
     visit_id: int,
     payment_method: str,
 ) -> None:
-    """Mark linked registrar invoices paid once all their visits have paid Payment rows."""
-    from app.models.payment import Payment
+    """Close an invoice only after every linked visit's debt is settled."""
+    from app.services.payment_invariant_service import PaymentInvariantService
 
+    service = PaymentInvariantService(db)
     links = (
         db.query(PaymentInvoiceVisit)
         .filter(PaymentInvoiceVisit.visit_id == visit_id)
         .all()
     )
-    for link in links:
-        invoice = link.invoice
+    for invoice_id in sorted({link.invoice_id for link in links}):
+        invoice = (
+            db.query(PaymentInvoice)
+            .filter(PaymentInvoice.id == invoice_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
         if not invoice or invoice.status not in {"pending", "processing"}:
             continue
-
-        visit_ids = [invoice_visit.visit_id for invoice_visit in invoice.visits]
-        if not visit_ids:
-            continue
-
-        paid_visit_ids = {
-            row[0]
-            for row in (
-                db.query(Payment.visit_id)
-                .filter(
-                    Payment.visit_id.in_(visit_ids),
-                    Payment.status == "paid",
-                )
-                .distinct()
-                .all()
-            )
-        }
-        if all(invoice_visit_id in paid_visit_ids for invoice_visit_id in visit_ids):
+        visits = [item.visit for item in invoice.visits]
+        if visits and service.summarize_visits(visits)["remaining_amount"] == 0:
             invoice.status = "paid"
             invoice.payment_method = payment_method or invoice.payment_method
             invoice.paid_at = datetime.now(UTC)
@@ -1100,6 +1092,140 @@ def _run_single_registrar_record_action(
 # ============================================================
 
 
+def _payment_visit_ids(db: Session, records: list[RegistrarRecordRef]) -> list[int]:
+    """Resolve identities on the server; never infer a visit by patient/date."""
+    visit_ids = set()
+    for record in records:
+        if record.record_kind == "visit":
+            visit_ids.add(record.record_id)
+        elif record.record_kind == "online_queue":
+            entry = db.get(OnlineQueueEntry, record.record_id)
+            if not entry:
+                raise HTTPException(404, "Queue entry not found")
+            visit = db.get(Visit, entry.visit_id) if entry.visit_id else None
+            if visit and visit.patient_id != entry.patient_id:
+                raise HTTPException(
+                    409, "Queue entry visit does not belong to the queue patient"
+                )
+            if not visit:
+                raise HTTPException(
+                    409, "Для оплаты нужна запись очереди с корректно связанным визитом"
+                )
+            visit_ids.add(visit.id)
+        else:
+            raise HTTPException(
+                409, "Для учёта оплаты и долга необходимо оформить визит"
+            )
+    visits = db.query(Visit).filter(Visit.id.in_(visit_ids)).all()
+    if not visit_ids or len(visits) != len(visit_ids):
+        raise HTTPException(404, "Visits not found")
+    if len({visit.patient_id for visit in visits}) != 1:
+        raise HTTPException(400, "Payment requires visits from exactly one patient")
+    return sorted(visit_ids)
+
+
+@router.post(
+    "/registrar/records/payment-summary", response_model=RegistrarPaymentSummary
+)
+def get_registrar_payment_summary(
+    request: RegistrarPaymentSummaryRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier")),
+):
+    from app.services.payment_invariant_service import PaymentInvariantService
+
+    _ensure_registrar_command_role(current_user, "mark_paid")
+    visit_ids = _payment_visit_ids(db, request.records)
+    visits = db.query(Visit).filter(Visit.id.in_(visit_ids)).all()
+    return PaymentInvariantService(db).summarize_visits(visits)
+
+
+def _receive_registrar_payment(
+    db: Session,
+    current_user: User,
+    records: list[RegistrarRecordRef],
+    payment_req: MarkPaidRequest,
+) -> RegistrarRecordActionResponse:
+    from app.services.payment_invariant_service import PaymentInvariantService
+    from app.services.visit_lifecycle_service import VisitLifecycleService
+
+    _ensure_registrar_command_role(current_user, "mark_paid")
+    try:
+        visit_ids = _payment_visit_ids(db, records)
+        method = str(payment_req.method or "cash").strip().lower()
+        visits, payments, summary = PaymentInvariantService(db).receive_grouped_payment(
+            visit_ids=visit_ids,
+            amount=payment_req.amount,
+            method=method,
+            current_user=current_user,
+            snapshot=payment_req.payment_snapshot,
+        )
+        # Serialize different visits sharing an invoice, in one consistent order.
+        invoice_ids = db.query(PaymentInvoiceVisit.invoice_id).filter(
+            PaymentInvoiceVisit.visit_id.in_(visit_ids)
+        )
+        db.query(PaymentInvoice).filter(PaymentInvoice.id.in_(invoice_ids)).order_by(
+            PaymentInvoice.id
+        ).with_for_update().populate_existing().all()
+        for visit in visits:
+            VisitLifecycleService(db).restore_operational_status_after_payment_change(
+                visit_id=visit.id,
+                commit=False,
+            )
+            _sync_payment_invoices_for_paid_visit(
+                db, visit_id=visit.id, payment_method=method
+            )
+        balances = {row["visit_id"]: row for row in summary["visits"]}
+        received = {}
+        for payment in payments:
+            received[payment.visit_id] = (
+                received.get(payment.visit_id, Decimal("0")) + payment.amount
+            )
+        results = []
+        reported_visits = set()
+        for record in records:
+            visit_id = (
+                record.record_id
+                if record.record_kind == "visit"
+                else db.get(OnlineQueueEntry, record.record_id).visit_id
+            )
+            visit = next(v for v in visits if v.id == visit_id)
+            balance = balances[visit_id]
+            received_amount = received.get(visit_id, Decimal("0")) if visit_id not in reported_visits else Decimal("0")
+            reported_visits.add(visit_id)
+            results.append(
+                _registrar_command_item(
+                    record_kind=record.record_kind,
+                    record_id=record.record_id,
+                    success=True,
+                    skipped=received_amount == 0,
+                    status_value=visit.status,
+                    payment_status=balance["payment_status"],
+                    result={
+                        "id": record.record_id,
+                        "status": visit.status,
+                        **balance,
+                        "amount": received_amount,
+                    },
+                )
+            )
+        response = RegistrarRecordActionResponse(
+            action="mark_paid",
+            success=True,
+            failed_count=0,
+            success_count=sum(not item.skipped for item in results),
+            skipped_count=sum(item.skipped for item in results),
+            results=results,
+            payment_summary=summary,
+        )
+        # Validate the response before committing; no database reads after commit.
+        db.commit()
+        return response
+    except Exception:
+        db.rollback()
+        raise
+
+
 @router.post("/registrar/visits/{visit_id}/mark-paid", response_model=dict[str, Any])
 def mark_visit_as_paid(
     visit_id: int,
@@ -1107,146 +1233,13 @@ def mark_visit_as_paid(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier")),
 ):
-    """Отметить запись из таблицы visits как оплаченную и создать платеж (SSOT)"""
-    try:
-        from app.models.visit import Visit
-        from app.services.billing_service import BillingService
-
-        # Логирование для диагностики
-        logger.info(
-            "mark_visit_as_paid: User: %s, Role: %s, Visit ID: %d",
-            current_user.username,
-            current_user.role,
-            visit_id,
-        )
-
-        # Находим запись
-        visit = db.query(Visit).filter(Visit.id == visit_id).first()
-        if not visit:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=t("error.not_found")
-            )
-
-        # [OK] ИСПРАВЛЕНО: Проверяем, не создан ли уже платеж для этого визита
-        from app.models.payment import Payment
-
-        existing_payment = (
-            db.query(Payment)
-            .filter(Payment.visit_id == visit_id, Payment.status == "paid")
-            .first()
-        )
-
-        requested_method = (
-            str(payment_req.method).strip().lower()
-            if payment_req and payment_req.method
-            else "cash"
-        )
-
-        if not existing_payment:
-            # Issue #06 Phase 4b Fix #1: Replaced raw SQL INSERT INTO payments
-            # with PaymentInvariantService.create_payment_for_visit().
-            #
-            # The raw SQL was originally a workaround for a BillingPayment vs
-            # Payment model conflict (both mapped to the `payments` table).
-            # That conflict has been resolved — BillingPayment is deprecated
-            # (app/models/billing.py:4), commented out (app/models/__init__.py:55),
-            # and removed from imports (app/services/billing_service_pkg/_base.py:33).
-            # Payment from app.models.payment is now the single ORM model.
-            #
-            # The raw SQL bypassed: with_for_update() lock, paid_amount check,
-            # overpayment policy, and IntegrityError defense-in-depth.
-            # PaymentInvariantService provides all of these.
-            from decimal import Decimal
-
-            from app.services.payment_invariant_service import PaymentInvariantService
-
-            billing_service = BillingService(db)
-            total_info = billing_service.calculate_total(
-                visit_id=visit_id, discount_mode=visit.discount_mode or "none"
-            )
-            payment_amount = Decimal(str(total_info["total"]))
-            note = f"Оплата визита {visit_id} через панель кассира"
-
-            payment = PaymentInvariantService(db).create_payment_for_visit(
-                visit_id=visit_id,
-                amount=payment_amount,
-                method=requested_method,
-                note=note,
-                current_user=current_user,
-            )
-
-            logger.info(
-                "mark_visit_as_paid: Создан платеж ID=%d для визита %d, сумма=%s, method=%s",
-                payment.id,
-                visit_id,
-                payment_amount,
-                requested_method,
-            )
-        else:
-            logger.warning(
-                "mark_visit_as_paid: Платеж уже существует для визита %d, ID=%d",
-                visit_id,
-                existing_payment.id,
-            )
-
-        # [FIX:PAYMENT_STATUS] Payment must not overwrite the operational visit/queue status.
-        # Issue #06 Phase 3: delegate to VisitLifecycleService.
-        changed_at = datetime.now(UTC)
-        from app.services.visit_lifecycle_service import VisitLifecycleService
-
-        visit = VisitLifecycleService(
-            db
-        ).restore_operational_status_after_payment_change(
-            visit_id=visit.id,
-        )
-        visit.updated_at = changed_at
-        _sync_payment_invoices_for_paid_visit(
-            db,
-            visit_id=visit.id,
-            payment_method=(
-                existing_payment.method
-                if existing_payment and getattr(existing_payment, "method", None)
-                else requested_method
-            ),
-        )
-        logger.info(
-            "[FIX:PAYMENT_STATUS] Visit marked paid without changing operational status: visit_id=%d, status=%s",
-            visit.id,
-            visit.status,
-        )
-        db.commit()
-        db.refresh(visit)
-
-        return {
-            "id": visit.id,
-            "status": visit.status,
-            "payment_status": "paid",
-            "payment_type": (
-                existing_payment.method
-                if existing_payment and getattr(existing_payment, "method", None)
-                else requested_method
-            ),
-            "amount": (
-                float(existing_payment.amount)
-                if existing_payment
-                and getattr(existing_payment, "amount", None) is not None
-                else payment_amount
-            ),
-            "message": "Запись отмечена как оплаченная",
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("mark_visit_as_paid: Error: %s", str(e), exc_info=True)
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
-
-
-# ===================== ЭНДПОИНТ ДЛЯ ОТМЕТКИ ЗАПИСЕЙ ОНЛАЙН-ОЧЕРЕДИ КАК ОПЛАЧЕННЫХ =====================
+    response = _receive_registrar_payment(
+        db,
+        current_user,
+        [RegistrarRecordRef(record_kind="visit", record_id=visit_id)],
+        payment_req or MarkPaidRequest(),
+    )
+    return response.results[0].result
 
 
 @router.post(
@@ -1258,198 +1251,24 @@ def mark_queue_entry_as_paid(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier")),
 ):
-    """
-    Отметить запись OnlineQueueEntry как оплаченную.
-
-    Находит связанный Visit через visit_id и оплачивает его.
-    Если visit_id отсутствует, пытается найти Visit по patient_id и дате.
-    """
-    try:
-        from app.models.online_queue import OnlineQueueEntry
-        from app.models.visit import Visit
-        from app.services.billing_service import BillingService
-
-        logger.info(
-            "mark_queue_entry_as_paid: User: %s, Role: %s, Entry ID: %d",
-            current_user.username,
-            current_user.role,
-            entry_id,
-        )
-
-        # Находим запись в очереди
-        entry = (
-            db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
-        )
-        if not entry:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Запись очереди с ID {entry_id} не найдена",
-            )
-
-        # Пытаемся найти связанный Visit
-        visit = None
-
-        # 1. Через visit_id
-        if entry.visit_id:
-            visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
-            logger.info(
-                f"mark_queue_entry_as_paid: Найден Visit {entry.visit_id} через entry.visit_id"
-            )
-
-        if visit and visit.patient_id != entry.patient_id:
-            logger.warning(
-                "mark_queue_entry_as_paid: entry visit owner mismatch entry_id=%d visit_id=%d",
-                entry.id,
-                visit.id,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Queue entry visit does not belong to the queue patient",
-            )
-
-        requested_method = (
-            str(payment_req.method).strip().lower()
-            if payment_req and payment_req.method
-            else "cash"
-        )
-
-        if not visit:
-            # Legacy fallback: без Visit нельзя создать Payment SSOT, поэтому оставляем queue marker.
-            logger.warning(
-                f"mark_queue_entry_as_paid: Visit не найден для entry {entry_id}. "
-                f"Обновляем только платежный статус."
-            )
-            entry.status = _preserve_operational_status_on_payment(entry.status)
-            entry.discount_mode = "paid"
-            entry.updated_at = datetime.now(UTC)
-            logger.info(
-                "[FIX:PAYMENT_STATUS] Queue entry marked paid without Visit: entry_id=%d, status=%s",
-                entry.id,
-                entry.status,
-            )
-            db.commit()
-            db.refresh(entry)
-
-            return {
-                "id": entry.id,
-                "status": entry.status,
-                "payment_status": "paid",
-                "payment_type": requested_method,
-                "message": "Запись в очереди отмечена как оплаченная (Visit не найден)",
-            }
-
-        # Проверяем, не создан ли уже платеж для этого визита
-        from app.models.payment import Payment
-
-        existing_payment = (
-            db.query(Payment)
-            .filter(Payment.visit_id == visit.id, Payment.status == "paid")
-            .first()
-        )
-
-        if not existing_payment:
-            # Issue #06 Phase 4b Fix #1: Replaced raw SQL INSERT INTO payments
-            # with PaymentInvariantService.create_payment_for_visit().
-            # See mark_visit_as_paid above for full rationale.
-            from decimal import Decimal
-
-            from app.services.payment_invariant_service import PaymentInvariantService
-
-            billing_service = BillingService(db)
-            total_info = billing_service.calculate_total(
-                visit_id=visit.id, discount_mode=visit.discount_mode or "none"
-            )
-            payment_amount = Decimal(str(total_info["total"]))
-            note = f"Оплата визита {visit.id} через запись очереди {entry_id}"
-
-            payment = PaymentInvariantService(db).create_payment_for_visit(
-                visit_id=visit.id,
-                amount=payment_amount,
-                method=requested_method,
-                note=note,
-                current_user=current_user,
-            )
-
-            logger.info(
-                "mark_queue_entry_as_paid: Создан платеж ID=%d для визита %d (через entry %d), сумма=%s, method=%s",
-                payment.id,
-                visit.id,
-                entry_id,
-                payment_amount,
-                requested_method,
-            )
-        else:
-            logger.info(
-                "mark_queue_entry_as_paid: Платеж уже существует для визита %d, ID=%d",
-                visit.id,
-                existing_payment.id,
-            )
-
-        # [FIX:PAYMENT_STATUS] Payment is stored separately; queue operational status stays intact.
-        # Issue #06 Phase 3: delegate visit status normalization to VisitLifecycleService.
-        changed_at = datetime.now(UTC)
-        from app.services.visit_lifecycle_service import VisitLifecycleService
-
-        visit = VisitLifecycleService(
-            db
-        ).restore_operational_status_after_payment_change(
-            visit_id=visit.id,
-        )
-        visit.updated_at = changed_at
-
-        # NOTE: entry.status is on OnlineQueueEntry, not Visit.
-        # This is a separate concern (queue_svc domain) and stays as-is.
+    entry = db.get(OnlineQueueEntry, entry_id)
+    if not entry:
+        raise HTTPException(404, "Queue entry not found")
+    # Keep the old marker-only command for legacy callers with no money amount.
+    # An actual receipt always requires a canonical visit owner.
+    if not entry.visit_id and (payment_req is None or payment_req.amount is None):
         entry.status = _preserve_operational_status_on_payment(entry.status)
-        entry.updated_at = changed_at
-        _sync_payment_invoices_for_paid_visit(
-            db,
-            visit_id=visit.id,
-            payment_method=(
-                existing_payment.method
-                if existing_payment and getattr(existing_payment, "method", None)
-                else requested_method
-            ),
-        )
-        logger.info(
-            "[FIX:PAYMENT_STATUS] Queue entry marked paid without changing operational status: entry_id=%d, visit_id=%d, entry_status=%s, visit_status=%s",
-            entry.id,
-            visit.id,
-            entry.status,
-            visit.status,
-        )
-
+        entry.discount_mode = "paid"
+        entry.updated_at = datetime.now(UTC)
         db.commit()
-        db.refresh(visit)
-        db.refresh(entry)
-
-        return {
-            "id": entry.id,
-            "visit_id": visit.id,
-            "status": visit.status,
-            "payment_status": "paid",
-            "payment_type": (
-                existing_payment.method
-                if existing_payment and getattr(existing_payment, "method", None)
-                else requested_method
-            ),
-            "amount": (
-                float(existing_payment.amount)
-                if existing_payment
-                and getattr(existing_payment, "amount", None) is not None
-                else payment_amount
-            ),
-            "message": "Запись отмечена как оплаченная",
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("mark_queue_entry_as_paid: Error: %s", str(e), exc_info=True)
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
+        return {"id": entry.id, "status": entry.status, "payment_status": "paid"}
+    response = _receive_registrar_payment(
+        db,
+        current_user,
+        [RegistrarRecordRef(record_kind="online_queue", record_id=entry_id)],
+        payment_req or MarkPaidRequest(),
+    )
+    return response.results[0].result
 
 
 @router.post("/registrar/visits/{visit_id}/complete", response_model=dict[str, Any])
@@ -1601,6 +1420,13 @@ def run_registrar_record_action(
             current_user,
             action,
             record.record_kind,
+        )
+
+    if action == "mark_paid" and request.amount is not None:
+        return _receive_registrar_payment(
+            db, current_user, unique_records,
+            MarkPaidRequest(amount=request.amount, method=request.method,
+                            payment_snapshot=request.payment_snapshot),
         )
 
     results = [
