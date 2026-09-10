@@ -1099,6 +1099,28 @@ class Mutation:
                     },
                 )
 
+                # QD-2C (Codex round-22 P2): registry_routed вычислен БЕЗ лока
+                # — ДО advisory-лока и FOR UPDATE-перепроверки внутри
+                # get_or_create_daily_queue. Если строка реестра
+                # деактивировалась в этом окне (а поверхности ещё не было),
+                # get_or_create падает в ДОКТОРСКУЮ ветку — а оба гварда уже
+                # пропущены по устаревшему boolean: внутренний 'Resource'-
+                # синтетик получил бы докторскую очередь и тикет ПОСЛЕ
+                # отключения его реестра. Решение по ФАКТУ возвращённой
+                # очереди (её вернул уже залоченный резолв): guard-skip
+                # законен только для очереди НА ресурсной оси; иначе —
+                # канонический гвард врача задним числом (реальный врач
+                # прошёл бы его и раньше — семантика байт-идентична).
+                if registry_routed and daily_queue.queue_resource_id is None:
+                    try:
+                        ensure_doctor_eligible_for_appointment(db, input.doctor_id)
+                    except HTTPException:
+                        return QueueMutationResponse(
+                            success=False,
+                            message="Врач недоступен для онлайн-записи",
+                            errors=["DOCTOR_INACTIVE"],
+                        )
+
                 # Codex P1 (round-15): get_or_create_daily_queue КОММИТИТ при
                 # создании очереди (и при обновлении кабинета) — внутренний
                 # commit завершает транзакцию и ОТПУСКАЕТ лок строки врача и
@@ -1304,12 +1326,15 @@ class Mutation:
             return response
 
         entry = response.queue_entry
-        specialist_id = (
-            entry.queue.specialist.id
-            if entry.queue and entry.queue.specialist
-            else input.doctor_id
-        )
         day = entry.queue.day if entry.queue else date.today()
+        # QD-2C (Codex round-22 P2): routing-комнаты для WS-broadcast —
+        # чистая ресурсная очередь адресуема через ЛЮБОГО same-specialty
+        # doctor id (каждый queue manager подписан на свой выбранный id),
+        # а не только через input.doctor_id; канонический хелпер
+        # queue_update_departments (round-18) расширяет её до всех
+        # routing-специалистов. Doctor/bridged очереди — легаси-комната
+        # байт-идентично. Fallback до вычисления — прежняя комната.
+        departments: list[str] = [f"specialist_{input.doctor_id}"]
 
         # 1) TV-табло: queue.created (payload строится при открытой сессии —
         # entry2.queue/patient lazy-load; после закрытия был бы DetachedInstanceError)
@@ -1322,26 +1347,30 @@ class Mutation:
                     .first()
                 )
                 if entry2:
+                    from app.ws.queue_ws import queue_update_departments
+
+                    departments = queue_update_departments(db2, entry2.queue)
                     await manager.broadcast_queue_update(
                         queue_entry=entry2, event_type="queue.created"
                     )
         except Exception as e:  # noqa: BLE001 — non-blocking
             logger.warning("GraphQL joinQueue: display broadcast failed: %s", e)
 
-        # 2) админский WS /ws/queue: entry_added
+        # 2) админский WS /ws/queue: entry_added — в КАЖДУЮ routing-комнату
         try:
             from app.ws.queue_ws import broadcast_queue_update
 
-            broadcast_queue_update(
-                department=f"specialist_{specialist_id}",
-                date=day.strftime("%Y-%m-%d"),
-                event_type="queue_update",
-                data={
-                    "action": "entry_added",
-                    "entry_id": entry.id,
-                    "number": entry.number,
-                },
-            )
+            for _dept in departments:
+                broadcast_queue_update(
+                    department=_dept,
+                    date=day.strftime("%Y-%m-%d"),
+                    event_type="queue_update",
+                    data={
+                        "action": "entry_added",
+                        "entry_id": entry.id,
+                        "number": entry.number,
+                    },
+                )
         except Exception as e:  # noqa: BLE001 — non-blocking
             logger.warning("GraphQL joinQueue: queue WS broadcast failed: %s", e)
 

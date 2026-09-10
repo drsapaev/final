@@ -4436,3 +4436,175 @@ def test_gql_join_queue_registry_tag_before_doctor_guard(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== FF. Codex round-22 pins =====================
+
+
+def test_gql_join_queue_stale_registry_flag_applies_doctor_guard(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-22 P2: registry_routed is computed UNLOCKED (before the
+    advisory lock and the FOR UPDATE recheck inside get_or_create). If the
+    registry row is deactivated in that window while no surface exists,
+    get_or_create falls back to the DOCTOR branch — the retro-check on the
+    RETURNED queue applies the canonical doctor guard: the Resource-role
+    synthetic must not receive a doctor-owned queue/ticket after its
+    registry was disabled. Simulated deterministically by stubbing the
+    precheck resolvers (the stale view) while the real registry row is
+    inactive. The impl COMMITs — durable rows cleaned in the finally."""
+    import contextlib
+    from types import SimpleNamespace
+
+    from app.graphql import mutations as gql_mutations
+    from app.graphql.types import QueueEntryInput
+    from app.models.patient import Patient
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    # the STALE precheck view: both resolvers claim the resource axis
+    monkeypatch.setattr(
+        gql_mutations, "tag_routes_to_resource", lambda db, tag, day: object()
+    )
+    monkeypatch.setattr(
+        gql_mutations, "_resolve_tag_resource", lambda db, tag: object()
+    )
+
+    patient = Patient(
+        last_name="Синтетикова",
+        first_name="Пациентка",
+        phone="+998901234595",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        user = _make_user(db_session, username="lab_res_ff1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        # the REAL registry state: the row is DEACTIVATED, no surface exists
+        _make_resource(db_session, code="lab", queue_tag="lab", active=False)
+
+        info = SimpleNamespace(context=None)
+        result = gql_mutations.Mutation._join_queue_impl(
+            info,
+            QueueEntryInput(
+                patient_id=patient.id,
+                doctor_id=synthetic.id,
+                queue_tag="lab",
+            ),
+        )
+        # the stale boolean must NOT hand a doctor-owned queue to the
+        # internal 'Resource' synthetic after its registry was disabled
+        assert result.success is False
+        assert result.errors == ["DOCTOR_INACTIVE"]
+        assert result.queue_entry is None
+
+        # no entry was inserted for the patient
+        from app.models.online_queue import OnlineQueueEntry as _OQE
+
+        joined = db_session.query(_OQE).filter(_OQE.patient_id == patient.id).count()
+        assert joined == 0
+    finally:
+        _durable_cleanup(db_session, "lab_res_ff1")
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_gql_join_queue_broadcasts_routing_rooms(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-22 P2: a successful GraphQL registry join broadcasts
+    entry_added to EVERY routing room — a pure resource queue is
+    addressable through any same-specialty doctor id (each queue manager
+    subscribes to its own selected id), and the canonical
+    queue_update_departments helper expands the queue to all routing
+    specialists. The doctor-queue wrapper keeps the legacy single room.
+    The wrapper COMMITS — durable rows cleaned in the finally."""
+    import asyncio
+    import contextlib
+    from types import SimpleNamespace
+
+    from app.graphql import mutations as gql_mutations
+    from app.graphql.types import QueueEntryInput
+    from app.models.patient import Patient
+    from app.ws import queue_ws
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    ws_calls: list[dict] = []
+
+    def fake_broadcast(**kwargs):
+        ws_calls.append(kwargs)
+
+    monkeypatch.setattr(queue_ws, "broadcast_queue_update", fake_broadcast)
+
+    patient = Patient(
+        last_name="Электрогард",
+        first_name="Пациент",
+        phone="+998901234594",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        # TWO doctors route to the 'lab' tag: the join target synthetic
+        # and a second same-specialty synthetic (each queue manager
+        # subscribes to its own selected id)
+        user_a = _make_user(db_session, username="lab_res_ff2a", role="Resource")
+        synth_a = _make_doctor(db_session, user_id=user_a.id, specialty="lab")
+        user_b = _make_user(db_session, username="lab_res_ff2b", role="Resource")
+        synth_b = _make_doctor(db_session, user_id=user_b.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+
+        info = SimpleNamespace(context=None)
+        response = asyncio.run(
+            gql_mutations.Mutation.join_queue(
+                None,
+                info,
+                QueueEntryInput(
+                    patient_id=patient.id,
+                    doctor_id=synth_a.id,
+                    queue_tag="lab",
+                ),
+            )
+        )
+        assert response.success is True, (response.message, response.errors)
+        assert response.queue_entry is not None
+
+        routed = sorted(
+            c["department"]
+            for c in ws_calls
+            if c.get("data", {}).get("action") == "entry_added"
+        )
+        assert routed == [
+            f"specialist_{synth_a.id}",
+            f"specialist_{synth_b.id}",
+        ], f"entry_added must reach every routing room: {ws_calls}"
+        assert "specialist_None" not in routed
+        assert all(c.get("event_type") == "queue_update" for c in ws_calls)
+    finally:
+        _durable_cleanup(db_session, "lab_res_ff2a", "lab_res_ff2b")
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
