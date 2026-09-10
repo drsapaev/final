@@ -958,8 +958,21 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+      # PR-1 reminder pipeline: the redis-marked end-to-end wiring test
+      # (tests/integration/test_reminder_pipeline.py) needs a real Redis;
+      # it skips gracefully when none is reachable.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb
+      ARQ_REDIS_URL: redis://localhost:6379/0
       CORS_DISABLE: '1'
       WS_DEV_ALLOW: '1'
       PYTHONIOENCODING: 'utf-8'
@@ -1030,6 +1043,16 @@ jobs:
           mkdir -p htmlcov
           echo "Placeholder coverage report - tests completed successfully" > htmlcov/index.html
         fi
+
+    # PR-1 reminder pipeline (Codex P2): the concurrent-claim race on
+    # visits.reminder_sent_at can only be proven under real PostgreSQL row
+    # locks (SQLite ignores FOR UPDATE). gate_d is excluded from the main
+    # suite above; this step runs the dedicated proof against the job's
+    # postgres service.
+    - name: 🧪 Reminder PG concurrency (gate_d)
+      run: |
+        cd backend
+        pytest tests/integration/test_reminder_pipeline_pg.py -m gate_d --noconftest
 
     - name: 🧪 Critical E2E Smoke
       run: |

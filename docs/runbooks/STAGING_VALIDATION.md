@@ -347,30 +347,86 @@ cd backend
 arq app.tasks.worker.WorkerSettings
 
 # Terminal 2: enqueue a test reminder
+# (Codex round 9: schedule_version is a REQUIRED producer argument — the
+# worker rejects unversioned jobs. The version is built from the visit's
+# date, time and reminder generation.
+# Codex round 15, P1: this check creates its fixture through the APPROVED
+# generator — `app.synthetic_seed.seed_staging_reminder_fixture()` — per
+# the AGENTS.md synthetic-data policy (all staging/demo data MUST come from
+# synthetic_seed.py or dev_seed.py; inline INSERTs are forbidden). The
+# generator owns User → Doctor → Patient → Visit with SYNTHETIC markers,
+# a unique per-run suffix and an appointment placed in the reminder window
+# (now + 24h + 2min, expressed in CLINIC wall-clock), so the check never
+# selects or consumes a REAL visit's reminder.
+# Codex round 14, P2 (channel honesty): patients have NO telegram_id
+# column, so _determine_best_channel() (telegram > pwa > phone) picks the
+# PWA branch for a +998 synthetic phone — the generator returns the
+# expected channel and the snippet passes it to enqueue_reminder.)
 cd backend
 python -c "
 import asyncio
+
+from app.synthetic_seed import seed_staging_reminder_fixture
+from app.db.session import SessionLocal
 from app.tasks import enqueue_reminder
 
 async def main():
-    job_id = await enqueue_reminder(visit_id=1, channel='telegram')
-    print(f'Enqueued job: {job_id}')
+    db = SessionLocal()
+    try:
+        fixture = seed_staging_reminder_fixture(db)
+        print(
+            f\"Created SYNTHETIC staging-check visit id={fixture['visit_id']} \"
+            f\"(suffix {fixture['suffix']})\"
+        )
+        print(f\"Expected delivery channel for this fixture: {fixture['expected_channel']}\")
+        print(f\"Schedule version: {fixture['schedule_version']}\")
+        job_id = await enqueue_reminder(
+            visit_id=fixture['visit_id'],
+            channel=fixture['expected_channel'],
+            schedule_version=fixture['schedule_version'],
+        )
+        print(f'Enqueued job: {job_id}')
+        print(f\"Cleanup suffix: {fixture['suffix']}\")
+    finally:
+        db.close()
 
 asyncio.run(main())
 "
 
-# Watch Terminal 1 for log output:
-# Expected: 'job.send_visit_reminder visit_id=1 channel=telegram'
-# Then: 'job.send_visit_reminder: visit 1 reminded via telegram' (if send succeeds)
-# Or: 'job.send_visit_reminder: send failed for visit 1: <error>' (if Telegram bot not configured)
+# Watch Terminal 1 for log output (substitute the printed visit id):
+# Expected: 'job.send_visit_reminder visit_id=<visit.id> channel=<expected>'
+# Then: 'job.send_visit_reminder: visit <visit.id> reminded via <expected>'
+# Or: 'job.send_visit_reminder: send failed for visit <visit.id>: <error>'
+# (e.g. no PWA push credentials for the synthetic recipient — see Expected)
 ```
 
 ### Expected
 
-- Worker logs show `task.enqueue.ok job_id=reminder:visit:1:telegram`
+- Worker logs show `task.enqueue.ok job_id=reminder:visit:<visit.id>:<expected>` (the synthetic visit id created by THIS run)
 - Worker attempts to send via `NotificationService.send_confirmation_reminder`
-- If Telegram bot is configured: reminder delivered, `visits.reminder_sent_at` set
-- If not configured: job fails + retries 3x with 10s/60s/300s backoff, then gives up
+- The delivery channel in the log MUST match the generator's printed `_determine_best_channel` priority: the +998 synthetic phone routes to `pwa`; `telegram` fires only for patients with actual Telegram linkage (not this fixture — see Check 6 for a real bot delivery)
+- Delivered: `visits.reminder_sent_at` is set for the synthetic visit; failed: job retries 3x with 10s/60s/300s backoff, then gives up
+
+### Cleanup (run after the check)
+
+```bash
+# Replace <suffix> with the printed cleanup suffix (unique per run).
+cd backend
+python -c "
+from app.synthetic_seed import remove_staging_reminder_fixture
+from app.db.session import SessionLocal
+
+db = SessionLocal()
+try:
+    removed = remove_staging_reminder_fixture(db, '<suffix>')
+    print(f'Removed staging reminder fixture: {removed}')
+finally:
+    db.close()
+"
+# A reminder job still sitting in Redis for a deleted synthetic visit is
+# harmless: the worker logs 'visit <id> not found' and completes — the
+# pipeline's idempotency contract covers missing visits by design.
+```
 
 ### If it fails
 

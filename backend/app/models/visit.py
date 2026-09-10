@@ -83,6 +83,32 @@ class Visit(Base):
         String(64), nullable=True
     )  # user_id, telegram_id, или phone
 
+    # ✅ Идемпотентность reminder-пайплайна (arq job send_visit_reminder):
+    # штампуется воркером после успешной отправки напоминания; повторные
+    # запуски job'а (arq retry / повторный enqueue) видят NOT NULL и
+    # пропускают отправку. Канонический путь записи — только воркер
+    # (app/tasks/worker.py), схема — миграция 0060.
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    # ✅ Lease (короткоживущий claim) того же job'а: ставится ДО dispatch,
+    # чтобы две конкурирующие доставки не отправили дважды, и снимается
+    # после успешной записи reminder_sent_at (или при неудаче). Lease старше
+    # LEASE_TTL воркера — след умершего процесса и подлежит перев claim'у.
+    # Схема — миграция 0060.
+    reminder_claimed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    # ✅ Поколение расписания (Codex round 7): инкрементируется каждым
+    # путём, меняющим расписание; входит в schedule_version джоба, делая
+    # версии неповторяющимися (цикл A→B→A не коллидирует с retained
+    # результатом arq). Схема — миграция 0060.
+    reminder_generation: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
     # ✅ SSOT: Источник визита (единственный источник истины)
     # 'online' = QR/Telegram регистрация
     # 'desk' = Регистратура
