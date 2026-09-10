@@ -5,11 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
 from app.core.specialties import canonical_specialty
 from app.crud import queue_resource_routing
+from app.crud.clinic import get_queue_settings
 from app.repositories.display_websocket_api_repository import (
     DisplayWebSocketApiRepository,
 )
@@ -35,6 +37,26 @@ class DisplayWebSocketApiService:
         self.repository = repository or DisplayWebSocketApiRepository(db)
         self._manager_provider = manager_provider
 
+    def _clinic_today(self) -> date:
+        """Codex round-24 P2: the quick-call day — the CLINIC-local date
+        (the queue-settings timezone SSOT), not the host-local
+        ``date.today()``: queue creation paths (GQL joinQueue, morning
+        pre-create, the canonical join flow) stamp the clinic-local day,
+        so on the documented UTC runtime with an Asia/Tashkent clinic
+        the first five local hours resolved the WRONG surface — the
+        quick-call missed that day's resource queue and fell through to
+        doctor selection (which excludes the seeded 'Resource' owner)
+        returning 404 despite a waiting entry. Unit-stub shape
+        (db=None + fake repository, same convention as
+        _resolve_registry_surface): the day only flows into the
+        stubbed lookups — host today keeps the stubs' contract."""
+        if not isinstance(self.db, Session):
+            return date.today()
+        timezone = ZoneInfo(
+            get_queue_settings(self.db).get("timezone", "Asia/Tashkent")
+        )
+        return datetime.now(timezone).date()
+
     def _resolve_registry_surface(self, specialty: str) -> object | None:
         """QD-2C (Codex round-11 P1): the (today, tag) registry surface
         for a registry-tag specialty, or None.
@@ -48,8 +70,9 @@ class DisplayWebSocketApiService:
         Non-Session db (unit stubs) keeps the legacy doctor path."""
         if not isinstance(self.db, Session):
             return None
+        # Codex round-24 P2: the clinic-local day (see _clinic_today).
         return queue_resource_routing.tag_routes_to_resource(
-            self.db, specialty, date.today()
+            self.db, specialty, self._clinic_today()
         )
 
     @staticmethod
@@ -230,7 +253,10 @@ class DisplayWebSocketApiService:
             daily_queue = registry_surface
         else:
             daily_queue = self.repository.get_daily_queue_for_specialist(
-                day=date.today(),
+                # Codex round-24 P2: the clinic-local day — the doctor
+                # queues are created with it (morning pre-create), the
+                # host-local date missed them in the early-morning window.
+                day=self._clinic_today(),
                 specialist_id=doctor.id,
             )
 

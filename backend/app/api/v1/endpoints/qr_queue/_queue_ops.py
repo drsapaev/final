@@ -199,15 +199,32 @@ async def call_next_patient(
             # Broadcast to /ws/queue admin panel subscribers (instant update
             # instead of 30s polling). Room: specialist_{id}::{date}.
             try:
-                from app.ws.queue_ws import broadcast_queue_update
+                from app.ws.queue_ws import (
+                    broadcast_queue_update,
+                    queue_update_departments,
+                )
 
                 queue_date_str = queue_date.strftime("%Y-%m-%d") if queue_date else ""
-                broadcast_queue_update(
-                    department=f"specialist_{specialist_id}",
-                    date=queue_date_str,
-                    event_type="queue_update",
-                    data={"action": "call_next", "entry_id": entry_id},
+                # QD-2C (Codex round-24 P2): комната — маршрутизирующая
+                # идентичность ВЫБРАННОЙ очереди: resource-очередь
+                # адресуема через ЛЮБОЙ same-specialty doctor id (менеджеры
+                # подписаны на свой выбранный id) — call_next достигает
+                # КАЖДУЮ routing-комнату, как join/restore/no-show
+                # (round-18/22). Doctor-очереди — легаси-комната
+                # байт-идентично; без entry (патологический случай) — прежняя
+                # комната вызвавшего.
+                call_rooms = (
+                    queue_update_departments(db, entry.queue)
+                    if entry is not None
+                    else [f"specialist_{specialist_id}"]
                 )
+                for _dept in call_rooms:
+                    broadcast_queue_update(
+                        department=_dept,
+                        date=queue_date_str,
+                        event_type="queue_update",
+                        data={"action": "call_next", "entry_id": entry_id},
+                    )
             except Exception as e:
                 logger.warning(f"Failed to broadcast queue WS update for entry {entry_id}: {e}")
         # --------------------------

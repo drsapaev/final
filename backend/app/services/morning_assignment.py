@@ -147,12 +147,19 @@ class MorningAssignmentService:
                 # general_resource-синтетика байт-идентично (до QD-2E).
                 if resolve_tag_resource(self.db, queue_tag) is not None:
                     if find_active_tag_queue(self.db, target_date, queue_tag) is None:
-                        queue_service.get_or_create_daily_queue(
-                            self.db,
-                            day=target_date,
-                            specialist_id=None,
-                            queue_tag=queue_tag,
-                        )
+                        # Codex round-24 P2: изоляция тега в SAVEPOINT — как
+                        # легаси-ветка ниже: get_or_create_daily_queue больше
+                        # НЕ откатывает сеанс при сбое flush (контракт #3092
+                        # P1), поэтому без savepoint сбойнувший тег оставлял
+                        # бы полусозданную очередь/счётчик врал бы после
+                        # catch-and-continue.
+                        with self.db.begin_nested():
+                            queue_service.get_or_create_daily_queue(
+                                self.db,
+                                day=target_date,
+                                specialist_id=None,
+                                queue_tag=queue_tag,
+                            )
                         created_count += 1
                         logger.info(
                             "✅ Pre-created resource DailyQueue for queue_tag=%s",

@@ -1522,6 +1522,19 @@ class Mutation:
                         # Codex P1 (round-9): день вызова — из ВЫБРАННОЙ очереди
                         # (загружен при снапшоте), не host date.today().
                         payload["broadcast_day"] = entry.queue.day
+                        # QD-2C (Codex round-24 P2): routing-комнаты выбранной
+                        # очереди — считаются ЗДЕСЬ, при живой сессии
+                        # (обёртка/event loop сессии не имеет): resource-
+                        # очередь адресуема через ЛЮБОЙ same-specialty
+                        # doctor id (менеджеры подписаны на свой выбранный
+                        # id) — call_next должен достичь каждую, как
+                        # join/restore/no-show (round-18/22); doctor-
+                        # очереди — легаси-комната байт-идентично.
+                        from app.ws.queue_ws import queue_update_departments
+
+                        payload["broadcast_departments"] = (
+                            queue_update_departments(db, entry.queue)
+                        )
 
                     # --- post-commit side effects с sync-DB (в этом же worker) ---
                     # 1) push-уведомление пациенту: sync-обёртка (asyncio.run
@@ -1648,14 +1661,24 @@ class Mutation:
                 from app.ws.queue_ws import broadcast_queue_update
 
                 broadcast_day = payload.get("broadcast_day")
-                broadcast_queue_update(
-                    department=f"specialist_{doctor_id}",
-                    date=(
-                        broadcast_day.strftime("%Y-%m-%d") if broadcast_day else None
-                    ),
-                    event_type="queue_update",
-                    data={"action": "call_next", "entry_id": entry_id},
-                )
+                # QD-2C (Codex round-24 P2): routing-комнаты выбранной
+                # очереди (посчитаны в impl при живой сессии) — broadcast
+                # в КАЖДУЮ; fallback (нет очереди в payload) — прежняя
+                # комната вызвавшего.
+                departments = payload.get("broadcast_departments") or [
+                    f"specialist_{doctor_id}"
+                ]
+                for _dept in departments:
+                    broadcast_queue_update(
+                        department=_dept,
+                        date=(
+                            broadcast_day.strftime("%Y-%m-%d")
+                            if broadcast_day
+                            else None
+                        ),
+                        event_type="queue_update",
+                        data={"action": "call_next", "entry_id": entry_id},
+                    )
             except Exception as e:  # noqa: BLE001 — non-blocking
                 logger.warning("GraphQL callNext: queue WS broadcast failed: %s", e)
 

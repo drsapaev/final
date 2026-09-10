@@ -409,13 +409,43 @@ def test_crud_get_or_create_non_registry_keeps_doctor_guard(
 # ===================== D. morning pre-create =====================
 
 
+def _neutralize_begin_nested(monkeypatch, db_session: Session) -> None:
+    """QD-2C (round-18 CI root-cause, main #3092 interplay): the
+    pre-create paths are wrapped in session.begin_nested() (bb01d3a0f;
+    round-24 extended it to the registry branch). On the sqlite test DB
+    that desyncs the db_session fixture's savepoint-restart listener:
+    the session-level savepoint ends, the listener re-arms a connection
+    savepoint the session no longer tracks, teardown rolls back to a
+    dead savepoint and the leaked connection LOCKS the shared file DB —
+    every later test fails with "database is locked" (the CI 20-minute
+    timeout cascade). The #3092 authors documented the exact class in
+    queue_svc/_operations.py ("a session-level savepoint (begin_nested)
+    breaks the savepoint-isolated test fixture — P2-1b warned exactly
+    this") and their own pin skips sqlite; this suite asserts
+    routing/ownership, not tag-failure isolation — neutralize the nested
+    block for the fixture's sake."""
+
+    class _FlatNested:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(db_session, "begin_nested", lambda *a, **k: _FlatNested())
+
+
 def test_morning_precreate_registry_tags_go_resource_axis(
     db_session: Session,
+    monkeypatch,
 ) -> None:
     """ensure_daily_queues_for_all_tags: lab/ecg (registry rows) are
     pre-created resource-owned — the synthetic general_resource is
     not even needed for them."""
     from app.services.morning_assignment import MorningAssignmentService
+
+    # round-24: the registry pre-create rides the per-tag savepoint too
+    _neutralize_begin_nested(monkeypatch, db_session)
 
     _scope_morning_world(db_session, "lab", "ecg")
     _make_resource(db_session, code="lab", queue_tag="lab")
@@ -444,27 +474,8 @@ def test_morning_precreate_general_tag_keeps_synthetic_path(
     pre-created on the general_resource synthetic doctor."""
     from app.services.morning_assignment import MorningAssignmentService
 
-    # QD-2C (round-18 CI root-cause, main #3092 interplay): the doctor-path
-    # pre-create is wrapped in session.begin_nested() (bb01d3a0f). On the
-    # sqlite test DB that desyncs the db_session fixture's savepoint-restart
-    # listener: the session-level savepoint ends, the listener re-arms a
-    # connection savepoint the session no longer tracks, teardown rolls
-    # back to a dead savepoint and the leaked connection LOCKS the shared
-    # file DB — every later test fails with "database is locked" (the CI
-    # 20-minute timeout cascade). The #3092 authors documented the exact
-    # class in queue_svc/_operations.py ("a session-level savepoint
-    # (begin_nested) breaks the savepoint-isolated test fixture — P2-1b
-    # warned exactly this") and their own pin skips sqlite; this suite
-    # asserts routing/ownership, not tag-failure isolation — neutralize
-    # the nested block for the fixture's sake.
-    class _FlatNested:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            return False
-
-    monkeypatch.setattr(db_session, "begin_nested", lambda *a, **k: _FlatNested())
+    # QD-2C (round-18 CI root-cause): see _neutralize_begin_nested.
+    _neutralize_begin_nested(monkeypatch, db_session)
 
     _scope_morning_world(db_session, "general")
     gen_user = _make_user(db_session, username="general_resource", role="Resource")
@@ -2467,12 +2478,17 @@ def test_display_quick_call_resolves_resource_surface(
 
 def _test_quick_call_body(db_session: Session) -> None:
     import asyncio
+    from datetime import datetime
     from unittest.mock import AsyncMock
+    from zoneinfo import ZoneInfo
 
     from app.services.display_websocket_api_service import DisplayWebSocketApiService
 
     _make_resource(db_session, code="lab", queue_tag="lab")
-    today = date.today()
+    # Codex round-24 P2: the service resolves the CLINIC-local day (the
+    # queue-settings timezone SSOT, default Asia/Tashkent) — the queue
+    # must live on that day, as the creation paths stamp it.
+    today = datetime.now(ZoneInfo("Asia/Tashkent")).date()
     queue = queue_service.get_or_create_daily_queue(
         db_session, day=today, specialist_id=None, queue_tag="lab"
     )
@@ -4752,3 +4768,169 @@ def test_gql_join_queue_doctor_fallback_keeps_full_guard_chain(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== HH. Codex round-24 pins =====================
+
+
+def test_quick_call_resolves_clinic_day_surface(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-24 P2: the display quick-call resolves the day in the
+    CLINIC timezone (the queue-settings SSOT), not the host-local
+    date.today() — on a UTC host with an Asia/Tashkent clinic the first
+    five local hours missed that day's resource queue and fell through
+    to doctor selection (which excludes the seeded 'Resource' owner),
+    returning 404 despite a waiting entry. The timezone here is chosen
+    dynamically so the clinic-local date GUARANTEEDLY differs from the
+    host date at test runtime (UTC+14 / UTC-12 extremes are 1-2 days
+    apart — at least one differs from any third date). The repository
+    COMMITs — durable rows cleaned in the finally."""
+    import asyncio
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+
+    from app.services import display_websocket_api_service as dwas
+
+    ahead = _dt.now(ZoneInfo("Pacific/Kiritimati")).date()  # UTC+14
+    behind = _dt.now(ZoneInfo("Etc/GMT+12")).date()  # UTC-12
+    assert ahead != behind  # the extremes are 1-2 days apart
+    host_today = date.today()
+    if ahead != host_today:
+        tz_name, clinic_day = "Pacific/Kiritimati", ahead
+    else:
+        tz_name, clinic_day = "Etc/GMT+12", behind
+    assert clinic_day != host_today  # the divergence window is real
+
+    monkeypatch.setattr(
+        dwas,
+        "get_queue_settings",
+        lambda db: {"timezone": tz_name},
+    )
+
+    class FakeManager:
+        connections: list = []
+
+        async def broadcast_patient_call(self, **kwargs):
+            pass
+
+    try:
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        # the queue-creation paths stamp the CLINIC-local day
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=51)
+        caller = _make_user(db_session, username="reg_hh1", role="Registrar")
+
+        service = dwas.DisplayWebSocketApiService(
+            db_session, manager_provider=lambda: FakeManager()
+        )
+        result = asyncio.run(
+            service.quick_call_next(specialty="lab", board_id=None, current_user=caller)
+        )
+        assert result["success"] is True, result
+        db_session.refresh(entry)
+        assert entry.status == "called"
+    finally:
+        _durable_cleanup(db_session, "reg_hh1")
+
+
+def test_call_next_broadcasts_routing_rooms(db_session: Session, monkeypatch) -> None:
+    """Codex round-24 P2: the call-next wrappers broadcast through EVERY
+    routing room of the SELECTED queue — a resource queue is addressable
+    through any same-specialty doctor id (each queue manager subscribes
+    to its own selected id), so managers on sibling ids must see the
+    waiting-to-called transition instantly. Covers the REST endpoint
+    (rooms derived from the selected entry's queue) and the GQL impl
+    (broadcast_departments payload). The wrapper COMMITs — durable rows
+    cleaned in the finally."""
+    import asyncio
+    import contextlib
+    from types import SimpleNamespace
+
+    from app.ws import queue_ws
+
+    ws_calls: list[dict] = []
+
+    def fake_broadcast(**kwargs):
+        ws_calls.append(kwargs)
+
+    monkeypatch.setattr(queue_ws, "broadcast_queue_update", fake_broadcast)
+
+    # the clinic-local day the call-next paths resolve
+    tz_day = _dt_now_tashkent_day()
+
+    try:
+        # TWO doctors route to the 'lab' tag: the invoked synthetic and
+        # a second same-specialty sibling (managers may select either id)
+        user_a = _make_user(db_session, username="lab_res_hh2a", role="Resource")
+        synth_a = _make_doctor(db_session, user_id=user_a.id, specialty="lab")
+        user_b = _make_user(db_session, username="lab_res_hh2b", role="Resource")
+        synth_b = _make_doctor(db_session, user_id=user_b.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=tz_day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=61)
+        caller = _make_user(db_session, username="reg_hh2", role="Registrar")
+
+        # --- REST endpoint: rooms from the selected entry's queue ---
+        from app.api.v1.endpoints.qr_queue._queue_ops import call_next_patient
+
+        async def scenario():
+            return await call_next_patient(
+                synth_a.id,
+                target_date=tz_day.isoformat(),
+                db=db_session,
+                current_user=caller,
+            )
+
+        payload = asyncio.run(scenario())
+        assert payload.success is True
+        db_session.refresh(entry)
+        assert entry.status == "called"
+
+        routed = sorted(
+            c["department"]
+            for c in ws_calls
+            if c.get("data", {}).get("action") == "call_next"
+        )
+        assert routed == [
+            f"specialist_{synth_a.id}",
+            f"specialist_{synth_b.id}",
+        ], f"call_next must reach every routing room: {ws_calls}"
+        assert "specialist_None" not in routed
+
+        # --- GQL impl: the broadcast rooms ride the payload ---
+        from app.graphql import mutations as gql_mutations
+
+        monkeypatch.setattr(
+            gql_mutations,
+            "get_db_session",
+            lambda: contextlib.nullcontext(db_session),
+        )
+        second = _make_waiting_entry(db_session, queue, number=62)
+        actor = _make_user(db_session, username="adm_hh2", role="Admin")
+        info = SimpleNamespace(context=SimpleNamespace(user=actor, request=None))
+        gql_payload = gql_mutations.Mutation._call_next_patient_impl(
+            info, synth_b.id, "lab"
+        )
+        assert gql_payload["success"] is True, gql_payload
+        db_session.refresh(second)
+        assert second.status == "called"
+        assert sorted(gql_payload["broadcast_departments"]) == sorted(
+            [f"specialist_{synth_a.id}", f"specialist_{synth_b.id}"]
+        )
+        assert "specialist_None" not in gql_payload["broadcast_departments"]
+    finally:
+        _durable_cleanup(
+            db_session, "lab_res_hh2a", "lab_res_hh2b", "reg_hh2", "adm_hh2"
+        )
+
+
+def _dt_now_tashkent_day():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    return datetime.now(ZoneInfo("Asia/Tashkent")).date()

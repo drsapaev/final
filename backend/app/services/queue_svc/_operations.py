@@ -464,7 +464,15 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 try:
                     db.flush()
                 except Exception as e:
-                    db.rollback()
+                    # Codex round-24 P2: NO db.rollback() here — the same
+                    # #3092 P1 contract as the doctor branch below: a full
+                    # rollback erases the CALLER's uncommitted rows in this
+                    # transaction (the morning pre-create loop's earlier
+                    # iterations, a wizard cart's staged flushes), so a
+                    # catch-and-continue caller would report success for
+                    # rows that no longer exist. The failure PROPAGATES;
+                    # catch-and-continue callers isolate the call in their
+                    # own per-tag savepoint (morning_assignment does).
                     logger.error(
                         "Failed to create resource DailyQueue: day=%s, "
                         "queue_resource_id=%s, queue_tag=%s, error=%s",
