@@ -35,7 +35,7 @@ import socket
 import sys
 import tempfile
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from urllib.parse import urlparse, urlsplit, urlunsplit
 
 import pytest
@@ -64,7 +64,11 @@ REDIS_URL = _test_redis_url()
 # Schedule version matching the make_visit fixture rows (date=today,
 # time="10:00", generation=0). Codex round 7: every delivery MUST carry a
 # schedule version — unversioned jobs are rejected by the worker.
-FIXTURE_VERSION = f"{date.today().isoformat()}T10:00#0"
+# Fixture visits live TWO days ahead: the round-16 worker legitimately
+# rejects reminders whose appointment has already started, so a "today
+# 10:00" fixture would be a past appointment every run after 05:00 UTC.
+FIXTURE_DATE = date.today() + timedelta(days=2)
+FIXTURE_VERSION = f"{FIXTURE_DATE.isoformat()}T10:00#0"
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +196,7 @@ def make_visit(pipeline_db):
             visit = Visit(
                 patient_id=patient.id,
                 doctor_id=doctor.id,
-                visit_date=date.today(),
+                visit_date=FIXTURE_DATE,
                 visit_time="10:00",
                 status="pending_confirmation",
                 discount_mode="none",
@@ -1209,7 +1213,7 @@ def test_stale_time_version_is_rejected(pipeline_db, make_visit, reminder_spy):
     from app.tasks.worker import send_visit_reminder
 
     visit_id = make_visit()  # visit_date = today, visit_time = "10:00"
-    stale_version = f"{date.today().isoformat()}T09:00#0"
+    stale_version = f"{FIXTURE_DATE.isoformat()}T09:00#0"
 
     asyncio.run(
         send_visit_reminder(
@@ -1238,7 +1242,7 @@ def test_stale_generation_is_rejected(pipeline_db, make_visit, reminder_spy):
     from app.tasks.worker import send_visit_reminder
 
     visit_id = make_visit()  # generation = 0
-    stale_gen_version = f"{date.today().isoformat()}T10:00#5"
+    stale_gen_version = f"{FIXTURE_DATE.isoformat()}T10:00#5"
 
     asyncio.run(
         send_visit_reminder(
@@ -1317,7 +1321,7 @@ def test_reschedule_during_dispatch_prevents_stale_record(
 
     # Old-generation delivery: the provider accepts, but the finalize must
     # refuse to record it (generation moved on underneath the dispatch).
-    old_version = f"{date.today().isoformat()}T10:00#0"
+    old_version = FIXTURE_VERSION
     asyncio.run(
         send_visit_reminder(
             {},
@@ -1469,7 +1473,7 @@ def test_reschedule_refuses_when_lease_never_clears(
         assert polls["n"] >= 1, "the wait must poll before refusing"
 
         row = s.query(Visit).filter(Visit.id == visit_id).first()
-        assert row.visit_date == date.today(), "schedule unchanged"
+        assert row.visit_date == FIXTURE_DATE, "schedule unchanged"
         assert row.reminder_generation == 0, "generation untouched"
         assert row.reminder_claimed_at is not None, "lease untouched"
     finally:
@@ -1532,7 +1536,7 @@ def test_noop_reschedule_skips_lease_coordination(
 
     s = sessionmaker(bind=pipeline_db)()
     try:
-        reschedule_visit(visit_id=visit_id, new_date=date.today(), new_time=None, db=s)
+        reschedule_visit(visit_id=visit_id, new_date=FIXTURE_DATE, new_time=None, db=s)
         row = s.query(Visit).filter(Visit.id == visit_id).first()
         assert row.reminder_generation == 0, "no-op preserves the generation"
         assert row.reminder_claimed_at is not None, "no-op preserves the lease"
@@ -1612,7 +1616,7 @@ def test_telegram_move_visit_is_lease_coordinated(
             )
 
         row = s.query(Visit).filter(Visit.id == visit_id).first()
-        assert row.visit_date == date.today(), "move refused — schedule intact"
+        assert row.visit_date == FIXTURE_DATE, "move refused — schedule intact"
         assert row.reminder_generation == 0
         assert row.reminder_claimed_at is not None
     finally:
@@ -1656,7 +1660,7 @@ def test_reschedule_atomic_update_rejects_lease_race(
         assert "Reminder delivery is in progress" in exc_info.value.detail
 
         row = s.query(Visit).filter(Visit.id == visit_id).first()
-        assert row.visit_date == date.today(), "schedule unchanged"
+        assert row.visit_date == FIXTURE_DATE, "schedule unchanged"
         assert row.reminder_generation == 0, "generation untouched"
         assert row.reminder_sent_at is None, "stamp untouched"
         assert row.reminder_claimed_at is not None, "lease untouched"
@@ -2614,5 +2618,283 @@ def test_transition_status_revalidates_lease_after_lock(
 
         row = s.query(Visit).filter(Visit.id == visit_id).first()
         assert row.status == "pending_confirmation", "status unchanged"
+    finally:
+        s.close()
+
+
+# ---------------------------------------------------------------------------
+# Codex round 16 — expired tokens, stale appointments, confirmation-claim
+# lease coordination, telegram generation guard
+# ---------------------------------------------------------------------------
+
+
+def test_worker_rejects_started_appointment(
+    pipeline_db, make_visit, reminder_spy
+):
+    """Round 16, P2: a job that sat in Redis through a long worker outage
+    must not dispatch for an appointment that has already started — the
+    claim matches the stored schedule but the worker rechecks the
+    appointment START itself (the sweep cannot invalidate queued jobs)."""
+    from datetime import timedelta
+
+    from app.models.visit import Visit
+    from app.tasks.scheduler import build_reminder_schedule_version
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {
+                "visit_date": date.today() - timedelta(days=1),
+                "visit_time": "10:00",
+            }
+        )
+        s.commit()
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        version = build_reminder_schedule_version(row)
+
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=visit_id,
+                channel="telegram",
+                schedule_version=version,
+            )
+        )
+
+        assert reminder_spy == [], "no dispatch for a started appointment"
+        fresh = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert fresh.reminder_sent_at is None, "nothing recorded"
+        assert fresh.reminder_claimed_at is None, "lease released"
+    finally:
+        s.close()
+
+
+def test_worker_refreshes_expired_confirmation_token(
+    pipeline_db, make_visit, reminder_spy
+):
+    """Round 16, P1: a confirmation token lives 48h from booking — a visit
+    booked further ahead would receive a reminder with an UNUSABLE link.
+    The worker re-issues the token (same generator + lifetime) while it
+    holds the lease, BEFORE the dispatch."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.visit import Visit
+    from app.tasks.scheduler import build_reminder_schedule_version
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {
+                "confirmation_expires_at": (
+                    datetime.now(UTC) - timedelta(hours=1)
+                ).replace(tzinfo=None),
+                "visit_date": date.today() + timedelta(days=2),
+                "visit_time": "10:00",
+            }
+        )
+        s.commit()
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        old_token = row.confirmation_token
+        assert old_token is not None
+        version = build_reminder_schedule_version(row)
+
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=visit_id,
+                channel="telegram",
+                schedule_version=version,
+            )
+        )
+
+        assert len(reminder_spy) == 1, "the reminder was dispatched"
+        s.expire_all()  # the worker committed via its own session
+        fresh = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert fresh.confirmation_token != old_token, "token re-issued"
+        assert fresh.confirmation_expires_at is not None
+        expires = fresh.confirmation_expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        assert expires > datetime.now(UTC) + timedelta(hours=47), (
+            "the fresh token carries the full 48h lifetime"
+        )
+        assert fresh.reminder_sent_at is not None, "delivery recorded"
+    finally:
+        s.close()
+
+
+def test_worker_keeps_valid_confirmation_token(
+    pipeline_db, make_visit, reminder_spy
+):
+    """The inverse: a still-valid token is left untouched (re-issuing
+    would invalidate links already in the patient's hands)."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.visit import Visit
+    from app.tasks.scheduler import build_reminder_schedule_version
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {
+                "confirmation_expires_at": (
+                    datetime.now(UTC) + timedelta(hours=10)
+                ).replace(tzinfo=None),
+                "visit_date": date.today() + timedelta(days=2),
+                "visit_time": "10:00",
+            }
+        )
+        s.commit()
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        old_token = row.confirmation_token
+        version = build_reminder_schedule_version(row)
+
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=visit_id,
+                channel="telegram",
+                schedule_version=version,
+            )
+        )
+
+        s.expire_all()  # the worker committed via its own session
+        fresh = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert fresh.confirmation_token == old_token, (
+            "a valid token is never re-issued"
+        )
+    finally:
+        s.close()
+
+
+def test_confirmation_claim_refuses_under_live_lease(
+    pipeline_db, make_visit, monkeypatch
+):
+    """Round 16, P2: the patient-confirm claim (pending_confirmation →
+    confirmation_processing) used to grab the row first and only then hit
+    the round-15 pre-lock wait — the wait then polled the lease while the
+    worker's finalize was blocked on the claim's own row lock (guaranteed
+    20s burn + 409). The claim now waits BEFORE grabbing the row and binds
+    its UPDATE to the no-live-lease predicate; a claim landing between the
+    wait and the update loses atomically with 409."""
+    from datetime import UTC, datetime
+
+    from app.models.visit import Visit
+    from app.services.visit_confirmation_service import (
+        VisitConfirmationDomainError,
+        VisitConfirmationService,
+    )
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        token = row.confirmation_token
+        _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+        monkeypatch.setattr(lease_mod, "DISPATCH_WAIT_BUDGET_SECONDS", 0.3)
+        monkeypatch.setattr(lease_mod.time, "sleep", lambda seconds: None)
+
+        svc = VisitConfirmationService(s)
+        with pytest.raises(VisitConfirmationDomainError) as exc_info:
+            svc._claim_pending_visit_for_confirmation(token)
+        assert exc_info.value.status_code == 409
+        assert "Reminder delivery is in progress" in exc_info.value.detail
+
+        s.expire_all()  # the failed claim used synchronize_session=False
+        fresh = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert fresh.status == "pending_confirmation", (
+            "the visit must NOT be claimed into confirmation_processing "
+            "under a live lease"
+        )
+    finally:
+        s.close()
+
+
+def test_telegram_move_rejects_stale_generation(
+    pipeline_db, make_visit, monkeypatch
+):
+    """Round 16, P2: two overlapping Telegram moves that both read the
+    same generation cannot both pass — the stale writer's UPDATE is bound
+    to the generation it read, matches zero rows, and is refused with a
+    distinct concurrent-change error instead of silently restoring an
+    older schedule without advancing the generation."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.audit import AuditLog
+    from app.models.visit import Visit
+    from app.services.telegram_staff_action_adapter_service import (
+        TelegramStaffActionAdapterError,
+        TelegramStaffActionAdapterService,
+    )
+    from app.tasks import lease as lease_mod
+
+    visit_id = make_visit()
+    _stamp_lease(pipeline_db, visit_id, datetime.now(UTC))
+
+    b_date = date.today() + timedelta(days=3)
+
+    s = sessionmaker(bind=pipeline_db)()
+
+    def _b_moves_during_wait(seconds):
+        # Request B (a fresh move to +3d) commits while A is waiting on
+        # the lease: B bumps the generation 0 → 1. B runs through its own
+        # committed session — its mutation must SURVIVE the rollback the
+        # adapter performs when it refuses the stale writer.
+        bx = sessionmaker(bind=pipeline_db)()
+        try:
+            bx.query(Visit).filter(Visit.id == visit_id).update(
+                {
+                    "visit_date": b_date,
+                    "reminder_sent_at": None,
+                    "reminder_generation": Visit.reminder_generation + 1,
+                    "reminder_claimed_at": None,
+                },
+                synchronize_session=False,
+            )
+            bx.commit()
+        finally:
+            bx.close()
+
+    monkeypatch.setattr(lease_mod.time, "sleep", _b_moves_during_wait)
+
+    try:
+        service = TelegramStaffActionAdapterService(s)
+        # The audit stub keeps the adapter from holding a write lock while
+        # it waits — on SQLite a concurrent session could not commit its
+        # mutation otherwise (PostgreSQL MVCC has no such limitation).
+        service._confirmed = lambda *a, **k: None
+
+        class _StubQueue:
+            def staff_move_visit_queue_link(self, db, **kwargs):
+                return {"status": "skipped", "queue_time_preserved": None}
+
+        service.queue_service = _StubQueue()
+        a_date = date.today() + timedelta(days=5)
+        with pytest.raises(TelegramStaffActionAdapterError) as exc_info:
+            service.staff_move_visit(
+                visit_id=visit_id,
+                new_visit_date=a_date,
+                actor_user_id=1,
+            )
+        assert exc_info.value.args[0] == "visit_schedule_changed_concurrently"
+
+        s.expire_all()  # B mutated with synchronize_session=False
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert row.visit_date == b_date, "B's fresh schedule survives"
+        assert row.reminder_generation == 1, (
+            "the stale writer must not bump the generation"
+        )
+        s.query(AuditLog).filter(
+            AuditLog.entity_id == visit_id, AuditLog.entity_type == "visit"
+        ).delete()
+        s.commit()
     finally:
         s.close()

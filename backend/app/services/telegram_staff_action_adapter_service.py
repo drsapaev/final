@@ -415,20 +415,29 @@ class TelegramStaffActionAdapterService:
                     wait_for_reminder_lease_clear,
                 )
 
-                if not wait_for_reminder_lease_clear(self.db, visit_id):
-                    raise TelegramStaffActionAdapterError(
-                        "reminder_delivery_in_progress"
-                    )
+                # Read the generation BEFORE the wait and bind the
+                # UPDATE to it (Codex round 16, P2): two overlapping moves
+                # that both read generation N cannot both pass — the stale
+                # writer's UPDATE matches zero rows and is refused, so it
+                # can no longer silently restore an older schedule without
+                # advancing the generation. A concurrent move that commits
+                # DURING the wait invalidates the read and loses the race
+                # below.
                 generation = (
                     self.db.query(Visit.reminder_generation)
                     .filter(Visit.id == visit_id)
                     .scalar()
                     or 0
                 )
+                if not wait_for_reminder_lease_clear(self.db, visit_id):
+                    raise TelegramStaffActionAdapterError(
+                        "reminder_delivery_in_progress"
+                    )
                 claimed = (
                     self.db.query(Visit)
                     .filter(
                         Visit.id == visit_id,
+                        Visit.reminder_generation == generation,
                         or_(
                             Visit.reminder_claimed_at.is_(None),
                             Visit.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
@@ -445,9 +454,18 @@ class TelegramStaffActionAdapterService:
                 )
                 if claimed == 0:
                     # The visit still exists — the conditional UPDATE lost
-                    # the race to a claim that landed after the wait loop's
-                    # last poll (the mutation would commit under a live
-                    # dispatch).
+                    # the race: either to a claim that landed after the
+                    # wait loop's last poll (live dispatch) or to a
+                    # concurrent move that already bumped the generation.
+                    current_gen = (
+                        self.db.query(Visit.reminder_generation)
+                        .filter(Visit.id == visit_id)
+                        .scalar()
+                    )
+                    if current_gen != generation:
+                        raise TelegramStaffActionAdapterError(
+                            "visit_schedule_changed_concurrently"
+                        )
                     raise TelegramStaffActionAdapterError(
                         "reminder_delivery_in_progress"
                     )

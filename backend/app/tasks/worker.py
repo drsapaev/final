@@ -292,6 +292,58 @@ async def send_visit_reminder(
                 visit_id,
             )
             return
+        # Round 16, P2: the stored schedule matching the version is not
+        # enough — a job that sat in Redis through a long worker outage
+        # may belong to an appointment that has ALREADY started. The
+        # sweep's start check cannot invalidate jobs already queued, so
+        # the worker rechecks the appointment start itself and never
+        # dispatches an obsolete confirmation request for a visit that is
+        # underway.
+        appointment_start = _appointment_start_utc(claimed_visit)
+        if appointment_start is None or appointment_start <= datetime.now(UTC):
+            db.execute(
+                update(Visit)
+                .where(
+                    Visit.id == visit_id,
+                    Visit.reminder_claimed_at == our_lease,
+                )
+                .values(reminder_claimed_at=None)
+            )
+            db.commit()
+            logger.info(
+                "job.send_visit_reminder: visit %s appointment start %s is "
+                "in the past (or undated) — obsolete job, aborting before "
+                "send",
+                visit_id,
+                appointment_start,
+            )
+            return
+        # Round 16, P1: the confirmation token is issued at booking time
+        # with a 48-hour lifetime (doctor_integration/_visits.py) — a visit
+        # booked more than 48h ahead would receive a reminder with an
+        # UNUSABLE confirmation link/button. Re-issue the token (same
+        # generator + lifetime) while the visit still holds the lease and
+        # BEFORE the dispatch, so the reminder carries a working link.
+        token_expires = claimed_visit.confirmation_expires_at
+        if token_expires is not None and token_expires.tzinfo is None:
+            token_expires = token_expires.replace(tzinfo=UTC)
+        if (
+            claimed_visit.confirmation_token is None
+            or token_expires is None
+            or token_expires <= datetime.now(UTC)
+        ):
+            import uuid
+
+            claimed_visit.confirmation_token = str(uuid.uuid4())
+            claimed_visit.confirmation_expires_at = datetime.now(UTC) + timedelta(
+                hours=48
+            )
+            db.commit()
+            logger.info(
+                "job.send_visit_reminder: confirmation token for visit %s "
+                "was missing or expired — re-issued before dispatch",
+                visit_id,
+            )
 
         # Dispatch OUTSIDE any transaction/lock. A reschedule during the
         # dispatch is resolved by the generation-guarded finalize below.
