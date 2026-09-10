@@ -17,7 +17,11 @@ class RemindersMixin(NotificationSenderMixinBase):
     """Reminders methods for NotificationSenderService."""
 
     async def send_confirmation_reminder(
-        self, db: Session, visit_id: int, hours_before: int = 24
+        self,
+        db: Session,
+        visit_id: int,
+        hours_before: int = 24,
+        channel: str | None = None,
     ) -> dict[str, Any]:
         """Отправляет напоминание о необходимости подтверждения"""
         from app.models.patient import Patient
@@ -32,7 +36,10 @@ class RemindersMixin(NotificationSenderMixinBase):
             if not patient:
                 return {"success": False, "error": "Пациент не найден"}
 
-            channel = self._determine_best_channel(patient)
+            # PR-1 (Codex round 18, P1): the reminder producer may pin the
+            # delivery channel to one PERMITTED BY THE VISIT'S contract —
+            # when it does, the auto-selection is bypassed entirely.
+            channel = channel or self._determine_best_channel(patient)
             notification_data = self._prepare_notification_data(db, visit, patient)
             notification_data["is_reminder"] = True
             notification_data["hours_before"] = hours_before
@@ -49,7 +56,28 @@ class RemindersMixin(NotificationSenderMixinBase):
             # happened on this session so far — the commit carries no
             # caller state.
             if channel == "telegram":
-                chat_id = patient.telegram_id
+                # PR-1 (Codex round 18, P1): Patient has NO telegram_id
+                # column — the Telegram linkage lives in TelegramUser.
+                chat_id = getattr(patient, "telegram_id", None)
+                if chat_id is None:
+                    from app.models.telegram_config import TelegramUser
+
+                    link = (
+                        db.query(TelegramUser)
+                        .filter(
+                            TelegramUser.patient_id == visit.patient_id,
+                            TelegramUser.active.is_(True),
+                            TelegramUser.blocked.is_(False),
+                            TelegramUser.appointment_reminders.is_(True),
+                        )
+                        .first()
+                    )
+                    chat_id = link.chat_id if link is not None else None
+                if chat_id is None:
+                    return {
+                        "success": False,
+                        "error": "Пациент не привязал Telegram",
+                    }
             db.commit()
 
             if channel == "telegram":

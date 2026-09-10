@@ -241,9 +241,16 @@ def reminder_spy(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
 
     calls: list[dict] = []
 
-    async def _spy(self, db, visit_id, hours_before=24):
-        calls.append({"db": db, "visit_id": visit_id, "hours_before": hours_before})
-        return {"success": True, "channel": "telegram"}
+    async def _spy(self, db, visit_id, hours_before=24, channel=None):
+        calls.append(
+            {
+                "db": db,
+                "visit_id": visit_id,
+                "hours_before": hours_before,
+                "channel": channel,
+            }
+        )
+        return {"success": True, "channel": channel or "telegram"}
 
     monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _spy)
     return calls
@@ -444,7 +451,7 @@ async def test_worker_send_failure_does_not_stamp_and_raises(
     from app.services.notifications_pkg._reminders import RemindersMixin
     from app.tasks.worker import send_visit_reminder
 
-    async def _failing(self, db, visit_id, hours_before=24):
+    async def _failing(self, db, visit_id, hours_before=24, channel=None):
         return {"success": False, "error": "telegram unavailable"}
 
     monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _failing)
@@ -878,7 +885,7 @@ def test_worker_failure_releases_only_own_claim(
     visit_id = make_visit()
     newer_lease = datetime.now(UTC) + timedelta(minutes=1)
 
-    async def _failing_spy(self, db, vid, hours_before=24):
+    async def _failing_spy(self, db, vid, hours_before=24, channel=None):
         # A concurrent delivery re-claims while OUR dispatch is in flight
         # (reschedule cleared our lease, the newer job took its own).
         db.query(Visit).filter(Visit.id == vid).update(
@@ -1312,7 +1319,7 @@ def test_reschedule_during_dispatch_prevents_stale_record(
 
     visit_id = make_visit()  # generation 0, date today, time "10:00"
 
-    async def _spy(self, db, vid, hours_before=24):
+    async def _spy(self, db, vid, hours_before=24, channel=None):
         # The reschedule lands while the provider call is in flight:
         # stamp cleared, generation bumped, lease PRESERVED (round 8).
         db.query(Visit).filter(Visit.id == vid).update(
@@ -1739,7 +1746,7 @@ async def test_status_change_during_dispatch_not_recorded(
 
     visit_id = make_visit()
 
-    async def _spy(self, db, vid, hours_before=24):
+    async def _spy(self, db, vid, hours_before=24, channel=None):
         # The patient confirms while the provider call is in flight.
         db.query(Visit).filter(Visit.id == vid).update({"status": "confirmed"})
         db.commit()
@@ -1777,7 +1784,7 @@ async def test_delivery_failure_gives_up_after_backoffs(
     from app.services.notifications_pkg._reminders import RemindersMixin
     from app.tasks.worker import send_visit_reminder
 
-    async def _failing(self, db, visit_id, hours_before=24):
+    async def _failing(self, db, visit_id, hours_before=24, channel=None):
         return {"success": False, "error": "telegram unavailable"}
 
     monkeypatch.setattr(RemindersMixin, "send_confirmation_reminder", _failing)
@@ -2909,14 +2916,14 @@ def test_telegram_move_rejects_stale_generation(
 # ---------------------------------------------------------------------------
 
 
-def test_worker_refuses_channel_contract_violation(
+def test_worker_pins_phone_channel_for_phone_contract(
     pipeline_db, make_visit, reminder_spy
 ):
-    """Round 17, P1: the service auto-selects the best channel from the
-    PATIENT's reach and ignores the visit's stored contract — a visit
-    stored with channel 'phone' would receive a PWA link that
-    confirm_by_pwa() rejects, and the delivery would still be stamped.
-    The worker refuses such a dispatch: lease released, nothing stamped."""
+    """Rounds 17+18, P1: an explicit 'phone' contract pins the dispatch
+    channel — the service's patient-based auto-selection (which would
+    pick PWA for a +998 patient and produce a link confirm_by_pwa
+    rejects) is bypassed; the registrar call-task path is used instead
+    and the delivery is recorded."""
     from app.models.visit import Visit
     from app.tasks.scheduler import build_reminder_schedule_version
     from app.tasks.worker import send_visit_reminder
@@ -2940,7 +2947,48 @@ def test_worker_refuses_channel_contract_violation(
             )
         )
 
-        assert reminder_spy == [], "no dispatch through a disallowed channel"
+        assert len(reminder_spy) == 1, "the phone-contract visit is dispatched"
+        assert reminder_spy[0]["channel"] == "phone", (
+            "the dispatch channel is pinned to the visit's contract"
+        )
+        s.expire_all()
+        fresh = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert fresh.reminder_sent_at is not None, "delivery recorded"
+    finally:
+        s.close()
+
+
+def test_worker_skips_unlinked_telegram_contract(
+    pipeline_db, make_visit, reminder_spy
+):
+    """Round 18, P1: a 'telegram'-contract visit whose patient has NO live
+    TelegramUser link has no working reminder path (no chat to deliver to;
+    a PWA link would be rejected by confirm_by_pwa for this contract) —
+    the worker skips WITHOUT stamping and releases the lease."""
+    from app.models.visit import Visit
+    from app.tasks.scheduler import build_reminder_schedule_version
+    from app.tasks.worker import send_visit_reminder
+
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {"confirmation_channel": "telegram"}
+        )
+        s.commit()
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        version = build_reminder_schedule_version(row)
+
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=visit_id,
+                channel="telegram",
+                schedule_version=version,
+            )
+        )
+
+        assert reminder_spy == [], "no dispatch without a Telegram link"
         fresh = s.query(Visit).filter(Visit.id == visit_id).first()
         assert fresh.reminder_sent_at is None, "nothing stamped"
         assert fresh.reminder_claimed_at is None, "lease released"
@@ -2948,17 +2996,68 @@ def test_worker_refuses_channel_contract_violation(
         s.close()
 
 
-def test_worker_allows_matching_and_null_channels(
+def test_worker_dispatches_linked_telegram_contract(
     pipeline_db, make_visit, reminder_spy
 ):
-    """Round 17, P1: a visit whose contract matches the best channel is
-    dispatched normally, and a NULL channel (GraphQL-created visits)
-    permits the auto-selected channel."""
+    """Round 18, P1: a 'telegram'-contract visit WITH a live TelegramUser
+    link dispatches through telegram (the chat is resolved from the
+    linkage — Patient has no telegram_id column)."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.telegram_config import TelegramUser
     from app.models.visit import Visit
     from app.tasks.scheduler import build_reminder_schedule_version
     from app.tasks.worker import send_visit_reminder
 
-    matching_id = make_visit()
+    visit_id = make_visit()
+    s = sessionmaker(bind=pipeline_db)()
+    try:
+        s.query(Visit).filter(Visit.id == visit_id).update(
+            {"confirmation_channel": "telegram"}
+        )
+        row = s.query(Visit).filter(Visit.id == visit_id).first()
+        s.add(
+            TelegramUser(
+                patient_id=row.patient_id,
+                chat_id=987654321,
+                active=True,
+                blocked=False,
+                appointment_reminders=True,
+            )
+        )
+        s.commit()
+        version = build_reminder_schedule_version(row)
+
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=visit_id,
+                channel="telegram",
+                schedule_version=version,
+            )
+        )
+
+        assert len(reminder_spy) == 1
+        assert reminder_spy[0]["channel"] == "telegram"
+        s.expire_all()
+        fresh = s.query(Visit).filter(Visit.id == visit_id).first()
+        assert fresh.reminder_sent_at is not None
+    finally:
+        s.close()
+
+
+def test_worker_normalizes_null_channel_to_auto(
+    pipeline_db, make_visit, reminder_spy
+):
+    """Round 18, P1: a NULL confirmation_channel (GraphQL-created visits)
+    is normalized to 'auto' IN THE PERSISTED CONTRACT before dispatch —
+    confirm_by_pwa() accepts only literal 'pwa'/'auto', so the old null
+    passthrough would send a reminder whose confirmation link answers
+    400 while reminder_sent_at prevented another delivery."""
+    from app.models.visit import Visit
+    from app.tasks.scheduler import build_reminder_schedule_version
+    from app.tasks.worker import send_visit_reminder
+
     null_id = make_visit()
     s = sessionmaker(bind=pipeline_db)()
     try:
@@ -2966,27 +3065,24 @@ def test_worker_allows_matching_and_null_channels(
             {"confirmation_channel": None}
         )
         s.commit()
+        row = s.query(Visit).filter(Visit.id == null_id).first()
+        version = build_reminder_schedule_version(row)
 
-        for vid in (matching_id, null_id):
-            row = s.query(Visit).filter(Visit.id == vid).first()
-            version = build_reminder_schedule_version(row)
-            asyncio.run(
-                send_visit_reminder(
-                    {},
-                    visit_id=vid,
-                    channel="telegram",
-                    schedule_version=version,
-                )
+        asyncio.run(
+            send_visit_reminder(
+                {},
+                visit_id=null_id,
+                channel="telegram",
+                schedule_version=version,
             )
-
-        got = {c["visit_id"] for c in reminder_spy}
-        assert got == {matching_id, null_id}, (
-            "matching and NULL-channel visits are dispatched: "
-            f"{sorted(got)}"
         )
+
+        assert len(reminder_spy) == 1, "the null-channel visit is dispatched"
         s.expire_all()  # the worker committed via its own session
-        for vid in (matching_id, null_id):
-            fresh = s.query(Visit).filter(Visit.id == vid).first()
-            assert fresh.reminder_sent_at is not None
+        fresh = s.query(Visit).filter(Visit.id == null_id).first()
+        assert fresh.confirmation_channel == "auto", (
+            "null must be normalized to 'auto' in the persisted contract"
+        )
+        assert fresh.reminder_sent_at is not None
     finally:
         s.close()

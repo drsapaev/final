@@ -196,7 +196,7 @@ def test_concurrent_reminder_jobs_send_exactly_once(
     calls: list[dict] = []
     started = threading.Barrier(2)
 
-    async def _spy(self, db, vid, hours_before=24):
+    async def _spy(self, db, vid, hours_before=24, channel=None):
         calls.append({"visit_id": vid, "hours_before": hours_before})
         # Simulate slow provider I/O AFTER the claim committed — the window
         # an unguarded second reader would exploit to double-send.

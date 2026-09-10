@@ -344,48 +344,92 @@ async def send_visit_reminder(
                 visit_id,
             )
 
-        # Round 17, P1: honor the visit's allowed confirmation channel.
-        # The service auto-selects the best channel from the PATIENT's
-        # reach (telegram > pwa > phone) and ignores the visit's stored
-        # contract — a visit stored with channel 'phone' would receive a
-        # PWA link that confirm_by_pwa() rejects, and the delivery would
-        # still be stamped. Reuse the REAL selector (no duplicate
-        # priority logic) and refuse the dispatch when its choice is not
-        # permitted by the visit contract. A NULL/empty/'auto' channel
-        # (GraphQL-created visits) permits the auto-selected channel.
+        # Round 17+18, P1: the delivery channel must be PERMITTED BY THE
+        # VISIT'S contract AND reachable by the patient.
+        # - A NULL/empty channel (GraphQL-created visits) is NORMALIZED to
+        #   'auto' in the persisted contract: confirm_by_pwa() accepts only
+        #   literal 'pwa'/'auto', so the old null passthrough would send a
+        #   reminder whose confirmation link answers 400.
+        # - An explicit contract picks the dispatch channel; the reminder
+        #   producer pins it via the service's channel parameter instead of
+        #   letting the patient-based auto-selection send an unusable link.
+        # - 'telegram' additionally requires a live TelegramUser link
+        #   (Patient has NO telegram_id column — the linkage lives there).
         service = NotificationService(db)
         patient = (
             db.query(Patient).filter(Patient.id == claimed_visit.patient_id).first()
         )
-        best_channel = (
-            service._determine_best_channel(patient) if patient is not None else None
-        )
-        allowed_channel = (claimed_visit.confirmation_channel or "").strip().lower()
-        if allowed_channel and allowed_channel != "auto" and best_channel != allowed_channel:
-            db.execute(
-                update(Visit)
-                .where(
-                    Visit.id == visit_id,
-                    Visit.reminder_claimed_at == our_lease,
-                )
-                .values(reminder_claimed_at=None)
-            )
+        raw_channel = claimed_visit.confirmation_channel
+        if raw_channel is None or str(raw_channel).strip() == "":
+            claimed_visit.confirmation_channel = "auto"
             db.commit()
             logger.info(
-                "job.send_visit_reminder: visit %s allows channel %r but the "
-                "best reachable channel is %r — refusing to dispatch an "
-                "unusable confirmation request",
+                "job.send_visit_reminder: visit %s had no confirmation "
+                "channel — normalized to 'auto'",
                 visit_id,
-                allowed_channel,
-                best_channel,
             )
-            return
+            allowed_channel = "auto"
+        else:
+            allowed_channel = str(raw_channel).strip().lower()
+
+        if allowed_channel == "auto":
+            best_channel = (
+                service._determine_best_channel(patient)
+                if patient is not None
+                else None
+            )
+            dispatch_channel = best_channel
+        elif allowed_channel == "telegram":
+            from app.models.telegram_config import TelegramUser
+
+            link = (
+                db.query(TelegramUser)
+                .filter(
+                    TelegramUser.patient_id == claimed_visit.patient_id,
+                    TelegramUser.active.is_(True),
+                    TelegramUser.blocked.is_(False),
+                    TelegramUser.appointment_reminders.is_(True),
+                )
+                .first()
+            )
+            if link is None:
+                # A telegram-contract visit without a live Telegram link
+                # has NO working reminder path (a PWA link would be
+                # rejected by confirm_by_pwa for this contract, and no
+                # chat exists to deliver the Telegram message to).
+                # Skipping (without stamping) is the only non-harmful
+                # outcome; the lease is released so a later delivery can
+                # proceed once the patient links the bot.
+                db.execute(
+                    update(Visit)
+                    .where(
+                        Visit.id == visit_id,
+                        Visit.reminder_claimed_at == our_lease,
+                    )
+                    .values(reminder_claimed_at=None)
+                )
+                db.commit()
+                logger.info(
+                    "job.send_visit_reminder: visit %s requires telegram but "
+                    "the patient has no live Telegram link — skipping without "
+                    "stamping",
+                    visit_id,
+                )
+                return
+            dispatch_channel = "telegram"
+        else:
+            # 'pwa' (SMS with a deep link) and 'phone'/'sms' (registrar
+            # call task) are always reachable paths.
+            dispatch_channel = allowed_channel
 
         # Dispatch OUTSIDE any transaction/lock. A reschedule during the
         # dispatch is resolved by the generation-guarded finalize below.
         try:
             result = await service.send_confirmation_reminder(
-                db, visit_id, hours_before=REMINDER_HOURS_BEFORE
+                db,
+                visit_id,
+                hours_before=REMINDER_HOURS_BEFORE,
+                channel=dispatch_channel,
             )
         except Exception as exc:
             raise _delivery_retry(
