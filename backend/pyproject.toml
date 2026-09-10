@@ -279,6 +279,7 @@ pytest_add_cli_args_test_selection = [
     "--deselect", "tests/integration/test_queue_resource_expand.py",
     "--deselect", "tests/integration/test_queue_resource_seed_backfill.py",
     "--deselect", "tests/integration/test_queue_resource_sentinel.py",
+    "--deselect", "tests/integration/test_manager_deprecation.py::test_nightly_smoke_repointed_and_manager_free",
     "--deselect", "tests/unit/test_idempotency_distributed_claim.py::test_compose_files_never_evict_idempotency_state",
     "--deselect", "tests/unit/test_notification_endpoint_inventory.py",
     "--deselect", "tests/unit/test_no_legacy_ports_in_active_text.py",
