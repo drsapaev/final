@@ -998,10 +998,16 @@ async def cancel_payment(
             detail="Визит платежа изменился; повторите операцию",
         )
 
-    if _cashier_payment_status(payment) in {"cancelled", "refunded", "void"}:
+    payment_status = _cashier_payment_status(payment)
+    if payment_status not in {"pending", "processing"}:
+        detail = (
+            "Оплаченный платеж необходимо оформить как возврат"
+            if payment_status in {"paid", "completed"}
+            else f"Платеж со статусом '{payment_status}' нельзя отменить"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Платеж уже отменен"
+            detail=detail,
         )
 
     try:
@@ -1055,6 +1061,9 @@ async def cancel_payment(
             "payment_id": payment_id
         }
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception:
         db.rollback()
         logger.exception("Unhandled cashier endpoint error")

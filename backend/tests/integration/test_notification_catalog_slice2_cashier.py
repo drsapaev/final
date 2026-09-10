@@ -412,7 +412,7 @@ def test_cashier_cancel_payment_creates_cancelled_payment_notification(
         visit_id=visit.id,
         amount=70000,
         method="cash",
-        status="paid",
+        status="pending",
     )
     db_session.add(payment)
     db_session.commit()
@@ -476,10 +476,10 @@ def test_cashier_payment_history_exposes_backend_owned_actions(
 
     paid_row = rows[paid_payment.id]
     assert paid_row["can_confirm"] is False
-    assert paid_row["can_cancel"] is True
+    assert paid_row["can_cancel"] is False
     assert paid_row["can_refund"] is True
     assert paid_row["can_print_receipt"] is True
-    assert set(paid_row["available_actions"]) == {"cancel", "refund", "print_receipt"}
+    assert set(paid_row["available_actions"]) == {"refund", "print_receipt"}
 
     refunded_row = rows[refunded_payment.id]
     assert refunded_row["can_confirm"] is False
@@ -487,6 +487,75 @@ def test_cashier_payment_history_exposes_backend_owned_actions(
     assert refunded_row["can_refund"] is False
     assert refunded_row["can_print_receipt"] is True
     assert refunded_row["available_actions"] == ["print_receipt"]
+
+
+def test_cashier_cancel_paid_payment_requires_refund_without_mutation(
+    client,
+    db_session,
+    auth_headers,
+):
+    patient, visit = _create_patient_visit(db_session, suffix="0006")
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("40000"),
+        method="cash",
+        status="paid",
+        note="original note",
+    )
+    db_session.add(payment)
+    db_session.commit()
+    db_session.refresh(payment)
+
+    response = client.post(
+        f"/api/v1/cashier/payments/{payment.id}/cancel",
+        json={"reason": "patient requested cancellation"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400, response.text
+    assert "возврат" in response.json()["detail"].lower()
+    db_session.refresh(payment)
+    assert payment.status == "paid"
+    assert payment.note == "original note"
+    assert _payment_event_deliveries(
+        db_session,
+        recipient_id=patient.user_id,
+    ) == []
+
+
+def test_cashier_cancel_transition_conflict_remains_409(
+    client,
+    db_session,
+    auth_headers,
+    monkeypatch,
+):
+    _, visit = _create_patient_visit(db_session, suffix="0007")
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("40000"),
+        method="cash",
+        status="pending",
+    )
+    db_session.add(payment)
+    db_session.commit()
+    db_session.refresh(payment)
+
+    from app.services.billing_service import BillingService
+
+    def _raise_conflict(*_args, **_kwargs):
+        raise ValueError("concurrent status change")
+
+    monkeypatch.setattr(BillingService, "update_payment_status", _raise_conflict)
+
+    response = client.post(
+        f"/api/v1/cashier/payments/{payment.id}/cancel",
+        json={"reason": "patient requested cancellation"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 409, response.text
+    db_session.refresh(payment)
+    assert payment.status == "pending"
 
 
 def test_cashier_confirm_refunded_payment_is_rejected_without_mutation(
