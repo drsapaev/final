@@ -4257,3 +4257,90 @@ def test_clinic_wide_profile_join_doctor_path_without_registry(
             QueueProfile.key == "laboratory_cc3"
         ).delete(synchronize_session=False)
         db_session.commit()
+
+
+# ===================== DD. Codex round-20 pins =====================
+
+
+def test_gql_queue_entries_doctor_and_tag_filters_intersect(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-20 P2: queueEntries(filter: {doctorId, queueTag}) keeps
+    the two filters INTERSECTED — the resource-axis predicate derives its
+    tag from the selected doctor's SPECIALTY only; the explicit queueTag
+    stays an independent intersection below. The round-13 shape (a
+    registry-tag doctor sees the resource rows) is preserved; the
+    combined incompatible case (doctorId(cardiology) + queueTag:"lab")
+    no longer returns the whole lab resource axis past doctorId."""
+    import asyncio
+    import contextlib
+    from types import SimpleNamespace
+
+    from app.graphql import resolvers as gql_resolvers
+    from app.graphql.types import QueueFilter
+
+    monkeypatch.setattr(
+        gql_resolvers,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+
+    try:
+        # the resource axis: a lab registry queue with a waiting entry
+        lab_user = _make_user(db_session, username="lab_res_dd1", role="Resource")
+        lab_synth = _make_doctor(db_session, user_id=lab_user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        lab_queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_DAY, specialist_id=None, queue_tag="lab"
+        )
+        lab_entry = _make_waiting_entry(db_session, lab_queue, number=41)
+
+        # an unrelated real doctor with their own tagged queue
+        doc_user = _make_user(db_session, username="dr_dd1_cardio", role="Doctor")
+        cardio = _make_doctor(db_session, user_id=doc_user.id, specialty="cardiology")
+        cardio_queue = _make_queue(
+            db_session, specialist_id=cardio.id, queue_tag="cardiology"
+        )
+        cardio_entry = _make_waiting_entry(db_session, cardio_queue, number=7)
+
+        info = SimpleNamespace(context=None)  # direct schema test: no audit ctx
+
+        # the P2 scenario: doctorId(cardiology) + queueTag:"lab" — the lab
+        # resource entry must NOT satisfy the doctor predicate; the
+        # explicit tag keeps intersecting independently
+        result_mixed = asyncio.run(
+            gql_resolvers.Query().queue_entries(
+                info,
+                QueueFilter(doctor_id=cardio.id, queue_tag="lab"),
+            )
+        )
+        ids_mixed = [e.id for e in result_mixed.items]
+        assert (
+            lab_entry.id not in ids_mixed
+        ), f"the lab resource axis leaked past doctorId: {ids_mixed}"
+        assert cardio_entry.id not in ids_mixed  # 'cardiology' != 'lab'
+
+        # the compatible combined case: the doctor's own tag intersects fine
+        result_own = asyncio.run(
+            gql_resolvers.Query().queue_entries(
+                info,
+                QueueFilter(doctor_id=cardio.id, queue_tag="cardiology"),
+            )
+        )
+        assert [e.id for e in result_own.items] == [cardio_entry.id]
+
+        # the round-13 shape preserved: a doctor whose specialty IS the
+        # registry tag sees the resource rows — with the matching
+        # explicit queueTag too (specialty-derived predicate + the
+        # independent tag filter agree)
+        result_lab = asyncio.run(
+            gql_resolvers.Query().queue_entries(
+                info,
+                QueueFilter(doctor_id=lab_synth.id, queue_tag="lab"),
+            )
+        )
+        ids_lab = [e.id for e in result_lab.items]
+        assert lab_entry.id in ids_lab
+        assert all(e.queue.queue_tag == "lab" for e in result_lab.items)
+    finally:
+        _durable_cleanup(db_session, "lab_res_dd1", "dr_dd1_cardio")

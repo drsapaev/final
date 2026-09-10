@@ -673,17 +673,22 @@ class Query:
                     # queue_resource_id) — doctor-keyed предикат один их
                     # не видит, и GraphQL-запись «исчезала» из
                     # соответствующего чтения. Ось тега добавляется к
-                    # фильтру врача: тег из самого фильтра или specialty
-                    # выбранного специалиста; строки с queue_resource_id —
-                    # по построению только теги реестра (switch-писатели
+                    # фильтру врача: тег — из specialty выбранного
+                    # специалиста; строки с queue_resource_id — по
+                    # построению только теги реестра (switch-писатели
                     # гейтируются реестром, 0059 backfill — только его
                     # теги), поэтому предикат самогейтится данными и
                     # деактивационно-устойчив (живые resource-очереди
                     # остаются видимыми — семантика tag_routes_to_resource).
-                    tag = filter.queue_tag
-                    if tag is None:
-                        doctor = db.get(Doctor, filter.doctor_id)
-                        tag = doctor.specialty if doctor is not None else None
+                    # Codex round-20 P2: тег ресурсной оси — ТОЛЬКО из
+                    # specialty выбранного врача; явный queueTag фильтра
+                    # сюда НЕ подставляется (ниже он остаётся независимым
+                    # пересечением) — подстановка делала ЛЮБУЮ resource-
+                    # строку поданного тега удовлетворяющей предикату
+                    # врача: doctorId(cardiology) + queueTag:"lab"
+                    # возвращал всю лабораторную resource-ось мимо doctorId.
+                    doctor = db.get(Doctor, filter.doctor_id)
+                    tag = doctor.specialty if doctor is not None else None
                     predicates = [DailyQueue.specialist_id == filter.doctor_id]
                     if tag:
                         predicates.append(
