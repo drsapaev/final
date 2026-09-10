@@ -1005,98 +1005,158 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     queue_profile.queue_tags or [profile_key]
                 )
 
-                # Ищем врачей с specialty из queue_tags профиля.
-                # Incomplete ("general" sentinel) profiles are explicitly
-                # excluded: they are not clinical-eligible for specialty QR
-                # routing even if an admin ever tags a profile with
-                # "general" (defense in depth, Codex P1-D).
-                # Codex round-3 P2: the candidate query applies the SAME
-                # owner-eligibility contract as the appointment writers
-                # (services/appointment_eligibility.py): an active Doctor
-                # row whose owner is missing (decision #13 — userless rows
-                # violate the linkage contract), deactivated or demoted to
-                # a non-doctor role is a legacy ghost — and the least-load
-                # ranking would PREFER it (load 0) over healthy doctors.
-                eligible_doctors = (
-                    db.query(Doctor)
-                    .join(User, Doctor.user_id == User.id)
-                    .filter(
-                        Doctor.active.is_(True),
-                        Doctor.specialty.in_(queue_tags),
-                        Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
-                        User.is_active.is_(True),
-                        func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
-                    )
-                    .order_by(Doctor.id.asc())
-                    .all()
+                # QD-2C (Codex round-19 P1): a registry-backed profile tag
+                # routes onto the RESOURCE surface BEFORE doctor selection.
+                # The seeded lab/ECG profiles' only owners are the 0055
+                # synthetic Doctors, and 0057 moved them to the internal
+                # 'Resource' role — the eligible-doctor query below
+                # (DOCTOR_ROLE_SPELLINGS) returns [] for a clinic without
+                # real lab/ECG doctors, so the clinic-wide QR join failed
+                # with «Нет активных врачей» even though the registry row
+                # (0059) is ACTIVE. The FIRST profile tag with a registry
+                # surface wins (deactivation-proof, round-3 P1: an existing
+                # resource-owned (day, tag) queue routes even when the row
+                # was deactivated mid-day): the (day, tag) resource queue is
+                # the ONE surface every other writer (wizard, batch, morning
+                # pre-create, GQL joinQueue) uses — routing through doctor
+                # selection here would fork a parallel legacy queue and
+                # re-create the split-queue incident class.
+                resource_tag = next(
+                    (
+                        tag
+                        for tag in queue_tags
+                        if queue_resource_routing.tag_routes_to_resource(db, tag, day)
+                        is not None
+                        or queue_resource_routing.resolve_tag_resource(db, tag)
+                        is not None
+                    ),
+                    None,
                 )
-                # D-2 least-loaded routing (NEEDS DECISION resolved): with
-                # several active doctors per specialty the new patient goes
-                # to the doctor with the shortest ACTIVE queue for the day
-                # (waiting+called), ties break to the lowest Doctor.id.
-                # queue_tag scopes the bookability pre-check to the exact
-                # (day, doctor, tag) row the join will use (Codex round-1 P1).
-                # Codex round-4 P1: resolve the patient's EXISTING entry
-                # across the profile's candidate queues BEFORE least-load
-                # routing (see _find_clinic_wide_duplicate) — otherwise a
-                # retry lands a second entry under another doctor.
-                existing_entry, existing_queue = _find_clinic_wide_duplicate(
-                    db,
-                    eligible_doctors,
-                    day=day,
-                    queue_tag=profile_key,
-                    phone=phone,
-                    telegram_id=telegram_id,
-                )
-                if existing_queue is not None:
-                    doctor = existing_queue.specialist or (
-                        db.query(Doctor)
-                        .filter(Doctor.id == existing_queue.specialist_id)
-                        .first()
+                if resource_tag is not None:
+                    daily_queue = self.get_or_create_daily_queue(
+                        db,
+                        day=day,
+                        specialist_id=None,
+                        queue_tag=resource_tag,
                     )
-                    daily_queue = existing_queue
-                    queue_tag = profile_key
-                    specialist_name = (
-                        (doctor.user.full_name or doctor.user.username)
-                        if doctor and doctor.user
+                    queue_tag = resource_tag
+                    # Round-18 pattern (validate_queue_token): the join
+                    # metadata advertises the REGISTRY owner — display_name
+                    # over the 0055 synthetic's «Врач ID ...» — and the
+                    # queue's registry-sourced cabinet; the profile title is
+                    # the stable fallback for a legacy-shape surface.
+                    resource = (
+                        daily_queue.queue_resource
+                        if daily_queue.queue_resource_id is not None
                         else None
                     )
                     specialist_name = (
-                        specialist_name
-                        or queue_profile.title_ru
-                        or f"Врач #{existing_queue.specialist_id}"
+                        resource.display_name
+                        if resource is not None and resource.display_name
+                        else (queue_profile.title_ru or queue_profile.title)
                     )
-                    cabinet = doctor.cabinet if doctor else None
+                    cabinet = daily_queue.cabinet_number or (
+                        resource.default_cabinet if resource is not None else None
+                    )
                 else:
-                    doctor = self._pick_least_loaded_doctor(
-                        db, eligible_doctors, day, queue_tag=profile_key
+                    # Ищем врачей с specialty из queue_tags профиля.
+                    # Incomplete ("general" sentinel) profiles are explicitly
+                    # excluded: they are not clinical-eligible for specialty QR
+                    # routing even if an admin ever tags a profile with
+                    # "general" (defense in depth, Codex P1-D).
+                    # Codex round-3 P2: the candidate query applies the SAME
+                    # owner-eligibility contract as the appointment writers
+                    # (services/appointment_eligibility.py): an active Doctor
+                    # row whose owner is missing (decision #13 — userless rows
+                    # violate the linkage contract), deactivated or demoted to
+                    # a non-doctor role is a legacy ghost — and the least-load
+                    # ranking would PREFER it (load 0) over healthy doctors.
+                    eligible_doctors = (
+                        db.query(Doctor)
+                        .join(User, Doctor.user_id == User.id)
+                        .filter(
+                            Doctor.active.is_(True),
+                            Doctor.specialty.in_(queue_tags),
+                            Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+                            User.is_active.is_(True),
+                            func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
+                        )
+                        .order_by(Doctor.id.asc())
+                        .all()
                     )
-
-                    # Если не нашли - это ошибка сопоставления профиля, а не повод
-                    # подставлять случайного активного врача.
-                    if not doctor:
-                        raise QueueValidationError(
-                            f"Нет активных врачей для профиля {queue_profile.title_ru or queue_profile.title}"
+                    # D-2 least-loaded routing (NEEDS DECISION resolved): with
+                    # several active doctors per specialty the new patient goes
+                    # to the doctor with the shortest ACTIVE queue for the day
+                    # (waiting+called), ties break to the lowest Doctor.id.
+                    # queue_tag scopes the bookability pre-check to the exact
+                    # (day, doctor, tag) row the join will use (Codex round-1 P1).
+                    # Codex round-4 P1: resolve the patient's EXISTING entry
+                    # across the profile's candidate queues BEFORE least-load
+                    # routing (see _find_clinic_wide_duplicate) — otherwise a
+                    # retry lands a second entry under another doctor.
+                    existing_entry, existing_queue = _find_clinic_wide_duplicate(
+                        db,
+                        eligible_doctors,
+                        day=day,
+                        queue_tag=profile_key,
+                        phone=phone,
+                        telegram_id=telegram_id,
+                    )
+                    if existing_queue is not None:
+                        doctor = existing_queue.specialist or (
+                            db.query(Doctor)
+                            .filter(Doctor.id == existing_queue.specialist_id)
+                            .first()
                         )
+                        daily_queue = existing_queue
+                        queue_tag = profile_key
+                        specialist_name = (
+                            (doctor.user.full_name or doctor.user.username)
+                            if doctor and doctor.user
+                            else None
+                        )
+                        specialist_name = (
+                            specialist_name
+                            or queue_profile.title_ru
+                            or f"Врач #{existing_queue.specialist_id}"
+                        )
+                        cabinet = doctor.cabinet if doctor else None
                     else:
-                        # Нашли врача - используем его данные
-                        queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty
-                        defaults = {
-                            "start_number": doctor.start_number_online,
-                            "max_online_entries": doctor.max_online_per_day,
-                            "cabinet_number": doctor.cabinet,
-                        }
-                        daily_queue = self.get_or_create_daily_queue(
-                            db,
-                            day=day,
-                            specialist_id=doctor.id,
-                            queue_tag=queue_tag,
-                            defaults=defaults,
+                        doctor = self._pick_least_loaded_doctor(
+                            db, eligible_doctors, day, queue_tag=profile_key
                         )
-                        if doctor.user:
-                            specialist_name = doctor.user.full_name or doctor.user.username
-                        specialist_name = specialist_name or queue_profile.title_ru or f"Врач #{doctor.id}"
-                        cabinet = doctor.cabinet
+
+                        # Если не нашли - это ошибка сопоставления профиля, а не повод
+                        # подставлять случайного активного врача.
+                        if not doctor:
+                            raise QueueValidationError(
+                                f"Нет активных врачей для профиля {queue_profile.title_ru or queue_profile.title}"
+                            )
+                        else:
+                            # Нашли врача - используем его данные
+                            queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty
+                            defaults = {
+                                "start_number": doctor.start_number_online,
+                                "max_online_entries": doctor.max_online_per_day,
+                                "cabinet_number": doctor.cabinet,
+                            }
+                            daily_queue = self.get_or_create_daily_queue(
+                                db,
+                                day=day,
+                                specialist_id=doctor.id,
+                                queue_tag=queue_tag,
+                                defaults=defaults,
+                            )
+                            if doctor.user:
+                                specialist_name = (
+                                    doctor.user.full_name or doctor.user.username
+                                )
+                            specialist_name = (
+                                specialist_name
+                                or queue_profile.title_ru
+                                or f"Врач #{doctor.id}"
+                            )
+                            cabinet = doctor.cabinet
             else:
                 # Legacy: specialist_id_override is Doctor.id
                 doctor = (

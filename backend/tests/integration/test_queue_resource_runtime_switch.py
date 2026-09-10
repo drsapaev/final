@@ -4020,3 +4020,240 @@ def test_reorder_rejects_duplicate_entry_ids(db_session: Session) -> None:
         assert info["queue_resource_id"] is not None
     finally:
         _durable_cleanup(db_session, "adm_bb3")
+
+
+# ===================== CC. Codex round-19 pins =====================
+
+
+def test_clinic_wide_profile_join_routes_registry_tag(db_session: Session) -> None:
+    """Codex round-19 P1: a clinic-wide QR that selects the seeded lab/ECG
+    QueueProfile resolves the profile onto the RESOURCE surface BEFORE
+    doctor selection — 0057 moved the profiles' only synthetic owners to
+    the internal 'Resource' role, so the eligible-doctor query
+    (doctor-family roles only) is empty and the join failed with «Нет
+    активных врачей» even though the registry row (0059) is ACTIVE. The
+    join metadata advertises the registry owner and cabinet (round-18
+    pattern). The service COMMITs — durable rows cleaned in the finally."""
+    from app.models.online_queue import QueueToken as _QueueToken
+    from app.models.queue_profile import QueueProfile
+
+    future_day = date.today() + timedelta(days=2)
+    profile = QueueProfile(
+        key="laboratory_cc1",
+        title="Лаборатория",
+        title_ru="Лаборатория",
+        queue_tags=["lab", "laboratory"],
+        department_key="laboratory",
+        show_on_qr_page=True,
+    )
+    token_value = None
+    try:
+        db_session.add(profile)
+        db_session.commit()
+
+        # the 0055/0057 shape: the only lab owner is the internal
+        # 'Resource' synthetic — NOT a doctor-family login
+        user = _make_user(db_session, username="lab_res_cc1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        synthetic.cabinet = None
+        db_session.commit()
+        resource = _make_resource(
+            db_session,
+            code="lab",
+            queue_tag="lab",
+            display_name="Лаборатория",
+        )
+        resource.default_cabinet = "4"
+        db_session.commit()
+
+        token_value, _meta = queue_service.assign_queue_token(
+            db_session,
+            specialist_id=None,
+            department="lab",
+            generated_by_user_id=None,
+            target_date=future_day,
+            is_clinic_wide=True,
+        )
+
+        result = queue_service.join_queue_with_token(
+            db_session,
+            token_str=token_value,
+            patient_name="Пациент Профиля",
+            phone="+998901234599",
+            specialist_id_override=profile.id,
+            source="online",
+        )
+        queue = result["daily_queue"]
+        assert queue.specialist_id is None  # resource-owned, not synthetic
+        assert queue.queue_resource_id == resource.id
+        assert queue.queue_tag == "lab"  # the registry tag, not the profile key
+        assert result["duplicate"] is False
+        assert result["specialist_name"] == "Лаборатория"  # registry owner
+        assert result["cabinet"] == "4"  # the registry destination
+        entry = result["entry"]
+        assert entry.queue_id == queue.id
+        assert entry.source == "online"
+        assert entry.number >= 1
+    finally:
+        _durable_cleanup(db_session, "lab_res_cc1")
+        if token_value is not None:
+            for row in (
+                db_session.query(_QueueToken)
+                .filter(_QueueToken.token == token_value)
+                .all()
+            ):
+                db_session.delete(row)
+        db_session.query(QueueProfile).filter(
+            QueueProfile.key == "laboratory_cc1"
+        ).delete(synchronize_session=False)
+        db_session.commit()
+
+
+def test_clinic_wide_profile_join_prefers_deactivated_resource_surface(
+    db_session: Session,
+) -> None:
+    """Codex round-19 P1 (deactivation-proof companion, round-3 P1 rule):
+    an operator deactivating the registry row mid-day must not strand the
+    profile join back on the doctor path — the existing resource-owned
+    (day, tag) queue IS the surface, patients already waiting there stay
+    reachable and new arrivals keep landing on it."""
+    from app.models.online_queue import QueueToken as _QueueToken
+    from app.models.queue_profile import QueueProfile
+
+    future_day = date.today() + timedelta(days=2)
+    profile = QueueProfile(
+        key="echokg_cc2",
+        title="ЭКГ",
+        title_ru="ЭКГ",
+        queue_tags=["ecg"],
+        department_key="echokg",
+        show_on_qr_page=True,
+    )
+    token_value = None
+    try:
+        db_session.add(profile)
+        db_session.commit()
+
+        # the registry row is DEACTIVATED, but the day's surface exists
+        resource = _make_resource(
+            db_session,
+            code="ecg",
+            queue_tag="ecg",
+            display_name="ЭКГ",
+            active=False,
+        )
+        surface = _make_queue(
+            db_session,
+            day=future_day,
+            specialist_id=None,
+            queue_tag="ecg",
+            queue_resource_id=resource.id,
+        )
+
+        token_value, _meta = queue_service.assign_queue_token(
+            db_session,
+            specialist_id=None,
+            department="echokg",
+            generated_by_user_id=None,
+            target_date=future_day,
+            is_clinic_wide=True,
+        )
+
+        result = queue_service.join_queue_with_token(
+            db_session,
+            token_str=token_value,
+            patient_name="Пациент ЭКГ",
+            phone="+998901234598",
+            specialist_id_override=profile.id,
+            source="online",
+        )
+        # the existing surface is reused — no fork, no «Нет активных врачей»
+        assert result["daily_queue"].id == surface.id
+        assert result["daily_queue"].specialist_id is None
+        assert result["daily_queue"].queue_resource_id == resource.id
+        assert result["entry"].queue_id == surface.id
+        assert result["specialist_name"] == "ЭКГ"  # registry display_name
+    finally:
+        _durable_cleanup(db_session)
+        if token_value is not None:
+            for row in (
+                db_session.query(_QueueToken)
+                .filter(_QueueToken.token == token_value)
+                .all()
+            ):
+                db_session.delete(row)
+        db_session.query(QueueProfile).filter(QueueProfile.key == "echokg_cc2").delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_clinic_wide_profile_join_doctor_path_without_registry(
+    db_session: Session,
+) -> None:
+    """Codex round-19 P1 (regression companion): a doctor-populated profile
+    WITHOUT a registry surface keeps the doctor path byte-identical — the
+    restructured else-branch (least-load routing, the profile-key queue
+    tag) and the alias-skip contract ('laboratory' never resolves the
+    'lab' registry row) both stay intact."""
+    from app.models.online_queue import QueueToken as _QueueToken
+    from app.models.queue_profile import QueueProfile
+
+    future_day = date.today() + timedelta(days=2)
+    profile = QueueProfile(
+        key="laboratory_cc3",
+        title="Лаборатория",
+        title_ru="Лаборатория",
+        queue_tags=["lab", "laboratory"],
+        department_key="laboratory",
+        show_on_qr_page=True,
+    )
+    token_value = None
+    try:
+        db_session.add(profile)
+        db_session.commit()
+
+        doc_user = _make_user(db_session, username="dr_lab_cc3", role="Doctor")
+        doc_user.full_name = "Лабораторный Врач"
+        db_session.commit()
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="lab")
+        doctor.cabinet = "9"
+        db_session.commit()
+
+        token_value, _meta = queue_service.assign_queue_token(
+            db_session,
+            specialist_id=None,
+            department="lab",
+            generated_by_user_id=None,
+            target_date=future_day,
+            is_clinic_wide=True,
+        )
+
+        result = queue_service.join_queue_with_token(
+            db_session,
+            token_str=token_value,
+            patient_name="Пациент Врача",
+            phone="+998901234597",
+            specialist_id_override=profile.id,
+            source="online",
+        )
+        queue = result["daily_queue"]
+        assert queue.specialist_id == doctor.id  # the doctor path
+        assert queue.queue_resource_id is None  # never the resource axis
+        assert queue.queue_tag == "laboratory_cc3"  # the profile key (SSOT)
+        assert result["specialist_name"] == "Лабораторный Врач"
+        assert result["cabinet"] == "9"
+        assert result["entry"].queue_id == queue.id
+    finally:
+        _durable_cleanup(db_session, "dr_lab_cc3")
+        if token_value is not None:
+            for row in (
+                db_session.query(_QueueToken)
+                .filter(_QueueToken.token == token_value)
+                .all()
+            ):
+                db_session.delete(row)
+        db_session.query(QueueProfile).filter(
+            QueueProfile.key == "laboratory_cc3"
+        ).delete(synchronize_session=False)
+        db_session.commit()
