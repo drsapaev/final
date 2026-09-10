@@ -8,6 +8,7 @@ from app.models.appointment import Appointment
 from app.models.notification import NotificationDelivery, NotificationEvent
 from app.models.patient import Patient
 from app.models.payment import Payment
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.user import User
 from app.models.visit import Visit, VisitService
 
@@ -77,6 +78,32 @@ def _add_visit_service(db_session, visit: Visit, *, price: str, service_id: int)
     db_session.commit()
     db_session.refresh(service)
     return service
+
+
+def _link_invoice(
+    db_session,
+    *,
+    visit: Visit,
+    amount: Decimal,
+) -> PaymentInvoice:
+    invoice = PaymentInvoice(
+        patient_id=visit.patient_id,
+        total_amount=amount,
+        status="pending",
+        payment_method="cash",
+    )
+    db_session.add(invoice)
+    db_session.flush()
+    db_session.add(
+        PaymentInvoiceVisit(
+            invoice_id=invoice.id,
+            visit_id=visit.id,
+            visit_amount=amount,
+        )
+    )
+    db_session.commit()
+    db_session.refresh(invoice)
+    return invoice
 
 
 def test_cashier_create_payment_creates_canonical_payment_notification(
@@ -489,12 +516,93 @@ def test_cashier_confirm_refunded_payment_is_rejected_without_mutation(
     assert payment.status == "refunded"
 
 
+def test_cashier_confirm_payment_closes_linked_invoice_and_normalizes_visit(
+    client,
+    db_session,
+    auth_headers,
+):
+    _, visit = _create_patient_visit(db_session, suffix="0004")
+    visit.status = "paid"
+    _add_visit_service(db_session, visit, price="40000", service_id=904)
+    invoice = _link_invoice(
+        db_session,
+        visit=visit,
+        amount=Decimal("40000"),
+    )
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("40000"),
+        method="cash",
+        status="pending",
+    )
+    db_session.add(payment)
+    db_session.commit()
+    db_session.refresh(payment)
+
+    response = client.post(
+        f"/api/v1/cashier/payments/{payment.id}/confirm",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.refresh(payment)
+    db_session.refresh(invoice)
+    db_session.refresh(visit)
+    assert payment.status == "paid"
+    assert payment.paid_at is not None
+    assert invoice.status == "paid"
+    assert invoice.payment_method == "cash"
+    assert invoice.paid_at is not None
+    assert visit.status == "waiting"
+
+
+def test_cashier_confirm_partial_payment_keeps_linked_invoice_open(
+    client,
+    db_session,
+    auth_headers,
+):
+    _, visit = _create_patient_visit(db_session, suffix="0005")
+    _add_visit_service(db_session, visit, price="60000", service_id=905)
+    invoice = _link_invoice(
+        db_session,
+        visit=visit,
+        amount=Decimal("60000"),
+    )
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("25000"),
+        method="cash",
+        status="pending",
+    )
+    db_session.add(payment)
+    db_session.commit()
+    db_session.refresh(payment)
+
+    response = client.post(
+        f"/api/v1/cashier/payments/{payment.id}/confirm",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.refresh(payment)
+    db_session.refresh(invoice)
+    assert payment.status == "paid"
+    assert invoice.status == "pending"
+    assert invoice.paid_at is None
+
+
 def test_cashier_confirm_completed_payment_does_not_downgrade_status(
     client,
     db_session,
     auth_headers,
 ):
     _, visit = _create_patient_visit(db_session, suffix="0003")
+    _add_visit_service(db_session, visit, price="45000", service_id=903)
+    invoice = _link_invoice(
+        db_session,
+        visit=visit,
+        amount=Decimal("45000"),
+    )
     payment = Payment(
         visit_id=visit.id,
         amount=Decimal("45000"),
@@ -512,4 +620,7 @@ def test_cashier_confirm_completed_payment_does_not_downgrade_status(
 
     assert response.status_code == 200, response.text
     db_session.refresh(payment)
+    db_session.refresh(invoice)
     assert payment.status == "completed"
+    assert invoice.status == "paid"
+    assert invoice.paid_at is not None

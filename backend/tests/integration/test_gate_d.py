@@ -42,6 +42,7 @@ Gate D PASS criterion:
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 import threading
@@ -1012,7 +1013,91 @@ def test_d6c_telegram_refund_serializes_on_visit_lock(
 
 
 
-# ─── Codex R10 PR 3118: edit-delta decrease guard serialization ────────
+# --- D6d: cashier confirmation lock order ----------------------------
+
+def test_d6d_cashier_confirm_serializes_on_visit_lock(
+    db_session, new_session_factory, test_user, monkeypatch
+):
+    """D6d: manual cashier confirmation joins the canonical visit lock order."""
+    from sqlalchemy.exc import OperationalError
+
+    from app.api.v1.endpoints.cashier import _payments as cashier_payments
+
+    async def _skip_notification(**_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        cashier_payments,
+        "_emit_payment_notification",
+        _skip_notification,
+    )
+
+    visit = create_test_visit(db_session, status="waiting")
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("10000"),
+        currency="UZS",
+        method="cash",
+        status="pending",
+        created_at=datetime.now(UTC),
+    )
+    db_session.add(payment)
+    db_session.commit()
+    payment_id = payment.id
+    visit_id = visit.id
+
+    PaymentInvariantService(db_session).lock_visit_for_payment_change(visit_id)
+
+    blocked = new_session_factory()
+    try:
+        blocked.execute(text("SET LOCAL lock_timeout = '800ms'"))
+        with pytest.raises(OperationalError):
+            asyncio.run(
+                cashier_payments.confirm_payment(
+                    payment_id=payment_id,
+                    db=blocked,
+                    current_user=test_user,
+                )
+            )
+    finally:
+        blocked.rollback()
+        blocked.close()
+
+    fresh = new_session_factory()
+    try:
+        unchanged = fresh.query(Payment).filter(Payment.id == payment_id).one()
+        assert unchanged.status == "pending"
+    finally:
+        fresh.close()
+
+    db_session.rollback()
+    after_lock = new_session_factory()
+    try:
+        result = asyncio.run(
+            cashier_payments.confirm_payment(
+                payment_id=payment_id,
+                db=after_lock,
+                current_user=test_user,
+            )
+        )
+        assert result["status"] == "paid"
+    finally:
+        after_lock.close()
+
+    cleanup = new_session_factory()
+    try:
+        persisted = cleanup.query(Payment).filter(Payment.id == payment_id).one()
+        assert persisted.status == "paid"
+        cleanup.execute(
+            text("DELETE FROM payments WHERE id = :pid"), {"pid": payment_id}
+        )
+        cleanup.execute(text("DELETE FROM visits WHERE id = :vid"), {"vid": visit_id})
+        cleanup.commit()
+    finally:
+        cleanup.close()
+
+
+# --- Codex R10 PR 3118: edit-delta decrease guard serialization -------
 
 def test_edit_delta_decrease_guard_serializes_with_payment_creation(
     db_engine, db_session, new_session_factory

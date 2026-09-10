@@ -1048,43 +1048,78 @@ async def confirm_payment(
     """
     Вручную подтвердить платеж.
     """
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    from app.services.payment_invariant_service import PaymentInvariantService
+
+    invariant_service = PaymentInvariantService(db)
+    payment_reference = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment_reference:
+        raise HTTPException(status_code=404, detail="Платеж не найден")
+
+    expected_visit_id = payment_reference.visit_id
+    visit = None
+    if expected_visit_id is not None:
+        visit = invariant_service.lock_visit_for_payment_change(expected_visit_id)
+
+    payment = (
+        db.query(Payment)
+        .filter(Payment.id == payment_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
     if not payment:
-         raise HTTPException(status_code=404, detail="Платеж не найден")
+        raise HTTPException(status_code=404, detail="Платеж не найден")
+    if payment.visit_id != expected_visit_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Визит платежа изменился; повторите операцию",
+        )
 
     payment_status = _cashier_payment_status(payment)
+    already_paid = payment_status in {"paid", "completed"}
 
-    if payment_status in {'paid', 'completed'}:
-         return {"success": True, "message": "Платеж уже оплачен"}
-
-    if payment_status in {'cancelled', 'refunded', 'void'}:
-         raise HTTPException(status_code=400, detail="Нельзя подтвердить отмененный платеж")
+    if payment_status in {"cancelled", "refunded", "void"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя подтвердить отмененный платеж",
+        )
 
     # Issue #06 Phase 4b B2: Replaced direct payment.status = 'paid'
     # with billing_service.update_payment_status() to enforce payment
     # state machine validation.
     from app.services.billing_service import BillingService
 
-    payment = BillingService(db).update_payment_status(
-        payment_id=payment.id,
-        new_status="paid",
-        commit=False,
-    )
-    if not payment.provider_transaction_id:
-        from datetime import datetime
-        payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.now(UTC).timestamp())}"
+    if not already_paid:
+        payment = BillingService(db).update_payment_status(
+            payment_id=payment.id,
+            new_status="paid",
+            commit=False,
+        )
+        if not payment.provider_transaction_id:
+            from datetime import datetime
+
+            payment.provider_transaction_id = (
+                f"MANUAL-{payment_id}-{int(datetime.now(UTC).timestamp())}"
+            )
 
     # Issue #06 Phase 3: delegate visit status normalization to
     # VisitLifecycleService (replaces _preserve_cashier_visit_status).
-    visit = None
     if payment.visit_id:
         from app.services.visit_lifecycle_service import VisitLifecycleService
 
         visit = VisitLifecycleService(db).restore_operational_status_after_payment_change(
             visit_id=payment.visit_id,
+            commit=False,
+        )
+        invariant_service.synchronize_linked_invoices(
+            visit_id=payment.visit_id,
+            payment_method=payment.method,
         )
 
     db.commit()
+    if already_paid:
+        return {"success": True, "message": "Платеж уже оплачен"}
+
     await _emit_payment_notification(
         db=db,
         payment=payment,
