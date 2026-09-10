@@ -4608,3 +4608,149 @@ def test_gql_join_queue_broadcasts_routing_rooms(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== GG. Codex round-23 pins =====================
+
+
+def test_gql_join_queue_deactivated_registry_guards_before_creation(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-23 P2: with the registry row DEACTIVATED and no
+    surface, the locked branch decision applies the doctor guard BEFORE
+    get_or_create_daily_queue — the Resource-role synthetic is rejected
+    with DOCTOR_INACTIVE and NO doctor-owned (day, tag) queue is
+    persisted (the round-22 retro-check fired only after the
+    constructor's internal commit, leaving an active invalid queue that
+    would shadow the resource surface after a reactivation)."""
+    import contextlib
+    from types import SimpleNamespace
+
+    from app.graphql import mutations as gql_mutations
+    from app.graphql.types import QueueEntryInput
+    from app.models.online_queue import DailyQueue as _DQ
+    from app.models.patient import Patient
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+
+    patient = Patient(
+        last_name="Рентгенова",
+        first_name="Пациентка",
+        phone="+998901234593",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        user = _make_user(db_session, username="lab_res_gg1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        # the real registry state: DEACTIVATED row, no surface, no stubs —
+        # the locked branch decision must see the truth
+        _make_resource(db_session, code="lab", queue_tag="lab", active=False)
+
+        info = SimpleNamespace(context=None)
+        result = gql_mutations.Mutation._join_queue_impl(
+            info,
+            QueueEntryInput(
+                patient_id=patient.id,
+                doctor_id=synthetic.id,
+                queue_tag="lab",
+            ),
+        )
+        assert result.success is False
+        assert result.errors == ["DOCTOR_INACTIVE"]
+        assert result.queue_entry is None
+
+        # nothing persisted: no (day, 'lab') queue exists at all — the
+        # invalid doctor-owned queue must not survive the rejection
+        stale_queues = (
+            db_session.query(_DQ).filter(_DQ.queue_tag == "lab").count()
+        )
+        assert stale_queues == 0, "an invalid doctor-owned lab queue persisted"
+    finally:
+        _durable_cleanup(db_session, "lab_res_gg1")
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_gql_join_queue_doctor_fallback_keeps_full_guard_chain(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-23 P2 (fallback companion): with the registry row
+    deactivated and no surface, a REAL doctor's join takes the doctor
+    branch through the FULL guard chain — the round-8 predicate AND the
+    round-15 post-create FOR UPDATE re-check both run (keyed on the
+    locked branch decision, not a stale boolean), and the entry lands on
+    the doctor-owned (day, tag) queue."""
+    import contextlib
+    from types import SimpleNamespace
+
+    from app.graphql import mutations as gql_mutations
+    from app.graphql.types import QueueEntryInput
+    from app.models.patient import Patient
+
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_db_session",
+        lambda: contextlib.nullcontext(db_session),
+    )
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+
+    patient = Patient(
+        last_name="Анализов",
+        first_name="Пациент",
+        phone="+998901234592",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        doc_user = _make_user(db_session, username="dr_gg2_lab", role="Doctor")
+        doc_user.full_name = "Лаборант Реальный"
+        db_session.commit()
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="lab")
+        doctor.cabinet = "12"
+        db_session.commit()
+        # the registry row is DEACTIVATED, no surface — the tag does not
+        # route onto the resource axis, the doctor branch owns the join
+        _make_resource(db_session, code="lab", queue_tag="lab", active=False)
+
+        info = SimpleNamespace(context=None)
+        result = gql_mutations.Mutation._join_queue_impl(
+            info,
+            QueueEntryInput(
+                patient_id=patient.id,
+                doctor_id=doctor.id,
+                queue_tag="lab",
+            ),
+        )
+        assert result.success is True, (result.message, result.errors)
+        assert result.queue_entry is not None
+        queue = result.queue_entry.queue
+        assert queue.specialist.id == doctor.id  # the doctor-owned branch
+        assert queue.queue_resource_id is None
+        assert queue.queue_tag == "lab"
+        assert result.queue_entry.status == "waiting"
+    finally:
+        _durable_cleanup(db_session, "dr_gg2_lab")
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()

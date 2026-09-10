@@ -42,6 +42,9 @@ from app.crud.queue_resource_routing import (
     resolve_tag_resource as _resolve_tag_resource,
 )
 from app.crud.queue_resource_routing import (
+    resolve_tag_resource_locked as _resolve_tag_resource_locked,
+)
+from app.crud.queue_resource_routing import (
     resource_start_number,
     tag_routes_to_resource,
 )
@@ -1030,38 +1033,6 @@ class Mutation:
                 today = now_local.date()
                 queue_start_hour = queue_settings.get("queue_start_hour", 7)
 
-                # QD-2C (Codex round-21 P1): joinQueue по тегу реестра
-                # роутится на resource-ось ДО гварда врача — 0056/0057
-                # перевели сиды lab/ECG на внутреннюю роль 'Resource', а
-                # канонический eligibility-предикат (врач + doctor-family
-                # роль владельца) отклонял их с DOCTOR_INACTIVE ещё ДО
-                # crud-ветки реестра. Гвард — контракт ДОКТОРСКОЙ очереди
-                # (владелец активен + doctor-family роль); resource-ось
-                # несёт свои инварианты (очередь активна/не открыта/окно
-                # часов/лимит) — они ниже не зависят от владельца.
-                # Деактивационно-устойчиво (round-3): живая resource-очередь
-                # (day, tag) маршрутизирует и при деактивированной строке
-                # реестра (tag_routes_to_resource), новая — только при
-                # АКТИВНОЙ строке (resolve_tag_resource).
-                registry_routed = bool(input.queue_tag) and (
-                    tag_routes_to_resource(db, input.queue_tag, today) is not None
-                    or _resolve_tag_resource(db, input.queue_tag) is not None
-                )
-                if not registry_routed:
-                    # Codex P1 (round-8): канонический eligibility-предикат (SSOT,
-                    # тот же, что в createAppointment): Doctor.active + завершённый
-                    # профиль + владелец существует/активен/с doctor-ролью —
-                    # legacy-ghost строки (active Doctor с неактивным владельцем)
-                    # больше не принимают онлайн-запись.
-                    try:
-                        ensure_doctor_eligible_for_appointment(db, input.doctor_id)
-                    except HTTPException:
-                        return QueueMutationResponse(
-                            success=False,
-                            message="Врач недоступен для онлайн-записи",
-                            errors=["DOCTOR_INACTIVE"],
-                        )
-
                 # P1: сериализуем СОЗДАНИЕ очереди на ключе (doctor, day, tag) —
                 # get_or_create_daily_queue это query-then-insert без
                 # unique-констрейнта; advisory lock (Postgres) закрывает гонку
@@ -1085,6 +1056,50 @@ class Mutation:
                         {"k": lock_key},
                     )
 
+                # QD-2C (Codex round-21 P1): joinQueue по тегу реестра
+                # роутится на resource-ось ДО гварда врача — 0056/0057
+                # перевели сиды lab/ECG на внутреннюю роль 'Resource', а
+                # канонический eligibility-предикат (врач + doctor-family
+                # роль владельца) отклонял их с DOCTOR_INACTIVE ещё ДО
+                # crud-ветки реестра. Гвард — контракт ДОКТОРСКОЙ очереди
+                # (владелец активен + doctor-family роль); resource-ось
+                # несёт свои инварианты (очередь активна/не открыта/окно
+                # часов/лимит) — они ниже не зависят от владельца.
+                # Codex round-23 P2: решение о ветке — ПОД локом, а не по
+                # unlocked-предчеку. Строка реестра перечитывается
+                # LOCKED-резолвером (FOR UPDATE + populate_existing — in-flight
+                # деактивация блокируется и видна свежим состоянием, лок
+                # держится до конца транзакции), поэтому registry_routed
+                # стабилен до самого коммита: деактивация в окне между
+                # предчеком и get_or_create больше не может уронить
+                # создание в ДОКТОРСКУЮ ветку с уже пропущенными гвардами
+                # (невалидная очередь синтетика персистилась и после
+                # реактивации реестра мешала resource-поверхности), а
+                # fallback на реального врача не может пропустить round-15
+                # FOR UPDATE-перепроверку по устаревшему true.
+                # Деактивационно-устойчиво (round-3): живая resource-очередь
+                # (day, tag) маршрутизирует и при деактивированной строке
+                # реестра (tag_routes_to_resource), новая — только при
+                # АКТИВНОЙ строке (locked-resolve).
+                registry_routed = bool(input.queue_tag) and (
+                    tag_routes_to_resource(db, input.queue_tag, today) is not None
+                    or _resolve_tag_resource_locked(db, input.queue_tag) is not None
+                )
+                if not registry_routed:
+                    # Codex P1 (round-8): канонический eligibility-предикат (SSOT,
+                    # тот же, что в createAppointment): Doctor.active + завершённый
+                    # профиль + владелец существует/активен/с doctor-ролью —
+                    # legacy-ghost строки (active Doctor с неактивным владельцем)
+                    # больше не принимают онлайн-запись.
+                    try:
+                        ensure_doctor_eligible_for_appointment(db, input.doctor_id)
+                    except HTTPException:
+                        return QueueMutationResponse(
+                            success=False,
+                            message="Врач недоступен для онлайн-записи",
+                            errors=["DOCTOR_INACTIVE"],
+                        )
+
                 # SSOT: get_or_create_daily_queue (уникальность day+specialist+tag).
                 # Codex P1 (round-8): новая очередь получает сконфигурированную
                 # капу врача (max_online_per_day) вместо дефолта модели 15 —
@@ -1099,18 +1114,15 @@ class Mutation:
                     },
                 )
 
-                # QD-2C (Codex round-22 P2): registry_routed вычислен БЕЗ лока
-                # — ДО advisory-лока и FOR UPDATE-перепроверки внутри
-                # get_or_create_daily_queue. Если строка реестра
-                # деактивировалась в этом окне (а поверхности ещё не было),
-                # get_or_create падает в ДОКТОРСКУЮ ветку — а оба гварда уже
-                # пропущены по устаревшему boolean: внутренний 'Resource'-
-                # синтетик получил бы докторскую очередь и тикет ПОСЛЕ
-                # отключения его реестра. Решение по ФАКТУ возвращённой
-                # очереди (её вернул уже залоченный резолв): guard-skip
-                # законен только для очереди НА ресурсной оси; иначе —
-                # канонический гвард врача задним числом (реальный врач
-                # прошёл бы его и раньше — семантика байт-идентична).
+                # QD-2C (Codex round-22 P2, теперь пояс-надежности): даже при
+                # стабилизированном под локом registry_routed проверяем ФАКТ
+                # по возвращённой очереди — закрывает экзотическое окно,
+                # когда живая поверхность деактивируется между нашим
+                # резолвом и внутренним резолвом get_or_create при уже
+                # неактивной строке реестра (оба гварда уже пропущены):
+                # guard-skip законен только для очереди НА ресурсной оси;
+                # иначе — канонический гвард врача задним числом (реальный
+                # врач прошёл бы его и раньше — семантика байт-идентична).
                 if registry_routed and daily_queue.queue_resource_id is None:
                     try:
                         ensure_doctor_eligible_for_appointment(db, input.doctor_id)
