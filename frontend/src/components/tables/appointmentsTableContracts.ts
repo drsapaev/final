@@ -11,6 +11,7 @@
  */
 
 import type { Appointment, QueueNumberInfo } from '../../types/domain/clinic';
+import { hasBackendAction } from '../../pages/registrar/registrarHelpers';
 
 /** Translation fn shape (same contract as RefundTranslationFn, PR-UI-14-6). */
 export type AppointmentsTranslationFn = (key: string, options?: Record<string, unknown>) => string;
@@ -52,6 +53,9 @@ const ACTION_ALIASES = {
 type ActionAliasKey = keyof typeof ACTION_ALIASES;
 
 export const getBackendActionAvailability = (row: Record<string, unknown> | null | undefined, action: string, flagName?: string) => {
+  if (action === 'payment' && Array.isArray(row?.grouped_records) && row.grouped_records.length > 0) {
+    return hasBackendAction(row, 'mark_paid');
+  }
   if (row && flagName && Object.prototype.hasOwnProperty.call(row, flagName)) {
     return Boolean(row[flagName]);
   }

@@ -1,6 +1,7 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useEffect, useRef, useState } from 'react';
+import { getBackendActionAvailability } from './appointmentsTableContracts';
 import {
   User,
   Calendar,
@@ -31,6 +32,9 @@ const hasBackendAction = (
   action: string,
   flagName: string
 ) => {
+  if (action === 'payment') {
+    return getBackendActionAvailability(row, action, flagName) === true;
+  }
   if (row && flagName && Object.prototype.hasOwnProperty.call(row, flagName)) {
     return Boolean(row[flagName]);
   }

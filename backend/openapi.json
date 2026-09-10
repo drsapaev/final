@@ -16621,13 +16621,60 @@
         }
       }
     },
+    "/api/v1/registrar/records/payment-summary": {
+      "post": {
+        "tags": [
+          "registrar-wizard"
+        ],
+        "summary": "Get Registrar Payment Summary",
+        "description": "Return current receipt-backed balances and the snapshot for payment submission.",
+        "operationId": "get_registrar_payment_summary_api_v1_registrar_records_payment_summary_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarPaymentSummaryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrarPaymentSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/registrar/visits/{visit_id}/mark-paid": {
       "post": {
         "tags": [
           "registrar-wizard"
         ],
         "summary": "Mark Visit As Paid",
-        "description": "Отметить запись из таблицы visits как оплаченную и создать платеж (SSOT)",
+        "description": "Receive the supplied amount; omitted amount pays the remaining visit debt.",
         "operationId": "mark_visit_as_paid_api_v1_registrar_visits__visit_id__mark_paid_post",
         "security": [
           {
@@ -16694,7 +16741,7 @@
           "registrar-wizard"
         ],
         "summary": "Mark Queue Entry As Paid",
-        "description": "Отметить запись OnlineQueueEntry как оплаченную.\n\nНаходит связанный Visit через visit_id и оплачивает его.\nЕсли visit_id отсутствует, пытается найти Visit по patient_id и дате.",
+        "description": "Receive payment for the explicitly linked visit; partial payments retain debt.",
         "operationId": "mark_queue_entry_as_paid_api_v1_registrar_queue_entry__entry_id__mark_paid_post",
         "security": [
           {
@@ -86309,7 +86356,7 @@
               },
               {
                 "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$"
               },
               {
                 "type": "null"
@@ -86328,6 +86375,18 @@
             ],
             "title": "Method",
             "default": "cash"
+          },
+          "payment_snapshot": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Snapshot"
           }
         },
         "type": "object",
@@ -95898,6 +95957,73 @@
         ],
         "title": "RegistrarPatientLinkDecisionRequest"
       },
+      "RegistrarPaymentSummary": {
+        "properties": {
+          "total_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Amount"
+          },
+          "paid_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Paid Amount"
+          },
+          "remaining_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Remaining Amount"
+          },
+          "payment_status": {
+            "type": "string",
+            "title": "Payment Status"
+          },
+          "can_pay": {
+            "type": "boolean",
+            "title": "Can Pay"
+          },
+          "snapshot": {
+            "type": "string",
+            "title": "Snapshot"
+          },
+          "visits": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrarVisitPaymentSummary"
+            },
+            "type": "array",
+            "title": "Visits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_amount",
+          "paid_amount",
+          "remaining_amount",
+          "payment_status",
+          "can_pay",
+          "snapshot",
+          "visits"
+        ],
+        "title": "RegistrarPaymentSummary"
+      },
+      "RegistrarPaymentSummaryRequest": {
+        "properties": {
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrarRecordRef"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Records"
+          }
+        },
+        "type": "object",
+        "required": [
+          "records"
+        ],
+        "title": "RegistrarPaymentSummaryRequest"
+      },
       "RegistrarRecordActionItemResponse": {
         "properties": {
           "record_kind": {
@@ -96033,7 +96159,7 @@
               },
               {
                 "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$"
               },
               {
                 "type": "null"
@@ -96052,6 +96178,18 @@
             ],
             "title": "Method",
             "default": "cash"
+          },
+          "payment_snapshot": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Snapshot"
           }
         },
         "type": "object",
@@ -96088,6 +96226,16 @@
             },
             "type": "array",
             "title": "Results"
+          },
+          "payment_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrarPaymentSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -96118,6 +96266,53 @@
           "record_id"
         ],
         "title": "RegistrarRecordRef"
+      },
+      "RegistrarVisitPaymentSummary": {
+        "properties": {
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "total_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Amount"
+          },
+          "paid_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Paid Amount"
+          },
+          "remaining_amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Remaining Amount"
+          },
+          "payment_status": {
+            "type": "string",
+            "title": "Payment Status"
+          },
+          "payment_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id",
+          "total_amount",
+          "paid_amount",
+          "remaining_amount",
+          "payment_status"
+        ],
+        "title": "RegistrarVisitPaymentSummary"
       },
       "ReorderQueueProfilesRequest": {
         "properties": {},
