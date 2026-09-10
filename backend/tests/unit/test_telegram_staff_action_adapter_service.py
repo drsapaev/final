@@ -210,7 +210,7 @@ def test_staff_payment_status_adapter_uses_billing_transition_and_audit(
 
     result = TelegramStaffActionAdapterService(db_session).staff_change_payment_status(
         payment_id=payment.id,
-        new_status="paid",
+        new_status="PAID",
         actor_user_id=admin_user.id,
         telegram_chat_id=7703,
         commit=False,

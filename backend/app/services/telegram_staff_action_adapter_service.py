@@ -603,7 +603,7 @@ class TelegramStaffActionAdapterService:
                 )
             payment = BillingService(self.db).update_payment_status(
                 payment_id,
-                new_status,
+                target_status,
                 meta={
                     "staff_action": "telegram_confirmed_payment_status_change",
                     "actor_user_id": actor_user_id,
