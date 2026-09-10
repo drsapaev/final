@@ -1089,6 +1089,15 @@ export const buildEditOriginalServiceIdentity = (
   const originalQuantities = identity.originalQuantities;
   const originalServiceCodes = identity.serviceCodes;
   const originalServiceNames = identity.serviceNames;
+  // Group-level updated_at is a presentation maximum across several entries.
+  // Only an ungrouped row explicitly identifying this entry can supply a fallback.
+  const ownRowVersion = (queueId: string | number) => {
+    if (Array.isArray(initialData.grouped_records)) return null;
+    const rowEntryId = initialData.original_queue_id ?? initialData.queue_entry_id;
+    return rowEntryId != null && String(rowEntryId) === String(queueId)
+      ? initialData.updated_at || initialData.last_changed_at
+      : null;
+  };
 
     // Определяем исходные услуги из initialData
     const serviceDetailOccurrences = new Map<string, number>();
@@ -1127,7 +1136,7 @@ export const buildEditOriginalServiceIdentity = (
         }
         // PR-14: collect updated_at for optimistic locking
         if (queueId) {
-          const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || initialData.updated_at || initialData.last_changed_at;
+          const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || ownRowVersion(queueId);
           if (ts) entryUpdatedAtMap[queueId] = ts;
         }
         if (serviceCode) originalServiceCodes.add(String(serviceCode).toUpperCase().trim());
@@ -1231,7 +1240,7 @@ export const buildEditOriginalServiceIdentity = (
           if (queueId) originalQueueIds.add(queueId); // ✅ Сохраняем ID записи очереди
           // PR-14: collect updated_at for optimistic locking
           if (queueId) {
-            const ts = q.updated_at || q.last_changed_at || initialData.updated_at || initialData.last_changed_at;
+            const ts = q.updated_at || q.last_changed_at || ownRowVersion(queueId);
             if (ts) entryUpdatedAtMap[queueId] = ts;
           }
           // Находим service_code и name по service_id

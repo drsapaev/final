@@ -90,7 +90,7 @@ class RegistrarEditDeltaService:
         # изменены другим пользователем с момента последнего чтения frontend'ом.
         if expected_entry_updated_at:
             self._assert_entries_not_concurrently_modified(
-                expected_entry_updated_at
+                expected_entry_updated_at, patient_id=patient_id
             )
 
         if patient_data:
@@ -284,29 +284,48 @@ class RegistrarEditDeltaService:
     def _assert_entries_not_concurrently_modified(
         self,
         expected_entry_updated_at: dict[int, str],
+        *,
+        patient_id: int | None = None,
     ) -> None:
-        """R-08 fix: optimistic locking via updated_at.
+        """Compare exact server versions under a lock held through the edit.
 
-        Проверяет что ни одна из existing queue entries не была изменена
-        другим пользователем с момента последнего чтения frontend'ом.
-
-        Если хотя бы одна entry изменилась — raises ValueError (caller maps to 400).
-        Это предотвращает silent data loss когда два регистратора одновременно
-        редактируют одного пациента (добавляют услуги, меняют количество и т.д.).
+        Refresh previously loaded objects after waiting for another writer.
+        A timestamp here is an opaque server version, not the client's clock:
+        accepting clock skew would allow lost updates within that interval.
+        ValueError preserves the endpoint's existing 400 response contract.
         """
 
         entry_ids = list(expected_entry_updated_at.keys())
         if not entry_ids:
             return
 
+        expected_versions = {}
+        for entry_id, expected_iso in expected_entry_updated_at.items():
+            try:
+                if not isinstance(expected_iso, str) or len(expected_iso) < 19:
+                    raise ValueError("Expected a full timestamp")
+                expected_dt = datetime.fromisoformat(expected_iso.replace("Z", "+00:00"))
+            except (ValueError, TypeError) as exc:
+                raise ValueError(
+                    f"Некорректная версия записи очереди #{entry_id}. "
+                    "Обновите страницу, чтобы получить актуальные данные."
+                ) from exc
+            expected_versions[entry_id] = (
+                expected_dt.replace(tzinfo=UTC) if expected_dt.tzinfo is None else expected_dt
+            )
+
+        query = self.db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id.in_(entry_ids))
+        if patient_id is not None:
+            query = query.filter(OnlineQueueEntry.patient_id == patient_id)
         entries = (
-            self.db.query(OnlineQueueEntry)
-            .filter(OnlineQueueEntry.id.in_(entry_ids))
+            query.order_by(OnlineQueueEntry.id)
+            .with_for_update(of=OnlineQueueEntry)
+            .populate_existing()
             .all()
         )
         entries_by_id = {e.id: e for e in entries}
 
-        for entry_id, expected_iso in expected_entry_updated_at.items():
+        for entry_id, expected_dt in expected_versions.items():
             entry = entries_by_id.get(entry_id)
             if entry is None:
                 # Entry уже удалена другим пользователем
@@ -315,26 +334,11 @@ class RegistrarEditDeltaService:
                     "Обновите страницу, чтобы получить актуальные данные."
                 )
 
-            try:
-                expected_dt = datetime.fromisoformat(
-                    expected_iso.replace("Z", "+00:00")
-                )
-            except (ValueError, TypeError):
-                # graceful degradation: не блокируем если не удалось распарсить
-                continue
-
-            # Нормализуем оба к timezone-aware UTC для сравнения
-            if expected_dt.tzinfo is None:
-                expected_dt = expected_dt.replace(tzinfo=UTC)
-
             actual_dt = entry.updated_at
-            if actual_dt is None:
-                continue
-            if actual_dt.tzinfo is None:
+            if actual_dt is not None and actual_dt.tzinfo is None:
                 actual_dt = actual_dt.replace(tzinfo=UTC)
 
-            # Допускаем 1 секунду разницы (clock skew, округление БД)
-            if abs((actual_dt - expected_dt).total_seconds()) > 1:
+            if actual_dt != expected_dt:
                 raise ValueError(
                     f"Запись очереди #{entry_id} была изменена другим пользователем. "
                     "Обновите страницу, чтобы получить актуальные данные."

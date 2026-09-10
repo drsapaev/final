@@ -25,11 +25,13 @@ on:
       - 'backend/app/services/payment_state_checks.py'
       - 'backend/app/services/billing_service_pkg/**'
       - 'backend/app/services/provider_webhook_service.py'
+      - 'backend/app/services/registrar_edit_delta_service.py'
       - 'backend/app/api/v1/endpoints/cashier/**'
       - 'backend/app/api/v1/endpoints/registrar_wizard/**'
       - 'backend/app/api/v1/endpoints/visits.py'
       - 'backend/app/crud/visit.py'
       - 'backend/tests/integration/test_gate_d.py'
+      - 'backend/tests/integration/test_registrar_edit_version_lock.py'
       - 'backend/pytest.ini'
       - '.github/workflows/gate-d.yml'
   push:
@@ -45,7 +47,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.11.10'
-  DATABASE_URL: 'postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinicdb'
+  DATABASE_URL: 'postgresql+psycopg://clinic:clinic_ci_only_password@localhost:5432/clinic_test'
   SECRET_KEY: 'ci-secret-key-for-gate-d-runtime-tests-32-chars-min'
   ENV: 'dev'
   ALLOW_SQLITE_DATABASE_URL: '0'
@@ -64,13 +66,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: clinicdb
+          POSTGRES_DB: clinic_test
           POSTGRES_USER: clinic
           POSTGRES_PASSWORD: clinic_ci_only_password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U clinic -d clinicdb"
+          --health-cmd "pg_isready -U clinic -d clinic_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -98,7 +100,7 @@ jobs:
           echo "Database: PostgreSQL 16"
           echo "Tests: D1, D2, D3a, D3b, D4, D4b, D5, D6, D6b"
           echo ""
-          python -m pytest tests/integration/test_gate_d.py -v -m gate_d -s --tb=long
+          python -m pytest tests/integration/test_gate_d.py tests/integration/test_registrar_edit_version_lock.py -v -m gate_d -s --tb=long
 
       - name: 📊 Gate D Summary
         if: always()

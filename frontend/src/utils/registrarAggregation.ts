@@ -104,12 +104,19 @@ const stampServiceDetailEntryId = (
   appointment: Record<string, unknown>
 ): Record<string, unknown> => {
   if (!serviceDetail || typeof serviceDetail !== 'object') return serviceDetail;
-  if (hasQueueIdentityValue(serviceDetail.original_queue_id) || hasQueueIdentityValue(serviceDetail.queue_entry_id)) {
-    return serviceDetail;
-  }
   const sourceEntryId = pickExplicitSourceQueueEntryId(appointment);
-  if (!hasQueueIdentityValue(sourceEntryId)) return serviceDetail;
-  return { ...serviceDetail, original_queue_id: sourceEntryId };
+  const detailEntryId = serviceDetail.original_queue_id ?? serviceDetail.queue_entry_id ?? sourceEntryId;
+  if (!hasQueueIdentityValue(detailEntryId)) return serviceDetail;
+  // Preserve the version of the source entry before the patient group combines
+  // timestamps. A detail identifying another entry must supply its own version.
+  const sourceVersion = String(detailEntryId) === String(sourceEntryId)
+    ? appointment.updated_at ?? appointment.last_changed_at ?? null
+    : null;
+  const identifiedDetail = hasQueueIdentityValue(serviceDetail.original_queue_id) || hasQueueIdentityValue(serviceDetail.queue_entry_id)
+    ? serviceDetail
+    : { ...serviceDetail, original_queue_id: detailEntryId };
+  const version = serviceDetail.updated_at ?? serviceDetail.last_changed_at ?? sourceVersion;
+  return version ? { ...identifiedDetail, updated_at: version } : identifiedDetail;
 };
 
 const pickQueueNumberEntryId = (queueNumber: unknown): string | number | null => {

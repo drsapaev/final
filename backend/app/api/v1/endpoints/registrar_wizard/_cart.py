@@ -578,6 +578,7 @@ def _quote_core(
     quote_req: CartQuoteRequest,
     lock_pricing_rows: bool = False,
     registration_settings: dict[str, Any] | None = None,
+    expected_entry_updated_at: dict[int, str] | None = None,
 ) -> CartQuoteResponse:
     """Shared pricing core for /registrar/cart/quote AND the save-time
     revalidation of the confirmed quote (Codex R3 #3095 P1). Raises the same
@@ -679,6 +680,17 @@ def _quote_core(
                 .all()
             ):
                 service_row_map[int(_svc.id)] = _svc
+
+    # Lock the complete version set after catalog locks, before quote routing
+    # locks individual entries. Otherwise two edits to different entries can
+    # each hold one row and then wait for the other's version-check lock.
+    if lock_pricing_rows and expected_entry_updated_at:
+        try:
+            RegistrarEditDeltaService(db)._assert_entries_not_concurrently_modified(
+                expected_entry_updated_at, patient_id=quote_req.patient_id
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # W2-PR2: канонический день edit-квоты — зеркало RegistrarEditDelta
     # Service.apply (та же resolve_edit_target_day): день предпочтённых записей,
@@ -923,6 +935,7 @@ def _assert_quote_token_matches(
     patient_id: int | None = None,
     target_date: date | None = None,
     preferred_entry_ids: list[int] | None = None,
+    expected_entry_updated_at: dict[int, str] | None = None,
 ) -> dict[str, Any] | None:
     """Save-command revalidation shared by /registrar/cart, edit-delta and
     full-update (Codex R4 #3095 P1). Recomputes the quote on the CURRENT
@@ -963,6 +976,7 @@ def _assert_quote_token_matches(
         ),
         lock_pricing_rows=True,
         registration_settings=settings_snapshot,
+        expected_entry_updated_at=expected_entry_updated_at,
     )
     if fresh_quote.quote_token != quote_token:
         logger.warning(
@@ -1020,6 +1034,7 @@ def apply_registrar_cart_edit_delta(
         patient_id=request.patient_id,
         target_date=request.target_date,
         preferred_entry_ids=request.existing_queue_entry_ids,
+        expected_entry_updated_at=request.expected_entry_updated_at,
     )
     try:
         result = RegistrarEditDeltaService(db).apply(
