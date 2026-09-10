@@ -20,5 +20,7 @@ if (-not (Test-Path -LiteralPath $gateScript)) {
 }
 
 $pythonArgs = @($gateScript) + $GateArgs
-& $pythonLauncher -PythonArgs $pythonArgs
+# Keep stdout machine-readable: run_python's interpreter diagnostic is emitted
+# on PowerShell's information stream, while the gate payload uses success output.
+& $pythonLauncher -PythonArgs $pythonArgs 6>$null
 exit $LASTEXITCODE

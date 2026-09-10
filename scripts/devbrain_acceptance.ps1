@@ -28,27 +28,6 @@ function Test-Text {
     return [regex]::IsMatch($Text, $Pattern, $regexOptions)
 }
 
-function Get-GateSection {
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyString()]
-        [string] $Text,
-        [Parameter(Mandatory = $true)]
-        [string] $Header
-    )
-
-    $escaped = [regex]::Escape($Header)
-    $match = [regex]::Match(
-        $Text,
-        "(?s)(?:^|\r?\n)$escaped`:\s*\r?\n(?<body>.*?)(?:\r?\n\r?\n|\z)"
-    )
-    if ($match.Success) {
-        return $match.Groups["body"].Value.Trim()
-    }
-
-    return ""
-}
-
 function Invoke-GateScenario {
     param(
         [Parameter(Mandatory = $true)]
@@ -66,11 +45,30 @@ function Invoke-GateScenario {
 
     $output = ($outputLines |
         ForEach-Object { $_.ToString().TrimEnd("`r", "`n") }) -join "`n"
+    try {
+        $payload = $output | ConvertFrom-Json
+    }
+    catch {
+        throw "Gate returned invalid JSON for task '$Task': $output"
+    }
+    $firstTouch = if ($payload.PSObject.Properties.Name -contains "first_touch_files") {
+        @($payload.first_touch_files) -join "`n"
+    }
+    else {
+        ""
+    }
+    $stops = if ($payload.PSObject.Properties.Name -contains "stop_conditions") {
+        @($payload.stop_conditions) -join "`n"
+    }
+    else {
+        ""
+    }
     return [pscustomobject]@{
         ExitCode = $exitCode
         Output = $output
-        FirstTouch = Get-GateSection -Text $output -Header "First-touch files"
-        Stops = Get-GateSection -Text $output -Header "Stop conditions"
+        Payload = $payload
+        FirstTouch = $firstTouch
+        Stops = $stops
     }
 }
 
@@ -112,6 +110,12 @@ function Test-ScenarioExpectations {
 
     $fail = [System.Collections.Generic.List[string]]::new()
     $warn = [System.Collections.Generic.List[string]]::new()
+    $mode = if ($Run.Payload.PSObject.Properties.Name -contains "mode") {
+        $Run.Payload.mode
+    }
+    else {
+        ""
+    }
 
     if ($Run.ExitCode -ne 0) {
         $fail.Add("gate exited with code $($Run.ExitCode)") | Out-Null
@@ -119,7 +123,7 @@ function Test-ScenarioExpectations {
 
     switch ($Scenario.Id) {
         "migration" {
-            if (-not (Test-Text $Run.Output "Mode:\s*migration")) {
+            if ($mode -ne "migration") {
                 $fail.Add("missing migration mode") | Out-Null
             }
             if (-not (Test-Text $Run.Output "DB migration ownership|SQLAlchemy model/table storage gap|storage gap")) {
@@ -158,13 +162,13 @@ function Test-ScenarioExpectations {
             if (-not (Test-Text $Run.Output "Telegram mixed frontend/backend ownership|frontend/backend")) {
                 $fail.Add("missing mixed frontend/backend ownership signal") | Out-Null
             }
-            if (-not (Test-Text $Run.FirstTouch "frontend/src/components/TelegramManager\.jsx")) {
+            if (-not (Test-Text $Run.FirstTouch "frontend/src/components/TelegramManager\.tsx")) {
                 $fail.Add("missing Telegram frontend manager first-touch") | Out-Null
             }
-            if (-not (Test-Text $Run.FirstTouch "backend/app/api/v1/endpoints/(admin_telegram|telegram_webhook)\.py")) {
+            if (-not (Test-Text $Run.FirstTouch "backend/app/api/v1/endpoints/(admin_telegram/_management|telegram_webhook/_routes)\.py")) {
                 $fail.Add("missing Telegram backend endpoint first-touch") | Out-Null
             }
-            if (Test-Text $Run.Output "Mode:\s*migration") {
+            if ($mode -eq "migration") {
                 $fail.Add("non-storage Telegram contract task was incorrectly routed to migration mode") | Out-Null
             }
         }
