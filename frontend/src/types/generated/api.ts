@@ -5735,6 +5735,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/registrar/records/payment-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Registrar Payment Summary
+         * @description Return current receipt-backed balances and the snapshot for payment submission.
+         */
+        post: operations["get_registrar_payment_summary_api_v1_registrar_records_payment_summary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/registrar/visits/{visit_id}/mark-paid": {
         parameters: {
             query?: never;
@@ -5746,7 +5766,7 @@ export type paths = {
         put?: never;
         /**
          * Mark Visit As Paid
-         * @description Отметить запись из таблицы visits как оплаченную и создать платеж (SSOT)
+         * @description Receive the supplied amount; omitted amount pays the remaining visit debt.
          */
         post: operations["mark_visit_as_paid_api_v1_registrar_visits__visit_id__mark_paid_post"];
         delete?: never;
@@ -5766,10 +5786,7 @@ export type paths = {
         put?: never;
         /**
          * Mark Queue Entry As Paid
-         * @description Отметить запись OnlineQueueEntry как оплаченную.
-         *
-         *     Находит связанный Visit через visit_id и оплачивает его.
-         *     Если visit_id отсутствует, пытается найти Visit по patient_id и дате.
+         * @description Receive payment for the explicitly linked visit; partial payments retain debt.
          */
         post: operations["mark_queue_entry_as_paid_api_v1_registrar_queue_entry__entry_id__mark_paid_post"];
         delete?: never;
@@ -29874,6 +29891,8 @@ export type components = {
              * @default cash
              */
             method: string | null;
+            /** Payment Snapshot */
+            payment_snapshot?: string | null;
         };
         /**
          * MeasurementRequest
@@ -33795,6 +33814,28 @@ export type components = {
             /** Safenote */
             safeNote?: string | null;
         };
+        /** RegistrarPaymentSummary */
+        RegistrarPaymentSummary: {
+            /** Total Amount */
+            total_amount: string;
+            /** Paid Amount */
+            paid_amount: string;
+            /** Remaining Amount */
+            remaining_amount: string;
+            /** Payment Status */
+            payment_status: string;
+            /** Can Pay */
+            can_pay: boolean;
+            /** Snapshot */
+            snapshot: string;
+            /** Visits */
+            visits: components["schemas"]["RegistrarVisitPaymentSummary"][];
+        };
+        /** RegistrarPaymentSummaryRequest */
+        RegistrarPaymentSummaryRequest: {
+            /** Records */
+            records: components["schemas"]["RegistrarRecordRef"][];
+        };
         /** RegistrarRecordActionItemResponse */
         RegistrarRecordActionItemResponse: {
             /** Record Kind */
@@ -33838,6 +33879,8 @@ export type components = {
              * @default cash
              */
             method: string | null;
+            /** Payment Snapshot */
+            payment_snapshot?: string | null;
         };
         /** RegistrarRecordActionResponse */
         RegistrarRecordActionResponse: {
@@ -33853,6 +33896,7 @@ export type components = {
             failed_count: number;
             /** Results */
             results: components["schemas"]["RegistrarRecordActionItemResponse"][];
+            payment_summary?: components["schemas"]["RegistrarPaymentSummary"] | null;
         };
         /** RegistrarRecordRef */
         RegistrarRecordRef: {
@@ -33860,6 +33904,21 @@ export type components = {
             record_kind: string;
             /** Record Id */
             record_id: number;
+        };
+        /** RegistrarVisitPaymentSummary */
+        RegistrarVisitPaymentSummary: {
+            /** Visit Id */
+            visit_id: number;
+            /** Total Amount */
+            total_amount: string;
+            /** Paid Amount */
+            paid_amount: string;
+            /** Remaining Amount */
+            remaining_amount: string;
+            /** Payment Status */
+            payment_status: string;
+            /** Payment Type */
+            payment_type?: string | null;
         };
         /**
          * ReorderQueueProfilesRequest
@@ -48483,6 +48542,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_registrar_payment_summary_api_v1_registrar_records_payment_summary_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarPaymentSummaryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarPaymentSummary"];
                 };
             };
             /** @description Validation Error */

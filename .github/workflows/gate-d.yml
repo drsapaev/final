@@ -32,6 +32,7 @@ on:
       - 'backend/app/crud/visit.py'
       - 'backend/tests/integration/test_gate_d.py'
       - 'backend/tests/integration/test_registrar_edit_version_lock.py'
+      - 'backend/tests/integration/test_registrar_partial_payments.py'
       - 'backend/pytest.ini'
       - '.github/workflows/gate-d.yml'
   push:
@@ -100,7 +101,7 @@ jobs:
           echo "Database: PostgreSQL 16"
           echo "Tests: D1, D2, D3a, D3b, D4, D4b, D5, D6, D6b"
           echo ""
-          python -m pytest tests/integration/test_gate_d.py tests/integration/test_registrar_edit_version_lock.py -v -m gate_d -s --tb=long
+          python -m pytest tests/integration/test_gate_d.py tests/integration/test_registrar_edit_version_lock.py tests/integration/test_registrar_partial_payments.py -v -m gate_d -s --tb=long
 
       - name: 📊 Gate D Summary
         if: always()
