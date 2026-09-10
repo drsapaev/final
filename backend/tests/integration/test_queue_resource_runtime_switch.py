@@ -4673,9 +4673,7 @@ def test_gql_join_queue_deactivated_registry_guards_before_creation(
 
         # nothing persisted: no (day, 'lab') queue exists at all — the
         # invalid doctor-owned queue must not survive the rejection
-        stale_queues = (
-            db_session.query(_DQ).filter(_DQ.queue_tag == "lab").count()
-        )
+        stale_queues = db_session.query(_DQ).filter(_DQ.queue_tag == "lab").count()
         assert stale_queues == 0, "an invalid doctor-owned lab queue persisted"
     finally:
         _durable_cleanup(db_session, "lab_res_gg1")
