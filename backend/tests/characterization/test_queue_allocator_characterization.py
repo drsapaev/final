@@ -219,14 +219,20 @@ def test_force_majeure_transfer_characterization_preserves_current_allocator_beh
         lambda: object(),
     )
 
+    # QD-2C (round-26): the transfer's "tomorrow" rides the clinic_today
+    # SSOT (the queue-settings timezone) — the fixtures follow it (host
+    # date.today() missed the 19:00-24:00Z window).
+    from app.crud.clinic import clinic_today
+
+    clinic_day = clinic_today(db_session)
     today_queue = DailyQueue(
-        day=date.today(),
+        day=clinic_day,
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,
     )
     tomorrow_queue = DailyQueue(
-        day=date.today() + timedelta(days=1),
+        day=clinic_day + timedelta(days=1),
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,

@@ -211,7 +211,20 @@ async def call_next_patient(
                     queue_update_departments,
                 )
 
-                queue_date_str = queue_date.strftime("%Y-%m-%d") if queue_date else ""
+                # Codex round-26 P2: дата broadcast'а — день ВЫБРАННОЙ
+                # очереди (entry.queue.day), а не опциональный параметр:
+                # при опущенном target_date сервис резолвит clinic_today,
+                # а queue_date здесь оставался None — пустая дата в
+                # комнате (specialist_X:: вместо specialist_X::{дата},
+                # useQueueWebSocket подписан на полную форму).
+                broadcast_day = (
+                    entry.queue.day
+                    if entry is not None and entry.queue is not None
+                    else queue_date
+                )
+                queue_date_str = (
+                    broadcast_day.strftime("%Y-%m-%d") if broadcast_day else ""
+                )
                 # QD-2C (Codex round-24 P2): комната — маршрутизирующая
                 # идентичность ВЫБРАННОЙ очереди: resource-очередь
                 # адресуема через ЛЮБОЙ same-specialty doctor id (менеджеры

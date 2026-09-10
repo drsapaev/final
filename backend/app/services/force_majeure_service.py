@@ -16,6 +16,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import (
     resolve_registry_tag_queue_for_specialist,
     resource_start_number,
@@ -76,7 +77,13 @@ class ForceMajeureService:
         Returns:
             Список записей со статусами waiting, called, in_service, diagnostics
         """
-        target_date = target_date or date.today()
+        # Codex round-26 P2: опущенная дата — день КЛИНИКИ по SSOT
+        # (clinic_today, таймзона настроек очередей): mounted
+        # ForceMajeureModal опускает target_date, и host date.today()
+        # на UTC-хосте между 19:00 и 24:00 искал ВЧЕРАШНИЙ день клиники
+        # — ресурсная поверхность не находилась, fallback на
+        # specialist_id не матчит pure-resource очередь (specialist NULL).
+        target_date = target_date or clinic_today(self.db)
 
         query = self.db.query(OnlineQueueEntry).join(DailyQueue)
 
@@ -134,7 +141,11 @@ class ForceMajeureService:
                 "message": "Нет записей для переноса"
             }
 
-        tomorrow = date.today() + timedelta(days=1)
+        # Codex round-26 P2: «завтра» — от дня КЛИНИКИ (тот же SSOT,
+        # что и резолв записей выше): host-завтра в раннем-вечернем
+        # окне = СЕГОДНЯ клиники — перенос сваливался бы в исходный
+        # день, из которого записи пришли.
+        tomorrow = clinic_today(self.db) + timedelta(days=1)
 
         # Получаем или создаём очередь на завтра
         tomorrow_queue = self._get_or_create_queue(specialist_id, tomorrow)

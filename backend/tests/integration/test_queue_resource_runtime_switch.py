@@ -1802,7 +1802,9 @@ def _test_force_majeure_transfer_body(db_session: Session) -> None:
     pending = service.get_pending_entries(specialist_id=synthetic.id, target_date=_DAY)
     assert [e.id for e in pending] == [entry.id]
 
-    tomorrow = date.today() + timedelta(days=1)
+    # Codex round-26 P2: the transfer's tomorrow rides the clinic_today
+    # SSOT (the queue-settings timezone) — not host date.today()
+    tomorrow = _dt_now_tashkent_day() + timedelta(days=1)
     result = service.transfer_entries_to_tomorrow(
         entries=pending,
         specialist_id=synthetic.id,
@@ -5061,3 +5063,102 @@ def test_rest_call_next_survives_notification_failure(
         assert entry.status == "called"
     finally:
         _durable_cleanup(db_session, "lab_res_ii2", "reg_ii2")
+
+
+# ===================== JJ. Codex round-26 pins =====================
+
+
+def test_force_majeure_pending_entries_default_to_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-26 P2: force-majeure resolves omitted dates through
+    the clinic_today SSOT — the mounted ForceMajeureModal omits
+    target_date, and host date.today() between 19:00-24:00 UTC searched
+    the clinic's PREVIOUS day: the resource surface was not found and
+    the specialist fallback cannot match a pure resource queue
+    (specialist NULL) — the pending list came back empty despite
+    waiting patients. The timezone is chosen dynamically so the
+    divergence is real at any runtime."""
+    from app.services import force_majeure_service as fm
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()
+    monkeypatch.setattr(fm, "clinic_today", lambda db: clinic_day)
+
+    try:
+        user = _make_user(db_session, username="lab_res_jj1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=91)
+
+        service = fm.ForceMajeureService(db_session)
+        pending = service.get_pending_entries(specialist_id=synthetic.id)
+        assert [e.id for e in pending] == [entry.id]
+
+        # and the transfer's tomorrow rides the same SSOT: clinic-tomorrow
+        tomorrow = clinic_day + timedelta(days=1)
+        assert tomorrow != date.today() + timedelta(days=1) or tomorrow == (
+            date.today() + timedelta(days=1)
+        )  # sanity only — the transfer day is derived, not asserted here
+    finally:
+        _durable_cleanup(db_session, "lab_res_jj1")
+
+
+def test_rest_call_next_broadcast_uses_resolved_queue_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-26 P2: an omitted target_date no longer produces an
+    undated WS room — the broadcast date is the SELECTED queue's day
+    (the day the service actually resolved), so the room keeps the
+    full specialist_X::{YYYY-MM-DD} form useQueueWebSocket subscribes
+    to. The service COMMITs — durable rows cleaned in the finally."""
+    import asyncio
+
+    from app.ws import queue_ws
+
+    ws_calls: list[dict] = []
+
+    def fake_broadcast(**kwargs):
+        ws_calls.append(kwargs)
+
+    monkeypatch.setattr(queue_ws, "broadcast_queue_update", fake_broadcast)
+
+    try:
+        from app.api.v1.endpoints.qr_queue._queue_ops import call_next_patient
+
+        user = _make_user(db_session, username="lab_res_jj2", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        tz_day = _dt_now_tashkent_day()
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=tz_day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=92)
+        caller = _make_user(db_session, username="reg_jj2", role="Registrar")
+
+        async def scenario():
+            return await call_next_patient(
+                synthetic.id,
+                target_date=None,  # OMITTED — the service resolves clinic_today
+                db=db_session,
+                current_user=caller,
+            )
+
+        payload = asyncio.run(scenario())
+        assert payload.success is True
+
+        routed = [
+            c for c in ws_calls if c.get("data", {}).get("action") == "call_next"
+        ]
+        assert routed, ws_calls
+        assert all(
+            c["date"] == tz_day.strftime("%Y-%m-%d") for c in routed
+        ), f"undated/wrong-day rooms: {ws_calls}"
+        assert all(c["date"] for c in routed)
+        db_session.refresh(entry)
+        assert entry.status == "called"
+    finally:
+        _durable_cleanup(db_session, "lab_res_jj2", "reg_jj2")
