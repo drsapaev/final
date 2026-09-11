@@ -20,6 +20,7 @@ import { useRegistrarWorklistData } from './registrar/useRegistrarWorklistData';
 import {
   computeDepartmentStats,
   computeRegistrarWorklistRows,
+  resolveRegistrarWorklistEmptyScopeKind,
   type QueueProfileItem,
 } from './registrar/registrarWorklistRows';
 import { useRegistrarDialogs } from './registrar/useRegistrarDialogs';
@@ -414,11 +415,9 @@ const RegistrarPanel = () => {
         {/* Основная панель с записями — extracted to WorklistView (PR-UI-13-4) */}
         {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
           <WorklistView
-            activeTab={activeTab}
-            currentWorklistLabel={currentWorklistLabel}
+            activeTab={activeTab} currentWorklistLabel={currentWorklistLabel}
             statusFilterLabel={statusFilterLabel}
-            showCalendar={showCalendar}
-            historyDate={historyDate}
+            showCalendar={showCalendar} historyDate={historyDate}
             language={language}
             legacyLanguage={legacyLanguage}
             isMobile={isMobile}
@@ -435,6 +434,7 @@ const RegistrarPanel = () => {
             // RQ-20.b: явный сброс активного статус-фильтра (владелец URL — useRegistrarNavigation).
             onClearStatusFilter={clearStatusFilter}
             stale={worklistStale} onRetry={() => { void loadAppointments({ silent: false, source: 'worklist_retry' }); }}
+            emptyScopeKind={resolveRegistrarWorklistEmptyScopeKind({ appointments, activeTab, queueProfiles })}
             tI18n={tI18n}
           />
         }

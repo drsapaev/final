@@ -16,6 +16,9 @@ import { AnimatedLoader } from '../../../components/ui';
 import logger from '../../../utils/logger';
 import { formatRegistrarDate } from '../../../utils/dateUtils';
 import type { WorklistPaginationInfo } from '../useRegistrarWorklistData';
+// RQ-21.a: scope fact ('queue-empty' vs 'filtered-empty') resolved by the
+// presentation-only SSOT module; the view only picks the empty state.
+import type { RegistrarWorklistEmptyScopeKind } from '../registrarWorklistRows';
 // RQ-19: the tabpanel labelledby must reference the REAL id of the tab
 // button selected in navigation/Tabs — both sides share tabButtonIdFor.
 import { tabButtonIdFor } from '../../../components/navigation/Tabs';
@@ -55,6 +58,11 @@ interface WorklistViewProps {
   /** RQ-22: explicit retry — refreshes the worklist (failed refresh and
    *  the primary error state both reuse it). Optional for compat. */
   onRetry?: () => void;
+  /** RQ-21.a (F-17): scope fact for the zero-rows API state. 'filtered-empty'
+   *  (scope holds entries; the active search/status filter excluded them all)
+   *  renders the "no matches" state instead of the misleading empty-queue
+   *  state. Default 'queue-empty' keeps the genuine QW-04 state. */
+  emptyScopeKind?: RegistrarWorklistEmptyScopeKind;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -80,6 +88,8 @@ const WorklistView = ({
   onClearStatusFilter,
   stale,
   onRetry,
+  // RQ-21.a: default keeps the pre-slice behavior (genuine empty-queue state).
+  emptyScopeKind = 'queue-empty',
   tI18n,
 }: WorklistViewProps) => (
   <div
@@ -193,6 +203,21 @@ const WorklistView = ({
           )}
         </div> :
     filteredAppointments.length === 0 && dataSource === 'api' ?
+    // RQ-21.a (F-17): a scope that HOLDS entries narrowed to zero rows by the
+    // active search/status filter is "no matches", not an empty queue — the
+    // old state invited a duplicate appointment creation.
+    emptyScopeKind === 'filtered-empty' ?
+    <div className="registrar-empty-state">
+          <div className="registrar-empty-icon-lg">
+            <Search size={24} aria-hidden="true" />
+          </div>
+          <h3 className="registrar-empty-heading registrar-empty-heading-text">
+            {tI18n('registrarPanel.rp_worklist_no_matches')}
+          </h3>
+          <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
+            {tI18n('registrarPanel.rp_empty_filter_desc')}
+          </p>
+        </div> :
     <div className="registrar-empty-state">
           <div className="registrar-empty-icon-lg">
             {/* QW-04: empty state 2 of 3 (worklist empty). */}
