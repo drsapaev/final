@@ -481,6 +481,23 @@ class TestStaffBotServiceStaleState:
         assert service.active is False
 
     @pytest.mark.asyncio
+    async def test_env_only_initialize_serves_env_token(self, db_session, monkeypatch):
+        """P1 pin (round 5): no config row + env token must initialize the
+        handler service - otherwise the polling worker consumes updates
+        without replies."""
+        from app.services import telegram_bot as telegram_bot_service_module
+
+        _clear_token_env(monkeypatch)
+        _clear_fernet_key(monkeypatch)
+        monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456789:env-only")
+
+        service = telegram_bot_service_module.TelegramBotService()
+        assert await service.initialize(db_session) is True
+        assert service.bot_token == "123456789:env-only"
+        assert service.active is True
+        assert service.bot_username is None
+
+    @pytest.mark.asyncio
     async def test_exception_path_also_clears_cached_credential(
         self, db_session, monkeypatch
     ):
@@ -667,6 +684,41 @@ class TestAdminSettingsEndpoints:
             .one()
         )
         assert event.actor_user_id == 1
+
+    def test_put_empty_token_reports_environment_fallback(
+        self, db_session, monkeypatch
+    ):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456789:env-active")
+        store_patient_bot_token(db_session, "123456789:compromised")
+        payload = UpdateTelegramSettingsRequest(bot_token="")
+
+        result = admin_telegram_settings.update_telegram_settings(
+            payload, db_session, _user()
+        )
+
+        # P1 pin (round 5): revocation with a live environment token must
+        # NOT claim a full success - the bot keeps operating on the env
+        # credential.
+        assert result["bot_token_cleared"] is True
+        assert result["environment_fallback_active"] is True
+
+    def test_put_empty_token_without_env_reports_clean_revocation(
+        self, db_session, monkeypatch
+    ):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", None)
+        store_patient_bot_token(db_session, "123456789:compromised")
+        payload = UpdateTelegramSettingsRequest(bot_token="")
+
+        result = admin_telegram_settings.update_telegram_settings(
+            payload, db_session, _user()
+        )
+
+        assert result["bot_token_cleared"] is True
+        assert result["environment_fallback_active"] is False
 
     def test_put_masked_placeholder_is_ignored(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)

@@ -26,10 +26,21 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "DELETE FROM telegram_configs "
-        "WHERE id NOT IN (SELECT MIN(id) FROM telegram_configs)"
-    )
+    bind = op.get_bind()
+    row_count = bind.execute(
+        sa.text("SELECT COUNT(*) FROM telegram_configs")
+    ).scalar_one()
+    if row_count > 1:
+        # Codex round 5: there is no authoritative ordering or merge rule for
+        # conflicting duplicates, so the upgrade must not destructively keep
+        # MIN(id) — the valid credential may live on a later row. Abort and
+        # require manual reconciliation instead.
+        raise RuntimeError(
+            "telegram_configs contains "
+            f"{row_count} rows; the singleton guard requires exactly one. "
+            "Reconcile the conflicting configurations manually (keep the row "
+            "holding the valid credential) before upgrading."
+        )
     op.add_column(
         "telegram_configs",
         sa.Column("singleton_guard", sa.Integer(), nullable=False, server_default="1"),

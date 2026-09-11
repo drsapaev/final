@@ -258,12 +258,15 @@ def _make_user(db_session: Session, *, username: str, role: str, password: str) 
 
 def test_auth_service_blocks_login_for_internal_sentinel(db_session: Session) -> None:
     """The sentinel account below is ACTIVE with a CORRECT password —
-  the role (not is_active, not the password hash) is the login defense."""
+    the role (not is_active, not the password hash) is the login defense."""
     from app.services.authentication_service import authentication_service
 
     probe_password = "Pass" + "w" + "0rd!"
     sentinel = _make_user(
-        db_session, username="qd11_ecg_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_ecg_resource",
+        role="Resource",
+        password=probe_password,
     )
     control = _make_user(
         db_session, username="qd11_registrar", role="Registrar", password=probe_password
@@ -516,9 +519,7 @@ def _revision_graph() -> dict[str, tuple[str, ...]]:
     graph: dict[str, tuple[str, ...]] = {}
     for path in sorted(versions_dir.glob("*.py")):
         source = path.read_text(encoding="utf-8")
-        revision_match = re.search(
-            r'^revision\s*=\s*["\']([^"\']+)["\']', source, re.M
-        )
+        revision_match = re.search(r'^revision\s*=\s*["\']([^"\']+)["\']', source, re.M)
         if not revision_match:
             continue
         down_match = re.search(r"^down_revision\s*=\s*(.+)$", source, re.M)
@@ -546,28 +547,25 @@ def test_alembic_chain_single_head_0061() -> None:
     # QD-2A: the chain head moved to 0058 (queue_resources registry +
     # daily_queues dual-owner EXPAND — additive DDL only).
     assert "0058_queue_resource_expand" in graph
-    assert graph["0058_queue_resource_expand"] == (
-        "0057_lab_resource_internal_role",
-    )
+    assert graph["0058_queue_resource_expand"] == ("0057_lab_resource_internal_role",)
     # QD-2B: the chain head moved to 0059 (lab/ecg registry seeds +
     # deterministic queue_resource_id backfill — data only; the id
     # stays <= 32 chars: alembic_version.version_num is VARCHAR(32)).
     assert "0059_resource_seed_backfill" in graph
-    assert graph["0059_resource_seed_backfill"] == (
-        "0058_queue_resource_expand",
-    )
+    assert graph["0059_resource_seed_backfill"] == ("0058_queue_resource_expand",)
     # PR-1: the chain head moved to 0060 (visits.reminder_sent_at — the
     # real schema for the reminder-pipeline idempotency stamp).
     assert "0060_visit_reminder_sent_at" in graph
-    assert graph["0060_visit_reminder_sent_at"] == (
-        "0059_resource_seed_backfill",
-    )
+    assert graph["0060_visit_reminder_sent_at"] == ("0059_resource_seed_backfill",)
     # PR-2: the chain head moved to 0061 (telegram_configs singleton
     # guard — the DB-level invariant behind the token-store race fix).
     assert "0061_telegram_config_singleton" in graph
-    assert graph["0061_telegram_config_singleton"] == (
-        "0060_visit_reminder_sent_at",
-    )
+    assert graph["0061_telegram_config_singleton"] == ("0060_visit_reminder_sent_at",)
+    # alembic_version.version_num is VARCHAR(32): both ends of the new
+    # link must fit (CI on 40cec49 exploded on real PostgreSQL with a
+    # 38-char id — scratch-SQLite ignores VARCHAR widths).
+    assert len("0061_telegram_config_singleton") <= 32
+    assert len("0060_visit_reminder_sent_at") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
     assert heads == ["0061_telegram_config_singleton"]
@@ -588,10 +586,16 @@ def test_mobile_login_blocks_internal_sentinel(
 
     probe_password = "Pass" + "w" + "0rd!"
     sentinel = _make_user(
-        db_session, username="qd11_mobile_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_mobile_resource",
+        role="Resource",
+        password=probe_password,
     )
     control = _make_user(
-        db_session, username="qd11_mobile_patient", role="Patient", password=probe_password
+        db_session,
+        username="qd11_mobile_patient",
+        role="Patient",
+        password=probe_password,
     )
     db_session.add_all(
         [
@@ -638,10 +642,16 @@ def test_get_current_user_rejects_sentinel_token(
 
     probe_password = "Pass" + "w" + "0rd!"
     sentinel = _make_user(
-        db_session, username="qd11_token_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_token_resource",
+        role="Resource",
+        password=probe_password,
     )
     control = _make_user(
-        db_session, username="qd11_token_registrar", role="Registrar", password=probe_password
+        db_session,
+        username="qd11_token_registrar",
+        role="Registrar",
+        password=probe_password,
     )
 
     def _token(user: User) -> str:
@@ -677,7 +687,10 @@ def test_refresh_token_rejected_for_internal_sentinel(db_session: Session) -> No
 
     probe_password = "Pass" + "w" + "0rd!"
     sentinel = _make_user(
-        db_session, username="qd11_refresh_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_refresh_resource",
+        role="Resource",
+        password=probe_password,
     )
 
     jti = "qd11-refresh-jti"
@@ -705,7 +718,10 @@ def test_users_list_hides_internal_sentinel_rows(
     and 422 on every edit)."""
     probe_password = "Pass" + "w" + "0rd!"
     _make_user(
-        db_session, username="qd11_list_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_list_resource",
+        role="Resource",
+        password=probe_password,
     )
     _make_user(
         db_session,
@@ -735,10 +751,16 @@ def test_websocket_resolvers_reject_sentinel(db_session: Session) -> None:
 
     probe_password = "Pass" + "w" + "0rd!"
     sentinel = _make_user(
-        db_session, username="qd11_ws_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_ws_resource",
+        role="Resource",
+        password=probe_password,
     )
     control = _make_user(
-        db_session, username="qd11_ws_registrar", role="Registrar", password=probe_password
+        db_session,
+        username="qd11_ws_registrar",
+        role="Registrar",
+        password=probe_password,
     )
 
     # shared resolver (queue WS; the display-board WS imports it directly)
@@ -778,10 +800,16 @@ def test_user_management_mutations_reject_sentinel(
     resolution the migration depends on."""
     probe_password = "Pass" + "w" + "0rd!"
     sentinel = _make_user(
-        db_session, username="qd11_mut_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_mut_resource",
+        role="Resource",
+        password=probe_password,
     )
     control = _make_user(
-        db_session, username="qd11_mut_registrar", role="Registrar", password=probe_password
+        db_session,
+        username="qd11_mut_registrar",
+        role="Registrar",
+        password=probe_password,
     )
 
     response = client.put(
@@ -837,7 +865,10 @@ def test_admin_doctor_surface_readonly_for_sentinel(
 
     probe_password = "Pass" + "w" + "0rd!"
     sentinel = _make_user(
-        db_session, username="qd11_doc_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_doc_resource",
+        role="Resource",
+        password=probe_password,
     )
     control_user = _make_user(
         db_session, username="qd11_doc_doctor", role="Doctor", password=probe_password
@@ -890,10 +921,16 @@ def test_queue_ws_auth_ok_rejects_sentinel(
 
     probe_password = "Pass" + "w" + "0rd!"
     sentinel = _make_user(
-        db_session, username="qd11_qws_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_qws_resource",
+        role="Resource",
+        password=probe_password,
     )
     control = _make_user(
-        db_session, username="qd11_qws_registrar", role="Registrar", password=probe_password
+        db_session,
+        username="qd11_qws_registrar",
+        role="Registrar",
+        password=probe_password,
     )
 
     monkeypatch.delenv("TESTING", raising=False)
@@ -932,7 +969,10 @@ def test_doctor_selectors_exclude_sentinel(
 
     probe_password = "Pass" + "w" + "0rd!"
     sentinel = _make_user(
-        db_session, username="qd11_sel_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_sel_resource",
+        role="Resource",
+        password=probe_password,
     )
     control_user = _make_user(
         db_session, username="qd11_sel_doctor", role="Doctor", password=probe_password
@@ -967,9 +1007,7 @@ def test_doctor_selectors_exclude_sentinel(
 
     # registrar selector (specialty filter would still match 'ecg' — the
     # exclusion is what hides the resource row)
-    response = client.get(
-        "/api/v1/registrar/doctors", headers=admin_auth_headers
-    )
+    response = client.get("/api/v1/registrar/doctors", headers=admin_auth_headers)
     assert response.status_code == 200, (response.status_code, response.text[:300])
     registrar_ids = {d["id"] for d in response.json().get("doctors", [])}
     assert sentinel_doctor.id not in registrar_ids, registrar_ids
@@ -986,7 +1024,10 @@ def test_department_mutations_reject_sentinel(
 
     probe_password = "Pass" + "w" + "0rd!"
     sentinel = _make_user(
-        db_session, username="qd11_dep_resource", role="Resource", password=probe_password
+        db_session,
+        username="qd11_dep_resource",
+        role="Resource",
+        password=probe_password,
     )
     control_user = _make_user(
         db_session, username="qd11_dep_doctor", role="Doctor", password=probe_password

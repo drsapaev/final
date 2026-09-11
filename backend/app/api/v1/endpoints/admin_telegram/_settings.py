@@ -123,12 +123,21 @@ def update_telegram_settings(
             db, "telegram", settings_dict, current_user.id
         )
 
+        # PR-2 (round 5): with TELEGRAM_BOT_TOKEN still configured in the
+        # environment, a cleared database credential does NOT stop the bot —
+        # the resolver keeps serving the environment token. Report that
+        # honestly instead of claiming a full revocation.
+        environment_fallback_active = False
+        if bot_token_cleared:
+            environment_fallback_active = resolve_patient_bot_token(db) is not None
+
         return {
             "success": True,
             "message": "Настройки Telegram обновлены",
             "updated_count": len(updated_settings),
             "bot_token_stored": bot_token_stored,
             "bot_token_cleared": bot_token_cleared,
+            "environment_fallback_active": environment_fallback_active,
         }
     except Exception as e:
         raise_admin_telegram_error(
