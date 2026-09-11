@@ -1033,17 +1033,21 @@ def get_queue_statistics(
                 # QD-2C (Codex round-4 P1): resource-owned очередь
                 # (specialist NULL) в агрегате — владелец из реестра,
                 # иначе AttributeError на q.specialist.user → 500
+                # Codex round-31/32 P2: у 0059-моста (оба владельца)
+                # поверхностью владеет ОСЬ РЕСУРСА — реестровый
+                # display_name вместо пустого имени/«Врач #id»
+                # удержанного синтета; приоритет ДО specialist-условия
                 "specialist_name": (
                     (
-                        q.specialist.user.full_name
-                        if q.specialist and q.specialist.user
-                        else f"Врач #{q.specialist_id}"
-                    )
-                    if q.specialist_id is not None
-                    else (
                         q.queue_resource.display_name
                         if q.queue_resource
                         else "Ресурс очереди"
+                    )
+                    if q.queue_resource_id is not None
+                    else (
+                        q.specialist.user.full_name
+                        if q.specialist and q.specialist.user
+                        else f"Врач #{q.specialist_id}"
                     )
                 ),
                 "queue_resource_id": q.queue_resource_id,

@@ -5817,3 +5817,99 @@ def test_legacy_serializers_prefer_resource_owner_for_bridges(
         assert doc_resp.specialist_name == "Доктор Кардио"
     finally:
         _durable_cleanup(db_session, "lab_res_oo2", "adm_oo2", "dr_oo2")
+
+
+# ===================== PP. Codex round-32 pins =====================
+
+
+def test_online_queue_today_defaults_to_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-32 P2: GET /api/v1/online-queue/today resolves the
+    day through the clinic_today SSOT — the separately mounted endpoint
+    passed host date.today() into the resource-aware lookup, so
+    ?specialist_id=<lab/ecg id> missed the live clinic-day surface and
+    reported queue_exists=false in the 19:00-24:00Z window. The timezone
+    is chosen dynamically so the divergence is real."""
+    from app.api.v1.endpoints.online_queue_new import get_today_queue
+    from app.crud import clinic as crud_clinic
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()
+    monkeypatch.setattr(crud_clinic, "clinic_today", lambda db: clinic_day)
+
+    try:
+        user = _make_user(db_session, username="lab_res_pp1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        assert queue is not None
+        _make_waiting_entry(db_session, queue, number=1)
+        _make_waiting_entry(db_session, queue, number=2)
+
+        viewer = _make_user(db_session, username="adm_pp1", role="Admin")
+        status = get_today_queue(
+            specialist_id=synthetic.id, db=db_session, current_user=viewer
+        )
+        assert status["queue_exists"] is True
+        assert status["queue_id"] == queue.id
+        assert status["total_entries"] == 2
+        assert status["waiting_entries"] == 2
+    finally:
+        _durable_cleanup(db_session, "lab_res_pp1", "adm_pp1")
+
+
+def test_online_queue_aggregate_prefers_resource_owner_for_bridges(
+    db_session: Session,
+) -> None:
+    """Codex round-32 P2: the online-queue aggregate (the no-specialist
+    form of GET /api/v1/online-queue/today) classifies a 0059 bridge
+    (both owners set) by the RESOURCE axis first — the registry
+    display_name instead of the retained synthetic's name/«Врач #id»,
+    consistent with the round-31 legacy serializers."""
+    from app.crud.online_queue import get_queue_statistics
+
+    try:
+        user = _make_user(db_session, username="lab_res_pp2", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        resource = (
+            db_session.query(QueueResource)
+            .filter(QueueResource.queue_tag == "lab")
+            .first()
+        )
+        resource.display_name = "Лаборатория (PP)"
+        db_session.commit()
+
+        today = _dt_now_tashkent_day()
+        bridged = _make_queue(
+            db_session,
+            day=today,
+            specialist_id=synthetic.id,
+            queue_tag="lab",
+            queue_resource_id=resource.id,
+        )
+        _make_waiting_entry(db_session, bridged, number=1)
+
+        doc_user = _make_user(db_session, username="dr_pp2", role="doctor")
+        doc_user.full_name = "Доктор Кардио"
+        db_session.commit()
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+        doctor_queue = _make_queue(
+            db_session, day=today, specialist_id=doctor.id, queue_tag="cardio"
+        )
+        _make_waiting_entry(db_session, doctor_queue, number=1)
+
+        stats = get_queue_statistics(db_session, today)
+        bridged_row = next(
+            q for q in stats["queues"] if q["queue_resource_id"] == resource.id
+        )
+        assert bridged_row["specialist_id"] == synthetic.id  # the bridge keeps it
+        assert bridged_row["specialist_name"] == "Лаборатория (PP)"
+
+        doctor_row = next(q for q in stats["queues"] if q["specialist_id"] == doctor.id)
+        assert doctor_row["specialist_name"] == "Доктор Кардио"
+    finally:
+        _durable_cleanup(db_session, "lab_res_pp2", "dr_pp2")
