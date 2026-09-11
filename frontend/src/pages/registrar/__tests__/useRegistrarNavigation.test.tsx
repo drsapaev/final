@@ -126,6 +126,52 @@ describe('useRegistrarNavigation (PR-UI-13-5)', () => {
     expect(hook.current.searchParams.get('dept')).toBe(null);
   });
 
+  // RQ-20 (срез RQ-20.a): setActiveTab must build the next query from the
+  // ROUTER searchParams. The previous implementation read
+  // window.location.search, which diverges from the router location under
+  // MemoryRouter (and any basename deployment) — switching tabs silently
+  // wiped ?q=/?status= filters.
+  it('keeps ?q=/?status= when switching tabs (RQ-20 param preservation)', async () => {
+    const { hook } = renderNavigationHook('/registrar?q=ivanov&status=done');
+    await act(async () => { hook.current.setActiveTab('derma'); });
+    expect(hook.current.searchParams.get('dept')).toBe('derma');
+    expect(hook.current.searchParams.get('q')).toBe('ivanov');
+    expect(hook.current.searchParams.get('status')).toBe('done');
+  });
+
+  // RQ-20 (срез RQ-20.a): tab changes PUSH a history entry (replace kept the
+  // URL correct but made Back exit the page instead of restoring the tab),
+  // and the hook syncs activeTab when the URL changes under it (the
+  // useState initializer alone only ran on mount, so Back changed ?dept=
+  // while the UI kept the newer tab).
+  it('restores the previous tab on browser back (RQ-20 push + sync)', async () => {
+    const { hook } = renderNavigationHook('/registrar');
+    await act(async () => { hook.current.setActiveTab('derma'); });
+    expect(hook.current.activeTab).toBe('derma');
+    expect(hook.current.searchParams.get('dept')).toBe('derma');
+    await act(async () => { hook.current.navigate(-1); });
+    expect(hook.current.searchParams.get('dept')).toBe(null);
+    expect(hook.current.activeTab).toBe(null);
+  });
+
+  it('re-applies the tab on browser forward (RQ-20 push + sync)', async () => {
+    const { hook } = renderNavigationHook('/registrar');
+    await act(async () => { hook.current.setActiveTab('derma'); });
+    await act(async () => { hook.current.navigate(-1); });
+    expect(hook.current.activeTab).toBe(null);
+    await act(async () => { hook.current.navigate(1); });
+    expect(hook.current.searchParams.get('dept')).toBe('derma');
+    expect(hook.current.activeTab).toBe('derma');
+  });
+
+  it('syncs activeTab when ?dept= changes externally while mounted (RQ-20)', async () => {
+    const { hook } = renderNavigationHook('/registrar');
+    await act(async () => { hook.current.navigate('/registrar?dept=cardio'); });
+    expect(hook.current.activeTab).toBe('cardio');
+    await act(async () => { hook.current.navigate('/registrar'); });
+    expect(hook.current.activeTab).toBe(null);
+  });
+
   it('opens the wizard on the openAppointmentWizard header event (P-008)', () => {
     const { setShowWizard } = renderNavigationHook('/registrar');
     act(() => {

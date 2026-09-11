@@ -43,17 +43,30 @@ export const useRegistrarNavigation = ({
   // R-02 fix: activeTab синхронизирован с URL (?dept=...).
   // Раньше был useState(null) — F5 сбрасывал выбранное отделение.
   const [activeTab, setActiveTabRaw] = useState(() => searchParams.get('dept') || null);
+  // RQ-20 (срез RQ-20.a): браузерные back/forward (и любой внешний переход,
+  // меняющий ?dept=, пока панель смонтирована) обязаны возвращать UI к вкладке
+  // из URL. useState-инициализатор выполняется только при маунте, поэтому без
+  // этой синхронизации Back менял ?dept= в адресной строке, а панель
+  // продолжала показывать новую вкладку.
+  useEffect(() => {
+    setActiveTabRaw(searchParams.get('dept') || null);
+  }, [searchParams]);
   const setActiveTab = useCallback((tab: string | null) => {
     setActiveTabRaw(tab);
-    // R-02: пишем в URL для shareable links + back button
-    const params = new URLSearchParams(window.location.search);
+    // R-02: пишем в URL для shareable links + back button.
+    // RQ-20 (срез RQ-20.a): (1) источник параметров — router searchParams,
+    // а не window.location.search: под MemoryRouter/basename location.search
+    // расходится с состоянием роутера, и смена вкладки молча стирала
+    // ?q=/?status=; (2) push вместо replace — история браузера обходит
+    // выбранные вкладки (back/forward соответствуют выбранной вкладке).
+    const params = new URLSearchParams(searchParams);
     if (tab) {
       params.set('dept', tab);
     } else {
       params.delete('dept');
     }
-    setSearchParams(params, { replace: true });
-  }, [setSearchParams]);
+    setSearchParams(params);
+  }, [searchParams, setSearchParams]);
 
   const currentView = useMemo(() => {
     // Phase 3: rely solely on canonical path-derived view.
