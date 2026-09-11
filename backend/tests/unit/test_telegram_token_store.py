@@ -195,6 +195,50 @@ class TestStorePatientBotToken:
         assert secret not in str(event.payload)
         assert event.payload["token_encrypted"] is True
 
+    def test_store_audit_captures_config_id_on_first_store(
+        self, db_session, monkeypatch
+    ):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+
+        config = store_patient_bot_token(db_session, "123456789:first-audit")
+
+        db_session.expire_all()
+        event = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_stored")
+            .one()
+        )
+        # P2 pin (round 2): the config INSERT is flushed before the audit row
+        # is constructed, so the event links to the created configuration.
+        assert event.entity_id == config.id
+        assert event.entity_id is not None
+
+    def test_store_deferred_commit_rolls_back_atomically(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        db_session.add(
+            ClinicSettings(
+                key="bot_token", value="123456789:legacy", category="telegram"
+            )
+        )
+        db_session.commit()
+
+        store_patient_bot_token(db_session, "123456789:pending", commit=False)
+        db_session.rollback()
+
+        db_session.expire_all()
+        # commit=False keeps token + legacy removal + audit in the caller's
+        # transaction: a rollback discards all three together.
+        assert db_session.query(TelegramConfig).first() is None
+        assert crud_clinic.get_setting_by_key(db_session, "bot_token") is not None
+        assert (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_stored")
+            .count()
+            == 0
+        )
+
 
 @pytest.mark.unit
 class TestCrudEncryptionAtWrite:
@@ -405,6 +449,46 @@ class TestAdminSettingsEndpoints:
         )
         assert event.actor_user_id == 1
         assert secret not in str(event.payload)
+
+    def test_put_combined_update_is_single_transaction(self, db_session, monkeypatch):
+        from app.crud import clinic as clinic_module
+
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        secret = "123456789:atomic-secret"
+        db_session.add(
+            ClinicSettings(
+                key="bot_token", value="123456789:legacy-atomic", category="telegram"
+            )
+        )
+        db_session.commit()
+
+        def _explode(db, category, settings, user_id):
+            raise RuntimeError("settings write failed")
+
+        monkeypatch.setattr(clinic_module, "update_settings_batch", _explode)
+        payload = UpdateTelegramSettingsRequest(
+            bot_token=secret,
+            notifications_enabled=False,
+        )
+
+        with pytest.raises(Exception):
+            admin_telegram_settings.update_telegram_settings(
+                payload, db_session, _user()
+            )
+
+        db_session.rollback()
+        # P2 pin (round 2): the token write, legacy-row removal and audit
+        # event share the settings batch's transaction — a failure in the
+        # batch discards the credential change too (no partial update).
+        assert db_session.query(TelegramConfig).first() is None
+        assert crud_clinic.get_setting_by_key(db_session, "bot_token") is not None
+        assert (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_stored")
+            .count()
+            == 0
+        )
 
     def test_put_masked_placeholder_is_ignored(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)

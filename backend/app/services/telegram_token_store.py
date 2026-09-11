@@ -159,7 +159,7 @@ def resolve_staff_bot_token(db, patient_token: str | None = None) -> str | None:
 
 
 def store_patient_bot_token(
-    db, token: str | None, *, actor_user_id: int | None = None
+    db, token: str | None, *, actor_user_id: int | None = None, commit: bool = True
 ) -> object:
     """Create-or-update the TelegramConfig bot token (encrypted at write).
 
@@ -171,6 +171,11 @@ def store_patient_bot_token(
     silently reactivate the superseded credential through the legacy
     fallback. An audit record is appended attributing the rotation to
     ``actor_user_id`` WITHOUT recording the token value.
+
+    With ``commit=False`` the whole write (token + legacy-row removal +
+    audit event) stays pending in the caller's transaction so an endpoint
+    can land it together with the rest of the request in ONE commit; any
+    later ``db.commit()`` on the same session finalizes it atomically.
     """
     from app.crud import (
         audit as crud_audit,
@@ -195,6 +200,11 @@ def store_patient_bot_token(
         db.delete(legacy_setting)
         legacy_removed = True
 
+    # Flush the pending config INSERT first so the audit row below captures
+    # the real config id (on the first store it would otherwise record
+    # entity_id=NULL — the id is assigned only at flush time).
+    db.flush()
+
     crud_audit.log(
         db,
         action="telegram_bot_token_stored",
@@ -207,6 +217,7 @@ def store_patient_bot_token(
         },
     )
 
-    db.commit()
-    db.refresh(config)
+    if commit:
+        db.commit()
+        db.refresh(config)
     return config

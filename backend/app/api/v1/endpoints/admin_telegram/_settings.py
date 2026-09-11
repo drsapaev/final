@@ -97,8 +97,14 @@ def update_telegram_settings(
         if "bot_token" in settings_dict:
             token_value = settings_dict.pop("bot_token")
             if isinstance(token_value, str) and token_value.strip():
+                # commit=False: update_settings_batch below commits the
+                # token, its audit event and the remaining settings in ONE
+                # transaction (codex round 2).
                 store_patient_bot_token(
-                    db, token_value, actor_user_id=current_user.id
+                    db,
+                    token_value,
+                    actor_user_id=current_user.id,
+                    commit=False,
                 )
                 bot_token_stored = True
 
@@ -156,8 +162,10 @@ def test_telegram_bot(
                 )
                 # PR-2: bot_token goes through the SSOT store (encrypted at
                 # write); non-secret fields stay on the regular crud path.
+                # commit=False: update_telegram_config below commits the
+                # pending token write together with its own fields.
                 store_patient_bot_token(
-                    db, bot_token, actor_user_id=current_user.id
+                    db, bot_token, actor_user_id=current_user.id, commit=False
                 )
                 crud_telegram.update_telegram_config(
                     db,
@@ -356,8 +364,10 @@ def set_telegram_webhook(
                 )
                 # PR-2: bot_token via the SSOT store (encrypted at write);
                 # webhook fields stay on the regular crud path.
+                # commit=False: the config update/create below commits the
+                # pending token write together with webhook fields.
                 store_patient_bot_token(
-                    db, bot_token, actor_user_id=current_user.id
+                    db, bot_token, actor_user_id=current_user.id, commit=False
                 )
                 config_payload = {
                     "bot_username": _get_configured_bot_username(db),
