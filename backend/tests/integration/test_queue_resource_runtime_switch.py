@@ -6386,3 +6386,52 @@ def test_resource_visit_times_use_the_clinic_clock(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== VV. Codex round-38 pins =====================
+
+
+def test_queue_statistics_stamp_the_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-38 P2: queue statistics rows are stamped with the
+    CLINIC-local day (the clinic_today SSOT from the queue-settings
+    timezone) — a QR join between 19:00 and midnight UTC recorded the
+    online_joins event under the previous HOST date, so the
+    resource-axis rows fell out of /admin/queue-analytics even when
+    the actual clinic day was requested explicitly. The service
+    COMMITs — durable rows cleaned in the finally."""
+    from app.models.online_queue import QueueStatistics
+    from app.services.qr_queue import QRQueueService
+    from app.services.qr_queue import _queue_ops as qr_ops
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()  # the divergence window is real
+    monkeypatch.setattr(qr_ops, "clinic_today", lambda db: clinic_day)
+
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+    )
+    _make_waiting_entry(db_session, queue, number=82)
+
+    try:
+        service = QRQueueService(db_session)
+        service._update_queue_statistics(queue.id, "online_joins")
+
+        stats = (
+            db_session.query(QueueStatistics)
+            .filter(QueueStatistics.queue_id == queue.id)
+            .all()
+        )
+        assert len(stats) == 1
+        # the row rides the CLINIC day, not the host clock
+        assert stats[0].date == clinic_day
+        assert stats[0].date != date.today()
+        assert stats[0].online_joins == 1
+    finally:
+        db_session.query(QueueStatistics).filter(
+            QueueStatistics.queue_id == queue.id
+        ).delete(synchronize_session=False)
+        _durable_cleanup(db_session)
+        db_session.commit()

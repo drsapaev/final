@@ -360,7 +360,13 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
 
     def _update_queue_statistics(self, queue_id: int, stat_field: str):
         """Обновляет статистику очереди"""
-        today = date.today()
+        # Codex round-38 P2: штамп статистики — КЛИНИК-локальный день
+        # (clinic_today SSOT, таймзона настроек очередей): host
+        # date.today() на UTC-хосте между 19:00 и полуночью уже
+        # «вчера» для Asia/Tashkent — QR-join записывался под прошлым
+        # днём и выпадал из /admin/queue-analytics даже при явном
+        # запросе актуального клиник-дня.
+        today = clinic_today(self.db)
 
         stats = (
             self.db.query(QueueStatistics)
