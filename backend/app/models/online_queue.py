@@ -32,11 +32,14 @@ from sqlalchemy import (
     JSON,
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -48,6 +51,28 @@ if TYPE_CHECKING:
     from app.models.patient import Patient
     from app.models.user import User
     from app.models.visit import Visit
+
+
+# QD-2D CONTRACT (0063, ADR-001 stage table): exactly one owner per
+# queue. The CASE-sum form (not PG-only num_nonnulls) is deliberate —
+# the model CheckConstraint must compile on BOTH the runtime
+# PostgreSQL schema and the SQLite test dialect (Base.metadata drives
+# the integration-test schema), so the portable expression is the SSOT
+# for the migration and the model alike.
+_OWNER_XOR_CHECK = (
+    "(CASE WHEN specialist_id IS NULL THEN 0 ELSE 1 END)"
+    " + (CASE WHEN queue_resource_id IS NULL THEN 0 ELSE 1 END) = 1"
+)
+
+# ADR-001 stage D: partial active uniqueness on (day, queue_resource_id)
+# — one ACTIVE resource queue per (day, resource). The predicate is
+# mirrored dialect-by-dialect (postgresql_where AND sqlite_where) so
+# the test dialect enforces the SAME partial contract, not the
+# stricter full-column unique a bare Index would produce on SQLite
+# (the patient_relationships precedent accepted the stricter shape;
+# daily_queues cannot — inactive rows and NULL-owner rows must stay
+# duplicate-legal, the predicate IS the contract).
+_ACTIVE_RESOURCE_UNIQUE_WHERE = text("active AND queue_resource_id IS NOT NULL")
 
 
 class QueueResource(Base):
@@ -96,17 +121,36 @@ class QueueResource(Base):
 
 
 class DailyQueue(Base):
-    """Ежедневные очереди по специалистам"""
+    """Ежедневные очереди по специалистам
+
+    Стадийный контракт владения (QD-2 FINAL, ADR-001 addendum): стадия A
+    (0058) сделала обе оси nullable; стадии B–C (0059 + рантайм) ввели
+    мост двойного владения (synthetic Doctor + QueueResource) — форма,
+    задокументированная ТОЛЬКО для B–C; стадия D (0063) замкнула мост
+    (specialist_id → NULL на ресурсных строках) и ввела XOR-контракт
+    ровно одного владельца + partial active uniqueness. QD-2E удалит
+    синтетические пары и словарь моста.
+    """
 
     __tablename__ = "daily_queues"
+    __table_args__ = (
+        CheckConstraint(_OWNER_XOR_CHECK, name="ck_daily_queues_owner_xor"),
+        Index(
+            "uq_daily_queues_active_resource_day",
+            "day",
+            "queue_resource_id",
+            unique=True,
+            postgresql_where=_ACTIVE_RESOURCE_UNIQUE_WHERE,
+            sqlite_where=_ACTIVE_RESOURCE_UNIQUE_WHERE,
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     day: Mapped[date] = mapped_column(Date, nullable=False, index=True)  # YYYY-MM-DD
-    # Двойной владелец (QD-2A expand): specialist_id (врач, FK к
-    # doctors.id) ИЛИ queue_resource_id (безврачебный ресурс, FK к
-    # queue_resources.id). Оба nullable на уровне схемы; XOR-контракт
-    # и partial unique — стадия QD-2D, до неё обе оси просто
-    # сосуществуют, старые строки не меняются.
+    # Двойной владелец (QD-2A expand, XOR с 0063/QD-2D): specialist_id
+    # (врач, FK к doctors.id) ИЛИ queue_resource_id (безврачебный
+    # ресурс, FK к queue_resources.id) — ровно один, никогда оба и
+    # никогда ни одного (ck_daily_queues_owner_xor).
     specialist_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("doctors.id"), nullable=True, index=True
     )  # FK к doctors.id (ось врача)

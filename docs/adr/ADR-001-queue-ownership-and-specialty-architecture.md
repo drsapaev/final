@@ -263,6 +263,44 @@ stage E retires them. Four clarifications the landing made explicit:
   identical to the synthetic's until E), and the GQL advisory lock for a
   registry tag keys on `(tag, day)` instead of `(doctor, day, tag)`.
 
+### Stage D landing note (2026-09-11, QD-2D — migration 0063)
+
+Stage D wrote the ownership contract into the schema:
+`ck_daily_queues_owner_xor` (exactly one of `specialist_id` /
+`queue_resource_id`) and `uq_daily_queues_active_resource_day`
+(`UNIQUE(day, queue_resource_id) WHERE active AND queue_resource_id IS
+NOT NULL` — the stage-table predicate verbatim). Four clarifications the
+landing made explicit:
+
+- **The bridge closes at D, the vocabulary at E.** The 0059
+  dual-ownership bridge (both owners set) was the documented B–C shape;
+  stage C made the runtime tag-first, so nothing consults the bridged
+  row's `specialist_id` for routing. 0063 therefore CONSUMES the bridge:
+  `specialist_id` → NULL on every canonical bridge (owner in the
+  synthetic vocabulary, tag matching the linked resource), with the
+  full per-row inventory printed to the migration log — the log is the
+  audit trail and a pre-D backup is the restore path. Stage E's paired
+  deletion of the synthetic pairs now faces zero `daily_queues`
+  references and only removes the bridge vocabulary (code + docs).
+- **The partial predicate is the contract.** Only ACTIVE resource rows
+  participate in the uniqueness: inactive rows and NULL-resource rows
+  stay duplicate-legal (history preservation first). The ORM model
+  mirrors the predicate on both the PostgreSQL and the SQLite test
+  dialect — the test dialect enforces the same partial contract, not a
+  stricter full-column unique.
+- **The abort taxonomy.** Orphan rows (both owners NULL — the migration
+  never invents an owner), ACTIVE (day, resource) duplicates (no dedup,
+  the 0059 contract), corrupt tag↔resource links (exact-tag-wins) and
+  bridges with a non-synthetic owner (a human doctor's link is never
+  severed by a migration) all abort loudly with the full inventory; the
+  repair is an explicit operator decision, then re-run.
+- **The shape cannot re-enter.** Post-0063 the both-set shape is
+  rejected at the DB level (PostgreSQL CHECK) and at the ORM level (the
+  SQLite test schema) — a pre-D DATA-only restore into a post-0063
+  schema fails on the CHECK loudly; a full backup restore re-runs
+  alembic head and the deterministic conversion is a clean no-op on
+  the second pass.
+
 ### Guidance for readers of this ADR
 
 Anything that routes, authorizes, or reports on queues must treat ownership
@@ -277,6 +315,11 @@ writes a resource-owned row; stage D enforces the XOR at the DB level.
 - `0058_queue_resource_expand` (stage A): additive DDL; strict downgrade
   (re-tightening `specialist_id` NOT NULL fails loudly if resource-owned
   rows exist — history preservation first).
+- `0063_queue_resource_contract` (stage D): consumes the dual-ownership
+  bridges (`specialist_id` → NULL on canonical rows) and adds the XOR
+  CHECK + partial active uniqueness; the downgrade drops both
+  constraints and does NOT restore consumed bridge links (the upgrade
+  log inventory is the audit trail).
 - Existing doctor-owned rows: byte-compatible, untouched at every stage.
 - Synthetic identities: removed only in stage E, after zero references.
 
