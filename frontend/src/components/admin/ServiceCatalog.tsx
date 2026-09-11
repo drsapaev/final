@@ -107,6 +107,10 @@ interface DepartmentItem {
 interface QueueProfileItem {
   key?: string;
   queue_tags?: string[];
+  // RQ-06 (F-05): the profile contract carries a real department_key
+  // (backend registrar_integration/_queue_profiles.py) that is distinct
+  // from the profile key. It must never be substituted by profile.key.
+  department_key?: string | null;
   title_ru?: string;
   title?: string;
   is_active?: boolean;
@@ -158,6 +162,48 @@ const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }: { q
 };
 
 const getAllowedPrefixesForGroup = (groupKey: string | null | undefined): string[] => SERVICE_GROUP_PREFIXES[groupKey || ''] || [];
+
+// RQ-06 (F-05): one meaningful option per allowed queue_tag of an active profile.
+// - Every queue_tag of the profile is selectable (not only the first one).
+// - Profiles without queue_tags keep the legacy profile.key fallback.
+// - department_key is carried from the profile contract so the form can store
+//   the real department instead of guessing it from profile.key.
+// - A shared tag is deduplicated: the first active profile declaring it wins.
+export interface QueueTagOption {
+  value: string;
+  label: string;
+  departmentKey: string | null;
+}
+
+export const buildQueueTagOptions = (profiles: QueueProfileItem[] | undefined): QueueTagOption[] => {
+  const options: QueueTagOption[] = [];
+  const seenTags = new Set<string>();
+
+  for (const profile of profiles || []) {
+    if (!profile || profile.is_active === false) continue;
+
+    const title = profile.title_ru || profile.title || profile.key || '';
+    const rawTags = (profile.queue_tags || [])
+      .map((tag) => String(tag ?? '').trim())
+      .filter(Boolean);
+    const legacyKey = String(profile.key ?? '').trim();
+    const candidates = rawTags.length ? rawTags : legacyKey ? [legacyKey] : [];
+    const multiTag = rawTags.length > 1;
+    const departmentKey = profile.department_key ? String(profile.department_key) : null;
+
+    for (const tag of candidates) {
+      if (!tag || seenTags.has(tag)) continue;
+      seenTags.add(tag);
+      options.push({
+        value: tag,
+        label: multiTag ? `${title} · ${tag}` : title,
+        departmentKey
+      });
+    }
+  }
+
+  return options;
+};
 
 const ServiceCatalog = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces native confirm()).
@@ -978,16 +1024,16 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
       normalizedValue = formatServiceCodeInput(String(value ?? ''));
     }
 
-    // ⭐ SSOT: Sync queue_tag with department_key
+    // ⭐ SSOT: Sync queue_tag with department_key via the profile contract.
+    // RQ-06 (F-05): write the matched profile's real department_key and never
+    // substitute profile.key. A profile without department_key leaves the
+    // department empty (explicit absence) instead of inventing one.
     if (field === 'queue_tag' && normalizedValue) {
       const normalizedStr = String(normalizedValue ?? '');
-      const matchingProfile = queueProfiles.find((p: unknown) => {
-        const profile = p as { queue_tags?: string[]; key?: string };
-        return (profile.queue_tags || []).includes(normalizedStr) || profile.key === normalizedStr;
-      });
+      const selectedOption = buildQueueTagOptions(queueProfiles).find((option) => option.value === normalizedStr);
 
-      if (matchingProfile) {
-        setFormData((prev) => ({ ...prev, [field]: normalizedValue, department_key: (matchingProfile as { key?: string })?.key }));
+      if (selectedOption) {
+        setFormData((prev) => ({ ...prev, queue_tag: normalizedValue, department_key: selectedOption.departmentKey ?? '' }));
         return;
       }
     }
@@ -1178,14 +1224,15 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               </label>
               <Select
               value={formData.queue_tag as string}
-              onChange={(value: unknown) => handleChange('queue_tag', String(value))}
+              // RQ-06 (F-05): onValueChange is the canonical Select contract
+              // (see UserModal). The legacy onChange emits an event object, so
+              // String(value) produced '[object Object]' and no real tag value.
+              onValueChange={(value) => handleChange('queue_tag', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_queue_no_queue') },
-              ...queueProfiles.
-              filter((profile) => profile.is_active !== false).
-              map((profile) => ({
-                value: profile.queue_tags?.[0] || profile.key || '',
-                label: profile.title_ru || profile.title || ''
+              ...buildQueueTagOptions(queueProfiles).map((option) => ({
+                value: option.value,
+                label: option.label
               }))]
               } />
             </div>
