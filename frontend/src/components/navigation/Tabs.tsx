@@ -50,6 +50,17 @@ const defaultTabColor = 'var(--mac-accent)';
 const toGradient = (color: string) =>
   `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color}, white 14%))`;
 
+// RQ-19: shared tab-id contract. The department tab buttons and the
+// registrar worklist tabpanel (WorklistView #main-content aria-labelledby)
+// MUST derive the same id, so both sides call this helper. Tab keys are
+// backend-defined (queue profile key) and may contain whitespace or other
+// characters illegal in an HTML id (see statusIdFor below) — the key is
+// percent-encoded (injective + deterministic, no cross-key collisions);
+// for clean keys ('cardiology') the output equals the pre-existing
+// `${key}-tab` format the panel already referenced (now resolvable).
+export const tabButtonIdFor = (tabKey: string): string =>
+  `${encodeURIComponent(tabKey)}-tab`;
+
 type IconComponent = React.ComponentType<{ size?: number | string; className?: string }>;
 
 interface TabItem {
@@ -345,6 +356,31 @@ const Tabs = ({
     return parts.join(', ');
   };
 
+  // RQ-19: ARIA tabs keyboard support — MANUAL ACTIVATION. Switching the
+  // active tab refetches the registrar worklist (per-tab data load), so
+  // arrow keys move focus WITHOUT activating (APG manual-activation tabs);
+  // Enter/Space (native button activation) or click performs the
+  // selection. ArrowLeft/ArrowRight wrap around; Home/End jump.
+  // preventDefault keeps the horizontally scrollable strip from scrolling
+  // while arrowing. Enter/Space deliberately keep the native click
+  // behavior (including the toggle-off of the active tab), so keyboard
+  // and pointer users get the same selection semantics as before.
+  const onTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const tabButtons = tabsRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    if (!tabButtons || tabButtons.length === 0) return;
+    const count = tabButtons.length;
+    let target = -1;
+    switch (event.key) {
+      case 'ArrowRight': target = (index + 1) % count; break;
+      case 'ArrowLeft': target = (index - 1 + count) % count; break;
+      case 'Home': target = 0; break;
+      case 'End': target = count - 1; break;
+      default: return;
+    }
+    event.preventDefault();
+    tabButtons[target]?.focus();
+  };
+
   // Показываем заглушку пока загружаются вкладки
   if (loading) {
     return (
@@ -416,10 +452,15 @@ const Tabs = ({
 
 
         {/* Контейнер для вкладок отделений */}
-        <div className="department-tabs" ref={tabsRef}>
+        {/* RQ-19: the strip is a real ARIA tablist — the department controls
+            are tabs, the selected one is announced via aria-selected (no
+            color/icon dependency). The decorative animated indicator below
+            is aria-hidden so the tablist exposes only its tabs. */}
+        <div className="department-tabs" role="tablist" ref={tabsRef}>
           {/* Анимированный индикатор */}
           <div
             className="tab-indicator"
+            aria-hidden="true"
             style={{
               ...indicatorStyle,
               background: activeTab ? tabs.find((tb) => tb.key === activeTab)?.gradient : 'transparent'
@@ -427,7 +468,7 @@ const Tabs = ({
 
 
           {/* Вкладки отделений */}
-          {tabs.map((tab) => {
+          {tabs.map((tab, index) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
 
@@ -435,6 +476,16 @@ const Tabs = ({
               <button
                 key={tab.key}
                 data-tab={tab.key}
+                id={tabButtonIdFor(tab.key)}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls="main-content"
+                // RQ-19: APG roving tabindex — with a selected tab only it
+                // stays in the Tab sequence; with NO selection (the
+                // all-departments view) every tab remains tabbable,
+                // preserving today's keyboard order in the default view.
+                tabIndex={isActive || activeTab == null ? 0 : -1}
+                onKeyDown={(event) => onTabKeyDown(event, index)}
                 className={`tab-button department ${isActive ? 'active' : ''}`}
                 onClick={() => onTabChange?.(isActive ? null : tab.key)}
                 // AXE-MOB-1: same button-name contract as the

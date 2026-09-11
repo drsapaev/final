@@ -16,6 +16,9 @@ import { AnimatedLoader } from '../../../components/ui';
 import logger from '../../../utils/logger';
 import { formatRegistrarDate } from '../../../utils/dateUtils';
 import type { WorklistPaginationInfo } from '../useRegistrarWorklistData';
+// RQ-19: the tabpanel labelledby must reference the REAL id of the tab
+// button selected in navigation/Tabs — both sides share tabButtonIdFor.
+import { tabButtonIdFor } from '../../../components/navigation/Tabs';
 import { ArrowUpDown, FileText, Plus, Search } from 'lucide-react';
 
 interface WorklistViewProps {
@@ -69,7 +72,12 @@ const WorklistView = ({
   <div
     id="main-content"
     role="tabpanel"
-    aria-labelledby={activeTab ? `${activeTab}-tab` : undefined}
+    // RQ-19: reference the department tab buttons' real ids (shared
+    // tabButtonIdFor contract with navigation/Tabs, percent-encoded for
+    // whitespace-bearing profile keys). Before RQ-19 this was
+    // `${activeTab}-tab`, which no button carried — a dangling IDREF that
+    // left the tabpanel unlabelled for screen readers.
+    aria-labelledby={activeTab ? tabButtonIdFor(activeTab) : undefined}
     className="registrar-table-container"
     data-breakpoint={isMobile ? 'mobile' : 'desktop'}>
     <div

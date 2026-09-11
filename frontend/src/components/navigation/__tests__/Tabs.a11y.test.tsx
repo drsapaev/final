@@ -15,7 +15,7 @@
  * backend in the loop (same pattern as UserModal.rolePayload.test.tsx,
  * where useTranslation is identity-mocked, so t(key) -> key).
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../api/client', () => ({
@@ -28,7 +28,7 @@ vi.mock('../../../i18n/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-import Tabs from '../Tabs';
+import Tabs, { tabButtonIdFor } from '../Tabs';
 
 afterEach(() => cleanup());
 
@@ -87,7 +87,9 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
       />
     );
 
-    const cardiology = await screen.findByRole('button', { name: 'misc.mt_kardiolog' });
+    // RQ-19: department controls are now ARIA tabs (role=tab inside the
+    // tablist) — the status-description contract below is unchanged.
+    const cardiology = await screen.findByRole('tab', { name: 'misc.mt_kardiolog' });
 
     const describedBy = cardiology.getAttribute('aria-describedby');
     expect(describedBy).toBeTruthy();
@@ -134,7 +136,7 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
     // Boolean-only state (active queue, zero count): previously this would
     // compute an EMPTY description (icon SVG only) — now it announces text,
     // with NO misleading "queue size" number.
-    const ecg = screen.getByRole('button', { name: 'misc.mt_ekg' });
+    const ecg = screen.getByRole('tab', { name: 'misc.mt_ekg' });
     expect(ecg).toHaveAccessibleDescription('final.tgs_active_queue');
   });
 
@@ -163,7 +165,7 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
       />
     );
 
-    const button = await screen.findByRole('button', { name: 'Общая медицина' });
+    const button = await screen.findByRole('tab', { name: 'Общая медицина' });
 
     const describedBy = button.getAttribute('aria-describedby');
     expect(describedBy).toBeTruthy();
@@ -233,5 +235,165 @@ describe('Tabs — accessible names survive the mobile label collapse (AXE-MOB-1
     expect(nsMemberValue(kk, 'registrarPanel', 'today')).toBe('Бүгін');
     expect(nsMemberValue(uzc, 'registrarPanel', 'pending_payments')).toBe('Тўловни кутмоқда');
     expect(nsMemberValue(uzc, 'registrarPanel', 'today')).toBe('Бугун');
+  });
+});
+
+/**
+ * RQ-19 — ARIA tabs pattern for the registrar department tabs.
+ *
+ * Before RQ-19 the department controls were plain buttons: the tab strip
+ * exposed no tablist/tab semantics, no aria-selected, no aria-controls,
+ * and the WorklistView tabpanel pointed at `${activeTab}-tab` — an id NO
+ * button carried (dangling IDREF, panel unlabelled for screen readers).
+ * The plan contract (plan §RQ-19 / S-16): "корректны role, id,
+ * aria-selected, aria-controls и клавиатура".
+ *
+ * Activation model — MANUAL (APG manual-activation tabs): switching the
+ * active tab refetches the registrar worklist (per-tab data load), so
+ * arrow keys move focus WITHOUT activating; Enter/Space or click selects.
+ */
+describe('RQ-19 — ARIA tabs pattern (tablist/tab, id, aria-selected, aria-controls, keyboard)', () => {
+  it('department tabs are owned by a tablist and publish id/aria-selected/aria-controls', async () => {
+    render(<Tabs activeTab="ecg" />);
+
+    await waitFor(() => {
+      expect(document.querySelectorAll('.tab-button.department').length).toBe(6);
+    });
+
+    const tablist = document.querySelector('.department-tabs');
+    expect(tablist).toHaveAttribute('role', 'tablist');
+
+    const tabs = within(tablist as HTMLElement).getAllByRole('tab');
+    expect(tabs).toHaveLength(6);
+
+    for (const tab of tabs) {
+      const key = tab.getAttribute('data-tab') as string;
+      // Shared id contract with the WorklistView tabpanel (aria-labelledby).
+      expect(tab.id).toBe(tabButtonIdFor(key));
+      // Backend keys may be whitespace-bearing — ids must not be.
+      expect(tab.id).not.toMatch(/\s/);
+      // The controlled panel is the registrar worklist region.
+      expect(tab).toHaveAttribute('aria-controls', 'main-content');
+      expect(tab).toHaveAttribute('aria-selected');
+    }
+
+    // Selected state is exposed non-visually (not via color/icon only).
+    expect(screen.getByRole('tab', { name: 'misc.mt_ekg' })).toHaveAttribute('aria-selected', 'true');
+    for (const tab of tabs) {
+      if (tab.getAttribute('data-tab') !== 'ecg') {
+        expect(tab).toHaveAttribute('aria-selected', 'false');
+      }
+    }
+  });
+
+  it('decorative animated indicator stays out of the tablist owned elements', async () => {
+    render(<Tabs />);
+
+    await waitFor(() => {
+      expect(document.querySelectorAll('.tab-button.department').length).toBe(6);
+    });
+
+    const indicator = document.querySelector('.department-tabs .tab-indicator');
+    expect(indicator).not.toBeNull();
+    expect(indicator).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('roving tabindex: selected tab keeps 0, siblings -1; without selection all stay tabbable', async () => {
+    const withSelection = render(<Tabs activeTab="ecg" />);
+    await waitFor(() => {
+      expect(document.querySelectorAll('.tab-button.department').length).toBe(6);
+    });
+    for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('[role="tab"]'))) {
+      expect(tab.getAttribute('tabindex')).toBe(tab.getAttribute('data-tab') === 'ecg' ? '0' : '-1');
+    }
+    withSelection.unmount();
+
+    // All-departments view: no tab is selected — every tab remains in the
+    // Tab sequence, preserving today's keyboard order in the default view.
+    render(<Tabs activeTab={null} />);
+    await waitFor(() => {
+      expect(document.querySelectorAll('.tab-button.department').length).toBe(6);
+    });
+    for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('[role="tab"]'))) {
+      expect(tab.getAttribute('tabindex')).toBe('0');
+    }
+  });
+
+  it('manual-activation keyboard: Arrow/Home/End move focus only, selection untouched', async () => {
+    const onTabChange = vi.fn();
+    render(<Tabs activeTab="ecg" onTabChange={onTabChange} />);
+
+    await waitFor(() => {
+      expect(document.querySelectorAll('.tab-button.department').length).toBe(6);
+    });
+
+    const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    expect(tabs.map((tab) => tab.getAttribute('data-tab'))).toEqual([
+      'cardiology', 'ecg', 'dermatology', 'stomatology', 'lab', 'procedures',
+    ]);
+
+    tabs[1]!.focus(); // ecg — the selected tab (tabindex 0)
+    expect(document.activeElement).toBe(tabs[1]);
+
+    fireEvent.keyDown(tabs[1]!, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(tabs[2]);
+    fireEvent.keyDown(tabs[2]!, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(tabs[1]);
+    fireEvent.keyDown(tabs[1]!, { key: 'End' });
+    expect(document.activeElement).toBe(tabs[5]);
+    fireEvent.keyDown(tabs[5]!, { key: 'ArrowRight' }); // wraps to first
+    expect(document.activeElement).toBe(tabs[0]);
+    fireEvent.keyDown(tabs[0]!, { key: 'Home' });
+    expect(document.activeElement).toBe(tabs[0]);
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowLeft' }); // wraps to last
+    expect(document.activeElement).toBe(tabs[5]);
+
+    // Manual activation: arrows NEVER select — selection happens via
+    // Enter/Space (native click) because switching tabs triggers the
+    // worklist data fetch.
+    expect(onTabChange).not.toHaveBeenCalled();
+  });
+
+  it('S-16 scale: 1/10/20 whitespace-keyed tabs keep the contract and long labels in the name', async () => {
+    const { api } = await import('../../../api/client');
+
+    for (const count of [1, 10, 20]) {
+      const profiles = Array.from({ length: count }, (_, i) => ({
+        key: `dept ${i}`, // whitespace keys exercise the id encoding
+        title_ru: `Синтетическое отделение с очень длинным названием профиля очереди ${i + 1}`,
+        icon: 'Heart',
+        color: '#cc0000',
+        queue_tags: [],
+      }));
+      vi.mocked(api.get).mockResolvedValueOnce({
+        data: { source: 'database', profiles },
+      });
+
+      const activeKey = count === 1 ? 'dept 0' : 'dept 3';
+      const { unmount } = render(<Tabs activeTab={activeKey} />);
+      await waitFor(() => {
+        expect(document.querySelectorAll('.tab-button.department').length).toBe(count);
+      });
+
+      const tabs = within(document.querySelector('.department-tabs') as HTMLElement).getAllByRole('tab');
+      expect(tabs).toHaveLength(count);
+
+      // Exactly one selected tab, distinguishable without color/icon.
+      const selected = tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true');
+      expect(selected).toHaveLength(1);
+      expect(selected[0]).toHaveAttribute('data-tab', activeKey);
+      // Long label survives into the accessible name (aria-label).
+      expect(selected[0]).toHaveAttribute(
+        'aria-label',
+        `Синтетическое отделение с очень длинным названием профиля очереди ${activeKey === 'dept 0' ? 1 : 4}`,
+      );
+
+      for (const tab of tabs) {
+        expect(tab.id).toBe(tabButtonIdFor(tab.getAttribute('data-tab') as string));
+        expect(tab.id).not.toMatch(/\s/);
+        expect(tab).toHaveAttribute('aria-controls', 'main-content');
+      }
+      unmount();
+    }
   });
 });
