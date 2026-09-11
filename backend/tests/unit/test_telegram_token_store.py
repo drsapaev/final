@@ -180,6 +180,19 @@ class TestStorePatientBotToken:
             store_patient_bot_token(db_session, oversized)
         assert db_session.query(TelegramConfig).first() is None
 
+    def test_store_rejects_oversized_non_ascii_token(self, db_session, monkeypatch):
+        """P2 pin (round 15): the limit is BYTES - 200 Cyrillic characters
+        are 400 UTF-8 bytes and would overflow the column after Fernet
+        expansion even though the character count is only 200."""
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        oversized_cyrillic = "ж" * 200
+
+        assert len(oversized_cyrillic) == 200
+        with pytest.raises(TokenStoreError):
+            store_patient_bot_token(db_session, oversized_cyrillic)
+        assert db_session.query(TelegramConfig).first() is None
+
     def test_store_rejects_empty_token(self, db_session):
         with pytest.raises(TokenStoreError):
             store_patient_bot_token(db_session, "")

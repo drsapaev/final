@@ -224,7 +224,9 @@ def store_patient_bot_token(
     if not token or not str(token).strip():
         raise TokenStoreError("patient bot token must be a non-empty string")
     token_text = str(token).strip()
-    if len(token_text) > MAX_PLAINTEXT_TOKEN_LENGTH:
+    # Byte-based (codex round 15): 256 non-ASCII CHARACTERS are 512 UTF-8
+    # bytes and would still overflow the column after Fernet expansion.
+    if len(token_text.encode("utf-8")) > MAX_PLAINTEXT_TOKEN_LENGTH:
         raise TokenStoreError(
             "patient bot token exceeds the Telegram bot token length limit"
         )
