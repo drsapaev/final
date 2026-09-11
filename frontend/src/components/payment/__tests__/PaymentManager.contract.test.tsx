@@ -25,12 +25,14 @@ describe('PaymentManager invoice DTO contract', () => {
     expect(SOURCE).not.toContain('setCreatedInvoiceId(invoice.id);');
   });
 
-  it('renders only backend-authorized registrar invoice providers', () => {
+  it('allows existing invoices only through backend-authorized providers', () => {
     expect(SOURCE).toContain('getPaymentProviders');
     expect(SOURCE).toContain('provider.features?.registrar_invoice_payment === true');
-    expect(SOURCE).toContain('invoiceProviders.map((provider) => (');
+    expect(SOURCE).toContain('invoiceProviders.some((provider) => provider.code.toLowerCase() === providerCode)');
     expect(SOURCE).toContain('disabled={loading || providersLoading || !providerSupported}');
     expect(SOURCE).toContain('providersLoadFailed');
+    expect(SOURCE).not.toContain('createPaymentInvoice');
+    expect(SOURCE).not.toContain('handleCreateInvoice');
     expect(SOURCE).not.toContain('value="payme"');
   });
 
