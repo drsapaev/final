@@ -299,6 +299,25 @@ class TestClearPatientBotToken:
         )
         assert event.actor_user_id == 7
 
+    def test_clear_invalidates_running_service_credential(
+        self, db_session, monkeypatch
+    ):
+        from app.services import telegram_bot as telegram_bot_module
+
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        service = telegram_bot_module.telegram_bot_service
+        service.bot_token = "123456789:cached-credential"
+        service.active = True
+
+        store_patient_bot_token(db_session, "123456789:fresh")
+
+        # P1 pin (round 6): the in-process singleton must drop the cached
+        # credential so the webhook/notification paths re-initialize
+        # instead of sending with the rotated-away token.
+        assert service.bot_token is None
+        assert service.active is False
+
     def test_clear_is_noop_without_any_token(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
         _clear_fernet_key(monkeypatch)

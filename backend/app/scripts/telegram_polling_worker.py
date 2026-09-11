@@ -23,8 +23,12 @@ LOGGER = logging.getLogger("telegram_polling_worker")
 DEFAULT_POLL_TIMEOUT_SECONDS = 25
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 35
 DEFAULT_RETRY_DELAY_SECONDS = 3
-DEFAULT_LOG_FILE = Path(__file__).resolve().parents[2] / "logs" / "telegram_polling_worker.log"
-DEFAULT_PID_FILE = Path(__file__).resolve().parents[2] / "logs" / "telegram_polling_worker.pid"
+DEFAULT_LOG_FILE = (
+    Path(__file__).resolve().parents[2] / "logs" / "telegram_polling_worker.log"
+)
+DEFAULT_PID_FILE = (
+    Path(__file__).resolve().parents[2] / "logs" / "telegram_polling_worker.pid"
+)
 
 
 class TelegramPollingWorker:
@@ -76,6 +80,22 @@ class TelegramPollingWorker:
                     LOGGER.warning(
                         "Telegram polling conflict: another polling worker may be running"
                     )
+                elif status_code == 401:
+                    # PR-2 (round 6): the credential may have been rotated or
+                    # revoked in the DB after this process started —
+                    # re-resolve through the SSOT chain instead of polling
+                    # with the stale token forever.
+                    refreshed = await self._load_bot_token()
+                    if refreshed and refreshed != token:
+                        LOGGER.info("Telegram bot token rotated — reloading")
+                        token = refreshed
+                        if not self.keep_webhook:
+                            self._delete_webhook(session, token)
+                        continue
+                    LOGGER.warning(
+                        "Telegram getUpdates unauthorized error_status=%s",
+                        status_code,
+                    )
                 else:
                     LOGGER.warning(
                         "Telegram getUpdates HTTP error error_type=%s status_code=%s",
@@ -112,7 +132,10 @@ class TelegramPollingWorker:
                     offset = int(update_id) + 1
 
                 processed_updates += 1
-                if self.max_updates is not None and processed_updates >= self.max_updates:
+                if (
+                    self.max_updates is not None
+                    and processed_updates >= self.max_updates
+                ):
                     LOGGER.info("Telegram polling worker reached max_updates")
                     return 0
 
@@ -184,7 +207,9 @@ class TelegramPollingWorker:
             handled = await _handle_clinic_bot_update(update, db, bot_service)
             if not handled:
                 await bot_service.process_webhook_update(update, db)
-            LOGGER.info("Telegram update handled update_id=%s handled=%s", update_id, handled)
+            LOGGER.info(
+                "Telegram update handled update_id=%s handled=%s", update_id, handled
+            )
         except Exception as exc:
             db.rollback()
             LOGGER.warning(
@@ -292,7 +317,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the Kosmed Clinic Telegram bot in polling mode."
     )
-    parser.add_argument("--poll-timeout", type=int, default=DEFAULT_POLL_TIMEOUT_SECONDS)
+    parser.add_argument(
+        "--poll-timeout", type=int, default=DEFAULT_POLL_TIMEOUT_SECONDS
+    )
     parser.add_argument(
         "--request-timeout", type=int, default=DEFAULT_REQUEST_TIMEOUT_SECONDS
     )

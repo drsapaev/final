@@ -162,6 +162,27 @@ def resolve_staff_bot_token(db, patient_token: str | None = None) -> str | None:
     return None
 
 
+def _invalidate_running_service_credential() -> None:
+    """Drop the cached credential of the in-process bot service singleton.
+
+    The webhook/notification paths read ``telegram_bot_service.bot_token``
+    directly and re-initialize only while ``active`` is false, so a DB-side
+    rotation or revocation must reset the cached state or the process keeps
+    operating with the old credential until restart (codex round 6).
+    """
+    # get_telegram_bot_service() is async; the store is sync — read the
+    # module-level singleton directly.
+    from app.services import telegram_bot as telegram_bot_module
+
+    service = telegram_bot_module.telegram_bot_service
+    if service.bot_token or service.active:
+        service.bot_token = None
+        service.active = False
+        service.bot_username = None
+        service.webhook_url = None
+        logger.info("Invalidated cached Telegram bot credential after token write")
+
+
 def store_patient_bot_token(
     db, token: str | None, *, actor_user_id: int | None = None, commit: bool = True
 ) -> object:
@@ -226,6 +247,7 @@ def store_patient_bot_token(
             # the rollback — loop once more and update it instead.
             continue
 
+        _invalidate_running_service_credential()
         crud_audit.log(
             db,
             action="telegram_bot_token_stored",
@@ -271,6 +293,7 @@ def clear_patient_bot_token(
     if not cleared:
         return config
 
+    _invalidate_running_service_credential()
     db.flush()
     crud_audit.log(
         db,
