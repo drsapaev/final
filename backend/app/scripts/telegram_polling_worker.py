@@ -70,6 +70,26 @@ class TelegramPollingWorker:
         LOGGER.info("Telegram polling worker started")
 
         while not self._stop_requested:
+            # PR-2 (round 7): a rotation keeps the old token VALID (200s
+            # forever), so the 401 branch alone never fires — re-resolve the
+            # canonical credential every cycle instead.
+            try:
+                canonical = await self._load_bot_token()
+            except Exception as exc:
+                LOGGER.warning(
+                    "Telegram token re-resolve failed error_type=%s",
+                    type(exc).__name__,
+                )
+            else:
+                if not canonical:
+                    LOGGER.error("Telegram bot token was revoked — stopping")
+                    return 2
+                if canonical != token:
+                    LOGGER.info("Telegram bot token changed — reloading")
+                    token = canonical
+                    if not self.keep_webhook:
+                        self._delete_webhook(session, token)
+                    offset = None
             try:
                 updates = self._get_updates(session, token, offset)
             except requests.HTTPError as exc:

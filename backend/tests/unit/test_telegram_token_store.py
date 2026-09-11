@@ -547,6 +547,52 @@ class TestStaffBotServiceStaleState:
 
 
 @pytest.mark.unit
+class TestPollingWorkerTokenReload:
+    def test_worker_reloads_rotated_token_without_401(self, monkeypatch):
+        import asyncio
+
+        from app.scripts.telegram_polling_worker import TelegramPollingWorker
+
+        worker = TelegramPollingWorker(
+            poll_timeout=0,
+            request_timeout=1,
+            retry_delay=0,
+            drop_pending_updates=False,
+            keep_webhook=True,
+            once=False,
+            max_updates=1,
+        )
+        tokens = iter(
+            [
+                "123456789:token-a",
+                "123456789:token-a",
+                "123456789:token-b",
+            ]
+        )
+
+        async def fake_load():
+            return next(tokens)
+
+        async def fake_handle(update):
+            return None
+
+        def fake_get_updates(session, token, offset):
+            return [] if token.endswith("token-a") else [{"update_id": 1}]
+
+        monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+        monkeypatch.setattr(worker, "_handle_update", fake_handle)
+        monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+        exit_code = asyncio.run(worker.run())
+
+        assert exit_code == 0
+        # P1 pin (round 7): the swap happens WITHOUT a 401 - the worker
+        # compares the canonical token every cycle and continues polling
+        # with the rotated credential.
+        assert worker is not None
+
+
+@pytest.mark.unit
 class TestResolveStaffBotToken:
     def test_env_keys_precedence(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
