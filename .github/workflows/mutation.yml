@@ -92,6 +92,10 @@ jobs:
           cp openapi.json mutants/openapi.json
           cp -r scripts mutants/scripts
           cp -r ../ops ops
+          # nurse-retirement mirror tests read frontend/src/{types,routing}
+          #/*.ts via parents-traversal resolving to backend/frontend/src.
+          mkdir -p frontend/src
+          cp -r ../frontend/src/. frontend/src/
 
       - name: Run mutmut on critical modules
         working-directory: backend
