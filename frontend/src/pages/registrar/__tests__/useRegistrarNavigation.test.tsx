@@ -172,6 +172,24 @@ describe('useRegistrarNavigation (PR-UI-13-5)', () => {
     expect(hook.current.activeTab).toBe(null);
   });
 
+  // RQ-20.b (child slice): explicit reset of the active status filter —
+  // only ?status= is removed; the other params (and the selected tab)
+  // survive; push semantics let Back restore the filter (RQ-20.a contract).
+  it('clearStatusFilter removes ?status= and preserves the rest (RQ-20.b)', async () => {
+    const { hook } = renderNavigationHook('/registrar?status=done&q=ivanov&dept=derma');
+    await act(async () => { hook.current.clearStatusFilter(); });
+    expect(hook.current.searchParams.get('status')).toBe(null);
+    expect(hook.current.searchParams.get('q')).toBe('ivanov');
+    expect(hook.current.searchParams.get('dept')).toBe('derma');
+    expect(hook.current.activeTab).toBe('derma');
+  });
+
+  it('clearStatusFilter is a no-op-safe without ?status= (RQ-20.b)', async () => {
+    const { hook } = renderNavigationHook('/registrar?dept=cardio');
+    await act(async () => { hook.current.clearStatusFilter(); });
+    expect(hook.current.searchParams.get('dept')).toBe('cardio');
+  });
+
   it('opens the wizard on the openAppointmentWizard header event (P-008)', () => {
     const { setShowWizard } = renderNavigationHook('/registrar');
     act(() => {

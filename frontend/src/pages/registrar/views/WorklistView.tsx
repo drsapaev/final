@@ -19,7 +19,7 @@ import type { WorklistPaginationInfo } from '../useRegistrarWorklistData';
 // RQ-19: the tabpanel labelledby must reference the REAL id of the tab
 // button selected in navigation/Tabs — both sides share tabButtonIdFor.
 import { tabButtonIdFor } from '../../../components/navigation/Tabs';
-import { ArrowUpDown, FileText, Plus, Search } from 'lucide-react';
+import { ArrowUpDown, FileText, Plus, Search, X } from 'lucide-react';
 
 interface WorklistViewProps {
   // presentation inputs
@@ -45,6 +45,9 @@ interface WorklistViewProps {
   onNewAppointment: () => void;
   /** Empty-state CTA (original: setShowWizard(true)). */
   onEmptyStateCta: () => void;
+  /** RQ-20.b: explicit reset of the active status filter (?status=) —
+   *  optional for compat; when absent the badge stays display-only. */
+  onClearStatusFilter?: () => void;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -67,6 +70,7 @@ const WorklistView = ({
   loadMoreAppointments,
   onNewAppointment,
   onEmptyStateCta,
+  onClearStatusFilter,
   tI18n,
 }: WorklistViewProps) => (
   <div
@@ -108,6 +112,20 @@ const WorklistView = ({
           <Badge variant="warning" className="registrar-inline-flex-tight">
               <Search size={16} aria-hidden="true" />
               {tI18n('registrarPanel.rp_worklist_filter', { label: statusFilterLabel })}
+              {/* RQ-20.b: explicit reset of the active filter on the worklist
+                  itself (plan §RQ-20 «действующие фильтры видны и сбрасываются
+                  явно»). aria-label composes the action with WHAT is reset —
+                  the standalone "Сбросить" would be ambiguous among the
+                  worklist controls. */}
+              {onClearStatusFilter && (
+                <button
+                  type="button"
+                  className="registrar-filter-clear"
+                  onClick={onClearStatusFilter}
+                  aria-label={`${tI18n('common.reset')}: ${statusFilterLabel}`}>
+                  <X size={12} aria-hidden="true" />
+                </button>
+              )}
             </Badge>
           }
           <Badge variant={appointmentsLoading ? 'info' : 'secondary'}>

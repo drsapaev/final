@@ -651,6 +651,34 @@
   gap: var(--mac-spacing-1);
 }
 
+/* RQ-20.b: explicit status-filter reset control (badge tail button) */
+.registrar-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.registrar-filter-clear:hover {
+  background: color-mix(in srgb, currentColor, transparent 85%);
+}
+
+/* Global styles strip focus from ALL buttons (outline:none !important) —
+   keep the reset control keyboard-visible (WCAG 2.4.7), same lesson and
+   same pattern as the RQ-19 tab focus ring: scoped high-specificity
+   selector + canonical token (--mac-accent), one !important to win the
+   cascade against the equally-important global reset. */
+.registrar-workflow-actions .registrar-filter-clear:focus-visible {
+  outline: 2px solid var(--mac-accent) !important;
+}
+
 /* Inline flex with flexShrink (for fixed-width containers) */
 .registrar-inline-flex-shrink {
   display: inline-flex;

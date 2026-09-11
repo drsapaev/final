@@ -146,6 +146,7 @@ const RegistrarPanel = () => {
     navigate,
     activeTab,
     setActiveTab,
+    clearStatusFilter,
     currentView,
     searchQuery,
     statusFilter,
@@ -429,12 +430,10 @@ const RegistrarPanel = () => {
             paginationInfo={paginationInfo}
             onActionClick={handleTableAction}
             loadMoreAppointments={loadMoreAppointments}
-            onNewAppointment={() => {
-              setWizardEditMode(false);
-              setWizardInitialData(null);
-              setShowWizard(true);
-            }}
+            onNewAppointment={() => { setWizardEditMode(false); setWizardInitialData(null); setShowWizard(true); }}
             onEmptyStateCta={() => setShowWizard(true)}
+            // RQ-20.b: явный сброс активного статус-фильтра (владелец URL — useRegistrarNavigation).
+            onClearStatusFilter={clearStatusFilter}
             tI18n={tI18n}
           />
         }
