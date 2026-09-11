@@ -62,6 +62,51 @@ export const REGISTRAR_TAB_LABEL_KEYS = {
 };
 
 /**
+ * Permissive profile shape consumed by resolveRegistrarTabLabel. At runtime
+ * the panel passes the TabItem objects loaded by navigation/Tabs (they carry
+ * a localized `label`); the breadcrumb contract historically declared the
+ * raw backend `title` field. Both are accepted.
+ */
+export interface RegistrarTabTitleProfile {
+  key?: string;
+  label?: string;
+  title?: string;
+}
+
+/**
+ * RQ-20 (срез RQ-20.a): shared registrar tab title resolution for the
+ * worklist header (Рабочий список: {label}) and the breadcrumb department
+ * crumb, so both always show the SAME title as the selected tab button.
+ *
+ * Resolution order:
+ * 1. the loaded queue profile's localized `label` (Tabs SSOT — what the tab
+ *    button renders from /queues/profiles);
+ * 2. the profile's raw backend `title` (permissive shape);
+ * 3. the legacy param-era key map (tabs_appointments/cardio/... — hotkeys
+ *    switch to these keys and they must stay localized while profiles load);
+ * 4. the raw key (truthful fallback for an arbitrary profile that is not
+ *    loaded yet). The previous hardcoded-map implementation returned the
+ *    generic all-departments label here, masking arbitrary profiles.
+ *
+ * @param activeTab    selected tab key (null = all departments)
+ * @param queueProfiles loaded profiles (Tabs SSOT via onProfilesLoaded)
+ * @param translate    registrarPanel.* key translator WITHOUT the prefix
+ *                     (callers wrap: (key) => tI18n('registrarPanel.' + key))
+ */
+export const resolveRegistrarTabLabel = (
+  activeTab: string | null,
+  queueProfiles: RegistrarTabTitleProfile[],
+  translate: (key: string) => string,
+): string => {
+  if (!activeTab) return translate('tabs_appointments');
+  const profile = queueProfiles.find((candidate) => candidate.key === activeTab);
+  const profileTitle = profile?.label || profile?.title;
+  if (typeof profileTitle === 'string' && profileTitle.trim() !== '') return profileTitle;
+  const knownKey = REGISTRAR_TAB_LABEL_KEYS[activeTab as keyof typeof REGISTRAR_TAB_LABEL_KEYS];
+  return knownKey ? translate(knownKey) : activeTab;
+};
+
+/**
  * Map of status filter values to i18n keys for status labels.
  * Used by status filter dropdown and context menu.
  */

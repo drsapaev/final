@@ -14,10 +14,16 @@
  */
 import { Calendar, ChevronRight, Search, Users } from 'lucide-react';
 ;
+// RQ-20 (срез RQ-20.a): the department crumb resolves its title through the
+// shared helper so it always matches the worklist header and the tab button
+// (the panel passes TabItem objects, whose display title is `label`).
+import { resolveRegistrarTabLabel } from '../registrarHelpers';
 
 interface RegistrarBreadcrumbProps {
   activeTab: string | null;
-  queueProfiles: { key?: string; title?: string }[];
+  // RQ-20 (срез RQ-20.a): TabItem objects carry a localized `label`; the
+  // raw backend shape carries `title` — both accepted by the shared helper.
+  queueProfiles: { key?: string; label?: string; title?: string }[];
   searchQuery: string;
   wizardEditMode: boolean;
   showWizard: boolean;
@@ -55,7 +61,11 @@ const RegistrarBreadcrumb = ({
     {activeTab && (
       <>
         <ChevronRight size={16} className="registrar-breadcrumb-separator" aria-hidden="true" />
-        <span>{queueProfiles.find(p => p.key === activeTab)?.title || activeTab}</span>
+        {/* RQ-20 (срез RQ-20.a): resolve through the shared helper — the
+            previous `?.title || activeTab` lookup never matched the TabItem
+            objects (they carry `label`), so every backend-driven tab showed
+            its raw key in the wayfinding crumb. */}
+        <span>{resolveRegistrarTabLabel(activeTab, queueProfiles, (key) => tI18n('registrarPanel.' + key))}</span>
       </>
     )}
     {searchQuery && (

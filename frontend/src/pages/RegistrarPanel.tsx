@@ -41,7 +41,7 @@ import WelcomeView from './registrar/views/WelcomeView';
 // useRegistrarCalendar; worklist/breadcrumb/dialogs JSX → views/*; helpers →
 // registrarHelpers; reference data → useRegistrarData.
 import {
-  REGISTRAR_TAB_LABEL_KEYS,
+  resolveRegistrarTabLabel,
   REGISTRAR_STATUS_LABEL_KEYS,
 } from './registrar/registrarHelpers';
 import { getLocalDateString } from '../utils/dateUtils';
@@ -157,7 +157,7 @@ const RegistrarPanel = () => {
   });
 
   // Worklist header labels (moved after nav wiring — PR-UI-13-5).
-  const currentWorklistLabel = tI18n('registrarPanel.' + (REGISTRAR_TAB_LABEL_KEYS[activeTab as keyof typeof REGISTRAR_TAB_LABEL_KEYS] || 'tabs_appointments'));
+  const currentWorklistLabel = resolveRegistrarTabLabel(activeTab, queueProfiles, (key) => tI18n('registrarPanel.' + key));
   const statusFilterLabel = statusFilter ? tI18n('registrarPanel.' + (REGISTRAR_STATUS_LABEL_KEYS[statusFilter as keyof typeof REGISTRAR_STATUS_LABEL_KEYS] || statusFilter)) : null;
 
   // Legacy aliases over the consolidated reschedule slice { open, data }.
