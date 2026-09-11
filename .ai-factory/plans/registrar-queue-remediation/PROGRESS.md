@@ -6,16 +6,15 @@
 
 ## Точка продолжения
 
-- Обновлено: 2026-09-11, подготовка плана.
-- План: v1; исходный main: `22febf376f710a3b3b6ce57ac85de589ebba3f21`.
-- Реализация: **не начата**, 0/30 задач закрыто.
-- Активная runtime-задача: нет. Владелец: не назначен.
-- Ветка подготовки документов: `codex/registrar-queue-remediation-plan`.
-- Подготовительный docs PR: [#3157](https://github.com/drsapaev/final/pull/3157), ветка опубликована. На момент этой записи PR открыт; актуальные CI/merge проверить при продолжении.
-- Следующий шаг: **RQ-01**, сверить свежий main и PR #3114, затем выбрать минимальный незаблокированный fix.
-- Ближайшие доступные после RQ-01: RQ-02, RQ-03, RQ-05, RQ-06, RQ-10, RQ-11, RQ-12.a, RQ-19, RQ-22, RQ-24.a, RQ-25.a, RQ-26.a, RQ-27.a; выполнять последовательно по правилам PR-цикла. RQ-01 допускает зарегистрированные частные blockers и не требует доступного PostgreSQL для всей программы.
-- Открытые продуктовые решения: D-01…D-07. Они не блокируют весь аудит/все независимые fixes.
-- Среда: безопасная БД/реальный API/browser для новой реализации пока не проверены.
+- Обновлено: 2026-09-11, RQ-01 базис зафиксирован (VERIFIED в PR, DONE после merge-сверки).
+- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `be6012b18484a7221e704afcd0c04ce33c4a9cf4`.
+- Реализация: 0/30 runtime-задач закрыто; RQ-01 VERIFIED (сверка базиса — см. E-003).
+- Активная runtime-задача: нет. Владелец RQ-01: агент среза 2026-09-11.
+- Подготовительный docs PR [#3157](https://github.com/drsapaev/final/pull/3157) **merged** в main (`be6012b18`); план доступен в fresh main — runtime-работа от fresh main разрешена.
+- Следующий шаг: **RQ-02** (минимальная незаблокированная: direct_execute, first-touch вне #3114). Перед стартом сверить merge RQ-01 и его фактический SHA.
+- Дрейф плана, зафиксированный RQ-01: QD-2A (0055–0059) уже merged через PR #3093 (`1f775cb`), поэтому открытый PR #3077 выглядит дубликатом/суперсeded — не мержить без сверки содержимого; F-10/F-16 частично смягчены; F-14 частично изменен. Подробности в E-003.
+- Открытые продуктовые решения: D-01…D-07 (все OPEN). Они не блокируют независимые fixes.
+- Среда: Node 24/npm/Playwright-chromium — frontend unit/MOCK доступны; pwsh 7.4.6 установлен user-local, gate валидирован; Python 3.12 (venv есть, зависимости backend НЕ установлены); PostgreSQL и Redis отсутствуют → PG/REAL_API-части соответствующих задач BLOCKED (см. E-003, частные blockers).
 - Публикация состояния: проверять remote HEAD перед передачей; не считать локальный checkpoint доступным облаку.
 
 ## Статусы и правила закрытия
@@ -44,7 +43,7 @@ DONE требует: критерий из плана выполнен; узки
 
 | ID | Задача | Зависимости | Статус | Owner / branch / PR | Evidence |
 |---|---|---|---|---|---|
-| RQ-01 | Актуальный базис | — | TODO | — | — |
+| RQ-01 | Актуальный базис | — | VERIFIED | codex/rq-01-baseline-verification / PR после checkpoint | E-003 |
 | RQ-02 | Поиск пациента | RQ-01 | TODO | — | — |
 | RQ-03 | Услуги мастера | RQ-01 | TODO | — | — |
 | RQ-04 | Атомарное отделение | RQ-01; проверить #3114 | TODO | — | — |
@@ -150,6 +149,40 @@ Parent DONE только после обоих children; parent и children не
 - Дополнительное read-only review исправило блокировки независимых задач, cloud prerequisites и merge reconciliation. Устаревшая ссылка на отсутствующий frontend/AGENTS.md исключена из обязательных источников.
 - NOT_RUN: новые тесты приложения, PostgreSQL/REAL_API/browser и staging; runtime не менялся. GitHub checks/merge сверять непосредственно в PR.
 - Результат: план доступен удаленному агенту, задачи RQ остаются TODO. Следующий шаг — RQ-01; runtime с fresh main после merge плана, если пользователь не назначил другую базу.
+
+### E-003 — RQ-01: сверка актуального базиса, владельцев и среды
+
+- Task / child: RQ-01 (dossier, без runtime-правок).
+- UTC timestamp: 2026-09-11, срез облачного агента.
+- Repo branch: `codex/rq-01-baseline-verification`; Base SHA / tested HEAD: `be6012b18484a7221e704afcd0c04ce33c4a9cf4` (= origin/main на момент среза, чистый checkout).
+- B0 сверка GitHub (read-only API): открытых PR — 23 (авторы: drsapaev, dependabot[bot], vercel[bot]; сторонних авторов нет). PR #3157 (план) **merged** 2026-09-11T02:57:43Z → merge commit `be6012b18` = текущий main. PR #3114 (QD-2C) **открыт**, head `d4eb4cfd7481`, 64 файла, 40 коммитов; карта пересечений с RQ: затрагивает first-touch/якоря RQ-04 (`admin_departments/_helpers.py`), RQ-08 (`doctor_integration/_queue_ops.py`), RQ-09/18 (`qr_queue/_queue_ops.py`, `_tokens.py`), RQ-14 (`queue_svc/_operations.py` +327/−104, `test_queue_allocator_characterization.py`), RQ-15 (`morning_assignment.py`), RQ-24 (`display_websocket*`), RQ-25 (`test_qr_queue_full_update.py`, `test_qr_queue_join.py`). Не пересекаются: RQ-02, RQ-03, RQ-05 (`_services_doctors.py` не в списке), RQ-06, RQ-07, RQ-10 (`qr_queue/_sessions.py` не в списке), RQ-11, RQ-12.a, RQ-19–RQ-22, RQ-26.a, RQ-27.a.
+- Сверка F-01…F-24 по исходникам `be6012b18` (трассировка каждого якоря): 21 STILL_PRESENT; частично изменены F-10 (TTL 5–15 мин в `queue_svc/_base.py:79-80` и скачиваемый PNG без предупреждения — как в плане, но на экране теперь отображается «Действует до»), F-16 (ARIA/aria-describedby/sr-only добавлены, но `@media (max-width:768px){.tab-label{display:none}}` в `Tabs.css:274-275` остается), F-14 (модель `QueueResource` и миграции 0055–0059 в main, но `morning_assignment.py:518-530` все еще использует синтетические `*_resource` аккаунты). Тест, закрепляющий дефект F-01, на месте: `registrarWorklistRows.test.ts:150-155` («PRE-EXISTING QUIRK… Pinned as-is»).
+- Дрейф против плана: QD-2A landed не через открытый PR #3077, а через **merged PR #3093** (commit `1f775cb`, миграции 0055–0059 на main, дополнительно 0060 visit_reminder). PR #3077 открыт и, судя по заголовку/содержимому, superseded — не мержить без поэлементной сверки; владелец #3114/#3077 должен подтвердить. Это снимает премису плана «0058 не merged» для RQ-15: его первый шаг (проверка merged реализации ресурсов) стал выполнимым.
+- Матрица прав вызова (существующие различия сохранены, ничего не расширять):
+  - doctor_integration call/start-visit/complete: `require_roles("Admin","Doctor","Registrar","Cashier","cardio","cardiology","Cardiologist","derma","dentist","Lab")` (`doctor_integration/_queue_ops.py:250-261, :392-403, :505-516`); бизнес-проверка владельца очереди или той же специальности (`:302-318`).
+  - QR `POST /queue/{specialist_id}/call-next` и status/entries-мутации: `require_roles("Admin","Doctor","Registrar")` + `_ensure_doctor_can_mutate_specialist_queue` (`qr_queue/_queue_ops.py:48`, `_entries.py:21,97,170,221`).
+  - QR-токены: generate — Admin/Doctor/Registrar (`_tokens.py:16`); generate-clinic — только Admin/Registrar (`_tokens.py:84`).
+  - Display quick call-next: Admin/Doctor/Registrar (`display_websocket.py:361`).
+  - Queue profiles: чтение Admin/Registrar/Doctor/Cashier/Lab (`_queue_profiles.py:45`); create/update/delete/reorder — только Admin (`:276, :344, :402, :455`).
+  - Публичный join (`/queue/qr-tokens/{token}/info`, `/queue/join/start|complete`) — без require_roles, токен-гейт (`_join.py`).
+  - Зафиксированное расхождение (не баг-фиксить здесь): кассир может вызвать через doctor-integration путь, но не через канонический QR call-next.
+- Команды и результаты (working dir `/home/z/repo/frontend`):
+  - `npm ci --legacy-peer-deps` → EXIT=0.
+  - `node node_modules/vitest/vitest.mjs run src/pages/registrar/__tests__/registrarWorklistRows.test.ts src/components/navigation/__tests__/Tabs.a11y.test.tsx src/components/wizard/__tests__/AppointmentWizardV2.contract.test.tsx src/components/admin/__tests__/UserModal.onboarding.test.tsx --no-cache --reporter=dot` → **4 files / 41 tests PASS** (2.81s). Найденные тесты отделены от запущенных: запущены ровно 4 файла E-000; прочие 9 backend-файлов только локализованы (все существуют), не запускались.
+  - `pwsh -NoProfile -File ./ai/langgraph/scripts/run_agent_gate.ps1 "RQ-01: …"` → `{"result":"stop","reason":"no first-touch files could be resolved…"}` (корректно для dossier без путей); повтор с `--known-root-cause frontend/src/pages/registrar/registrarWorklistRows.ts` → валидный JSON (`first_touch_files`, `validation_targets`, `stop_conditions`). Gate-инструментарий работоспособен.
+  - `git diff --check` — PASS (перед checkpoint-коммитом).
+- Инвентаризация тестов (найдены, НЕ запускались): `backend/tests/characterization/test_registrar_wizard_queue_characterization.py`, `test_queue_allocator_characterization.py`, `backend/tests/integration/test_registrar_services_grouping.py`, `test_qr_queue_join.py`, `test_queue_resource_expand.py`, `test_queue_resource_seed_backfill.py`, `test_queue_resource_sentinel.py`, `test_multi_doctor_same_specialty_isolation.py`, `backend/tests/unit/test_queue_time_window.py`.
+- Среда: Node v24.19.0 (CI — Node 20; дрейф некритичен, тесты зеленые); Playwright chromium в кэше → browser MOCK доступен; pwsh 7.4.6 установлен user-local (`~/.local/share/powershell`, без глобальных настроек); Python 3.12.14 (формально ≥3.11 по CLOUD-START, но CI — 3.11.10; зависимости backend не установлены).
+- Acceptance S-IDs: не применимы к RQ-01 (dossier). MOCK/REAL_API маркировка: frontend vitest — MOCK-уровень окружения; REAL_API — NOT_RUN.
+- NOT_RUN и почему: backend pytest (зависимости backend не установлены в venv — bootstrap по P0 не выполнялся в этом срезе); PostgreSQL/Alembic-проверки (PostgreSQL отсутствует в среде); REAL_API/browser-over-backend (Redis и disposable backend отсутствуют); e2e Playwright suite (полнота — gate merge UI PR, не требуется RQ-01).
+- Частные blockers (не блокируют весь план):
+  1. PostgreSQL недоступен (нет psql/postgres/docker) → BLOCKED PG-части RQ-04/14/15/25 и любые schema-срезы. Условие разблокировки: disposable PostgreSQL 16 (или docker) с безопасным тестовым DSN.
+  2. Redis недоступен + backend-зависимости не установлены → BLOCKED REAL_API-сценарии (S-03/S-13/S-21 REAL_API-части). Условие: disposable Redis + `python3 -m venv .venv && pip install -r backend/requirements.txt` по P0.
+  3. PR #3114 активен (64 файла) → перед RQ-04/08/09/13/14/15/16/18/24 обязательна повторная сверка его head и файлов.
+  4. D-01…D-07 OPEN — behavior-changing задачи ждут решений владельца.
+- Status now: RQ-01 VERIFIED (в границах этого PR; DONE — после merge-сверки следующего цикла).
+- Next smallest action: RQ-02 — direct_execute, first-touch `frontend/src/pages/registrar/registrarWorklistRows.ts` + его тест (оба вне #3114); исправить пусто-цифровую телефонную ветку поиска и ожидание теста, закрепляющего дефект; targeted Vitest + `git diff --check`.
+- Checkpoint commit: см. PR из строки RQ-01; remote HEAD — сверять при продолжении.
 
 ### Шаблон следующей записи — скопировать и заполнить
 
