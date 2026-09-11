@@ -45,7 +45,9 @@ from app.services.telegram_templates import get_telegram_templates_service
 
 router = APIRouter()
 
-PROTECTED_LAB_RESULTS_URL = "/patient/lab-results"  # P3 fix: relative URL, not example.com
+PROTECTED_LAB_RESULTS_URL = (
+    "/patient/lab-results"  # P3 fix: relative URL, not example.com
+)
 PROTECTED_DOCTOR_CONTACT_REFERENCE = "assigned"
 PROTECTED_PAYMENT_HISTORY_PATH = PATIENT_PAYMENT_ENTRY_ROUTE
 PROTECTED_PAYMENT_REFERENCE = "available-in-protected-account"
@@ -270,9 +272,7 @@ async def send_appointment_reminder(
             )
 
         # Получаем данные пациента
-        _ensure_doctor_can_send_appointment_reminder(
-            db, appointment, current_user
-        )
+        _ensure_doctor_can_send_appointment_reminder(db, appointment, current_user)
         patient = crud_patient.get_patient(db, appointment.patient_id)
         if not patient:
             raise HTTPException(
@@ -287,15 +287,17 @@ async def send_appointment_reminder(
                 "message": "Пациент не зарегистрирован в Telegram боте",
             }
 
-        if not _telegram_notification_allowed(
-            telegram_user, "appointment_reminders"
-        ):
+        if not _telegram_notification_allowed(telegram_user, "appointment_reminders"):
             return _telegram_notifications_disabled_response()
 
         # Получаем сервис бота
         bot_service = await get_telegram_bot_service()
-        if not bot_service.active:
-            await bot_service.initialize(db)
+        # PR-2 (round 9): cross-process rotation/revocation visibility.
+        from app.api.v1.endpoints.telegram_webhook._helpers import (
+            _ensure_bot_service_fresh,
+        )
+
+        await _ensure_bot_service_fresh(db, bot_service)
 
         # Формируем данные для шаблона
         template_data = {
@@ -395,8 +397,12 @@ async def send_lab_results(
         )
 
         bot_service = await get_telegram_bot_service()
-        if not bot_service.active:
-            await bot_service.initialize(db)
+        # PR-2 (round 9): cross-process rotation/revocation visibility.
+        from app.api.v1.endpoints.telegram_webhook._helpers import (
+            _ensure_bot_service_fresh,
+        )
+
+        await _ensure_bot_service_fresh(db, bot_service)
 
         # Получаем сервис шаблонов
         templates_service = get_telegram_templates_service()
@@ -488,8 +494,12 @@ async def send_payment_confirmation(
 
         # Получаем сервис бота
         bot_service = await get_telegram_bot_service()
-        if not bot_service.active:
-            await bot_service.initialize(db)
+        # PR-2 (round 9): cross-process rotation/revocation visibility.
+        from app.api.v1.endpoints.telegram_webhook._helpers import (
+            _ensure_bot_service_fresh,
+        )
+
+        await _ensure_bot_service_fresh(db, bot_service)
 
         # Формируем данные для шаблона
         template_data = _safe_payment_template_data(payment_data.model_dump())
@@ -534,7 +544,8 @@ BROADCAST_MAX_RECIPIENTS = 1000
 
 @router.post("/broadcast-message", response_model=dict[str, Any])
 @limiter.limit("1/5minute")
-async def send_broadcast_message(request: Request,
+async def send_broadcast_message(
+    request: Request,
     message: str,
     target_groups: list[str] = Query(
         ..., description="Группы получателей: patients, doctors, admins"
@@ -576,8 +587,12 @@ async def send_broadcast_message(request: Request,
 
         # Получаем сервис бота
         bot_service = await get_telegram_bot_service()
-        if not bot_service.active:
-            await bot_service.initialize(db)
+        # PR-2 (round 9): cross-process rotation/revocation visibility.
+        from app.api.v1.endpoints.telegram_webhook._helpers import (
+            _ensure_bot_service_fresh,
+        )
+
+        await _ensure_bot_service_fresh(db, bot_service)
 
         # Отправляем сообщения
         sent_count = 0

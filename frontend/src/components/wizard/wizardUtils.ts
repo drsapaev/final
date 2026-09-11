@@ -946,6 +946,89 @@ export const getWizardDepartmentFilterKeys = (
   return (WIZARD_DEPARTMENT_FILTER_KEYS_FALLBACK as Record<string, string[]>)[normalized] || [normalized];
 };
 
+// =====================================================================
+// RQ-03 (F-02): tab filter for the wizard service catalog.
+// =====================================================================
+
+/**
+ * RQ-03 (F-02): filter description for the wizard service catalog on a
+ * registrar tab.
+ *
+ * `null` means "no restriction" — the «Все отделения» tab (null/''/'all')
+ * must NOT limit the catalog. Previously an empty tab key produced
+ * `['']`, which hid every service that has a department_key.
+ *
+ * When the tab matches a queue profile, the two real DTO axes are kept
+ * separate — profile `queue_tags` are compared against the service's
+ * `queue_tag`, and the profile's `department_key` against the service's
+ * `department_key`. Profile tags are NEVER compared with a service
+ * department key: that was the F-02 defect (an ECG service with
+ * department_key='cardiology' disappeared from the ecg tab because the
+ * tab tags ['ecg','echokg'] were matched against 'cardiology').
+ */
+export interface WizardServiceTabFilter {
+  /** queue_tag values (lowercased) a service's queue_tag may match. */
+  tags: string[];
+  /** department_key values (lowercased) a service's department_key may match. */
+  departmentKeys: string[];
+}
+
+const asLowercasedList = (values: unknown): string[] =>
+  (Array.isArray(values) ? values : [])
+    .map((t) => String(t ?? '').trim().toLowerCase())
+    .filter(Boolean);
+
+/**
+ * RQ-03 (F-02): resolve how the wizard service catalog is restricted on
+ * the given registrar tab.
+ *
+ * @param {unknown} value - tab key (queue profile key) or null for «Все отделения»
+ * @param {Array} [queueProfiles] - profiles from /queues/profiles ({key, queue_tags, department_key})
+ * @returns {WizardServiceTabFilter | null} null = show the full catalog
+ */
+export const getWizardServiceTabFilter = (
+  value: unknown,
+  queueProfiles: QueueProfileLike[] | null = null
+): WizardServiceTabFilter | null => {
+  const normalized = String(value || '').trim().toLowerCase();
+
+  // «Все отделения» / no tab selected: do not restrict the catalog (S-02).
+  if (!normalized || normalized === 'all') return null;
+
+  // Dynamic path — a matched profile carries both real axes
+  // (queue_tags + department_key); each is only ever compared with its
+  // own counterpart on the service (tag↔tag, department↔department).
+  if (queueProfiles && Array.isArray(queueProfiles) && queueProfiles.length > 0) {
+    const profile = queueProfiles.find(
+      (p) => String(p.key || '').trim().toLowerCase() === normalized
+    );
+    if (profile) {
+      const tags = asLowercasedList(profile.queue_tags);
+      const profileDepartment = String(profile.department_key ?? '').trim().toLowerCase();
+      if (tags.length > 0 || profileDepartment) {
+        return {
+          tags,
+          departmentKeys: profileDepartment ? [profileDepartment] : [],
+        };
+      }
+      // Profile exists but carries neither tags nor department_key:
+      // fall through to the legacy key-based behavior below.
+    }
+  }
+
+  // Unknown tab, or profile without tags/department_key, or the degraded
+  // mode when the profiles API failed: keep the legacy behavior — filter
+  // by the key itself (E-000: 'neurology' → its department services are
+  // expected). The hardcoded map stays as the degraded-mode fallback; its
+  // entries are compared with service department_key only, as before.
+  return {
+    tags: [],
+    departmentKeys:
+      (WIZARD_DEPARTMENT_FILTER_KEYS_FALLBACK as Record<string, string[]>)[normalized] ||
+      [normalized],
+  };
+};
+
 export const serviceCodeToWizardCategory = (value: unknown): 'laboratory' | 'procedures' | 'specialists' | null => {
   const prefix = String(value || '').trim().toUpperCase().charAt(0);
   if (prefix === 'L') return 'laboratory';
@@ -1089,6 +1172,15 @@ export const buildEditOriginalServiceIdentity = (
   const originalQuantities = identity.originalQuantities;
   const originalServiceCodes = identity.serviceCodes;
   const originalServiceNames = identity.serviceNames;
+  // Group-level updated_at is a presentation maximum across several entries.
+  // Only an ungrouped row explicitly identifying this entry can supply a fallback.
+  const ownRowVersion = (queueId: string | number) => {
+    if (Array.isArray(initialData.grouped_records)) return null;
+    const rowEntryId = initialData.original_queue_id ?? initialData.queue_entry_id;
+    return rowEntryId != null && String(rowEntryId) === String(queueId)
+      ? initialData.updated_at || initialData.last_changed_at
+      : null;
+  };
 
     // Определяем исходные услуги из initialData
     const serviceDetailOccurrences = new Map<string, number>();
@@ -1127,7 +1219,7 @@ export const buildEditOriginalServiceIdentity = (
         }
         // PR-14: collect updated_at for optimistic locking
         if (queueId) {
-          const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || initialData.updated_at || initialData.last_changed_at;
+          const ts = serviceDetail.updated_at || serviceDetail.last_changed_at || ownRowVersion(queueId);
           if (ts) entryUpdatedAtMap[queueId] = ts;
         }
         if (serviceCode) originalServiceCodes.add(String(serviceCode).toUpperCase().trim());
@@ -1231,7 +1323,7 @@ export const buildEditOriginalServiceIdentity = (
           if (queueId) originalQueueIds.add(queueId); // ✅ Сохраняем ID записи очереди
           // PR-14: collect updated_at for optimistic locking
           if (queueId) {
-            const ts = q.updated_at || q.last_changed_at || initialData.updated_at || initialData.last_changed_at;
+            const ts = q.updated_at || q.last_changed_at || ownRowVersion(queueId);
             if (ts) entryUpdatedAtMap[queueId] = ts;
           }
           // Находим service_code и name по service_id
@@ -1763,6 +1855,7 @@ export default {
   resolveInitialPatientId,
   WIZARD_DEPARTMENT_FILTER_KEYS,
   getWizardDepartmentFilterKeys,
+  getWizardServiceTabFilter,
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
   resolveInitialServiceCategory,

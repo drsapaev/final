@@ -199,9 +199,12 @@ export const hasBackendAction = (record: RegistrarRecordLike | null | undefined,
     normalizedAction.replace('-', '_'),
   ]);
   if (Array.isArray(record.grouped_records) && record.grouped_records.length > 0) {
-    return record.grouped_records.every((groupedRecord) =>
-      hasBackendAction(groupedRecord as RegistrarRecordLike, normalizedAction)
-    );
+    const exposesAction = (groupedRecord: RegistrarRecordLike) => hasBackendAction(groupedRecord, normalizedAction);
+    // The grouped payment command skips settled visits and receives money only
+    // against debt. Keep every record ref; the server validates the group/snapshot.
+    return normalizedAction.replace('-', '_') === 'mark_paid'
+      ? record.grouped_records.some(exposesAction)
+      : record.grouped_records.every(exposesAction);
   }
   if (Array.isArray(record.available_actions)) {
     return record.available_actions.some((availableAction) =>

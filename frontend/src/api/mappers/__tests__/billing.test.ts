@@ -51,6 +51,24 @@ describe('mapInvoiceDto', () => {
     const invoice = mapInvoiceDto(dto);
     expect((invoice as unknown as Record<string, unknown>).extra_field).toBe('value');
   });
+
+  it('preserves backend-owned settlement actions for a provider-neutral invoice', () => {
+    const invoice = mapInvoiceDto({
+      ...validDto,
+      provider: null,
+      remaining_amount: 32000,
+      available_actions: [
+        { action: 'start_online_payment', provider: 'click' },
+      ],
+      online_payment_block_reason: null,
+    });
+
+    expect(invoice.provider).toBeNull();
+    expect(invoice.remaining_amount).toBe(32000);
+    expect(invoice.available_actions).toEqual([
+      { action: 'start_online_payment', provider: 'click' },
+    ]);
+  });
 });
 
 describe('mapPaymentDto', () => {

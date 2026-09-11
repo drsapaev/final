@@ -1,5 +1,5 @@
 
-from typing import Any
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
@@ -13,23 +13,70 @@ from app.models.user import User
 from app.schemas import appointment as appointment_schemas
 from app.schemas import lab as lab_schemas
 from app.schemas import patient as patient_schemas
+from app.services.patient_access_audit import (
+    log_patient_access,
+    log_patient_access_many,
+)
 from app.services.patient_portal_service import (
     PatientPortalDomainError,
     PatientPortalService,
 )
-from app.services.patient_service import PatientService
+from app.services.patient_service import PatientReadAccessDenied, PatientService
 
 router = APIRouter()
 
 
-def _ensure_patient_self_access(current_user: User, patient_id: int) -> None:
-    if current_user.role != "Patient":
-        return
-    if not current_user.patient or current_user.patient.id != patient_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+def _audit_patient_read(
+    *,
+    request: Request,
+    current_user: User,
+    patient_id: int,
+    resource_type: str,
+    outcome: str = "success",
+    extra_data: dict[str, Any] | None = None,
+) -> None:
+    from app.db.session import SessionLocal
+
+    audit_db = SessionLocal()
+    try:
+        log_patient_access(
+            audit_db,
+            actor_user=current_user,
+            subject_patient_id=patient_id,
+            resource_type=resource_type,
+            resource_id=str(patient_id),
+            action="view",
+            outcome=outcome,
+            request=request,
+            extra_data=extra_data,
+        )
+    finally:
+        audit_db.close()
 
 
-@router.get("/appointments", response_model=list[appointment_schemas.Appointment])
+def _raise_patient_read_denied(
+    *,
+    request: Request,
+    current_user: User,
+    patient_id: int,
+    resource_type: str,
+    error: PatientReadAccessDenied,
+) -> NoReturn:
+    _audit_patient_read(
+        request=request,
+        current_user=current_user,
+        patient_id=patient_id,
+        resource_type=resource_type,
+        outcome="denied",
+        extra_data={"reason": error.reason},
+    )
+    raise HTTPException(status_code=403, detail="Access denied") from error
+
+
+@router.get(
+    "/appointments",
+    response_model=list[appointment_schemas.AppointmentHistoryItem],
+)
 def get_my_appointments(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_roles("Patient")),
@@ -40,8 +87,12 @@ def get_my_appointments(
     if not current_user.patient:
         return []
 
-    appointments = patient_crud.get_patient_appointments(db, patient_id=current_user.patient.id)
-    return appointments
+    service = PatientService(db)
+    patient, appointments = service.get_patient_appointment_history_for_read(
+        current_user=current_user,
+        patient_id=current_user.patient.id,
+    )
+    return appointments if patient is not None else []
 
 
 @router.get("/appointments/{appointment_id}", response_model=appointment_schemas.Appointment)
@@ -82,6 +133,7 @@ def get_my_results(
 
 @router.get("/", response_model=list[patient_schemas.Patient])
 def list_patients(
+    request: Request,
     db: Session = Depends(deps.get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -95,9 +147,31 @@ def list_patients(
     - q: общий поиск по всем полям (частичное совпадение)
     - phone: точный поиск по телефону (приоритет над q)
     """
-    patients = patient_crud.get_patients(
-        db, skip=skip, limit=limit, search_query=q, phone=phone
-    )
+    service = PatientService(db)
+    try:
+        patients = service.list_patients_for_read(
+            current_user=current_user,
+            skip=skip,
+            limit=limit,
+            search_query=q,
+            phone=phone,
+        )
+    except PatientReadAccessDenied as exc:
+        raise HTTPException(status_code=403, detail="Access denied") from exc
+    from app.db.session import SessionLocal
+
+    audit_db = SessionLocal()
+    try:
+        log_patient_access_many(
+            audit_db,
+            actor_user=current_user,
+            subject_patient_ids=[patient.id for patient in patients],
+            resource_type="patient",
+            action="view",
+            request=request,
+        )
+    finally:
+        audit_db.close()
     return patients
 
 
@@ -131,6 +205,7 @@ def get_deleted_patients(
 @router.get("/{patient_id}", response_model=patient_schemas.Patient)
 def get_patient(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     patient_id: int,
     current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Lab", "Cashier", "Patient")),
@@ -138,10 +213,28 @@ def get_patient(
     """
     Получить пациента по ID
     """
-    _ensure_patient_self_access(current_user, patient_id)
-    patient = patient_crud.get(db, id=patient_id)
+    service = PatientService(db)
+    try:
+        patient = service.get_patient_for_read(
+            current_user=current_user,
+            patient_id=patient_id,
+        )
+    except PatientReadAccessDenied as exc:
+        _raise_patient_read_denied(
+            request=request,
+            current_user=current_user,
+            patient_id=patient_id,
+            resource_type="patient",
+            error=exc,
+        )
     if not patient:
         raise HTTPException(status_code=404, detail=t("patient.not_found"))
+    _audit_patient_read(
+        request=request,
+        current_user=current_user,
+        patient_id=patient.id,
+        resource_type="patient",
+    )
     return patient
 
 
@@ -177,9 +270,13 @@ def delete_patient(
     )
 
 
-@router.get("/{patient_id}/appointments", response_model=dict[str, Any])
+@router.get(
+    "/{patient_id}/appointments",
+    response_model=list[appointment_schemas.AppointmentHistoryItem],
+)
 def get_patient_appointments(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     patient_id: int,
     current_user: User = Depends(deps.require_roles("Admin", "Registrar", *DOCTOR_FAMILY_GATE_ROLES, "Patient")),
@@ -187,12 +284,29 @@ def get_patient_appointments(
     """
     Получить все записи пациента
     """
-    _ensure_patient_self_access(current_user, patient_id)
-    patient = patient_crud.get(db, id=patient_id)
+    service = PatientService(db)
+    try:
+        patient, appointments = service.get_patient_appointment_history_for_read(
+            current_user=current_user,
+            patient_id=patient_id,
+        )
+    except PatientReadAccessDenied as exc:
+        _raise_patient_read_denied(
+            request=request,
+            current_user=current_user,
+            patient_id=patient_id,
+            resource_type="appointment_history",
+            error=exc,
+        )
     if not patient:
         raise HTTPException(status_code=404, detail=t("patient.not_found"))
-
-    appointments = patient_crud.get_patient_appointments(db, patient_id=patient_id)
+    _audit_patient_read(
+        request=request,
+        current_user=current_user,
+        patient_id=patient.id,
+        resource_type="appointment_history",
+        extra_data={"appointment_count": len(appointments)},
+    )
     return appointments
 
 

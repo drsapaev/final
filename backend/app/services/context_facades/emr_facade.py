@@ -19,6 +19,21 @@ class EmrServiceContractAdapter:
     def __init__(self, db: Session) -> None:
         self._db = db
 
+    def restore_operational_status_after_payment_change(
+        self,
+        visit_id: int,
+        *,
+        commit: bool = False,
+        request_id: str | None = None,
+    ) -> None:
+        _ = request_id
+        from app.services.visit_lifecycle_service import VisitLifecycleService
+
+        VisitLifecycleService(self._db).restore_operational_status_after_payment_change(
+            visit_id=visit_id,
+            commit=commit,
+        )
+
     def get_visit_clinical_snapshot(
         self,
         visit_id: int,
@@ -60,6 +75,34 @@ class EmrContextFacade:
 
     def __init__(self, contract: EmrContract) -> None:
         self._contract = EmrContractFacade(contract)
+
+    def restore_operational_status_after_payment_change(
+        self,
+        visit_id: int,
+        *,
+        commit: bool = False,
+        correlation_id: str | None = None,
+    ) -> None:
+        logger.info(
+            "emr_facade.restore_operational_status_after_payment_change "
+            "correlation_id=%s visit_id=%s",
+            correlation_id or "-",
+            visit_id,
+        )
+        try:
+            self._contract.restore_operational_status_after_payment_change(
+                visit_id=visit_id,
+                commit=commit,
+                request_id=correlation_id,
+            )
+        except Exception:
+            logger.exception(
+                "emr_facade.restore_operational_status_after_payment_change failed "
+                "correlation_id=%s visit_id=%s",
+                correlation_id or "-",
+                visit_id,
+            )
+            raise
 
     def get_visit_clinical_snapshot(
         self,

@@ -30,6 +30,26 @@ def get_visits_by_patient(
     return query.order_by(desc(Visit.created_at)).limit(limit).all()
 
 
+def patient_has_visit_with_doctors(
+    db: Session,
+    *,
+    patient_id: int,
+    doctor_ids: set[int],
+) -> bool:
+    """Return whether a patient has a visit assigned to an allowed doctor ID."""
+    if not doctor_ids:
+        return False
+    return (
+        db.query(Visit.id)
+        .filter(
+            Visit.patient_id == patient_id,
+            Visit.doctor_id.in_(doctor_ids),
+        )
+        .first()
+        is not None
+    )
+
+
 def get_visits_by_doctor(
     db: Session,
     doctor_id: int,

@@ -19,9 +19,17 @@ export const InvoiceDtoSchema = z.object({
   patient_name: z.string().optional(),
   amount: z.union([z.string(), z.number()]).optional(),
   paid_amount: z.union([z.string(), z.number()]).optional(),
+  remaining_amount: z.union([z.string(), z.number()]).optional(),
   discount_amount: z.union([z.string(), z.number()]).optional(),
   status: z.string().optional(),
   method: z.string().optional(),
+  payment_method: z.string().optional(),
+  provider: z.string().nullable().optional(),
+  available_actions: z.array(z.object({
+    action: z.literal('start_online_payment'),
+    provider: z.string().min(1),
+  })).optional(),
+  online_payment_block_reason: z.string().nullable().optional(),
   created_at: z.string().optional(),
   paid_at: z.string().optional(),
   // Pass-through for backend extras

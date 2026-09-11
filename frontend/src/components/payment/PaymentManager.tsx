@@ -1,29 +1,21 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
-import { CreditCard, DollarSign, Receipt, Clock, CheckCircle, X } from 'lucide-react';
+import { CreditCard, Receipt, Clock, CheckCircle, X } from 'lucide-react';
 import PaymentClick from './PaymentClick';
 import PaymentPayMe from './PaymentPayMe';
 // ADR-0015: use usePaymentsApi hook instead of importing api/payments directly.
 import { usePaymentsApi } from '../../hooks/usePaymentsApi';
-import type { Invoice } from '../../types/domain/billing';
+import type { Invoice, PaymentInvoiceAction } from '../../types/domain/billing';
 import logger from '../../utils/logger';
 import './PaymentManager.css';
-import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-
-interface PatientInfo {
-  fio?: string;
-  phone?: string;
-  [key: string]: unknown;
-}
 
 interface PaymentManagerProps {
   isOpen: boolean;
   onClose?: (result?: { success?: boolean; paymentData?: unknown }) => void;
   invoiceId?: string | number | null;
   initialAmount?: number | null;
-  patientInfo?: PatientInfo | null;
 }
 
 // UX Audit Stage 3 (Payment issue 8.1):
@@ -33,6 +25,41 @@ interface PaymentManagerProps {
 
 const getInvoiceId = (invoice: Invoice | null | undefined): string | number | null =>
   (invoice?.invoice_id as string | number | undefined) ?? invoice?.id ?? null;
+
+const getProviderLabel = (provider: string): string => {
+  const code = provider;
+  if (code.toLowerCase() === 'payme') return 'PayMe';
+  if (code.toLowerCase() === 'click') return 'Click';
+  if (code.toLowerCase() === 'kaspi') return 'Kaspi';
+  return provider;
+};
+
+const getInvoiceHostedProvider = (invoice: Invoice): string | null => {
+  const provider = invoice.provider?.trim();
+  if (provider) return provider;
+
+  const paymentMethod = invoice.payment_method?.trim().toLowerCase();
+  return paymentMethod && ['click', 'payme'].includes(paymentMethod)
+    ? paymentMethod
+    : null;
+};
+
+const getOnlinePaymentActions = (invoice: Invoice): PaymentInvoiceAction[] =>
+  (invoice.available_actions ?? []).filter((action) => {
+    const provider = action.provider.trim().toLowerCase();
+    return action.action === 'start_online_payment' && ['click', 'payme'].includes(provider);
+  });
+
+const ONLINE_PAYMENT_BLOCK_REASON_KEYS: Record<string, string> = {
+  invoice_not_pending: 'payment.pay_mgr_block_refresh',
+  invoice_settled: 'payment.pay_mgr_block_refresh',
+  invoice_not_linked: 'payment.pay_mgr_block_support',
+  invoice_allocation_mismatch: 'payment.pay_mgr_block_support',
+  invoice_amount_mismatch: 'payment.pay_mgr_block_support',
+  invoice_payment_in_progress: 'payment.pay_mgr_block_in_progress',
+  role_not_allowed: 'payment.pay_mgr_block_role',
+  partial_online_payment_not_supported: 'payment.pay_mgr_block_partial',
+};
 
 // UX Audit Stage 3 (Payment issue 8.2):
 // Локализация статусов счетов для русского UI.
@@ -56,20 +83,17 @@ const PaymentManager = ({
   isOpen,
   onClose,
   invoiceId = null,
-  initialAmount = null,
-  patientInfo = null
+  initialAmount = null
 }: PaymentManagerProps) => {
   const { t: rawT } = useTranslation(); const t = rawT;
+  const tRef = useRef(t);
+  tRef.current = t;
   // ADR-0015: payments API accessed via hook.
   const {
     getPendingInvoices,
-    createPaymentInvoice,
     formatUZS,
-    normalizePaymentAmount,
-    isValidPaymentAmount,
   } = usePaymentsApi();
   // Состояние компонента
-  const [selectedProvider, setSelectedProvider] = useState('click');
   const [paymentAmount, setPaymentAmount] = useState(initialAmount || 0);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
@@ -95,17 +119,37 @@ const PaymentManager = ({
       setInvoices(Array.isArray(data) ? data : []);
     } catch (error) {
       logger.error('Ошибка загрузки счетов:', error);
-      toast.error((error as { message?: string })?.message || t('payment.pay_mgr_error_loading'));
+      toast.error(
+        (error as { message?: string })?.message ||
+          tRef.current('payment.pay_mgr_error_loading')
+      );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getPendingInvoices]);
 
   useEffect(() => {
     if (isOpen) {
       void loadPendingInvoices();
     }
   }, [isOpen, loadPendingInvoices]);
+
+  const getProviderBlockReason = (invoice: Invoice): string => {
+    if (invoice.online_payment_block_reason === 'provider_unavailable') {
+      const boundProvider = getInvoiceHostedProvider(invoice);
+      if (!boundProvider) {
+        return t('payment.pay_mgr_no_providers');
+      }
+      return t('payment.pay_mgr_provider_unavailable', {
+        provider: getProviderLabel(boundProvider),
+      });
+    }
+
+    const messageKey = invoice.online_payment_block_reason
+      ? ONLINE_PAYMENT_BLOCK_REASON_KEYS[invoice.online_payment_block_reason]
+      : undefined;
+    return t(messageKey || 'payment.pay_mgr_block_unknown');
+  };
 
   // UX Audit Stage 3 (Payment issue 8.2):
   // ESC-close для модального окна.
@@ -126,58 +170,18 @@ const PaymentManager = ({
     };
   }, [isOpen, showClickPayment, showPayMePayment, onClose]);
 
-  // Создание нового счета для оплаты
-  // UX Audit Stage 3 (Payment issue 8.1 + 8.2):
-  // - Заменён raw fetch() на createPaymentInvoice() из api/payments.
-  // - Добавлена NaN-валидация через isValidPaymentAmount.
-  const handleCreateInvoice = async () => {
-    // UX Audit Stage 3 (Payment issue 8.2):
-    // Раньше было `if (!paymentAmount || paymentAmount <= 0)` — пропускало NaN.
-    // Теперь используем isValidPaymentAmount с проверкой Number.isFinite.
-    if (!isValidPaymentAmount(paymentAmount)) {
-      toast.error(t('payment.pay_mgr_invalid_amount'));
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const result = await createPaymentInvoice({
-        amount: paymentAmount,
-        currency: 'UZS',
-        provider: selectedProvider,
-        // UX Audit: защищаемся от patientInfo без fio (было «Оплата - undefined»)
-        description: patientInfo?.fio
-          ? t('payment.pay_mgr_description_with_patient', { patient: patientInfo.fio })
-          : t('payment.pay_mgr_description'),
-        patient_info: patientInfo,
-      });
-      setCreatedInvoiceId(result.invoice_id as string | number);
-
-      // Открываем соответствующий диалог оплаты
-      if (selectedProvider === 'click') {
-        setShowClickPayment(true);
-      } else if (selectedProvider === 'payme') {
-        setShowPayMePayment(true);
-      }
-
-      toast.success(t('payment.pay_mgr_invoice_created'));
-    } catch (error) {
-      logger.error('Ошибка создания счета:', error);
-      toast.error(t('payment.pay_mgr_invoice_create_error', { error: (error as { message?: string })?.message || t('payment.unknown_error') }));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Инициация оплаты существующего счета
-  const payExistingInvoice = (invoice: Invoice) => {
+  const payExistingInvoice = (invoice: Invoice, action: PaymentInvoiceAction) => {
+    const providerCode = action.provider.trim().toLowerCase();
     setCreatedInvoiceId(getInvoiceId(invoice));
-    setPaymentAmount(invoice.amount ?? 0);
+    setPaymentAmount(invoice.remaining_amount ?? invoice.amount ?? 0);
 
-    if ((invoice.provider as string) === 'click') {
+    if (providerCode === 'click') {
       setShowClickPayment(true);
-    } else if ((invoice.provider as string) === 'payme') {
+    } else if (providerCode === 'payme') {
       setShowPayMePayment(true);
+    } else {
+      toast.error(getProviderBlockReason(invoice));
     }
   };
 
@@ -216,13 +220,6 @@ const PaymentManager = ({
     }
   };
 
-  // UX Audit Stage 3 (Payment issue 8.2):
-  // Нормализация ввода суммы через normalizePaymentAmount.
-  // Раньше было `Number(e.target.value)` — давало NaN при пустом/нечисловом вводе.
-  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setPaymentAmount(normalizePaymentAmount(event.target.value));
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -254,84 +251,7 @@ const PaymentManager = ({
             </button>
           </div>
 
-          <div className="payment-manager-content">
-            {/* Создание новой оплаты */}
-            <div className="payment-section">
-              <h3>
-                <DollarSign size={20} aria-hidden="true" />
-                {t('payment.pay_mgr_new_payment')}
-              </h3>
-
-              <div className="payment-form">
-                <div className="form-row">
-                  <label htmlFor="payment-manager-amount">{t('payment.pay_mgr_amount_label')}</label>
-                  <Input
-                    id="payment-manager-amount"
-                    type="number"
-                    aria-label={t('payment.pay_mgr_amount_aria')}
-                    value={paymentAmount || ''}
-                    onChange={handleAmountChange}
-                    placeholder={t('payment.pay_mgr_amount_placeholder')}
-                    min="1"
-                  />
-                </div>
-
-                <div className="form-row">
-                  <label>{t('payment.pay_mgr_provider_label')}</label>
-                  <div className="provider-options">
-                    <label className="radio-option">
-                      <input
-                        type="radio"
-                        name="provider"
-                        value="click"
-                        aria-label={t('payment.pay_mgr_provider_click_aria')}
-                        checked={selectedProvider === 'click'}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSelectedProvider(e.target.value)}
-                      />
-                      <span>Click</span>
-                    </label>
-
-                    <label className="radio-option">
-                      <input
-                        type="radio"
-                        name="provider"
-                        value="payme"
-                        aria-label={t('payment.pay_mgr_provider_payme_aria')}
-                        checked={selectedProvider === 'payme'}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSelectedProvider(e.target.value)}
-                      />
-                      <span>PayMe</span>
-                    </label>
-                  </div>
-                </div>
-
-                {patientInfo && (
-                  <div className="patient-info">
-                    {/* UX Audit Stage 3: semantic <dl> вместо <p><strong> */}
-                    <dl>
-                      <dt>{t('payment.pay_mgr_patient')}</dt>
-                      <dd>{patientInfo.fio || '—'}</dd>
-                      {patientInfo.phone && (
-                        <>
-                          <dt>{t('payment.pay_mgr_phone')}</dt>
-                          <dd>{patientInfo.phone}</dd>
-                        </>
-                      )}
-                    </dl>
-                  </div>
-                )}
-
-                <button
-                  className="create-payment-btn"
-                  onClick={handleCreateInvoice}
-                  disabled={loading || !isValidPaymentAmount(paymentAmount)}
-                  type="button"
-                >
-                  {loading ? t('payment.pay_mgr_creating') : t('payment.pay_mgr_create_btn')}
-                </button>
-              </div>
-            </div>
-
+          <div className="payment-manager-content payment-manager-content--settlement-only">
             {/* Список неоплаченных счетов */}
             <div className="invoices-section">
               <h3>
@@ -351,39 +271,69 @@ const PaymentManager = ({
                 </div>
               ) : (
                 <div className="invoices-list">
-                  {invoices.map((invoice) => (
-                    <div key={getInvoiceId(invoice)} className="invoice-item">
-                      <div className="invoice-info">
-                        {/* UX Audit Stage 3 (Payment issue 8.2):
-                            Заменён toLocaleString() без локали на formatUZS() с ru-RU. */}
-                        <div className="invoice-amount">
-                          {formatUZS(invoice.amount ?? 0)}
-                        </div>
-                        <div className="invoice-details">
-                          <span className="invoice-id">№{String(getInvoiceId(invoice) ?? '')}</span>
-                          <span className="invoice-provider">{String(invoice.provider ?? '')}</span>
-                          {/* UX Audit Stage 3: локализация статуса */}
-                          <span className="invoice-status">
-                            {String(getInvoiceStatusLabel(invoice.status as string | undefined, t))}
-                          </span>
-                        </div>
-                        {Boolean(invoice.description) && (
-                          <div className="invoice-description">
-                            {String(invoice.description)}
-                          </div>
-                        )}
-                      </div>
+                  {invoices.map((invoice) => {
+                    const invoiceIdValue = getInvoiceId(invoice);
+                    const paymentActions = getOnlinePaymentActions(invoice);
+                    const providerLabels = paymentActions
+                      .map((action) => getProviderLabel(action.provider))
+                      .join(', ');
 
-                      <button
-                        className="pay-invoice-btn"
-                        onClick={() => payExistingInvoice(invoice)}
-                        disabled={loading}
-                        type="button"
-                      >
-                        {t('payment.pay_mgr_pay_btn')}
-                      </button>
-                    </div>
-                  ))}
+                    return (
+                      <div key={invoiceIdValue} className="invoice-item">
+                        <div className="invoice-info">
+                          {/* UX Audit Stage 3 (Payment issue 8.2):
+                              Заменён toLocaleString() без локали на formatUZS() с ru-RU. */}
+                          <div className="invoice-amount">
+                            {formatUZS(invoice.remaining_amount ?? invoice.amount ?? 0)}
+                          </div>
+                          <div className="invoice-details">
+                            <span className="invoice-id">№{String(invoiceIdValue ?? '')}</span>
+                            <span className="invoice-provider">
+                              {String(invoice.provider || providerLabels)}
+                            </span>
+                            {/* UX Audit Stage 3: локализация статуса */}
+                            <span className="invoice-status">
+                              {String(getInvoiceStatusLabel(invoice.status as string | undefined, t))}
+                            </span>
+                          </div>
+                          {Boolean(invoice.description) && (
+                            <div className="invoice-description">
+                              {String(invoice.description)}
+                            </div>
+                          )}
+                          {paymentActions.length === 0 && (
+                            <div className="invoice-provider-warning">
+                              {getProviderBlockReason(invoice)}
+                            </div>
+                          )}
+                        </div>
+
+                        {paymentActions.length === 0 ? (
+                          <button
+                            className="pay-invoice-btn"
+                            disabled
+                            aria-label={getProviderBlockReason(invoice)}
+                            type="button"
+                          >
+                            {t('payment.pay_mgr_pay_btn')}
+                          </button>
+                        ) : paymentActions.map((action) => (
+                          <button
+                            key={`${action.action}:${action.provider}`}
+                            className="pay-invoice-btn"
+                            onClick={() => payExistingInvoice(invoice, action)}
+                            disabled={loading}
+                            aria-label={t('payment.pay_mgr_provider_aria', {
+                              provider: getProviderLabel(action.provider),
+                            })}
+                            type="button"
+                          >
+                            {t('payment.pay_mgr_pay_btn')} · {getProviderLabel(action.provider)}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

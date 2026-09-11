@@ -199,8 +199,9 @@ class EditDeltaResponse(BaseModel):
 
 class MarkPaidRequest(BaseModel):
     # REG-AUDIT-28 P0-2: validate amount is positive and reasonable
-    amount: Decimal | None = Field(None, gt=0, le=Decimal("1000000000"))
+    amount: Decimal | None = Field(None, gt=0, le=Decimal("1000000000"), decimal_places=2)
     method: str | None = Field(default="cash")
+    payment_snapshot: str | None = Field(default=None, max_length=64)
 
 
 class RegistrarRecordRef(BaseModel):
@@ -215,8 +216,32 @@ class RegistrarRecordActionRequest(BaseModel):
     records: list[RegistrarRecordRef] | None = None
     reason: str | None = None
     # REG-AUDIT-28 P0-2: validate amount is positive and reasonable
-    amount: Decimal | None = Field(None, gt=0, le=Decimal("1000000000"))
+    amount: Decimal | None = Field(None, gt=0, le=Decimal("1000000000"), decimal_places=2)
     method: str | None = Field(default="cash")
+    payment_snapshot: str | None = Field(default=None, max_length=64)
+
+
+class RegistrarPaymentSummaryRequest(BaseModel):
+    records: list[RegistrarRecordRef] = Field(min_length=1, max_length=100)
+
+
+class RegistrarVisitPaymentSummary(BaseModel):
+    visit_id: int
+    total_amount: Decimal
+    paid_amount: Decimal
+    remaining_amount: Decimal
+    payment_status: str
+    payment_type: str | None = None
+
+
+class RegistrarPaymentSummary(BaseModel):
+    total_amount: Decimal
+    paid_amount: Decimal
+    remaining_amount: Decimal
+    payment_status: str
+    can_pay: bool
+    snapshot: str
+    visits: list[RegistrarVisitPaymentSummary]
 
 
 class RegistrarRecordActionItemResponse(BaseModel):
@@ -237,6 +262,7 @@ class RegistrarRecordActionResponse(BaseModel):
     skipped_count: int
     failed_count: int
     results: list[RegistrarRecordActionItemResponse]
+    payment_summary: RegistrarPaymentSummary | None = None
 
 
 class RepeatEligibilityCandidate(BaseModel):
@@ -499,32 +525,14 @@ def _resolve_payment_truth(
     legacy_paid_at: datetime | None = None,
 ) -> tuple[str, str | None]:
     if visit_id:
-        try:
-            from app.models.payment import Payment
+        from app.models.payment import Payment
+        from app.models.visit import Visit
+        from app.services.payment_invariant_service import PaymentInvariantService
 
-            payment_row = (
-                db.query(Payment)
-                .filter(Payment.visit_id == visit_id)
-                .order_by(Payment.created_at.desc())
-                .first()
-            )
-            if payment_row:
-                payment_status = (
-                    "paid"
-                    if (
-                        str(getattr(payment_row, "status", "") or "").lower() == "paid"
-                        or getattr(payment_row, "paid_at", None)
-                    )
-                    else "pending"
-                )
-                return payment_status, getattr(payment_row, "method", None) or None
-        except Exception:
-            logger.debug(
-                "registrar_wizard: failed to resolve payment truth for visit %s",
-                visit_id,
-                exc_info=True,
-            )
-
+        visit = db.get(Visit, visit_id)
+        if visit and db.query(Payment.id).filter(Payment.visit_id == visit_id).first():
+            row = PaymentInvariantService(db).summarize_visits([visit])["visits"][0]
+            return row["payment_status"], row["payment_type"]
     return ("paid", None) if legacy_paid_at else ("pending", None)
 
 
@@ -747,7 +755,7 @@ def _create_queue_entries(
 
 class InvoicePaymentRequest(BaseModel):
     invoice_id: int
-    provider: str = Field(default="click")  # click|payme
+    provider: str = Field(default="click")  # click
     return_url: str | None = None
     cancel_url: str | None = None
 
@@ -757,7 +765,4 @@ class InvoicePaymentResponse(BaseModel):
     payment_url: str | None = None
     provider_payment_id: str | None = None
     error_message: str | None = None
-
-
-SUPPORTED_INVOICE_PAYMENT_PROVIDERS = {"click", "payme"}
 

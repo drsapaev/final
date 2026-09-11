@@ -235,8 +235,7 @@ import {
   wizardContentSignature,
   getWizardDepartmentForService,
   resolveInitialPatientId,
-  WIZARD_DEPARTMENT_FILTER_KEYS,
-  getWizardDepartmentFilterKeys,
+  getWizardServiceTabFilter,
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
@@ -937,14 +936,24 @@ const AppointmentWizardV2 = ({
           });
         }
 
-        // ✅ ФИЛЬТРАЦИЯ ПО ОТДЕЛЕНИЮ: Если activeTab указан, показываем услуги этого отделения
-        // PR-25: use dynamic queueProfiles instead of hardcoded map
-        const departmentFilterKeys = editMode ? [] : getWizardDepartmentFilterKeys(activeTab, profiles);
-        if (departmentFilterKeys.length > 0) {
-          const departmentFilterSet = new Set(departmentFilterKeys);
+        // ✅ ФИЛЬТРАЦИЯ ПО ВКЛАДКЕ: RQ-03 (F-02) — «Все отделения»/null НЕ
+        // ограничивает каталог; теги профиля сравниваются с queue_tag услуги,
+        // department_key профиля — с department_key услуги (тег ≠ отделение:
+        // ecg-услуга с department_key='cardiology' больше не пропадает с
+        // вкладки ЭКГ). Неклассифицированные услуги (без отдела и тега)
+        // видимы на любой вкладке — прежнее поведение строк без department_key.
+        // PR-25: dynamic queueProfiles; RQ-03: getWizardServiceTabFilter.
+        const serviceTabFilter = editMode ? null : getWizardServiceTabFilter(activeTab, profiles);
+        if (serviceTabFilter) {
+          const serviceTagSet = new Set(serviceTabFilter.tags);
+          const serviceDepartmentSet = new Set(serviceTabFilter.departmentKeys);
           allServices = allServices.filter((service) => {
             const departmentKey = String(service.department_key || service.departmentKey || '').trim().toLowerCase();
-            return !departmentKey || departmentFilterSet.has(departmentKey);
+            const queueTag = String(service.queue_tag || service.queueTag || '').trim().toLowerCase();
+            if (!departmentKey && !queueTag) return true;
+            if (queueTag && serviceTagSet.has(queueTag)) return true;
+            if (departmentKey && serviceDepartmentSet.has(departmentKey)) return true;
+            return false;
           });
         }
 

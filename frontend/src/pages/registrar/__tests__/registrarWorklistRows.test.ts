@@ -129,7 +129,7 @@ describe('computeRegistrarWorklistRows (PR-UI-13-2)', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('search matches FIO (case-insensitive), record id, and phone digits; digit-free queries match all rows (pre-existing quirk)', () => {
+  it('search matches FIO (case-insensitive), record id, and phone digits; letter-only query filters via remaining branches (RQ-02)', () => {
     const base = {
       appointments: asAppointments([
         appt({ id: '10', queue_tag: 'cardiology', queue_time: '2026-08-29T08:00:00+05:00', patient_fio: 'Иванов Иван' }),
@@ -142,17 +142,26 @@ describe('computeRegistrarWorklistRows (PR-UI-13-2)', () => {
       services: {},
       fallbackPatientLabel: FALLBACK,
     };
+    // Empty query returns the original set (search branch skipped).
+    const noQuery = computeRegistrarWorklistRows({ ...base });
+    expect(noQuery.map((r) => r.id)).toEqual(['10', '20']);
     // Digit-bearing queries filter properly.
     const byId = computeRegistrarWorklistRows({ ...base, searchQuery: '20' });
     expect(byId.map((r) => r.id)).toEqual(['20']);
     const byPhoneDigits = computeRegistrarWorklistRows({ ...base, searchQuery: '90123' });
     expect(byPhoneDigits.map((r) => r.id)).toEqual(['20']);
-    // PRE-EXISTING QUIRK (verbatim port, documented in PR-UI-13-2): a query
-    // without digits yields searchDigits='' and phoneDigits.includes('') === true,
-    // so inPhone passes for EVERY row — FIO search on the tab path is effectively
-    // non-filtering. Pinned as-is; fixing it is a follow-up (behavior change).
-    const byAlpha = computeRegistrarWorklistRows({ ...base, searchQuery: 'иван' });
-    expect(byAlpha.map((r) => r.id)).toEqual(['10', '20']);
+    // Formatted phone still matches (digits present in the query).
+    const byFormattedPhone = computeRegistrarWorklistRows({ ...base, searchQuery: '+998 90 123-45-67' });
+    expect(byFormattedPhone.map((r) => r.id)).toEqual(['20']);
+    // RQ-02 regression: a letter-only query used to yield searchDigits='' and
+    // phoneDigits.includes('') === true, so inPhone passed for EVERY row and
+    // letter search never filtered (F-01). The phone branch now participates
+    // only when the query has digits; Cyrillic FIO match survives.
+    const byCyrillic = computeRegistrarWorklistRows({ ...base, searchQuery: 'иван' });
+    expect(byCyrillic.map((r) => r.id)).toEqual(['10']);
+    // Latin letters match nothing (no FIO/id/phone match) instead of every row.
+    const byLatin = computeRegistrarWorklistRows({ ...base, searchQuery: 'ivan' });
+    expect(byLatin).toHaveLength(0);
   });
 
   it('rows without patient_fio get the localized fallback label + normalized queue_numbers shape', () => {
@@ -213,7 +222,7 @@ describe('computeRegistrarWorklistRows (PR-UI-13-2)', () => {
     expect(fios.every((f) => typeof f === 'string')).toBe(true);
   });
 
-  it('all-departments tab: digit-bearing search filters aggregated rows by phone digits; digit-free search is non-filtering (pre-existing quirk)', () => {
+  it('all-departments tab: digit-bearing search filters aggregated rows by phone digits; letter-only search filters by FIO (RQ-02)', () => {
     const base = {
       appointments: asAppointments([
         appt({ id: '1', queue_tag: 'cardiology', queue_time: '2026-08-29T08:00:00+05:00', patient_fio: 'Иванов Иван', patient_id: 100, services: ['K01'], patient_phone: '+998901111111' }),
@@ -226,14 +235,22 @@ describe('computeRegistrarWorklistRows (PR-UI-13-2)', () => {
       services: {},
       fallbackPatientLabel: FALLBACK,
     };
+    // Empty query returns the original aggregated set (search branch skipped).
+    const noQuery = computeRegistrarWorklistRows({ ...base });
+    expect(noQuery.length).toBe(2);
     // Phone-digit query filters aggregated rows.
     const byPhone = computeRegistrarWorklistRows({ ...base, searchQuery: '90222' });
     const phoneFios = byPhone.map((r) => String(r.patient_fio || ''));
     expect(phoneFios.some((f) => f.includes('Петров'))).toBe(true);
     expect(phoneFios.some((f) => f.includes('Иванов'))).toBe(false);
-    // Digit-free query matches all (same pre-existing quirk as the tab path).
+    // Formatted phone query matches the same single patient.
+    const byFormatted = computeRegistrarWorklistRows({ ...base, searchQuery: '+998902222222' });
+    expect(byFormatted.length).toBe(1);
+    // RQ-02 regression: a letter-only query used to pass the phone branch for
+    // every aggregated row; now only the FIO match survives.
     const byAlpha = computeRegistrarWorklistRows({ ...base, searchQuery: 'петров' });
-    expect(byAlpha.length).toBeGreaterThanOrEqual(1);
+    expect(byAlpha.length).toBe(1);
+    expect(String(byAlpha[0].patient_fio || '')).toContain('Петров');
   });
 
   it('explicit status filter on all-departments path filters before aggregation', () => {

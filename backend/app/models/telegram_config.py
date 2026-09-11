@@ -38,30 +38,56 @@ class TelegramConfig(Base):
     __tablename__ = "telegram_configs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    bot_token: Mapped[str | None] = mapped_column(String(500), nullable=True)  # TG-AUDIT-28 P1: encrypted (Fernet)
-    webhook_url: Mapped[str | None] = mapped_column(String(300), nullable=True)  # URL вебхука
-    webhook_secret: Mapped[str | None] = mapped_column(String(100), nullable=True)  # Секрет для верификации
+    bot_token: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )  # TG-AUDIT-28 P1: encrypted (Fernet)
+    webhook_url: Mapped[str | None] = mapped_column(
+        String(300), nullable=True
+    )  # URL вебхука
+    webhook_secret: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # Секрет для верификации
 
     # Настройки бота
     bot_username: Mapped[str | None] = mapped_column(String(100), nullable=True)
     bot_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
 
     # Чаты администраторов
-    admin_chat_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)  # [123456, 789012]
+    admin_chat_ids: Mapped[list[int] | None] = mapped_column(
+        JSON, nullable=True
+    )  # [123456, 789012]
 
     # Настройки уведомлений
-    notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    appointment_reminders: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    lab_results_notifications: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    payment_notifications: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notifications_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+    appointment_reminders: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+    lab_results_notifications: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+    payment_notifications: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
 
     # Языки
-    default_language: Mapped[str] = mapped_column(String(5), default="ru", nullable=False)
+    default_language: Mapped[str] = mapped_column(
+        String(5), default="ru", nullable=False
+    )
     supported_languages: Mapped[list[str]] = mapped_column(
         JSON, default=["ru", "uz", "en"], nullable=False
     )
 
     active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # PR-2 round 4: DB-level singleton invariant. The app has always treated
+    # telegram_configs as a single row (get_telegram_config -> .first()); the
+    # unique constraint turns a concurrent first-store race into an
+    # IntegrityError the token store resolves by updating the winner instead
+    # of leaving two credential rows behind (migration 0061).
+    singleton_guard: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, unique=True
+    )
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -69,38 +95,23 @@ class TelegramConfig(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-
-
-
     @property
     def decrypted_bot_token(self) -> str | None:
-        """TG-AUDIT-28 P1: decrypt bot_token on read."""
+        """TG-AUDIT-28 P1 / PR-2: decrypt bot_token on read (fail-closed)."""
         if not self.bot_token:
             return None
-        from app.core.config import settings
-        if not settings.ENCRYPTION_KEY:
-            return self.bot_token  # plaintext fallback (dev/test)
-        try:
-            if self.bot_token.startswith("gAAAAA"):
-                from cryptography.fernet import Fernet
-                cipher = Fernet(settings.ENCRYPTION_KEY.encode())
-                return cipher.decrypt(self.bot_token.encode()).decode()
-            return self.bot_token  # not encrypted yet (migration period)
-        except Exception:
-            return self.bot_token
+        from app.services.telegram_token_store import decrypt_token
+
+        # Fail-closed: Fernet-shaped values decrypt to None on a missing/wrong
+        # key (never the ciphertext); plaintext rows pass through unchanged
+        # (migration period).
+        return decrypt_token(self.bot_token)
 
     def set_bot_token(self, value: str | None) -> None:
-        """TG-AUDIT-28 P1: encrypt bot_token on write."""
-        if not value:
-            self.bot_token = None
-            return
-        from app.core.config import settings
-        if not settings.ENCRYPTION_KEY:
-            self.bot_token = value  # plaintext fallback (dev/test)
-            return
-        from cryptography.fernet import Fernet
-        cipher = Fernet(settings.ENCRYPTION_KEY.encode())
-        self.bot_token = cipher.encrypt(value.encode()).decode()
+        """TG-AUDIT-28 P1 / PR-2: encrypt bot_token on write."""
+        from app.services.telegram_token_store import encrypt_token
+
+        self.bot_token = encrypt_token(value)
 
 
 class TelegramTemplate(Base):
@@ -118,14 +129,20 @@ class TelegramTemplate(Base):
     language: Mapped[str] = mapped_column(String(5), default="ru", nullable=False)
 
     # Контент шаблона
-    subject: Mapped[str | None] = mapped_column(String(200), nullable=True)  # Заголовок (если нужен)
-    message_text: Mapped[str] = mapped_column(Text, nullable=False)  # Jinja2 шаблон сообщения
+    subject: Mapped[str | None] = mapped_column(
+        String(200), nullable=True
+    )  # Заголовок (если нужен)
+    message_text: Mapped[str] = mapped_column(
+        Text, nullable=False
+    )  # Jinja2 шаблон сообщения
 
     # Настройки отправки
     parse_mode: Mapped[str] = mapped_column(
         String(20), default="HTML", nullable=False
     )  # HTML, Markdown, None
-    disable_web_page_preview: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    disable_web_page_preview: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
 
     # Кнопки (inline keyboard)
     inline_buttons: Mapped[list[dict[str, Any]] | None] = mapped_column(
@@ -148,32 +165,40 @@ class TelegramUser(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     patient_id: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("patients.id", ondelete="SET NULL"),
-        nullable=True
+        Integer, ForeignKey("patients.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve Telegram link
     user_id: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve Telegram link
 
     # Telegram данные
-    chat_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False, index=True)
+    chat_id: Mapped[int] = mapped_column(
+        BigInteger, unique=True, nullable=False, index=True
+    )
     username: Mapped[str | None] = mapped_column(String(100), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     language_code: Mapped[str] = mapped_column(String(16), default="ru", nullable=False)
 
     # Настройки уведомлений
-    notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    appointment_reminders: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    lab_notifications: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notifications_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+    appointment_reminders: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
+    lab_notifications: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
 
     # Статус
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # Заблокировал бота
-    last_activity: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    blocked: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )  # Заблокировал бота
+    last_activity: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -307,12 +332,8 @@ class TelegramStaffConfirmationToken(Base):
     command_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     action_payload_hash: Mapped[str] = mapped_column(String(96), nullable=False)
     target_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    target_reference_hash: Mapped[str | None] = mapped_column(
-        String(96), nullable=True
-    )
-    idempotency_key_hash: Mapped[str | None] = mapped_column(
-        String(96), nullable=True
-    )
+    target_reference_hash: Mapped[str | None] = mapped_column(String(96), nullable=True)
+    idempotency_key_hash: Mapped[str | None] = mapped_column(String(96), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -468,9 +489,7 @@ class PatientOnboardingRequest(Base):
     status: Mapped[str] = mapped_column(
         String(32), default="pending_review", nullable=False
     )
-    language_code: Mapped[str] = mapped_column(
-        String(16), default="ru", nullable=False
-    )
+    language_code: Mapped[str] = mapped_column(String(16), default="ru", nullable=False)
     contact_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     contact_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     desired_service: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -528,7 +547,9 @@ class TelegramMessage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
-    message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # ID сообщения в Telegram
+    message_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # ID сообщения в Telegram
 
     # Тип и контент
     message_type: Mapped[str] = mapped_column(
@@ -545,9 +566,7 @@ class TelegramMessage(Base):
 
     # Метаданные
     sent_by_user_id: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )  # ✅ SECURITY: SET NULL to preserve message log
     related_entity_type: Mapped[str | None] = mapped_column(
         String(50), nullable=True
@@ -557,7 +576,9 @@ class TelegramMessage(Base):
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Relationships
     sent_by: Mapped[User | None] = relationship("User", foreign_keys=[sent_by_user_id])

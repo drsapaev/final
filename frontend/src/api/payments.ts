@@ -23,8 +23,17 @@ function createWrappedError(message: string, extras: { status?: number; detail?:
 
 import { api } from './client';
 import logger from '../utils/logger';
+import type { PaymentInvoiceCreateDto } from '../types/api';
 import type { Invoice } from '../types/domain/billing';
 import { mapInvoiceDtos, mapInvoiceDto } from './mappers';
+
+export interface PaymentProviderInfoDto {
+  name: string;
+  code: string;
+  supported_currencies: string[];
+  is_active: boolean;
+  features: Record<string, boolean>;
+}
 
 // =====================================================================
 // INVOICES API
@@ -52,7 +61,7 @@ export async function getPendingInvoices(): Promise<Invoice[]> {
  * @param invoiceData - { amount, currency, provider, description, patient_info }
  * @returns {Promise<Invoice>} Created invoice (домен)
  */
-export async function createPaymentInvoice(invoiceData: Record<string, unknown>): Promise<Invoice> {
+export async function createPaymentInvoice(invoiceData: PaymentInvoiceCreateDto): Promise<Invoice> {
   try {
     const response = await api.post('/payments/invoice/create', invoiceData);
     return mapInvoiceDto(response.data as Record<string, unknown>);
@@ -62,6 +71,26 @@ export async function createPaymentInvoice(invoiceData: Record<string, unknown>)
       detail: (error as HttpApiError)?.response?.data?.detail,
     });
     throw createWrappedError(String((error as HttpApiError)?.response?.data?.detail || 'Ошибка создания счёта'), { status: (error as HttpApiError)?.response?.status as number | undefined, response: (error as HttpApiError)?.response });
+  }
+}
+
+/** Return configured providers and backend-owned operation capabilities. */
+export async function getPaymentProviders(): Promise<PaymentProviderInfoDto[]> {
+  try {
+    const response = await api.get('/payments/providers');
+    return Array.isArray(response.data?.providers) ? response.data.providers : [];
+  } catch (error) {
+    logger.error('[payments API] getPaymentProviders failed', {
+      status: (error as HttpApiError)?.response?.status,
+      detail: (error as HttpApiError)?.response?.data?.detail,
+    });
+    throw createWrappedError(
+      String((error as HttpApiError)?.response?.data?.detail || 'Ошибка загрузки платёжных провайдеров'),
+      {
+        status: (error as HttpApiError)?.response?.status as number | undefined,
+        response: (error as HttpApiError)?.response,
+      }
+    );
   }
 }
 
@@ -118,6 +147,7 @@ export function isValidPaymentAmount(amount: unknown): boolean {
 const paymentsAPI = {
   getPendingInvoices,
   createPaymentInvoice,
+  getPaymentProviders,
   formatUZS,
   normalizePaymentAmount,
   isValidPaymentAmount,

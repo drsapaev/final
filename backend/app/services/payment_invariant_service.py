@@ -85,6 +85,8 @@ only exact amounts are accepted).
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -92,9 +94,10 @@ from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.payment import Payment
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.visit import Visit
 
 logger = logging.getLogger(__name__)
@@ -132,6 +135,7 @@ class PaymentInvariantService:
             self.db.query(Visit)
             .filter(Visit.id == visit_id)
             .with_for_update()
+            .populate_existing()
             .first()
         )
         if not visit:
@@ -140,6 +144,55 @@ class PaymentInvariantService:
                 detail=f"Visit {visit_id} not found",
             )
         return visit
+
+    def lock_visit_for_payment_change(self, visit_id: int) -> Visit:
+        """Acquire the canonical visit lock before mutating its payment ledger."""
+        visit = self._load_visit_for_update(visit_id)
+        self.assert_no_processing_invoice_reservation([visit_id])
+        return visit
+
+    def assert_no_processing_invoice_reservation(
+        self,
+        visit_ids: list[int],
+        *,
+        exclude_invoice_id: int | None = None,
+    ) -> None:
+        """Reject ledger changes reserved by an in-flight invoice checkout.
+
+        Callers must lock the visits first. The additional invoice lock follows
+        the shared visit -> invoice order used by cashier and registrar payment
+        commands, so provider settlement and counter payments cannot cross.
+        """
+        query = (
+            self.db.query(PaymentInvoice)
+            .join(
+                PaymentInvoiceVisit,
+                PaymentInvoiceVisit.invoice_id == PaymentInvoice.id,
+            )
+            .filter(
+                PaymentInvoiceVisit.visit_id.in_(set(visit_ids)),
+                PaymentInvoiceVisit.visit_amount > 0,
+                PaymentInvoice.status == "processing",
+            )
+        )
+        if exclude_invoice_id is not None:
+            query = query.filter(PaymentInvoice.id != exclude_invoice_id)
+        reservation = (
+            query.order_by(PaymentInvoice.id)
+            .with_for_update(of=PaymentInvoice)
+            .first()
+        )
+        if reservation is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "reason": "invoice_payment_in_progress",
+                    "message": (
+                        "По визиту уже обрабатывается онлайн-оплата. "
+                        "Обновите данные платежа перед изменением расчёта."
+                    ),
+                },
+            )
 
     # ─── Calculations (single source of truth — remove duplication) ───
 
@@ -180,8 +233,8 @@ class PaymentInvariantService:
     def compute_paid_amount(self, visit_id: int) -> Decimal:
         """Compute the total paid amount for a visit.
 
-        Sums all ``paid`` and ``completed`` payments. This is the
-        canonical implementation — replaces the duplicated
+        Sums the unrefunded portion of all ``paid`` and ``completed``
+        payments. This is the canonical implementation — replaces the duplicated
         ``_cashier_paid_amounts_by_visit_id`` in ``cashier/_helpers.py``.
         """
         payments = (
@@ -190,12 +243,191 @@ class PaymentInvariantService:
                 Payment.visit_id == visit_id,
                 Payment.status.in_(["paid", "completed"]),
             )
+            .populate_existing()
             .all()
         )
         return sum(
-            (Decimal(str(p.amount or 0)) for p in payments),
+            (self._net_settled_amount(payment) for payment in payments),
             Decimal("0"),
         )
+
+    @staticmethod
+    def _net_settled_amount(payment: Payment) -> Decimal:
+        """Return money still settled after partial or full refunds."""
+        amount = Decimal(str(payment.amount or 0))
+        refunded = Decimal(str(payment.refunded_amount or 0))
+        return max(amount - refunded, Decimal("0"))
+
+    def summarize_visits(self, visits: list[Visit]) -> dict[str, Any]:
+        """Read receipt-backed balances using the same totals as payment creation.
+
+        A snapshot identifies the displayed ledger. Submitting it while holding
+        the visit locks prevents a retry from silently becoming another receipt.
+        It is a concurrency token, not an authorization credential.
+        """
+        visits = sorted(visits, key=lambda visit: visit.id)
+        payments = (
+            self.db.query(Payment)
+            .filter(Payment.visit_id.in_([visit.id for visit in visits]))
+            .order_by(Payment.id)
+            .populate_existing()
+            .all()
+        )
+        settled_by_visit: dict[int, list[Payment]] = {}
+        for payment in payments:
+            if payment.status in {"paid", "completed"}:
+                settled_by_visit.setdefault(payment.visit_id, []).append(payment)
+
+        rows = []
+        for visit in visits:
+            total = self.compute_total_cost(visit)
+            settled = settled_by_visit.get(visit.id, [])
+            paid = sum(
+                (self._net_settled_amount(payment) for payment in settled),
+                Decimal("0"),
+            )
+            remaining = max(total - paid, Decimal("0"))
+            rows.append(
+                {
+                    "visit_id": visit.id,
+                    "total_amount": total,
+                    "paid_amount": paid,
+                    "remaining_amount": remaining,
+                    "payment_status": "paid"
+                    if (total > 0 or paid > 0) and remaining == 0
+                    else "partial"
+                    if paid > 0
+                    else "pending",
+                    "payment_type": settled[-1].method if settled else None,
+                }
+            )
+        total = sum((row["total_amount"] for row in rows), Decimal("0"))
+        paid = sum((row["paid_amount"] for row in rows), Decimal("0"))
+        remaining = sum((row["remaining_amount"] for row in rows), Decimal("0"))
+        ledger = {
+            "visits": rows,
+            "payments": [
+                (p.id, p.visit_id, p.amount, p.status, p.refunded_amount, p.updated_at)
+                for p in payments
+            ],
+        }
+        snapshot = hashlib.sha256(
+            json.dumps(ledger, sort_keys=True, default=str).encode()
+        ).hexdigest()
+        return {
+            "total_amount": total,
+            "paid_amount": paid,
+            "remaining_amount": remaining,
+            "payment_status": "paid"
+            if (total > 0 or paid > 0) and remaining == 0
+            else "partial"
+            if paid > 0
+            else "pending",
+            "can_pay": remaining > 0,
+            "snapshot": snapshot,
+            "visits": rows,
+        }
+
+    def synchronize_linked_invoices(
+        self,
+        *,
+        visit_id: int,
+        payment_method: str | None = None,
+    ) -> None:
+        """Keep linked invoice status consistent with receipt-backed debt."""
+        links = (
+            self.db.query(PaymentInvoiceVisit)
+            .filter(PaymentInvoiceVisit.visit_id == visit_id)
+            .all()
+        )
+        for invoice_id in sorted({link.invoice_id for link in links}):
+            invoice = (
+                self.db.query(PaymentInvoice)
+                .filter(PaymentInvoice.id == invoice_id)
+                .with_for_update()
+                .populate_existing()
+                .first()
+            )
+            if not invoice or invoice.status not in {"pending", "processing", "paid"}:
+                continue
+
+            visits = [item.visit for item in invoice.visits]
+            if not visits:
+                continue
+
+            remaining = self.summarize_visits(visits)["remaining_amount"]
+            if remaining == 0:
+                if invoice.status in {"pending", "processing"}:
+                    invoice.status = "paid"
+                    invoice.payment_method = payment_method or invoice.payment_method
+                    invoice.paid_at = datetime.now(UTC)
+            elif invoice.status == "paid":
+                invoice.status = "pending"
+                invoice.paid_at = None
+
+    def receive_grouped_payment(
+        self,
+        *,
+        visit_ids: list[int],
+        amount: Decimal | None,
+        method: str,
+        current_user: Any,
+        snapshot: str | None = None,
+    ) -> tuple[list[Visit], list[Payment], dict[str, Any]]:
+        """Allocate one receipt amount to existing debt; caller owns commit.
+
+        Lock the complete visit set in ID order before reading balances. The
+        allocation order is oldest visit first, matching cashier group payments.
+        """
+        visits = (
+            self.db.query(Visit)
+            .options(selectinload(Visit.services))
+            .filter(Visit.id.in_(set(visit_ids)))
+            .order_by(Visit.id)
+            .with_for_update(of=Visit)
+            .populate_existing()
+            .all()
+        )
+        if not visits or len(visits) != len(set(visit_ids)):
+            raise HTTPException(404, "Visits not found")
+        if len({visit.patient_id for visit in visits}) != 1:
+            raise HTTPException(400, "Payment requires visits from exactly one patient")
+        before = self.summarize_visits(visits)
+        if snapshot is not None and snapshot != before["snapshot"]:
+            raise HTTPException(
+                409,
+                "Суммы изменились. Обновите данные оплаты перед следующим платежом.",
+            )
+        amount = before["remaining_amount"] if amount is None else amount
+        if amount < 0 or amount > before["remaining_amount"]:
+            raise HTTPException(400, "Сумма превышает остаток долга")
+        if amount == 0:
+            return visits, [], before
+        balances = {
+            row["visit_id"]: row["remaining_amount"] for row in before["visits"]
+        }
+        payments = []
+        remaining = amount
+        for visit in sorted(
+            visits,
+            key=lambda v: (v.created_at.timestamp() if v.created_at else 0, v.id),
+        ):
+            allocation = min(remaining, balances[visit.id])
+            if allocation <= 0:
+                continue
+            payments.append(
+                self.create_payment_for_visit(
+                    visit_id=visit.id,
+                    amount=allocation,
+                    method=method,
+                    note="Registrar payment",
+                    current_user=current_user,
+                    allow_overpayment=False,
+                    commit=False,
+                )
+            )
+            remaining -= allocation
+        return visits, payments, self.summarize_visits(visits)
 
     def check_payment_allowed(
         self,
@@ -217,6 +449,7 @@ class PaymentInvariantService:
                 visit already fully paid and overpayment not allowed).
         """
         visit = self._load_visit_for_update(visit_id)
+        self.assert_no_processing_invoice_reservation([visit_id])
         total_cost = self.compute_total_cost(visit)
         paid_amount = self.compute_paid_amount(visit_id)
         remaining_debt = total_cost - paid_amount
@@ -261,6 +494,7 @@ class PaymentInvariantService:
         currency: str = "UZS",
         provider: str | None = None,
         allow_overpayment: bool = True,
+        settling_invoice_id: int | None = None,
         commit: bool = True,
     ) -> Payment:
         """Create a payment for a visit with race-condition protection.
@@ -282,6 +516,8 @@ class PaymentInvariantService:
             allow_overpayment: If True (default), allow ``amount >
                 remaining_debt`` as an advance/deposit (logged at
                 WARNING). If False, reject overpayment with 400.
+            settling_invoice_id: Processing invoice allowed to settle its own
+                reserved visits. Other processing invoices still block.
             commit: If True (default), commit the transaction before
                 returning. If False, the caller is responsible for
                 committing — the mutation is staged but NOT persisted.
@@ -310,6 +546,10 @@ class PaymentInvariantService:
         # that calls create_payment_for_visit on the same visit will
         # block here until this transaction commits.
         visit = self._load_visit_for_update(visit_id)
+        self.assert_no_processing_invoice_reservation(
+            [visit_id],
+            exclude_invoice_id=settling_invoice_id,
+        )
 
         total_cost = self.compute_total_cost(visit)
         paid_amount = self.compute_paid_amount(visit_id)
@@ -490,6 +730,7 @@ class PaymentInvariantService:
 
         # Acquire row lock — serializes concurrent pending payment attempts.
         visit = self._load_visit_for_update(visit_id)
+        self.assert_no_processing_invoice_reservation([visit_id])
 
         # B1/B4 coordination: check for existing pending payment with
         # the same provider. This prevents uncontrolled duplicates —

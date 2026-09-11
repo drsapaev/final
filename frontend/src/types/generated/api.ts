@@ -5735,6 +5735,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/registrar/records/payment-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Registrar Payment Summary
+         * @description Return current receipt-backed balances and the snapshot for payment submission.
+         */
+        post: operations["get_registrar_payment_summary_api_v1_registrar_records_payment_summary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/registrar/visits/{visit_id}/mark-paid": {
         parameters: {
             query?: never;
@@ -5746,7 +5766,7 @@ export type paths = {
         put?: never;
         /**
          * Mark Visit As Paid
-         * @description Отметить запись из таблицы visits как оплаченную и создать платеж (SSOT)
+         * @description Receive the supplied amount; omitted amount pays the remaining visit debt.
          */
         post: operations["mark_visit_as_paid_api_v1_registrar_visits__visit_id__mark_paid_post"];
         delete?: never;
@@ -5766,10 +5786,7 @@ export type paths = {
         put?: never;
         /**
          * Mark Queue Entry As Paid
-         * @description Отметить запись OnlineQueueEntry как оплаченную.
-         *
-         *     Находит связанный Visit через visit_id и оплачивает его.
-         *     Если visit_id отсутствует, пытается найти Visit по patient_id и дате.
+         * @description Receive payment for the explicitly linked visit; partial payments retain debt.
          */
         post: operations["mark_queue_entry_as_paid_api_v1_registrar_queue_entry__entry_id__mark_paid_post"];
         delete?: never;
@@ -22935,6 +22952,29 @@ export type components = {
             department: components["schemas"]["DepartmentInfoResponse"];
         };
         /**
+         * AppointmentHistoryItem
+         * @description Stable, minimal response item for patient appointment history.
+         */
+        AppointmentHistoryItem: {
+            /** Id */
+            id: number;
+            /**
+             * Appointment Date
+             * Format: date
+             */
+            appointment_date: string;
+            /** Appointment Time */
+            appointment_time?: string | null;
+            /** Department */
+            department?: string | null;
+            /** Doctor Id */
+            doctor_id?: number | null;
+            /** Status */
+            status: string;
+            /** Notes */
+            notes?: string | null;
+        };
+        /**
          * AppointmentNotificationRequest
          * @description Схема для уведомления о записи
          */
@@ -29874,6 +29914,8 @@ export type components = {
              * @default cash
              */
             method: string | null;
+            /** Payment Snapshot */
+            payment_snapshot?: string | null;
         };
         /**
          * MeasurementRequest
@@ -31588,6 +31630,16 @@ export type components = {
             /** Error Message */
             error_message?: string | null;
         };
+        /** PaymentInvoiceAction */
+        PaymentInvoiceAction: {
+            /**
+             * Action
+             * @constant
+             */
+            action: "start_online_payment";
+            /** Provider */
+            provider: string;
+        };
         /** PaymentInvoiceCreateRequest */
         PaymentInvoiceCreateRequest: {
             /**
@@ -31611,13 +31663,16 @@ export type components = {
              * @description Описание платежа
              */
             description?: string | null;
+            /** @description Ссылка на пациента, для которого создаётся счёт */
+            patient_info: components["schemas"]["PaymentInvoicePatientReference"];
+        };
+        /** PaymentInvoicePatientReference */
+        PaymentInvoicePatientReference: {
             /**
-             * Patient Info
-             * @description Информация о пациенте
+             * Patient Id
+             * @description ID существующего активного пациента
              */
-            patient_info?: {
-                [key: string]: unknown;
-            } | null;
+            patient_id: number;
         };
         /** PaymentInvoiceResponse */
         PaymentInvoiceResponse: {
@@ -31628,9 +31683,19 @@ export type components = {
             /** Currency */
             currency: string;
             /** Provider */
-            provider: string;
+            provider: string | null;
+            /** Payment Method */
+            payment_method: string;
             /** Status */
             status: string;
+            /** Paid Amount */
+            paid_amount: number;
+            /** Remaining Amount */
+            remaining_amount: number;
+            /** Available Actions */
+            available_actions: components["schemas"]["PaymentInvoiceAction"][];
+            /** Online Payment Block Reason */
+            online_payment_block_reason: string | null;
             /** Description */
             description: string | null;
             /**
@@ -33795,6 +33860,28 @@ export type components = {
             /** Safenote */
             safeNote?: string | null;
         };
+        /** RegistrarPaymentSummary */
+        RegistrarPaymentSummary: {
+            /** Total Amount */
+            total_amount: string;
+            /** Paid Amount */
+            paid_amount: string;
+            /** Remaining Amount */
+            remaining_amount: string;
+            /** Payment Status */
+            payment_status: string;
+            /** Can Pay */
+            can_pay: boolean;
+            /** Snapshot */
+            snapshot: string;
+            /** Visits */
+            visits: components["schemas"]["RegistrarVisitPaymentSummary"][];
+        };
+        /** RegistrarPaymentSummaryRequest */
+        RegistrarPaymentSummaryRequest: {
+            /** Records */
+            records: components["schemas"]["RegistrarRecordRef"][];
+        };
         /** RegistrarRecordActionItemResponse */
         RegistrarRecordActionItemResponse: {
             /** Record Kind */
@@ -33838,6 +33925,8 @@ export type components = {
              * @default cash
              */
             method: string | null;
+            /** Payment Snapshot */
+            payment_snapshot?: string | null;
         };
         /** RegistrarRecordActionResponse */
         RegistrarRecordActionResponse: {
@@ -33853,6 +33942,7 @@ export type components = {
             failed_count: number;
             /** Results */
             results: components["schemas"]["RegistrarRecordActionItemResponse"][];
+            payment_summary?: components["schemas"]["RegistrarPaymentSummary"] | null;
         };
         /** RegistrarRecordRef */
         RegistrarRecordRef: {
@@ -33860,6 +33950,21 @@ export type components = {
             record_kind: string;
             /** Record Id */
             record_id: number;
+        };
+        /** RegistrarVisitPaymentSummary */
+        RegistrarVisitPaymentSummary: {
+            /** Visit Id */
+            visit_id: number;
+            /** Total Amount */
+            total_amount: string;
+            /** Paid Amount */
+            paid_amount: string;
+            /** Remaining Amount */
+            remaining_amount: string;
+            /** Payment Status */
+            payment_status: string;
+            /** Payment Type */
+            payment_type?: string | null;
         };
         /**
          * ReorderQueueProfilesRequest
@@ -38969,7 +39074,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Appointment"][];
+                    "application/json": components["schemas"]["AppointmentHistoryItem"][];
                 };
             };
         };
@@ -39242,9 +39347,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AppointmentHistoryItem"][];
                 };
             };
             /** @description Validation Error */
@@ -48483,6 +48586,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_registrar_payment_summary_api_v1_registrar_records_payment_summary_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrarPaymentSummaryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrarPaymentSummary"];
                 };
             };
             /** @description Validation Error */

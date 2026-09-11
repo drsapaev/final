@@ -63,7 +63,11 @@ class TelegramService:
             finally:
                 _init_db.close()
 
-            if not self.config or not self.config.bot_token:
+            # PR-2: SSOT read - decrypt-on-read (fail-closed) instead of raw column
+            bot_token_value = (
+                self.config.decrypted_bot_token if self.config else None
+            )
+            if not bot_token_value:
                 logger.error("Токен Telegram бота не настроен")
                 return False
 
@@ -72,11 +76,11 @@ class TelegramService:
                 return False
 
             # Создаем бота
-            self.bot = Bot(token=self.config.bot_token)
+            self.bot = Bot(token=bot_token_value)
 
             # Создаем приложение
             self.application = (
-                Application.builder().token(self.config.bot_token).build()
+                Application.builder().token(bot_token_value).build()
             )
 
             # Регистрируем обработчики

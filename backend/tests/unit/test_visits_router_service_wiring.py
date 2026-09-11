@@ -357,9 +357,17 @@ def test_visit_endpoint_reschedule_updates_only_same_patient_queue_link(
         doctor=test_doctor,
     )
 
+    # The target date must differ from the visit's OWN clinic-calendar
+    # date — clinic_today() can equal UTC-tomorrow in the 19:00-24:00 UTC
+    # window (Asia/Tashkent is UTC+5), which would turn the request into
+    # a no-op reschedule that (round 14) deliberately performs no write
+    # and no queue update.
+    from app.crud.clinic import clinic_today
+
+    target_date = clinic_today(db_session) + timedelta(days=1)
     response = client.post(
         f"/api/v1/visits/visits/{test_visit.id}/reschedule",
-        params={"new_date": (date.today() + timedelta(days=1)).isoformat()},
+        params={"new_date": target_date.isoformat()},
         headers=auth_headers,
     )
 

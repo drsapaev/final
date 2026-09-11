@@ -8,6 +8,11 @@ from app.api.v1.endpoints.admin_telegram._helpers import (
     _validate_staff_action_target_binding,
     _validate_staff_action_target_request,
 )  # noqa: F401
+from app.services.telegram_token_store import (  # noqa: F401
+    decrypt_token,
+    resolve_patient_bot_token,
+    resolve_staff_bot_token,
+)
 
 
 @router.post("/telegram/staff-actions/{confirmation_id}/confirm", response_model=dict[str, Any])
@@ -357,12 +362,8 @@ def _has_secret_value(value: Any) -> bool:
 
 
 def _get_configured_bot_token(db: Session) -> str | None:
-    config = crud_telegram.get_telegram_config(db)
-    if config and config.bot_token:
-        return config.bot_token
-
-    bot_token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
-    return getattr(bot_token_setting, "value", None) if bot_token_setting else None
+    """PR-2: SSOT resolution (config decrypted -> legacy settings -> env)."""
+    return resolve_patient_bot_token(db)
 
 
 def _build_staff_bot_token_status(
@@ -404,7 +405,10 @@ def _get_staff_bot_token_runtime_status(
 
     for setting_key in STAFF_BOT_TOKEN_SETTING_KEYS:
         setting = crud_clinic.get_setting_by_key(db, setting_key)
-        token_value = getattr(setting, "value", None)
+        raw_value = getattr(setting, "value", None)
+        # PR-2: compare the PLAINTEXT value (decrypt-if-encrypted) so the
+        # patient-token reuse check also works for encrypted setting rows.
+        token_value = decrypt_token(raw_value)
         if _has_secret_value(token_value):
             return _build_staff_bot_token_status(
                 token_value=token_value,
@@ -426,19 +430,8 @@ def _get_staff_bot_token_runtime_status(
 def _get_configured_staff_bot_token(
     db: Session, patient_bot_token: str | None = None
 ) -> str | None:
-    patient_token_text = str(patient_bot_token or "").strip()
-    for env_key in STAFF_BOT_TOKEN_ENV_KEYS:
-        token_text = str(os.getenv(env_key) or "").strip()
-        if token_text and token_text != patient_token_text:
-            return token_text
-
-    for setting_key in STAFF_BOT_TOKEN_SETTING_KEYS:
-        setting = crud_clinic.get_setting_by_key(db, setting_key)
-        token_text = str(getattr(setting, "value", None) or "").strip()
-        if token_text and token_text != patient_token_text:
-            return token_text
-
-    return None
+    """PR-2: SSOT staff resolution (env keys -> setting keys, decrypted)."""
+    return resolve_staff_bot_token(db, patient_token=patient_bot_token)
 
 
 def _build_staff_bot_token_contract(token_status: dict[str, Any]) -> dict[str, Any]:

@@ -185,7 +185,7 @@ def _registrar_available_actions(
     patient_id: int | None = None,
 ) -> list[str]:
     actions: list[str] = []
-    if _registrar_can_mark_paid(user, payment_status):
+    if visit_id is not None and _registrar_can_mark_paid(user, payment_status):
         actions.append("mark_paid")
     if _registrar_can_start_visit(user, queue_status):
         actions.append("start_visit")
@@ -334,32 +334,14 @@ def _resolve_payment_truth(
 ) -> tuple[str, str | None]:
     """Resolve payment status/method from payments, with a narrow legacy fallback."""
     if visit_id:
-        try:
-            from app.models.payment import Payment
+        from app.models.payment import Payment
+        from app.models.visit import Visit
+        from app.services.payment_invariant_service import PaymentInvariantService
 
-            payment = (
-                db.query(Payment)
-                .filter(Payment.visit_id == visit_id)
-                .order_by(Payment.created_at.desc())
-                .first()
-            )
-            if payment:
-                status = (
-                    "paid"
-                    if (
-                        str(getattr(payment, "status", "") or "").lower() == "paid"
-                        or getattr(payment, "paid_at", None)
-                    )
-                    else "pending"
-                )
-                method = getattr(payment, "method", None) or None
-                return status, method
-        except Exception:
-            logger.debug(
-                "registrar_integration: failed to resolve payment truth for visit",
-                exc_info=True,
-            )
-
+        visit = db.get(Visit, visit_id)
+        if visit and db.query(Payment.id).filter(Payment.visit_id == visit_id).first():
+            row = PaymentInvariantService(db).summarize_visits([visit])["visits"][0]
+            return row["payment_status"], row["payment_type"]
     return ("paid", None) if legacy_paid_at else ("pending", None)
 
 

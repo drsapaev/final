@@ -22,6 +22,7 @@ import notify from '../../../services/notify';
 import { getErrorMessage } from '../../../utils/errorHandler';
 import { printPanelTicketInBrowserAsync } from '../../../services/panelPrint';
 import type { Appointment } from '../../../types/domain/clinic';
+import type { RegistrarPaymentInput, RegistrarPaymentSummary } from '../../../api/registrarPayments';
 import RecordPreview from './RecordPreview';
 import RescheduleSlots from './RescheduleSlots';
 import type {
@@ -77,7 +78,7 @@ interface RegistrarDialogsLayerProps {
   handleContextMenuAction: (action: string, row: Appointment) => void | Promise<void>;
   handleWizardComplete: (wizardData: unknown) => void | Promise<void>;
   runRegistrarRecordAction: (record: Record<string, unknown>, action: string, payload?: Record<string, unknown>) => Promise<{ success?: boolean; success_count?: number; failed_count?: number; results?: { success?: boolean; error?: string }[] } | null>;
-  handlePayment: (appointment: Record<string, unknown>, paymentData?: { amount?: number | null; method?: string | null } | null) => Promise<unknown>;
+  handlePayment: (appointment: Record<string, unknown>, paymentData: RegistrarPaymentInput) => Promise<RegistrarPaymentSummary>;
   resolveRescheduleVisitId: (appointmentRow: Record<string, unknown>) => unknown;
   removeRescheduledAppointmentFromView: (appointmentRow: Record<string, unknown>, visitId: unknown) => void;
   confirm: (options: Record<string, unknown>) => Promise<boolean>;
@@ -173,15 +174,9 @@ const RegistrarDialogsLayer = ({
       onClose={() => setPaymentDialog({ open: false, row: null, paid: false, source: null })}
       appointment={paymentDialog.row}
       onPaymentSuccess={async (paymentData) => {
-        // ✅ ИСПРАВЛЕНО: используем реальный API вызов через handlePayment
         const appointment = paymentDialog.row;
-        if (appointment) {
-          const updated = await handlePayment(appointment as Record<string, unknown>, paymentData as { amount?: number | null; method?: string | null } | null);
-          if (updated) {
-            // Canonical state is refreshed by handlePayment via loadAppointments.
-            logger.info('PaymentDialog: Оплата успешна, данные обновлены:', updated);
-          }
-        }
+        if (!appointment) throw new Error('Payment record is missing');
+        return handlePayment(appointment as Record<string, unknown>, paymentData);
       }}
       onPrintTicket={(appointment: unknown) => {
         const rowObj = (paymentDialog.row && typeof paymentDialog.row === 'object' ? paymentDialog.row : {}) as Record<string, unknown>;

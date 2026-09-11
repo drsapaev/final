@@ -14,6 +14,10 @@
  */
 
 import { test, expect } from '@playwright/test';
+import {
+  attachRuntimeErrorCapture,
+  installAuthenticatedQaHarness,
+} from '../support/authenticatedQa';
 
 // Helper: measure request latency
 async function measureLatency(fn: () => Promise<void>): Promise<number> {
@@ -101,31 +105,57 @@ test.describe('Load: EMR — 20 parallel doctors', () => {
   });
 
   test('parallel EMR requests do not crash frontend', async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'doctor-token');
-      localStorage.setItem('auth_profile', JSON.stringify({ id: 5, role: 'doctor' }));
-    });
+    const { pageErrors, consoleErrors } = attachRuntimeErrorCapture(page);
+    const { token } = await installAuthenticatedQaHarness(page, { role: 'Doctor' });
 
     let requestCount = 0;
-    await page.route('**/api/v1/emr/**', async (route) => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const authorizationHeaders: Array<string | undefined> = [];
+    await page.route('**/api/v1/v2/emr/*', async (route) => {
       requestCount++;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 1,
-          visit_id: 1,
-          specialty_data: { complaints: 'test', diagnosis: 'I10' },
-          is_draft: false,
-          row_version: 1,
-        }),
-      });
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      authorizationHeaders.push(route.request().headers()['authorization']);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        const visitId = Number(new URL(route.request().url()).pathname.split('/').at(-1));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: visitId,
+            visit_id: visitId,
+            specialty_data: {},
+            is_draft: false,
+            row_version: 1,
+          }),
+        });
+      } finally {
+        inFlight--;
+      }
     });
 
-    await page.goto('/doctor');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/doctor', { waitUntil: 'domcontentloaded' });
+    await expect(page).not.toHaveURL(/\/login$/);
+
+    const statuses = await page.evaluate(async () => {
+      const token = window.sessionStorage.getItem('auth_token');
+      const responses = await Promise.all(
+        Array.from({ length: 20 }, (_, index) => fetch(`/api/v1/v2/emr/${index + 1}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }))
+      );
+      return responses.map((response) => response.status);
+    });
+
+    expect(statuses).toEqual(Array(20).fill(200));
+    expect(requestCount).toBe(20);
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(authorizationHeaders).toHaveLength(20);
+    expect(authorizationHeaders.every((header) => header === `Bearer ${token}`)).toBe(true);
     await expect(page.locator('body')).toBeVisible();
-    // Multiple EMR requests during page load
-    expect(requestCount).toBeGreaterThan(0);
+    expect(pageErrors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
   });
 });

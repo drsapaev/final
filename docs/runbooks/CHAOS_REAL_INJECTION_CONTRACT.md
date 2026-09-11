@@ -113,4 +113,4 @@ the product is affected.
 | Date | Scenario | Result | Evidence / notes |
 |---|---|---|---|
 | 2026-09-09 | S4a cloudflared stop | **PASS** | net stop at ~03:00 local (UAC elevated); service STOPPED, 0 cloudflared processes; api.finalclinic.fyi/api/v1/health unreachable externally (finalclinic.fyi kept serving the static SPA — caught a probe-URL pitfall: the public API probe must use api.finalclinic.fyi, corrected in S4a fields); LAN /api/v1/health stayed 200 the whole window (≈15 min); recovery: net start (elevated) → 4× "Registered tunnel connection" → api.finalclinic.fyi/api/v1/health 200 {"ok":true,"db":"ok"} |
-| — | — | — | no executions yet (contract PR) |
+| 2026-09-09 | S4b host reboot | **PASS** | shutdown /r → boot 23:25:47; autostart chain: cloudflared svc Running + proc alive, uvicorn on 18000 (ClinicBackendBootAutostart), local /api/v1/health 200, api.finalclinic.fyi JSON 200; zero manual interventions; verification: s4_reboot_verify.ps1 |

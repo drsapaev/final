@@ -4,17 +4,18 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from app.core.config import settings
 from app.models.online_queue import DailyQueue
 from app.models.service import Service
 from app.models.telegram_config import TelegramConfig
 from app.models.visit import VisitService
 from app.services.visit_confirmation_service import (
-    TELEGRAM_TICKET_QR_TTL_MINUTES,
-    VisitConfirmationDomainError,
-    VisitConfirmationService,
     build_telegram_ticket_start_token,
     consume_telegram_ticket_start_token,
     parse_telegram_ticket_start_token,
+    TELEGRAM_TICKET_QR_TTL_MINUTES,
+    VisitConfirmationDomainError,
+    VisitConfirmationService,
 )
 
 
@@ -80,7 +81,9 @@ class TestVisitConfirmationService:
         assert result["visit_id"] == test_visit.id
         assert test_visit.status in {"confirmed", "open"}
 
-    def test_assign_queue_numbers_uses_doctor_id_for_daily_queue(self, db_session, test_visit, test_doctor):
+    def test_assign_queue_numbers_uses_doctor_id_for_daily_queue(
+        self, db_session, test_visit, test_doctor
+    ):
         service = Service(
             code="CARDIO_CONFIRM",
             name="Подтвержденная консультация",
@@ -105,7 +108,9 @@ class TestVisitConfirmationService:
         db_session.commit()
 
         confirmation_service = VisitConfirmationService(db_session)
-        queue_numbers, print_tickets = confirmation_service._assign_queue_numbers_on_confirmation(test_visit)
+        queue_numbers, print_tickets = (
+            confirmation_service._assign_queue_numbers_on_confirmation(test_visit)
+        )
         db_session.flush()
 
         assert len(queue_numbers) == 1
@@ -161,6 +166,26 @@ class TestVisitConfirmationService:
             )
             <= 1
         )
+
+    def test_ticket_telegram_qr_skipped_when_no_token_resolves(
+        self, db_session, test_visit, monkeypatch
+    ):
+        """PR-2 (round 16): a surviving bot_username without a resolvable
+        credential must not produce t.me links (fail-closed)."""
+        for env_key in ("TELEGRAM_BOT_TOKEN",):
+            monkeypatch.delenv(env_key, raising=False)
+        monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", None)
+        db_session.add(TelegramConfig(bot_username="clinic_bot", active=True))
+        db_session.commit()
+
+        confirmation_service = VisitConfirmationService(db_session)
+
+        payload = confirmation_service._build_ticket_telegram_qr_payload(test_visit)
+
+        assert payload is None
+        # Fail-closed skips BEFORE issuing a fresh confirmation token — the
+        # pre-existing fixture value must remain untouched.
+        assert test_visit.confirmation_token == "test-token-123"
 
     def test_ticket_telegram_qr_rollout_rejects_expired_and_malformed_tokens(
         self,

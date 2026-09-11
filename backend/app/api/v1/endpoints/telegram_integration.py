@@ -18,6 +18,7 @@ from app.api.deps import get_db, require_roles
 from app.core.config import settings
 from app.crud import patient as crud_patient
 from app.crud import telegram_config as crud_telegram
+from app.services.telegram_token_store import resolve_patient_bot_token
 from app.models.appointment import Appointment
 from app.models.lab import LabOrder, LabResult
 from app.models.user import User
@@ -73,6 +74,7 @@ def _ensure_appointment_reminder_belongs_to_phone(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
         )
+
 
 def _lab_result_id_from_payload(lab_data: dict[str, Any]) -> int | None:
     for key in ("lab_results_id", "lab_result_id", "id"):
@@ -370,17 +372,31 @@ def get_bot_status(
     try:
         config = crud_telegram.get_telegram_config(db)
 
+        # PR-2 (round 10): resolve BEFORE the no-config early return - a
+        # deployment relying only on TELEGRAM_BOT_TOKEN (including
+        # backend/.env) is configured even without a telegram_configs row.
+        configured = resolve_patient_bot_token(db) is not None
+
         if not config:
             return {
-                "configured": False,
+                "configured": configured,
                 "active": False,
-                "message": "Telegram бот не настроен",
+                "message": (
+                    "Telegram бот работает через переменную окружения"
+                    if configured
+                    else "Telegram бот не настроен"
+                ),
             }
 
-        telegram_service = get_telegram_service()  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
+        telegram_service = (
+            get_telegram_service()
+        )  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
 
         return {
-            "configured": bool(config.bot_token),
+            # PR-2 (round 8): report through the same SSOT resolver the
+            # polling/webhook/admin paths use - an undecryptable config row
+            # with a live legacy/env fallback must not read as unconfigured.
+            "configured": configured,
             "active": config.active,
             "bot_username": config.bot_username,
             "notifications_enabled": config.notifications_enabled,

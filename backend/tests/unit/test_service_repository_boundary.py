@@ -310,6 +310,30 @@ def test_appointment_flow_service_uses_patient_emr_iam_facades() -> None:
     )
 
 
+def test_payment_invoice_service_uses_patient_facade() -> None:
+    service_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "services"
+        / "payment_invoice_service.py"
+    )
+    logic = service_path.read_text(encoding="utf-8")
+    assert "PatientContextFacade" in logic, (
+        "broken contract: billing must use the patient facade for active patient checks"
+    )
+
+    repository_path = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "repositories"
+        / "payment_invoice_repository.py"
+    )
+    repository_logic = repository_path.read_text(encoding="utf-8")
+    assert "app.models.patient" not in repository_logic, (
+        "broken contract: billing repository must not import patient ORM models"
+    )
+
+
 def test_patients_service_avoids_direct_session_calls() -> None:
     # R-17: patients_api_service.py удалён (мёртвый код — router не зарегистрирован,
     # символы не импортируются). Тест больше не применим.

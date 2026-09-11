@@ -1,7 +1,7 @@
 import React from 'react';
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import FileUpload from '../FileUpload';
 
@@ -27,6 +27,11 @@ vi.mock('../../../utils/logger', () => ({
 const heic2anyMockTyped = heic2anyMock as unknown as ReturnType<typeof vi.fn>;
 
 describe('FileUpload accessibility', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     vi.stubGlobal('URL', {
       createObjectURL: vi.fn(() => 'blob:test'),

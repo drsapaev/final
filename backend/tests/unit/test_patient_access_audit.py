@@ -14,10 +14,8 @@ Covers:
 """
 from __future__ import annotations
 
-from datetime import datetime
-from unittest.mock import MagicMock, patch
-
-import pytest
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from app.services.patient_access_audit import (
     _get_client_ip,
@@ -93,6 +91,88 @@ class TestPatientAccessAuditService:
         assert audit_entry.resource_type == "lab_report"
         assert audit_entry.resource_id == "123"
         assert audit_entry.action == "download"
+
+    def test_jwt_patient_access_is_attributed_to_patient_actor(self):
+        db = MagicMock()
+        actor = SimpleNamespace(
+            id=100,
+            role="Patient",
+            patient=SimpleNamespace(id=42),
+        )
+
+        log_patient_access(
+            db=db,
+            actor_user=actor,
+            subject_patient_id=42,
+            resource_type="patient",
+            action="view",
+        )
+
+        audit_entry = db.add.call_args[0][0]
+        assert audit_entry.actor_type == "self"
+        assert audit_entry.actor_patient_id == 42
+        assert audit_entry.actor_staff_user_id is None
+
+    def test_jwt_staff_access_remains_attributed_to_staff_actor(self):
+        db = MagicMock()
+        actor = SimpleNamespace(id=100, role="Registrar", patient=None)
+
+        log_patient_access(
+            db=db,
+            actor_user=actor,
+            subject_patient_id=42,
+            resource_type="patient",
+            action="view",
+        )
+
+        audit_entry = db.add.call_args[0][0]
+        assert audit_entry.actor_type == "staff"
+        assert audit_entry.actor_patient_id is None
+        assert audit_entry.actor_staff_user_id == 100
+
+    def test_patient_list_audit_uses_a_separate_session(self, monkeypatch):
+        from app.api.v1.endpoints import patients as patients_endpoint
+
+        request_db = MagicMock()
+        audit_db = MagicMock()
+        request = MagicMock()
+        actor = SimpleNamespace(id=100, role="Registrar")
+        returned_patients = [SimpleNamespace(id=41), SimpleNamespace(id=42)]
+        audit_many = MagicMock()
+
+        monkeypatch.setattr("app.db.session.SessionLocal", lambda: audit_db)
+        monkeypatch.setattr(
+            patients_endpoint.patient_crud,
+            "get_patients",
+            lambda *args, **kwargs: returned_patients,
+        )
+        monkeypatch.setattr(
+            patients_endpoint,
+            "log_patient_access_many",
+            audit_many,
+        )
+
+        result = patients_endpoint.list_patients(
+            request=request,
+            db=request_db,
+            skip=0,
+            limit=100,
+            q=None,
+            phone=None,
+            current_user=actor,
+        )
+
+        assert result == returned_patients
+        audit_many.assert_called_once_with(
+            audit_db,
+            actor_user=actor,
+            subject_patient_ids=[41, 42],
+            resource_type="patient",
+            action="view",
+            request=request,
+        )
+        audit_db.close.assert_called_once_with()
+        request_db.commit.assert_not_called()
 
     def test_log_patient_access_derives_subject_from_scope(self):
         """When subject_patient_id is None, derive from scope.patient_id."""

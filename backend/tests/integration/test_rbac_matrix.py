@@ -13,13 +13,29 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models.user import User
-from app.models.patient import Patient
-from app.models.visit import Visit
-from app.models.payment import Payment
-from app.models.emr import EMR
-from app.models.appointment import Appointment
 from app.core.security import get_password_hash
+from app.models.appointment import Appointment
+from app.models.clinic import Doctor
+from app.models.department import Department
+from app.models.emr import EMR
+from app.models.patient import Patient
+from app.models.patient_access_audit import PatientAccessAuditLog
+from app.models.payment import Payment
+from app.models.user import User
+from app.models.visit import Visit
+
+
+class _NoCloseSessionProxy:
+    """Expose the fixture session to isolated audit writes without closing it."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def __getattr__(self, name: str):
+        return getattr(self._session, name)
+
+    def close(self) -> None:
+        pass
 
 
 # ===================== FIXTURES =====================
@@ -178,13 +194,89 @@ class TestPositiveRBAC:
         )
         assert response.status_code == 200
 
-    def test_doctor_can_read_patient(self, client: TestClient, doctor_token: str, test_patient_for_rbac: Patient):
-        """Doctor может читать данные пациента"""
+    def test_doctor_can_read_assigned_patient(
+        self,
+        client: TestClient,
+        doctor_token: str,
+        test_doctor_user: User,
+        test_patient_for_rbac: Patient,
+        db_session: Session,
+    ):
+        """Doctor может читать пациента, связанного с его визитом."""
+        doctor = Doctor(
+            user_id=test_doctor_user.id,
+            specialty="general",
+            active=True,
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+        db_session.add(
+            Visit(
+                patient_id=test_patient_for_rbac.id,
+                doctor_id=doctor.id,
+                status="open",
+            )
+        )
+        db_session.commit()
+
+        other_doctor = Doctor(
+            specialty="other",
+            active=True,
+        )
+        db_session.add(other_doctor)
+        db_session.commit()
+        db_session.refresh(other_doctor)
+        department = Department(
+            key="rbac-general",
+            name_ru="Synthetic RBAC department",
+        )
+        db_session.add(department)
+        db_session.commit()
+        db_session.refresh(department)
+        own_appointment = Appointment(
+            patient_id=test_patient_for_rbac.id,
+            doctor_id=doctor.id,
+            department_id=department.id,
+            appointment_date=date.today(),
+            appointment_time="10:00",
+            status="scheduled",
+            notes="Own appointment",
+        )
+        other_appointment = Appointment(
+            patient_id=test_patient_for_rbac.id,
+            doctor_id=other_doctor.id,
+            appointment_date=date.today(),
+            appointment_time="11:00",
+            status="scheduled",
+            notes="Other doctor's appointment",
+        )
+        db_session.add_all([own_appointment, other_appointment])
+        db_session.commit()
+        db_session.refresh(own_appointment)
+
         response = client.get(
             f"/api/v1/patients/{test_patient_for_rbac.id}",
             headers={"Authorization": f"Bearer {doctor_token}"},
         )
         assert response.status_code == 200
+        appointments_response = client.get(
+            f"/api/v1/patients/{test_patient_for_rbac.id}/appointments",
+            headers={"Authorization": f"Bearer {doctor_token}"},
+        )
+        assert appointments_response.status_code == 200
+        payload = appointments_response.json()
+        assert payload == [
+            {
+                "id": own_appointment.id,
+                "appointment_date": date.today().isoformat(),
+                "appointment_time": "10:00",
+                "department": department.key,
+                "doctor_id": doctor.id,
+                "status": "scheduled",
+                "notes": "Own appointment",
+            }
+        ]
 
     def test_cashier_can_init_payment(self, client: TestClient, cashier_token: str, test_patient_for_rbac: Patient, db_session: Session):
         """Cashier может инициализировать платёж"""
@@ -334,9 +426,59 @@ class TestOwnDataRBAC:
 
     def test_patient_can_read_own_appointments(self, client: TestClient, patient_token: str, db_session: Session):
         """Patient может читать свои записи"""
-        # TODO: Реализовать когда будет связь Patient -> User
-        # Сейчас пропускаем, так как связь Patient-User может быть не настроена
-        pass
+        patient_user = db_session.query(User).filter(User.username == "patient_test").one()
+        own_patient = Patient(
+            user_id=patient_user.id,
+            last_name="Synthetic",
+            first_name="Patient",
+            phone="SYNTHETIC-PATIENT-OWN",
+            birth_date=date(1990, 1, 1),
+        )
+        other_patient = Patient(
+            last_name="Synthetic",
+            first_name="Other",
+            phone="SYNTHETIC-PATIENT-OTHER",
+            birth_date=date(1991, 1, 1),
+        )
+        db_session.add_all([own_patient, other_patient])
+        db_session.commit()
+        db_session.refresh(own_patient)
+        db_session.refresh(other_patient)
+
+        own_appointment = Appointment(
+            patient_id=own_patient.id,
+            appointment_date=date.today(),
+            appointment_time="09:00",
+            status="scheduled",
+            notes="Synthetic own appointment",
+        )
+        other_appointment = Appointment(
+            patient_id=other_patient.id,
+            appointment_date=date.today(),
+            appointment_time="11:00",
+            status="scheduled",
+            notes="Synthetic other appointment",
+        )
+        db_session.add_all([own_appointment, other_appointment])
+        db_session.commit()
+        db_session.refresh(own_appointment)
+
+        response = client.get(
+            "/api/v1/patients/appointments",
+            headers={"Authorization": f"Bearer {patient_token}"},
+        )
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "id": own_appointment.id,
+                "appointment_date": date.today().isoformat(),
+                "appointment_time": "09:00",
+                "department": None,
+                "doctor_id": None,
+                "status": "scheduled",
+                "notes": "Synthetic own appointment",
+            }
+        ]
 
     def test_patient_cannot_read_other_patient_data(self, client: TestClient, patient_token: str, test_patient_for_rbac: Patient):
         """Patient НЕ может читать данные других пациентов (если не связан)"""
@@ -492,7 +634,10 @@ class TestRegressionRBAC:
         assert visits.status_code == 200
 
     def test_doctor_specialized_roles_have_same_permissions(
-        self, client: TestClient, db_session: Session
+        self,
+        client: TestClient,
+        db_session: Session,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         """Doctor, cardio, derma, dentist (+алиасы) получают одинаковые решения гейтов.
 
@@ -502,8 +647,12 @@ class TestRegressionRBAC:
         Контроль: Patient-роль отклоняется на обоих (403).
         """
         from app.core.roles import DOCTOR_ROLE_SPELLINGS
-        from app.models.clinic import Doctor
         from tests.conftest import mint_access_token
+
+        monkeypatch.setattr(
+            "app.db.session.SessionLocal",
+            lambda: _NoCloseSessionProxy(db_session),
+        )
 
         def make_family_user(role: str) -> User:
             username = "rbac_family_" + role.lower().strip()
@@ -536,21 +685,92 @@ class TestRegressionRBAC:
                 db_session.refresh(doctor)
             return doctor
 
-        statuses: dict[str, tuple[int, int, int]] = {}
-        for role in sorted(DOCTOR_ROLE_SPELLINGS):
+        unowned_patient = Patient(
+            last_name="Unowned",
+            first_name="Patient",
+            phone="SYNTHETIC-UNOWNED",
+            birth_date=date(1990, 1, 1),
+        )
+        db_session.add(unowned_patient)
+        db_session.commit()
+        db_session.refresh(unowned_patient)
+
+        statuses: dict[
+            str,
+            tuple[int, int, int, int, int, int, bool, bool, set[str]],
+        ] = {}
+        for index, role in enumerate(sorted(DOCTOR_ROLE_SPELLINGS), start=1):
             user = make_family_user(role)
             doctor = linked_doctor(user)
+            own_patient = Patient(
+                last_name="Assigned",
+                first_name=f"Patient{index}",
+                phone=f"SYNTHETIC-ASSIGNED-{index}",
+                birth_date=date(1990, 1, 1),
+            )
+            db_session.add(own_patient)
+            db_session.commit()
+            db_session.refresh(own_patient)
+            db_session.add(
+                Visit(
+                    patient_id=own_patient.id,
+                    doctor_id=doctor.id,
+                    status="open",
+                )
+            )
+            db_session.commit()
+
             token = mint_access_token(user)
             headers = {"Authorization": f"Bearer {token}"}
             patients = client.get("/api/v1/patients/", headers=headers)
+            patient_ids = {item["id"] for item in patients.json()}
+            own_patient_response = client.get(
+                f"/api/v1/patients/{own_patient.id}", headers=headers
+            )
+            unowned_patient_response = client.get(
+                f"/api/v1/patients/{unowned_patient.id}", headers=headers
+            )
+            unowned_appointments_response = client.get(
+                f"/api/v1/patients/{unowned_patient.id}/appointments",
+                headers=headers,
+            )
+            denied_audits = (
+                db_session.query(PatientAccessAuditLog)
+                .filter(
+                    PatientAccessAuditLog.actor_staff_user_id == user.id,
+                    PatientAccessAuditLog.subject_patient_id == unowned_patient.id,
+                    PatientAccessAuditLog.outcome == "denied",
+                )
+                .all()
+            )
             unscoped = client.get("/api/v1/visits/visits", headers=headers)
             scoped = client.get(
                 f"/api/v1/visits/visits?doctor_id={doctor.id}", headers=headers
             )
-            statuses[role] = (patients.status_code, unscoped.status_code, scoped.status_code)
+            statuses[role] = (
+                patients.status_code,
+                own_patient_response.status_code,
+                unowned_patient_response.status_code,
+                unowned_appointments_response.status_code,
+                unscoped.status_code,
+                scoped.status_code,
+                own_patient.id in patient_ids,
+                unowned_patient.id in patient_ids,
+                {audit.resource_type for audit in denied_audits},
+            )
 
-        # Паранит-регрессия exact-role: все написания семьи — ОДИНАКОВЫЕ статусы
-        expected = (200, 403, 200)
+        # Все doctor-family spellings получают один и тот же ownership-контракт.
+        expected = (
+            200,
+            200,
+            403,
+            403,
+            403,
+            200,
+            True,
+            False,
+            {"patient", "appointment_history"},
+        )
         for role, actual in statuses.items():
             assert actual == expected, f"role={role}: {actual} != {expected}"
 
@@ -573,6 +793,75 @@ class TestRegressionRBAC:
         outsider_headers = {"Authorization": f"Bearer {outsider_token}"}
         assert client.get("/api/v1/visits/visits", headers=outsider_headers).status_code == 403
         assert client.get("/api/v1/patients/", headers=outsider_headers).status_code == 403
+
+    def test_doctor_without_active_profile_fails_closed_for_patient_reads(
+        self,
+        client: TestClient,
+        db_session: Session,
+        test_patient_for_rbac: Patient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from tests.conftest import mint_access_token
+
+        monkeypatch.setattr(
+            "app.db.session.SessionLocal",
+            lambda: _NoCloseSessionProxy(db_session),
+        )
+
+        user = User(
+            username="rbac_inactive_doctor",
+            email="rbac_inactive_doctor@test.com",
+            full_name="RBAC Inactive Doctor",
+            hashed_password=get_password_hash("inactive-doctor123"),
+            role="Doctor",
+            is_active=True,
+            is_superuser=False,
+        )
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
+        db_session.add(
+            Doctor(
+                user_id=user.id,
+                specialty="general",
+                active=False,
+            )
+        )
+        db_session.commit()
+
+        headers = {"Authorization": f"Bearer {mint_access_token(user)}"}
+        assert client.get("/api/v1/patients/", headers=headers).status_code == 403
+        assert (
+            client.get(
+                f"/api/v1/patients/{test_patient_for_rbac.id}",
+                headers=headers,
+            ).status_code
+            == 403
+        )
+        assert (
+            client.get(
+                f"/api/v1/patients/{test_patient_for_rbac.id}/appointments",
+                headers=headers,
+            ).status_code
+            == 403
+        )
+        denied_audits = (
+            db_session.query(PatientAccessAuditLog)
+            .filter(
+                PatientAccessAuditLog.actor_staff_user_id == user.id,
+                PatientAccessAuditLog.subject_patient_id
+                == test_patient_for_rbac.id,
+                PatientAccessAuditLog.outcome == "denied",
+            )
+            .all()
+        )
+        assert {audit.resource_type for audit in denied_audits} == {
+            "patient",
+            "appointment_history",
+        }
+        assert {audit.extra_data["reason"] for audit in denied_audits} == {
+            "inactive_or_missing_doctor_profile"
+        }
 
 
 # ===================== Codex round-1 regressions (D-3 follow-up) =====================

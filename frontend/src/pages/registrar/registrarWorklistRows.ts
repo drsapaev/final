@@ -167,7 +167,11 @@ export const computeRegistrarWorklistRows = ({
         const inId = String(entry.id).includes(searchQuery);
         const phoneDigits = String(entry.patient_phone || entry.phone || '').replace(/\D/g, '');
         const searchDigits = searchQuery.replace(/\D/g, '');
-        const inPhone = phoneDigits.includes(searchDigits);
+        // RQ-02: the phone branch participates only when the query has digits.
+        // Previously a letter-only query produced searchDigits='' and
+        // phoneDigits.includes('') === true, so inPhone passed for EVERY row
+        // and letter search never filtered (F-01).
+        const inPhone = searchDigits.length > 0 && phoneDigits.includes(searchDigits);
         if (!inFio && !inId && !inPhone) return false;
       }
 
@@ -236,9 +240,10 @@ export const computeRegistrarWorklistRows = ({
         const phoneDigits = originalPhone.replace(/\D/g, '');
         const searchDigits = searchQuery.replace(/\D/g, '');
 
-        const inPhone = originalPhone.includes(searchQuery) ||
+        const inPhone = searchDigits.length > 0 && (
+        originalPhone.includes(searchQuery) ||
         phoneDigits.includes(searchDigits) ||
-        searchDigits.length >= 3 && phoneDigits.includes(searchDigits);
+        searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
 
         // Поиск по услугам (теперь ищем в агрегированном списке)
         const inServices = Array.isArray(patient.services) && patient.services.some((s: string) => String(s).toLowerCase().includes(searchQuery));

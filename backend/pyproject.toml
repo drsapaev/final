@@ -271,6 +271,16 @@ pytest_add_cli_args_test_selection = [
     "--deselect", "tests/unit/test_frontend_backend_parity.py",
     "--deselect", "tests/unit/test_frontend_backend_parity_gate.py",
     "--deselect", "tests/unit/test_load_regression_profiles.py",
+    # Repo-artifact readers: they verify files OUTSIDE the mutated surface
+    # (alembic versions, ops/compose files) and break under the mutants/
+    # layout - the mutation run gains nothing from them.
+    "--deselect", "tests/integration/test_doctor_user_unique_invariant.py",
+    "--deselect", "tests/integration/test_lab_resource_internal_role.py",
+    "--deselect", "tests/integration/test_queue_resource_expand.py",
+    "--deselect", "tests/integration/test_queue_resource_seed_backfill.py",
+    "--deselect", "tests/integration/test_queue_resource_sentinel.py",
+    "--deselect", "tests/integration/test_manager_deprecation.py::test_nightly_smoke_repointed_and_manager_free",
+    "--deselect", "tests/unit/test_idempotency_distributed_claim.py::test_compose_files_never_evict_idempotency_state",
     "--deselect", "tests/unit/test_notification_endpoint_inventory.py",
     "--deselect", "tests/unit/test_no_legacy_ports_in_active_text.py",
     "--deselect", "tests/integration/test_pr30_security_hardening.py",
