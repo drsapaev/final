@@ -6313,3 +6313,76 @@ def test_resource_visit_dates_follow_the_queue_day(db_session: Session) -> None:
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== UU. Codex round-37 pins =====================
+
+
+def test_resource_visit_times_use_the_clinic_clock(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-37 P2: resource-visit times ride the CLINIC clock (the
+    queue-settings timezone) — host datetime.now() recorded a clinic
+    01:00 encounter as 20:00 the previous day, and the start overwrite
+    repeated the host-local value; registrar views and time-based
+    notifications showed a time up to five hours late. The clock is
+    frozen at a fixed clinic time so the assertion is deterministic."""
+    from app.api.v1.endpoints.doctor_integration import _queue_ops as dqo
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+
+    frozen_day = date.today() + timedelta(days=1)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            frozen = datetime.combine(frozen_day, datetime.min.time()).replace(
+                hour=13, minute=45
+            )
+            if tz is not None:
+                return frozen.replace(tzinfo=tz)
+            return frozen
+
+    monkeypatch.setattr(dqo, "datetime", FixedDateTime)
+
+    patient = Patient(
+        last_name="Ресурсный5",
+        first_name="Пациент",
+        phone="+998901234538",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=frozen_day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=1)
+        entry.patient_id = patient.id
+        db_session.commit()
+
+        admin = _make_user(db_session, username="adm_uu1", role="Admin")
+        assert dqo.call_patient(entry_id=entry.id, db=db_session, current_user=admin)[
+            "success"
+        ]
+        assert dqo.start_patient_visit(
+            entry_id=entry.id, db=db_session, current_user=admin
+        )["success"]
+
+        db_session.refresh(entry)
+        visit = db_session.query(Visit).filter(Visit.id == entry.visit_id).first()
+        assert visit is not None
+        # the CLINIC clock time, not the host wall time
+        assert visit.visit_time == "13:45"
+        assert "13:45" in (visit.notes or "")
+    finally:
+        _durable_cleanup(db_session, "adm_uu1")
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()

@@ -247,6 +247,19 @@ def get_doctor_queue_today(
 # ============================================================================
 
 
+def _clinic_now(db: Session) -> datetime:
+    """Codex round-37 P2: клиник-локальное «сейчас» (таймзона настроек
+    очередей) для временных меток визитов — host-часы на UTC-хосте в
+    окне 19:00-24:00Z отстают от клиник-времени до 5 часов, и время
+    приёма записывалось «на пять часов раньше»."""
+    from zoneinfo import ZoneInfo
+
+    from app.crud.clinic import get_queue_settings
+
+    tz_name = get_queue_settings(db).get("timezone", "Asia/Tashkent")
+    return datetime.now(ZoneInfo(tz_name))
+
+
 def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
     """Визит командной поверхности доктора привязан к САМОЙ записи очереди.
 
@@ -289,7 +302,8 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 patient_id=queue_entry.patient_id,
                 doctor_id=None,
                 visit_date=queue_day,
-                visit_time=datetime.now().strftime("%H:%M"),
+                # Codex round-37 P2: время визита — клиник-локальные часы
+                visit_time=_clinic_now(db).strftime("%H:%M"),
                 department=department,
             )
     else:
@@ -578,8 +592,13 @@ def start_patient_visit(
             )
 
         # Обновляем время начала приема
-        visit.visit_time = datetime.now().strftime("%H:%M")
-        visit.notes = f"Прием начат в {datetime.now().strftime('%H:%M')}"
+        # Codex round-37 P2: время начала — ОДНИ клиник-локальные часы
+        # (таймзона настроек очередей): host-часы записывали «на пять
+        # часов раньше», и представления/уведомления показывали
+        # неверное время приёма
+        clinic_now = _clinic_now(db)
+        visit.visit_time = clinic_now.strftime("%H:%M")
+        visit.notes = f"Прием начат в {clinic_now.strftime('%H:%M')}"
 
         visit.updated_at = changed_at
 
