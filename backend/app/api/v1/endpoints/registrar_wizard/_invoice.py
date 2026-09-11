@@ -42,14 +42,15 @@ def init_invoice_payment(
 
         # Инициализируем провайдер платежей
         provider_name = payment_req.provider.lower()
-        if provider_name not in SUPPORTED_INVOICE_PAYMENT_PROVIDERS:
+        payment_manager = get_payment_manager()
+        if not payment_manager.supports_registrar_invoice_payment(provider_name):
             return InvoicePaymentResponse(
                 success=False,
                 error_message=f"Провайдер {payment_req.provider} не поддерживается",
             )
 
         # Создаём платёж
-        result = get_payment_manager().create_payment(
+        result = payment_manager.create_payment(
             provider_name=provider_name,
             amount=invoice.total_amount,
             currency=invoice.currency,
@@ -116,8 +117,9 @@ def check_invoice_status(
         if invoice.provider_payment_id and invoice.provider:
             provider_name = invoice.provider.lower()
 
-            if provider_name in SUPPORTED_INVOICE_PAYMENT_PROVIDERS:
-                result = get_payment_manager().check_payment_status(
+            payment_manager = get_payment_manager()
+            if payment_manager.supports_registrar_invoice_payment(provider_name):
+                result = payment_manager.check_payment_status(
                     provider_name, invoice.provider_payment_id
                 )
 
@@ -169,8 +171,11 @@ def check_invoice_status(
                                     # commit=False because this is inside a
                                     # composition (payment + visit confirmation
                                     # committed together at line 200).
-                                    from app.services.payment_invariant_service import PaymentInvariantService
                                     from decimal import Decimal
+
+                                    from app.services.payment_invariant_service import (
+                                        PaymentInvariantService,
+                                    )
 
                                     payment = PaymentInvariantService(db).create_payment_for_visit(
                                         visit_id=visit.id,
@@ -201,7 +206,9 @@ def check_invoice_status(
                                 # commit=False because this is inside a larger
                                 # transaction (invoice status + payment + visit
                                 # status all committed together at line 171).
-                                from app.services.visit_lifecycle_service import VisitLifecycleService
+                                from app.services.visit_lifecycle_service import (
+                                    VisitLifecycleService,
+                                )
 
                                 class _InvoiceActor:
                                     def __init__(self, invoice_id: int) -> None:

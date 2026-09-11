@@ -19,8 +19,26 @@ describe('PaymentManager invoice DTO contract', () => {
     expect(SOURCE).toContain('invoice?.invoice_id');
     expect(SOURCE).toContain('invoice?.id');
     expect(SOURCE).toContain('setCreatedInvoiceId(getInvoiceId(invoice));');
-    expect(SOURCE).toContain('key={getInvoiceId(invoice)}');
-    expect(SOURCE).toContain('<span className="invoice-id">№{getInvoiceId(invoice)}</span>');
+    expect(SOURCE).toContain('const invoiceIdValue = getInvoiceId(invoice);');
+    expect(SOURCE).toContain('key={invoiceIdValue}');
+    expect(SOURCE).toContain('<span className="invoice-id">№{String(invoiceIdValue ?? \'\')}</span>');
     expect(SOURCE).not.toContain('setCreatedInvoiceId(invoice.id);');
+  });
+
+  it('renders only backend-authorized registrar invoice providers', () => {
+    expect(SOURCE).toContain('getPaymentProviders');
+    expect(SOURCE).toContain('provider.features?.registrar_invoice_payment === true');
+    expect(SOURCE).toContain('invoiceProviders.map((provider) => (');
+    expect(SOURCE).toContain('disabled={loading || providersLoading || !providerSupported}');
+    expect(SOURCE).toContain('providersLoadFailed');
+    expect(SOURCE).not.toContain('value="payme"');
+  });
+
+  it('does not reload on every translation wrapper identity change', () => {
+    expect(SOURCE).toContain('const tRef = useRef(t);');
+    expect(SOURCE).toContain('}, [getPendingInvoices]);');
+    expect(SOURCE).toContain('}, [getPaymentProviders]);');
+    expect(SOURCE).not.toContain('[getPendingInvoices, t]');
+    expect(SOURCE).not.toContain('[getPaymentProviders, t]');
   });
 });
