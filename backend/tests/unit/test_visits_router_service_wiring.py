@@ -103,6 +103,9 @@ def test_get_visit_endpoint_delegates_to_service(
             },
             "services": [
                 {
+                    "id": 3,
+                    "visit_id": visit_id,
+                    "service_id": 42,
                     "code": "CONSULT",
                     "name": "Consultation",
                     "price": 125000.0,

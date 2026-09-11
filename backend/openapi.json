@@ -1194,6 +1194,136 @@
         }
       }
     },
+    "/api/v1/visits": {
+      "get": {
+        "tags": [
+          "visits"
+        ],
+        "summary": "Список визитов (мобильный алиас)",
+        "operationId": "list_visits_api_v1_visits_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "name": "status_q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Q"
+            }
+          },
+          {
+            "name": "planned_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Planned Date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VisitOut"
+                  },
+                  "title": "Response List Visits Api V1 Visits Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/visits/visits/{visit_id}": {
       "get": {
         "tags": [
@@ -3966,6 +4096,54 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Get Visit Info By Token Api V1 Visits Info  Token  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/visits/{visit_id}": {
+      "get": {
+        "tags": [
+          "visits-mobile-alias"
+        ],
+        "summary": "Карточка визита (мобильный алиас)",
+        "description": "Мобильный контракт (Android-клиент): GET /api/v1/visits/{visit_id}.\nДелегирует каноническому обработчику (включая PHI-аудит) — ответ\nидентичен байт-в-байт.",
+        "operationId": "get_visit_mobile_alias_api_v1_visits__visit_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitWithServices"
                 }
               }
             }
@@ -23141,6 +23319,53 @@
         }
       }
     },
+    "/api/v1/telegram-integration/send-notification": {
+      "post": {
+        "tags": [
+          "telegram-integration-mobile"
+        ],
+        "summary": "Send Mobile Self Test Notification",
+        "description": "Self-test Telegram delivery for the mobile client.\n\nSends a fixed server-side test message to the CURRENT user's own linked\nchat. The chat is resolved server-side from the TelegramUser link; the\nclient-supplied chat_id/message/parse_mode are parsed for wire\ncompatibility and ignored (no arbitrary-recipient relay).",
+        "operationId": "send_mobile_self_test_notification_api_v1_telegram_integration_send_notification_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileTelegramSelfTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileTelegramSelfTestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/display/call-patient": {
       "post": {
         "tags": [
@@ -42069,6 +42294,53 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/queue/move-entry": {
+      "put": {
+        "tags": [
+          "queue-reorder-mobile-alias"
+        ],
+        "summary": "Move Queue Entry Mobile Alias",
+        "description": "Мобильный контракт (Android-клиент): PUT /api/v1/queue/move-entry.\nСемантика и ответ идентичны каноническому /queue/reorder/move-entry.",
+        "operationId": "move_queue_entry_mobile_alias_api_v1_queue_move_entry_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueEntryMoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueReorderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/email-sms/send-appointment-reminder-enhanced": {
@@ -63122,6 +63394,112 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/EMRRestoreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EMRRecordOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emr/{visit_id}": {
+      "get": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "emr-v2-mobile-alias"
+        ],
+        "summary": "Get Emr Mobile Alias",
+        "description": "Mobile contract (Android client): GET /api/v1/emr/{visit_id}.\n\nDelegates to the canonical /v2/emr/{visit_id} handler (incl. its\naudit trail) — response identical byte-for-byte.",
+        "operationId": "get_emr_mobile_alias_api_v1_emr__visit_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EMRRecordOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "emr-v2-mobile-alias"
+        ],
+        "summary": "Save Emr Mobile Alias",
+        "description": "Mobile contract (Android client): POST /api/v1/emr/{visit_id}.\n\nDelegates to the canonical /v2/emr/{visit_id} handler (incl. its\naudit trail and row_version optimistic locking).",
+        "operationId": "save_emr_mobile_alias_api_v1_emr__visit_id__post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EMRSaveRequest"
               }
             }
           }
@@ -87402,6 +87780,73 @@
         "title": "MobileQuickStats",
         "description": "Быстрая статистика для мобильного приложения"
       },
+      "MobileTelegramSelfTestRequest": {
+        "properties": {
+          "chat_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Id"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "parse_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parse Mode"
+          }
+        },
+        "type": "object",
+        "title": "MobileTelegramSelfTestRequest",
+        "description": "Body of POST /api/v1/telegram-integration/send-notification as sent by\nthe Android client. Every field is accepted for wire compatibility and\ndeliberately IGNORED: the recipient chat is always the CURRENT user's own\nTelegramUser link and the text is a fixed server-side string, so the\nendpoint can never be used to relay arbitrary messages to arbitrary\nchats (no spam/phishing relay surface)."
+      },
+      "MobileTelegramSelfTestResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "chat_id": {
+            "type": "integer",
+            "title": "Chat Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "chat_id"
+        ],
+        "title": "MobileTelegramSelfTestResponse",
+        "description": "Concrete response contract for the mobile self-test endpoint."
+      },
       "MonitoringThresholds": {
         "properties": {
           "cpu_usage": {
@@ -106721,6 +107166,68 @@
         ],
         "title": "VisitServiceIn"
       },
+      "VisitServiceOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price",
+            "default": 0.0
+          },
+          "qty": {
+            "type": "integer",
+            "title": "Qty",
+            "default": 1
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "visit_id",
+          "service_id",
+          "name"
+        ],
+        "title": "VisitServiceOut",
+        "description": "Row-level visit service. Exposes service_id (catalog Service.id) —\nmobile-contract gap #8: the Android client re-books via the batch\nqueue-registration endpoint, which needs the catalog id, not the\nvisit-service row id. Additive fields are backward-compatible for\nexisting web consumers."
+      },
       "VisitWithServices": {
         "properties": {
           "visit": {
@@ -106728,7 +107235,7 @@
           },
           "services": {
             "items": {
-              "$ref": "#/components/schemas/VisitServiceIn"
+              "$ref": "#/components/schemas/VisitServiceOut"
             },
             "type": "array",
             "title": "Services"

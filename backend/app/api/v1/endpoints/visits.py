@@ -7,13 +7,17 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import MetaData, Table, or_, select, text, update
+from sqlalchemy import Table, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
 from app.models.clinic import Doctor
 from app.models.visit import Visit
+from app.services.patient_access_audit import (
+    log_patient_access,
+    log_patient_access_many,
+)
 from app.services.visit_state_checks import (
     ACCEPTED_VISIT_STATUSES,
     force_reopen_target_allowed,
@@ -22,6 +26,10 @@ from app.services.visit_state_checks import (
 from app.services.visits_api_service import VisitsApiService
 
 router = APIRouter()
+# Alias router for the mobile-client (Android) contract paths. Mounted in
+# api.py AFTER visit_confirmation_router so the static GET /visits/info/{token}
+# keeps winning by registration order over the parametric detail alias below.
+alias_router = APIRouter()
 logger = logging.getLogger(__name__)
 # RBAC unification (D-3): admit the whole doctor family, not only the exact
 # "Doctor" spelling — legacy doctor accounts (cardio/derma/dentist/...) must
@@ -75,9 +83,26 @@ class VisitServiceIn(BaseModel):
     qty: int = 1
 
 
+class VisitServiceOut(BaseModel):
+    """Row-level visit service. Exposes service_id (catalog Service.id) —
+    mobile-contract gap #8: the Android client re-books via the batch
+    queue-registration endpoint, which needs the catalog id, not the
+    visit-service row id. Additive fields are backward-compatible for
+    existing web consumers."""
+
+    id: int
+    visit_id: int
+    service_id: int
+    code: str | None = None
+    name: str
+    price: float = 0.0
+    qty: int = 1
+    created_at: datetime | None = None
+
+
 class VisitWithServices(BaseModel):
     visit: VisitOut
-    services: list[VisitServiceIn]
+    services: list[VisitServiceOut]
 
 
 # PR-1 (Codex round 11+13, P1): the lease-coordination refusal detail —
@@ -217,8 +242,10 @@ def _ensure_doctor_can_create_visit_for_payload(
         raise HTTPException(status_code=403, detail="Access denied")
 
 
+@router.get("", response_model=list[VisitOut], summary="Список визитов (мобильный алиас)")
 @router.get("/visits", response_model=list[VisitOut], summary="Список визитов")
 def list_visits(
+    request: Request,
     patient_id: int | None = Query(default=None),
     doctor_id: int | None = Query(default=None),
     status_q: str | None = Query(default=None),
@@ -242,6 +269,24 @@ def list_visits(
         limit=limit,
         offset=offset,
     )
+
+    # Threat model (AGENTS.md "Threat model"): "Audit log on every patient
+    # read" — list rows carry patient_id + clinical notes, so each returned
+    # row is a per-patient PHI read by a staff actor. Batch trail covers both
+    # the canonical and the mobile alias route (one transaction).
+    subject_ids = sorted(
+        {row["patient_id"] for row in rows if row.get("patient_id") is not None}
+    )
+    if subject_ids:
+        log_patient_access_many(
+            db,
+            actor_user=current_user,
+            subject_patient_ids=subject_ids,
+            resource_type="visit",
+            action="view",
+            request=request,
+        )
+
     return [VisitOut(**row) for row in rows]  # type: ignore[arg-type]
 
 
@@ -276,6 +321,7 @@ def create_visit(
 )
 def get_visit(
     visit_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(*VISIT_READ_ROLES)),
 ):
@@ -285,9 +331,44 @@ def get_visit(
     _ensure_visit_doctor_access(db, visit, current_user)
 
     payload = VisitsApiService(db).get_visit(visit_id=visit_id)
+
+    # Threat model (AGENTS.md "Threat model"): "Audit log on every patient
+    # read" — the card carries patient name/phone/birth year/address, so the
+    # response is a per-patient PHI read by a staff actor. The mobile alias
+    # delegates here, so both routes share one attributable trail.
+    log_patient_access(
+        db,
+        actor_user=current_user,
+        subject_patient_id=visit.patient_id,
+        resource_type="visit",
+        resource_id=str(visit_id),
+        action="view",
+        request=request,
+        extra_data={"operation": "visit_card_view"},
+    )
+
     return VisitWithServices(
         visit=VisitOut(**payload["visit"]),
-        services=[VisitServiceIn(**item) for item in payload["services"]],
+        services=[VisitServiceOut(**item) for item in payload["services"]],
+    )
+
+
+@alias_router.get(
+    "/visits/{visit_id}",
+    response_model=VisitWithServices,
+    summary="Карточка визита (мобильный алиас)",
+)
+def get_visit_mobile_alias(
+    visit_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles(*VISIT_READ_ROLES)),
+):
+    """Мобильный контракт (Android-клиент): GET /api/v1/visits/{visit_id}.
+    Делегирует каноническому обработчику (включая PHI-аудит) — ответ
+    идентичен байт-в-байт."""
+    return get_visit(
+        visit_id=visit_id, request=request, db=db, current_user=current_user
     )
 
 

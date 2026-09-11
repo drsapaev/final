@@ -393,6 +393,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/visits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Список визитов (мобильный алиас) */
+        get: operations["list_visits_api_v1_visits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/visits/visits/{visit_id}": {
         parameters: {
             query?: never;
@@ -1362,6 +1379,28 @@ export type paths = {
          * @description Получение информации о визите по токену (без подтверждения).
          */
         get: operations["get_visit_info_by_token_api_v1_visits_info__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/visits/{visit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Карточка визита (мобильный алиас)
+         * @description Мобильный контракт (Android-клиент): GET /api/v1/visits/{visit_id}.
+         *     Делегирует каноническому обработчику (включая PHI-аудит) — ответ
+         *     идентичен байт-в-байт.
+         */
+        get: operations["get_visit_mobile_alias_api_v1_visits__visit_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8261,6 +8300,31 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram-integration/send-notification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Mobile Self Test Notification
+         * @description Self-test Telegram delivery for the mobile client.
+         *
+         *     Sends a fixed server-side test message to the CURRENT user's own linked
+         *     chat. The chat is resolved server-side from the TelegramUser link; the
+         *     client-supplied chat_id/message/parse_mode are parsed for wire
+         *     compatibility and ignored (no arbitrary-recipient relay).
+         */
+        post: operations["send_mobile_self_test_notification_api_v1_telegram_integration_send_notification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/display/call-patient": {
         parameters: {
             query?: never;
@@ -14771,6 +14835,27 @@ export type paths = {
          */
         get: operations["get_queue_status_api_v1_queue_reorder_status__queue_id__get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/move-entry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Move Queue Entry Mobile Alias
+         * @description Мобильный контракт (Android-клиент): PUT /api/v1/queue/move-entry.
+         *     Семантика и ответ идентичны каноническому /queue/reorder/move-entry.
+         */
+        put: operations["move_queue_entry_mobile_alias_api_v1_queue_move_entry_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -21298,6 +21383,36 @@ export type paths = {
          *     The restore is recorded in the revision history.
          */
         post: operations["restore_emr_api_v1_v2_emr__visit_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emr/{visit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Emr Mobile Alias
+         * @description Mobile contract (Android client): GET /api/v1/emr/{visit_id}.
+         *
+         *     Delegates to the canonical /v2/emr/{visit_id} handler (incl. its
+         *     audit trail) — response identical byte-for-byte.
+         */
+        get: operations["get_emr_mobile_alias_api_v1_emr__visit_id__get"];
+        put?: never;
+        /**
+         * Save Emr Mobile Alias
+         * @description Mobile contract (Android client): POST /api/v1/emr/{visit_id}.
+         *
+         *     Delegates to the canonical /v2/emr/{visit_id} handler (incl. its
+         *     audit trail and row_version optimistic locking).
+         */
+        post: operations["save_emr_mobile_alias_api_v1_emr__visit_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -30382,6 +30497,35 @@ export type components = {
             pending_payments: number;
         };
         /**
+         * MobileTelegramSelfTestRequest
+         * @description Body of POST /api/v1/telegram-integration/send-notification as sent by
+         *     the Android client. Every field is accepted for wire compatibility and
+         *     deliberately IGNORED: the recipient chat is always the CURRENT user's own
+         *     TelegramUser link and the text is a fixed server-side string, so the
+         *     endpoint can never be used to relay arbitrary messages to arbitrary
+         *     chats (no spam/phishing relay surface).
+         */
+        MobileTelegramSelfTestRequest: {
+            /** Chat Id */
+            chat_id?: string | number | null;
+            /** Message */
+            message?: string | null;
+            /** Parse Mode */
+            parse_mode?: string | null;
+        };
+        /**
+         * MobileTelegramSelfTestResponse
+         * @description Concrete response contract for the mobile self-test endpoint.
+         */
+        MobileTelegramSelfTestResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
+            /** Chat Id */
+            chat_id: number;
+        };
+        /**
          * MonitoringThresholds
          * @description Пороговые значения для мониторинга
          */
@@ -37579,11 +37723,43 @@ export type components = {
              */
             qty: number;
         };
+        /**
+         * VisitServiceOut
+         * @description Row-level visit service. Exposes service_id (catalog Service.id) —
+         *     mobile-contract gap #8: the Android client re-books via the batch
+         *     queue-registration endpoint, which needs the catalog id, not the
+         *     visit-service row id. Additive fields are backward-compatible for
+         *     existing web consumers.
+         */
+        VisitServiceOut: {
+            /** Id */
+            id: number;
+            /** Visit Id */
+            visit_id: number;
+            /** Service Id */
+            service_id: number;
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Price
+             * @default 0
+             */
+            price: number;
+            /**
+             * Qty
+             * @default 1
+             */
+            qty: number;
+            /** Created At */
+            created_at?: string | null;
+        };
         /** VisitWithServices */
         VisitWithServices: {
             visit: components["schemas"]["VisitOut"];
             /** Services */
-            services: components["schemas"]["VisitServiceIn"][];
+            services: components["schemas"]["VisitServiceOut"][];
         };
         /**
          * WaitTimeAnalyticsResponse
@@ -39638,6 +39814,42 @@ export interface operations {
             };
         };
     };
+    list_visits_api_v1_visits_get: {
+        parameters: {
+            query?: {
+                patient_id?: number | null;
+                doctor_id?: number | null;
+                status_q?: string | null;
+                planned_date?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_visit_api_v1_visits_visits__visit_id__get: {
         parameters: {
             query?: never;
@@ -41278,6 +41490,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_visit_mobile_alias_api_v1_visits__visit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitWithServices"];
                 };
             };
             /** @description Validation Error */
@@ -52662,6 +52905,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_mobile_self_test_notification_api_v1_telegram_integration_send_notification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileTelegramSelfTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileTelegramSelfTestResponse"];
                 };
             };
             /** @description Validation Error */
@@ -64130,6 +64406,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_queue_entry_mobile_alias_api_v1_queue_move_entry_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueEntryMoveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueReorderResponse"];
                 };
             };
             /** @description Validation Error */
@@ -75936,6 +76245,72 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["EMRRestoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRRecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_emr_mobile_alias_api_v1_emr__visit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRRecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_emr_mobile_alias_api_v1_emr__visit_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EMRSaveRequest"];
             };
         };
         responses: {

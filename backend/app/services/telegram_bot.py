@@ -3,6 +3,7 @@ Telegram Bot сервис для клиники
 Полнофункциональный бот с обработкой команд и webhook
 """
 
+import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
@@ -627,6 +628,24 @@ class TelegramBotService:
         except Exception as e:
             logger.error(f"Ошибка отправки сообщения: {e}")
             return False
+
+    async def send_plain_message(self, chat_id: int, text: str) -> bool:
+        """Public wrapper around the raw sendMessage path.
+
+        Mobile-contract self-test endpoint (POST /api/v1/telegram-integration/
+        send-notification): sends a fixed server-side text to the caller's own
+        linked chat and reports honest success/failure. Returns False on any
+        send failure (corrupted text, missing token, non-200 Telegram reply).
+
+        The underlying request path is a synchronous requests.post (up to the
+        10s timeout); run it in a worker thread so an authenticated caller
+        can never block the application event loop.
+        """
+
+        def _blocking_send() -> bool:
+            return asyncio.run(self._send_message(chat_id, text))
+
+        return await asyncio.to_thread(_blocking_send)
 
     async def _send_document(
         self,

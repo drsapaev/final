@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import clinic_today
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
@@ -30,7 +31,9 @@ def _seed_legacy_today_queue(
     test_patient: Patient,
 ) -> DailyQueue:
     queue = DailyQueue(
-        day=date.today(),
+        # SSOT: день КЛИНИКИ (не host-UTC) — host date diverges from the
+        # clinic day 19:00–00:00 UTC and the endpoint 404s (time-of-day flake).
+        day=clinic_today(db_session),
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,
@@ -62,7 +65,7 @@ def _seed_legacy_call_entry(
     patient: Patient,
 ) -> OnlineQueueEntry:
     queue = DailyQueue(
-        day=date.today(),
+        day=clinic_today(db_session),
         specialist_id=doctor.id,
         queue_tag="cardiology_common",
         active=True,
