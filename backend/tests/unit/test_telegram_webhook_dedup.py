@@ -413,6 +413,33 @@ def test_processed_row_is_duplicate_even_when_old(db_session):
     )
 
 
+def test_claim_churn_exhaustion_returns_unowned_disposition(db_session):
+    """Codex round 28 (P2): after both INSERT/lookup rounds lose the
+    race, the terminal result is UNAVAILABLE — an unowned disposition.
+    Returning CLAIMED there would let a later failure release a THIRD
+    delivery's claim created meanwhile."""
+    db_session.add(TelegramWebhookDedup(update_id=113, status="processed"))
+    db_session.commit()
+    seen = []
+
+    def fake_reclaim(db, update_id, bot_identity):
+        seen.append(update_id)
+        return None  # the conflicting row "vanished" — both times
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            telegram_webhook_dedup,
+            "_reclaim_stale_or_duplicate",
+            fake_reclaim,
+        )
+        disposition = telegram_webhook_dedup.claim_update(db_session, 113)
+
+    # Both retry rounds ran (INSERT rejected twice, lookup "vanished"
+    # twice) and the terminal result is UNOWNED.
+    assert seen == [113, 113]
+    assert disposition == telegram_webhook_dedup.UNAVAILABLE
+
+
 # =================== service: mark / release / fail-open ===================
 
 

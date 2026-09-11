@@ -342,9 +342,11 @@ def claim_update(
         # INSERT once so this delivery leaves a proper ledger row.
 
     # Pathological churn: both the INSERT and the lookup kept losing the
-    # race. Fail open without a ledger row — at-least-once is preserved
-    # (a later redelivery re-claims cleanly).
-    return CLAIMED
+    # race. Fail open WITHOUT ownership (codex round 28): an unowned
+    # disposition (UNAVAILABLE) means the caller processes this delivery
+    # but never releases on failure — a spurious release could delete a
+    # third delivery's live or completed claim created meanwhile.
+    return UNAVAILABLE
 
 
 def _reclaim_stale_or_duplicate(
