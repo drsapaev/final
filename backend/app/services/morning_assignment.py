@@ -12,6 +12,10 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today as _clinic_today
+from app.crud.queue_resource_routing import (
+    find_active_tag_queue,
+    resolve_tag_resource,
+)
 from app.db.session import SessionLocal
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -109,24 +113,63 @@ class MorningAssignmentService:
 
         created_count = 0
 
-        # Get default resource doctor for fallback
-        default_doctor = (
-            self.db.query(Doctor)
-            .join(User, Doctor.user_id == User.id)
-            .filter(User.username == "general_resource", User.is_active == True)
-            .first()
-        )
+        # Get default resource doctor for fallback — QD-2C: resolved
+        # LAZILY: registry tags (lab/ecg) never need it, so a
+        # registry-only catalog must not abort when the synthetic is
+        # absent (the QD-2E direction).
+        default_doctor: Doctor | None = None
+        default_doctor_resolved = False
 
-        if not default_doctor:
-            # Fallback to any active doctor
-            default_doctor = self.db.query(Doctor).filter(Doctor.active == True).first()
-
-        if not default_doctor:
-            logger.warning("No default doctor found for pre-creating queues")
-            return 0
+        def _get_default_doctor() -> Doctor | None:
+            nonlocal default_doctor, default_doctor_resolved
+            if default_doctor_resolved:
+                return default_doctor
+            default_doctor_resolved = True
+            default_doctor = (
+                self.db.query(Doctor)
+                .join(User, Doctor.user_id == User.id)
+                .filter(User.username == "general_resource", User.is_active == True)
+                .first()
+            )
+            if not default_doctor:
+                # Fallback to any active doctor
+                default_doctor = self.db.query(Doctor).filter(Doctor.active == True).first()
+            if not default_doctor:
+                logger.warning("No default doctor found for pre-creating queues")
+            return default_doctor
 
         for (queue_tag,) in unique_tags:
             try:
+                # QD-2C runtime switch: тег со строкой в queue_resources
+                # (сиды 0059 — lab/ecg) пре-создается на РЕСУРСНОЙ оси:
+                # specialist NULL + queue_resource_id. Теги без строки
+                # реестра (general и др.) идут по старому пути
+                # general_resource-синтетика байт-идентично (до QD-2E).
+                if resolve_tag_resource(self.db, queue_tag) is not None:
+                    if find_active_tag_queue(self.db, target_date, queue_tag) is None:
+                        # Codex round-24 P2: изоляция тега в SAVEPOINT — как
+                        # легаси-ветка ниже: get_or_create_daily_queue больше
+                        # НЕ откатывает сеанс при сбое flush (контракт #3092
+                        # P1), поэтому без savepoint сбойнувший тег оставлял
+                        # бы полусозданную очередь/счётчик врал бы после
+                        # catch-and-continue.
+                        with self.db.begin_nested():
+                            queue_service.get_or_create_daily_queue(
+                                self.db,
+                                day=target_date,
+                                specialist_id=None,
+                                queue_tag=queue_tag,
+                            )
+                        created_count += 1
+                        logger.info(
+                            "✅ Pre-created resource DailyQueue for queue_tag=%s",
+                            queue_tag,
+                        )
+                    continue
+
+                if _get_default_doctor() is None:
+                    continue
+
                 # Check if queue already exists for this tag on this day
                 existing = (
                     self.db.query(DailyQueue)
@@ -512,54 +555,68 @@ class MorningAssignmentService:
                 )
                 doctor_id = None
 
-        # Для очередей без конкретного врача используем ресурс-врачей
+        # QD-2C runtime switch: тег со строкой в queue_resources (сиды
+        # 0059 — lab/ecg) маршрутизируется на РЕСУРСНУЮ ось без
+        # резолва синтетика: get_or_create_daily_queue найдёт/создаст
+        # ресурсную очередь (specialist_id для тегов реестра
+        # игнорируется — см. queue_svc/_operations.py). Теги без строки
+        # реестра идут по старому маппингу синтетиков байт-идентично.
+        registry_tag = False
         if not doctor_id:
-            # Маппинг queue_tag → resource_username
-            resource_mapping = {
-                "ecg": "ecg_resource",
-                "lab": "lab_resource",
-                "stomatology": "stomatology_resource",
-                "general": "general_resource",
-                "cardiology_common": "general_resource",  # Используем общий ресурс
-                "dermatology": "general_resource",  # Используем общий ресурс
-                "procedures": "general_resource",  # Используем общий ресурс
-            }
+            if resolve_tag_resource(self.db, queue_tag) is not None:
+                registry_tag = True
+                doctor = None
+                logger.info(
+                    "queue_tag=%s routes to the queue resource axis (QD-2C)",
+                    queue_tag,
+                )
+            else:
+                # Маппинг queue_tag → resource_username
+                resource_mapping = {
+                    "ecg": "ecg_resource",
+                    "lab": "lab_resource",
+                    "stomatology": "stomatology_resource",
+                    "general": "general_resource",
+                    "cardiology_common": "general_resource",  # Используем общий ресурс
+                    "dermatology": "general_resource",  # Используем общий ресурс
+                    "procedures": "general_resource",  # Используем общий ресурс
+                }
 
-            resource_username = resource_mapping.get(
-                queue_tag, "general_resource"
-            )  # Fallback на general_resource
+                resource_username = resource_mapping.get(
+                    queue_tag, "general_resource"
+                )  # Fallback на general_resource
 
-            # ✅ ИСПРАВЛЕНИЕ: Ищем doctor_id через связь User → Doctor
-            resource_user = (
-                self.db.query(User)
-                .filter(User.username == resource_username, User.is_active == True)
-                .first()
-            )
-
-            if resource_user:
-                # Находим запись врача по user_id
-                resource_doctor = (
-                    self.db.query(Doctor)
-                    .filter(Doctor.user_id == resource_user.id)
+                # ✅ ИСПРАВЛЕНИЕ: Ищем doctor_id через связь User → Doctor
+                resource_user = (
+                    self.db.query(User)
+                    .filter(User.username == resource_username, User.is_active == True)
                     .first()
                 )
 
-                if resource_doctor:
-                    doctor_id = resource_doctor.id  # Используем doctor_id, а не user_id
-                    doctor = resource_doctor
-                    logger.info(
-                        f"Для queue_tag={queue_tag} используется ресурс-врач: {resource_username} (Doctor ID: {doctor_id})"
+                if resource_user:
+                    # Находим запись врача по user_id
+                    resource_doctor = (
+                        self.db.query(Doctor)
+                        .filter(Doctor.user_id == resource_user.id)
+                        .first()
                     )
+
+                    if resource_doctor:
+                        doctor_id = resource_doctor.id  # Используем doctor_id, а не user_id
+                        doctor = resource_doctor
+                        logger.info(
+                            f"Для queue_tag={queue_tag} используется ресурс-врач: {resource_username} (Doctor ID: {doctor_id})"
+                        )
+                    else:
+                        logger.warning(
+                            f"У ресурс-пользователя {resource_username} (User ID: {resource_user.id}) нет записи в таблице doctors"
+                        )
                 else:
                     logger.warning(
-                        f"У ресурс-пользователя {resource_username} (User ID: {resource_user.id}) нет записи в таблице doctors"
+                        f"Ресурс-врач {resource_username} не найден для queue_tag={queue_tag}"
                     )
-            else:
-                logger.warning(
-                    f"Ресурс-врач {resource_username} не найден для queue_tag={queue_tag}"
-                )
 
-        if not doctor_id:
+        if not doctor_id and not registry_tag:
             # Last-resort fallback: reuse already opened queue for this tag/day.
             existing_queue = (
                 self.db.query(DailyQueue)

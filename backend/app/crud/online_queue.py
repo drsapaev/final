@@ -35,6 +35,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.crud import clinic as crud_clinic
+from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
@@ -596,6 +598,16 @@ def open_daily_queue(db: Session, day: date, specialist_id: int) -> dict[str, An
         .first()
     )
 
+    # QD-2C (Codex round-3 P1): очередь тега реестра может быть
+    # resource-owned — /online-queue/qrcode создаёт её с specialist
+    # NULL; без fallback открытие приёма создавало бы ПАРАЛЛЕЛЬНУЮ
+    # врачебную очередь, оставив ресурсную открытой для онлайна.
+    # Codex round-5 P1: неактивная легаси-строка не затеняет живую
+    # поверхность — открытие открывает РЕСУРСНУЮ очередь.
+    daily_queue = queue_resource_routing.prefer_registry_surface(
+        db, daily_queue, day, specialist_id
+    )
+
     if not daily_queue:
         # Создаем очередь если не существует
         daily_queue = DailyQueue(day=day, specialist_id=specialist_id, active=True)
@@ -640,6 +652,13 @@ def get_queue_status(db: Session, day: date, specialist_id: int) -> dict[str, An
         db.query(DailyQueue)
         .filter(and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id))
         .first()
+    )
+
+    # QD-2C (Codex round-3 P1): resource-owned очередь тега реестра —
+    # тот же fallback, иначе статус reports queue_exists=False;
+    # round-5 P1: предпочтение активной поверхности
+    daily_queue = queue_resource_routing.prefer_registry_surface(
+        db, daily_queue, day, specialist_id
     )
 
     if not daily_queue:
@@ -691,8 +710,15 @@ def check_queue_availability(
     current_time = datetime.now(timezone)
     queue_start_hour = queue_settings.get("queue_start_hour", 7)
 
+    # Codex round-33 P2: день сравнения — тоже КЛИНИК-локальный (из
+    # того же current_time): host date.today() в окне 19:00-24:00Z
+    # считал текущий клиник-день «будущим» и ПРОПУСКАЛ ограничение
+    # TOO_EARLY — /online-queue/status отвечал within_hours=true до
+    # открытия онлайн-записи.
+    today = current_time.date()
+
     # Проверяем дату
-    if day < date.today():
+    if day < today:
         return {
             "available": False,
             "reason": "DATE_PAST",
@@ -700,7 +726,7 @@ def check_queue_availability(
         }
 
     # Если сегодня, проверяем время
-    if day == date.today():
+    if day == today:
         if current_time.hour < queue_start_hour:
             return {
                 "available": False,
@@ -714,6 +740,12 @@ def check_queue_availability(
         db.query(DailyQueue)
         .filter(and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id))
         .first()
+    )
+
+    # QD-2C (Codex round-3 P1): resource-owned очередь тега реестра;
+    # round-5 P1: предпочтение активной поверхности
+    daily_queue = queue_resource_routing.prefer_registry_surface(
+        db, daily_queue, day, specialist_id
     )
 
     if daily_queue and daily_queue.opened_at:
@@ -824,7 +856,7 @@ def validate_queue_token(
 def get_or_create_daily_queue(
     db: Session,
     day: date,
-    specialist_id: int,
+    specialist_id: int | None,
     queue_tag: str | None = None,
     cabinet_number: str | None = None,
     cabinet_floor: int | None = None,
@@ -836,7 +868,67 @@ def get_or_create_daily_queue(
     Теперь очереди уникальны по (day, specialist_id, queue_tag)
 
     ⭐ ВАЖНО: specialist_id канонически хранит Doctor.id (ForeignKey на doctors.id).
+
+    QD-2C runtime switch: тег со строкой в queue_resources (сиды 0059
+    — lab/ecg) — докторлесс: существующая активная (day, tag)-очередь
+    возвращается (унификация тег-первый), новой очередью становится
+    resource-owned строка (specialist NULL, queue_resource_id, капы из
+    реестра); specialist_id игнорируется и может быть None. Теги без
+    строки реестра — прежний путь врача байт-идентично.
     """
+    # QD-2C: тег реестра → ресурсная ось (унификация тег-первый;
+    # Codex round-3 P1: поверхность деактивационно-устойчива —
+    # существующая resource-owned очередь остаётся поверхностью,
+    # новые ресурсные очереди — только при АКТИВНОЙ строке;
+    # Codex round-4 P2: активность строки перепроверяется ПОСЛЕ лока —
+    # деактивация между resolve и lock не должна приводить к созданию;
+    # Codex round-6 P2: перепроверка под row-lock (FOR UPDATE) и с
+    # populate_existing — идентити-кэш сессии не возвращает
+    # устаревший активный объект, блокировка строки держится до
+    # вставки)
+    if queue_tag:
+        surface = queue_resource_routing.tag_routes_to_resource(db, queue_tag, day)
+        if surface is not None:
+            return surface
+        resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
+        if resource is not None:
+            queue_resource_routing.lock_registry_tag_creation(db, queue_tag, day)
+            resource = queue_resource_routing.resolve_tag_resource_locked(
+                db, queue_tag
+            )
+        if resource is not None:
+            existing_by_tag = (
+                db.query(DailyQueue)
+                .filter(
+                    DailyQueue.day == day,
+                    DailyQueue.queue_tag == queue_tag,
+                    DailyQueue.active.is_(True),
+                )
+                .first()
+            )
+            if existing_by_tag:
+                return existing_by_tag
+            queue_settings = crud_clinic.get_queue_settings(db)
+            daily_queue = DailyQueue(
+                day=day,
+                specialist_id=None,
+                queue_resource_id=int(resource.id),
+                queue_tag=queue_tag,
+                active=True,
+                online_start_time=f"{int(queue_settings.get('queue_start_hour', 7)):02d}:00",
+                online_end_time=f"{int(queue_settings.get('queue_end_hour', 9)):02d}:00",
+                max_online_entries=resource.max_online_per_day,
+                # Codex round-8 P2: канонический кабинет реестра — во
+                # ВСЕХ ветках создания (GQL joinQueue здесь; тикеты и
+                # уведомления читают cabinet_number очереди), паритет
+                # с queue_svc-конструктором (round-7)
+                cabinet_number=resource.default_cabinet,
+            )
+            db.add(daily_queue)
+            db.commit()
+            db.refresh(daily_queue)
+            return daily_queue
+
     doctor_exists = db.query(Doctor).filter(Doctor.id == specialist_id).first()
     if not doctor_exists:
         raise ValueError(
@@ -945,11 +1037,27 @@ def get_queue_statistics(
         "queues": [
             {
                 "specialist_id": q.specialist_id,
+                # QD-2C (Codex round-4 P1): resource-owned очередь
+                # (specialist NULL) в агрегате — владелец из реестра,
+                # иначе AttributeError на q.specialist.user → 500
+                # Codex round-31/32 P2: у 0059-моста (оба владельца)
+                # поверхностью владеет ОСЬ РЕСУРСА — реестровый
+                # display_name вместо пустого имени/«Врач #id»
+                # удержанного синтета; приоритет ДО specialist-условия
                 "specialist_name": (
-                    q.specialist.user.full_name
-                    if q.specialist.user
-                    else f"Врач #{q.specialist_id}"
+                    (
+                        q.queue_resource.display_name
+                        if q.queue_resource
+                        else "Ресурс очереди"
+                    )
+                    if q.queue_resource_id is not None
+                    else (
+                        q.specialist.user.full_name
+                        if q.specialist and q.specialist.user
+                        else f"Врач #{q.specialist_id}"
+                    )
                 ),
+                "queue_resource_id": q.queue_resource_id,
                 "opened_at": q.opened_at,
                 "entries_count": db.query(OnlineQueueEntry)
                 .filter(OnlineQueueEntry.queue_id == q.id)

@@ -157,7 +157,14 @@ def get_queue_status_with_limits(
     """
     try:
         if day is None:
-            day = date.today()
+            # Codex round-30 P2: опущенный день — clinic_today SSOT (таймзона
+            # настроек очередей): resource-очереди создаются на
+            # КЛИНИК-локальном дне, и host date.today() в окне 19:00-24:00Z
+            # читал ВЧЕРАШНИЕ очереди — /queue-status отвечал нулевую
+            # загрузку/«закрыто» при ждущих пациентах.
+            from app.crud.clinic import clinic_today
+
+            day = clinic_today(db)
 
         result = QueueDomainService(db).get_queue_limits_status(
             day=day,

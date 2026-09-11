@@ -38,6 +38,16 @@ from app.crud.appointment import (
 )
 from app.crud.clinic import get_queue_settings
 from app.crud.patient import soft_delete_patient
+from app.crud.queue_resource_routing import (
+    resolve_tag_resource as _resolve_tag_resource,
+)
+from app.crud.queue_resource_routing import (
+    resolve_tag_resource_locked as _resolve_tag_resource_locked,
+)
+from app.crud.queue_resource_routing import (
+    resource_start_number,
+    tag_routes_to_resource,
+)
 from app.crud.visit import create_visit
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.services.appointment_eligibility import (
@@ -1012,23 +1022,11 @@ class Mutation:
                         errors=["DOCTOR_NOT_FOUND"],
                     )
 
-                # Codex P1 (round-8): канонический eligibility-предикат (SSOT,
-                # тот же, что в createAppointment): Doctor.active + завершённый
-                # профиль + владелец существует/активен/с doctor-ролью —
-                # legacy-ghost строки (active Doctor с неактивным владельцем)
-                # больше не принимают онлайн-запись.
-                try:
-                    ensure_doctor_eligible_for_appointment(db, input.doctor_id)
-                except HTTPException:
-                    return QueueMutationResponse(
-                        success=False,
-                        message="Врач недоступен для онлайн-записи",
-                        errors=["DOCTOR_INACTIVE"],
-                    )
-
                 # Codex P1 (round-8): день очереди — по КОНФИГУРИРУЕМОЙ
                 # таймзоне (Asia/Tashkent), а не по host-локали (UTC-контейнеры
                 # между 19:00 и полуночью UTC получали вчерашнюю очередь).
+                # QD-2C (round-21): вычисление перенесено ВЫШЕ гварда врача —
+                # тег реестра резолвится по клинической дате до проверки.
                 queue_settings = get_queue_settings(db)
                 timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
                 now_local = datetime.now(timezone)
@@ -1039,16 +1037,68 @@ class Mutation:
                 # get_or_create_daily_queue это query-then-insert без
                 # unique-констрейнта; advisory lock (Postgres) закрывает гонку
                 # двух первых joinQueue. SQLite (тесты) пропускает.
+                # QD-2C: тег реестра лочится по (tag, day) — ресурсная
+                # очередь одна на день независимо от переданного врача
+                # (унификация тег-первый в get_or_create_daily_queue).
                 if db.bind is not None and db.bind.dialect.name == "postgresql":
+                    if _resolve_tag_resource(db, input.queue_tag) is not None:
+                        lock_key = (
+                            f"daily_queue:tag:{input.queue_tag}:"
+                            f"{today.isoformat()}"
+                        )
+                    else:
+                        lock_key = (
+                            f"daily_queue:{input.doctor_id}:"
+                            f"{today.isoformat()}:{input.queue_tag or ''}"
+                        )
                     db.execute(
                         text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
-                        {
-                            "k": (
-                                f"daily_queue:{input.doctor_id}:"
-                                f"{today.isoformat()}:{input.queue_tag or ''}"
-                            )
-                        },
+                        {"k": lock_key},
                     )
+
+                # QD-2C (Codex round-21 P1): joinQueue по тегу реестра
+                # роутится на resource-ось ДО гварда врача — 0056/0057
+                # перевели сиды lab/ECG на внутреннюю роль 'Resource', а
+                # канонический eligibility-предикат (врач + doctor-family
+                # роль владельца) отклонял их с DOCTOR_INACTIVE ещё ДО
+                # crud-ветки реестра. Гвард — контракт ДОКТОРСКОЙ очереди
+                # (владелец активен + doctor-family роль); resource-ось
+                # несёт свои инварианты (очередь активна/не открыта/окно
+                # часов/лимит) — они ниже не зависят от владельца.
+                # Codex round-23 P2: решение о ветке — ПОД локом, а не по
+                # unlocked-предчеку. Строка реестра перечитывается
+                # LOCKED-резолвером (FOR UPDATE + populate_existing — in-flight
+                # деактивация блокируется и видна свежим состоянием, лок
+                # держится до конца транзакции), поэтому registry_routed
+                # стабилен до самого коммита: деактивация в окне между
+                # предчеком и get_or_create больше не может уронить
+                # создание в ДОКТОРСКУЮ ветку с уже пропущенными гвардами
+                # (невалидная очередь синтетика персистилась и после
+                # реактивации реестра мешала resource-поверхности), а
+                # fallback на реального врача не может пропустить round-15
+                # FOR UPDATE-перепроверку по устаревшему true.
+                # Деактивационно-устойчиво (round-3): живая resource-очередь
+                # (day, tag) маршрутизирует и при деактивированной строке
+                # реестра (tag_routes_to_resource), новая — только при
+                # АКТИВНОЙ строке (locked-resolve).
+                registry_routed = bool(input.queue_tag) and (
+                    tag_routes_to_resource(db, input.queue_tag, today) is not None
+                    or _resolve_tag_resource_locked(db, input.queue_tag) is not None
+                )
+                if not registry_routed:
+                    # Codex P1 (round-8): канонический eligibility-предикат (SSOT,
+                    # тот же, что в createAppointment): Doctor.active + завершённый
+                    # профиль + владелец существует/активен/с doctor-ролью —
+                    # legacy-ghost строки (active Doctor с неактивным владельцем)
+                    # больше не принимают онлайн-запись.
+                    try:
+                        ensure_doctor_eligible_for_appointment(db, input.doctor_id)
+                    except HTTPException:
+                        return QueueMutationResponse(
+                            success=False,
+                            message="Врач недоступен для онлайн-записи",
+                            errors=["DOCTOR_INACTIVE"],
+                        )
 
                 # SSOT: get_or_create_daily_queue (уникальность day+specialist+tag).
                 # Codex P1 (round-8): новая очередь получает сконфигурированную
@@ -1064,6 +1114,25 @@ class Mutation:
                     },
                 )
 
+                # QD-2C (Codex round-22 P2, теперь пояс-надежности): даже при
+                # стабилизированном под локом registry_routed проверяем ФАКТ
+                # по возвращённой очереди — закрывает экзотическое окно,
+                # когда живая поверхность деактивируется между нашим
+                # резолвом и внутренним резолвом get_or_create при уже
+                # неактивной строке реестра (оба гварда уже пропущены):
+                # guard-skip законен только для очереди НА ресурсной оси;
+                # иначе — канонический гвард врача задним числом (реальный
+                # врач прошёл бы его и раньше — семантика байт-идентична).
+                if registry_routed and daily_queue.queue_resource_id is None:
+                    try:
+                        ensure_doctor_eligible_for_appointment(db, input.doctor_id)
+                    except HTTPException:
+                        return QueueMutationResponse(
+                            success=False,
+                            message="Врач недоступен для онлайн-записи",
+                            errors=["DOCTOR_INACTIVE"],
+                        )
+
                 # Codex P1 (round-15): get_or_create_daily_queue КОММИТИТ при
                 # создании очереди (и при обновлении кабинета) — внутренний
                 # commit завершает транзакцию и ОТПУСКАЕТ лок строки врача и
@@ -1074,27 +1143,32 @@ class Mutation:
                 # повторяем канонический eligibility-предикат; лок держится до
                 # финального коммита вставки талона (порядок локов
                 # doctor -> queue сохраняется — дедлоков нет).
-                doctor = (
-                    db.query(Doctor)
-                    .filter(Doctor.id == input.doctor_id)
-                    .with_for_update()
-                    .populate_existing()
-                    .first()
-                )
-                if not doctor:
-                    return QueueMutationResponse(
-                        success=False,
-                        message=t("doctor.not_found"),
-                        errors=["DOCTOR_NOT_FOUND"],
+                # QD-2C (Codex round-21 P1): только для ДОКТОРСКОЙ ветки —
+                # registry-routed join не гвардится врачом (см. выше); его
+                # doctor-строка используется лишь как fallback капы/старта,
+                # а ресурсная очередь несёт собственные значения реестра.
+                if not registry_routed:
+                    doctor = (
+                        db.query(Doctor)
+                        .filter(Doctor.id == input.doctor_id)
+                        .with_for_update()
+                        .populate_existing()
+                        .first()
                     )
-                try:
-                    ensure_doctor_eligible_for_appointment(db, input.doctor_id)
-                except HTTPException:
-                    return QueueMutationResponse(
-                        success=False,
-                        message="Врач недоступен для онлайн-записи",
-                        errors=["DOCTOR_INACTIVE"],
-                    )
+                    if not doctor:
+                        return QueueMutationResponse(
+                            success=False,
+                            message=t("doctor.not_found"),
+                            errors=["DOCTOR_NOT_FOUND"],
+                        )
+                    try:
+                        ensure_doctor_eligible_for_appointment(db, input.doctor_id)
+                    except HTTPException:
+                        return QueueMutationResponse(
+                            success=False,
+                            message="Врач недоступен для онлайн-записи",
+                            errors=["DOCTOR_INACTIVE"],
+                        )
 
                 # P1: лочим строку очереди ДО проверок дубликата/лимита и
                 # выдачи номера — параллельные joinQueue выстраиваются здесь
@@ -1199,6 +1273,13 @@ class Mutation:
                 # start_number_online != 1 выдавала всегда билет #1. Как в
                 # каноническом calculate_next_number (queue_svc/_operations.py):
                 # max(max_number + 1, start_number), старт — настройка врача.
+                # QD-2C (Codex round-1 P2): очередь тега реестра (ресурсная
+                # или мост) стартует со значения реестра — как REST/svc пути
+                # (calculate_next_number), иначе GQL и REST расходились бы в
+                # последовательностях при отличии от настроки врача.
+                start_floor = resource_start_number(db, daily_queue)
+                if start_floor is None:
+                    start_floor = doctor.start_number_online
                 next_number = max(
                     (
                         db.query(func.max(OnlineQueueEntry.number))
@@ -1207,7 +1288,7 @@ class Mutation:
                         or 0
                     )
                     + 1,
-                    doctor.start_number_online,
+                    start_floor,
                 )
 
                 queue_entry = OnlineQueueEntry(
@@ -1257,12 +1338,15 @@ class Mutation:
             return response
 
         entry = response.queue_entry
-        specialist_id = (
-            entry.queue.specialist.id
-            if entry.queue and entry.queue.specialist
-            else input.doctor_id
-        )
         day = entry.queue.day if entry.queue else date.today()
+        # QD-2C (Codex round-22 P2): routing-комнаты для WS-broadcast —
+        # чистая ресурсная очередь адресуема через ЛЮБОГО same-specialty
+        # doctor id (каждый queue manager подписан на свой выбранный id),
+        # а не только через input.doctor_id; канонический хелпер
+        # queue_update_departments (round-18) расширяет её до всех
+        # routing-специалистов. Doctor/bridged очереди — легаси-комната
+        # байт-идентично. Fallback до вычисления — прежняя комната.
+        departments: list[str] = [f"specialist_{input.doctor_id}"]
 
         # 1) TV-табло: queue.created (payload строится при открытой сессии —
         # entry2.queue/patient lazy-load; после закрытия был бы DetachedInstanceError)
@@ -1275,26 +1359,30 @@ class Mutation:
                     .first()
                 )
                 if entry2:
+                    from app.ws.queue_ws import queue_update_departments
+
+                    departments = queue_update_departments(db2, entry2.queue)
                     await manager.broadcast_queue_update(
                         queue_entry=entry2, event_type="queue.created"
                     )
         except Exception as e:  # noqa: BLE001 — non-blocking
             logger.warning("GraphQL joinQueue: display broadcast failed: %s", e)
 
-        # 2) админский WS /ws/queue: entry_added
+        # 2) админский WS /ws/queue: entry_added — в КАЖДУЮ routing-комнату
         try:
             from app.ws.queue_ws import broadcast_queue_update
 
-            broadcast_queue_update(
-                department=f"specialist_{specialist_id}",
-                date=day.strftime("%Y-%m-%d"),
-                event_type="queue_update",
-                data={
-                    "action": "entry_added",
-                    "entry_id": entry.id,
-                    "number": entry.number,
-                },
-            )
+            for _dept in departments:
+                broadcast_queue_update(
+                    department=_dept,
+                    date=day.strftime("%Y-%m-%d"),
+                    event_type="queue_update",
+                    data={
+                        "action": "entry_added",
+                        "entry_id": entry.id,
+                        "number": entry.number,
+                    },
+                )
         except Exception as e:  # noqa: BLE001 — non-blocking
             logger.warning("GraphQL joinQueue: queue WS broadcast failed: %s", e)
 
@@ -1413,14 +1501,40 @@ class Mutation:
                                 trail_exc,
                             )
                     if entry.queue:
-                        payload["cabinet"] = entry.queue.cabinet_number or (
-                            entry.queue.specialist.cabinet
-                            if entry.queue.specialist
-                            else None
-                        )
+                        # QD-2C (Codex round-13 P2): resource/bridged
+                        # очередь — кабинет с оси ресурса (реестр), как в
+                        # QR-метаданных (round-12): queue.cabinet_number,
+                        # затем default_cabinet, НЕ кабинет отсутствующего
+                        # специалиста
+                        if entry.queue.queue_resource_id is not None:
+                            _resource = entry.queue.queue_resource
+                            payload["cabinet"] = entry.queue.cabinet_number or (
+                                _resource.default_cabinet
+                                if _resource is not None
+                                else None
+                            )
+                        else:
+                            payload["cabinet"] = entry.queue.cabinet_number or (
+                                entry.queue.specialist.cabinet
+                                if entry.queue.specialist
+                                else None
+                            )
                         # Codex P1 (round-9): день вызова — из ВЫБРАННОЙ очереди
                         # (загружен при снапшоте), не host date.today().
                         payload["broadcast_day"] = entry.queue.day
+                        # QD-2C (Codex round-24 P2): routing-комнаты выбранной
+                        # очереди — считаются ЗДЕСЬ, при живой сессии
+                        # (обёртка/event loop сессии не имеет): resource-
+                        # очередь адресуема через ЛЮБОЙ same-specialty
+                        # doctor id (менеджеры подписаны на свой выбранный
+                        # id) — call_next должен достичь каждую, как
+                        # join/restore/no-show (round-18/22); doctor-
+                        # очереди — легаси-комната байт-идентично.
+                        from app.ws.queue_ws import queue_update_departments
+
+                        payload["broadcast_departments"] = (
+                            queue_update_departments(db, entry.queue)
+                        )
 
                     # --- post-commit side effects с sync-DB (в этом же worker) ---
                     # 1) push-уведомление пациенту: sync-обёртка (asyncio.run
@@ -1438,13 +1552,26 @@ class Mutation:
                     # 2) TV-табло — payload собирается при открытой сессии
                     # (lazy queue/specialist), отправка — на event loop.
                     try:
-                        specialist_name = (
-                            entry.queue.specialist.user.full_name
-                            if entry.queue
-                            and entry.queue.specialist
-                            and entry.queue.specialist.user
-                            else "Врач"
-                        )
+                        # QD-2C (Codex round-13 P2): resource/bridged очередь
+                        # — владелец объявления с оси ресурса (реестр), как
+                        # display и legacy call пути (round-11/12); иначе
+                        # табло говорит «Врач» при живом реестровом
+                        # назначении
+                        if entry.queue and entry.queue.queue_resource_id is not None:
+                            _resource = entry.queue.queue_resource
+                            specialist_name = (
+                                _resource.display_name
+                                if _resource is not None
+                                else "Ресурс очереди"
+                            )
+                        else:
+                            specialist_name = (
+                                entry.queue.specialist.user.full_name
+                                if entry.queue
+                                and entry.queue.specialist
+                                and entry.queue.specialist.user
+                                else "Врач"
+                            )
                         payload[
                             "display_message"
                         ] = get_display_manager().build_patient_call_message(
@@ -1534,14 +1661,24 @@ class Mutation:
                 from app.ws.queue_ws import broadcast_queue_update
 
                 broadcast_day = payload.get("broadcast_day")
-                broadcast_queue_update(
-                    department=f"specialist_{doctor_id}",
-                    date=(
-                        broadcast_day.strftime("%Y-%m-%d") if broadcast_day else None
-                    ),
-                    event_type="queue_update",
-                    data={"action": "call_next", "entry_id": entry_id},
-                )
+                # QD-2C (Codex round-24 P2): routing-комнаты выбранной
+                # очереди (посчитаны в impl при живой сессии) — broadcast
+                # в КАЖДУЮ; fallback (нет очереди в payload) — прежняя
+                # комната вызвавшего.
+                departments = payload.get("broadcast_departments") or [
+                    f"specialist_{doctor_id}"
+                ]
+                for _dept in departments:
+                    broadcast_queue_update(
+                        department=_dept,
+                        date=(
+                            broadcast_day.strftime("%Y-%m-%d")
+                            if broadcast_day
+                            else None
+                        ),
+                        event_type="queue_update",
+                        data={"action": "call_next", "entry_id": entry_id},
+                    )
             except Exception as e:  # noqa: BLE001 — non-blocking
                 logger.warning("GraphQL callNext: queue WS broadcast failed: %s", e)
 

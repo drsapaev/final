@@ -11,7 +11,7 @@
 # Use ``importlib.import_module`` to bypass the package-attribute shadowing
 # and bind to the actual modules.
 import importlib as _importlib
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -96,7 +96,10 @@ class ServiceSearchRequest(BaseModel):
 class QueueStatusResponse(BaseModel):
     """Статус очереди"""
 
-    doctor_id: int
+    # QD-2C (Codex round-8 P1): ресурсные очереди тега (specialist
+    # NULL) — doctor_id nullable, владелец представлен осью ресурса
+    # (doctor_name = display_name реестра, specialty = queue_tag).
+    doctor_id: int | None
     doctor_name: str
     specialty: str
     current_number: int
@@ -331,7 +334,13 @@ async def get_queues_status(
 ):
     """Статус всех очередей на сегодня"""
     try:
-        today = date.today()
+        # Codex round-29 P2: день статуса — clinic_today SSOT (таймзона
+        # настроек очередей): resource-очереди создаются на КЛИНИК-локальном
+        # дне, и host date.today() в окне 19:00-24:00Z молча пропускал
+        # живые lab/ECG очереди в мобильном статусе.
+        from app.crud.clinic import clinic_today
+
+        today = clinic_today(db)
         queues = crud_queue.get_daily_queues(db, day=today, active_only=True)
 
         result = []
@@ -352,8 +361,22 @@ async def get_queues_status(
             result.append(
                 QueueStatusResponse(
                     doctor_id=queue.specialist_id,
-                    doctor_name=_doctor_full_name(doctor),
-                    specialty=_doctor_specialty(doctor),
+                    doctor_name=(
+                        # QD-2C (Codex round-8 P1 / round-10 P2): the
+                        # resource axis — bridged rows included; the
+                        # owner is the registry display_name
+                        queue.queue_resource.display_name
+                        if queue.queue_resource_id is not None
+                        else _doctor_full_name(doctor)
+                    ),
+                    specialty=(
+                        queue.queue_tag
+                        if (
+                            queue.queue_resource_id is not None
+                            and queue.queue_tag
+                        )
+                        else _doctor_specialty(doctor)
+                    ),
                     current_number=current_number,
                     total_numbers=total_numbers,
                     estimated_wait_time=estimated_wait,
@@ -403,8 +426,22 @@ async def get_my_queue_position(
             result.append(
                 {
                     "queue_id": position.queue_id,
-                    "doctor_name": _doctor_full_name(doctor),
-                    "specialty": _doctor_specialty(doctor),
+                    # QD-2C (Codex round-9 P2 / round-10 P2): the
+                    # resource axis — bridged rows included; the owner
+                    # is the registry display_name, the axis is the tag
+                    "doctor_name": (
+                        queue.queue_resource.display_name
+                        if queue.queue_resource_id is not None
+                        else _doctor_full_name(doctor)
+                    ),
+                    "specialty": (
+                        queue.queue_tag
+                        if (
+                            queue.queue_resource_id is not None
+                            and queue.queue_tag
+                        )
+                        else _doctor_specialty(doctor)
+                    ),
                     "my_number": position.number,
                     "current_number": current_number,
                     "patients_before_me": max(0, patients_before),

@@ -126,13 +126,23 @@ class QueueEntryType:
 
 @strawberry.type
 class DailyQueueType:
-    """Тип дневной очереди (DailyQueue: day/specialist_id/active)"""
+    """Тип дневной очереди (DailyQueue: day/specialist_id/active)
+
+    QD-2C (runtime switch, GQL nullable): specialist — nullable —
+       ресурсная очередь (specialist NULL, queue_resource_id
+    установлен) отдаёт specialist=None + owner_kind="resource";
+       врачебные очереди — owner_kind="doctor". Мост двойного владения
+    (обе оси, бэкфилл 0059) классифицируется как resource — ось
+       владения определяется queue_resource_id (как в DailyQueueOut).
+    """
 
     id: int
-    specialist: DoctorType
+    specialist: DoctorType | None = None
     day: date
     queue_tag: str | None = None
     active: bool
+    queue_resource_id: int | None = None
+    owner_kind: str | None = None
     opened_at: datetime | None = None
     cabinet_number: str | None = None
     cabinet_floor: int | None = None

@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 import strawberry
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import selectinload
 
 
@@ -305,6 +305,10 @@ def daily_queue_to_type(queue: DailyQueue) -> DailyQueueType:
         day=queue.day,
         queue_tag=queue.queue_tag,
         active=queue.active,
+        # QD-2C: ось владения выводится из queue_resource_id (как в
+        # DailyQueueOut): мост двойного владения — resource
+        queue_resource_id=queue.queue_resource_id,
+        owner_kind="resource" if queue.queue_resource_id else "doctor",
         opened_at=queue.opened_at,
         cabinet_number=queue.cabinet_number,
         cabinet_floor=queue.cabinet_floor,
@@ -664,7 +668,36 @@ class Query:
             # Применяем фильтры
             if filter:
                 if filter.doctor_id:
-                    query = query.filter(DailyQueue.specialist_id == filter.doctor_id)
+                    # QD-2C (Codex round-13 P2): joinQueue пишет записи в
+                    # resource-owned очередь тега (specialist NULL,
+                    # queue_resource_id) — doctor-keyed предикат один их
+                    # не видит, и GraphQL-запись «исчезала» из
+                    # соответствующего чтения. Ось тега добавляется к
+                    # фильтру врача: тег — из specialty выбранного
+                    # специалиста; строки с queue_resource_id — по
+                    # построению только теги реестра (switch-писатели
+                    # гейтируются реестром, 0059 backfill — только его
+                    # теги), поэтому предикат самогейтится данными и
+                    # деактивационно-устойчив (живые resource-очереди
+                    # остаются видимыми — семантика tag_routes_to_resource).
+                    # Codex round-20 P2: тег ресурсной оси — ТОЛЬКО из
+                    # specialty выбранного врача; явный queueTag фильтра
+                    # сюда НЕ подставляется (ниже он остаётся независимым
+                    # пересечением) — подстановка делала ЛЮБУЮ resource-
+                    # строку поданного тега удовлетворяющей предикату
+                    # врача: doctorId(cardiology) + queueTag:"lab"
+                    # возвращал всю лабораторную resource-ось мимо doctorId.
+                    doctor = db.get(Doctor, filter.doctor_id)
+                    tag = doctor.specialty if doctor is not None else None
+                    predicates = [DailyQueue.specialist_id == filter.doctor_id]
+                    if tag:
+                        predicates.append(
+                            and_(
+                                DailyQueue.queue_resource_id.isnot(None),
+                                DailyQueue.queue_tag == tag,
+                            )
+                        )
+                    query = query.filter(or_(*predicates))
                 if filter.queue_date:
                     query = query.filter(DailyQueue.day == filter.queue_date)
                 if filter.queue_tag:

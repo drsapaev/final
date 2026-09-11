@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
+from app.crud import queue_resource_routing
 from app.crud.clinic import get_queue_settings
 from app.repositories.queue_read_repository import QueueReadRepository
 from app.services.queue_service import queue_service
@@ -63,6 +64,19 @@ class QueueDomainService:
             specialist_id=specialist_id,
             day=day,
         )
+        # QD-2C (Codex round-13 P2): реестр-тег специалист — (day, tag)-
+        # поверхность может быть resource-owned (specialist NULL):
+        # doctor-keyed lookup её не видит, и reorder-status отвечает 404
+        # при живой очереди (утренний пре-креат / пост-свитч писатель).
+        # Тот же резолв, что и limit-status выше: поверхность реестра
+        # предпочитается легаси-строке (prefer_registry_surface —
+        # deactivation-proof, round-5/6 семантика), врач-теги без
+        # поверхности неизменны. isinstance: unit-стабы могут передавать
+        # не-Session db — для них легаси-путь.
+        if isinstance(self.db, Session):
+            queue = queue_resource_routing.prefer_registry_surface(
+                self.db, queue, day, specialist_id
+            )
         if not queue:
             raise QueueDomainReadError(404, "Очередь не найдена")
 
@@ -80,6 +94,40 @@ class QueueDomainService:
         return f"Специалист #{specialist_id}"
 
     def _build_cabinet_payload(self, queue: object) -> dict[str, Any]:
+        # QD-2C (Codex round-8 P1 / round-10 P2): resource-axis очередь
+        # (queue_resource_id — включая BRIDGED строки 0059, у которых
+        # specialist_id тоже установлен; контракт DailyQueueOut/GQL
+        # классифицирует мост как resource) — врач-ось отсутствует по
+        # дизайну: владелец = реестр, кабинет — из строки очереди
+        # (default_cabinet копируется при создании), sync-семантика
+        # «нет связанного врача» не является integrity-проблемой.
+        if getattr(queue, "queue_resource_id", None) is not None:
+            resource = getattr(queue, "queue_resource", None)
+            queue_cabinet = queue.cabinet_number
+            return {
+                "id": queue.id,
+                "day": queue.day.isoformat(),
+                # the bridge KEEPS the doctor axis (0059 backfill shape);
+                # pure resource rows carry None
+                "specialist_id": queue.specialist_id,
+                "specialist_name": (
+                    resource.display_name if resource else "Ресурс очереди"
+                ),
+                "queue_tag": queue.queue_tag,
+                "cabinet_number": queue_cabinet,
+                "doctor_cabinet": None,
+                "effective_cabinet": queue_cabinet,
+                "cabinet_floor": queue.cabinet_floor,
+                "cabinet_building": queue.cabinet_building,
+                "entries_count": self.read_repository.count_entries(queue_id=queue.id),
+                "active": queue.active,
+                "linked_doctor_found": False,
+                "doctor_has_cabinet": False,
+                "sync_status": "resource_owned",
+                "integrity_warnings": (
+                    [] if queue_cabinet else ["effective_cabinet_missing"]
+                ),
+            }
         doctor = self.read_repository.get_doctor(queue.specialist_id)
         doctor_cabinet = getattr(doctor, "cabinet", None) if doctor else None
         linked_doctor_found = doctor is not None
@@ -129,10 +177,41 @@ class QueueDomainService:
         specialist_id: int | None,
         cabinet_number: str | None,
     ) -> list[dict[str, Any]]:
+        # Codex round-44 P2 + round-45 P2: specialist-filtered admin
+        # reads resolve the REGISTRY surface — a pure resource queue
+        # stores specialist_id NULL, so the doctor-keyed filter alone
+        # returned an empty list for the live lab/ECG queue the same
+        # legacy identity addresses on every other surface.
+        # Round-45: гейт деактивационно-устойчив (round-3 P1 контракт) —
+        # ЗАПРОШЕННЫЙ ДЕНЬ резолвит существующую поверхность тега ПЕРВЫМ:
+        # живая ресурс-очередь остаётся в скоупе фильтра, даже если
+        # строку реестра деактивировали ПОСЛЕ её создания; без фильтра
+        # дня любую живую ресурс-очередь тега держит его в скоупе, а
+        # активная строка реестра открывает тег и до первого создания.
+        registry_tag = None
+        if specialist_id is not None:
+            doctor = self.read_repository.get_doctor(specialist_id)
+            if doctor is not None and doctor.specialty:
+                tag = doctor.specialty
+                if day is not None:
+                    if (
+                        queue_resource_routing.tag_routes_to_resource(self.db, tag, day)
+                        is not None
+                    ):
+                        registry_tag = tag
+                else:
+                    # без фильтра дня: любая живая ресурс-очередь тега
+                    # держит его в скоупе; иначе — активная строка реестра
+                    if self.read_repository.has_resource_tag_queues(queue_tag=tag) or (
+                        queue_resource_routing.resolve_tag_resource(self.db, tag)
+                        is not None
+                    ):
+                        registry_tag = tag
         queues = self.read_repository.list_daily_queues(
             day_obj=day,
             specialist_id=specialist_id,
             cabinet_number=cabinet_number,
+            registry_tag=registry_tag,
         )
         return [self._build_cabinet_payload(queue) for queue in queues]
 
@@ -157,20 +236,41 @@ class QueueDomainService:
             # Preserve current runtime behavior: limits read paths resolve DailyQueue
             # by Doctor.user_id even though DailyQueue.specialist_id is modeled
             # against doctors.id.
-            daily_queue = self.read_repository.get_queue_by_specialist_day(
-                specialist_id=doctor.user_id,
-                day=day,
-            )
-
-            current_entries = 0
-            queue_opened = False
-            if daily_queue:
+            # QD-2C (Codex round-10 P2): registry-tag врач — usage/кап/
+            # открытость читаются с (day, tag)-ПОВЕРХНОСТИ (могла быть
+            # создана ресурсной после переключения), иначе отчёт
+            # показывает нулевую загрузку сразу после смены лимита.
+            # isinstance: unit-стабы могут передавать не-Session db —
+            # для них легаси-путь (их врачи не registry-теги).
+            surface = None
+            if doctor.specialty and isinstance(self.db, Session):
+                surface = (
+                    queue_resource_routing.resolve_registry_tag_queue_for_specialist(
+                        self.db, day, doctor.id, None
+                    )
+                )
+            if surface is not None:
+                daily_queue = surface
                 current_entries = self.read_repository.count_entries(
                     queue_id=daily_queue.id
                 )
                 queue_opened = daily_queue.opened_at is not None
-
-            max_entries = max_per_day_settings.get(doctor.specialty, 15)
+                max_entries = daily_queue.max_online_entries or max_per_day_settings.get(
+                    doctor.specialty, 15
+                )
+            else:
+                daily_queue = self.read_repository.get_queue_by_specialist_day(
+                    specialist_id=doctor.user_id,
+                    day=day,
+                )
+                current_entries = 0
+                queue_opened = False
+                if daily_queue:
+                    current_entries = self.read_repository.count_entries(
+                        queue_id=daily_queue.id
+                    )
+                    queue_opened = daily_queue.opened_at is not None
+                max_entries = max_per_day_settings.get(doctor.specialty, 15)
             result.append(
                 {
                     "doctor_id": doctor.id,

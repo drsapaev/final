@@ -4,14 +4,16 @@ Split from queue_service.py.
 """
 from __future__ import annotations
 
+from app.core.roles import DOCTOR_ROLE_SPELLINGS
+from app.core.specialties import expand_queue_tags
+from app.crud import queue_resource_routing
+from app.models.online_queue import QueueResource
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase, _now
 from app.services.user_mgmt._base import (
     INCOMPLETE_DOCTOR_SPECIALTY,
     is_doctor_profile_incomplete,
 )
-from app.core.specialties import expand_queue_tags
-from app.core.roles import DOCTOR_ROLE_SPELLINGS
 
 
 def _unbookable_doctor_ids(
@@ -275,16 +277,25 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
 
     def calculate_next_number(cls, db: Session, daily_queue: DailyQueue) -> int:
-        """Вычислить следующий номер в очереди"""
+        """Вычислить следующий номер в очереди.
+
+        QD-2C: ресурсная очередь (queue_resource_id установлен) берёт
+        стартовый номер из строки реестра
+        (QueueResource.start_number_online — сиды 0059 перенесли
+        LIVE-значения синтетика, до QD-2E значения совпадают)."""
         max_number = (
             db.query(func.max(OnlineQueueEntry.number))
             .filter(OnlineQueueEntry.queue_id == daily_queue.id)
             .scalar()
         ) or 0
 
-        start_number = getattr(
-            daily_queue, "start_number", None
-        ) or cls.SPECIALTY_START_NUMBERS.get("default", 1)
+        start_number = getattr(daily_queue, "start_number", None)
+        if not start_number and daily_queue.queue_resource_id:
+            resource = db.get(QueueResource, daily_queue.queue_resource_id)
+            if resource is not None and resource.start_number_online:
+                start_number = int(resource.start_number_online)
+        if not start_number:
+            start_number = cls.SPECIALTY_START_NUMBERS.get("default", 1)
         return max(max_number + 1, start_number)
 
     @classmethod
@@ -357,17 +368,31 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         db: Session,
         *,
         day: date,
-        specialist_id: int,
+        specialist_id: int | None,
         queue_tag: str | None = None,
         defaults: dict[str, Any] | None = None,
     ) -> DailyQueue:
         """
         Получить или создать ежедневную очередь
 
+        QD-2C runtime switch: если queue_tag имеет активную строку в
+        queue_resources (прямо сейчас lab/ecg — сиды 0059), очередь
+        тега принадлежит РЕСУРСУ, а не врачу: существующая активная
+        (day, tag)-очередь возвращается как есть (унификация тег-первый
+        — мост двойного владения и ресурсные строки это ОДНА и та же
+        поверхность), новой очередью становится resource-owned строка
+        (specialist NULL, queue_resource_id, капы из реестра).
+        specialist_id в этой ветке игнорируется (в т.ч. синтетик —
+        doctorless-тег не форкает параллельную очередь на враче).
+        Теги без строки реестра идут по прежнему пути врача
+        байт-идентично (general/stomatology/специальности до QD-2E).
+
         Args:
             db: Database session
             day: Дата очереди
-            specialist_id: ID врача (ForeignKey на doctors.id)
+            specialist_id: ID врача (ForeignKey на doctors.id); None
+                допустим ТОЛЬКО для тега со строкой реестра (ресурсная
+                ветка не требует врача)
             queue_tag: Тег очереди (опционально)
             defaults: Значения по умолчанию
 
@@ -375,9 +400,97 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             DailyQueue instance
 
         Raises:
-            IntegrityError: Если врач с specialist_id не существует
+            ValueError: Если врач с specialist_id не существует (ветка
+                врача; ресурсная ветка врача не требует)
         """
         defaults = defaults or {}
+
+        # QD-2C: тег реестра → ресурсная ось (унификация тег-первый).
+        # Codex round-3 P1: поверхность деактивационно-устойчива —
+        # существующая resource-owned очередь тега остаётся поверхностью
+        # даже при деактивации строки реестра (пациенты не исчезают,
+        # параллельная очередь не форкается); НОВЫЕ ресурсные очереди
+        # создаются только при АКТИВНОЙ строке.
+        if queue_tag:
+            surface = queue_resource_routing.tag_routes_to_resource(db, queue_tag, day)
+            if surface is not None:
+                return surface
+            resource = queue_resource_routing.resolve_tag_resource(db, queue_tag)
+            if resource is not None:
+                queue_resource_routing.lock_registry_tag_creation(
+                    db, queue_tag, day
+                )
+                # Codex round-4 P2: перепроверка ПОСЛЕ лока — деактивация
+                # строки между resolve и lock не должна создавать очередь;
+                # round-6 P2: перепроверка под row-lock (FOR UPDATE) и с
+                # populate_existing — кэш сессии не возвращает устаревший
+                # активный объект, блокировка строки держится до вставки
+                resource = queue_resource_routing.resolve_tag_resource_locked(
+                    db, queue_tag
+                )
+            if resource is not None:
+                existing = queue_resource_routing.find_active_tag_queue(
+                    db, day, queue_tag
+                )
+                if existing is not None:
+                    return existing
+                queue_settings = self._load_queue_settings(db)
+                daily_queue = DailyQueue(
+                    day=day,
+                    specialist_id=None,
+                    queue_resource_id=int(resource.id),
+                    queue_tag=queue_tag,
+                    active=True,
+                    online_start_time=f"{int(queue_settings.get('queue_start_hour', 7)):02d}:00",
+                    online_end_time=f"{int(queue_settings.get('queue_end_hour', 9)):02d}:00",
+                    max_online_entries=(
+                        queue_resource_routing.resource_queue_defaults(resource)[
+                            "max_online_entries"
+                        ]
+                    ),
+                    # Codex round-7 P1: кабинет ОБЩЕЙ очереди тега — из
+                    # реестра (default_cabinet; сиды 0059 держат NULL —
+                    # канонического источника нет), НЕ из кабинета
+                    # направившего врача в defaults: строка
+                    # переиспользуется всеми пациентами тега/дня, а
+                    # тикеты/уведомления читают cabinet_number очереди —
+                    # первый создатель не должен уводить весь lab/ecg в
+                    # свой кабинет. floor/building у реестра нет — NULL.
+                    cabinet_number=resource.default_cabinet,
+                    cabinet_floor=None,
+                    cabinet_building=None,
+                )
+                db.add(daily_queue)
+                try:
+                    db.flush()
+                except Exception as e:
+                    # Codex round-24 P2: NO db.rollback() here — the same
+                    # #3092 P1 contract as the doctor branch below: a full
+                    # rollback erases the CALLER's uncommitted rows in this
+                    # transaction (the morning pre-create loop's earlier
+                    # iterations, a wizard cart's staged flushes), so a
+                    # catch-and-continue caller would report success for
+                    # rows that no longer exist. The failure PROPAGATES;
+                    # catch-and-continue callers isolate the call in their
+                    # own per-tag savepoint (morning_assignment does).
+                    logger.error(
+                        "Failed to create resource DailyQueue: day=%s, "
+                        "queue_resource_id=%s, queue_tag=%s, error=%s",
+                        day,
+                        resource.id,
+                        queue_tag,
+                        e,
+                    )
+                    raise
+                logger.info(
+                    "Created resource DailyQueue id=%s day=%s resource=%s "
+                    "queue_tag=%s",
+                    daily_queue.id,
+                    day,
+                    resource.id,
+                    queue_tag,
+                )
+                return daily_queue
 
         # ✅ SECURITY: Проверяем существование врача перед созданием очереди
         # SSOT: DailyQueue.specialist_id ссылается на Doctor.id
@@ -496,13 +609,20 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
         fallback_start = default_start
         if fallback_start is None:
-            if daily_queue and getattr(daily_queue, "start_number", None):
+            # QD-2C: ресурсная очередь стартует с нумерации реестра
+            # (QueueResource.start_number_online — сиды 0059 перенесли
+            # LIVE-значения синтетика, до QD-2E значения совпадают)
+            if daily_queue is not None and daily_queue.queue_resource_id:
+                resource = db.get(QueueResource, daily_queue.queue_resource_id)
+                if resource is not None and resource.start_number_online:
+                    fallback_start = int(resource.start_number_online)
+            elif daily_queue and getattr(daily_queue, "start_number", None):
                 fallback_start = daily_queue.start_number
-            else:
-                tag_key = queue_tag or "default"
-                fallback_start = start_numbers.get(
-                    tag_key, self.SPECIALTY_START_NUMBERS.get(tag_key, 1)
-                )
+        if fallback_start is None:
+            tag_key = queue_tag or "default"
+            fallback_start = start_numbers.get(
+                tag_key, self.SPECIALTY_START_NUMBERS.get(tag_key, 1)
+            )
 
         if fallback_start is None:
             fallback_start = self.SPECIALTY_START_NUMBERS.get("default", 1)
@@ -629,13 +749,28 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if doctor and doctor.user:
             specialist_name = doctor.user.full_name or doctor.user.username
 
+        # QD-2C (Codex round-12 P2): поверхность = ресурсная очередь —
+        # владелец/кабинет QR-метаданных с оси ресурса (реестр), а не с
+        # синтетика: иначе /online-queue/qrcode и /registrar/generate-qr
+        # рекламируют устаревший/отсутствующий кабинет при живом
+        # реестровом назначении
+        cabinet = getattr(doctor, "cabinet", None) if doctor else None
+        if daily_queue is not None and daily_queue.queue_resource_id is not None:
+            resource = daily_queue.queue_resource
+            specialist_name = (
+                resource.display_name if resource is not None else "Ресурс очереди"
+            )
+            cabinet = daily_queue.cabinet_number or (
+                resource.default_cabinet if resource is not None else None
+            )
+
         metadata = {
             "day": day,
             "queue_id": daily_queue.id if daily_queue else None,
             "specialist_name": specialist_name
             or ("Все специалисты" if is_clinic_wide else None),
             "specialty": doctor.specialty if doctor else "clinic",
-            "cabinet": getattr(doctor, "cabinet", None) if doctor else None,
+            "cabinet": cabinet,
             "start_time": (
                 daily_queue.online_start_time
                 if daily_queue
@@ -689,10 +824,43 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 )
                 .first()
             )
+            # QD-2C (Codex round-2 P1): очередь тега реестра может быть
+            # resource-owned (specialist NULL) — токен по-прежнему
+            # именует тег через specialty синтетика: резолвим (day, tag)-
+            # поверхность, иначе валидация токена отвергала живую очередь.
+            # Codex round-5 P1: НЕАКТИВНАЯ легаси-строка не должна
+            # затенять живую ресурсную поверхность — lookup без active-
+            # предиката возвращал выключенную очередь.
+            daily_queue = queue_resource_routing.prefer_registry_surface(
+                db, daily_queue, queue_token.day, queue_token.specialist_id
+            )
             if not daily_queue:
                 raise QueueNotFoundError(
                     "Очередь ещё не создана для выбранного специалиста"
                 )
+
+        # QD-2C (Codex round-18 P2): токен резолвится в ресурсную очередь —
+        # владелец/кабинет join-метаданных с оси ресурса (реестр): публичный
+        # экран QueueJoin и join-ответы показывают registry-назначение, а не
+        # «Врач ID ...» синтетика 0055 (без full_name) с null-кабинетом;
+        # врач-токены байт-идентичны (cabinet в метаданных отсутствовал и
+        # раньше — get() отдавал None)
+        specialist_name = (
+            queue_token.specialist.user.full_name
+            if queue_token.specialist
+            and queue_token.specialist.user
+            and queue_token.specialist.user.full_name
+            else None
+        )
+        cabinet = None
+        if daily_queue is not None and daily_queue.queue_resource_id is not None:
+            resource = daily_queue.queue_resource
+            specialist_name = (
+                resource.display_name if resource is not None else "Ресурс очереди"
+            )
+            cabinet = daily_queue.cabinet_number or (
+                resource.default_cabinet if resource is not None else None
+            )
 
         metadata = {
             "day": queue_token.day,
@@ -701,13 +869,8 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             "daily_queue": daily_queue,
             "is_clinic_wide": queue_token.is_clinic_wide,
             "department": queue_token.department,
-            "specialist_name": (
-                queue_token.specialist.user.full_name
-                if queue_token.specialist
-                and queue_token.specialist.user
-                and queue_token.specialist.user.full_name
-                else None
-            ),
+            "specialist_name": specialist_name,
+            "cabinet": cabinet,
         }
         return queue_token, metadata
 
@@ -850,98 +1013,158 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     queue_profile.queue_tags or [profile_key]
                 )
 
-                # Ищем врачей с specialty из queue_tags профиля.
-                # Incomplete ("general" sentinel) profiles are explicitly
-                # excluded: they are not clinical-eligible for specialty QR
-                # routing even if an admin ever tags a profile with
-                # "general" (defense in depth, Codex P1-D).
-                # Codex round-3 P2: the candidate query applies the SAME
-                # owner-eligibility contract as the appointment writers
-                # (services/appointment_eligibility.py): an active Doctor
-                # row whose owner is missing (decision #13 — userless rows
-                # violate the linkage contract), deactivated or demoted to
-                # a non-doctor role is a legacy ghost — and the least-load
-                # ranking would PREFER it (load 0) over healthy doctors.
-                eligible_doctors = (
-                    db.query(Doctor)
-                    .join(User, Doctor.user_id == User.id)
-                    .filter(
-                        Doctor.active.is_(True),
-                        Doctor.specialty.in_(queue_tags),
-                        Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
-                        User.is_active.is_(True),
-                        func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
-                    )
-                    .order_by(Doctor.id.asc())
-                    .all()
+                # QD-2C (Codex round-19 P1): a registry-backed profile tag
+                # routes onto the RESOURCE surface BEFORE doctor selection.
+                # The seeded lab/ECG profiles' only owners are the 0055
+                # synthetic Doctors, and 0057 moved them to the internal
+                # 'Resource' role — the eligible-doctor query below
+                # (DOCTOR_ROLE_SPELLINGS) returns [] for a clinic without
+                # real lab/ECG doctors, so the clinic-wide QR join failed
+                # with «Нет активных врачей» even though the registry row
+                # (0059) is ACTIVE. The FIRST profile tag with a registry
+                # surface wins (deactivation-proof, round-3 P1: an existing
+                # resource-owned (day, tag) queue routes even when the row
+                # was deactivated mid-day): the (day, tag) resource queue is
+                # the ONE surface every other writer (wizard, batch, morning
+                # pre-create, GQL joinQueue) uses — routing through doctor
+                # selection here would fork a parallel legacy queue and
+                # re-create the split-queue incident class.
+                resource_tag = next(
+                    (
+                        tag
+                        for tag in queue_tags
+                        if queue_resource_routing.tag_routes_to_resource(db, tag, day)
+                        is not None
+                        or queue_resource_routing.resolve_tag_resource(db, tag)
+                        is not None
+                    ),
+                    None,
                 )
-                # D-2 least-loaded routing (NEEDS DECISION resolved): with
-                # several active doctors per specialty the new patient goes
-                # to the doctor with the shortest ACTIVE queue for the day
-                # (waiting+called), ties break to the lowest Doctor.id.
-                # queue_tag scopes the bookability pre-check to the exact
-                # (day, doctor, tag) row the join will use (Codex round-1 P1).
-                # Codex round-4 P1: resolve the patient's EXISTING entry
-                # across the profile's candidate queues BEFORE least-load
-                # routing (see _find_clinic_wide_duplicate) — otherwise a
-                # retry lands a second entry under another doctor.
-                existing_entry, existing_queue = _find_clinic_wide_duplicate(
-                    db,
-                    eligible_doctors,
-                    day=day,
-                    queue_tag=profile_key,
-                    phone=phone,
-                    telegram_id=telegram_id,
-                )
-                if existing_queue is not None:
-                    doctor = existing_queue.specialist or (
-                        db.query(Doctor)
-                        .filter(Doctor.id == existing_queue.specialist_id)
-                        .first()
+                if resource_tag is not None:
+                    daily_queue = self.get_or_create_daily_queue(
+                        db,
+                        day=day,
+                        specialist_id=None,
+                        queue_tag=resource_tag,
                     )
-                    daily_queue = existing_queue
-                    queue_tag = profile_key
-                    specialist_name = (
-                        (doctor.user.full_name or doctor.user.username)
-                        if doctor and doctor.user
+                    queue_tag = resource_tag
+                    # Round-18 pattern (validate_queue_token): the join
+                    # metadata advertises the REGISTRY owner — display_name
+                    # over the 0055 synthetic's «Врач ID ...» — and the
+                    # queue's registry-sourced cabinet; the profile title is
+                    # the stable fallback for a legacy-shape surface.
+                    resource = (
+                        daily_queue.queue_resource
+                        if daily_queue.queue_resource_id is not None
                         else None
                     )
                     specialist_name = (
-                        specialist_name
-                        or queue_profile.title_ru
-                        or f"Врач #{existing_queue.specialist_id}"
+                        resource.display_name
+                        if resource is not None and resource.display_name
+                        else (queue_profile.title_ru or queue_profile.title)
                     )
-                    cabinet = doctor.cabinet if doctor else None
+                    cabinet = daily_queue.cabinet_number or (
+                        resource.default_cabinet if resource is not None else None
+                    )
                 else:
-                    doctor = self._pick_least_loaded_doctor(
-                        db, eligible_doctors, day, queue_tag=profile_key
+                    # Ищем врачей с specialty из queue_tags профиля.
+                    # Incomplete ("general" sentinel) profiles are explicitly
+                    # excluded: they are not clinical-eligible for specialty QR
+                    # routing even if an admin ever tags a profile with
+                    # "general" (defense in depth, Codex P1-D).
+                    # Codex round-3 P2: the candidate query applies the SAME
+                    # owner-eligibility contract as the appointment writers
+                    # (services/appointment_eligibility.py): an active Doctor
+                    # row whose owner is missing (decision #13 — userless rows
+                    # violate the linkage contract), deactivated or demoted to
+                    # a non-doctor role is a legacy ghost — and the least-load
+                    # ranking would PREFER it (load 0) over healthy doctors.
+                    eligible_doctors = (
+                        db.query(Doctor)
+                        .join(User, Doctor.user_id == User.id)
+                        .filter(
+                            Doctor.active.is_(True),
+                            Doctor.specialty.in_(queue_tags),
+                            Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+                            User.is_active.is_(True),
+                            func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
+                        )
+                        .order_by(Doctor.id.asc())
+                        .all()
                     )
-
-                    # Если не нашли - это ошибка сопоставления профиля, а не повод
-                    # подставлять случайного активного врача.
-                    if not doctor:
-                        raise QueueValidationError(
-                            f"Нет активных врачей для профиля {queue_profile.title_ru or queue_profile.title}"
+                    # D-2 least-loaded routing (NEEDS DECISION resolved): with
+                    # several active doctors per specialty the new patient goes
+                    # to the doctor with the shortest ACTIVE queue for the day
+                    # (waiting+called), ties break to the lowest Doctor.id.
+                    # queue_tag scopes the bookability pre-check to the exact
+                    # (day, doctor, tag) row the join will use (Codex round-1 P1).
+                    # Codex round-4 P1: resolve the patient's EXISTING entry
+                    # across the profile's candidate queues BEFORE least-load
+                    # routing (see _find_clinic_wide_duplicate) — otherwise a
+                    # retry lands a second entry under another doctor.
+                    existing_entry, existing_queue = _find_clinic_wide_duplicate(
+                        db,
+                        eligible_doctors,
+                        day=day,
+                        queue_tag=profile_key,
+                        phone=phone,
+                        telegram_id=telegram_id,
+                    )
+                    if existing_queue is not None:
+                        doctor = existing_queue.specialist or (
+                            db.query(Doctor)
+                            .filter(Doctor.id == existing_queue.specialist_id)
+                            .first()
                         )
+                        daily_queue = existing_queue
+                        queue_tag = profile_key
+                        specialist_name = (
+                            (doctor.user.full_name or doctor.user.username)
+                            if doctor and doctor.user
+                            else None
+                        )
+                        specialist_name = (
+                            specialist_name
+                            or queue_profile.title_ru
+                            or f"Врач #{existing_queue.specialist_id}"
+                        )
+                        cabinet = doctor.cabinet if doctor else None
                     else:
-                        # Нашли врача - используем его данные
-                        queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty
-                        defaults = {
-                            "start_number": doctor.start_number_online,
-                            "max_online_entries": doctor.max_online_per_day,
-                            "cabinet_number": doctor.cabinet,
-                        }
-                        daily_queue = self.get_or_create_daily_queue(
-                            db,
-                            day=day,
-                            specialist_id=doctor.id,
-                            queue_tag=queue_tag,
-                            defaults=defaults,
+                        doctor = self._pick_least_loaded_doctor(
+                            db, eligible_doctors, day, queue_tag=profile_key
                         )
-                        if doctor.user:
-                            specialist_name = doctor.user.full_name or doctor.user.username
-                        specialist_name = specialist_name or queue_profile.title_ru or f"Врач #{doctor.id}"
-                        cabinet = doctor.cabinet
+
+                        # Если не нашли - это ошибка сопоставления профиля, а не повод
+                        # подставлять случайного активного врача.
+                        if not doctor:
+                            raise QueueValidationError(
+                                f"Нет активных врачей для профиля {queue_profile.title_ru or queue_profile.title}"
+                            )
+                        else:
+                            # Нашли врача - используем его данные
+                            queue_tag = profile_key  # ⭐ Используем ключ профиля, не doctor.specialty
+                            defaults = {
+                                "start_number": doctor.start_number_online,
+                                "max_online_entries": doctor.max_online_per_day,
+                                "cabinet_number": doctor.cabinet,
+                            }
+                            daily_queue = self.get_or_create_daily_queue(
+                                db,
+                                day=day,
+                                specialist_id=doctor.id,
+                                queue_tag=queue_tag,
+                                defaults=defaults,
+                            )
+                            if doctor.user:
+                                specialist_name = (
+                                    doctor.user.full_name or doctor.user.username
+                                )
+                            specialist_name = (
+                                specialist_name
+                                or queue_profile.title_ru
+                                or f"Врач #{doctor.id}"
+                            )
+                            cabinet = doctor.cabinet
             else:
                 # Legacy: specialist_id_override is Doctor.id
                 doctor = (

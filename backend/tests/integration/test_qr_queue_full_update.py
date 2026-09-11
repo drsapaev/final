@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 
 from app.core.security import get_password_hash
+from app.crud.clinic import clinic_today
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
@@ -58,8 +59,12 @@ def _create_queue_entry_for_doctor(
     doctor: Doctor,
     status: str = "waiting",
 ) -> OnlineQueueEntry:
+    # QD-2C (round-25): the REST call-next day default is the
+    # clinic_today SSOT (unified with queue_svc/GQL/quick-call) — the
+    # fixture follows it (host date.today() missed the 19:00-24:00Z
+    # window).
     queue = DailyQueue(
-        day=date.today(),
+        day=clinic_today(db_session),
         specialist_id=doctor.id,
         queue_tag=f"qr-owner-{doctor.id}",
         active=True,

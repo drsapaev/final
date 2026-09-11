@@ -40,21 +40,49 @@ def get_queue_analytics(
                 detail="Неверный формат end_date. Используйте YYYY-MM-DD",
             )
 
+    # Codex round-39 P2: дефолтные границы периода — КЛИНИК-локальный
+    # день (clinic_today SSOT, таймзона настроек очередей): строки
+    # статистики штампуются клиник-днём (round-38), и host date.today()
+    # в окне расхождения 19:00-24:00Z исключал текущий клиник-день из
+    # дефолтного 30-дневного периода.
+    from app.crud.clinic import clinic_today
+
+    clinic_day = clinic_today(db)
+
     # Если даты не указаны, берем последние 30 дней
     if not start_dt:
-        start_dt = date.today() - timedelta(days=30)
+        start_dt = clinic_day - timedelta(days=30)
     if not end_dt:
-        end_dt = date.today()
+        end_dt = clinic_day
 
+    # QD-2C (Codex round-11 P2): specialist's registry tag — include the
+    # resource-axis rows (specialist NULL, queue_resource_id) in the
+    # HISTORICAL filter: the lab/ecg activity moved onto the resource
+    # surface, so a doctor-only join would return zero totals for the
+    # legacy specialist id despite recorded resource-queue rows.
+    from sqlalchemy import and_, or_
+
+    from app.models.clinic import Doctor
     from app.models.online_queue import DailyQueue, QueueStatistics
+
+    queue_filter = DailyQueue.specialist_id == specialist_id
+    doctor_row = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+    if doctor_row is not None and doctor_row.specialty:
+        queue_filter = or_(
+            DailyQueue.specialist_id == specialist_id,
+            and_(
+                DailyQueue.queue_resource_id.isnot(None),
+                DailyQueue.queue_tag == doctor_row.specialty,
+            ),
+        )
 
     # Получаем статистику
     stats = (
         db.query(QueueStatistics)
         .join(DailyQueue)
         .filter(
-        DailyQueue.specialist_id == specialist_id,
-        QueueStatistics.date >= start_dt,
+            queue_filter,
+            QueueStatistics.date >= start_dt,
             QueueStatistics.date <= end_dt,
         )
         .all()

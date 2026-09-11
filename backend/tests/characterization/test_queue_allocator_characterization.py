@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -11,8 +11,14 @@ from app.services.queue_service import QueueBusinessService, queue_service
 
 
 def _create_daily_queue_and_token(db_session, test_doctor, token_value: str) -> tuple[DailyQueue, QueueToken]:
+    # Codex round-30: join/start classifies the token day in the CLINIC
+    # timezone — stamp the fixtures with the clinic-local day (same
+    # convention as the round-26 force-majeure test below).
+    from app.crud.clinic import clinic_today
+
+    clinic_day = clinic_today(db_session)
     daily_queue = DailyQueue(
-        day=date.today(),
+        day=clinic_day,
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,
@@ -24,7 +30,7 @@ def _create_daily_queue_and_token(db_session, test_doctor, token_value: str) -> 
     local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
     token = QueueToken(
         token=token_value,
-        day=date.today(),
+        day=clinic_day,
         specialist_id=test_doctor.id,
         department="cardiology",
         expires_at=local_now + timedelta(hours=2),
@@ -219,14 +225,20 @@ def test_force_majeure_transfer_characterization_preserves_current_allocator_beh
         lambda: object(),
     )
 
+    # QD-2C (round-26): the transfer's "tomorrow" rides the clinic_today
+    # SSOT (the queue-settings timezone) — the fixtures follow it (host
+    # date.today() missed the 19:00-24:00Z window).
+    from app.crud.clinic import clinic_today
+
+    clinic_day = clinic_today(db_session)
     today_queue = DailyQueue(
-        day=date.today(),
+        day=clinic_day,
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,
     )
     tomorrow_queue = DailyQueue(
-        day=date.today() + timedelta(days=1),
+        day=clinic_day + timedelta(days=1),
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,

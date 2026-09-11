@@ -7,6 +7,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.crud import queue_resource_routing
 from app.repositories.queue_api_repository import QueueApiRepository
 
 
@@ -30,10 +31,36 @@ class QueueApiService:
         return self.repository.get_doctor_user(specialist_id)
 
     def get_daily_queue(self, *, day: date, specialist_id: int):
+        """QD-2C (Codex round-6 P1): the registry surface first — the
+        legacy open/close/today/statistics endpoints must all address
+        the ONE (day, tag) surface the switched runtime uses, not a
+        parallel doctor-owned shadow. Pure lookup (no creation); a
+        doctor queue without a registry surface keeps the raw
+        doctor-keyed lookup."""
+        surface = queue_resource_routing.resolve_registry_tag_queue_for_specialist(
+            self.repository.db, day, specialist_id, None
+        )
+        if surface is not None:
+            return surface
         return self.repository.get_daily_queue(day=day, specialist_id=specialist_id)
 
     def get_or_create_daily_queue(self, *, day: date, specialist_id: int):
-        daily_queue = self.repository.get_daily_queue(day=day, specialist_id=specialist_id)
+        """QD-2C (Codex round-6 P1): registry-tag specialists (the
+        synthetic lab/ecg Doctors) get the (day, tag) surface returned
+        or created as a resource-owned queue — the legacy/open flow
+        must not fork an active untagged doctor row next to the live
+        resource queue. Tags without a registry row keep the legacy
+        doctor-keyed path byte-identically."""
+        doctor = self.repository.get_doctor(specialist_id)
+        if doctor is not None and doctor.specialty:
+            registry_queue = self.repository.get_or_create_registry_queue(
+                day=day, queue_tag=doctor.specialty
+            )
+            if registry_queue is not None:
+                return registry_queue
+        daily_queue = self.repository.get_daily_queue(
+            day=day, specialist_id=specialist_id
+        )
         if daily_queue:
             return daily_queue
         return self.repository.create_daily_queue(day=day, specialist_id=specialist_id)

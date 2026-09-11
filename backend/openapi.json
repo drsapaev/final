@@ -44611,8 +44611,15 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "format": "date",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "description": "День для статистики",
               "title": "Day"
             },
@@ -93995,7 +94002,14 @@
             "title": "Day"
           },
           "specialist_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Specialist Id"
           },
           "specialist_name": {

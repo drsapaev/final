@@ -24,6 +24,7 @@ from app.api.deps import get_db, require_roles  # noqa: F401
 from app.crud import clinic as crud_clinic  # noqa: F401
 from app.crud import online_queue as crud_queue  # noqa: F401
 from app.crud.appointment import appointment as crud_appointment  # noqa: F401
+from app.crud.queue_resource_routing import resolve_tag_resource  # noqa: F401
 from app.models.clinic import ClinicSettings, Doctor  # noqa: F401
 from app.models.doctor_price_override import DoctorPriceOverride  # noqa: F401
 from app.models.patient import Patient  # noqa: F401
@@ -645,8 +646,18 @@ def _create_queue_entries(
                 # Определяем врача для очереди
                 doctor_id = visit.doctor_id
 
+                # QD-2C runtime switch: тег со строкой в queue_resources
+                # (сиды 0059 — lab/ecg) — докторлесс: синтетик не
+                # резолвится (doctor_id остаётся None),
+                # crud_queue.get_or_create_daily_queue ниже найдёт/создаст
+                # ресурсную очередь. Теги без строки реестра — старый путь.
+                registry_tag = (
+                    not doctor_id
+                    and resolve_tag_resource(db, queue_tag) is not None
+                )
+
                 # Для очередей без конкретного врача используем ресурс-врачей
-                if queue_tag == "ecg" and not doctor_id:
+                if queue_tag == "ecg" and not doctor_id and not registry_tag:
                     # Ищем ресурс-врача ЭКГ
                     from app.models.user import User
 
@@ -663,7 +674,7 @@ def _create_queue_entries(
                         )
                         continue
 
-                elif queue_tag == "lab" and not doctor_id:
+                elif queue_tag == "lab" and not doctor_id and not registry_tag:
                     # Ищем ресурс-врача лаборатории
                     from app.models.user import User
 

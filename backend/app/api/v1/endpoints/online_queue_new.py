@@ -236,7 +236,13 @@ def get_today_queue(
 ):
     """Получить очередь на сегодня"""
     try:
-        today = date.today()
+        # Codex round-32 P2: день «сегодня» — clinic_today SSOT (таймзона
+        # настроек очередей): resource-очереди создаются на КЛИНИК-локальном
+        # дне, и host date.today() в окне 19:00-24:00Z отдавал
+        # queue_exists=false для живой lab/ecg поверхности.
+        from app.crud.clinic import clinic_today
+
+        today = clinic_today(db)
 
         if specialist_id:
             # Очередь конкретного специалиста

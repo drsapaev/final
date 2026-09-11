@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
 from app.core.specialties import canonical_specialty
+from app.crud import queue_resource_routing
+from app.crud.clinic import get_queue_settings
 from app.repositories.display_websocket_api_repository import (
     DisplayWebSocketApiRepository,
 )
@@ -30,8 +33,47 @@ class DisplayWebSocketApiService:
         repository: DisplayWebSocketApiRepository | None = None,
         manager_provider: Callable = get_display_manager,  # type: ignore[type-arg]
     ):
+        self.db = db
         self.repository = repository or DisplayWebSocketApiRepository(db)
         self._manager_provider = manager_provider
+
+    def _clinic_today(self) -> date:
+        """Codex round-24 P2: the quick-call day — the CLINIC-local date
+        (the queue-settings timezone SSOT), not the host-local
+        ``date.today()``: queue creation paths (GQL joinQueue, morning
+        pre-create, the canonical join flow) stamp the clinic-local day,
+        so on the documented UTC runtime with an Asia/Tashkent clinic
+        the first five local hours resolved the WRONG surface — the
+        quick-call missed that day's resource queue and fell through to
+        doctor selection (which excludes the seeded 'Resource' owner)
+        returning 404 despite a waiting entry. Unit-stub shape
+        (db=None + fake repository, same convention as
+        _resolve_registry_surface): the day only flows into the
+        stubbed lookups — host today keeps the stubs' contract."""
+        if not isinstance(self.db, Session):
+            return date.today()
+        timezone = ZoneInfo(
+            get_queue_settings(self.db).get("timezone", "Asia/Tashkent")
+        )
+        return datetime.now(timezone).date()
+
+    def _resolve_registry_surface(self, specialty: str) -> object | None:
+        """QD-2C (Codex round-11 P1): the (today, tag) registry surface
+        for a registry-tag specialty, or None.
+
+        The quick-call route addresses a specialty; for a doctorless
+        registry tag the queue IS the (today, tag) surface — the pure
+        resource row has no specialist, and the bridged synthetic owner
+        holds the Resource role excluded from the doctor selection — so
+        the surface must be resolved BEFORE the doctor lookup, otherwise
+        the mounted quick-call returns 404 despite waiting patients.
+        Non-Session db (unit stubs) keeps the legacy doctor path."""
+        if not isinstance(self.db, Session):
+            return None
+        # Codex round-24 P2: the clinic-local day (see _clinic_today).
+        return queue_resource_routing.tag_routes_to_resource(
+            self.db, specialty, self._clinic_today()
+        )
 
     @staticmethod
     def _role_name(current_user: object) -> str:
@@ -107,9 +149,22 @@ class DisplayWebSocketApiService:
         queue_entry.called_by_user_id = getattr(current_user, "id", None)
         self.repository.save()
 
-        doctor = queue_entry.queue.specialist
-        doctor_name = doctor.user.full_name if doctor and doctor.user else "Врач"
-        cabinet = doctor.cabinet if doctor else None
+        # QD-2C (Codex round-10 P1): resource/bridged очередь
+        # (queue_resource_id) — назначение вызова из оси ресурса:
+        # имя из реестра, кабинет из строки очереди (persisted
+        # default_cabinet / админ-override) с фолбэком на реестр;
+        # иначе вызванному пациенту не сообщается кабинет.
+        queue = queue_entry.queue
+        if getattr(queue, "queue_resource_id", None) is not None:
+            resource = getattr(queue, "queue_resource", None)
+            doctor_name = resource.display_name if resource is not None else "Врач"
+            cabinet = queue.cabinet_number or (
+                resource.default_cabinet if resource is not None else None
+            )
+        else:
+            doctor = queue.specialist
+            doctor_name = doctor.user.full_name if doctor and doctor.user else "Врач"
+            cabinet = doctor.cabinet if doctor else None
 
         manager = self._manager_provider()
         await manager.broadcast_patient_call(
@@ -133,7 +188,12 @@ class DisplayWebSocketApiService:
         }
 
     def get_department_queue_state_payload(self, *, department: str) -> dict:
-        today = date.today()
+        # Codex round-30 P2: день снапшота отделения — clinic_today SSOT
+        # (таймзона настроек очередей, см. _clinic_today): соединения и
+        # request_update в окне 19:00-24:00Z получали пустой/вчерашний
+        # снапшот, пока живые resource-очереди лежали на текущем
+        # клиник-локальном дне.
+        today = self._clinic_today()
         queue_entries = self.repository.list_active_entries_for_day(day=today)
 
         filtered_entries = []
@@ -172,6 +232,7 @@ class DisplayWebSocketApiService:
         board_id: str | None,
         current_user: object,
     ) -> dict:
+        registry_surface = None
         if self._role_name(current_user) == "doctor":
             doctor = self._current_doctor_or_403(current_user)
             if not self._same_specialty(getattr(doctor, "specialty", None), specialty):
@@ -180,17 +241,29 @@ class DisplayWebSocketApiService:
                     detail="Doctor can only quick-call patients for their own specialty",
                 )
         else:
-            doctor = self.repository.get_active_doctor_by_specialty(specialty)
-        if not doctor:
-            raise DisplayWebSocketApiDomainError(
-                status_code=404,
-                detail=f"Врач специальности {specialty} не найден",
-            )
+            doctor = None
+            # QD-2C (Codex round-11 P1): registry-tag specialty — the
+            # surface first (see _resolve_registry_surface); the
+            # doctor selection stays for non-registry specialties.
+            registry_surface = self._resolve_registry_surface(specialty)
+            if registry_surface is None:
+                doctor = self.repository.get_active_doctor_by_specialty(specialty)
+            if not doctor and registry_surface is None:
+                raise DisplayWebSocketApiDomainError(
+                    status_code=404,
+                    detail=f"Врач специальности {specialty} не найден",
+                )
 
-        daily_queue = self.repository.get_daily_queue_for_specialist(
-            day=date.today(),
-            specialist_id=doctor.id,
-        )
+        if registry_surface is not None:
+            daily_queue = registry_surface
+        else:
+            daily_queue = self.repository.get_daily_queue_for_specialist(
+                # Codex round-24 P2: the clinic-local day — the doctor
+                # queues are created with it (morning pre-create), the
+                # host-local date missed them in the early-morning window.
+                day=self._clinic_today(),
+                specialist_id=doctor.id,
+            )
 
         if daily_queue:
             self._ensure_doctor_can_call_queue(

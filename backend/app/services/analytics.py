@@ -3,7 +3,7 @@ import statistics
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -381,8 +381,40 @@ class AnalyticsService:
             # ('dental') must match canonical 'dentistry' doctors after
             # 0049 (Codex round-5 P2 — exact join filter silently
             # returned no queues).
-            queue_query = queue_query.join(DailyQueue.specialist).filter(
-                Doctor.specialty.in_(specialty_variants(department))
+            # QD-2C (Codex round-7 P2): ресурсные очереди тега
+            # (specialist NULL, queue_resource_id) не выпадают из
+            # department-отчётов — тег очереди и есть ось «отделения»
+            # для ресурс-строк (outerjoin: врач-ось ИЛИ resource-ось,
+            # exact-tag против того же словаря variants).
+            # QD-2C (Codex round-33 P2): канонические ключи департаментов
+            # сидов 0055 ('laboratory', 'echokg') НЕ равны тегам
+            # ресурсных очередей ('lab', 'ecg') — D-1 variants их не
+            # раскрывают. Соответствие «департамент → теги очередей»
+            # живёт в QueueProfile (department_key → queue_tags, как в
+            # department overview); profile-теги расширяются D-1
+            # variants (зубное семейство) и объединяются с вариантами
+            # самого ключа.
+            variants = specialty_variants(department)
+            from app.models.queue_profile import QueueProfile
+
+            profile_tags: set[str] = set()
+            for profile in (
+                db.query(QueueProfile)
+                .filter(QueueProfile.department_key == department)
+                .all()
+            ):
+                for tag in profile.queue_tags or []:
+                    if tag:
+                        profile_tags.update(specialty_variants(tag) or [tag])
+            resource_tag_values = set(variants) | profile_tags
+            queue_query = queue_query.outerjoin(DailyQueue.specialist).filter(
+                or_(
+                    Doctor.specialty.in_(variants),
+                    and_(
+                        DailyQueue.queue_resource_id.isnot(None),
+                        DailyQueue.queue_tag.in_(resource_tag_values),
+                    ),
+                )
             )
 
         queues = queue_query.all()

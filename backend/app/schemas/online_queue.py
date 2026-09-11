@@ -3,8 +3,9 @@ Pydantic схемы для онлайн-очереди согласно detail.m
 """
 
 from datetime import date, datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # ===================== QR ТОКЕНЫ =====================
 
@@ -115,11 +116,18 @@ class DailyQueueOut(BaseModel):
     id: int
     day: date
     # QD-2A (dual-owner expand): specialist_id теперь nullable — у
-    # ресурсной очереди врач-владелец отсутствует, владелец живёт в
-    # queue_resource_id. Полный output-контракт (owner_kind,
-    # owner_display_name, объект queue_resource) — стадия QD-2C.
+    # ресурсной очереди врач-владелец отступает, владелец живёт в
+    # queue_resource_id.
+    # QD-2C (runtime switch, output contract): добавлены owner_kind
+    # («doctor» | «resource» — какая ось владеет очередью),
+    # owner_display_name (человекочитаемый владелец) и краткий объект
+    # queue_resource. Выводимая ось вычисляется из сохранённых полей
+    # (queue_resource_id установлен — ресурс; иначе врач).
     specialist_id: int | None = None
     queue_resource_id: int | None = None
+    owner_kind: Literal["doctor", "resource"] | None = None
+    owner_display_name: str | None = None
+    queue_resource: dict | None = None
     active: bool
     opened_at: datetime | None = None
     created_at: datetime
@@ -132,6 +140,48 @@ class DailyQueueOut(BaseModel):
     total_entries: int = 0
     waiting_count: int = 0
     served_count: int = 0
+
+    @model_validator(mode="before")
+    @classmethod
+    def _qd2c_coerce_orm(cls, data: object) -> object:
+        """ORM-гидрация (from_attributes): связи specialist /
+        queue_resource — ORM-объекты, а поля схемы — dict;
+        конвертируем до валидации (врач — в None: полная карточка
+        врача отдаётся полем specialist только явными билдерами).
+        """
+        if isinstance(data, dict) or data is None:
+            return data
+        queue = data
+        fields = {
+            "id": queue.id,
+            "day": queue.day,
+            "specialist_id": queue.specialist_id,
+            "queue_resource_id": queue.queue_resource_id,
+            "active": queue.active,
+            "opened_at": queue.opened_at,
+            "created_at": queue.created_at,
+        }
+        resource = getattr(queue, "queue_resource", None)
+        if resource is not None:
+            fields["queue_resource"] = {
+                "id": resource.id,
+                "code": resource.code,
+                "queue_tag": resource.queue_tag,
+                "display_name": resource.display_name,
+            }
+            fields["owner_display_name"] = resource.display_name
+        return fields
+
+    @model_validator(mode="after")
+    def _resolve_qd2c_owner_fields(self) -> "DailyQueueOut":
+        """QD-2C output contract: ось владения выводится из полей
+        строки (queue_resource_id установлен — ресурс; иначе врач).
+        Явно переданные значения не перезаписываются."""
+        if self.owner_kind is None:
+            self.owner_kind = "resource" if self.queue_resource_id else "doctor"
+        if self.queue_resource_id and self.queue_resource is None:
+            self.queue_resource = {"id": self.queue_resource_id}
+        return self
 
 
 # ===================== НАСТРОЙКИ ОЧЕРЕДИ =====================

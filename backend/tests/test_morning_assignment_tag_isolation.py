@@ -88,3 +88,73 @@ def test_tag_failure_does_not_erase_earlier_precreated_queues(
         .count()
         == 0
     ), "the failed tag must not leave a half-created queue behind"
+
+
+def test_registry_tag_failure_does_not_erase_earlier_resource_queues(
+    db_session: Session,
+    monkeypatch,
+):
+    """Codex round-24 P2: the registry-branch pre-create rides the same
+    per-tag SAVEPOINT as the legacy branch, and get_or_create_daily_queue
+    no longer rolls the session back on flush failure (#3092 P1 contract
+    — round-24 extended it to the resource axis): a failing registry tag
+    must not erase the resource queue an earlier iteration created, and
+    created_count must stay honest."""
+    if db_session.get_bind().dialect.name == "sqlite":
+        pytest.skip(
+            "SAVEPOINT isolation is a PostgreSQL semantics test (gate_d convention)"
+        )
+    from app.models.online_queue import QueueResource
+
+    _tagged_service(db_session, code="R24-ISO-1", tag="lab")
+    _tagged_service(db_session, code="R24-ISO-2", tag="ecg")
+    db_session.add(
+        QueueResource(
+            code="lab", queue_tag="lab", display_name="Лаборатория", active=True
+        )
+    )
+    db_session.add(
+        QueueResource(
+            code="ecg", queue_tag="ecg", display_name="ЭКГ", active=True
+        )
+    )
+    db_session.commit()
+
+    real_get_or_create = queue_service_module.queue_service.get_or_create_daily_queue
+    calls: list[str] = []
+
+    def flaky_get_or_create(db, *, day, specialist_id, queue_tag):
+        calls.append(queue_tag)
+        if queue_tag == "ecg":
+            raise RuntimeError("simulated registry flush failure")
+        return real_get_or_create(
+            db, day=day, specialist_id=specialist_id, queue_tag=queue_tag
+        )
+
+    monkeypatch.setattr(
+        queue_service_module.queue_service,
+        "get_or_create_daily_queue",
+        flaky_get_or_create,
+    )
+
+    created = MorningAssignmentService(db_session).ensure_daily_queues_for_all_tags(
+        date.today()
+    )
+
+    assert set(calls) == {
+        "lab",
+        "ecg",
+    }, "the failing registry tag must not prevent the later tags"
+    assert created == 1, "created_count must reflect only queues that exist"
+    assert (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.queue_tag == "lab", DailyQueue.active.is_(True))
+        .count()
+        == 1
+    ), "the earlier registry tag's resource queue must SURVIVE the later failure"
+    assert (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.queue_tag == "ecg", DailyQueue.active.is_(True))
+        .count()
+        == 0
+    ), "the failed registry tag must not leave a half-created queue behind"

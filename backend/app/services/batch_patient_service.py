@@ -11,13 +11,15 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, date as date_type, datetime
+from datetime import UTC, datetime
+from datetime import date as date_type
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.crud.queue_resource_routing import resolve_tag_resource
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
@@ -25,8 +27,8 @@ from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
 from app.services.queue_domain_service import QueueDomainService
-from app.services.queue_status import is_terminal_queue
 from app.services.queue_service import get_queue_service
+from app.services.queue_status import is_terminal_queue
 from app.services.service_mapping import (
     get_default_service_by_specialty,
     normalize_service_code,
@@ -703,7 +705,18 @@ class BatchPatientService:
         action: EntryAction,
         queue_tag: str,
         service: Service | None,
-    ) -> int:
+    ) -> int | None:
+        """Владелец-врач для create-action или None для тега реестра.
+
+        QD-2C runtime switch: тег со строкой в queue_resources (сиды
+        0059 — lab/ecg) — докторлесс: возвращаем None, очередь создаёт
+        get_or_create_daily_queue на ресурсной оси (см.
+        queue_svc/_operations.py). Порядок прежний для остальных
+        тегов: единственный врач услуг → синтетик по маппингу →
+        специальность → ошибка."""
+        # QD-2C: тег реестра — ресурсная ось, врач не нужен
+        if resolve_tag_resource(self.db, queue_tag) is not None:
+            return None
         service_doctor_ids = [
             doctor_id
             for (doctor_id,) in (
