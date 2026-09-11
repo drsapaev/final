@@ -211,6 +211,80 @@ async def test_resolve_falls_back_without_caching_when_getme_fails():
     assert token not in telegram_webhook_dedup._IDENTITY_BY_TOKEN
 
 
+def _patch_service_session(monkeypatch, db_session):
+    """Point the dedup service's own-session helpers at the fixture db."""
+    monkeypatch.setattr(
+        "app.db.session.SessionLocal",
+        lambda: _NoCloseSession(db_session),
+    )
+
+
+def test_persisted_identity_roundtrip_is_credential_bound(
+    db_session, monkeypatch
+):
+    """Codex round 25: the persisted identity lives in clinic_settings
+    (covers env-backed credentials too) and is bound to the credential
+    fingerprint it was resolved for — a different credential does not
+    inherit it."""
+    import json as _json
+
+    from app.models.clinic import ClinicSettings
+
+    _patch_service_session(monkeypatch, db_session)
+    token = "123456789:env-backed-token"
+    identity = "tgbot:777000"
+
+    telegram_webhook_dedup._persist_bot_identity(token, identity)
+
+    row = (
+        db_session.query(ClinicSettings)
+        .filter(ClinicSettings.key == telegram_webhook_dedup.BOT_IDENTITY_SETTING_KEY)
+        .one()
+    )
+    payload = _json.loads(row.value)
+    assert payload == {
+        "cred": telegram_webhook_dedup.ledger_bot_identity(token),
+        "identity": identity,
+    }
+
+    # The SAME credential reads it back — without getMe.
+    assert telegram_webhook_dedup._read_persisted_identity(token) == identity
+
+    # A DIFFERENT credential (replacement bot / rotation) does not
+    # inherit the identity: the fingerprint stops matching.
+    assert telegram_webhook_dedup._read_persisted_identity("other-token") is None
+
+
+def test_persisted_identity_upserts_for_env_backed_credentials(
+    db_session, monkeypatch
+):
+    """Codex round 25 (P1): the persist path must not depend on
+    telegram_configs at all — an env-backed credential (no config row)
+    still shares its identity across workers."""
+    import json as _json
+
+    from app.models.clinic import ClinicSettings
+
+    _patch_service_session(monkeypatch, db_session)
+    assert db_session.query(TelegramConfig).count() == 0  # env-backed
+
+    telegram_webhook_dedup._persist_bot_identity("123456789:env-token", "tgbot:42")
+
+    row = (
+        db_session.query(ClinicSettings)
+        .filter(ClinicSettings.key == telegram_webhook_dedup.BOT_IDENTITY_SETTING_KEY)
+        .one()
+    )
+    payload = _json.loads(row.value)
+    assert payload == {
+        "cred": telegram_webhook_dedup.ledger_bot_identity("123456789:env-token"),
+        "identity": "tgbot:42",
+    }
+    assert telegram_webhook_dedup._read_persisted_identity(
+        "123456789:env-token"
+    ) == "tgbot:42"
+
+
 def test_claims_of_different_bots_do_not_collide(db_session):
     """Codex round 20 core scenario: the ledger key is per-bot. The same
     numeric update_id of a DIFFERENT bot must claim cleanly."""

@@ -157,9 +157,6 @@ class TestStorePatientBotToken:
         config.webhook_url = "https://example.com/webhook"
         config.webhook_secret = "old-bot-secret"
         config.active = True
-        # PR-3 (round 24): a persisted dedup identity resolved for the
-        # OLD credential must not be inherited by the replacement bot.
-        config.bot_identity = "tgbot:111"
         db_session.commit()
 
         store_patient_bot_token(db_session, "123456789:new-bot")
@@ -171,9 +168,6 @@ class TestStorePatientBotToken:
         assert row.decrypted_bot_token == "123456789:new-bot"
         assert row.webhook_secret is None
         assert row.webhook_url is None
-        # P2 pin (round 24): the persisted identity is bound to the
-        # current credential — resolvers re-resolve for the new one.
-        assert row.bot_identity is None
 
     def test_same_token_restore_preserves_webhook_state(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)

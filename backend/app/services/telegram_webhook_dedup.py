@@ -96,31 +96,49 @@ def ledger_bot_identity(token: str | None) -> str | None:
 # persisted id.
 _IDENTITY_BY_TOKEN: dict[str, str] = {}
 
+# Clinic-settings key for the persisted, SHARED bot identity (codex
+# rounds 24-25). The value is a JSON object binding the identity to the
+# credential fingerprint it was resolved for:
+#   {"cred": "cred:<sha256[:32]>", "identity": "tgbot:<id>"}
+# A credential change invalidates the row by fingerprint comparison — no
+# clearing is needed; the next successful getMe overwrites it for the
+# new credential. Unlike telegram_configs this covers env/.env-backed
+# credentials too, so every worker resolves ONE namespace regardless of
+# where the credential came from.
+BOT_IDENTITY_SETTING_KEY = "telegram_bot_dedup_identity"
+
 
 def _read_persisted_identity(token_text: str) -> str | None:
-    """Read the token-conditioned persisted identity (own session,
+    """Read the credential-bound persisted identity (own session,
     fail-open).
 
-    telegram_configs.bot_identity is the ONE identity value shared by
-    every uvicorn worker and the polling worker (codex round 24). It is
-    only used while the stored credential is the one it was resolved
-    for — a replacement bot's token gets a fresh resolution instead of
-    the previous bot's id.
+    The clinic_settings row is the ONE identity value shared by every
+    uvicorn worker and the polling worker (codex round 24) — and it
+    covers env/.env-backed credentials too, where telegram_configs is
+    absent (codex round 25). The stored credential fingerprint makes the
+    row self-invalidating: a credential change (replacement bot or
+    rotation) simply stops matching, and the next successful getMe
+    overwrites the row for the new credential.
     """
     try:
-        from app.crud import telegram_config as crud_telegram
+        import json as _json
+
+        from app.crud import clinic as crud_clinic
         from app.db.session import SessionLocal
-        from app.services.telegram_token_store import decrypt_token
 
         db = SessionLocal()
         try:
-            config = crud_telegram.get_telegram_config(db)
-            if (
-                config is not None
-                and config.bot_identity
-                and decrypt_token(config.bot_token) == token_text
-            ):
-                return config.bot_identity
+            setting = crud_clinic.get_setting_by_key(
+                db, BOT_IDENTITY_SETTING_KEY
+            )
+            raw = getattr(setting, "value", None)
+            if not raw:
+                return None
+            payload = _json.loads(raw)
+            if payload.get("cred") != ledger_bot_identity(token_text):
+                # Bound to a superseded credential.
+                return None
+            return payload.get("identity") or None
         finally:
             db.close()
     except Exception as exc:  # noqa: BLE001 — best-effort read, fail open
@@ -134,22 +152,44 @@ def _read_persisted_identity(token_text: str) -> str | None:
 def _persist_bot_identity(token_text: str, identity: str) -> None:
     """Best-effort persist of the getMe-resolved identity (own session).
 
-    Concurrent resolvers store the SAME value (a token's bot id cannot
-    change), so the write is idempotent; failures are logged and the
-    next successful resolution retries the write.
+    Works for ANY credential source (config row, legacy setting, or env
+    fallback — codex round 25): the row binds the identity to the
+    credential fingerprint it was resolved for. Concurrent resolvers
+    store the SAME value (a token's bot id cannot change), so the write
+    is idempotent; failures are logged and the next successful
+    resolution retries the write.
     """
     try:
-        from app.crud import telegram_config as crud_telegram
-        from app.db.session import SessionLocal
-        from app.services.telegram_token_store import decrypt_token
+        import json as _json
 
+        from app.crud import clinic as crud_clinic
+        from app.db.session import SessionLocal
+        from app.models.clinic import ClinicSettings
+
+        payload = _json.dumps(
+            {
+                "cred": ledger_bot_identity(token_text),
+                "identity": identity,
+            }
+        )
         db = SessionLocal()
         try:
-            config = crud_telegram.get_telegram_config(db)
-            if config is not None and decrypt_token(config.bot_token) == token_text:
-                if config.bot_identity != identity:
-                    config.bot_identity = identity
-                    db.commit()
+            setting = crud_clinic.get_setting_by_key(
+                db, BOT_IDENTITY_SETTING_KEY
+            )
+            if setting is None:
+                db.add(
+                    ClinicSettings(
+                        key=BOT_IDENTITY_SETTING_KEY,
+                        value=payload,
+                        category="telegram",
+                    )
+                )
+            elif setting.value != payload:
+                setting.value = payload
+            else:
+                return
+            db.commit()
         finally:
             db.close()
     except SQLAlchemyError as exc:
@@ -189,12 +229,14 @@ async def resolve_ledger_bot_identity(token: str | None) -> str | None:
     bot (a different id) naturally gets a different namespace. The id is
     public and non-secret; the token itself is never stored.
 
-    Resolution order (codex round 24):
+    Resolution order (codex rounds 24-25):
     1. in-process cache (successful resolutions only);
-    2. the PERSISTED identity (telegram_configs.bot_identity,
-       token-conditioned) — the ONE value shared by every uvicorn worker
-       and the polling worker, so retries routed across workers always
-       claim under the same key;
+    2. the PERSISTED identity (clinic_settings[
+       telegram_bot_dedup_identity], credential-fingerprint-bound) — the
+       ONE value shared by every uvicorn worker and the polling worker
+       for ANY credential source (config row, legacy setting, or env
+       fallback), so retries routed across workers always claim under
+       the same key;
     3. getMe — persisted on success so the other workers converge;
     4. when getMe is unreachable: the deterministic credential-scoped
        identity, deliberately NOT cached — the next resolution retries

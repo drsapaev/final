@@ -563,29 +563,21 @@ def test_alembic_chain_single_head_0062() -> None:
     assert graph["0061_telegram_config_singleton"] == ("0060_visit_reminder_sent_at",)
     # PR-3: the chain head moved to 0062 (telegram_webhook_dedup — the
     # table behind the atomic update_id dedup; the ORM model existed
-    # without it, so PostgreSQL silently had no dedup ledger).
+    # without it, so PostgreSQL silently had no dedup ledger). The
+    # round-24 persisted bot identity lives in clinic_settings (a KV
+    # row, covering env-backed credentials too) — no schema entry.
     assert "0062_telegram_webhook_dedup" in graph
     assert graph["0062_telegram_webhook_dedup"] == (
         "0061_telegram_config_singleton",
     )
-    # PR-3 round 24: the chain head moved to 0063 (telegram_configs
-    # .bot_identity — the persisted STABLE per-bot identity shared by all
-    # uvicorn workers + the polling worker; without it a credential-
-    # scoped fallback cached by one worker diverges from a resolved id
-    # in another and the same update claims twice).
-    assert "0063_telegram_config_identity" in graph
-    assert graph["0063_telegram_config_identity"] == (
-        "0062_telegram_webhook_dedup",
-    )
     # alembic_version.version_num is VARCHAR(32): both ends of the new
     # link must fit (CI on 40cec49 exploded on real PostgreSQL with a
     # 38-char id — scratch-SQLite ignores VARCHAR widths).
-    assert len("0063_telegram_config_identity") <= 32
     assert len("0062_telegram_webhook_dedup") <= 32
     assert len("0061_telegram_config_singleton") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0063_telegram_config_identity"]
+    assert heads == ["0062_telegram_webhook_dedup"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

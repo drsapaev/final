@@ -278,14 +278,6 @@ def store_patient_bot_token(
                 if config.bot_username:
                     config.bot_username = None
                     identity_cleared = True
-                # PR-3 (round 24): the persisted dedup identity is bound to
-                # the CURRENT credential (mirrors the bot_username contract,
-                # round 17) — a replacement bot must not inherit the
-                # previous bot's persisted getMe id; resolvers re-resolve
-                # for the new credential.
-                if config.bot_identity:
-                    config.bot_identity = None
-                    identity_cleared = True
                 legacy_username = crud_clinic.get_setting_by_key(
                     db, PATIENT_BOT_USERNAME_SETTING_KEY
                 )
@@ -394,12 +386,6 @@ def clear_patient_bot_token(
     # clinic_settings row).
     if config is not None and config.bot_username:
         config.bot_username = None
-        identity_cleared = True
-    # PR-3 (round 24): the persisted dedup identity is bound to the CURRENT
-    # credential — a fallback credential cannot be verified to belong to
-    # the same bot, so the stale id is cleared; resolvers re-resolve.
-    if config is not None and config.bot_identity:
-        config.bot_identity = None
         identity_cleared = True
     legacy_username = crud_clinic.get_setting_by_key(
         db, PATIENT_BOT_USERNAME_SETTING_KEY

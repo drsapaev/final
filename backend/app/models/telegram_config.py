@@ -51,15 +51,6 @@ class TelegramConfig(Base):
     # Настройки бота
     bot_username: Mapped[str | None] = mapped_column(String(100), nullable=True)
     bot_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
-    # PR-3 (round 24): STABLE per-bot dedup identity ("tgbot:<getMe id>"),
-    # persisted so ALL uvicorn workers / the polling worker agree on ONE
-    # ledger namespace even when getMe is flaky (a credential-scoped
-    # fallback cached by one worker and a resolved id by another would
-    # claim the same update under different keys — double execution).
-    # Token-conditioned on read (only used while the stored token is the
-    # one it was resolved for) and cleared by the token store on any
-    # credential change (identity bound to the current credential).
-    bot_identity: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Чаты администраторов
     admin_chat_ids: Mapped[list[int] | None] = mapped_column(
