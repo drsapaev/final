@@ -145,8 +145,11 @@ def test_init_payment_success_path_updates_pending_status(
         amount=200_000,
         currency="UZS",
         description=None,
-        return_url=None,
-        cancel_url=None,
+        return_url=(
+            "https://clinic.example/payment/success"
+            "?source=widget&payment_id=wrong#details"
+        ),
+        cancel_url="https://clinic.example/payment/cancel",
     )
 
     assert result["success"] is True
@@ -157,6 +160,15 @@ def test_init_payment_success_path_updates_pending_status(
     assert payment.provider_payment_id == "payme_abc"
     assert payment.payment_url == "https://pay.example/payme_abc"
     assert payment.provider_data == {"provider": "payme"}
+
+    create_kwargs = manager.create_payment.call_args.kwargs
+    assert create_kwargs["return_url"] == (
+        "https://clinic.example/payment/success"
+        "?source=widget&payment_id=501#details"
+    )
+    assert create_kwargs["cancel_url"] == (
+        "https://clinic.example/payment/cancel?payment_id=501"
+    )
 
     # Issue #06: billing.create_payment no longer called — PaymentInvariantService.create_pending_payment is used instead
     billing.update_payment_status.assert_called_once_with(
