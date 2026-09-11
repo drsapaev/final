@@ -189,6 +189,57 @@ class DataRetentionService:
 
         return stats
 
+    def cleanup_webhook_dedup(
+        self,
+        retention_days: int | None = None,
+        dry_run: bool = True
+    ) -> dict:
+        """
+        PR-3: удалить протухшие строки telegram_webhook_dedup.
+
+        Это ledger дедупликации update_id (не пользовательские данные):
+        Telegram не может повторно доставить update спустя 24 часа после
+        ACK, поэтому недельного горизонта достаточно с запасом.
+
+        Args:
+            retention_days: Количество дней хранения (по умолчанию 7)
+            dry_run: Если True, только посчитать без удаления
+
+        Returns:
+            Статистика удаления
+        """
+        from app.models.telegram_webhook_dedup import TelegramWebhookDedup
+        from app.services.telegram_webhook_dedup import DEDUP_RETENTION_DAYS
+
+        retention_days = retention_days or DEDUP_RETENTION_DAYS
+        cutoff_date = self.get_retention_date(retention_days)
+
+        query = self.db.query(TelegramWebhookDedup).filter(
+            TelegramWebhookDedup.processed_at < cutoff_date
+        )
+        count = query.count()
+
+        stats = {
+            "retention_days": retention_days,
+            "cutoff_date": cutoff_date.isoformat(),
+            "rows_to_delete": count,
+            "dry_run": dry_run,
+            "deleted": 0
+        }
+
+        if not dry_run and count > 0:
+            # Bulk delete: high-churn service ledger, ORM-side looping
+            # would hold the rows in memory for no benefit.
+            deleted = query.delete(synchronize_session=False)
+            self.db.commit()
+            stats["deleted"] = deleted
+            logger.info(
+                f"Retention cleanup completed: {deleted} "
+                f"telegram_webhook_dedup rows deleted"
+            )
+
+        return stats
+
     def get_retention_stats(self) -> dict:
         """Получить статистику по хранению данных"""
         total_messages = self.db.query(Message).count()
@@ -247,7 +298,8 @@ def run_scheduled_cleanup(db: Session) -> dict:
         "run_at": datetime.now(UTC).isoformat(),
         "old_messages": service.cleanup_old_messages(dry_run=False),
         "deleted_messages": service.cleanup_deleted_messages(dry_run=False),
-        "voice_messages": service.cleanup_voice_messages(dry_run=False)
+        "voice_messages": service.cleanup_voice_messages(dry_run=False),
+        "webhook_dedup": service.cleanup_webhook_dedup(dry_run=False)
     }
 
     logger.info(f"Scheduled cleanup completed: {results}")

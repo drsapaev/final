@@ -181,6 +181,7 @@ from .telegram_config import (
     TelegramTemplate,
     TelegramUser,
 )
+from .telegram_webhook_dedup import TelegramWebhookDedup
 from .two_factor_auth import (
     TwoFactorAuth,
     TwoFactorBackupCode,

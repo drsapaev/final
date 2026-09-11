@@ -72,6 +72,22 @@ def _signed_mini_app_init_data(
     return urlencode({**params, "hash": payload_hash})
 
 
+@pytest.fixture(autouse=True)
+def _deterministic_bot_identity(monkeypatch):
+    """The webhook endpoint resolves the bot identity before claiming;
+    tests must not depend on the real getMe (round 24-26)."""
+    from app.services import telegram_webhook_dedup as dedup_module
+
+    async def fake_resolve(token):
+        return dedup_module.ledger_bot_identity(token)
+
+    monkeypatch.setattr(
+        dedup_module,
+        "resolve_ledger_bot_identity",
+        fake_resolve,
+    )
+
+
 def _add_mini_app_telegram_config(db_session) -> None:
     db_session.add(TelegramConfig(bot_token=MINI_APP_BOT_TOKEN, active=True))
     db_session.commit()

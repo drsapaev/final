@@ -17,6 +17,16 @@ from sqlalchemy.orm import Session
 from app.api.v1.endpoints.telegram_webhook import _handle_clinic_bot_update
 from app.db.session import SessionLocal
 from app.services.telegram_bot import get_telegram_bot_service
+# PR-3: update_id dedup shared with the webhook endpoint.
+from app.services.telegram_webhook_dedup import (
+    CLAIMED,
+    DUPLICATE,
+    IN_FLIGHT,
+    claim_update,
+    mark_processed,
+    release_claim,
+    resolve_ledger_bot_identity,
+)
 from app.services.telegram_token_store import resolve_patient_bot_token
 
 LOGGER = logging.getLogger("telegram_polling_worker")
@@ -60,6 +70,9 @@ class TelegramPollingWorker:
         if not token:
             LOGGER.error("Telegram bot token is not configured")
             return 2
+        # PR-3 (round 22): claims are scoped to the STABLE per-bot identity
+        # (getMe bot id), not the rotatable credential.
+        ledger_identity = await resolve_ledger_bot_identity(token)
 
         session = requests.Session()
         if not self.keep_webhook:
@@ -96,14 +109,28 @@ class TelegramPollingWorker:
                     LOGGER.error("Telegram bot token was revoked — stopping")
                     return 2
                 if canonical != token:
+                    canonical_identity = await resolve_ledger_bot_identity(
+                        canonical
+                    )
+                    identity_changed = canonical_identity != ledger_identity
                     LOGGER.info("Telegram bot token changed — reloading")
+                    superseded_identity = ledger_identity
                     token = canonical
+                    ledger_identity = canonical_identity
                     if not self.keep_webhook:
                         # Retained as pending: retried on later cycles until
                         # Telegram actually removes the webhook (codex
                         # round 11).
                         pending_webhook_deletion = True
                     offset = None
+                    # If the IDENTITY changed (replacement bot), the offset
+                    # is the superseded bot's cursor and the reset above is
+                    # exactly what the new sequence needs. The ledger is
+                    # NOT wiped either way: the composite key isolates the
+                    # replacement bot's claims, and deleting rows could
+                    # drop a live claim of an in-flight old-bot delivery
+                    # (codex round 27) — superseded rows age out via the
+                    # retention sweep.
             if pending_webhook_deletion:
                 try:
                     self._delete_webhook(session, token)
@@ -143,6 +170,12 @@ class TelegramPollingWorker:
                         time.sleep(self.retry_delay)
                         continue
                     if refreshed and refreshed != token:
+                        refreshed_identity = await resolve_ledger_bot_identity(
+                            refreshed
+                        )
+                        if refreshed_identity != ledger_identity:
+                            offset = None
+                        ledger_identity = refreshed_identity
                         LOGGER.info("Telegram bot token rotated — reloading")
                         token = refreshed
                         if not self.keep_webhook:
@@ -211,18 +244,61 @@ class TelegramPollingWorker:
                     "Telegram bot token changed during the long poll — "
                     "dropping the batch fetched with the superseded credential"
                 )
+                post_poll_identity = await resolve_ledger_bot_identity(post_poll)
+                identity_changed = post_poll_identity != ledger_identity
                 token = post_poll
+                ledger_identity = post_poll_identity
                 if not self.keep_webhook:
                     pending_webhook_deletion = True
                 offset = None
+                # Round 27: no ledger wipe here either — same rationale as
+                # the cycle-top swap.
                 if self.once:
                     return 0
                 time.sleep(self.retry_delay)
                 continue
 
+            if ledger_identity is None and updates:
+                # PR-3 (round 27): the token may be unchanged while
+                # Telegram or the database recover — re-resolve the
+                # CURRENT token's identity before deferring, otherwise
+                # the worker would defer forever until a restart or a
+                # credential change.
+                ledger_identity = await resolve_ledger_bot_identity(token)
+            if ledger_identity is None and updates:
+                # PR-3 (round 26): without a SHARED identity a claim could
+                # land in a transient namespace another worker (which
+                # resolved the real bot id) does not use — the same
+                # update would be claimable under two keys and could
+                # execute twice. Leave the batch unconfirmed (the offset
+                # does not move); Telegram keeps the updates pending and
+                # the next cycle retries the resolution.
+                LOGGER.warning(
+                    "Telegram bot identity unavailable — updates left "
+                    "unconfirmed this cycle"
+                )
+                if self.once:
+                    return 1
+                time.sleep(self.retry_delay)
+                continue
+
             for update in updates:
                 update_id = update.get("update_id")
-                await self._handle_update(update)
+                disposition = await self._handle_update(update, ledger_identity)
+                if disposition == IN_FLIGHT and update_id is not None:
+                    # Codex round 22 (P1): do NOT confirm an in-flight
+                    # update — advancing the offset past it would ACK it
+                    # before the stale-reclaim path can ever run (a
+                    # crashed worker's orphaned claim would be confirmed
+                    # away). Leave it unconfirmed; Telegram redelivers
+                    # once the owner completes (→ duplicate) or releases
+                    # (→ reclaim/reprocess).
+                    LOGGER.info(
+                        "Telegram update in flight — left unconfirmed "
+                        "update_id=%s",
+                        update_id,
+                    )
+                    break
                 if update_id is not None:
                     offset = int(update_id) + 1
 
@@ -291,22 +367,69 @@ class TelegramPollingWorker:
             raise RuntimeError(payload.get("description") or "getUpdates failed")
         return list(payload.get("result") or [])
 
-    async def _handle_update(self, update: dict[str, Any]) -> None:
+    async def _handle_update(
+        self, update: dict[str, Any], bot_identity: str | None = None
+    ) -> str | None:
+        """Handle one update under ``bot_identity``; returns the claim
+        disposition so ``run()`` knows whether the delivery was safely
+        handled (CLAIMED/DUPLICATE) or must stay unconfirmed
+        (IN_FLIGHT — codex round 22). None = the handler failed and the
+        claim was released (pre-existing crash-window semantics)."""
         update_id = update.get("update_id")
         db: Session = SessionLocal()
+        # None until a claim is actually owned — the failure path must
+        # never release a claim this worker does not hold (round 26).
+        claim: str | None = None
         try:
             bot_service = await get_telegram_bot_service()
             if not bot_service.active:
                 await bot_service.initialize(db)
 
+            # PR-3: the same update_id dedup as the webhook endpoint. The
+            # offset cursor alone is not sufficient — a restart or token
+            # rotation resets it to None and Telegram re-delivers every
+            # unconfirmed update of the last 24h.
+            claim = claim_update(db, update_id, bot_identity)
+            if claim in (DUPLICATE, IN_FLIGHT):
+                LOGGER.info(
+                    "Telegram update skipped as %s update_id=%s",
+                    claim,
+                    update_id,
+                )
+                return claim
+
             handled = await _handle_clinic_bot_update(update, db, bot_service)
             if not handled:
                 await bot_service.process_webhook_update(update, db)
+            if claim == CLAIMED:
+                # Round 30: mark ONLY the row this worker owns — a
+                # fail-open UNAVAILABLE claim has no owner_token, and an
+                # unfenced mark could flip ANOTHER delivery's live row
+                # once the database recovers.
+                mark_processed(
+                    db,
+                    update_id,
+                    bot_identity,
+                    getattr(claim, "owner_token", None),
+                )
             LOGGER.info(
                 "Telegram update handled update_id=%s handled=%s", update_id, handled
             )
+            # CLAIMED (we processed it) or UNAVAILABLE (fail-open — we
+            # processed it without a claim). Both are safe to confirm.
+            return claim
         except Exception as exc:
             db.rollback()
+            # PR-3: release the claim so a re-fetched batch reprocesses
+            # this update instead of suppressing it forever. Round 26:
+            # ONLY a claim this worker actually owns (CLAIMED) — a
+            # fail-open UNAVAILABLE claim must never delete another
+            # delivery's live or processed row once the database has
+            # recovered.
+            if claim == CLAIMED:
+                release_claim(
+                    db, update_id, bot_identity, getattr(claim, "owner_token", None)
+                )
             LOGGER.warning(
                 "Telegram update failed update_id=%s error_type=%s",
                 update_id,

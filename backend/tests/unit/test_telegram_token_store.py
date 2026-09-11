@@ -42,6 +42,21 @@ TOKEN_ENV_KEYS = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _deterministic_worker_identity(monkeypatch):
+    """The polling-worker run-loop tests must not hit the real getMe:
+    resolve identities deterministically per credential."""
+    from app.services import telegram_webhook_dedup as dedup_module
+
+    async def fake_resolve(token):
+        return dedup_module.ledger_bot_identity(token)
+
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.resolve_ledger_bot_identity",
+        fake_resolve,
+    )
+
+
 def _set_fernet_key(monkeypatch) -> str:
     key = Fernet.generate_key().decode()
     monkeypatch.setattr(settings, "ENCRYPTION_KEY", key)
@@ -170,6 +185,27 @@ class TestStorePatientBotToken:
         row = db_session.query(TelegramConfig).one()
         assert row.webhook_secret == "valid-secret"
         assert row.webhook_url == "https://example.com/webhook"
+
+    def test_rotation_leaves_dedup_ledger_untouched(self, db_session, monkeypatch):
+        """P2 pin (codex round 22): the token store performs NO dedup-ledger
+        wipe. With the (bot_identity, update_id) key a replacement bot can
+        never collide with the previous bot's rows, while a same-bot token
+        rotation MUST keep them (they still deduplicate the unconfirmed
+        backlog) — a wipe on any token change would reintroduce exactly
+        the duplicate-execution window round 22 flagged."""
+        from app.models.telegram_webhook_dedup import TelegramWebhookDedup
+        from app.services import telegram_webhook_dedup as dedup_module
+
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:old-bot")
+        db_session.add(TelegramWebhookDedup(update_id=777, status="processed"))
+        db_session.commit()
+
+        store_patient_bot_token(db_session, "123456789:new-bot")
+
+        db_session.expire_all()
+        assert db_session.query(TelegramWebhookDedup).count() == 1
 
     def test_store_rejects_oversized_token(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
@@ -897,7 +933,7 @@ class TestPollingWorkerTokenReload:
         async def fake_load():
             return next(tokens)
 
-        async def fake_handle(update):
+        async def fake_handle(update, identity=None):
             return None
 
         def fake_get_updates(session, token, offset):
@@ -944,7 +980,7 @@ class TestPollingWorkerTokenReload:
                 raise RuntimeError("transient db outage")
             return value
 
-        async def fake_handle(update):
+        async def fake_handle(update, identity=None):
             return None
 
         response = _requests.Response()
@@ -1003,7 +1039,7 @@ class TestPollingWorkerTokenReload:
         async def fake_load():
             return next(tokens)
 
-        async def fake_handle(update):
+        async def fake_handle(update, identity=None):
             handled.append(update.get("update_id"))
 
         def fake_get_updates(session, token, offset):
@@ -1064,7 +1100,7 @@ class TestPollingWorkerTokenReload:
                 raise RuntimeError("transient db outage")
             return value
 
-        async def fake_handle(update):
+        async def fake_handle(update, identity=None):
             handled.append(update.get("update_id"))
 
         def fake_get_updates(session, token, offset):
@@ -1107,7 +1143,7 @@ class TestPollingWorkerTokenReload:
         async def fake_load():
             return next(tokens)
 
-        async def fake_handle(update):
+        async def fake_handle(update, identity=None):
             handled.append(update.get("update_id"))
 
         def fake_get_updates(session, token, offset):

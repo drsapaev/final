@@ -48,29 +48,28 @@ from app.schemas.notifications import (
 )
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
+# PR-3: referenced via module namespace (not from-imported) so tests can
+# monkeypatch telegram_webhook_dedup.* the same way they patch
+# telegram_webhook.get_telegram_bot_service.
+from app.services import telegram_webhook_dedup
 
 
-def _is_duplicate_update(db, update_id: int | None) -> bool:
-    """P1-9: check if this Telegram update was already processed."""
+def _release_claim_after_failure(
+    db,
+    update_id: int | None,
+    bot_identity: str | None = None,
+    owner_token: str | None = None,
+) -> None:
+    """PR-3: undo the dedup claim on any failure path.
+
+    The handler may leave uncommitted state on ``db``; roll that back
+    first, then drop the claim so Telegram's redelivery is reprocessed
+    instead of being suppressed forever.
+    """
     if update_id is None:
-        return False
-    try:
-        from app.models.telegram_webhook_dedup import TelegramWebhookDedup
-
-        existing = (
-            db.query(TelegramWebhookDedup)
-            .filter(TelegramWebhookDedup.update_id == update_id)
-            .first()
-        )
-        if existing:
-            return True
-        # Record this update_id
-        dedup = TelegramWebhookDedup(update_id=update_id)
-        db.add(dedup)
-        db.commit()
-        return False
-    except Exception:
-        return False  # Non-blocking: if dedup fails, process anyway
+        return
+    db.rollback()
+    telegram_webhook_dedup.release_claim(db, update_id, bot_identity, owner_token)
 
 
 @router.post(
@@ -727,8 +726,19 @@ async def telegram_webhook(
     """
     Webhook endpoint для получения обновлений от Telegram
     """
+    # PR-3: set once the dedup claim exists, so every failure path below
+    # can release it. Secret validation runs BEFORE the claim — a 403/503
+    # rejection must never write to the dedup ledger.
+    claimed_update_id: int | None = None
+    claimed_bot_identity: str | None = None
+    claimed_owner_token: str | None = None
     try:
-        _validate_webhook_secret(request, db)
+        # PR-3 (round 31): the secret validation returns the config row it
+        # authenticated — the dedup identity is derived from THAT row's
+        # credential snapshot, so a bot replacement landing between the
+        # validation and the claim can no longer bind an old-bot update to
+        # the replacement bot's identity.
+        validated_config = _validate_webhook_secret(request, db)
         update = body.model_dump(exclude_none=True)
         logger.info(
             "Telegram webhook update accepted",
@@ -740,8 +750,93 @@ async def telegram_webhook(
         # telegram_webhook.get_telegram_bot_service takes effect.
         bot_service = await _ensure_bot_service_fresh(db)
 
+        # PR-3: claim the update_id before dispatching to any handler.
+        # Claims are scoped to the STABLE per-bot identity (getMe bot id,
+        # codex round 22 — unchanged across same-bot token rotations): a
+        # replacement bot lands in a different key namespace and can never
+        # collide with the previous bot's retained rows.
+        # DUPLICATE → ACK 200 without re-running handlers, so Telegram
+        # stops retrying a delivery that was already processed.
+        # IN_FLIGHT → 503: a live handler owns the update — acknowledging
+        # it as handled would lose the update if that handler later fails
+        # (codex round 20); Telegram retries the delivery instead.
+        # UNAVAILABLE → fail open and process anyway (dedup must never
+        # reduce delivery availability).
+        snapshot_token = None
+        if validated_config is not None and getattr(
+            validated_config, "bot_token", None
+        ):
+            # A stored credential EXISTS (codex round 32): it must
+            # decrypt, or the delivery is deferred — silently falling
+            # back to the service's (possibly env) token would claim an
+            # update authenticated by THIS secret under ANOTHER bot's
+            # identity.
+            snapshot_token = getattr(
+                validated_config, "decrypted_bot_token", None
+            )
+            if not snapshot_token:
+                logger.warning(
+                    "Telegram webhook validated credential failed to "
+                    "decrypt — deferring the delivery"
+                )
+                return JSONResponse(
+                    status_code=503,
+                    content={"status": "identity_unavailable"},
+                )
+        # A config row WITHOUT a stored credential means the token comes
+        # from the process-static env fallback — it cannot change
+        # mid-process, so falling back to the service's token there is
+        # race-free.
+        identity_source = snapshot_token or getattr(
+            bot_service, "bot_token", None
+        )
+        claimed_bot_identity = await telegram_webhook_dedup.resolve_ledger_bot_identity(
+            identity_source
+        )
+        if claimed_bot_identity is None and body.update_id is not None:
+            # PR-3 (round 26): without a SHARED identity a claim could
+            # land in a transient namespace that another worker (which
+            # resolved the real bot id) does not use — the same update
+            # would be claimable under two keys and could execute twice.
+            # Defer: 503 so Telegram retries once an identity is
+            # available (persisted by whichever worker resolves first).
+            logger.info(
+                "Telegram webhook bot identity unavailable, retry "
+                "requested update_id=%s",
+                body.update_id,
+            )
+            return JSONResponse(
+                status_code=503,
+                content={"status": "identity_unavailable"},
+            )
+        claim = telegram_webhook_dedup.claim_update(
+            db, body.update_id, claimed_bot_identity
+        )
+        if claim == telegram_webhook_dedup.DUPLICATE:
+            logger.info(
+                "Telegram webhook duplicate update suppressed update_id=%s",
+                body.update_id,
+            )
+            return {"status": "ok", "handled": "duplicate_update"}
+        if claim == telegram_webhook_dedup.IN_FLIGHT:
+            logger.info(
+                "Telegram webhook update in flight elsewhere, retry "
+                "requested update_id=%s",
+                body.update_id,
+            )
+            return JSONResponse(
+                status_code=503,
+                content={"status": "update_in_flight"},
+            )
+        if claim == telegram_webhook_dedup.CLAIMED:
+            claimed_update_id = body.update_id
+            claimed_owner_token = getattr(claim, "owner_token", None)
+
         # Обрабатываем обновление
         if await _handle_clinic_bot_update(update, db, bot_service):
+            telegram_webhook_dedup.mark_processed(
+                db, claimed_update_id, claimed_bot_identity, claimed_owner_token
+            )
             return {"status": "ok", "handled": "clinic_bot_update"}
 
         # If _handle_clinic_bot_update returned False, the update was not
@@ -751,11 +846,20 @@ async def telegram_webhook(
         if callable(process_wh):
             await process_wh(update, db)
 
+        telegram_webhook_dedup.mark_processed(
+            db, claimed_update_id, claimed_bot_identity, claimed_owner_token
+        )
         return {"status": "ok"}
 
     except HTTPException:
+        _release_claim_after_failure(
+            db, claimed_update_id, claimed_bot_identity, claimed_owner_token
+        )
         raise
     except Exception as e:
+        _release_claim_after_failure(
+            db, claimed_update_id, claimed_bot_identity, claimed_owner_token
+        )
         _raise_telegram_webhook_internal_error(
             "telegram_webhook",
             TELEGRAM_WEBHOOK_PUBLIC_ERROR,

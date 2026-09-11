@@ -284,6 +284,15 @@ def store_patient_bot_token(
                 if legacy_username is not None:
                     db.delete(legacy_username)
                     identity_cleared = True
+                # PR-3 (round 22): NO dedup-ledger wipe here. The ledger key
+                # is (bot_identity, update_id) with the identity resolved
+                # from getMe — a replacement bot lands in a different
+                # namespace and can never collide with the previous bot's
+                # rows, while a same-bot token ROTATION must KEEP the rows
+                # (they still deduplicate the unconfirmed backlog). A wipe
+                # on any token change would reintroduce exactly the
+                # duplicate-execution window codex round 22 flagged; old
+                # rows age out via the retention sweep instead.
 
             legacy_setting = crud_clinic.get_setting_by_key(
                 db, PATIENT_BOT_TOKEN_SETTING_KEY
@@ -384,6 +393,10 @@ def clear_patient_bot_token(
     if legacy_username is not None:
         db.delete(legacy_username)
         identity_cleared = True
+    # PR-3 (round 22): NO dedup-ledger wipe on revocation — same rationale
+    # as the store path. The (bot_identity, update_id) key keeps any
+    # fallback credential's claims in their own namespace; a retained row
+    # can never suppress a different bot's updates.
     if not cleared and not identity_cleared:
         return config
 
