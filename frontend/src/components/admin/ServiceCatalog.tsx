@@ -562,7 +562,11 @@ const ServiceCatalog = () => {
             </label>
             <Select
               value={selectedSpecialty}
-              onChange={(value: unknown) => setSelectedSpecialty(String(value))}
+              // RQ-06.c: onValueChange is the canonical Select contract (see
+              // RQ-06.b). The legacy onChange emits an event object, so
+              // String(value) stored '[object Object]' in the filter state and
+              // emptied the list.
+              onValueChange={(value) => setSelectedSpecialty(String(value))}
               options={[
               { value: 'all', label: t('admin2.sc_filter_specialty_all') },
               { value: 'cardiology', label: t('admin2.sc_filter_specialty_cardiology') },
@@ -579,7 +583,10 @@ const ServiceCatalog = () => {
             </label>
             <Select
               value={selectedCategory}
-              onChange={(value: unknown) => setSelectedCategory(String(value))}
+              // RQ-06.c: canonical onValueChange — the legacy onChange emitted
+              // an event object, so String(value) made parseInt(selectedCategory)
+              // NaN and the category filter hid every service.
+              onValueChange={(value) => setSelectedCategory(String(value))}
               options={[
               { value: 'all', label: t('admin2.sc_filter_category_all') },
               ...categories.map((category) => ({
@@ -595,7 +602,10 @@ const ServiceCatalog = () => {
             </label>
             <Select
               value={selectedDepartment}
-              onChange={(value: unknown) => setSelectedDepartment(String(value))}
+              // RQ-06.c: canonical onValueChange — the legacy onChange emitted
+              // an event object, so String(value) stored '[object Object]' in
+              // the department filter state and emptied the list.
+              onValueChange={(value) => setSelectedDepartment(String(value))}
               options={[
               { value: 'all', label: t('admin2.sc_filter_department_all') },
               ...departments.map((dept) => ({
