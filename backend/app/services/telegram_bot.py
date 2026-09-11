@@ -165,6 +165,11 @@ class TelegramBotService:
                 self.webhook_url = config.webhook_url
                 self.active = config.active
                 return True
+            # PR-2 (round 3): never keep a previously resolved credential
+            # across a failed re-initialization - callers such as the
+            # polling worker read bot_service.bot_token directly.
+            self.bot_token = None
+            self.active = False
             return False
         except Exception as e:
             logger.error(f"Ошибка инициализации бота: {e}")

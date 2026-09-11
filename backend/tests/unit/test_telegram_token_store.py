@@ -341,6 +341,22 @@ class TestResolvePatientBotToken:
 
         assert resolve_patient_bot_token(db_session) == "123456789:env-token"
 
+    def test_falls_back_to_pydantic_loaded_env(self, db_session, monkeypatch):
+        """backend/.env tokens live in the Settings object, NOT os.environ."""
+        _clear_token_env(monkeypatch)
+        monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456789:dotenv-token")
+
+        assert resolve_patient_bot_token(db_session) == "123456789:dotenv-token"
+
+    def test_runtime_env_override_wins_over_loaded_settings(
+        self, db_session, monkeypatch
+    ):
+        _clear_token_env(monkeypatch)
+        monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456789:dotenv")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123456789:runtime")
+
+        assert resolve_patient_bot_token(db_session) == "123456789:runtime"
+
     def test_encrypted_config_without_key_falls_through(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
         _set_fernet_key(monkeypatch)
@@ -353,8 +369,42 @@ class TestResolvePatientBotToken:
     def test_none_when_nothing_configured(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
         _clear_fernet_key(monkeypatch)
+        monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", None)
 
         assert resolve_patient_bot_token(db_session) is None
+
+
+@pytest.mark.unit
+class TestStaffBotServiceStaleState:
+    @pytest.mark.asyncio
+    async def test_failed_reinit_clears_cached_credential(
+        self, db_session, monkeypatch
+    ):
+        from app.services import telegram_bot as telegram_bot_service_module
+
+        _set_fernet_key(monkeypatch)
+        config = TelegramConfig()
+        config.set_bot_token("123456789:good-token")
+        config.active = True
+        db_session.add(config)
+        db_session.commit()
+
+        service = telegram_bot_service_module.TelegramBotService()
+        assert await service.initialize(db_session) is True
+        assert service.bot_token == "123456789:good-token"
+        assert service.active is True
+
+        # Rotate to corrupted ciphertext and drop the key: fail-closed read.
+        config.bot_token = "gAAAAA-corrupted-value"
+        db_session.commit()
+        monkeypatch.setattr(settings, "ENCRYPTION_KEY", None)
+
+        assert await service.initialize(db_session) is False
+        # P2 pin (round 3): the stale credential must not survive a failed
+        # re-initialization - the polling worker reads bot_service.bot_token
+        # directly, ignoring the return value.
+        assert service.bot_token is None
+        assert service.active is False
 
 
 @pytest.mark.unit

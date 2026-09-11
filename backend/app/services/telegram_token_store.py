@@ -127,11 +127,13 @@ def resolve_patient_bot_token(db) -> str | None:
         if token:
             return token
 
-    # os.getenv (not settings.TELEGRAM_BOT_TOKEN): the pydantic Settings
-    # object is instantiated once at import time and never re-reads the
-    # environment; the staff resolver in the endpoints layer has the same
-    # runtime contract.
+    # Runtime os.environ wins (post-import overrides), then the pydantic
+    # Settings value — TELEGRAM_BOT_TOKEN configured only in backend/.env is
+    # loaded into the settings object WITHOUT being present in os.environ,
+    # so a bare os.getenv() would miss it (codex round 3).
     env_token = str(os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+    if not env_token:
+        env_token = str(getattr(settings, "TELEGRAM_BOT_TOKEN", None) or "").strip()
     return env_token or None
 
 
