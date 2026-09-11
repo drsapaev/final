@@ -665,6 +665,16 @@ async def send_mobile_self_test_notification(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="telegram_bot_disabled",
         )
+    # Admin disable-switch freshness: service.active may be STALE in
+    # multi-worker deployments when TelegramConfig.active flips to False
+    # without a token change (the cache predicate above then skips
+    # initialize() entirely). Re-read the switch on every self-test.
+    config = crud_telegram.get_telegram_config(db)
+    if config is not None and not config.active:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="telegram_bot_disabled",
+        )
 
     sent = await service.send_plain_message(chat_id, _MOBILE_SELF_TEST_TEXT)
     if not sent:
