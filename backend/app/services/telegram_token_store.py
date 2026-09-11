@@ -300,6 +300,12 @@ def clear_patient_bot_token(
     cleared = False
     if config is not None and config.bot_token:
         config.set_bot_token(None)
+        # PR-2 (round 12): clear the webhook authentication state atomically
+        # with the token - a retained webhook_secret would keep
+        # authenticating the revoked bot's updates against clinic state.
+        config.webhook_secret = None
+        config.webhook_url = None
+        config.active = False
         cleared = True
     if legacy_setting is not None:
         db.delete(legacy_setting)

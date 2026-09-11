@@ -73,16 +73,28 @@ async def _ensure_bot_service_fresh(db: Session, bot_service=None):
 
     if bot_service is None:
         bot_service = await _tw_package.get_telegram_bot_service()
+    from sqlalchemy.orm import Session as _SaSession
+
+    if not isinstance(db, _SaSession):
+        # Non-session stub (unit tests) - nothing to verify against.
+        return bot_service
     try:
         canonical = resolve_patient_bot_token(db)
     except Exception as exc:
-        # Resolution unavailable (transient DB failure, non-session stub):
-        # keep the cached state rather than tearing down a working bot.
+        # PR-2 (round 12): fail closed - the credential cannot be verified
+        # against the SSOT, so abort the operation (Telegram retries failed
+        # webhook deliveries; send paths surface 503) instead of sending
+        # with a possibly-revoked token.
         logger.warning(
             "Telegram bot token freshness check failed error_type=%s",
             type(exc).__name__,
         )
-        return bot_service
+        bot_service.bot_token = None
+        bot_service.active = False
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Telegram credential state is temporarily unverifiable",
+        ) from exc
     if not bot_service.active or bot_service.bot_token != canonical:
         await bot_service.initialize(db)
     return bot_service

@@ -328,6 +328,27 @@ class TestClearPatientBotToken:
         assert service.bot_token is None
         assert service.active is False
 
+    def test_clear_disables_webhook_state(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:compromised")
+        config = db_session.query(TelegramConfig).one()
+        config.webhook_url = "https://example.com/webhook"
+        config.webhook_secret = "topsecret"
+        config.active = True
+        db_session.commit()
+
+        clear_patient_bot_token(db_session, actor_user_id=1)
+
+        db_session.expire_all()
+        row = db_session.query(TelegramConfig).one()
+        # P1 pin (round 12): a retained webhook_secret would keep
+        # authenticating the revoked bot's updates against clinic state.
+        assert row.bot_token is None
+        assert row.webhook_secret is None
+        assert row.webhook_url is None
+        assert row.active is False
+
     def test_clear_is_noop_without_any_token(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
         _clear_fernet_key(monkeypatch)
@@ -508,6 +529,43 @@ class TestStaffBotServiceStaleState:
         # directly, ignoring the return value.
         assert service.bot_token is None
         assert service.active is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.asyncio
+    async def test_freshness_check_fails_closed_on_resolver_failure(
+        self, db_session, monkeypatch
+    ):
+        import fastapi
+        from app.api.v1.endpoints.telegram_webhook import _helpers
+        from app.services import telegram_token_store as store_module
+
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        config = TelegramConfig()
+        config.set_bot_token("123456789:good-token")
+        config.active = True
+        db_session.add(config)
+        db_session.commit()
+
+        service = telegram_bot_module.telegram_bot_service
+        service.bot_token = "123456789:good-token"
+        service.active = True
+        try:
+
+            def _boom(session):
+                raise RuntimeError("db outage")
+
+            monkeypatch.setattr(store_module, "resolve_patient_bot_token", _boom)
+            with pytest.raises(fastapi.HTTPException) as exc_info:
+                await _helpers._ensure_bot_service_fresh(db_session)
+            # P2 pin (round 12): an unverifiable credential must not keep
+            # operating - the operation aborts and the cache is cleared.
+            assert exc_info.value.status_code == 503
+            assert service.bot_token is None
+            assert service.active is False
+        finally:
+            service.bot_token = None
+            service.active = False
 
     @pytest.mark.asyncio
     async def test_env_only_initialize_serves_env_token(self, db_session, monkeypatch):

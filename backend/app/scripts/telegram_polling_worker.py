@@ -81,10 +81,16 @@ class TelegramPollingWorker:
             try:
                 canonical = await self._load_bot_token()
             except Exception as exc:
+                # PR-2 (round 12): fail closed for this cycle - do NOT
+                # consume updates with an unverifiable credential; Telegram
+                # keeps them pending until the SSOT check succeeds.
                 LOGGER.warning(
-                    "Telegram token re-resolve failed error_type=%s",
+                    "Telegram token re-resolve failed error_type=%s — "
+                    "skipping cycle",
                     type(exc).__name__,
                 )
+                time.sleep(self.retry_delay)
+                continue
             else:
                 if not canonical:
                     LOGGER.error("Telegram bot token was revoked — stopping")
