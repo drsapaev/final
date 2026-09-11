@@ -187,11 +187,11 @@ async def test_resolve_uses_persisted_identity_without_getme():
 
 @pytest.mark.real_identity_resolver
 @pytest.mark.asyncio
-async def test_resolve_falls_back_without_caching_when_getme_fails():
-    """Codex round 24 (P1): a failed getMe must NOT be cached as the
-    credential-scoped fallback — the next resolution retries getMe /
-    re-reads the persisted value so every worker converges on one
-    namespace instead of a worker keeping a divergent key forever."""
+async def test_resolve_returns_none_without_caching_when_getme_fails():
+    """Codex rounds 24-26: a failed getMe must NOT produce a claimable
+    identity (the caller defers the delivery instead) and nothing is
+    cached — the next resolution retries getMe / re-reads the persisted
+    value so every worker converges on one namespace."""
     token = "123456789:resolve-fallback-token"
     telegram_webhook_dedup._IDENTITY_BY_TOKEN.pop(token, None)
     fetch_calls = []
@@ -206,7 +206,7 @@ async def test_resolve_falls_back_without_caching_when_getme_fails():
         first = await telegram_webhook_dedup.resolve_ledger_bot_identity(token)
         second = await telegram_webhook_dedup.resolve_ledger_bot_identity(token)
 
-    assert first == second == telegram_webhook_dedup.ledger_bot_identity(token)
+    assert first is None and second is None  # defer, never a fallback key
     assert fetch_calls == [token, token]  # retried — nothing was cached
     assert token not in telegram_webhook_dedup._IDENTITY_BY_TOKEN
 
@@ -737,6 +737,37 @@ def test_webhook_in_flight_delivery_is_not_acknowledged(
     assert row.status == "processing"
 
 
+def test_webhook_identity_unavailable_delivery_is_deferred(
+    client, db_session, monkeypatch
+):
+    """Codex round 26 (P1): without a SHARED identity a claim could land
+    in a transient namespace another worker does not use — the delivery
+    is deferred (503) instead of being claimed under a fallback key."""
+    _add_secret_config(db_session)
+    fake = FakeTelegramBotService()
+    monkeypatch.setattr(
+        telegram_webhook, "get_telegram_bot_service", AsyncMock(return_value=fake)
+    )
+
+    async def no_identity(token):
+        return None
+
+    monkeypatch.setattr(
+        telegram_webhook_dedup,
+        "resolve_ledger_bot_identity",
+        no_identity,
+    )
+
+    response = client.post(
+        WEBHOOK_URL, json={"update_id": 509}, headers=SECRET_HEADER
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "identity_unavailable"}
+    fake.process_webhook_update.assert_not_awaited()
+    assert db_session.query(TelegramWebhookDedup).count() == 0
+
+
 def test_webhook_update_schema_keeps_update_id_optional():
     """Contract pin: TelegramWebhookUpdateRequest.update_id feeds dedup."""
     assert TelegramWebhookUpdateRequest.model_fields["update_id"].default is None
@@ -846,6 +877,83 @@ async def test_worker_skips_in_flight_update(worker, db_session, monkeypatch):
 
     fake.process_webhook_update.assert_not_awaited()
     (row,) = _dedup_rows(db_session, 605)
+    assert row.status == "processing"
+
+
+@pytest.mark.asyncio
+async def test_worker_identity_unavailable_leaves_batch_unconfirmed(
+    worker, db_session, monkeypatch
+):
+    """Codex round 26 (P1): without a SHARED identity the batch is left
+    unconfirmed instead of being claimed under a transient fallback key
+    another worker would not use."""
+    resolutions = {"123456789:token-a": None}
+
+    async def fake_resolve(t):
+        return resolutions[t]
+
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.resolve_ledger_bot_identity",
+        fake_resolve,
+    )
+    worker.once = False
+    polls = []
+    handled = []
+
+    async def fake_load():
+        return "123456789:token-a"
+
+    async def fake_handle(update, identity=None):
+        handled.append(update.get("update_id"))
+
+    def fake_get_updates(session, token, offset):
+        polls.append((token, offset))
+        if len(polls) == 1:
+            return [{"update_id": 902}]
+        worker.request_stop()
+        return []
+
+    monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+    monkeypatch.setattr(worker, "_handle_update", fake_handle)
+    monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+    exit_code = await worker.run()
+
+    assert exit_code == 0
+    # Nothing was dispatched, and the offset did NOT move: update 902
+    # stays pending for the cycle where an identity becomes available.
+    assert handled == []
+    assert polls == [("123456789:token-a", None), ("123456789:token-a", None)]
+    assert db_session.query(TelegramWebhookDedup).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_worker_failure_does_not_release_a_claim_it_does_not_own(
+    worker, db_session, monkeypatch
+):
+    """Codex round 26 (P2): after a fail-open UNAVAILABLE claim this
+    worker owns NOTHING — a handler exception must not delete another
+    delivery's live or processed row once the database has recovered."""
+    fake = _FakeWorkerBotService()
+    fake.process_webhook_update = AsyncMock(side_effect=RuntimeError("boom"))
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.get_telegram_bot_service",
+        AsyncMock(return_value=fake),
+    )
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.claim_update",
+        lambda db, update_id, bot_identity=None: telegram_webhook_dedup.UNAVAILABLE,
+    )
+    # Another delivery's live claim for the same update.
+    telegram_webhook_dedup.claim_update(db_session, 606)
+
+    disposition = await worker._handle_update({"update_id": 606})
+
+    # The handler failed (disposition None) — but the release was skipped
+    # because the fail-open UNAVAILABLE claim was never owned.
+    assert disposition is None
+    # The other delivery's claim SURVIVED the failure path.
+    (row,) = _dedup_rows(db_session, 606)
     assert row.status == "processing"
 
 

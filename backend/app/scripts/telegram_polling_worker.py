@@ -19,6 +19,7 @@ from app.db.session import SessionLocal
 from app.services.telegram_bot import get_telegram_bot_service
 # PR-3: update_id dedup shared with the webhook endpoint.
 from app.services.telegram_webhook_dedup import (
+    CLAIMED,
     DUPLICATE,
     IN_FLIGHT,
     claim_update,
@@ -284,6 +285,23 @@ class TelegramPollingWorker:
                 time.sleep(self.retry_delay)
                 continue
 
+            if ledger_identity is None and updates:
+                # PR-3 (round 26): without a SHARED identity a claim could
+                # land in a transient namespace another worker (which
+                # resolved the real bot id) does not use — the same
+                # update would be claimable under two keys and could
+                # execute twice. Leave the batch unconfirmed (the offset
+                # does not move); Telegram keeps the updates pending and
+                # the next cycle retries the resolution.
+                LOGGER.warning(
+                    "Telegram bot identity unavailable — updates left "
+                    "unconfirmed this cycle"
+                )
+                if self.once:
+                    return 1
+                time.sleep(self.retry_delay)
+                continue
+
             for update in updates:
                 update_id = update.get("update_id")
                 disposition = await self._handle_update(update, ledger_identity)
@@ -379,6 +397,9 @@ class TelegramPollingWorker:
         claim was released (pre-existing crash-window semantics)."""
         update_id = update.get("update_id")
         db: Session = SessionLocal()
+        # None until a claim is actually owned — the failure path must
+        # never release a claim this worker does not hold (round 26).
+        claim: str | None = None
         try:
             bot_service = await get_telegram_bot_service()
             if not bot_service.active:
@@ -410,8 +431,13 @@ class TelegramPollingWorker:
         except Exception as exc:
             db.rollback()
             # PR-3: release the claim so a re-fetched batch reprocesses
-            # this update instead of suppressing it forever.
-            release_claim(db, update_id, bot_identity)
+            # this update instead of suppressing it forever. Round 26:
+            # ONLY a claim this worker actually owns (CLAIMED) — a
+            # fail-open UNAVAILABLE claim must never delete another
+            # delivery's live or processed row once the database has
+            # recovered.
+            if claim == CLAIMED:
+                release_claim(db, update_id, bot_identity)
             LOGGER.warning(
                 "Telegram update failed update_id=%s error_type=%s",
                 update_id,

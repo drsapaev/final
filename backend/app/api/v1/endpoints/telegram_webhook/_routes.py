@@ -756,6 +756,22 @@ async def telegram_webhook(
         claimed_bot_identity = await telegram_webhook_dedup.resolve_ledger_bot_identity(
             getattr(bot_service, "bot_token", None)
         )
+        if claimed_bot_identity is None and body.update_id is not None:
+            # PR-3 (round 26): without a SHARED identity a claim could
+            # land in a transient namespace that another worker (which
+            # resolved the real bot id) does not use — the same update
+            # would be claimable under two keys and could execute twice.
+            # Defer: 503 so Telegram retries once an identity is
+            # available (persisted by whichever worker resolves first).
+            logger.info(
+                "Telegram webhook bot identity unavailable, retry "
+                "requested update_id=%s",
+                body.update_id,
+            )
+            return JSONResponse(
+                status_code=503,
+                content={"status": "identity_unavailable"},
+            )
         claim = telegram_webhook_dedup.claim_update(
             db, body.update_id, claimed_bot_identity
         )

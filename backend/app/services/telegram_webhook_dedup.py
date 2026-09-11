@@ -238,12 +238,12 @@ async def resolve_ledger_bot_identity(token: str | None) -> str | None:
        fallback), so retries routed across workers always claim under
        the same key;
     3. getMe — persisted on success so the other workers converge;
-    4. when getMe is unreachable: the deterministic credential-scoped
-       identity, deliberately NOT cached — the next resolution retries
-       getMe / re-reads the persisted value. All workers failing
-       together still agree on the same fallback (same credential), so
-       the namespace only ever diverges transiently instead of
-       permanently.
+    4. when getMe is unreachable: return None — the caller DEFERS the
+       delivery (webhook 503 / worker leaves updates unconfirmed) until
+       an identity is available (codex round 26). Claiming under a
+       transient credential-scoped fallback would let another worker
+       that resolved the real id claim the same update under a different
+       key — double execution.
 
     None means no credential at all (the claim lands in the "unknown"
     namespace).
@@ -267,9 +267,11 @@ async def resolve_ledger_bot_identity(token: str | None) -> str | None:
         _IDENTITY_BY_TOKEN[token_text] = identity
         return identity
 
-    # Degraded mode — deterministic, shared while the outage lasts, and
-    # never cached: every worker keeps retrying for the persisted id.
-    return ledger_bot_identity(token_text)
+    # Degraded mode — DEFER (codex round 26): without a shared identity
+    # a claim could land in a transient namespace another worker does
+    # not use. Telegram keeps the updates pending; the next resolution
+    # retries getMe / re-reads the persisted value.
+    return None
 
 
 def _log_db_failure(operation: str, update_id: int | None, exc: Exception) -> None:
