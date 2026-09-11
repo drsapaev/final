@@ -487,61 +487,6 @@ def test_run_scheduled_cleanup_includes_webhook_dedup(db_session):
 # ================= service: identity-change reset =================
 
 
-def test_reset_ledger_deletes_every_row(db_session):
-    telegram_webhook_dedup.claim_update(db_session, 701)
-    telegram_webhook_dedup.claim_update(db_session, 702)
-    telegram_webhook_dedup.mark_processed(db_session, 701)
-
-    deleted = telegram_webhook_dedup.reset_ledger(db_session)
-
-    assert deleted == 2
-    assert db_session.query(TelegramWebhookDedup).count() == 0
-
-
-def test_reset_ledger_scopes_to_one_identity(db_session):
-    """Codex round 24 (P2): purging the superseded bot's namespace must
-    not delete claims the webhook workers already made for the NEW bot."""
-    identity_a = telegram_webhook_dedup.ledger_bot_identity("123456789:bot-a")
-    identity_b = telegram_webhook_dedup.ledger_bot_identity("123456789:bot-b")
-    telegram_webhook_dedup.claim_update(db_session, 721, identity_a)
-    telegram_webhook_dedup.claim_update(db_session, 722, identity_b)
-
-    deleted = telegram_webhook_dedup.reset_ledger(db_session, identity_a)
-
-    assert deleted == 1
-    remaining = {
-        r.bot_identity
-        for r in db_session.query(TelegramWebhookDedup).all()
-    }
-    assert remaining == {identity_b}
-
-
-def test_reset_ledger_fail_open_when_table_missing(db_session):
-    db_session.execute(text("DROP TABLE telegram_webhook_dedup"))
-    db_session.commit()
-
-    assert telegram_webhook_dedup.reset_ledger(db_session) == 0
-
-
-def test_replacement_bot_update_not_suppressed_by_previous_bot_row(db_session):
-    """The codex round 19 scenario: update_id sequences are PER BOT. A row
-    retained from the previous bot must not make the replacement bot's
-    legitimate update look duplicate (silently skipped and ACKed)."""
-    # Previous bot: update_id 710 delivered and processed.
-    telegram_webhook_dedup.claim_update(db_session, 710)
-    telegram_webhook_dedup.mark_processed(db_session, 710)
-
-    # The configured bot is replaced — the ledger is wiped (the token
-    # store clears it atomically with the swap, the polling worker
-    # mirrors the offset reset).
-    telegram_webhook_dedup.reset_ledger(db_session)
-
-    # The replacement bot's update happens to carry the same numeric id.
-    assert telegram_webhook_dedup.claim_update(db_session, 710) == (
-        telegram_webhook_dedup.CLAIMED
-    )
-
-
 # ========================= webhook endpoint =========================
 
 
@@ -1041,61 +986,6 @@ async def test_worker_same_bot_rotation_keeps_ledger(worker, db_session, monkeyp
 
 
 @pytest.mark.asyncio
-async def test_worker_cycle_top_identity_change_clears_ledger(
-    worker, db_session, monkeypatch
-):
-    """The cycle-top swap resets the offset and clears the ledger ONLY
-    when the resolved BOT IDENTITY changed (round 22) — and the purge is
-    SCOPED to the superseded identity (round 24): claims the webhook
-    workers already made for the NEW bot survive."""
-    identity_a, identity_b = "tgbot:111", "tgbot:222"
-    resolutions = {
-        "123456789:token-a": identity_a,
-        "123456789:token-b": identity_b,
-    }
-
-    async def fake_resolve(t):
-        return resolutions[t]
-
-    monkeypatch.setattr(
-        "app.scripts.telegram_polling_worker.resolve_ledger_bot_identity",
-        fake_resolve,
-    )
-    telegram_webhook_dedup.claim_update(db_session, 801, identity_a)
-    telegram_webhook_dedup.mark_processed(db_session, 801, identity_a)
-    # The webhook workers already claimed a new-bot update before the
-    # polling worker observed the credential change (round 24).
-    telegram_webhook_dedup.claim_update(db_session, 802, identity_b)
-    tokens = iter(
-        ["123456789:token-a", "123456789:token-b", "123456789:token-b"]
-    )
-    polls = []
-
-    async def fake_load():
-        return next(tokens)
-
-    def fake_get_updates(session, token, offset):
-        polls.append((token, offset))
-        return []
-
-    monkeypatch.setattr(worker, "_load_bot_token", fake_load)
-    monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
-
-    exit_code = await worker.run()
-
-    assert exit_code == 0
-    # The offset was reset — the replacement bot is polled from scratch.
-    assert polls == [("123456789:token-b", None)]
-    db_session.expire_all()
-    # The superseded identity's rows are gone; the new bot's claim
-    # SURVIVED the purge (no re-execution of its update).
-    assert _dedup_rows(db_session, 801) == []
-    (new_claim,) = _dedup_rows(db_session, 802)
-    assert new_claim.bot_identity == identity_b
-    assert new_claim.status == "processing"
-
-
-@pytest.mark.asyncio
 async def test_worker_in_flight_update_is_left_unconfirmed(
     worker, db_session, monkeypatch
 ):
@@ -1146,11 +1036,13 @@ async def test_worker_in_flight_update_is_left_unconfirmed(
 
 
 @pytest.mark.asyncio
-async def test_worker_post_poll_credential_change_clears_ledger(
+async def test_worker_post_poll_identity_change_resets_offset(
     worker, db_session, monkeypatch
 ):
-    """A rotation landing during the long poll drops the stale batch AND
-    purges the superseded identity's rows along with it."""
+    """A rotation landing during the long poll drops the stale batch and
+    resets the offset — and does NOT purge the ledger (codex round 27):
+    deleting rows could drop a live claim of an in-flight old-bot
+    delivery, while the composite key already isolates the new bot."""
     identity_a = "tgbot:777000"
     resolutions = {
         "123456789:token-a": identity_a,
@@ -1190,4 +1082,8 @@ async def test_worker_post_poll_credential_change_clears_ledger(
     # The stale batch was dropped, not dispatched.
     assert handled == []
     db_session.expire_all()
-    assert _dedup_rows(db_session, 802) == []
+    # The superseded identity's rows are NOT deleted (a live claim of an
+    # in-flight old-bot delivery must survive); they age out via
+    # retention.
+    (row,) = _dedup_rows(db_session, 802)
+    assert row.status == "processed"

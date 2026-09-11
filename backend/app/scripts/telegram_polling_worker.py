@@ -25,7 +25,6 @@ from app.services.telegram_webhook_dedup import (
     claim_update,
     mark_processed,
     release_claim,
-    reset_ledger,
     resolve_ledger_bot_identity,
 )
 from app.services.telegram_token_store import resolve_patient_bot_token
@@ -65,29 +64,6 @@ class TelegramPollingWorker:
 
     def request_stop(self) -> None:
         self._stop_requested = True
-
-    def _clear_dedup_ledger(self, bot_identity: str | None) -> None:
-        """PR-3: purge the SUPERSEDED bot's ledger rows when the identity
-        changes (codex round 24).
-
-        The delete is scoped to the superseded identity: webhook workers
-        may already have claimed or completed updates for the NEW bot
-        before the polling worker observes the credential change — a
-        global reset would delete those claims and let a retry run the
-        handler again (or concurrently). The composite key isolates the
-        namespaces; anything not purged here ages out via the retention
-        sweep. Fail-open: a failed purge is logged.
-        """
-        db: Session = SessionLocal()
-        try:
-            deleted = reset_ledger(db, bot_identity)
-            LOGGER.info(
-                "Telegram dedup ledger cleared for the superseded bot "
-                "rows_deleted=%s",
-                deleted,
-            )
-        finally:
-            db.close()
 
     async def run(self) -> int:
         token = await self._load_bot_token()
@@ -147,13 +123,14 @@ class TelegramPollingWorker:
                         # round 11).
                         pending_webhook_deletion = True
                     offset = None
-                    if identity_changed:
-                        # The ledger and the offset are both cursors of the
-                        # superseded bot. A same-bot token rotation keeps
-                        # the identity — and its dedup continuity (round
-                        # 22) — so only the SUPERSEDED identity's rows are
-                        # purged, never the new bot's claims (round 24).
-                        self._clear_dedup_ledger(superseded_identity)
+                    # If the IDENTITY changed (replacement bot), the offset
+                    # is the superseded bot's cursor and the reset above is
+                    # exactly what the new sequence needs. The ledger is
+                    # NOT wiped either way: the composite key isolates the
+                    # replacement bot's claims, and deleting rows could
+                    # drop a live claim of an in-flight old-bot delivery
+                    # (codex round 27) — superseded rows age out via the
+                    # retention sweep.
             if pending_webhook_deletion:
                 try:
                     self._delete_webhook(session, token)
@@ -198,7 +175,6 @@ class TelegramPollingWorker:
                         )
                         if refreshed_identity != ledger_identity:
                             offset = None
-                            self._clear_dedup_ledger(ledger_identity)
                         ledger_identity = refreshed_identity
                         LOGGER.info("Telegram bot token rotated — reloading")
                         token = refreshed
@@ -270,21 +246,25 @@ class TelegramPollingWorker:
                 )
                 post_poll_identity = await resolve_ledger_bot_identity(post_poll)
                 identity_changed = post_poll_identity != ledger_identity
-                superseded_identity = ledger_identity
                 token = post_poll
                 ledger_identity = post_poll_identity
                 if not self.keep_webhook:
                     pending_webhook_deletion = True
                 offset = None
-                if identity_changed:
-                    # Same rule as the cycle-top swap: purge only the
-                    # superseded identity's rows (round 24).
-                    self._clear_dedup_ledger(superseded_identity)
+                # Round 27: no ledger wipe here either — same rationale as
+                # the cycle-top swap.
                 if self.once:
                     return 0
                 time.sleep(self.retry_delay)
                 continue
 
+            if ledger_identity is None and updates:
+                # PR-3 (round 27): the token may be unchanged while
+                # Telegram or the database recover — re-resolve the
+                # CURRENT token's identity before deferring, otherwise
+                # the worker would defer forever until a restart or a
+                # credential change.
+                ledger_identity = await resolve_ledger_bot_identity(token)
             if ledger_identity is None and updates:
                 # PR-3 (round 26): without a SHARED identity a claim could
                 # land in a transient namespace another worker (which

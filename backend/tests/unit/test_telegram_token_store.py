@@ -202,18 +202,8 @@ class TestStorePatientBotToken:
         db_session.add(TelegramWebhookDedup(update_id=777, status="processed"))
         db_session.commit()
 
-        calls = []
-        real_reset = dedup_module.reset_ledger
-
-        def spy(db, *, commit=True):
-            calls.append(True)
-            return real_reset(db, commit=commit)
-
-        monkeypatch.setattr(dedup_module, "reset_ledger", spy)
-
         store_patient_bot_token(db_session, "123456789:new-bot")
 
-        assert calls == []  # the store never wipes the ledger
         db_session.expire_all()
         assert db_session.query(TelegramWebhookDedup).count() == 1
 

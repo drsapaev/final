@@ -455,45 +455,6 @@ def release_claim(
         _log_db_failure("release", update_id, exc)
 
 
-def reset_ledger(
-    db: Session, bot_identity: str | None = None, *, commit: bool = True
-) -> int:
-    """Delete ledger rows. Returns the number of deleted rows.
-
-    With ``bot_identity`` the delete is SCOPED to that identity's rows
-    (codex round 24): the polling worker wiping the superseded bot's
-    namespace must not delete a claim the webhook workers already made
-    or completed for the NEW bot — the composite key isolates the two
-    namespaces, so only the superseded one is purged. With
-    ``bot_identity=None`` EVERY row is deleted (all identities).
-
-    ... (commit semantics unchanged)
-    """
-    try:
-        stmt = delete(TelegramWebhookDedup)
-        if bot_identity is not None:
-            stmt = stmt.where(
-                TelegramWebhookDedup.bot_identity == _key_identity(bot_identity)
-            )
-        result = db.execute(stmt)
-        if commit:
-            db.commit()
-    except SQLAlchemyError as exc:
-        if not commit:
-            # Caller-owned transaction: surface the failure so the
-            # caller's error handling (rollback / retry) applies.
-            raise
-        db.rollback()
-        _log_db_failure("reset", None, exc)
-        return 0
-    deleted = int(result.rowcount or 0)
-    if deleted:
-        logger.info(
-            "Telegram webhook dedup ledger reset rows_deleted=%s", deleted
-        )
-    return deleted
-
-
 def purge_expired(
     db: Session, retention_days: int = DEDUP_RETENTION_DAYS
 ) -> int:
