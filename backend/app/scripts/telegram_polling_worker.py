@@ -129,7 +129,19 @@ class TelegramPollingWorker:
                     # revoked in the DB after this process started —
                     # re-resolve through the SSOT chain instead of polling
                     # with the stale token forever.
-                    refreshed = await self._load_bot_token()
+                    try:
+                        refreshed = await self._load_bot_token()
+                    except Exception as exc:
+                        # PR-2 (round 13): a transient resolver failure must
+                        # not terminate run() — recover like the per-cycle
+                        # refresh does.
+                        LOGGER.warning(
+                            "Telegram token re-resolve failed error_type=%s "
+                            "— skipping cycle",
+                            type(exc).__name__,
+                        )
+                        time.sleep(self.retry_delay)
+                        continue
                     if refreshed and refreshed != token:
                         LOGGER.info("Telegram bot token rotated — reloading")
                         token = refreshed

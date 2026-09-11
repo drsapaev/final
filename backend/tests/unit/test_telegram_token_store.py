@@ -134,6 +134,43 @@ class TestStorePatientBotToken:
         assert len(rows) == 1
         assert rows[0].decrypted_bot_token == "123456789:second"
 
+    def test_rotation_invalidates_stale_webhook_state(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:old-bot")
+        config = db_session.query(TelegramConfig).one()
+        config.webhook_url = "https://example.com/webhook"
+        config.webhook_secret = "old-bot-secret"
+        config.active = True
+        db_session.commit()
+
+        store_patient_bot_token(db_session, "123456789:new-bot")
+
+        db_session.expire_all()
+        row = db_session.query(TelegramConfig).one()
+        # P1 pin (round 13): the superseded bot's webhook secret must not
+        # keep authenticating old-bot updates after a rotation.
+        assert row.decrypted_bot_token == "123456789:new-bot"
+        assert row.webhook_secret is None
+        assert row.webhook_url is None
+
+    def test_same_token_restore_preserves_webhook_state(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:same-bot")
+        config = db_session.query(TelegramConfig).one()
+        config.webhook_url = "https://example.com/webhook"
+        config.webhook_secret = "valid-secret"
+        config.active = True
+        db_session.commit()
+
+        store_patient_bot_token(db_session, "123456789:same-bot")
+
+        db_session.expire_all()
+        row = db_session.query(TelegramConfig).one()
+        assert row.webhook_secret == "valid-secret"
+        assert row.webhook_url == "https://example.com/webhook"
+
     def test_store_rejects_oversized_token(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
         _set_fernet_key(monkeypatch)
@@ -722,6 +759,62 @@ class TestPollingWorkerTokenReload:
         exit_code = asyncio.run(worker.run())
 
         assert exit_code == 0
+
+    def test_worker_401_branch_survives_resolver_failure(self, monkeypatch):
+        import asyncio
+
+        import requests as _requests
+
+        from app.scripts.telegram_polling_worker import TelegramPollingWorker
+
+        worker = TelegramPollingWorker(
+            poll_timeout=0,
+            request_timeout=1,
+            retry_delay=0,
+            drop_pending_updates=False,
+            keep_webhook=True,
+            once=False,
+            max_updates=1,
+        )
+        _RAISE = object()
+        script = [
+            "123456789:token-a",
+            "123456789:token-a",
+            _RAISE,  # resolver failure inside the 401 branch
+            "123456789:token-b",
+        ]
+        loads = []
+
+        async def fake_load():
+            value = script[len(loads)]
+            loads.append(value)
+            if value is _RAISE:
+                raise RuntimeError("transient db outage")
+            return value
+
+        async def fake_handle(update):
+            return None
+
+        response = _requests.Response()
+        response.status_code = 401
+        get_updates_calls = []
+
+        def fake_get_updates(session, token, offset):
+            get_updates_calls.append(token)
+            if len(get_updates_calls) == 1:
+                raise _requests.HTTPError("401 Unauthorized", response=response)
+            return [{"update_id": 1}]
+
+        monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+        monkeypatch.setattr(worker, "_handle_update", fake_handle)
+        monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+        exit_code = asyncio.run(worker.run())
+
+        # P2 pin (round 13): a resolver failure inside the 401 branch must
+        # not terminate run() - the worker recovers on the next cycle.
+        assert exit_code == 0
+        assert get_updates_calls == ["123456789:token-a", "123456789:token-b"]
         # P1 pin (round 7): the swap happens WITHOUT a 401 - the worker
         # compares the canonical token every cycle and continues polling
         # with the rotated credential.

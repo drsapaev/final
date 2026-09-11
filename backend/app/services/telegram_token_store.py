@@ -236,10 +236,22 @@ def store_patient_bot_token(
             # violation escaping via autoflush must roll back and re-resolve
             # exactly like an explicit flush would (codex round 9).
             config = crud_telegram.get_telegram_config(db)
+            token_changed = (
+                decrypt_token(config.bot_token) != token_text
+                if config is not None
+                else True
+            )
             if config is None:
                 config = TelegramConfig()
                 db.add(config)
             config.set_bot_token(token_text)
+            if token_changed and config.webhook_secret is not None:
+                # PR-2 (round 13): the superseded bot's webhook secret must
+                # not keep authenticating old-bot updates after a rotation.
+                # The new bot needs a fresh webhook registration anyway, so
+                # the stale registration is invalidated here.
+                config.webhook_secret = None
+                config.webhook_url = None
 
             legacy_setting = crud_clinic.get_setting_by_key(
                 db, PATIENT_BOT_TOKEN_SETTING_KEY
