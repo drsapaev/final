@@ -36,8 +36,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import uuid
-from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, select, update
@@ -224,25 +224,40 @@ def _persist_bot_identity(token_text: str, identity: str) -> None:
         )
 
 
-@contextmanager
-def _no_http_request_logs():
-    """Temporarily raise the httpx/httpcore log levels (codex round 33).
+class _TelegramCredentialLogFilter(logging.Filter):
+    """Redact Telegram bot credentials from httpx/httpcore records
+    (codex round 34).
 
     httpx logs the complete request URL at INFO — and the getMe URL
     embeds the bot credential, which the PII filter does not recognize.
-    Suppressing the request logs for the duration of the call keeps the
-    credential out of stdout and the polling worker's log file; levels
-    are restored afterwards.
+    A PERMANENT per-record filter is concurrency-safe: overlapping
+    resolutions in one ASGI process cannot restore levels on each other
+    and re-expose the credential (the round-33 level toggling could).
     """
-    loggers = [logging.getLogger("httpx"), logging.getLogger("httpcore")]
-    previous = [(lg, lg.level) for lg in loggers]
-    for lg in loggers:
-        lg.setLevel(max(lg.level, logging.WARNING))
-    try:
-        yield
-    finally:
-        for lg, level in previous:
-            lg.setLevel(level)
+
+    _TOKEN_URL_RE = re.compile(r"/bot\d+:[A-Za-z0-9_-]{20,}/")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if "/bot" in message:
+            redacted = self._TOKEN_URL_RE.sub("/bot[REDACTED]/", message)
+            if redacted != message:
+                record.msg = redacted
+                record.args = None
+        return True
+
+
+def _install_credential_log_filter() -> None:
+    """Attach the redaction filter once per process (idempotent)."""
+    for name in ("httpx", "httpcore"):
+        log = logging.getLogger(name)
+        if not any(
+            isinstance(f, _TelegramCredentialLogFilter) for f in log.filters
+        ):
+            log.addFilter(_TelegramCredentialLogFilter())
+
+
+_install_credential_log_filter()
 
 
 async def _fetch_bot_id(token: str) -> str | None:
@@ -250,12 +265,11 @@ async def _fetch_bot_id(token: str) -> str | None:
     try:
         import httpx
 
-        with _no_http_request_logs():
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(
-                    f"https://api.telegram.org/bot{token}/getMe"
-                )
-                payload = response.json()
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                f"https://api.telegram.org/bot{token}/getMe"
+            )
+            payload = response.json()
         if payload.get("ok"):
             return str(payload["result"]["id"])
     except Exception as exc:  # noqa: BLE001 — identity resolution is best-effort

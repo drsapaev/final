@@ -211,26 +211,36 @@ async def test_resolve_returns_none_without_caching_when_getme_fails():
     assert token not in telegram_webhook_dedup._IDENTITY_BY_TOKEN
 
 
-@pytest.mark.real_identity_resolver
-def test_getme_suppresses_credential_bearing_request_logs(caplog):
-    """Codex round 33 (P1): the getMe URL embeds the bot credential and
-    httpx logs the full URL at INFO — the suppression window must keep
-    that line out of the handlers (and restore the levels afterwards)."""
+def test_httpx_request_logs_redact_bot_credentials(caplog):
+    """Codex rounds 33-34: the getMe URL embeds the bot credential and
+    httpx logs the full URL at INFO. A PERMANENT per-record filter
+    (concurrency-safe — no process-global level mutation) redacts the
+    credential in every handler, and overlapping resolutions cannot
+    re-expose it."""
     import logging as _logging
 
+    telegram_webhook_dedup._install_credential_log_filter()
     httpx_logger = _logging.getLogger("httpx")
     with caplog.at_level(_logging.INFO, logger="httpx"):
-        with telegram_webhook_dedup._no_http_request_logs():
-            httpx_logger.info(
-                "HTTP Request: GET https://api.telegram.org/"
-                "botSECRET-TOKEN/getMe"
-            )
         httpx_logger.info(
-            "HTTP Request: GET https://api.telegram.org/after-suppression"
+            "HTTP Request: GET https://api.telegram.org/"
+            "bot123456789:SECRET-TOKEN-VALUE-12345678/getMe"
+        )
+        # A concurrent resolution logs another credential-bearing URL —
+        # the filter is per-record, so it is redacted just the same.
+        httpx_logger.info(
+            "HTTP Request: GET https://api.telegram.org/"
+            "bot987654321:OTHER-SECRET-TOKEN-VALUE-9/getMe"
         )
 
-    leaked = [r for r in caplog.records if "SECRET-TOKEN" in r.getMessage()]
+    leaked = [
+        r
+        for r in caplog.records
+        if "SECRET-TOKEN" in r.getMessage() or "OTHER-SECRET" in r.getMessage()
+    ]
     assert leaked == []
+    redacted = [r for r in caplog.records if "[REDACTED]" in r.getMessage()]
+    assert len(redacted) == 2
 
 
 def _patch_service_session(monkeypatch, db_session):
