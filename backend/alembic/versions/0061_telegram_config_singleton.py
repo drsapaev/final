@@ -11,7 +11,7 @@ Any pre-existing duplicate rows (pathological - the app has always treated
 the table as a singleton) are collapsed to the lowest id before the unique
 constraint is created.
 
-Revision ID: 0061_telegram_config_singleton_guard
+Revision ID: 0061_telegram_config_singleton
 Revises: 0060_visit_reminder_sent_at
 Create Date: 2026-09-11
 """
@@ -19,7 +19,7 @@ Create Date: 2026-09-11
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0061_telegram_config_singleton_guard"
+revision = "0061_telegram_config_singleton"
 down_revision = "0060_visit_reminder_sent_at"
 branch_labels = None
 depends_on = None

@@ -564,13 +564,13 @@ def test_alembic_chain_single_head_0061() -> None:
     )
     # PR-2: the chain head moved to 0061 (telegram_configs singleton
     # guard — the DB-level invariant behind the token-store race fix).
-    assert "0061_telegram_config_singleton_guard" in graph
-    assert graph["0061_telegram_config_singleton_guard"] == (
+    assert "0061_telegram_config_singleton" in graph
+    assert graph["0061_telegram_config_singleton"] == (
         "0060_visit_reminder_sent_at",
     )
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0061_telegram_config_singleton_guard"]
+    assert heads == ["0061_telegram_config_singleton"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============
