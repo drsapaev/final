@@ -1,15 +1,21 @@
 """Mobile-contract tests (PR-4): pin the Android client's backend surface.
 
 Basis: the full Retrofit surface of drsapaev/apkfinal (MobileApiService +
-ApiService) checked against the live FastAPI route table. 40 of 41 client
-endpoints must resolve; the only declared-but-uncalled path (GET /users) is
-documented in the PR body as mobile-repo backlog, intentionally not served.
+ApiService) checked against the backend's published OpenAPI schema and live
+behavior. 40 of 41 client endpoints must resolve; the only declared-but-
+uncalled path (GET /users) is documented in the PR body as mobile-repo
+backlog, intentionally not served.
 
 Layers covered here:
-1. Route-table contract: every (method, path-template) the mobile app calls
-   resolves in app.routes (path params normalized, canonical routes included).
-2. Mount-order regression pins: static routes must keep winning over the new
-   parametric aliases (registration order is behavior).
+1. Route-table contract via the OpenAPI schema: every (method, path-template)
+   the mobile app calls is published by the backend (path params normalized).
+   OpenAPI introspection is stable across FastAPI/Starlette versions (unlike
+   manual app.routes matching, which broke with the _IncludedRouter model).
+2. Registration-order behavior pins: static routes must keep winning over the
+   new parametric aliases. Asserted behaviorally: a non-int segment that
+   would 422 if the parametric alias captured it resolves through the static
+   handler instead (auth gates answer 401/403, public handlers answer
+   200/404).
 3. Functional pins: alias handlers share the canonical implementation and the
    mobile self-test endpoint pins the chat server-side (no relay surface).
 """
@@ -17,8 +23,6 @@ Layers covered here:
 import re
 
 import pytest
-from fastapi.routing import APIRoute
-from starlette.routing import Match
 
 from app.main import app
 
@@ -77,64 +81,64 @@ def _normalize(path: str) -> str:
     return re.sub(r"\{[^}]+\}", "{}", path).rstrip("/")
 
 
-def _registered() -> set[tuple[str, str]]:
+def _published() -> set[tuple[str, str]]:
+    schema = app.openapi()
     seen: set[tuple[str, str]] = set()
-    for route in app.routes:
-        if not isinstance(route, APIRoute):
-            continue
-        for method in route.methods or set():
-            if method in {"HEAD", "OPTIONS"}:
+    for path, operations in (schema.get("paths") or {}).items():
+        for method in operations:
+            if method.lower() in {"head", "options", "parameters"}:
                 continue
-            seen.add((method, _normalize(route.path)))
+            seen.add((method.upper(), _normalize(path)))
     return seen
 
 
 def test_mobile_contract_all_client_endpoints_resolve() -> None:
-    registered = _registered()
+    published = _published()
     missing = [
         (method, path)
         for method, path in MOBILE_CONTRACT_ENDPOINTS
-        if (method, _normalize(path)) not in registered
+        if (method, _normalize(path)) not in published
     ]
     assert not missing, f"Mobile contract endpoints missing on backend: {missing}"
 
 
 # ---------------------------------------------------------------------------
-# 2. Mount-order regression pins (static routes must beat parametric aliases)
+# 2. Registration-order behavior pins (static routes must beat parametric
+#    aliases). Discriminator: if a parametric alias captured a static path,
+#    the non-int segment would fail validation with 422; the static handler
+#    instead answers with its own auth gate (401/403) or its normal result.
 # ---------------------------------------------------------------------------
 
 
-def _first_full_match(method: str, path: str) -> str | None:
-    for route in app.routes:
-        match = route.matches(
-            scope={"type": "http", "method": method, "path": path}
-        )
-        if match[0] == Match.FULL:
-            return getattr(route, "name", None)
-    return None
-
-
 @pytest.mark.parametrize(
-    ("method", "path", "expected_name"),
+    ("method", "path", "forbidden"),
     [
-        ("GET", "/api/v1/emr/templates", "get_emr_templates"),
-        ("GET", "/api/v1/emr/templates/user", "get_user_templates"),
-        ("GET", "/api/v1/emr/doctor-history", "get_doctor_history"),
-        ("GET", "/api/v1/emr/patient/5", "get_patient_emrs"),
-        ("GET", "/api/v1/visits/info/anytoken", "get_visit_info_by_token"),
+        # Non-int segments that a parametric alias would 422 on if it won:
+        ("GET", "/api/v1/emr/templates", {404, 422}),
+        ("GET", "/api/v1/emr/templates/user", {404, 422}),
+        ("GET", "/api/v1/emr/doctor-history", {404, 422}),
+        ("GET", "/api/v1/emr/patient/5", {404, 422}),
+        # Auth-gated alias/canonical details must be routed:
+        ("GET", "/api/v1/visits/123", {404, 422}),
+        ("GET", "/api/v1/visits/visits/123", {404, 422}),
+        # Public confirmation-info handler legitimately 404s on unknown
+        # tokens - only parametric capture (422) would be a regression.
+        ("GET", "/api/v1/visits/info/anytoken", {422}),
     ],
 )
-def test_static_routes_win_over_parametric_aliases(
-    method: str, path: str, expected_name: str
+def test_static_and_alias_routes_resolve_without_parametric_capture(
+    client, method: str, path: str, forbidden: set[int]
 ) -> None:
-    assert _first_full_match(method, path) == expected_name, (
-        f"{method} {path} must resolve to the static handler {expected_name}"
+    response = getattr(client, method.lower())(path)
+    assert response.status_code not in forbidden, (
+        f"{method} {path} -> {response.status_code}: route must be registered "
+        "and must not be captured by a parametric alias"
     )
 
 
-def test_visits_detail_alias_resolves_to_alias_handler() -> None:
-    assert _first_full_match("GET", "/api/v1/visits/123") == "get_visit_mobile_alias"
-    assert _first_full_match("GET", "/api/v1/visits/visits/123") == "get_visit"
+def test_visit_confirmation_info_route_is_published() -> None:
+    published = _published()
+    assert ("GET", _normalize("/api/v1/visits/info/{token}")) in published
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +334,71 @@ def test_mobile_self_test_pins_own_chat_and_ignores_client_chat(
     assert body["success"] is True
     assert body["chat_id"] == 777
     assert fake.sent == [(777, ti_module._MOBILE_SELF_TEST_TEXT)]
+
+
+def test_mobile_self_test_direct_link_beats_newer_patient_link(
+    client, db, patient_user, patient_token, monkeypatch
+) -> None:
+    """Documented precedence: a direct user_id link always wins, even when a
+    NEWER patient-domain link exists for the same user."""
+    from datetime import date
+
+    from app.api.v1.endpoints import telegram_integration as ti_module
+    from app.models.patient import Patient
+    from app.models.telegram_config import TelegramUser
+
+    patient = Patient(
+        first_name="П",
+        last_name="Тестовый",
+        phone="+998900000099",
+        birth_date=date(1990, 1, 1),
+        address="Тестовый адрес",
+        user_id=patient_user.id,
+    )
+    db.add(patient)
+    db.commit()
+    db.refresh(patient)
+
+    direct = TelegramUser(
+        user_id=patient_user.id,
+        chat_id=555,
+        language_code="ru",
+        active=True,
+        blocked=False,
+    )
+    db.add(direct)
+    db.commit()
+    db.refresh(direct)
+
+    # Newer row on the patient-domain link must NOT steal the delivery.
+    patient_link = TelegramUser(
+        patient_id=patient.id,
+        chat_id=888,
+        language_code="ru",
+        active=True,
+        blocked=False,
+    )
+    db.add(patient_link)
+    db.commit()
+
+    fake = _FakeBotService()
+
+    async def _fake_get_service():
+        return fake
+
+    monkeypatch.setattr(ti_module, "get_telegram_bot_service", _fake_get_service)
+    monkeypatch.setattr(
+        ti_module, "resolve_patient_bot_token", lambda db: "canonical-token"
+    )
+
+    response = client.post(
+        "/api/v1/telegram-integration/send-notification",
+        json={"chat_id": "888"},
+        headers=_auth_headers(patient_token),
+    )
+    assert response.status_code == 200
+    assert response.json()["chat_id"] == 555
+    assert fake.sent == [(555, ti_module._MOBILE_SELF_TEST_TEXT)]
 
 
 def test_mobile_self_test_rejects_inactive_link(

@@ -11,13 +11,21 @@ app.schemas.notifications.
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Request,
+    status,
+)
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user, get_db, require_roles
 from app.core.config import settings
+from app.core.rate_limiter import limiter
 from app.crud import patient as crud_patient
 from app.crud import telegram_config as crud_telegram
 from app.models.appointment import Appointment
@@ -570,24 +578,36 @@ class MobileTelegramSelfTestRequest(BaseModel):
 
 def _resolve_own_telegram_link(db: Session, current_user: User) -> TelegramUser:
     """Resolve the CURRENT user's own ACTIVE TelegramUser link (never a
-    client-supplied chat): staff-style user_id link first, then the
-    patient-domain link (patient_id). Inactive or blocked links are rejected
-    the same way the canonical Mini App / notification paths treat them."""
-    query = (
+    client-supplied chat). Documented precedence: a direct user_id link
+    ALWAYS wins over the patient-domain link, so a newer patient link can
+    never steal the self-test delivery from the direct link. Inactive or
+    blocked links are rejected the same way the canonical Mini App /
+    notification paths treat them."""
+    base_filters = (
+        TelegramUser.active.is_(True),
+        TelegramUser.blocked.is_(False),
+    )
+    # 1) Direct staff-style/user link — explicit ownership contract rank.
+    link = (
+        db.query(TelegramUser)
+        .filter(TelegramUser.user_id == current_user.id, *base_filters)
+        .order_by(TelegramUser.id.desc())
+        .first()
+    )
+    if link:
+        return link
+    # 2) Patient-domain fallback (bot /start links patient rows).
+    link = (
         db.query(TelegramUser)
         .filter(
-            or_(
-                TelegramUser.user_id == current_user.id,
-                TelegramUser.patient_id.in_(
-                    select(Patient.id).where(Patient.user_id == current_user.id)
-                ),
-            )
+            TelegramUser.patient_id.in_(
+                select(Patient.id).where(Patient.user_id == current_user.id)
+            ),
+            *base_filters,
         )
-        .filter(TelegramUser.active.is_(True))
-        .filter(TelegramUser.blocked.is_(False))
         .order_by(TelegramUser.id.desc())
+        .first()
     )
-    link = query.first()
     if not link:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -600,8 +620,10 @@ def _resolve_own_telegram_link(db: Session, current_user: User) -> TelegramUser:
     "/send-notification",
     response_model=MobileTelegramSelfTestResponse,
 )
+@limiter.limit("3/minute")  # external send per call; keep the blast radius tiny
 async def send_mobile_self_test_notification(
-    request: MobileTelegramSelfTestRequest,
+    request: Request,
+    payload: MobileTelegramSelfTestRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
