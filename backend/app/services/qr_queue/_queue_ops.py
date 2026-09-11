@@ -415,6 +415,22 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         # ✅ ИСПРАВЛЕНИЕ: Используем дату из токена, а не сегодняшнюю
         target_date = qr_token.day
 
+        # Codex round-30 P2: и день QR-сессии, и текущее время — в
+        # таймзоне КЛИНИКИ (настройки очередей): resource-очереди
+        # создаются на КЛИНИК-локальном дне, и host date.today() в окне
+        # 19:00-24:00Z классифицировал текущий клиник-день как «будущий
+        # QR» — запись разрешалась до 07:00 клиник-времени, минуя окно
+        # старта онлайн-записи. Одни и те же now/today используются
+        # обеими ветками (общий и specialist QR); _now() сохраняет
+        # тестовую заморозку времени.
+        from zoneinfo import ZoneInfo
+
+        from app.crud.clinic import get_queue_settings
+
+        _tz_name = get_queue_settings(self.db).get("timezone", "Asia/Tashkent")
+        now = _now(ZoneInfo(_tz_name))
+        today = now.date()
+
         logger.debug("[_check_online_time_restrictions] Ищем DailyQueue:")
         logger.debug(f"  target_date: {target_date}")
         logger.debug(f"  specialist_id: {qr_token.specialist_id}")
@@ -432,8 +448,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             # ✅ ИСПРАВЛЕНИЕ: Для общего QR разрешаем запись даже если очередей еще нет
             # (они могут быть созданы позже, или запись может быть на будущую дату)
             if not daily_queue:
-                # Проверяем, что дата не в прошлом
-                today = date.today()
+                # Проверяем, что дата не в прошлом (clinic-day SSOT)
                 if target_date < today:
                     logger.debug(
                         f"[_check_online_time_restrictions] ❌ Дата {target_date} в прошлом"
@@ -445,10 +460,10 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
 
                 # ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем время для сегодняшнего дня
                 # Используем ту же логику, что и в check_queue_time_window
+                # (now — клиник-локальное время, см. clinic-day SSOT выше)
                 if target_date == today:
                     from app.services.queue_service import QueueBusinessService
 
-                    now = _now()
                     current_time = now.time()
                     start_time = QueueBusinessService.ONLINE_QUEUE_START_TIME  # 07:00
 
@@ -553,13 +568,8 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "status": "closed_reception_opened",
                 }
 
-        # ✅ ИСПРАВЛЕНИЕ: Проверяем время только если это сегодня
-        # ⚠️ ВАЖНО: Для общего QR daily_queue может быть None (если очереди еще не созданы)
-        # В этом случае мы уже вернули результат выше, так что здесь daily_queue всегда существует
-        now = _now()
-        today = date.today()
-
         # Если QR для будущей даты - разрешаем запись
+        # (day/today — клиник-локальные, см. clinic-day SSOT выше)
         if target_date > today:
             # ✅ Защита от None для общего QR (хотя мы уже вернули результат выше)
             if daily_queue:

@@ -5474,3 +5474,217 @@ def test_legacy_today_endpoint_defaults_to_clinic_day(
         assert response.waiting_entries == 1
     finally:
         _durable_cleanup(db_session, "lab_res_mm3", "adm_mm3")
+
+
+# ===================== NN. Codex round-30 pins =====================
+
+
+def test_bridged_queue_broadcasts_routing_rooms(db_session: Session) -> None:
+    """Codex round-30 P2: a BRIDGED queue (the 0059 backfill rows carry
+    BOTH specialist_id and queue_resource_id) is addressable through
+    EVERY routing sibling id — each queue manager subscribes to its own
+    selected specialist room, so the early legacy-only return starved
+    sibling subscribers of join/call/restore/no-show updates until
+    polling. Pure doctor queues keep the single legacy room;
+    pure resource queues keep the routing rooms."""
+    from app.ws.queue_ws import queue_update_departments
+
+    try:
+        user_a = _make_user(db_session, username="lab_res_nn1a", role="Resource")
+        synth_a = _make_doctor(db_session, user_id=user_a.id, specialty="lab")
+        user_b = _make_user(db_session, username="lab_res_nn1b", role="Resource")
+        synth_b = _make_doctor(db_session, user_id=user_b.id, specialty="lab")
+        resource = _make_resource(db_session, code="lab", queue_tag="lab")
+        today = _dt_now_tashkent_day()
+
+        # the bridged shape (0059 backfill): BOTH ids set
+        bridged = _make_queue(
+            db_session,
+            day=today,
+            specialist_id=synth_a.id,
+            queue_tag="lab",
+            queue_resource_id=resource.id,
+        )
+        rooms = queue_update_departments(db_session, bridged)
+        assert set(rooms) == {
+            f"specialist_{synth_a.id}",
+            f"specialist_{synth_b.id}",
+        }, rooms
+        assert "specialist_None" not in rooms
+
+        # regression: the pure doctor queue keeps the single legacy room
+        doc_user = _make_user(db_session, username="dr_nn1", role="doctor")
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+        doctor_queue = _make_queue(
+            db_session, day=today, specialist_id=doctor.id, queue_tag="cardio"
+        )
+        assert queue_update_departments(db_session, doctor_queue) == [
+            f"specialist_{doctor.id}"
+        ]
+
+        # regression: the pure resource queue keeps the routing rooms
+        pure_resource = _make_queue(
+            db_session,
+            day=today,
+            specialist_id=None,
+            queue_tag="lab",
+            queue_resource_id=resource.id,
+        )
+        assert set(queue_update_departments(db_session, pure_resource)) == {
+            f"specialist_{synth_a.id}",
+            f"specialist_{synth_b.id}",
+        }
+    finally:
+        _durable_cleanup(db_session, "lab_res_nn1a", "lab_res_nn1b", "dr_nn1")
+
+
+def test_admin_queue_status_defaults_to_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-30 P2: GET /api/v1/admin/queue-limits/queue-status
+    resolves the omitted day through the clinic_today SSOT — the
+    endpoint converted the omitted day with host date.today(), so in
+    the 19:00-24:00Z window the resource-surface lookup read the
+    previous day's queues and reported zero usage/closed state despite
+    waiting patients. The timezone is chosen dynamically so the
+    divergence is real."""
+    from app.api.v1.endpoints.queue_limits import get_queue_status_with_limits
+    from app.crud import clinic as crud_clinic
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()
+    monkeypatch.setattr(crud_clinic, "clinic_today", lambda db: clinic_day)
+
+    try:
+        user = _make_user(db_session, username="lab_res_nn2", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        assert queue is not None
+        _make_waiting_entry(db_session, queue, number=1)
+        _make_waiting_entry(db_session, queue, number=2)
+
+        admin = _make_user(db_session, username="adm_nn2", role="Admin")
+        rows = get_queue_status_with_limits(
+            day=None, specialty="lab", db=db_session, current_user=admin
+        )
+        lab_row = next(r for r in rows if r.specialty == "lab")
+        assert lab_row.doctor_id == synthetic.id
+        assert lab_row.day == clinic_day
+        assert lab_row.current_entries == 2
+    finally:
+        _durable_cleanup(db_session, "lab_res_nn2", "adm_nn2")
+
+
+def test_qr_time_restrictions_use_clinic_clock(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-30 P2: the QR session day/time classification rides
+    the CLINIC clock — host date.today() classified the current
+    clinic-day token as FUTURE (allowed=True, skipping the start
+    window), letting a lab/ECG join session open during the clinic's
+    pre-07:00 period. The clock is frozen on the next clinic-local day
+    at 05:30 (guaranteed to differ from the host date): the same-day
+    start window must reject the join."""
+    from datetime import time as _time
+
+    import app.services.qr_queue_service as qr_queue_service
+    import app.services.queue_service as queue_service_module
+    from app.models.online_queue import QueueToken
+    from app.services.qr_queue import QRQueueService
+
+    frozen_day = date.today() + timedelta(days=1)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            frozen = datetime.combine(frozen_day, _time(5, 30))
+            if tz is not None:
+                return frozen.replace(tzinfo=tz)
+            return frozen
+
+        @classmethod
+        def utcnow(cls):  # type: ignore[override]
+            return datetime.combine(frozen_day, _time(5, 30))
+
+    monkeypatch.setattr(qr_queue_service, "datetime", FixedDateTime)
+    monkeypatch.setattr(queue_service_module, "datetime", FixedDateTime)
+
+    try:
+        user = _make_user(db_session, username="lab_res_nn3", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        surface = queue_service.get_or_create_daily_queue(
+            db_session, day=frozen_day, specialist_id=None, queue_tag="lab"
+        )
+        assert surface is not None
+        token = QueueToken(
+            token="tok-nn3",
+            day=frozen_day,
+            specialist_id=synthetic.id,
+            department="lab",
+            is_clinic_wide=False,
+            expires_at=datetime.combine(frozen_day + timedelta(days=60), _time(12)),
+            active=True,
+        )
+        db_session.add(token)
+        db_session.commit()
+
+        result = QRQueueService(db_session)._check_online_time_restrictions("tok-nn3")
+        # NOT the future-day "allowed" verdict the host clock produced
+        assert result["allowed"] is False, result
+        assert result["status"] == "before_start_time", result
+        assert "07:00" in result["message"]
+    finally:
+        _durable_cleanup(db_session, "lab_res_nn3")
+        db_session.query(QueueToken).filter(QueueToken.token == "tok-nn3").delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_department_snapshot_defaults_to_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-30 P2: the department display snapshot
+    (/api/v1/display/ws/queue/{department} connections and
+    request_update messages) resolves the day through the clinic
+    timezone — host date.today() returned an empty/stale snapshot
+    during the 19:00-24:00Z window while the live resource queues sat
+    on the current clinic-local day. The timezone is chosen dynamically
+    so the divergence is real."""
+    from app.services import display_websocket_api_service as dwas
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()
+    monkeypatch.setattr(
+        dwas,
+        "get_queue_settings",
+        lambda db: {"timezone": tz_name},
+    )
+
+    try:
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        resource = (
+            db_session.query(QueueResource)
+            .filter(QueueResource.queue_tag == "lab")
+            .first()
+        )
+        queue = _make_queue(
+            db_session,
+            day=clinic_day,
+            specialist_id=None,
+            queue_tag="lab",
+            queue_resource_id=resource.id,
+        )
+        entry = _make_waiting_entry(db_session, queue, number=11)
+
+        service = dwas.DisplayWebSocketApiService(db_session)
+        payload = service.get_department_queue_state_payload(department="lab")
+        numbers = [e["number"] for e in payload["entries"]]
+        assert entry.number in numbers, payload
+        assert payload["total_waiting"] >= 1
+    finally:
+        _durable_cleanup(db_session)

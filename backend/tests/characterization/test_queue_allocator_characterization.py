@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -11,8 +11,14 @@ from app.services.queue_service import QueueBusinessService, queue_service
 
 
 def _create_daily_queue_and_token(db_session, test_doctor, token_value: str) -> tuple[DailyQueue, QueueToken]:
+    # Codex round-30: join/start classifies the token day in the CLINIC
+    # timezone — stamp the fixtures with the clinic-local day (same
+    # convention as the round-26 force-majeure test below).
+    from app.crud.clinic import clinic_today
+
+    clinic_day = clinic_today(db_session)
     daily_queue = DailyQueue(
-        day=date.today(),
+        day=clinic_day,
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,
@@ -24,7 +30,7 @@ def _create_daily_queue_and_token(db_session, test_doctor, token_value: str) -> 
     local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
     token = QueueToken(
         token=token_value,
-        day=date.today(),
+        day=clinic_day,
         specialist_id=test_doctor.id,
         department="cardiology",
         expires_at=local_now + timedelta(hours=2),

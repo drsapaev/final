@@ -14,6 +14,13 @@ from app.models.queue_profile import QueueProfile
 from app.services.queue_service import QueueBusinessService
 
 
+def _clinic_day() -> date:
+    """Codex round-30: join/start classifies the token day in the CLINIC
+    timezone — stamp the fixtures with the clinic-local day so the tests
+    stay deterministic in the 19:00-24:00Z host window."""
+    return datetime.now(ZoneInfo("Asia/Tashkent")).date()
+
+
 @pytest.mark.queue
 def test_qr_join_flow_success(client, db_session, test_doctor, monkeypatch):
     # Ensure time restrictions never block the test
@@ -21,7 +28,7 @@ def test_qr_join_flow_success(client, db_session, test_doctor, monkeypatch):
 
     # Arrange: daily queue + active token
     daily_queue = DailyQueue(
-        day=date.today(),
+        day=_clinic_day(),
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,
@@ -33,7 +40,7 @@ def test_qr_join_flow_success(client, db_session, test_doctor, monkeypatch):
     local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
     token = QueueToken(
         token=token_value,
-        day=date.today(),
+        day=_clinic_day(),
         specialist_id=test_doctor.id,
         department="cardiology",
         expires_at=local_now + timedelta(hours=2),
@@ -70,7 +77,7 @@ def test_qr_join_duplicate_is_not_recreated(client, db_session, test_doctor, mon
     monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
 
     daily_queue = DailyQueue(
-        day=date.today(),
+        day=_clinic_day(),
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,
@@ -82,7 +89,7 @@ def test_qr_join_duplicate_is_not_recreated(client, db_session, test_doctor, mon
     local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
     token = QueueToken(
         token=token_value,
-        day=date.today(),
+        day=_clinic_day(),
         specialist_id=test_doctor.id,
         department="cardiology",
         expires_at=local_now + timedelta(hours=2),
@@ -157,7 +164,7 @@ def test_clinic_wide_qr_exposes_backend_selectable_specialists(
     local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
     token = QueueToken(
         token=token_value,
-        day=date.today(),
+        day=_clinic_day(),
         specialist_id=None,
         department="clinic",
         is_clinic_wide=True,
@@ -232,7 +239,7 @@ def test_clinic_wide_qr_rejects_non_selectable_specialist_ids(
     local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
     token = QueueToken(
         token=token_value,
-        day=date.today(),
+        day=_clinic_day(),
         specialist_id=None,
         department="clinic",
         is_clinic_wide=True,

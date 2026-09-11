@@ -188,7 +188,12 @@ class DisplayWebSocketApiService:
         }
 
     def get_department_queue_state_payload(self, *, department: str) -> dict:
-        today = date.today()
+        # Codex round-30 P2: день снапшота отделения — clinic_today SSOT
+        # (таймзона настроек очередей, см. _clinic_today): соединения и
+        # request_update в окне 19:00-24:00Z получали пустой/вчерашний
+        # снапшот, пока живые resource-очереди лежали на текущем
+        # клиник-локальном дне.
+        today = self._clinic_today()
         queue_entries = self.repository.list_active_entries_for_day(day=today)
 
         filtered_entries = []

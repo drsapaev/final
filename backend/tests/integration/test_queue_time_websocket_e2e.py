@@ -38,9 +38,15 @@ def _freeze_datetime(monkeypatch, frozen_dt: datetime) -> None:
     monkeypatch.setattr(queue_service_module, "datetime", FixedDateTime)
 
 
+_FROZEN_DAY = date(2026, 1, 1)
+
+
 def _create_queue_and_token(db_session, test_doctor, token_value: str) -> str:
+    # Codex round-30: the session day/time is classified in the CLINIC
+    # timezone through the frozen clock — stamp the queue and the token
+    # with the frozen day (host date.today() diverges from it).
     daily_queue = DailyQueue(
-        day=date.today(),
+        day=_FROZEN_DAY,
         specialist_id=test_doctor.id,
         queue_tag="cardiology_common",
         active=True,
@@ -51,7 +57,7 @@ def _create_queue_and_token(db_session, test_doctor, token_value: str) -> str:
     local_now = datetime.now(ZoneInfo("Asia/Tashkent")).replace(tzinfo=None)
     token = QueueToken(
         token=token_value,
-        day=date.today(),
+        day=_FROZEN_DAY,
         specialist_id=test_doctor.id,
         department="cardiology",
         expires_at=local_now + timedelta(hours=2),
