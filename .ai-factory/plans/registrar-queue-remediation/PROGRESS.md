@@ -6,12 +6,12 @@
 
 ## Точка продолжения
 
-- Обновлено: 2026-09-11, RQ-06 PR_OPEN (VERIFIED в границах PR; DONE — после merge-сверки); RQ-01/RQ-02/RQ-03 DONE. Следующая минимальная незаблокированная задача — RQ-06.a (обнаруженный дефект парсинга в handleConfirmSave) либо RQ-19 (frontend-only). RQ-04/RQ-05 — валидация требует disposable PostgreSQL (P0): без него backend-часть BLOCKED.
-- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `1286ccbce7ddeb0c63c99c709325d6a37913d984` (merged план #3157, RQ-01 #3159, RQ-02 #3160, docs-checkpoint #3162, RQ-03 #3163, docs #3164, payments #3166).
-- Реализация: 3/30 закрыто (RQ-01, RQ-02, RQ-03 DONE); RQ-06 — PR_OPEN.
-- Активная runtime-задача: RQ-06 (owner — облачный агент, ветка `codex/rq-06-profile-tag-department`).
+- Обновлено: 2026-09-11, RQ-06 DONE (merged #3167, merge SHA `17b94ec4409e3dcc3578d4b53f6c084cf4dc676e`); RQ-01/RQ-02/RQ-03 DONE. Следующая минимальная незаблокированная задача — RQ-06.a (обнаруженный дефект парсинга в handleConfirmSave; тот же first-touch файл) либо RQ-19 (frontend-only). RQ-04/RQ-05 — валидация требует disposable PostgreSQL (P0): без него backend-часть BLOCKED.
+- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `17b94ec4409e3dcc3578d4b53f6c084cf4dc676e` (merged план #3157, RQ-01 #3159, RQ-02 #3160, docs-checkpoint #3162, RQ-03 #3163, docs #3164, payments #3166, RQ-06 #3167).
+- Реализация: 4/30 закрыто (RQ-01, RQ-02, RQ-03, RQ-06 DONE).
+- Активная runtime-задача: нет. Владелец: не назначен.
 - Подготовительный docs PR [#3157](https://github.com/drsapaev/final/pull/3157) **merged** в main (`be6012b18`); план доступен в fresh main — runtime-работа от fresh main разрешена.
-- Следующий шаг: после merge RQ-06 — сверить SHA, перевести в DONE; далее минимальная незаблокированная: RQ-06.a (обнаруженный дефект сохранения формы, first-touch тот же файл) либо RQ-19 (frontend-only, gate/direct по AGENTS; якоря Tabs/navigation — вне wizard-PR #3083-#3086). Перед backend-задачами (RQ-05 и др.) требуется disposable PostgreSQL — иначе BLOCKED по P0. Для RQ-04 дополнительно сверить head #3114.
+- Следующий шаг: минимальная незаблокированная: RQ-06.a (обнаруженный дефект сохранения формы, first-touch тот же файл) либо RQ-19 (frontend-only, gate/direct по AGENTS; якоря Tabs/navigation — вне wizard-PR #3083-#3086). Перед backend-задачами (RQ-05 и др.) требуется disposable PostgreSQL — иначе BLOCKED по P0. Для RQ-04 дополнительно сверить head #3114.
 - Дрейф F-05, зафиксированный RQ-06 (E-006): на базисе `1286ccbce` селектор queue_tag в ServiceForm вообще не доставлял значение тега (легаси `onChange` + `String(event)` → `'[object Object]'`), поэтому наблюдение аудита «profile.key записывается в department_key» через UI на текущем main не воспроизводится — дефект глубже; исправлены и проводка селекта (канонический `onValueChange`), и синхронизация (реальный `department_key` профиля). Обнаружены и зарегистрированы смежные дефекты той же формы: RQ-06.a, RQ-06.b.
 - Дрейф плана, зафиксированный RQ-01: QD-2A (0055–0059) уже merged через PR #3093 (`1f775cb`), поэтому открытый PR #3077 выглядит дубликатом/суперсeded — не мержить без сверки содержимого; F-10/F-16 частично смягчены; F-14 частично изменен. Подробности в E-003.
 - Открытые продуктовые решения: D-01…D-07 (все OPEN). Они не блокируют независимые fixes.
@@ -50,7 +50,7 @@ DONE требует: критерий из плана выполнен; узки
 | RQ-03 | Услуги мастера | RQ-01 | DONE | codex/rq-03-wizard-services / [#3163](https://github.com/drsapaev/final/pull/3163) merged `2cf108cace3432690fb20843dfaa347c4b3ac121` | E-005 |
 | RQ-04 | Атомарное отделение | RQ-01; проверить #3114 | TODO | — | — |
 | RQ-05 | Обязательный врач | RQ-01 | TODO | — | — |
-| RQ-06 | Профиль/тег/отделение | RQ-01 | PR_OPEN | codex/rq-06-profile-tag-department / [#3167](https://github.com/drsapaev/final/pull/3167) head `a5579a4f2` | E-006 |
+| RQ-06 | Профиль/тег/отделение | RQ-01 | DONE | codex/rq-06-profile-tag-department / [#3167](https://github.com/drsapaev/final/pull/3167) merged `17b94ec4409e3dcc3578d4b53f6c084cf4dc676e` | E-006 |
 | RQ-07 | Категории корзины | RQ-03, RQ-05 | TODO | — | — |
 | RQ-08 | Допустимые врачи и теги | RQ-05, RQ-06; проверить #3114 | TODO | — | — |
 | RQ-09 | Публичная видимость QR | RQ-01; проверить #3114 | TODO | — | — |
@@ -260,7 +260,8 @@ Parent DONE только после обоих children; parent и children не
 - Not checked and why: REAL_API — среда без PostgreSQL/Redis (blocker E-003.2); SQLite не применим (frontend-срез); screenshots S-04 — только MOCK-уровень.
 - Discovered defects (зарегистрированы, НЕ чинились в этом срезе): **RQ-06.a** — `handleConfirmSave` парсит `formData.code` вместо `formData.price`/`category_id`/`doctor_id` (blame `f35b91d270`, 2026-07-22): `price` → `parseFloat(code)` = NaN → null и т.п.; **RQ-06.b** — селекты `category_id`/`doctor_id`/`currency` ServiceForm используют тот же легаси `onChange`+`String(event)` паттерн (code-review; runtime-пруф пока только для queue_tag).
 - PR URL: [#3167](https://github.com/drsapaev/final/pull/3167) (head `a5579a4f223da48801c0bc87d6812af066a6ceb9`); merge SHA — сверить в следующем цикле (статус PR_OPEN/VERIFIED до сверки).
-- Status now: RQ-06 VERIFIED (в границах этого PR).
+- Status now: RQ-06 VERIFIED (в границах PR #3167).
+- Merge подтвержден (этот docs-checkpoint): PR #3167 squash-merged 2026-09-11, merge SHA `17b94ec4409e3dcc3578d4b53f6c084cf4dc676e`; все required checks на финальном head `faad4e711` success (37/37, включая Frontend e2e и PR Required Gate). RQ-06 → DONE.
 - Blocker: нет (частные blockers E-003 не затрагивают этот срез).
 - Next smallest action: после merge — сверить merge SHA, перевести RQ-06 в DONE; затем RQ-06.a (narrow, direct_execute/gate по AGENTS; тот же first-touch файл) либо RQ-19 при приоритете frontend-only.
 - Checkpoint commit / remote HEAD: см. PR этого среза; remote — сверять при продолжении.
