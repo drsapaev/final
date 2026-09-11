@@ -7369,3 +7369,41 @@ def test_cabinet_specialist_filter_sees_resource_queues(db_session: Session) -> 
     # surface instead of an empty list
     assert [item["id"] for item in payload] == [resource_queue.id]
     assert payload[0]["active"] is True
+
+
+# ===================== AE. Codex round-45 pin =====================
+
+
+def test_cabinet_filter_survives_registry_deactivation(db_session: Session) -> None:
+    """Codex round-45 P2: an operator deactivating a registry row
+    after a pure resource queue was created must not evict it from
+    the specialist-filtered cabinet screen — the requested day's
+    EXISTING resource surface keeps the tag in scope (the round-3 P1
+    deactivation-proof routing contract), and the day-less filter
+    keeps any live resource queue of the tag visible too."""
+    from app.services.queue_domain_service import QueueDomainService
+
+    day = _dt_now_tashkent_day()
+    res_user = _make_user(db_session, username="lab_res_ae1", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=res_user.id, specialty="lab")
+    resource_row = _make_resource(db_session, code="lab", queue_tag="lab")
+    resource_queue = queue_service.get_or_create_daily_queue(
+        db_session, day=day, specialist_id=None, queue_tag="lab"
+    )
+    _make_waiting_entry(db_session, resource_queue, number=106)
+
+    # the operator deactivates the registry row AFTER the queue exists
+    resource_row.active = False
+    db_session.commit()
+
+    payload = QueueDomainService(db_session).list_queue_cabinet_info(
+        day=day, specialist_id=synthetic.id, cabinet_number=None
+    )
+    assert [item["id"] for item in payload] == [resource_queue.id]
+
+    # day-less filter: any live resource queue of the tag keeps the
+    # tag in scope (the active-registry row is no longer required)
+    payload_all = QueueDomainService(db_session).list_queue_cabinet_info(
+        day=None, specialist_id=synthetic.id, cabinet_number=None
+    )
+    assert resource_queue.id in [item["id"] for item in payload_all]

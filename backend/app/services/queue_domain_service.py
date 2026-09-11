@@ -177,21 +177,36 @@ class QueueDomainService:
         specialist_id: int | None,
         cabinet_number: str | None,
     ) -> list[dict[str, Any]]:
-        # Codex round-44 P2: specialist-filtered admin reads resolve the
-        # REGISTRY surface — a pure resource queue stores specialist_id
-        # NULL, so the doctor-keyed filter alone returned an empty list
-        # for the live lab/ECG queue the same legacy identity addresses
-        # on every other surface. A registry-backed specialty (the
-        # synthetic Doctor's specialty IS the routing tag) widens the
-        # filter to the tag's resource rows.
+        # Codex round-44 P2 + round-45 P2: specialist-filtered admin
+        # reads resolve the REGISTRY surface — a pure resource queue
+        # stores specialist_id NULL, so the doctor-keyed filter alone
+        # returned an empty list for the live lab/ECG queue the same
+        # legacy identity addresses on every other surface.
+        # Round-45: гейт деактивационно-устойчив (round-3 P1 контракт) —
+        # ЗАПРОШЕННЫЙ ДЕНЬ резолвит существующую поверхность тега ПЕРВЫМ:
+        # живая ресурс-очередь остаётся в скоупе фильтра, даже если
+        # строку реестра деактивировали ПОСЛЕ её создания; без фильтра
+        # дня любую живую ресурс-очередь тега держит его в скоупе, а
+        # активная строка реестра открывает тег и до первого создания.
         registry_tag = None
         if specialist_id is not None:
             doctor = self.read_repository.get_doctor(specialist_id)
             if doctor is not None and doctor.specialty:
-                from app.crud.queue_resource_routing import resolve_tag_resource
-
-                if resolve_tag_resource(self.db, doctor.specialty) is not None:
-                    registry_tag = doctor.specialty
+                tag = doctor.specialty
+                if day is not None:
+                    if (
+                        queue_resource_routing.tag_routes_to_resource(self.db, tag, day)
+                        is not None
+                    ):
+                        registry_tag = tag
+                else:
+                    # без фильтра дня: любая живая ресурс-очередь тега
+                    # держит его в скоупе; иначе — активная строка реестра
+                    if self.read_repository.has_resource_tag_queues(queue_tag=tag) or (
+                        queue_resource_routing.resolve_tag_resource(self.db, tag)
+                        is not None
+                    ):
+                        registry_tag = tag
         queues = self.read_repository.list_daily_queues(
             day_obj=day,
             specialist_id=specialist_id,

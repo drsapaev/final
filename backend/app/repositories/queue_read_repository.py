@@ -72,6 +72,21 @@ class QueueReadRepository:
             query = query.filter(DailyQueue.cabinet_number == cabinet_number)
         return query.order_by(DailyQueue.day.desc(), DailyQueue.specialist_id).all()
 
+    def has_resource_tag_queues(self, *, queue_tag: str) -> bool:
+        """Codex round-45 P2: any live resource-owned queue of the tag
+        (any day) keeps the tag in scope of the specialist-filtered
+        cabinet reads — the deactivation-proof surface check for the
+        day-less filter."""
+        return (
+            self.db.query(DailyQueue.id)
+            .filter(
+                DailyQueue.specialist_id.is_(None),
+                DailyQueue.queue_tag == queue_tag,
+            )
+            .first()
+            is not None
+        )
+
     def get_queue_by_specialist_day(
         self,
         *,
