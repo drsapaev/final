@@ -172,6 +172,11 @@ class TelegramBotService:
             self.active = False
             return False
         except Exception as e:
+            # PR-2 (round 4): the exception path bypasses the in-try reset —
+            # a transient failure must not leave the previously resolved
+            # credential cached for callers that read bot_token directly.
+            self.bot_token = None
+            self.active = False
             logger.error(f"Ошибка инициализации бота: {e}")
             return False
 

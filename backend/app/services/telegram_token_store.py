@@ -34,6 +34,8 @@ from __future__ import annotations
 
 import logging
 
+from sqlalchemy.exc import IntegrityError
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -178,6 +180,12 @@ def store_patient_bot_token(
     audit event) stays pending in the caller's transaction so an endpoint
     can land it together with the rest of the request in ONE commit; any
     later ``db.commit()`` on the same session finalizes it atomically.
+
+    A concurrent first-store race (two transactions both observing "no
+    config") is resolved by the DB-level singleton guard (unique
+    ``singleton_guard``, migration 0061): the losing INSERT raises
+    ``IntegrityError`` at flush, this function rolls back and updates the
+    committed winner instead.
     """
     from app.crud import (
         audit as crud_audit,
@@ -190,36 +198,91 @@ def store_patient_bot_token(
         raise TokenStoreError("patient bot token must be a non-empty string")
     token_text = str(token).strip()
 
-    config = crud_telegram.get_telegram_config(db)
-    if config is None:
-        config = TelegramConfig()
-        db.add(config)
-    config.set_bot_token(token_text)
+    for attempt in range(2):
+        config = crud_telegram.get_telegram_config(db)
+        if config is None:
+            config = TelegramConfig()
+            db.add(config)
+        config.set_bot_token(token_text)
 
-    legacy_setting = crud_clinic.get_setting_by_key(db, PATIENT_BOT_TOKEN_SETTING_KEY)
-    legacy_removed = False
-    if legacy_setting is not None:
-        db.delete(legacy_setting)
-        legacy_removed = True
+        legacy_setting = crud_clinic.get_setting_by_key(
+            db, PATIENT_BOT_TOKEN_SETTING_KEY
+        )
+        legacy_removed = False
+        if legacy_setting is not None:
+            db.delete(legacy_setting)
+            legacy_removed = True
 
-    # Flush the pending config INSERT first so the audit row below captures
-    # the real config id (on the first store it would otherwise record
-    # entity_id=NULL — the id is assigned only at flush time).
-    db.flush()
+        try:
+            # Flush the pending config INSERT first so the audit row below
+            # captures the real config id, and so a singleton-guard violation
+            # (lost creation race) surfaces before the audit event is built.
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            if attempt:
+                raise
+            # Lost the race: the winner row is committed and visible after
+            # the rollback — loop once more and update it instead.
+            continue
 
-    crud_audit.log(
-        db,
-        action="telegram_bot_token_stored",
-        entity_type="telegram_config",
-        entity_id=config.id,
-        actor_user_id=actor_user_id,
-        payload={
-            "legacy_clinic_settings_row_removed": legacy_removed,
-            "token_encrypted": is_encrypted_token(config.bot_token),
-        },
-    )
+        crud_audit.log(
+            db,
+            action="telegram_bot_token_stored",
+            entity_type="telegram_config",
+            entity_id=config.id,
+            actor_user_id=actor_user_id,
+            payload={
+                "legacy_clinic_settings_row_removed": legacy_removed,
+                "token_encrypted": is_encrypted_token(config.bot_token),
+            },
+        )
+        break
 
     if commit:
         db.commit()
         db.refresh(config)
+    return config
+
+
+def clear_patient_bot_token(
+    db, *, actor_user_id: int | None = None, commit: bool = True
+) -> object | None:
+    """Revoke the stored patient bot token (canonical + legacy fallback).
+
+    Writes ``NULL`` to ``telegram_configs.bot_token``, removes the legacy
+    ``clinic_settings[bot_token]`` row and appends an audit event — all in
+    the caller's transaction (see ``commit`` semantics above).
+    """
+    from app.crud import audit as crud_audit
+    from app.crud import clinic as crud_clinic
+    from app.crud import telegram_config as crud_telegram
+
+    config = crud_telegram.get_telegram_config(db)
+    legacy_setting = crud_clinic.get_setting_by_key(db, PATIENT_BOT_TOKEN_SETTING_KEY)
+
+    cleared = False
+    if config is not None and config.bot_token:
+        config.set_bot_token(None)
+        cleared = True
+    if legacy_setting is not None:
+        db.delete(legacy_setting)
+        cleared = True
+    if not cleared:
+        return config
+
+    db.flush()
+    crud_audit.log(
+        db,
+        action="telegram_bot_token_cleared",
+        entity_type="telegram_config",
+        entity_id=config.id if config is not None else None,
+        actor_user_id=actor_user_id,
+        payload={},
+    )
+
+    if commit:
+        db.commit()
+        if config is not None:
+            db.refresh(config)
     return config

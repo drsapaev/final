@@ -23,6 +23,7 @@ from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401  
 )
 from app.schemas.notifications import UpdateTelegramSettingsRequest
 from app.services.telegram_token_store import (
+    clear_patient_bot_token,
     resolve_patient_bot_token,
     store_patient_bot_token,
 )
@@ -94,6 +95,7 @@ def update_telegram_settings(
         # routed through the SSOT store into telegram_configs (encrypted at
         # write). Masked placeholders are filtered out above.
         bot_token_stored = False
+        bot_token_cleared = False
         if "bot_token" in settings_dict:
             token_value = settings_dict.pop("bot_token")
             if isinstance(token_value, str) and token_value.strip():
@@ -107,6 +109,14 @@ def update_telegram_settings(
                     commit=False,
                 )
                 bot_token_stored = True
+            elif isinstance(token_value, str):
+                # PR-2 round 4: an explicitly emptied field revokes the
+                # stored credential (masked placeholders are filtered out
+                # above and never reach this branch).
+                clear_patient_bot_token(
+                    db, actor_user_id=current_user.id, commit=False
+                )
+                bot_token_cleared = True
 
         # Обновляем настройки в категории "telegram"
         updated_settings = crud_clinic.update_settings_batch(
@@ -118,6 +128,7 @@ def update_telegram_settings(
             "message": "Настройки Telegram обновлены",
             "updated_count": len(updated_settings),
             "bot_token_stored": bot_token_stored,
+            "bot_token_cleared": bot_token_cleared,
         }
     except Exception as e:
         raise_admin_telegram_error(

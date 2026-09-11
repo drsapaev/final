@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import pytest
 from cryptography.fernet import Fernet
+from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.endpoints import admin_telegram
 from app.api.v1.endpoints.admin_telegram import _settings as admin_telegram_settings
@@ -23,6 +24,7 @@ from app.models.clinic import ClinicSettings
 from app.models.telegram_config import TelegramConfig
 from app.schemas.notifications import UpdateTelegramSettingsRequest
 from app.services.telegram_token_store import (
+    clear_patient_bot_token,
     decrypt_token,
     encrypt_token,
     is_encrypted_token,
@@ -173,6 +175,37 @@ class TestStorePatientBotToken:
         )
         assert event.payload["legacy_clinic_settings_row_removed"] is False
 
+    def test_singleton_guard_rejects_second_config_row(self, db_session):
+        db_session.add(TelegramConfig())
+        db_session.add(TelegramConfig())
+        with pytest.raises(IntegrityError):
+            db_session.flush()
+        db_session.rollback()
+
+    def test_store_recovers_from_lost_creation_race(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+
+        flush_calls = {"n": 0}
+        original_flush = db_session.flush
+
+        def _flaky_flush(*args, **kwargs):
+            flush_calls["n"] += 1
+            if flush_calls["n"] == 1:
+                raise IntegrityError(
+                    "INSERT", {}, Exception("uq_telegram_configs_singleton_guard")
+                )
+            return original_flush(*args, **kwargs)
+
+        monkeypatch.setattr(db_session, "flush", _flaky_flush)
+
+        store_patient_bot_token(db_session, "123456789:race-winner")
+
+        db_session.expire_all()
+        rows = db_session.query(TelegramConfig).all()
+        assert len(rows) == 1
+        assert rows[0].decrypted_bot_token == "123456789:race-winner"
+
     def test_store_writes_audit_record_without_token_value(
         self, db_session, monkeypatch
     ):
@@ -235,6 +268,47 @@ class TestStorePatientBotToken:
         assert (
             db_session.query(AuditLog)
             .filter(AuditLog.action == "telegram_bot_token_stored")
+            .count()
+            == 0
+        )
+
+
+@pytest.mark.unit
+class TestClearPatientBotToken:
+    def test_clear_revokes_canonical_and_legacy(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:to-revoke")
+        db_session.add(
+            ClinicSettings(
+                key="bot_token", value="123456789:legacy", category="telegram"
+            )
+        )
+        db_session.commit()
+
+        clear_patient_bot_token(db_session, actor_user_id=7)
+
+        db_session.expire_all()
+        row = db_session.query(TelegramConfig).one()
+        assert row.bot_token is None
+        assert crud_clinic.get_setting_by_key(db_session, "bot_token") is None
+        event = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_cleared")
+            .one()
+        )
+        assert event.actor_user_id == 7
+
+    def test_clear_is_noop_without_any_token(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _clear_fernet_key(monkeypatch)
+
+        clear_patient_bot_token(db_session)
+
+        db_session.expire_all()
+        assert (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_cleared")
             .count()
             == 0
         )
@@ -406,6 +480,35 @@ class TestStaffBotServiceStaleState:
         assert service.bot_token is None
         assert service.active is False
 
+    @pytest.mark.asyncio
+    async def test_exception_path_also_clears_cached_credential(
+        self, db_session, monkeypatch
+    ):
+        from app.crud import telegram_config as crud_telegram_module
+        from app.services import telegram_bot as telegram_bot_service_module
+
+        _set_fernet_key(monkeypatch)
+        config = TelegramConfig()
+        config.set_bot_token("123456789:good-token")
+        config.active = True
+        db_session.add(config)
+        db_session.commit()
+
+        service = telegram_bot_service_module.TelegramBotService()
+        assert await service.initialize(db_session) is True
+        assert service.bot_token == "123456789:good-token"
+
+        def _boom(session):
+            raise RuntimeError("transient db failure")
+
+        monkeypatch.setattr(crud_telegram_module, "get_telegram_config", _boom)
+
+        assert await service.initialize(db_session) is False
+        # P2 pin (round 4): the exception handler bypasses the in-try reset,
+        # so it must clear the cached state itself.
+        assert service.bot_token is None
+        assert service.active is False
+
 
 @pytest.mark.unit
 class TestResolveStaffBotToken:
@@ -539,6 +642,31 @@ class TestAdminSettingsEndpoints:
             .count()
             == 0
         )
+
+    def test_put_empty_token_clears_canonical(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:compromised")
+        payload = UpdateTelegramSettingsRequest(
+            bot_token="",
+            notifications_enabled=True,
+        )
+
+        result = admin_telegram_settings.update_telegram_settings(
+            payload, db_session, _user()
+        )
+
+        assert result["bot_token_cleared"] is True
+        assert result["bot_token_stored"] is False
+        db_session.expire_all()
+        row = db_session.query(TelegramConfig).one()
+        assert row.bot_token is None
+        event = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_cleared")
+            .one()
+        )
+        assert event.actor_user_id == 1
 
     def test_put_masked_placeholder_is_ignored(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)

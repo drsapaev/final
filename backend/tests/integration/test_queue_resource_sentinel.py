@@ -531,7 +531,7 @@ def _revision_graph() -> dict[str, tuple[str, ...]]:
     return graph
 
 
-def test_alembic_chain_single_head_0060() -> None:
+def test_alembic_chain_single_head_0061() -> None:
     graph = _revision_graph()
     assert "0056_queue_resource_role_cleanup" in graph
     assert graph["0056_queue_resource_role_cleanup"] == (
@@ -562,9 +562,15 @@ def test_alembic_chain_single_head_0060() -> None:
     assert graph["0060_visit_reminder_sent_at"] == (
         "0059_resource_seed_backfill",
     )
+    # PR-2: the chain head moved to 0061 (telegram_configs singleton
+    # guard — the DB-level invariant behind the token-store race fix).
+    assert "0061_telegram_config_singleton_guard" in graph
+    assert graph["0061_telegram_config_singleton_guard"] == (
+        "0060_visit_reminder_sent_at",
+    )
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0060_visit_reminder_sent_at"]
+    assert heads == ["0061_telegram_config_singleton_guard"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============
