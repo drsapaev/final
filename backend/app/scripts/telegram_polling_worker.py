@@ -23,6 +23,7 @@ from app.services.telegram_webhook_dedup import (
     claim_update,
     mark_processed,
     release_claim,
+    reset_ledger,
 )
 from app.services.telegram_token_store import resolve_patient_bot_token
 
@@ -61,6 +62,30 @@ class TelegramPollingWorker:
 
     def request_stop(self) -> None:
         self._stop_requested = True
+
+    def _clear_dedup_ledger(self) -> None:
+        """PR-3 (round 2): wipe the update_id dedup ledger on a credential
+        change.
+
+        Telegram update_id sequences are per-bot, and the offset reset
+        that accompanies a credential change makes this worker consume
+        the new bot's INDEPENDENT sequence — a row retained from the
+        previous bot can suppress a legitimate update of the replacement
+        bot (colliding update_id, silently skipped and ACKed). The ledger
+        and the offset are both cursors of the superseded bot, so the
+        clear mirrors the offset reset. Fail-open: a failed clear is
+        logged; the daily retention sweep bounds any staleness.
+        """
+        db: Session = SessionLocal()
+        try:
+            deleted = reset_ledger(db)
+            LOGGER.info(
+                "Telegram dedup ledger cleared after credential change "
+                "rows_deleted=%s",
+                deleted,
+            )
+        finally:
+            db.close()
 
     async def run(self) -> int:
         token = await self._load_bot_token()
@@ -111,6 +136,10 @@ class TelegramPollingWorker:
                         # round 11).
                         pending_webhook_deletion = True
                     offset = None
+                    # PR-3 (round 2): the ledger belongs to the superseded
+                    # bot just like the offset does — clear it together
+                    # with the offset reset.
+                    self._clear_dedup_ledger()
             if pending_webhook_deletion:
                 try:
                     self._delete_webhook(session, token)
@@ -222,6 +251,9 @@ class TelegramPollingWorker:
                 if not self.keep_webhook:
                     pending_webhook_deletion = True
                 offset = None
+                # PR-3 (round 2): same as the cycle-top swap — the dropped
+                # batch and the ledger both belong to the superseded bot.
+                self._clear_dedup_ledger()
                 if self.once:
                     return 0
                 time.sleep(self.retry_delay)

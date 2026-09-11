@@ -171,6 +171,56 @@ class TestStorePatientBotToken:
         assert row.webhook_secret == "valid-secret"
         assert row.webhook_url == "https://example.com/webhook"
 
+    def test_rotation_clears_dedup_ledger_in_same_transaction(
+        self, db_session, monkeypatch
+    ):
+        """P2 pin (codex round 19): Telegram update_id sequences are
+        per-bot — a row retained from the previous bot can suppress the
+        replacement bot's legitimate update (colliding id, silently
+        skipped and ACKed). The wipe must be part of the token-write
+        transaction (commit=False), not a standalone commit."""
+        from app.models.telegram_webhook_dedup import TelegramWebhookDedup
+        from app.services import telegram_webhook_dedup as dedup_module
+
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:old-bot")
+        db_session.add(TelegramWebhookDedup(update_id=777, status="processed"))
+        db_session.commit()
+
+        calls: list[bool] = []
+        real_reset = dedup_module.reset_ledger
+
+        def spy(db, *, commit=True):
+            calls.append(commit)
+            return real_reset(db, commit=commit)
+
+        monkeypatch.setattr(dedup_module, "reset_ledger", spy)
+
+        store_patient_bot_token(db_session, "123456789:new-bot")
+
+        assert calls == [False]  # participates in the caller's transaction
+        db_session.expire_all()
+        assert db_session.query(TelegramWebhookDedup).count() == 0
+
+    def test_same_token_store_preserves_dedup_ledger(
+        self, db_session, monkeypatch
+    ):
+        """PR-3 (round 2): storing the SAME token is not an identity
+        change — dedup continuity is preserved (no wipe)."""
+        from app.models.telegram_webhook_dedup import TelegramWebhookDedup
+
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:same-bot")
+        db_session.add(TelegramWebhookDedup(update_id=778, status="processed"))
+        db_session.commit()
+
+        store_patient_bot_token(db_session, "123456789:same-bot")
+
+        db_session.expire_all()
+        assert db_session.query(TelegramWebhookDedup).count() == 1
+
     def test_store_rejects_oversized_token(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
         _set_fernet_key(monkeypatch)
@@ -358,6 +408,23 @@ class TestClearPatientBotToken:
             .one()
         )
         assert event.actor_user_id == 7
+
+    def test_clear_revocation_clears_dedup_ledger(self, db_session, monkeypatch):
+        """P2 pin (codex round 19): a revocation can hand ingress over to a
+        fallback credential of a DIFFERENT bot (env token) — retained rows
+        of the revoked bot must not suppress its updates."""
+        from app.models.telegram_webhook_dedup import TelegramWebhookDedup
+
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:to-revoke")
+        db_session.add(TelegramWebhookDedup(update_id=779, status="processed"))
+        db_session.commit()
+
+        clear_patient_bot_token(db_session)
+
+        db_session.expire_all()
+        assert db_session.query(TelegramWebhookDedup).count() == 0
 
     def test_clear_invalidates_running_service_credential(
         self, db_session, monkeypatch

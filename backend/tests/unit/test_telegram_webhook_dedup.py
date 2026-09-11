@@ -220,6 +220,46 @@ def test_run_scheduled_cleanup_includes_webhook_dedup(db_session):
     assert _dedup_rows(db_session, 150) == []
 
 
+# ================= service: identity-change reset =================
+
+
+def test_reset_ledger_deletes_every_row(db_session):
+    telegram_webhook_dedup.claim_update(db_session, 701)
+    telegram_webhook_dedup.claim_update(db_session, 702)
+    telegram_webhook_dedup.mark_processed(db_session, 701)
+
+    deleted = telegram_webhook_dedup.reset_ledger(db_session)
+
+    assert deleted == 2
+    assert db_session.query(TelegramWebhookDedup).count() == 0
+
+
+def test_reset_ledger_fail_open_when_table_missing(db_session):
+    db_session.execute(text("DROP TABLE telegram_webhook_dedup"))
+    db_session.commit()
+
+    assert telegram_webhook_dedup.reset_ledger(db_session) == 0
+
+
+def test_replacement_bot_update_not_suppressed_by_previous_bot_row(db_session):
+    """The codex round 19 scenario: update_id sequences are PER BOT. A row
+    retained from the previous bot must not make the replacement bot's
+    legitimate update look duplicate (silently skipped and ACKed)."""
+    # Previous bot: update_id 710 delivered and processed.
+    telegram_webhook_dedup.claim_update(db_session, 710)
+    telegram_webhook_dedup.mark_processed(db_session, 710)
+
+    # The configured bot is replaced — the ledger is wiped (the token
+    # store clears it atomically with the swap, the polling worker
+    # mirrors the offset reset).
+    telegram_webhook_dedup.reset_ledger(db_session)
+
+    # The replacement bot's update happens to carry the same numeric id.
+    assert telegram_webhook_dedup.claim_update(db_session, 710) == (
+        telegram_webhook_dedup.CLAIMED
+    )
+
+
 # ========================= webhook endpoint =========================
 
 
@@ -425,3 +465,76 @@ async def test_worker_failure_releases_claim(worker, db_session, monkeypatch):
     await worker._handle_update({"update_id": 603})
 
     assert _dedup_rows(db_session, 603) == []
+
+
+# ================ worker: credential-change ledger reset ================
+
+
+@pytest.mark.asyncio
+async def test_worker_cycle_top_credential_change_clears_ledger(
+    worker, db_session, monkeypatch
+):
+    """PR-3 (round 2): the cycle-top credential swap resets the offset and
+    must clear the dedup ledger too — the ledger and the offset are both
+    cursors of the superseded bot."""
+    telegram_webhook_dedup.claim_update(db_session, 801)
+    telegram_webhook_dedup.mark_processed(db_session, 801)
+    # initial load, cycle-top swap, post-poll re-resolve (unchanged).
+    tokens = iter(
+        ["123456789:token-a", "123456789:token-b", "123456789:token-b"]
+    )
+    polls = []
+
+    async def fake_load():
+        return next(tokens)
+
+    def fake_get_updates(session, token, offset):
+        polls.append((token, offset))
+        return []
+
+    monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+    monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+    exit_code = await worker.run()
+
+    assert exit_code == 0
+    # The offset was reset — the replacement bot is polled from scratch.
+    assert polls == [("123456789:token-b", None)]
+    db_session.expire_all()
+    # The previous bot's retained rows do not suppress the new sequence.
+    assert db_session.query(TelegramWebhookDedup).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_worker_post_poll_credential_change_clears_ledger(
+    worker, db_session, monkeypatch
+):
+    """PR-3 (round 2): a rotation landing during the long poll drops the
+    stale batch AND wipes the ledger along with it."""
+    telegram_webhook_dedup.claim_update(db_session, 802)
+    telegram_webhook_dedup.mark_processed(db_session, 802)
+    tokens = iter(
+        ["123456789:token-a", "123456789:token-a", "123456789:token-b"]
+    )
+    handled = []
+
+    async def fake_load():
+        return next(tokens)
+
+    async def fake_handle(update):
+        handled.append(update.get("update_id"))
+
+    def fake_get_updates(session, token, offset):
+        return [{"update_id": 802}]
+
+    monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+    monkeypatch.setattr(worker, "_handle_update", fake_handle)
+    monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+    exit_code = await worker.run()
+
+    assert exit_code == 0
+    # The stale batch was dropped, not dispatched.
+    assert handled == []
+    db_session.expire_all()
+    assert db_session.query(TelegramWebhookDedup).count() == 0

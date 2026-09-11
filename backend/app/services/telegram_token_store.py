@@ -259,6 +259,7 @@ def store_patient_bot_token(
                 db.add(config)
             config.set_bot_token(token_text)
             identity_cleared = False
+            dedup_ledger_cleared = False
             if token_changed:
                 if config.webhook_secret is not None:
                     # PR-2 (round 13): the superseded bot's webhook secret must
@@ -284,6 +285,16 @@ def store_patient_bot_token(
                 if legacy_username is not None:
                     db.delete(legacy_username)
                     identity_cleared = True
+                # PR-3 (round 2): Telegram update_id sequences are per-bot —
+                # a ledger row retained from the previous bot can suppress a
+                # legitimate update of the replacement bot (the ledger key
+                # is update_id alone). The ledger is wiped IN THIS
+                # TRANSACTION, so the clear lands atomically with the
+                # credential swap (codex round 19).
+                from app.services.telegram_webhook_dedup import reset_ledger
+
+                reset_ledger(db, commit=False)
+                dedup_ledger_cleared = True
 
             legacy_setting = crud_clinic.get_setting_by_key(
                 db, PATIENT_BOT_TOKEN_SETTING_KEY
@@ -316,6 +327,7 @@ def store_patient_bot_token(
                 "legacy_clinic_settings_row_removed": legacy_removed,
                 "token_encrypted": is_encrypted_token(config.bot_token),
                 "bot_identity_cleared": identity_cleared,
+                "dedup_ledger_cleared": dedup_ledger_cleared,
             },
         )
         break
@@ -351,6 +363,7 @@ def clear_patient_bot_token(
 
     cleared = False
     identity_cleared = False
+    dedup_ledger_cleared = False
     if config is not None:
         if config.bot_token:
             config.set_bot_token(None)
@@ -384,6 +397,15 @@ def clear_patient_bot_token(
     if legacy_username is not None:
         db.delete(legacy_username)
         identity_cleared = True
+    if cleared:
+        # PR-3 (round 2): a revocation that stops a live credential can
+        # hand ingress over to a fallback credential representing a
+        # DIFFERENT bot (env token) — retained rows of the revoked bot
+        # must not suppress its updates. Same-transaction wipe.
+        from app.services.telegram_webhook_dedup import reset_ledger
+
+        reset_ledger(db, commit=False)
+        dedup_ledger_cleared = True
     if not cleared and not identity_cleared:
         return config
 
@@ -395,7 +417,10 @@ def clear_patient_bot_token(
         entity_type="telegram_config",
         entity_id=config.id if config is not None else None,
         actor_user_id=actor_user_id,
-        payload={"bot_identity_cleared": identity_cleared},
+        payload={
+            "bot_identity_cleared": identity_cleared,
+            "dedup_ledger_cleared": dedup_ledger_cleared,
+        },
     )
 
     if commit:

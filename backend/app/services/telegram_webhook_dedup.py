@@ -167,6 +167,47 @@ def release_claim(db: Session, update_id: int | None) -> None:
         _log_db_failure("release", update_id, exc)
 
 
+def reset_ledger(db: Session, *, commit: bool = True) -> int:
+    """Delete EVERY ledger row. Returns the number of deleted rows.
+
+    Telegram update_id sequences are PER BOT. When the configured bot is
+    replaced, rows retained from the previous bot can make a legitimate
+    update of the replacement bot look duplicate — silently skipped and
+    ACKed (the ledger key is update_id alone). Callers wipe the ledger
+    whenever the bot identity changes:
+
+    - the token write path clears it IN THE SAME TRANSACTION as the
+      credential swap (``commit=False`` — atomic with the change);
+    - the polling worker clears it whenever it resets its offset after
+      detecting a credential change (the ledger and the offset are both
+      cursors of the superseded bot).
+
+    With ``commit=True`` (standalone use) the delete commits on its own
+    and follows the module's fail-open contract: a failure is logged and
+    returns 0 — the retention sweep bounds any staleness. With
+    ``commit=False`` the DELETE stays pending in the caller's transaction
+    (and errors propagate — the caller owns the transaction).
+    """
+    try:
+        result = db.execute(delete(TelegramWebhookDedup))
+        if commit:
+            db.commit()
+    except SQLAlchemyError as exc:
+        if not commit:
+            # Caller-owned transaction: surface the failure so the
+            # caller's error handling (rollback / retry) applies.
+            raise
+        db.rollback()
+        _log_db_failure("reset", None, exc)
+        return 0
+    deleted = int(result.rowcount or 0)
+    if deleted:
+        logger.info(
+            "Telegram webhook dedup ledger reset rows_deleted=%s", deleted
+        )
+    return deleted
+
+
 def purge_expired(
     db: Session, retention_days: int = DEDUP_RETENTION_DAYS
 ) -> int:
