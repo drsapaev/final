@@ -14,6 +14,10 @@ and the fail-open dedup silently degraded to "no dedup". This revision
 creates the real table.
 
 Column notes:
+- owner_token fences mark/release to the CURRENT owner: regenerated on
+  insert and on stale-reclaim, so a handler whose claim was handed to a
+  later delivery can never mark or delete the new owner's row (codex
+  round 29).
 - bot_identity is a stable, NON-SECRET per-credential identity (SHA-256
   prefix of the resolved bot token; never the token itself), "unknown"
   when no credential resolves. Telegram update_id sequences are PER BOT,
@@ -48,6 +52,7 @@ def upgrade() -> None:
         "telegram_webhook_dedup",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("bot_identity", sa.String(length=64), nullable=False),
+        sa.Column("owner_token", sa.String(length=64), nullable=False),
         sa.Column("update_id", sa.BigInteger(), nullable=False),
         sa.Column(
             "processed_at",

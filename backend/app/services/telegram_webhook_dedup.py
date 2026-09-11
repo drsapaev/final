@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, select, update
@@ -66,6 +67,29 @@ DEDUP_RETENTION_DAYS = 7
 
 _STATUS_PROCESSING = "processing"
 _STATUS_PROCESSED = "processed"
+
+
+class ClaimResult(str):
+    """The claim disposition, carrying the OWNER TOKEN that fences
+    mark/release for THIS acquisition (codex round 29).
+
+    A str subclass: equality with the CLAIMED/DUPLICATE/IN_FLIGHT/
+    UNAVAILABLE constants keeps working for callers that do not need
+    the token, while the production paths thread ``owner_token`` into
+    mark/release so a stale-reclaimed claim can never be marked or
+    released by its PREVIOUS owner.
+    """
+
+    __slots__ = ("owner_token",)
+
+    def __new__(cls, disposition: str, owner_token: str | None):
+        obj = super().__new__(cls, disposition)
+        obj.owner_token = owner_token
+        return obj
+
+
+def _new_owner_token() -> str:
+    return uuid.uuid4().hex
 
 
 def _utcnow() -> datetime:
@@ -312,14 +336,16 @@ def claim_update(
 
     for _ in range(2):
         try:
+            owner_token = _new_owner_token()
             db.add(
                 TelegramWebhookDedup(
                     update_id=int(update_id),
                     bot_identity=_key_identity(bot_identity),
+                    owner_token=owner_token,
                 )
             )
             db.commit()
-            return CLAIMED
+            return ClaimResult(CLAIMED, owner_token)
         except IntegrityError:
             # The UNIQUE index rejected a concurrent/previous claim of the
             # SAME bot identity. Either a live claim holds it (IN_FLIGHT),
@@ -330,7 +356,7 @@ def claim_update(
         except SQLAlchemyError as exc:
             db.rollback()
             _log_db_failure("claim", update_id, exc)
-            return UNAVAILABLE
+            return ClaimResult(UNAVAILABLE, None)
 
         disposition = _reclaim_stale_or_duplicate(
             db, int(update_id), _key_identity(bot_identity)
@@ -346,7 +372,7 @@ def claim_update(
     # disposition (UNAVAILABLE) means the caller processes this delivery
     # but never releases on failure — a spurious release could delete a
     # third delivery's live or completed claim created meanwhile.
-    return UNAVAILABLE
+    return ClaimResult(UNAVAILABLE, None)
 
 
 def _reclaim_stale_or_duplicate(
@@ -359,6 +385,10 @@ def _reclaim_stale_or_duplicate(
     when the conflicting row vanished — the caller retries the INSERT.
     """
     cutoff = _utcnow() - timedelta(seconds=DEDUP_STALE_SECONDS)
+    # The reclaim hands the claim to a NEW owner: regenerate the owner
+    # token so the (possibly still-alive) previous handler's mark/release
+    # can no longer touch this row (codex round 29).
+    reclaimed_owner = _new_owner_token()
     try:
         result = db.execute(
             update(TelegramWebhookDedup)
@@ -368,7 +398,7 @@ def _reclaim_stale_or_duplicate(
                 TelegramWebhookDedup.status == _STATUS_PROCESSING,
                 TelegramWebhookDedup.processed_at < cutoff,
             )
-            .values(processed_at=_utcnow())
+            .values(processed_at=_utcnow(), owner_token=reclaimed_owner)
             .execution_options(synchronize_session=False)
         )
         db.commit()
@@ -379,7 +409,7 @@ def _reclaim_stale_or_duplicate(
                 update_id,
                 DEDUP_STALE_SECONDS,
             )
-            return CLAIMED
+            return ClaimResult(CLAIMED, reclaimed_owner)
 
         row_status = db.execute(
             select(TelegramWebhookDedup.status).where(
@@ -390,34 +420,39 @@ def _reclaim_stale_or_duplicate(
     except SQLAlchemyError as exc:
         db.rollback()
         _log_db_failure("stale-reclaim", update_id, exc)
-        return UNAVAILABLE
+        return ClaimResult(UNAVAILABLE, None)
 
     if row_status == _STATUS_PROCESSED:
-        return DUPLICATE
+        return ClaimResult(DUPLICATE, None)
     if row_status == _STATUS_PROCESSING:
         # Fresh 'processing' row → a live handler owns the update. The
         # delivery must NOT be ACKed as handled: if that handler later
         # fails and releases, only an un-ACKed delivery is retried by
         # Telegram (codex round 20).
-        return IN_FLIGHT
+        return ClaimResult(IN_FLIGHT, None)
     # Row gone — retry the INSERT.
     return None
 
 
 def mark_processed(
-    db: Session, update_id: int | None, bot_identity: str | None = None
+    db: Session,
+    update_id: int | None,
+    bot_identity: str | None = None,
+    owner_token: str | None = None,
 ) -> None:
     """Flip the claim to 'processed' (best effort, never raises).
 
     Scoped to the claiming bot identity so a concurrent claim of another
-    bot for the same numeric update_id is never touched. If this fails
-    the row stays 'processing' and the stale-reclaim path remains
-    available; nothing is lost.
+    bot for the same numeric update_id is never touched, and FENCED by
+    the owner token so a handler whose claim was stale-reclaimed by a
+    later delivery cannot flip the new owner's row (codex round 29). If
+    this fails the row stays 'processing' and the stale-reclaim path
+    remains available; nothing is lost.
     """
     if update_id is None:
         return
     try:
-        db.execute(
+        stmt = (
             update(TelegramWebhookDedup)
             .where(
                 TelegramWebhookDedup.update_id == int(update_id),
@@ -426,6 +461,9 @@ def mark_processed(
             .values(status=_STATUS_PROCESSED, processed_at=_utcnow())
             .execution_options(synchronize_session=False)
         )
+        if owner_token is not None:
+            stmt = stmt.where(TelegramWebhookDedup.owner_token == owner_token)
+        db.execute(stmt)
         db.commit()
     except SQLAlchemyError as exc:
         db.rollback()
@@ -433,24 +471,30 @@ def mark_processed(
 
 
 def release_claim(
-    db: Session, update_id: int | None, bot_identity: str | None = None
+    db: Session,
+    update_id: int | None,
+    bot_identity: str | None = None,
+    owner_token: str | None = None,
 ) -> None:
     """Delete the claim so a redelivery of this update is reprocessed.
 
-    Scoped to the claiming bot identity (see ``mark_processed``). Best
-    effort, never raises. Call on ANY failure path after a successful
-    claim (handler exception, HTTP error response) — otherwise the failed
-    update would be suppressed forever.
+    Scoped to the claiming bot identity and FENCED by the owner token
+    (see ``mark_processed``) — a handler whose claim was reclaimed by a
+    later delivery cannot delete the new owner's row. Best effort, never
+    raises. Call on ANY failure path after a successful claim (handler
+    exception, HTTP error response) — otherwise the failed update would
+    be suppressed forever.
     """
     if update_id is None:
         return
     try:
-        db.execute(
-            delete(TelegramWebhookDedup).where(
-                TelegramWebhookDedup.update_id == int(update_id),
-                TelegramWebhookDedup.bot_identity == _key_identity(bot_identity),
-            )
+        stmt = delete(TelegramWebhookDedup).where(
+            TelegramWebhookDedup.update_id == int(update_id),
+            TelegramWebhookDedup.bot_identity == _key_identity(bot_identity),
         )
+        if owner_token is not None:
+            stmt = stmt.where(TelegramWebhookDedup.owner_token == owner_token)
+        db.execute(stmt)
         db.commit()
     except SQLAlchemyError as exc:
         db.rollback()

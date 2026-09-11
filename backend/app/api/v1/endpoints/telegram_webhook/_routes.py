@@ -55,7 +55,10 @@ from app.services import telegram_webhook_dedup
 
 
 def _release_claim_after_failure(
-    db, update_id: int | None, bot_identity: str | None = None
+    db,
+    update_id: int | None,
+    bot_identity: str | None = None,
+    owner_token: str | None = None,
 ) -> None:
     """PR-3: undo the dedup claim on any failure path.
 
@@ -66,7 +69,7 @@ def _release_claim_after_failure(
     if update_id is None:
         return
     db.rollback()
-    telegram_webhook_dedup.release_claim(db, update_id, bot_identity)
+    telegram_webhook_dedup.release_claim(db, update_id, bot_identity, owner_token)
 
 
 @router.post(
@@ -728,6 +731,7 @@ async def telegram_webhook(
     # rejection must never write to the dedup ledger.
     claimed_update_id: int | None = None
     claimed_bot_identity: str | None = None
+    claimed_owner_token: str | None = None
     try:
         _validate_webhook_secret(request, db)
         update = body.model_dump(exclude_none=True)
@@ -793,11 +797,12 @@ async def telegram_webhook(
             )
         if claim == telegram_webhook_dedup.CLAIMED:
             claimed_update_id = body.update_id
+            claimed_owner_token = getattr(claim, "owner_token", None)
 
         # Обрабатываем обновление
         if await _handle_clinic_bot_update(update, db, bot_service):
             telegram_webhook_dedup.mark_processed(
-                db, claimed_update_id, claimed_bot_identity
+                db, claimed_update_id, claimed_bot_identity, claimed_owner_token
             )
             return {"status": "ok", "handled": "clinic_bot_update"}
 
@@ -809,15 +814,19 @@ async def telegram_webhook(
             await process_wh(update, db)
 
         telegram_webhook_dedup.mark_processed(
-            db, claimed_update_id, claimed_bot_identity
+            db, claimed_update_id, claimed_bot_identity, claimed_owner_token
         )
         return {"status": "ok"}
 
     except HTTPException:
-        _release_claim_after_failure(db, claimed_update_id, claimed_bot_identity)
+        _release_claim_after_failure(
+            db, claimed_update_id, claimed_bot_identity, claimed_owner_token
+        )
         raise
     except Exception as e:
-        _release_claim_after_failure(db, claimed_update_id, claimed_bot_identity)
+        _release_claim_after_failure(
+            db, claimed_update_id, claimed_bot_identity, claimed_owner_token
+        )
         _raise_telegram_webhook_internal_error(
             "telegram_webhook",
             TELEGRAM_WEBHOOK_PUBLIC_ERROR,

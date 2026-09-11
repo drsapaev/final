@@ -32,6 +32,7 @@ Row lifecycle:
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import BigInteger, DateTime, Index, Integer, String
@@ -81,6 +82,14 @@ class TelegramWebhookDedup(Base):
     # BigInteger: Telegram update_ids are a growing per-bot sequence and
     # can exceed the PostgreSQL INT4 range.
     update_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # Ownership token (codex round 29): regenerated on insert AND on
+    # stale-reclaim, so a handler whose claim was handed to a later
+    # delivery can never mark/release the new owner's row. Fenced
+    # mark/release use it; unowned calls (owner_token=None) stay
+    # unfenced for tests/ops.
+    owner_token: Mapped[str] = mapped_column(
+        String(64), nullable=False, default=lambda: uuid.uuid4().hex
+    )
     processed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )

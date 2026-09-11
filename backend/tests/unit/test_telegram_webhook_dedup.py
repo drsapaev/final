@@ -384,6 +384,47 @@ def test_stale_processing_claim_is_reclaimed(db_session):
     assert stored > stale_at  # refreshed by the reclaim
 
 
+def test_stale_reclaim_fences_the_previous_owner(db_session):
+    """Codex round 29 (P2): the reclaim hands the claim to a NEW owner
+    token — a handler that is STILL ALIVE past DEDUP_STALE_SECONDS can
+    no longer mark or release the row, so it can neither duplicate the
+    retry's state-changing actions nor delete its live claim."""
+    stale_at = datetime.now(timezone.utc) - timedelta(
+        seconds=telegram_webhook_dedup.DEDUP_STALE_SECONDS + 60
+    )
+    stale_row = TelegramWebhookDedup(
+        update_id=910, status="processing", processed_at=stale_at
+    )
+    db_session.add(stale_row)
+    db_session.commit()
+    old_token = stale_row.owner_token
+
+    result = telegram_webhook_dedup.claim_update(
+        db_session, 910, telegram_webhook_dedup.UNKNOWN_BOT_IDENTITY
+    )
+    assert result == telegram_webhook_dedup.CLAIMED
+    new_token = result.owner_token
+    assert new_token and new_token != old_token  # ownership changed hands
+
+    # The OLD (still-alive) handler cannot mark or release the row.
+    telegram_webhook_dedup.mark_processed(
+        db_session, 910, telegram_webhook_dedup.UNKNOWN_BOT_IDENTITY, old_token
+    )
+    (row,) = _dedup_rows(db_session, 910)
+    assert row.status == "processing"
+    telegram_webhook_dedup.release_claim(
+        db_session, 910, telegram_webhook_dedup.UNKNOWN_BOT_IDENTITY, old_token
+    )
+    assert _dedup_rows(db_session, 910)
+
+    # The NEW owner flips the row normally.
+    telegram_webhook_dedup.mark_processed(
+        db_session, 910, telegram_webhook_dedup.UNKNOWN_BOT_IDENTITY, new_token
+    )
+    (row,) = _dedup_rows(db_session, 910)
+    assert row.status == "processed"
+
+
 def test_fresh_processing_claim_is_in_flight(db_session):
     """A LIVE handler owns the update — the retry must NOT be ACKed as
     handled (a premature 200 plus a later failure of the owner would

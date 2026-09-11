@@ -401,7 +401,9 @@ class TelegramPollingWorker:
             handled = await _handle_clinic_bot_update(update, db, bot_service)
             if not handled:
                 await bot_service.process_webhook_update(update, db)
-            mark_processed(db, update_id, bot_identity)
+            mark_processed(
+                db, update_id, bot_identity, getattr(claim, "owner_token", None)
+            )
             LOGGER.info(
                 "Telegram update handled update_id=%s handled=%s", update_id, handled
             )
@@ -417,7 +419,9 @@ class TelegramPollingWorker:
             # delivery's live or processed row once the database has
             # recovered.
             if claim == CLAIMED:
-                release_claim(db, update_id, bot_identity)
+                release_claim(
+                    db, update_id, bot_identity, getattr(claim, "owner_token", None)
+                )
             LOGGER.warning(
                 "Telegram update failed update_id=%s error_type=%s",
                 update_id,
