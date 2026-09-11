@@ -267,6 +267,26 @@
   background: var(--mac-accent-blue);
 }
 
+/* RQ-22 (F-18): staleness variants — rows kept after a failed refresh must
+   be visibly marked, never shown with the fresh-success look. */
+.registrar-ds-stale {
+  background: var(--mac-warning-strong, var(--mac-warning));
+}
+
+.registrar-stale-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  padding: 8px 12px;
+  margin-bottom: var(--mac-spacing-3);
+  border-radius: var(--mac-radius-sm);
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-medium);
+  color: var(--mac-text-primary);
+  background: color-mix(in srgb, var(--mac-warning), transparent 85%);
+  border: 1px solid color-mix(in srgb, var(--mac-warning), transparent 50%);
+}
+
 .registrar-ds-retry-btn {
   background: color-mix(in srgb, white, transparent 80%);
   border: none;

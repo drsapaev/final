@@ -56,6 +56,9 @@ export interface WorklistDataState {
   dataSource: 'loading' | 'api' | 'error';
   appointmentsLoading: boolean;
   paginationInfo: WorklistPaginationInfo;
+  /** RQ-22 (F-18): true when the displayed rows are previously loaded data
+   *  kept after a failed refresh. Staleness must be explicit, never silent. */
+  stale: boolean;
 }
 
 export type WorklistDataAction =
@@ -74,6 +77,7 @@ export const initialWorklistDataState: WorklistDataState = {
   dataSource: 'loading',
   appointmentsLoading: false,
   paginationInfo: { total: 0, hasMore: false, loadingMore: false },
+  stale: false,
 };
 
 /**
@@ -91,25 +95,46 @@ export const worklistDataReducer = (
       return { ...state, appointmentsLoading: true, dataSource: 'loading' };
     case 'LOAD_TOKEN_MISSING':
       // Original (startTransition): if (!silent) setDataSource('api'); setAppointments([]);
+      // RQ-22: a deliberate auth-data wipe is not staleness — flag resets.
       return {
         ...state,
         dataSource: action.silent ? state.dataSource : 'api',
         appointments: [],
+        stale: false,
       };
     case 'LOAD_EMPTY':
       // Original (NOT in startTransition): setAppointments([]); setDataSource('api');
       // setAppointmentsLoading(false);
-      return { ...state, appointments: [], dataSource: 'api', appointmentsLoading: false };
+      // RQ-22: an authoritative empty answer is fresh data, not staleness.
+      return { ...state, appointments: [], dataSource: 'api', appointmentsLoading: false, stale: false };
     case 'LOAD_SUCCEEDED':
       // Original (startTransition): setAppointments(enriched); setDataSource('api');
-      return { ...state, appointments: action.rows, dataSource: 'api' };
-    case 'LOAD_FAILED':
+      // RQ-22: a successful response refreshes the sample — staleness clears.
+      return { ...state, appointments: action.rows, dataSource: 'api', stale: false };
+    case 'LOAD_FAILED': {
       // Original (startTransition): if (!silent) setDataSource('error'); setAppointments([]);
+      // RQ-22 (F-18): a failed refresh must NOT wipe previously loaded rows
+      // into a misleading "successfully empty" list. When rows exist they
+      // stay on screen with an explicit stale flag (retry affordance in
+      // WorklistView); only a PRIMARY failure (nothing loaded yet) keeps
+      // the plain error state. Silent failures keep the indicators intact
+      // (original contract) but still mark the displayed data stale.
+      const hasRows = state.appointments.length > 0;
+      if (!hasRows) {
+        return {
+          ...state,
+          dataSource: action.silent ? state.dataSource : 'error',
+          appointments: [],
+          stale: false,
+        };
+      }
       return {
         ...state,
-        dataSource: action.silent ? state.dataSource : 'error',
-        appointments: [],
+        dataSource: 'api',
+        appointments: state.appointments,
+        stale: true,
       };
+    }
     case 'LOAD_FINALLY':
       // Original: if (!silent) setAppointmentsLoading(false);
       if (action.silent) return state;
@@ -149,12 +174,17 @@ export const useRegistrarWorklistData = ({
 }) => {
   const [state, dispatch] = useReducer(worklistDataReducer, initialWorklistDataState);
 
-  const { appointments, dataSource, appointmentsLoading, paginationInfo } = state;
+  const { appointments, dataSource, appointmentsLoading, paginationInfo, stale } = state;
   const appointmentsCount = appointments.length;
 
   // In-flight / cooldown / freshness guards (ports of panel refs).
   const initialLoadRef = useRef(false);
   const loadAppointmentsInFlightRef = useRef(false);
+  // RQ-22 (S-19): monotonically increasing request id — the hook keeps only
+  // the LATEST request's result. A late response of a superseded request
+  // (calendar date switch, manual retry after a timeout) must not overwrite
+  // the newer sample or clobber its state.
+  const requestSeqRef = useRef(0);
   const autoRefreshCooldownUntilRef = useRef(0);
   const autoRefreshCooldownLoggedRef = useRef(false);
   // UX Audit R-4.1: track last WebSocket update timestamp to skip redundant interval refresh.
@@ -190,6 +220,9 @@ export const useRegistrarWorklistData = ({
     }
 
     loadAppointmentsInFlightRef.current = true;
+    // RQ-22: claim this request's id BEFORE any await; only the newest id wins.
+    const requestId = ++requestSeqRef.current;
+    const isSuperseded = () => requestId !== requestSeqRef.current;
     try {
       if (!silent) {
         dispatch({ type: 'LOAD_STARTED', silent: Boolean(silent) });
@@ -199,9 +232,11 @@ export const useRegistrarWorklistData = ({
       const token = tokenManager.getAccessToken();
       if (!token) {
         logger.warn('Токен аутентификации отсутствует, показываем пустое состояние');
-        startTransition(() => {
-          dispatch({ type: 'LOAD_TOKEN_MISSING', silent: Boolean(silent) });
-        });
+        if (!isSuperseded()) {
+          startTransition(() => {
+            dispatch({ type: 'LOAD_TOKEN_MISSING', silent: Boolean(silent) });
+          });
+        }
         return;
       }
 
@@ -211,6 +246,12 @@ export const useRegistrarWorklistData = ({
       const dateParam = showCalendar && historyDate ? historyDate : urlDate || getLocalDateString();
 
       const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } }) as import('axios').AxiosResponse<Record<string, unknown>>;
+
+      // RQ-22 (S-19): a newer request has started while this one was in
+      // flight — this response is stale and must not overwrite the sample.
+      if (isSuperseded()) {
+        return;
+      }
 
       // Axios successful response
       const data = response.data;
@@ -281,6 +322,12 @@ export const useRegistrarWorklistData = ({
         // Обогащаем данные записей информацией о пациентах
         const enriched = await enrichAppointmentsWithPatientData(appointmentsData);
 
+        // RQ-22 (S-19): re-check after the enrichment await — a newer load
+        // may have started (and even finished) while patients were enriched.
+        if (isSuperseded()) {
+          return;
+        }
+
         // ⭐ SSOT: Просто устанавливаем данные без local overrides
         // Removed: _locallyModified, localStorage overrides
         startTransition(() => {
@@ -291,6 +338,9 @@ export const useRegistrarWorklistData = ({
         // QW-03 fix: empty API response is a valid state, not a demo fallback.
         // Empty result is already handled earlier (line ~1370). This branch
         // is unreachable but kept as defensive code.
+        if (isSuperseded()) {
+          return;
+        }
         startTransition(() => {
           dispatch({ type: 'LOAD_SUCCEEDED', rows: [] });
         });
@@ -312,6 +362,9 @@ export const useRegistrarWorklistData = ({
         logger.warn('Токен недействителен (401), очищаем и показываем ошибку');
         sessionStorage.removeItem('auth_token');  // PR-39 / P0-2;
         // QW-03 fix: show error state instead of demo data.
+        if (isSuperseded()) {
+          return;
+        }
         startTransition(() => {
           dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
         });
@@ -319,6 +372,9 @@ export const useRegistrarWorklistData = ({
         // Other errors (network, 404, 500, etc.)
         logger.error('❌ Backend недоступен для загрузки записей:', getErrorMessage(error));
         logger.error('❌ Детали ошибки:', error);
+        if (isSuperseded()) {
+          return;
+        }
         startTransition(() => {
           dispatch({ type: 'LOAD_FAILED', silent: Boolean(silent) });
         });
@@ -329,7 +385,9 @@ export const useRegistrarWorklistData = ({
       }
     } finally {
       loadAppointmentsInFlightRef.current = false;
-      if (!silent) {
+      // RQ-22: the finally cleanup of a SUPERSEDED request must not clear
+      // the loading flag of the newer in-flight load.
+      if (!isSuperseded() && !silent) {
         dispatch({ type: 'LOAD_FINALLY', silent: Boolean(silent) });
       }
     }
@@ -489,6 +547,7 @@ export const useRegistrarWorklistData = ({
     dataSource,
     appointmentsLoading,
     paginationInfo,
+    stale,
     loadAppointments,
     loadMoreAppointments,
   };

@@ -10102,6 +10102,7 @@ const uzLatn = {
     data_source_api: 'Ma\'lumotlar serverdan yuklandi',
     ds_error_message: 'Yozuvlarni yuklab bo\'lmadi. Serverga ulanishni tekshiring.',
     ds_retry: 'Qayta urinish',
+    rp_worklist_stale_warning: 'Oldin yuklangan ma\'lumotlar ko\'rsatilmoqda — oxirgi yangilash amalga oshmadi',
 
     // ─── RegistrarPanel.jsx (rp_) ──────────────────────────────────────────
     rp_aria_panel: "Ro'yxatga olish paneli",
