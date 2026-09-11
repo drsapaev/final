@@ -132,6 +132,17 @@
   box-shadow: none !important;
 }
 
+/* RQ-19: theme/globalStyles.css strips the outline from
+   button[role="tab"] — including :focus-visible — with !important, which
+   would make keyboard focus INVISIBLE on the ARIA tab buttons introduced
+   by RQ-19 (WCAG 2.4.7 / S-16 "фокус не теряется"). Restore a visible
+   focus ring for the tab strip; the higher specificity wins the cascade
+   against the global reset. */
+.tabs-container button.tab-button:focus-visible {
+  outline: 3px solid var(--mac-accent) !important;
+  outline-offset: 2px;
+}
+
 /* Содержимое вкладки */
 .tab-content {
   display: flex;

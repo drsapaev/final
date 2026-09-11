@@ -1,8 +1,8 @@
 {
   "version": 1,
   "description": "UI_AUDIT_PLAN.md Phase 0 baseline. Ratchet: values may only improve (decrease). To move the baseline intentionally run: node scripts/ui-baseline.mjs --write-baseline and justify the change in the PR description.",
-  "generatedAt": "2026-09-02T10:01:53.359Z",
-  "gitCommit": "9f9bf2677",
+  "generatedAt": "2026-09-11T10:48:06.369Z",
+  "gitCommit": "c1e7aeddd",
   "metrics": {
     "tokenSourceFiles": [
       {
@@ -219,14 +219,14 @@
       "--warning-border",
       "--warning-text"
     ],
-    "varUsagesTotal": 12532,
+    "varUsagesTotal": 12537,
     "varUsagesNoFallback": 11299,
     "cssHexOutsideTokens": 743,
-    "tsxHex": 367,
+    "tsxHex": 365,
     "tsxHexFiles": 61,
     "inlineStyles": 2432,
     "inlineStyleFiles": 210,
-    "cssImportant": 307,
+    "cssImportant": 308,
     "tsxImportant": 47,
     "modalFilesOutsideKit": [
       "src/components/ResponsiveModal.tsx",
@@ -256,13 +256,13 @@
     "kitModalImporters": 13,
     "kitDialogImporters": 14,
     "reactToastifyImporters": 45,
-    "notifyServiceImporters": 55,
+    "notifyServiceImporters": 56,
     "customToastProviderImporters": 3,
     "macTabImporters": 7,
     "modernTabsImporters": 0,
-    "tablistRoles": 6,
+    "tablistRoles": 7,
     "macEmptyStateImporters": 0,
-    "appEmptyImporters": 42,
+    "appEmptyImporters": 43,
     "appLoadingImporters": 9,
     "stateWrapperImporters": 2,
     "breakpointsUnique": [
