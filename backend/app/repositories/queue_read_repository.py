@@ -42,12 +42,32 @@ class QueueReadRepository:
         day_obj: date | None = None,
         specialist_id: int | None = None,
         cabinet_number: str | None = None,
+        registry_tag: str | None = None,
     ) -> list[DailyQueue]:
+        from sqlalchemy import and_, or_
+
         query = self.db.query(DailyQueue)
         if day_obj:
             query = query.filter(DailyQueue.day == day_obj)
         if specialist_id:
-            query = query.filter(DailyQueue.specialist_id == specialist_id)
+            if registry_tag:
+                # Codex round-44 P2: specialist-filtered reads must see
+                # the REGISTRY surface — a pure resource row deliberately
+                # stores specialist_id NULL, so the doctor-keyed filter
+                # alone returned an empty list for the live lab/ECG
+                # queue the same identity addresses on every other
+                # surface. The tag's resource rows join the filter.
+                query = query.filter(
+                    or_(
+                        DailyQueue.specialist_id == specialist_id,
+                        and_(
+                            DailyQueue.specialist_id.is_(None),
+                            DailyQueue.queue_tag == registry_tag,
+                        ),
+                    )
+                )
+            else:
+                query = query.filter(DailyQueue.specialist_id == specialist_id)
         if cabinet_number:
             query = query.filter(DailyQueue.cabinet_number == cabinet_number)
         return query.order_by(DailyQueue.day.desc(), DailyQueue.specialist_id).all()

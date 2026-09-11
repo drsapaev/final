@@ -61,11 +61,18 @@ class TestQueueDomainService:
             cabinet_building="B",
             active=True,
         )
-        doctor = SimpleNamespace(user=SimpleNamespace(full_name="Doctor Test"))
+        doctor = SimpleNamespace(
+            user=SimpleNamespace(full_name="Doctor Test"), specialty=None
+        )
 
         class Repository:
-            def list_daily_queues(self, *, day_obj, specialist_id, cabinet_number):
+            def list_daily_queues(
+                self, *, day_obj, specialist_id, cabinet_number, registry_tag
+            ):
                 assert specialist_id == 7
+                # a specialty-less doctor keeps the pure doctor-keyed
+                # filter (no registry widening)
+                assert registry_tag is None
                 return [queue]
 
             def get_doctor(self, doctor_id):

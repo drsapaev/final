@@ -7338,3 +7338,34 @@ def test_full_update_cross_tag_auto_create_resolves_service_doctor(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== AD. Codex round-44 pin =====================
+
+
+def test_cabinet_specialist_filter_sees_resource_queues(db_session: Session) -> None:
+    """Codex round-44 P2: the admin cabinet screen filtered by the
+    legacy lab/ECG specialist_id must see the REGISTRY surface — a
+    pure resource queue stores specialist_id NULL, so the doctor-keyed
+    filter alone returned an empty list for the live resource queue
+    the same identity addresses on every other surface."""
+    from app.services.queue_domain_service import QueueDomainService
+
+    day = _dt_now_tashkent_day()
+    res_user = _make_user(db_session, username="lab_res_ad1", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=res_user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    # the PURE resource world: the lab queue is resource-owned
+    # (specialist NULL), no doctor-keyed shadow exists
+    resource_queue = queue_service.get_or_create_daily_queue(
+        db_session, day=day, specialist_id=None, queue_tag="lab"
+    )
+    _make_waiting_entry(db_session, resource_queue, number=105)
+
+    payload = QueueDomainService(db_session).list_queue_cabinet_info(
+        day=day, specialist_id=synthetic.id, cabinet_number=None
+    )
+    # the legacy identity's filter resolves the registry-backed
+    # surface instead of an empty list
+    assert [item["id"] for item in payload] == [resource_queue.id]
+    assert payload[0]["active"] is True
