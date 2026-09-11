@@ -6,12 +6,12 @@
 
 ## Точка продолжения
 
-- Обновлено: 2026-09-11, RQ-06 DONE (merged #3167, merge SHA `17b94ec4409e3dcc3578d4b53f6c084cf4dc676e`); RQ-01/RQ-02/RQ-03 DONE. Следующая минимальная незаблокированная задача — RQ-06.a (обнаруженный дефект парсинга в handleConfirmSave; тот же first-touch файл) либо RQ-19 (frontend-only). RQ-04/RQ-05 — валидация требует disposable PostgreSQL (P0): без него backend-часть BLOCKED.
-- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `17b94ec4409e3dcc3578d4b53f6c084cf4dc676e` (merged план #3157, RQ-01 #3159, RQ-02 #3160, docs-checkpoint #3162, RQ-03 #3163, docs #3164, payments #3166, RQ-06 #3167).
-- Реализация: 4/30 закрыто (RQ-01, RQ-02, RQ-03, RQ-06 DONE).
-- Активная runtime-задача: нет. Владелец: не назначен.
+- Обновлено: 2026-09-11, RQ-06.a VERIFIED (runtime-PR этого среза открыт, merge сверить в следующем цикле); RQ-06 DONE (merged #3167, merge SHA `17b94ec4409e3dcc3578d4b53f6c084cf4dc676e`); RQ-01/RQ-02/RQ-03 DONE. Следующая минимальная незаблокированная задача — RQ-06.b (легаси-селекты category_id/doctor_id/currency той же формы) либо RQ-19 (frontend-only). RQ-04/RQ-05 — валидация требует disposable PostgreSQL (P0): без него backend-часть BLOCKED.
+- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `8a548616523e48e00649b214729c69cf9f326fd4` (merged план #3157, RQ-01 #3159, RQ-02 #3160, docs-checkpoint #3162, RQ-03 #3163, docs #3164, payments #3166, RQ-06 #3167, docs #3168).
+- Реализация: 4/30 закрыто (RQ-01, RQ-02, RQ-03, RQ-06 DONE); дочерний срез RQ-06.a VERIFIED в границах своего PR (детализация не повышает completion).
+- Активная runtime-задача: RQ-06.a — PR открыт (ветка `codex/rq-06a-service-save-fields`, база `8a5486165`); merge сверить в следующем цикле.
 - Подготовительный docs PR [#3157](https://github.com/drsapaev/final/pull/3157) **merged** в main (`be6012b18`); план доступен в fresh main — runtime-работа от fresh main разрешена.
-- Следующий шаг: минимальная незаблокированная: RQ-06.a (обнаруженный дефект сохранения формы, first-touch тот же файл) либо RQ-19 (frontend-only, gate/direct по AGENTS; якоря Tabs/navigation — вне wizard-PR #3083-#3086). Перед backend-задачами (RQ-05 и др.) требуется disposable PostgreSQL — иначе BLOCKED по P0. Для RQ-04 дополнительно сверить head #3114.
+- Следующий шаг: после merge RQ-06.a — сверить merge SHA, перевести RQ-06.a в DONE; далее RQ-06.b (легаси-селекты category_id/doctor_id/currency — тот же first-touch файл, отдельный узкий срез) либо RQ-19 (frontend-only, gate/direct по AGENTS; якоря Tabs/navigation — вне wizard-PR #3083-#3086). Перед backend-задачами (RQ-05 и др.) требуется disposable PostgreSQL — иначе BLOCKED по P0. Для RQ-04 дополнительно сверить head #3114.
 - Дрейф F-05, зафиксированный RQ-06 (E-006): на базисе `1286ccbce` селектор queue_tag в ServiceForm вообще не доставлял значение тега (легаси `onChange` + `String(event)` → `'[object Object]'`), поэтому наблюдение аудита «profile.key записывается в department_key» через UI на текущем main не воспроизводится — дефект глубже; исправлены и проводка селекта (канонический `onValueChange`), и синхронизация (реальный `department_key` профиля). Обнаружены и зарегистрированы смежные дефекты той же формы: RQ-06.a, RQ-06.b.
 - Дрейф плана, зафиксированный RQ-01: QD-2A (0055–0059) уже merged через PR #3093 (`1f775cb`), поэтому открытый PR #3077 выглядит дубликатом/суперсeded — не мержить без сверки содержимого; F-10/F-16 частично смягчены; F-14 частично изменен. Подробности в E-003.
 - Открытые продуктовые решения: D-01…D-07 (все OPEN). Они не блокируют независимые fixes.
@@ -108,7 +108,7 @@ DONE требует: критерий из плана выполнен; узки
 | RQ-26.b | CSV после нового target/lifecycle | RQ-26.a, RQ-06, RQ-12, RQ-16 | TODO | — |
 | RQ-27.a | Две сессии существующих профилей, точечное обновление | RQ-01 | TODO | — |
 | RQ-27.b | Новое направление/настройки и сохранение открытого мастера | RQ-27.a, RQ-13, RQ-17, RQ-23 | TODO | — |
-| RQ-06.a | handleConfirmSave парсит `formData.code` вместо `formData.price`/`category_id`/`doctor_id` (внесено f35b91d270, 2026-07-22): цена/категория/врач при сохранении формы обнуляются/теряются; исправить на корректные поля + regression-тест | RQ-06 | TODO | обнаружен в RQ-06 (E-006); first-touch: `frontend/src/components/admin/ServiceCatalog.tsx` + соседний тест |
+| RQ-06.a | handleConfirmSave парсит `formData.code` вместо `formData.price`/`category_id`/`doctor_id` (внесено f35b91d270, 2026-07-22): цена/категория/врач при сохранении формы обнуляются/теряются; исправить на корректные поля + regression-тест | RQ-06 | VERIFIED (PR_OPEN) | codex/rq-06a-service-save-fields / PR этого среза / E-007 |
 | RQ-06.b | ServiceForm: селекты `category_id`/`doctor_id`/`currency` используют легаси `onChange` + `String(event)` → риск `'[object Object]'` в formData; runtime-проверка + миграция на канонический `onValueChange` (паттерн UserModal) + тесты | RQ-06 | TODO | обнаружен в RQ-06 (E-006, code-review того же паттерна); first-touch: `frontend/src/components/admin/ServiceCatalog.tsx` + соседний тест |
 
 Parent DONE только после обоих children; parent и children не складываются при расчете процента: знаменатель основного плана — 30 задач, детализация не повышает completion искусственно. Для нового среза добавить:
@@ -264,6 +264,32 @@ Parent DONE только после обоих children; parent и children не
 - Merge подтвержден (этот docs-checkpoint): PR #3167 squash-merged 2026-09-11, merge SHA `17b94ec4409e3dcc3578d4b53f6c084cf4dc676e`; все required checks на финальном head `faad4e711` success (37/37, включая Frontend e2e и PR Required Gate). RQ-06 → DONE.
 - Blocker: нет (частные blockers E-003 не затрагивают этот срез).
 - Next smallest action: после merge — сверить merge SHA, перевести RQ-06 в DONE; затем RQ-06.a (narrow, direct_execute/gate по AGENTS; тот же first-touch файл) либо RQ-19 при приоритете frontend-only.
+- Checkpoint commit / remote HEAD: см. PR этого среза; remote — сверять при продолжении.
+
+### E-007 — RQ-06.a: сохранение полей формы услуги (price/category/doctor/duration)
+
+- Task / child: RQ-06.a (дочерний срез RQ-06; режим gate_known_root_cause — сохранение формы формирует backend-payload услуги; root cause подтвержден в E-006 и перепроверен на актуальном main).
+- UTC timestamp: 2026-09-11, срез облачного агента.
+- Repo branch: `codex/rq-06a-service-save-fields` (отдельный worktree `/home/z/final-rq06a` от fresh origin/main; базовый checkout не тронут). Base SHA / tested HEAD: `8a548616523e48e00649b214729c69cf9f326fd4` (= origin/main, включает merged RQ-06 #3167 и docs #3168).
+- Mode / gate: `pwsh -NoProfile -File ./ai/langgraph/scripts/run_agent_gate.ps1 "RQ-06.a: …" --known-root-cause frontend/src/components/admin/ServiceCatalog.tsx` → `{"result":"narrow_override","mode":"execute","gate_misroute":false,"override_used":true,"first_touch_files":["frontend/src/components/admin/ServiceCatalog.tsx"]}`. Pre-work block (mode/anchor/first-touch/allowed/denied/validation/stop) зафиксирован до правок.
+- Координация (сверка перед стартом, GitHub API): открытые PR #3114 (head обновился на `183898a867eb`), #3042, #3089, #3046, wizard-PR #3083/#3084/#3085/#3086/#3079, #3102, #3155 — НИ ОДИН не трогает `ServiceCatalog.tsx`/ServiceForm (проверено по файлам каждого PR).
+- Observed before (воспроизведено тестом на дефектном коде): inline ServiceForm в `ServiceCatalog.tsx` (handleConfirmSave, строки ~994–1006) парсил `formData.code` для ВСЕХ числовых полей: `price: formData.price ? parseFloat(String(formData.code ?? '')) : null` и аналогично `category_id`/`doctor_id`/`duration_minutes`. Фактический payload (зафиксирован падающим тестом): `price: NaN` (→ null в JSON), `duration_minutes: 30` независимо от ввода, `category_id: null`, `doctor_id: null` — при введенных пользователем цене 50000 и длительности 45. Т.е. каждое сохранение через UI молча теряло цену/категорию/врача и сбрасывало длительность. Эталон корректного парсинга существует в standalone `ServiceForm.tsx:227-230` (файл вне импортов, использован как reference-only). Blame: аннотация `Record<string, unknown>` поверх дефектных строк — `86850cf48` (2026-07-29, BS-66).
+- Changed behavior: `handleConfirmSave` парсит каждое поле из собственного значения formData: `price` → `parseFloat(String(formData.price))`; `category_id`/`doctor_id` → `parseInt(String(...), 10)`; `duration_minutes` → `parseInt(String(formData.duration_minutes ?? ''), 10) || 30` (прежний дефолт 30 сохранен). Семантика пустых значений не изменена: пустая цена/категория/врач → явный `null`. Backend/DTO не затронуты; селекты `category_id`/`doctor_id`/`currency` сознательно НЕ тронуты (это зарегистрированный отдельный срез RQ-06.b — delivery-дефект, а не parsing); preview-модалка, код-валидации и Rest формы не менялись.
+- Commands (working dir `/home/z/final-rq06a/frontend`):
+  1. `npm ci --legacy-peer-deps` → EXIT=0.
+  2. Fail-first: новый `node node_modules/vitest/vitest.mjs run src/components/admin/__tests__/ServiceCatalog.saveFields.test.tsx --no-cache` на дефектном коде → 2 failed / 1 passed (edit: ожидание 65000/3/7/45 против фактических NaN/null/null/30; new: NaN/30 вместо 50000/45; воспроизведение зафиксировано в логе среза).
+  3. После фикса: тот же файл → **3/3 PASS** (edit-режим с preview-подтверждением: payload `price:65000, category_id:3, doctor_id:7, duration_minutes:45`; new-режим: `price:50000, duration_minutes:45, category_id:null, doctor_id:null`; явные null для нетронутых полей, `price` не NaN).
+  4. Соседи: `ServiceCatalog.profileTags + ServiceCatalog.emptyState + AdminRemaining.i18n.contract` → **3 files / 42 tests PASS**.
+  5. Обязательный Tier 1 (docs/AGENTS_UI.md §13): `npm run type-check` → EXIT=0; `npm run lint:check` → 0 errors (3081 pre-existing warnings); `npm run check-theme` → PASS; `npm run audit:icon-controls` → 0 new findings; `npm run build` → PASS (pre-existing chunk-size warnings); `npm run test:run` → **222 files / 1911 tests PASS** (33.2s; +1 файл/+3 теста этого среза).
+  6. Self-contained Playwright suite (W0): `CI=1 npm run test:e2e -- e2e/registrar-time.spec.ts e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts --project=chromium` → **82 passed** (5.3m; vite proxy noise — ожидаемый MOCK-уровень, backend не запущен).
+  7. `git diff --check` → PASS (перед checkpoint-коммитом).
+- Acceptance S-IDs: S-04 — частично усилен (поле сохранения услуги: значения формы доходят до payload сохранения без искажений на SYNTHETIC-фикстурах; Vitest-уровень). Полный S-04 (REAL_API сохранение и повторное чтение) — NOT_RUN (нет disposable backend/PostgreSQL/Redis; частные blockers E-003). Browser MOCK — W0 82 passed.
+- Artifacts: PR этого среза (1 измененный файл + 1 новый тест + PROGRESS.md); данные SYNTHETIC («Синтетическая …» — доменные фикстуры, без PHI).
+- Not checked and why: REAL_API — среда без PostgreSQL/Redis (blocker E-003.2); серверная валидация контракта не менялась (backend не тронут); standalone `ServiceForm.tsx` не модифицировался (вне импортов, reference-only — в границах first-touch не входит).
+- PR URL: PR этого среза (ветка `codex/rq-06a-service-save-fields`); merge SHA — сверить в следующем цикле (статус VERIFIED/PR_OPEN до сверки).
+- Status now: RQ-06.a VERIFIED (в границах этого PR).
+- Blocker: нет (частные blockers E-003 не затрагивают этот срез).
+- Next smallest action: после merge — сверить merge SHA, перевести RQ-06.a в DONE; затем RQ-06.b (легаси-селекты category_id/doctor_id/currency → канонический `onValueChange`, тот же first-touch файл, отдельный узкий PR) либо RQ-19.
 - Checkpoint commit / remote HEAD: см. PR этого среза; remote — сверять при продолжении.
 
 ### Шаблон следующей записи — скопировать и заполнить
