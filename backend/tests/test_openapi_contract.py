@@ -94,6 +94,42 @@ def test_openapi_payment_invoice_requires_positive_patient_reference(
     assert patient_contract["properties"]["patient_id"]["exclusiveMinimum"] == 0
 
 
+def test_openapi_pending_invoice_exposes_backend_owned_settlement_state(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/payments/invoices/pending"]["get"]
+    response_schema = operation["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]
+    response_name = response_schema["items"]["$ref"].rsplit("/", 1)[-1]
+    response_contract = schema["components"]["schemas"][response_name]
+
+    assert {
+        "provider",
+        "payment_method",
+        "paid_amount",
+        "remaining_amount",
+        "available_actions",
+        "online_payment_block_reason",
+    }.issubset(response_contract["required"])
+    provider_types = {
+        item.get("type")
+        for item in response_contract["properties"]["provider"]["anyOf"]
+    }
+    assert provider_types == {"string", "null"}
+    action_ref = response_contract["properties"]["available_actions"]["items"][
+        "$ref"
+    ]
+    action_contract = schema["components"]["schemas"][
+        action_ref.rsplit("/", 1)[-1]
+    ]
+    assert action_contract["properties"]["action"]["const"] == (
+        "start_online_payment"
+    )
+    assert action_contract["required"] == ["action", "provider"]
+
+
 def test_openapi_patient_appointment_history_is_an_explicit_list(
     client: TestClient,
 ) -> None:

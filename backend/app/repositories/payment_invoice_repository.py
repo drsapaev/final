@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
-from app.models.payment_invoice import PaymentInvoice
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.visit import Visit
 
 
 class PaymentInvoiceRepository:
@@ -28,6 +29,11 @@ class PaymentInvoiceRepository:
     def list_pending(self, limit: int = 50) -> list[PaymentInvoice]:
         return (
             self.db.query(PaymentInvoice)
+            .options(
+                selectinload(PaymentInvoice.visits)
+                .selectinload(PaymentInvoiceVisit.visit)
+                .selectinload(Visit.services)
+            )
             .filter(PaymentInvoice.status.in_(["pending", "processing"]))
             .order_by(PaymentInvoice.created_at.desc())
             .limit(limit)

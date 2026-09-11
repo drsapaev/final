@@ -90774,6 +90774,25 @@
         "title": "PaymentInitResponse",
         "description": "Ответ на инициализацию платежа"
       },
+      "PaymentInvoiceAction": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "start_online_payment",
+            "title": "Action"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "provider"
+        ],
+        "title": "PaymentInvoiceAction"
+      },
       "PaymentInvoiceCreateRequest": {
         "properties": {
           "amount": {
@@ -90849,12 +90868,49 @@
             "title": "Currency"
           },
           "provider": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Provider"
+          },
+          "payment_method": {
+            "type": "string",
+            "title": "Payment Method"
           },
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "paid_amount": {
+            "type": "number",
+            "title": "Paid Amount"
+          },
+          "remaining_amount": {
+            "type": "number",
+            "title": "Remaining Amount"
+          },
+          "available_actions": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentInvoiceAction"
+            },
+            "type": "array",
+            "title": "Available Actions"
+          },
+          "online_payment_block_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Payment Block Reason"
           },
           "description": {
             "anyOf": [
@@ -90879,7 +90935,12 @@
           "amount",
           "currency",
           "provider",
+          "payment_method",
           "status",
+          "paid_amount",
+          "remaining_amount",
+          "available_actions",
+          "online_payment_block_reason",
           "description",
           "created_at"
         ],

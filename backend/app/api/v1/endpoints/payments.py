@@ -3,7 +3,7 @@ API endpoints для платежной системы
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import AliasChoices, BaseModel, Field
@@ -137,12 +137,22 @@ class PaymentInvoiceCreateRequest(BaseModel):
     )
 
 
+class PaymentInvoiceAction(BaseModel):
+    action: Literal["start_online_payment"]
+    provider: str
+
+
 class PaymentInvoiceResponse(BaseModel):
     invoice_id: int
     amount: float
     currency: str
-    provider: str
+    provider: str | None
+    payment_method: str
     status: str
+    paid_amount: float
+    remaining_amount: float
+    available_actions: list[PaymentInvoiceAction]
+    online_payment_block_reason: str | None
     description: str | None
     created_at: datetime
 
