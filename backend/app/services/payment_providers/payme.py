@@ -4,17 +4,16 @@
 
 import base64
 import hmac
-from datetime import datetime
 from decimal import Decimal
 from typing import Any
-
-import httpx
 
 from .base import BasePaymentProvider, PaymentResult, PaymentStatus
 
 
 class PayMeProvider(BasePaymentProvider):
     """Провайдер для PayMe платежной системы"""
+
+    supports_status_check = False
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config)
@@ -23,7 +22,6 @@ class PayMeProvider(BasePaymentProvider):
         self.merchant_id = config.get("merchant_id")
         self.secret_key = config.get("secret_key")
         self.base_url = config.get("base_url", "https://checkout.paycom.uz")
-        self.api_url = config.get("api_url", "https://api.paycom.uz")
 
         # Валидация конфигурации
         if not all([self.merchant_id, self.secret_key]):
@@ -91,107 +89,16 @@ class PayMeProvider(BasePaymentProvider):
             )
 
     def check_payment_status(self, payment_id: str) -> PaymentResult:
-        """Проверка статуса платежа в PayMe через JSON-RPC API"""
-
-        try:
-            # PayMe JSON-RPC API для проверки статуса
-            url = f"{self.api_url}"
-
-            # Формируем запрос GetStatement для поиска транзакций
-            request_data = {
-                "jsonrpc": "2.0",
-                "method": "GetStatement",
-                "params": {
-                    "from": int(
-                        (datetime.now().timestamp() - 86400) * 1000
-                    ),  # 24 часа назад
-                    "to": int(datetime.now().timestamp() * 1000),  # сейчас
-                },
-                "id": 1,
-            }
-
-            # Аутентификация через Basic Auth
-            auth_string = f"Paycom:{self.secret_key}"
-            auth_header = base64.b64encode(auth_string.encode()).decode()
-
-            headers = {
-                "Authorization": f"Basic {auth_header}",
-                "Content-Type": "application/json",
-            }
-
-            response = httpx.post(
-                url, json=request_data, headers=headers, timeout=30
-            )
-            response.raise_for_status()
-
-            data = response.json()
-
-            if "error" in data:
-                self.log_error(
-                    "check_payment_status",
-                    f"PayMe API error: {data['error']}",
-                    {"payment_id": payment_id},
-                )
-                return PaymentResult(
-                    success=False, error_message=f"Ошибка PayMe API: {data['error']}"
-                )
-
-            # Ищем транзакцию по order_id в account
-            transactions = data.get("result", {}).get("transactions", [])
-            target_transaction = None
-
-            for transaction in transactions:
-                account = transaction.get("account", {})
-                if account.get("order_id") == payment_id:
-                    target_transaction = transaction
-                    break
-
-            if not target_transaction:
-                # Транзакция не найдена - возможно еще не создана
-                return PaymentResult(
-                    success=True,
-                    payment_id=payment_id,
-                    status=PaymentStatus.PENDING,
-                    provider_data={"message": "Transaction not found, still pending"},
-                )
-
-            # Маппинг статусов PayMe
-            payme_state = target_transaction.get("state", 0)
-            status_mapping = {
-                1: PaymentStatus.PROCESSING,  # Создана
-                2: PaymentStatus.COMPLETED,  # Успешно завершена
-                -1: PaymentStatus.CANCELLED,  # Отменена до perform
-                -2: PaymentStatus.FAILED,  # Отменена после perform
-            }
-
-            our_status = status_mapping.get(payme_state, PaymentStatus.PENDING)
-
-            self.log_operation(
-                "check_status",
-                {
-                    "payment_id": payment_id,
-                    "payme_state": payme_state,
-                    "our_status": our_status,
-                    "transaction_id": target_transaction.get("id"),
-                },
-            )
-
-            return PaymentResult(
-                success=True,
-                payment_id=payment_id,
-                status=our_status,
-                provider_data={
-                    "transaction": target_transaction,
-                    "payme_transaction_id": target_transaction.get("id"),
-                    "state": payme_state,
-                },
-            )
-
-        except Exception as e:
-            self.log_error("check_payment_status", str(e), {"payment_id": payment_id})
-            return PaymentResult(
-                success=False, error_message="Внутренняя ошибка"
-            )
+        """Keep Checkout status local; Merchant API calls flow Payme -> clinic."""
+        return PaymentResult(
+            success=False,
+            payment_id=payment_id,
+            error_message=(
+                "Исходящая проверка статуса недоступна для Payme Checkout; "
+                "статус обновляется входящими Merchant API запросами"
+            ),
+            provider_data={"status_source": "merchant_api_webhook"},
+        )
 
     def process_webhook(self, webhook_data: dict[str, Any]) -> PaymentResult:
         """Обработка webhook от PayMe (JSON-RPC методы)"""

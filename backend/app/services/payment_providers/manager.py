@@ -285,7 +285,9 @@ class PaymentProviderManager:
         """Получение поддерживаемых функций провайдера"""
         return {
             "create_payment": True,
-            "check_status": True,
+            "check_status": bool(
+                getattr(provider, "supports_status_check", True)
+            ),
             "webhook": True,
             "cancel": hasattr(provider, 'cancel_payment')
             and provider.cancel_payment.__func__ != BasePaymentProvider.cancel_payment,
