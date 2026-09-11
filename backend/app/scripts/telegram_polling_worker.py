@@ -15,9 +15,9 @@ import requests
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.telegram_webhook import _handle_clinic_bot_update
-from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
 from app.db.session import SessionLocal
 from app.services.telegram_bot import get_telegram_bot_service
+from app.services.telegram_token_store import resolve_patient_bot_token
 
 LOGGER = logging.getLogger("telegram_polling_worker")
 DEFAULT_POLL_TIMEOUT_SECONDS = 25
@@ -131,13 +131,9 @@ class TelegramPollingWorker:
             if bot_service.bot_token:
                 return str(bot_service.bot_token)
 
-            config = crud_telegram.get_telegram_config(db)
-            if config and config.bot_token:
-                return str(config.bot_token)
-
-            token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
-            token = getattr(token_setting, "value", None) if token_setting else None
-            return str(token) if token else None
+            # PR-2: SSOT fallback chain (config decrypted -> legacy settings
+            # -> env) instead of duplicated raw-column reads.
+            return resolve_patient_bot_token(db)
         finally:
             db.close()
 

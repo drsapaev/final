@@ -222,13 +222,12 @@ TELEGRAM_AI_APPROVAL_CONTRACT = {
 STAFF_LINK_TOKEN_PREFIX = "stl"
 STAFF_LINK_TOKEN_HASH_PREFIX = "staff_link_token:"
 STAFF_LINK_TOKEN_SEPARATOR = "_"
-STAFF_BOT_TOKEN_ENV_KEYS = (
-    "TELEGRAM_STAFF_BOT_TOKEN",
-    "STAFF_TELEGRAM_BOT_TOKEN",
-)
-STAFF_BOT_TOKEN_SETTING_KEYS = (
-    "staff_bot_token",
-    "telegram_staff_bot_token",
+# PR-2: canonical home for the staff token source keys is
+# app.services.telegram_token_store; re-exported here so every import site
+# (and the star-import chain) keeps working unchanged.
+from app.services.telegram_token_store import (  # noqa: E402, F401
+    STAFF_BOT_TOKEN_ENV_KEYS,
+    STAFF_BOT_TOKEN_SETTING_KEYS,
 )
 
 STAFF_BOT_SUPPORTED_ROLES = [

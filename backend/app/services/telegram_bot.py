@@ -157,8 +157,10 @@ class TelegramBotService:
         """Инициализация бота"""
         try:
             config = crud_telegram.get_telegram_config(db)
-            if config and config.bot_token:
-                self.bot_token = config.decrypted_bot_token  # TG-AUDIT-28 P1: decrypt
+            # PR-2: presence + assignment both via decrypted (fail-closed)
+            token_value = config.decrypted_bot_token if config else None
+            if token_value:
+                self.bot_token = token_value
                 self.bot_username = config.bot_username
                 self.webhook_url = config.webhook_url
                 self.active = config.active

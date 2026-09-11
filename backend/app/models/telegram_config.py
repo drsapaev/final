@@ -74,33 +74,21 @@ class TelegramConfig(Base):
 
     @property
     def decrypted_bot_token(self) -> str | None:
-        """TG-AUDIT-28 P1: decrypt bot_token on read."""
+        """TG-AUDIT-28 P1 / PR-2: decrypt bot_token on read (fail-closed)."""
         if not self.bot_token:
             return None
-        from app.core.config import settings
-        if not settings.ENCRYPTION_KEY:
-            return self.bot_token  # plaintext fallback (dev/test)
-        try:
-            if self.bot_token.startswith("gAAAAA"):
-                from cryptography.fernet import Fernet
-                cipher = Fernet(settings.ENCRYPTION_KEY.encode())
-                return cipher.decrypt(self.bot_token.encode()).decode()
-            return self.bot_token  # not encrypted yet (migration period)
-        except Exception:
-            return self.bot_token
+        from app.services.telegram_token_store import decrypt_token
+
+        # Fail-closed: Fernet-shaped values decrypt to None on a missing/wrong
+        # key (never the ciphertext); plaintext rows pass through unchanged
+        # (migration period).
+        return decrypt_token(self.bot_token)
 
     def set_bot_token(self, value: str | None) -> None:
-        """TG-AUDIT-28 P1: encrypt bot_token on write."""
-        if not value:
-            self.bot_token = None
-            return
-        from app.core.config import settings
-        if not settings.ENCRYPTION_KEY:
-            self.bot_token = value  # plaintext fallback (dev/test)
-            return
-        from cryptography.fernet import Fernet
-        cipher = Fernet(settings.ENCRYPTION_KEY.encode())
-        self.bot_token = cipher.encrypt(value.encode()).decode()
+        """TG-AUDIT-28 P1 / PR-2: encrypt bot_token on write."""
+        from app.services.telegram_token_store import encrypt_token
+
+        self.bot_token = encrypt_token(value)
 
 
 class TelegramTemplate(Base):

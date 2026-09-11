@@ -380,7 +380,7 @@ def get_bot_status(
         telegram_service = get_telegram_service()  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
 
         return {
-            "configured": bool(config.bot_token),
+            "configured": bool(config.decrypted_bot_token),
             "active": config.active,
             "bot_username": config.bot_username,
             "notifications_enabled": config.notifications_enabled,

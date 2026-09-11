@@ -22,6 +22,10 @@ from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401  
     webhook_info_error_response,
 )
 from app.schemas.notifications import UpdateTelegramSettingsRequest
+from app.services.telegram_token_store import (
+    resolve_patient_bot_token,
+    store_patient_bot_token,
+)
 
 
 @router.get("/telegram/settings", response_model=dict[str, Any])
@@ -48,6 +52,11 @@ def get_telegram_settings(
         for setting in telegram_settings:
             if setting.key in result:
                 result[setting.key] = setting.value
+
+        # PR-2: the canonical token store is telegram_configs (encrypted at
+        # write); legacy clinic-settings rows still surface via the loop above.
+        if not result["bot_token"] and resolve_patient_bot_token(db):
+            result["bot_token"] = "***скрыт***"
 
         # Скрываем токен бота в ответе
         if result["bot_token"]:
@@ -81,6 +90,16 @@ def update_telegram_settings(
         if bt and isinstance(bt, str) and "***" in bt:
             settings_dict = {k: v for k, v in settings_dict.items() if k != "bot_token"}
 
+        # PR-2: bot_token never lands in clinic_settings plaintext — it is
+        # routed through the SSOT store into telegram_configs (encrypted at
+        # write). Masked placeholders are filtered out above.
+        bot_token_stored = False
+        if "bot_token" in settings_dict:
+            token_value = settings_dict.pop("bot_token")
+            if isinstance(token_value, str) and token_value.strip():
+                store_patient_bot_token(db, token_value)
+                bot_token_stored = True
+
         # Обновляем настройки в категории "telegram"
         updated_settings = crud_clinic.update_settings_batch(
             db, "telegram", settings_dict, current_user.id
@@ -90,6 +109,7 @@ def update_telegram_settings(
             "success": True,
             "message": "Настройки Telegram обновлены",
             "updated_count": len(updated_settings),
+            "bot_token_stored": bot_token_stored,
         }
     except Exception as e:
         raise_admin_telegram_error(
@@ -132,16 +152,17 @@ def test_telegram_bot(
                     },
                     current_user.id,
                 )
-                config_payload = {
-                    "bot_token": bot_token,
-                    "bot_username": bot_data.get("username"),
-                    "bot_name": bot_data.get("first_name"),
-                    "active": True,
-                }
-                if crud_telegram.get_telegram_config(db):
-                    crud_telegram.update_telegram_config(db, config_payload)
-                else:
-                    crud_telegram.create_telegram_config(db, config_payload)
+                # PR-2: bot_token goes through the SSOT store (encrypted at
+                # write); non-secret fields stay on the regular crud path.
+                store_patient_bot_token(db, bot_token)
+                crud_telegram.update_telegram_config(
+                    db,
+                    {
+                        "bot_username": bot_data.get("username"),
+                        "bot_name": bot_data.get("first_name"),
+                        "active": True,
+                    },
+                )
 
                 return {
                     "success": True,
@@ -329,8 +350,10 @@ def set_telegram_webhook(
                 crud_clinic.update_setting(
                     db, "webhook_url", {"value": selected_webhook_url}, current_user.id
                 )
+                # PR-2: bot_token via the SSOT store (encrypted at write);
+                # webhook fields stay on the regular crud path.
+                store_patient_bot_token(db, bot_token)
                 config_payload = {
-                    "bot_token": bot_token,
                     "bot_username": _get_configured_bot_username(db),
                     "webhook_url": selected_webhook_url,
                     "webhook_secret": secret_token,
