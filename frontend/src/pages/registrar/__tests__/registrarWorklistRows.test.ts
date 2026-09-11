@@ -16,6 +16,7 @@ import type { Appointment } from '../../../types/domain/clinic';
 import {
   computeDepartmentStats,
   computeRegistrarWorklistRows,
+  resolveRegistrarWorklistEmptyScopeKind,
   type QueueProfileItem,
 } from '../registrarWorklistRows';
 
@@ -270,5 +271,82 @@ describe('computeRegistrarWorklistRows (PR-UI-13-2)', () => {
     const allIds = JSON.stringify(rows);
     expect(allIds).not.toContain('Иванов');
     expect(allIds).toContain('Петров');
+  });
+});
+
+// RQ-21.a (F-17): a search / status filter that matches nothing must not be
+// presented as an empty QUEUE. The helper returns the FACT about the loaded
+// date scope: 'queue-empty' — the scope itself holds zero entries (nothing to
+// match); 'filtered-empty' — the scope holds entries, so zero final rows can
+// only come from the active narrowing (status filter / search query).
+describe('resolveRegistrarWorklistEmptyScopeKind (RQ-21.a)', () => {
+  const profiles: QueueProfileItem[] = [{ key: 'cardio', queue_tags: ['cardiology', 'cardio-kb'] }];
+
+  it('specific tab with no matching entries → queue-empty (a "no matches" text here would imply there was something to match)', () => {
+    const kind = resolveRegistrarWorklistEmptyScopeKind({
+      appointments: asAppointments([
+        appt({ id: '1', queue_tag: 'lab', queue_time: '2026-08-29T08:00:00+05:00' }),
+      ]),
+      activeTab: 'cardio',
+      queueProfiles: profiles,
+    });
+    expect(kind).toBe('queue-empty');
+  });
+
+  it('specific tab holding entries → filtered-empty (zero rows are caused by the search/status narrowing, not by an empty queue)', () => {
+    // F-17 defect scenario: the tab queue HAS records; a letter-only search
+    // ("иван" vs Петров/Бета) filters everything out, and the UI called it
+    // "Очередь пуста" — inviting a duplicate appointment.
+    const kind = resolveRegistrarWorklistEmptyScopeKind({
+      appointments: asAppointments([
+        appt({ id: '1', queue_tag: 'cardiology', queue_time: '2026-08-29T08:00:00+05:00', patient_fio: 'Петров Пётр' }),
+        appt({ id: '2', queue_tag: 'cardio-kb', queue_time: '2026-08-29T08:30:00+05:00', patient_fio: 'Бета' }),
+      ]),
+      activeTab: 'cardio',
+      queueProfiles: profiles,
+    });
+    expect(kind).toBe('filtered-empty');
+  });
+
+  it('secondary tag of a multi-tag profile counts as scope entries (same SSOT tag resolution as rows)', () => {
+    const kind = resolveRegistrarWorklistEmptyScopeKind({
+      appointments: asAppointments([
+        appt({ id: '1', queue_tag: 'cardio-kb', queue_time: '2026-08-29T08:00:00+05:00' }),
+      ]),
+      activeTab: 'cardio',
+      queueProfiles: profiles,
+    });
+    expect(kind).toBe('filtered-empty');
+  });
+
+  it('profile without queue_tags falls back to [tabKey] (same adapter as rows)', () => {
+    const kind = resolveRegistrarWorklistEmptyScopeKind({
+      appointments: asAppointments([
+        appt({ id: '1', queue_tag: 'derma', queue_time: '2026-08-29T08:00:00+05:00' }),
+      ]),
+      activeTab: 'derma',
+      queueProfiles: [{ key: 'derma' }],
+    });
+    expect(kind).toBe('filtered-empty');
+  });
+
+  it('all-departments tab: no appointments at all → queue-empty', () => {
+    const kind = resolveRegistrarWorklistEmptyScopeKind({
+      appointments: asAppointments([]),
+      activeTab: null,
+      queueProfiles: profiles,
+    });
+    expect(kind).toBe('queue-empty');
+  });
+
+  it('all-departments tab: any loaded appointment → filtered-empty (aggregation cannot lose every patient)', () => {
+    const kind = resolveRegistrarWorklistEmptyScopeKind({
+      appointments: asAppointments([
+        appt({ id: '1', queue_tag: 'lab', queue_time: '2026-08-29T08:00:00+05:00' }),
+      ]),
+      activeTab: null,
+      queueProfiles: profiles,
+    });
+    expect(kind).toBe('filtered-empty');
   });
 });

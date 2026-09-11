@@ -226,3 +226,58 @@ describe('RQ-22 — worklist failed-refresh display (S-19)', () => {
     expect(screen.queryByText(/ds_error_message/)).toBeNull();
   });
 });
+
+// RQ-21.a (child slice, F-17): a search / status filter that matches nothing
+// used to render the "Очередь пуста" state — the registrar read it as "no
+// records today" and could create a duplicate appointment. The panel now
+// resolves the SCOPE fact (resolveRegistrarWorklistEmptyScopeKind) and the
+// view picks the empty state accordingly:
+// - 'filtered-empty' → "no matches" state (search icon family), NOT the
+//   empty-queue title/CTA;
+// - 'queue-empty' (and the absent-prop default) → the genuine QW-04 state.
+describe('RQ-21.a — worklist "no matches" vs empty queue (S-18)', () => {
+  it('zero rows with a narrowed scope show the no-matches state, not the empty-queue state', () => {
+    render(
+      <WorklistView
+        {...baseProps}
+        filteredAppointments={[]}
+        dataSource="api"
+        emptyScopeKind="filtered-empty"
+      />,
+    );
+
+    expect(screen.getByText(/rp_worklist_no_matches/)).toBeInTheDocument();
+    expect(screen.getByText(/rp_empty_filter_desc/)).toBeInTheDocument();
+    // THE F-17 defect: the empty-queue title and its "create appointment" CTA
+    // must NOT appear for a filtered-to-zero answer.
+    expect(screen.queryByText(/rp_empty_queue_title/)).toBeNull();
+    expect(screen.queryByText(/rp_empty_queue_dept/)).toBeNull();
+  });
+
+  it('zero rows with a genuinely empty scope keep the empty-queue state and its CTA', () => {
+    render(
+      <WorklistView
+        {...baseProps}
+        filteredAppointments={[]}
+        dataSource="api"
+        emptyScopeKind="queue-empty"
+      />,
+    );
+
+    expect(screen.getByText(/rp_empty_queue_title/)).toBeInTheDocument();
+    expect(screen.queryByText(/rp_worklist_no_matches/)).toBeNull();
+  });
+
+  it('absent emptyScopeKind prop → backward-compatible queue-empty default', () => {
+    render(
+      <WorklistView
+        {...baseProps}
+        filteredAppointments={[]}
+        dataSource="api"
+      />,
+    );
+
+    expect(screen.getByText(/rp_empty_queue_title/)).toBeInTheDocument();
+    expect(screen.queryByText(/rp_worklist_no_matches/)).toBeNull();
+  });
+});

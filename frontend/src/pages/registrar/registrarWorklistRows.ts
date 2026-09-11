@@ -106,6 +106,31 @@ export const computeDepartmentStats = (
  * - "all departments" tab: patient aggregation + search over aggregated rows
  * - presentation-only ordering via sortRegistrarRowsForPresentation
  */
+/**
+ * SSOT tag resolution shared by computeRegistrarWorklistRows and
+ * resolveRegistrarWorklistEmptyScopeKind (single source — no drift):
+ * profile queue_tags from the API, fallback to the tabKey itself
+ * (⚠️ TEMPORARY ADAPTER for backwards compatibility during transition).
+ */
+const getQueueTagsForTabKey = (tabKey: string, queueProfiles: QueueProfileItem[]): string[] => {
+  if (!tabKey) return [];
+
+  const profile = queueProfiles.find((p) => p.key === tabKey);
+  if (profile && profile.queue_tags && profile.queue_tags.length > 0) {
+    return profile.queue_tags;
+  }
+
+  return [tabKey];
+};
+
+/** Normalized queue-tag value of a worklist entry (same normalization as rows). */
+const appointmentQueueTagValue = (entry: Appointment): string => (
+  entry.queue_tag ||
+  entry.specialty ||
+  entry.queue_numbers && entry.queue_numbers[0]?.queue_tag ||
+  '').
+  toString().toLowerCase().trim();
+
 export const computeRegistrarWorklistRows = ({
   appointments,
   activeTab,
@@ -123,36 +148,15 @@ export const computeRegistrarWorklistRows = ({
   services: Record<string, unknown>;
   fallbackPatientLabel: string;
 }): Record<string, unknown>[] => {
-  // ⭐ SSOT: Get queue_tags from loaded profiles instead of hardcoded mapping
-  // queueProfiles is populated by ModernTabs via onProfilesLoaded callback
-  const getQueueTagsForTab = (tabKey: string) => {
-    if (!tabKey) return [];
-
-    // Find profile by key
-    const profile = queueProfiles.find((p) => p.key === tabKey);
-    if (profile && profile.queue_tags && profile.queue_tags.length > 0) {
-      return profile.queue_tags;
-    }
-
-    // Fallback: use tabKey itself as the only tag
-    // ⚠️ TEMPORARY ADAPTER: for backwards compatibility during transition
-    return [tabKey];
-  };
-
   // Если выбрана конкретная вкладка (не "Все отделения"), используем appointments с фильтрацией по queue_tag
   if (activeTab) {
     // ⭐ SSOT: queue_tags from API profiles, not hardcoded
-    const possibleTags = getQueueTagsForTab(activeTab);
+    const possibleTags = getQueueTagsForTabKey(activeTab, queueProfiles);
 
     // Фильтруем appointments по queue_tag вкладки
     const entriesForTab = (appointments).filter((entry) => {
       // Определяем queue_tag записи
-      const entryQueueTag = (
-      entry.queue_tag ||
-      entry.specialty ||
-      entry.queue_numbers && entry.queue_numbers[0]?.queue_tag ||
-      '').
-      toString().toLowerCase().trim();
+      const entryQueueTag = appointmentQueueTagValue(entry);
 
       // Проверяем соответствие вкладке
       const matchesTab = possibleTags.some((tag: string) => tag.toLowerCase() === entryQueueTag);
@@ -267,6 +271,50 @@ export const computeRegistrarWorklistRows = ({
 
   // Presentation-only order on a copy; backend remains owner of queue facts.
   return sortRegistrarRowsForPresentation(appointments as Record<string, unknown>[]);
+};
+
+/**
+ * RQ-21.a (F-17): scope fact for the worklist empty state.
+ *
+ * 'queue-empty' — the loaded date scope itself holds zero entries for the
+ * active tab (specific tab: no appointment matches the tab's queue_tags;
+ * "all departments": no appointments loaded at all). A "no matches" message
+ * here would wrongly imply there was something to match.
+ *
+ * 'filtered-empty' — the scope holds entries, so when the final rows are
+ * empty the cause is the active narrowing (status filter / search query).
+ * Presenting that as "queue is empty" was the F-17 defect: a failed search
+ * looked like an empty queue and invited a duplicate appointment.
+ *
+ * Contract: the caller combines this fact with its own
+ * `filteredAppointments.length === 0` render condition (the empty state is
+ * reached only then). This helper intentionally does NOT re-run the search
+ * predicate — duplicating it would drift against computeRegistrarWorklistRows;
+ * the scope fact above is exactly what the two states need to differ.
+ */
+export type RegistrarWorklistEmptyScopeKind = 'queue-empty' | 'filtered-empty';
+
+export const resolveRegistrarWorklistEmptyScopeKind = ({
+  appointments,
+  activeTab,
+  queueProfiles,
+}: {
+  appointments: Appointment[];
+  activeTab: string | null;
+  queueProfiles: QueueProfileItem[];
+}): RegistrarWorklistEmptyScopeKind => {
+  // "All departments": every loaded appointment is in scope; aggregation
+  // never loses patients, so any entry means zero rows can only be narrowing.
+  if (!activeTab) {
+    return appointments.length === 0 ? 'queue-empty' : 'filtered-empty';
+  }
+
+  // Specific tab: same SSOT tag resolution and entry normalization as rows.
+  const possibleTags = getQueueTagsForTabKey(activeTab, queueProfiles);
+  const scopeHasEntries = appointments.some((entry) =>
+    possibleTags.some((tag: string) => tag.toLowerCase() === appointmentQueueTagValue(entry)));
+
+  return scopeHasEntries ? 'filtered-empty' : 'queue-empty';
 };
 
 export default computeRegistrarWorklistRows;
