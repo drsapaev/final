@@ -258,13 +258,32 @@ def store_patient_bot_token(
                 config = TelegramConfig()
                 db.add(config)
             config.set_bot_token(token_text)
-            if token_changed and config.webhook_secret is not None:
-                # PR-2 (round 13): the superseded bot's webhook secret must
-                # not keep authenticating old-bot updates after a rotation.
-                # The new bot needs a fresh webhook registration anyway, so
-                # the stale registration is invalidated here.
-                config.webhook_secret = None
-                config.webhook_url = None
+            identity_cleared = False
+            if token_changed:
+                if config.webhook_secret is not None:
+                    # PR-2 (round 13): the superseded bot's webhook secret must
+                    # not keep authenticating old-bot updates after a rotation.
+                    # The new bot needs a fresh webhook registration anyway, so
+                    # the stale registration is invalidated here.
+                    config.webhook_secret = None
+                    config.webhook_url = None
+                # PR-2 (round 17): identity must be bound to the CURRENT
+                # credential. Keeping the previous bot's username after a
+                # rotation would keep ticket QR links pointing at the old bot
+                # until /telegram/test-bot re-binds the identity from getMe —
+                # clear it on every token change instead. (An explicitly
+                # submitted bot_username in the same PUT payload is re-applied
+                # right after by update_settings_batch — an admin-asserted
+                # binding.)
+                if config.bot_username:
+                    config.bot_username = None
+                    identity_cleared = True
+                legacy_username = crud_clinic.get_setting_by_key(
+                    db, PATIENT_BOT_USERNAME_SETTING_KEY
+                )
+                if legacy_username is not None:
+                    db.delete(legacy_username)
+                    identity_cleared = True
 
             legacy_setting = crud_clinic.get_setting_by_key(
                 db, PATIENT_BOT_TOKEN_SETTING_KEY
@@ -296,6 +315,7 @@ def store_patient_bot_token(
             payload={
                 "legacy_clinic_settings_row_removed": legacy_removed,
                 "token_encrypted": is_encrypted_token(config.bot_token),
+                "bot_identity_cleared": identity_cleared,
             },
         )
         break
@@ -313,10 +333,12 @@ def clear_patient_bot_token(
 
     Writes ``NULL`` to ``telegram_configs.bot_token``, removes the legacy
     ``clinic_settings[bot_token]`` row and appends an audit event — all in
-    the caller's transaction (see ``commit`` semantics above). When no
-    environment fallback remains, the stale bot identity metadata is cleared
-    as well (``telegram_configs.bot_username`` + legacy
-    ``clinic_settings[bot_username]``; audited as ``bot_identity_cleared``).
+    the caller's transaction (see ``commit`` semantics above). The bot
+    identity metadata (``telegram_configs.bot_username`` + legacy
+    ``clinic_settings[bot_username]``) is cleared as well and audited as
+    ``bot_identity_cleared`` — a fallback credential cannot be verified to
+    belong to the same bot, so ``/telegram/test-bot`` re-binds the identity
+    from getMe (PR-2 round 17).
     """
     from app.crud import (
         audit as crud_audit,
@@ -346,21 +368,22 @@ def clear_patient_bot_token(
     if legacy_setting is not None:
         db.delete(legacy_setting)
         cleared = True
-    # PR-2 (round 16): a revoked credential must not keep steering patients
-    # to the old bot. When no environment fallback remains, the bot identity
-    # metadata is stale too — VisitConfirmationService would otherwise keep
-    # generating ``t.me/<revoked-bot>`` ticket QR links from the surviving
-    # bot_username (canonical column + legacy clinic_settings row).
-    if not _patient_bot_env_token():
-        if config is not None and config.bot_username:
-            config.bot_username = None
-            identity_cleared = True
-        legacy_username = crud_clinic.get_setting_by_key(
-            db, PATIENT_BOT_USERNAME_SETTING_KEY
-        )
-        if legacy_username is not None:
-            db.delete(legacy_username)
-            identity_cleared = True
+    # PR-2 (round 17): the identity must be bound to the CURRENT credential.
+    # An environment fallback cannot be verified to belong to the same bot
+    # (it may replace bot A with bot B), so the stale username is cleared on
+    # every revocation; /telegram/test-bot re-binds it from getMe. Otherwise
+    # VisitConfirmationService would keep generating ``t.me/<old-bot>``
+    # ticket QR links from the surviving identity (canonical column + legacy
+    # clinic_settings row).
+    if config is not None and config.bot_username:
+        config.bot_username = None
+        identity_cleared = True
+    legacy_username = crud_clinic.get_setting_by_key(
+        db, PATIENT_BOT_USERNAME_SETTING_KEY
+    )
+    if legacy_username is not None:
+        db.delete(legacy_username)
+        identity_cleared = True
     if not cleared and not identity_cleared:
         return config
 

@@ -181,6 +181,45 @@ class TelegramPollingWorker:
                 time.sleep(self.retry_delay)
                 continue
 
+            # PR-2 (round 17): the default 25-second getUpdates long poll
+            # can span a rotation or revocation — the batch returned by the
+            # poll must NOT be dispatched under the stale credential, or the
+            # old (possibly revoked/compromised) bot executes state-changing
+            # handlers one full cycle past the change. Re-resolve BEFORE
+            # dispatching; on any change/failure the batch is dropped
+            # (Telegram keeps unacked updates pending for the next cycle).
+            try:
+                post_poll = await self._load_bot_token()
+            except Exception as exc:
+                LOGGER.warning(
+                    "Telegram token re-resolve after long poll failed "
+                    "error_type=%s — dropping batch, skipping cycle",
+                    type(exc).__name__,
+                )
+                if self.once:
+                    return 1
+                time.sleep(self.retry_delay)
+                continue
+            if post_poll != token:
+                if not post_poll:
+                    LOGGER.error(
+                        "Telegram bot token was revoked during the long poll "
+                        "— stopping"
+                    )
+                    return 2
+                LOGGER.info(
+                    "Telegram bot token changed during the long poll — "
+                    "dropping the batch fetched with the superseded credential"
+                )
+                token = post_poll
+                if not self.keep_webhook:
+                    pending_webhook_deletion = True
+                offset = None
+                if self.once:
+                    return 0
+                time.sleep(self.retry_delay)
+                continue
+
             for update in updates:
                 update_id = update.get("update_id")
                 await self._handle_update(update)

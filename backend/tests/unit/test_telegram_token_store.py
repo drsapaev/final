@@ -456,7 +456,12 @@ class TestClearPatientBotToken:
         )
         assert event.payload["bot_identity_cleared"] is True
 
-    def test_clear_keeps_identity_with_env_fallback(self, db_session, monkeypatch):
+    def test_clear_removes_identity_even_with_env_fallback(
+        self, db_session, monkeypatch
+    ):
+        """P1 pin (round 17): a fallback credential cannot be verified to
+        belong to the same bot — the stale identity is cleared on every
+        revocation and /telegram/test-bot re-binds it from getMe."""
         _clear_token_env(monkeypatch)
         _set_fernet_key(monkeypatch)
         store_patient_bot_token(db_session, "123456789:compromised")
@@ -469,7 +474,65 @@ class TestClearPatientBotToken:
 
         db_session.expire_all()
         row = db_session.query(TelegramConfig).one()
-        assert row.bot_username == "old_revoked_bot"
+        assert row.bot_username is None
+        assert crud_clinic.get_setting_by_key(db_session, "bot_username") is None
+        event = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_cleared")
+            .one()
+        )
+        assert event.payload["bot_identity_cleared"] is True
+
+    def test_store_rotation_clears_stale_bot_identity(self, db_session, monkeypatch):
+        """P1 pin (round 17): rotating from bot A to bot B must not keep
+        bot A's identity — ticket QR links would target the old bot."""
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:bot-a-token")
+        config = db_session.query(TelegramConfig).one()
+        config.bot_username = "old_bot_a"
+        db_session.add(
+            ClinicSettings(key="bot_username", value="old_bot_a", category="telegram")
+        )
+        db_session.commit()
+
+        store_patient_bot_token(db_session, "123456789:bot-b-token")
+
+        db_session.expire_all()
+        row = db_session.query(TelegramConfig).one()
+        assert row.bot_username is None
+        assert crud_clinic.get_setting_by_key(db_session, "bot_username") is None
+        event = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_stored")
+            .order_by(AuditLog.id.desc())
+            .first()
+        )
+        assert event.payload["bot_identity_cleared"] is True
+
+    def test_store_same_token_keeps_identity(self, db_session, monkeypatch):
+        """Round 17 self-heal contract: /telegram/test-bot writes the
+        getMe-verified username and then re-stores the SAME token — the
+        identity must survive that flow."""
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:stable-token")
+        config = db_session.query(TelegramConfig).one()
+        config.bot_username = "getme_verified_bot"
+        db_session.commit()
+
+        store_patient_bot_token(db_session, "123456789:stable-token")
+
+        db_session.expire_all()
+        row = db_session.query(TelegramConfig).one()
+        assert row.bot_username == "getme_verified_bot"
+        event = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_stored")
+            .order_by(AuditLog.id.desc())
+            .first()
+        )
+        assert event.payload["bot_identity_cleared"] is False
 
     def test_clear_is_noop_without_any_token(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
@@ -823,9 +886,11 @@ class TestPollingWorkerTokenReload:
         )
         tokens = iter(
             [
-                "123456789:token-a",
-                "123456789:token-a",
-                "123456789:token-b",
+                "123456789:token-a",  # initial
+                "123456789:token-a",  # cycle-top
+                "123456789:token-a",  # post-poll (round 17)
+                "123456789:token-b",  # cycle-top: rotation
+                "123456789:token-b",  # post-poll (round 17)
             ]
         )
 
@@ -864,10 +929,11 @@ class TestPollingWorkerTokenReload:
         )
         _RAISE = object()
         script = [
-            "123456789:token-a",
-            "123456789:token-a",
+            "123456789:token-a",  # initial
+            "123456789:token-a",  # cycle-top
             _RAISE,  # resolver failure inside the 401 branch
-            "123456789:token-b",
+            "123456789:token-b",  # cycle-top: rotation
+            "123456789:token-b",  # post-poll (round 17)
         ]
         loads = []
 
@@ -905,6 +971,156 @@ class TestPollingWorkerTokenReload:
         # compares the canonical token every cycle and continues polling
         # with the rotated credential.
         assert worker is not None
+
+    def test_worker_drops_batch_rotated_during_long_poll(self, monkeypatch):
+        """P2 pin (round 17): updates fetched with the pre-rotation token
+        must not be dispatched under the rotated credential."""
+        import asyncio
+
+        from app.scripts.telegram_polling_worker import TelegramPollingWorker
+
+        worker = TelegramPollingWorker(
+            poll_timeout=0,
+            request_timeout=1,
+            retry_delay=0,
+            drop_pending_updates=False,
+            keep_webhook=True,
+            once=False,
+            max_updates=1,
+        )
+        tokens = iter(
+            [
+                "123456789:token-a",  # initial
+                "123456789:token-a",  # cycle-top
+                "123456789:token-b",  # post-poll: rotated DURING the poll
+                "123456789:token-b",  # cycle-top
+                "123456789:token-b",  # post-poll
+            ]
+        )
+        handled = []
+        poll_calls = []
+
+        async def fake_load():
+            return next(tokens)
+
+        async def fake_handle(update):
+            handled.append(update.get("update_id"))
+
+        def fake_get_updates(session, token, offset):
+            poll_calls.append((token, offset))
+            if token.endswith("token-a"):
+                return [{"update_id": 1}]
+            return [{"update_id": 2}]
+
+        monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+        monkeypatch.setattr(worker, "_handle_update", fake_handle)
+        monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+        exit_code = asyncio.run(worker.run())
+
+        assert exit_code == 0
+        # The stale batch (update_id 1) was dropped; only the new-bot batch
+        # was dispatched.
+        assert handled == [2]
+        # offset was reset after the rotation — the new bot is polled from
+        # scratch.
+        assert poll_calls == [
+            ("123456789:token-a", None),
+            ("123456789:token-b", None),
+        ]
+
+    def test_worker_drops_batch_on_resolver_failure_after_poll(self, monkeypatch):
+        """P2 pin (round 17): a resolver failure after the long poll must
+        drop the batch instead of dispatching it under an unverifiable
+        credential."""
+        import asyncio
+
+        from app.scripts.telegram_polling_worker import TelegramPollingWorker
+
+        worker = TelegramPollingWorker(
+            poll_timeout=0,
+            request_timeout=1,
+            retry_delay=0,
+            drop_pending_updates=False,
+            keep_webhook=True,
+            once=False,
+            max_updates=1,
+        )
+        _RAISE = object()
+        script = [
+            "123456789:token-a",  # initial
+            "123456789:token-a",  # cycle-top
+            _RAISE,  # post-poll: transient resolver failure
+            "123456789:token-b",  # cycle-top
+            "123456789:token-b",  # post-poll
+        ]
+        loads = []
+        handled = []
+
+        async def fake_load():
+            value = script[len(loads)]
+            loads.append(value)
+            if value is _RAISE:
+                raise RuntimeError("transient db outage")
+            return value
+
+        async def fake_handle(update):
+            handled.append(update.get("update_id"))
+
+        def fake_get_updates(session, token, offset):
+            return [{"update_id": 1 if token.endswith("token-a") else 2}]
+
+        monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+        monkeypatch.setattr(worker, "_handle_update", fake_handle)
+        monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+        exit_code = asyncio.run(worker.run())
+
+        assert exit_code == 0
+        assert handled == [2]
+
+    def test_worker_stops_when_token_revoked_during_long_poll(self, monkeypatch):
+        """P2 pin (round 17): a revocation landing during the long poll
+        stops the worker instead of dispatching the stale batch."""
+        import asyncio
+
+        from app.scripts.telegram_polling_worker import TelegramPollingWorker
+
+        worker = TelegramPollingWorker(
+            poll_timeout=0,
+            request_timeout=1,
+            retry_delay=0,
+            drop_pending_updates=False,
+            keep_webhook=True,
+            once=False,
+            max_updates=1,
+        )
+        tokens = iter(
+            [
+                "123456789:token-a",  # initial
+                "123456789:token-a",  # cycle-top
+                None,  # post-poll: revoked during the poll
+            ]
+        )
+        handled = []
+
+        async def fake_load():
+            return next(tokens)
+
+        async def fake_handle(update):
+            handled.append(update.get("update_id"))
+
+        def fake_get_updates(session, token, offset):
+            return [{"update_id": 1}]
+
+        monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+        monkeypatch.setattr(worker, "_handle_update", fake_handle)
+        monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+        exit_code = asyncio.run(worker.run())
+
+        assert exit_code == 2
+        assert handled == []
 
 
 @pytest.mark.unit
